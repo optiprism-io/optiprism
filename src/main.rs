@@ -1,9 +1,11 @@
+use std::marker::PhantomData;
+
 #[derive(Default)]
 struct Context {
     row_id: usize,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 enum EvalResult {
     True(bool),
     False(bool),
@@ -166,16 +168,11 @@ impl Node for Then {
 
         if let ThenBranch::Right = self.branch {
             let result = self.right.evaluate(ctx);
-            match result {
-                EvalResult::True(stateful) => {
-                    if stateful {
-                        self.state = Some(NodeState::True);
-                    }
-
-                    return result;
-                }
-                _ => return result,
+            if let EvalResult::True(true) = result {
+                self.state = Some(NodeState::True);
             }
+
+            return result;
         }
 
         return EvalResult::False(false);
@@ -189,14 +186,32 @@ impl Node for Then {
     }
 }
 
-struct ScalarValue<T: PartialEq> {
-    state: Option<NodeState>,
-    is_partition: bool,
-    needle: T,
-    value: T,
+trait Cmp<T> {
+    fn is_true(left: T, right: T) -> bool;
+    fn is_false(left: T, right: T) -> bool;
 }
 
-impl<T: PartialEq> Node for ScalarValue<T> {
+struct Equal;
+
+impl Cmp<u32> for Equal {
+    fn is_true(left: u32, right: u32) -> bool {
+        left == right
+    }
+
+    fn is_false(left: u32, right: u32) -> bool {
+        left != right
+    }
+}
+
+struct ScalarValue<T, C> {
+    c: PhantomData<C>,
+    state: Option<NodeState>,
+    is_partition: bool,
+    left: T,
+    right: T,
+}
+
+impl<T, C> Node for ScalarValue<T, C> where T: Copy, C: Cmp<T> {
     fn evaluate(&mut self, _: &Context) -> EvalResult {
         // check if node already has state
         if let Some(state) = &self.state {
@@ -205,7 +220,7 @@ impl<T: PartialEq> Node for ScalarValue<T> {
                 NodeState::False => EvalResult::False(true),
             };
         }
-        if self.value == self.needle {
+        if C::is_true(self.left, self.right) {
             if self.is_partition {
                 self.state = Some(NodeState::True);
                 return EvalResult::True(true);
@@ -224,14 +239,15 @@ impl<T: PartialEq> Node for ScalarValue<T> {
     }
 }
 
-struct VectorValue<T> {
+struct VectorValue<T, C> {
+    c: PhantomData<C>,
     state: Option<NodeState>,
     is_partition: bool,
-    needle: T,
-    values: Vec<T>,
+    left: Vec<T>,
+    right: T,
 }
 
-impl<T: PartialEq> Node for VectorValue<T> {
+impl<T, C> Node for VectorValue<T, C> where T: Copy, C: Cmp<T> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         if let Some(state) = &self.state {
@@ -240,7 +256,7 @@ impl<T: PartialEq> Node for VectorValue<T> {
                 NodeState::False => EvalResult::False(true),
             };
         }
-        if self.values[ctx.row_id] == self.needle {
+        if C::is_true(self.left[ctx.row_id], self.right) {
             if self.is_partition {
                 self.state = Some(NodeState::True);
                 return EvalResult::True(true);
@@ -257,6 +273,36 @@ impl<T: PartialEq> Node for VectorValue<T> {
     fn reset(&mut self) {
         self.state = None;
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    #[test]
+    fn scalar_value_equal_fails() {
+        let v: ScalarValue<u32, Equal> = ScalarValue {
+            c: PhantomData,
+            state: None,
+            is_partition: false,
+            left: 2,
+            right: 1,
+        };
+
+        let mut n: Box<dyn Node> = Box::new(v);
+
+        let ctx = Context::default();
+
+        assert_eq!(n.evaluate(&ctx), EvalResult::False(false))
+    }
+    /*    #[test]
+        fn a_and_b() {
+            let mut q: Box<dyn Node> = Box::new(And {
+                state: None,
+                children: None,
+                limits: None
+            }),
+        }*/
 }
 
 fn main() {
