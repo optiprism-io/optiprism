@@ -1,17 +1,19 @@
+#[derive(Default)]
 struct Context {
     row_id: usize,
 }
 
-pub trait Node {
-    fn evaluate(&mut self, ctx: &Context) -> EvalResult;
-    fn reset(&mut self);
-}
-
+#[derive(Debug)]
 enum EvalResult {
     True(bool),
     False(bool),
     Rewind(usize),
     ResetNode,
+}
+
+trait Node {
+    fn evaluate(&mut self, ctx: &Context) -> EvalResult;
+    fn reset(&mut self);
 }
 
 enum NodeState {
@@ -21,14 +23,18 @@ enum NodeState {
 
 struct Limits {}
 
-/*impl Limits {
-    pub fn check(&mut self) -> EvalResult {}
-    pub fn reset(&mut self) {}
-}*/
+impl Limits {
+    fn check(&mut self) -> EvalResult {
+        unimplemented!("Limits::check");
+    }
+    fn reset(&mut self) {
+        unimplemented!("Limits::check");
+    }
+}
 
 struct And {
     state: Option<NodeState>,
-    children: Vec<dyn Node>,
+    children: Option<Vec<Box<dyn Node>>>,
     limits: Option<Limits>,
 }
 
@@ -41,40 +47,41 @@ impl Node for And {
                 NodeState::False => EvalResult::False(true),
             };
         }
-
         // node is stateful by default
         let mut is_stateful: bool = true;
-        for c in self.children.iter_mut() {
-            match c.evaluate(ctx) {
-                EvalResult::True(stateful) => {
-                    // node is stateful only if all evaluations are true and stateful
-                    if !stateful {
-                        is_stateful = false
+        if let Some(children) = &mut self.children {
+            for c in children.iter_mut() {
+                match c.evaluate(ctx) {
+                    EvalResult::True(stateful) => {
+                        // node is stateful only if all evaluations are true and stateful
+                        if !stateful {
+                            is_stateful = false
+                        }
                     }
-                }
-                EvalResult::False(stateful) => {
-                    if stateful {
-                        self.state = Some(NodeState::False)
+                    EvalResult::False(stateful) => {
+                        if stateful {
+                            self.state = Some(NodeState::False)
+                        }
+                        return EvalResult::False(stateful);
                     }
-                    return EvalResult::False(stateful);
+                    _ => panic!(),
                 }
             }
         }
-
         if is_stateful {
             self.state = Some(NodeState::True);
-            EvalResult::True(true)
+            return EvalResult::True(true);
         }
-
         EvalResult::True(false)
     }
 
     fn reset(&mut self) {
         self.state = None;
-        for c in self.children.iter_mut() {
-            c.reset()
+        if let Some(children) = &mut self.children {
+            for c in children.iter_mut() {
+                c.reset()
+            }
         }
-
         if let Some(limits) = &mut self.limits {
             limits.reset();
         }
@@ -83,7 +90,7 @@ impl Node for And {
 
 struct Or {
     state: Option<NodeState>,
-    children: Vec<dyn Node>,
+    children: Option<Vec<Box<dyn Node>>>,
 }
 
 impl Node for Or {
@@ -95,31 +102,34 @@ impl Node for Or {
                 NodeState::False => EvalResult::False(true),
             };
         }
-
         let mut is_stateful: bool = true;
-        for c in self.children.iter_mut() {
-            match c.evaluate(ctx) {
-                EvalResult::True(stateful) => {
-                    if stateful {
-                        self.state = Some(NodeState::True);
+        if let Some(children) = &mut self.children {
+            for c in children.iter_mut() {
+                match c.evaluate(ctx) {
+                    EvalResult::True(stateful) => {
+                        if stateful {
+                            self.state = Some(NodeState::True);
+                        }
+                        return EvalResult::True(stateful);
                     }
-                    return EvalResult::True(stateful);
-                }
-                EvalResult::False(stateful) => {
-                    if !stateful {
-                        is_stateful = false;
+                    EvalResult::False(stateful) => {
+                        if !stateful {
+                            is_stateful = false;
+                        }
                     }
+                    _ => panic!(),
                 }
             }
         }
-
         EvalResult::False(is_stateful)
     }
 
     fn reset(&mut self) {
         self.state = None;
-        for c in self.children.iter_mut() {
-            c.reset()
+        if let Some(children) = &mut self.children {
+            for c in children.iter_mut() {
+                c.reset()
+            }
         }
     }
 }
@@ -130,8 +140,8 @@ enum ThenBranch {
 }
 
 struct Then {
-    left: dyn Node,
-    right: dyn Node,
+    left: Box<dyn Node>,
+    right: Box<dyn Node>,
     state: Option<NodeState>,
     branch: ThenBranch,
 }
@@ -147,14 +157,16 @@ impl Node for Then {
         }
 
         if let ThenBranch::Left = self.branch {
-            match result = self.left.evaluate(ctx) {
+            let result = self.left.evaluate(ctx);
+            match result {
                 EvalResult::True(_) => self.branch = ThenBranch::Right,
-                _ => return result
+                _ => return result,
             }
         }
 
         if let ThenBranch::Right = self.branch {
-            match result = self.right.evaluate(ctx) {
+            let result = self.right.evaluate(ctx);
+            match result {
                 EvalResult::True(stateful) => {
                     if stateful {
                         self.state = Some(NodeState::True);
@@ -162,7 +174,7 @@ impl Node for Then {
 
                     return result;
                 }
-                _ => return result
+                _ => return result,
             }
         }
 
@@ -177,33 +189,15 @@ impl Node for Then {
     }
 }
 
-trait Cmp<T> {
-    fn is_true(left: T, right: T) -> bool;
-    fn is_false(left: T, right: T) -> bool;
-}
-
-struct Equal;
-
-impl Cmp<u32> for Equal {
-    fn is_true(left: u32, right: u32) -> bool {
-        left == right
-    }
-
-    fn is_false(left: u32, right: u32) -> bool {
-        left != right
-    }
-}
-
-struct ScalarValue<T> {
+struct ScalarValue<T: PartialEq> {
     state: Option<NodeState>,
     is_partition: bool,
-    cmp: dyn Cmp<T>,
     needle: T,
     value: T,
 }
 
-impl Node for ScalarValue<T> {
-    fn evaluate<T, C: Cmp<T>>(&mut self, _: &Context) -> EvalResult {
+impl<T: PartialEq> Node for ScalarValue<T> {
+    fn evaluate(&mut self, _: &Context) -> EvalResult {
         // check if node already has state
         if let Some(state) = &self.state {
             return match state {
@@ -211,23 +205,18 @@ impl Node for ScalarValue<T> {
                 NodeState::False => EvalResult::False(true),
             };
         }
-
-        match C::is_true(self.value, self.needle) {
-            true => {
-                if self.is_partition {
-                    self.state = Some(NodeState::True);
-                    EvalResult::True(true)
-                }
-                EvalResult::True(false)
+        if self.value == self.needle {
+            if self.is_partition {
+                self.state = Some(NodeState::True);
+                return EvalResult::True(true);
             }
-            false => {
-                if self.is_partition {
-                    self.state = Some(NodeState::False);
-                    EvalResult::False(true)
-                }
-                EvalResult::False(false)
-            }
+            return EvalResult::True(false);
         }
+        if self.is_partition {
+            self.state = Some(NodeState::False);
+            return EvalResult::False(true);
+        }
+        EvalResult::False(false)
     }
 
     fn reset(&mut self) {
@@ -242,8 +231,8 @@ struct VectorValue<T> {
     values: Vec<T>,
 }
 
-impl Node for VectorValue<T> {
-    fn evaluate<T, C: Cmp<T>>(&mut self, ctx: &Context) -> EvalResult {
+impl<T: PartialEq> Node for VectorValue<T> {
+    fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         if let Some(state) = &self.state {
             return match state {
@@ -251,23 +240,18 @@ impl Node for VectorValue<T> {
                 NodeState::False => EvalResult::False(true),
             };
         }
-
-        match C::is_true(self.values[&ctx.row_id], self.needle) {
-            true => {
-                if self.is_partition {
-                    self.state = Some(NodeState::True);
-                    EvalResult::True(true)
-                }
-                EvalResult::True(false)
+        if self.values[ctx.row_id] == self.needle {
+            if self.is_partition {
+                self.state = Some(NodeState::True);
+                return EvalResult::True(true);
             }
-            false => {
-                if self.is_partition {
-                    self.state = Some(NodeState::False);
-                    EvalResult::False(true)
-                }
-                EvalResult::False(false)
-            }
+            return EvalResult::True(false);
         }
+        if self.is_partition {
+            self.state = Some(NodeState::False);
+            return EvalResult::False(true);
+        }
+        EvalResult::False(false)
     }
 
     fn reset(&mut self) {
@@ -276,15 +260,23 @@ impl Node for VectorValue<T> {
 }
 
 fn main() {
-    let mut q = Node {
-        children: Some(vec![
-            Node {
-                children: None,
-                count: 0,
-            }]),
+    /*let mut q = Node {
+        children: Some(vec![Node {
+            children: None,
+            count: 0,
+        }]),
         count: 0,
-    };
+    };*/
 
-    q.eval();
-    println!("{}", q.children.unwrap()[0].count);
+    let mut q: Box<dyn Node> = Box::new(And {
+        state: None,
+        children: Some(vec![Box::new(Or {
+            state: None,
+            children: None,
+        })]),
+        limits: None,
+    });
+    let ctx = Context::default();
+
+    dbg!(q.evaluate(&ctx));
 }
