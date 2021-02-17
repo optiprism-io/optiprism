@@ -20,6 +20,7 @@ trait Node {
     fn reset(&mut self);
 }
 
+#[derive(Debug)]
 enum NodeState {
     True,
     False,
@@ -161,11 +162,18 @@ impl Node for Then {
         }
 
         if let ThenBranch::Left = self.branch {
-            let result = self.left.evaluate(ctx);
-            match result {
-                EvalResult::True(_) => self.branch = ThenBranch::Right,
-                _ => return result,
-            }
+            return match self.left.evaluate(ctx) {
+                EvalResult::True(_) => {
+                    self.branch = ThenBranch::Right;
+                    EvalResult::False(false)
+                }
+                EvalResult::False(true) => {
+                    EvalResult::False(true)
+                }
+                _ => {
+                    EvalResult::False(false)
+                }
+            };
         }
 
         if let ThenBranch::Right = self.branch {
@@ -278,7 +286,7 @@ mod tests {
 
         let ctx = Context::default();
 
-        assert_eq!(n.evaluate(&ctx), EvalResult::False(false))
+        assert_eq!(n.evaluate(&ctx), EvalResult::False(false));
     }
 
     #[test]
@@ -296,6 +304,41 @@ mod tests {
         let ctx = Context::default();
 
         assert_eq!(n.evaluate(&ctx), EvalResult::True(false))
+    }
+
+    #[test]
+    fn scalar_value_equal_fails_stateful() {
+        let v: ScalarValue<u32, cmp::Equal> = ScalarValue {
+            c: PhantomData,
+            state: None,
+            is_partition: true,
+            left: 2,
+            right: 1,
+        };
+
+        let mut n: Box<dyn Node> = Box::new(v);
+
+        let ctx = Context::default();
+
+        assert_eq!(n.evaluate(&ctx), EvalResult::False(true))
+    }
+
+
+    #[test]
+    fn scalar_value_stateful() {
+        let v: ScalarValue<u32, cmp::Equal> = ScalarValue {
+            c: PhantomData,
+            state: None,
+            is_partition: true,
+            left: 1,
+            right: 1,
+        };
+
+        let mut n: Box<dyn Node> = Box::new(v);
+
+        let ctx = Context::default();
+
+        assert_eq!(n.evaluate(&ctx), EvalResult::True(true))
     }
 
     #[test]
@@ -333,6 +376,67 @@ mod tests {
     }
 
     #[test]
+    fn vector_value_equal_fails_stateful() {
+        let v: VectorValue<u32, cmp::Equal> = VectorValue {
+            c: PhantomData,
+            state: None,
+            is_partition: true,
+            left: vec![0, 1],
+            right: 1,
+        };
+
+        let mut n: Box<dyn Node> = Box::new(v);
+
+        let ctx = Context { row_id: 0 };
+
+        assert_eq!(n.evaluate(&ctx), EvalResult::False(true))
+    }
+
+    #[test]
+    fn vector_value_equal_stateful() {
+        let v: VectorValue<u32, cmp::Equal> = VectorValue {
+            c: PhantomData,
+            state: None,
+            is_partition: true,
+            left: vec![0, 1],
+            right: 1,
+        };
+
+        let mut n: Box<dyn Node> = Box::new(v);
+
+        let ctx = Context { row_id: 1 };
+
+        assert_eq!(n.evaluate(&ctx), EvalResult::True(true))
+    }
+
+    #[test]
+    fn a_and_b_fails() {
+        let mut q: Box<dyn Node> = Box::new(And {
+            state: None,
+            children: Some(vec![
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: false,
+                    left: 1,
+                    right: 2,
+                }),
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: false,
+                    left: 2,
+                    right: 2,
+                })
+            ]),
+            limits: None,
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false))
+    }
+
+    #[test]
     fn a_and_b() {
         let mut q: Box<dyn Node> = Box::new(And {
             state: None,
@@ -357,6 +461,326 @@ mod tests {
 
         let ctx = Context::default();
         assert_eq!(q.evaluate(&ctx), EvalResult::True(false))
+    }
+
+    #[test]
+    fn a_stateful_and_b() {
+        let mut q: Box<dyn Node> = Box::new(And {
+            state: None,
+            children: Some(vec![
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: true,
+                    left: 1,
+                    right: 1,
+                }),
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: false,
+                    left: 2,
+                    right: 2,
+                })
+            ]),
+            limits: None,
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false))
+    }
+
+    #[test]
+    fn a_stateful_and_b_stateful() {
+        let mut q: Box<dyn Node> = Box::new(And {
+            state: None,
+            children: Some(vec![
+                Box::new(VectorValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: true,
+                    left: vec![1, 2],
+                    right: 1,
+                }),
+                Box::new(VectorValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: true,
+                    left: vec![2, 3],
+                    right: 2,
+                })
+            ]),
+            limits: None,
+        });
+
+        let mut ctx = Context { row_id: 0 };
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(true));
+        ctx.row_id = 1;
+        // check for stateful
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(true));
+    }
+
+    #[test]
+    fn a_stateful_and_b_stateful_fails() {
+        let mut q: Box<dyn Node> = Box::new(And {
+            state: None,
+            children: Some(vec![
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: true,
+                    left: 1,
+                    right: 2,
+                }),
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: true,
+                    left: 2,
+                    right: 2,
+                })
+            ]),
+            limits: None,
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(true))
+    }
+
+    #[test]
+    fn a_or_b() {
+        let mut q: Box<dyn Node> = Box::new(Or {
+            state: None,
+            children: Some(vec![
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: false,
+                    left: 2, //fails
+                    right: 1,
+                }),
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: false,
+                    left: 2,
+                    right: 2,
+                })
+            ]),
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false))
+    }
+
+    #[test]
+    fn a_or_b_fails() {
+        let mut q: Box<dyn Node> = Box::new(Or {
+            state: None,
+            children: Some(vec![
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: false,
+                    left: 2, //fails
+                    right: 1,
+                }),
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: false,
+                    left: 2,
+                    right: 1,
+                })
+            ]),
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false))
+    }
+
+    #[test]
+    fn a_or_stateful_b() {
+        let mut q: Box<dyn Node> = Box::new(Or {
+            state: None,
+            children: Some(vec![
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: false,
+                    left: 1,
+                    right: 1,
+                }),
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: true,
+                    left: 1,
+                    right: 1,
+                })
+            ]),
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false))
+    }
+
+    #[test]
+    fn a_or_stateful_b_stateful() {
+        let mut q: Box<dyn Node> = Box::new(Or {
+            state: None,
+            children: Some(vec![
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: false,
+                    left: 2, //fails
+                    right: 1,
+                }),
+                Box::new(VectorValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: true,
+                    left: vec![1, 2],
+                    right: 1,
+                })
+            ]),
+        });
+
+        let mut ctx = Context { row_id: 0 };
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(true));
+        ctx.row_id = 1;
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(true));
+    }
+
+    #[test]
+    fn a_or_stateful_b_fails() {
+        let mut q: Box<dyn Node> = Box::new(Or {
+            state: None,
+            children: Some(vec![
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: false,
+                    left: 2, //fails
+                    right: 1,
+                }),
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: true,
+                    left: 1,
+                    right: 2,
+                })
+            ]),
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false))
+    }
+
+    #[test]
+    fn stateful_a_or_stateful_b_fails() {
+        let mut q: Box<dyn Node> = Box::new(Or {
+            state: None,
+            children: Some(vec![
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: true,
+                    left: 2, //fails
+                    right: 1,
+                }),
+                Box::new(ScalarValue::<u32, cmp::Equal> {
+                    c: PhantomData,
+                    state: None,
+                    is_partition: true,
+                    left: 1,
+                    right: 2,
+                })
+            ]),
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(true))
+    }
+
+    #[test]
+    fn then() {
+        let mut q: Box<dyn Node> = Box::new(Then {
+            left: Box::new(ScalarValue::<u32, cmp::Equal> {
+                c: PhantomData,
+                state: None,
+                is_partition: false,
+                left: 1,
+                right: 1,
+            }),
+            right: Box::new(ScalarValue::<u32, cmp::Equal> {
+                c: PhantomData,
+                state: None,
+                is_partition: false,
+                left: 2,
+                right: 2,
+            }),
+            state: None,
+            branch: ThenBranch::Left,
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
+    }
+
+    #[test]
+    fn then_right_fail() {
+        let mut q: Box<dyn Node> = Box::new(Then {
+            left: Box::new(ScalarValue::<u32, cmp::Equal> {
+                c: PhantomData,
+                state: None,
+                is_partition: false,
+                left: 1,
+                right: 1,
+            }),
+            right: Box::new(ScalarValue::<u32, cmp::Equal> {
+                c: PhantomData,
+                state: None,
+                is_partition: false,
+                left: 1,
+                right: 2,
+            }),
+            state: None,
+            branch: ThenBranch::Left,
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+    }
+
+    #[test]
+    fn then_left_stateful_fail() {
+        let mut q: Box<dyn Node> = Box::new(Then {
+            left: Box::new(ScalarValue::<u32, cmp::Equal> {
+                c: PhantomData,
+                state: None,
+                is_partition: true,
+                left: 1,
+                right: 2,
+            }),
+            right: Box::new(ScalarValue::<u32, cmp::Equal> {
+                c: PhantomData,
+                state: None,
+                is_partition: false,
+                left: 2,
+                right: 2,
+            }),
+            state: None,
+            branch: ThenBranch::Left,
+        });
+
+        let ctx = Context::default();
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(true));
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(true));
     }
 }
 
