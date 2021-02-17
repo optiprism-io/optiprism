@@ -36,13 +36,13 @@ impl Limits {
     }
 }
 
-struct And {
+struct And<'a> {
     state: Option<NodeState>,
-    children: Option<Vec<Box<dyn Node>>>,
+    children: Option<Vec<&'a mut dyn Node>>,
     limits: Option<Limits>,
 }
 
-impl Node for And {
+impl<'a> Node for And<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         if let Some(state) = &self.state {
@@ -92,12 +92,12 @@ impl Node for And {
     }
 }
 
-struct Or {
+struct Or<'a> {
     state: Option<NodeState>,
-    children: Option<Vec<Box<dyn Node>>>,
+    children: Option<Vec<&'a mut dyn Node>>,
 }
 
-impl Node for Or {
+impl<'a> Node for Or<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         if let Some(state) = &self.state {
@@ -143,14 +143,14 @@ enum ThenBranch {
     Right,
 }
 
-struct Then {
-    left: Box<dyn Node>,
-    right: Box<dyn Node>,
+struct Then<'a> {
+    left: &'a mut dyn Node,
+    right: &'a mut dyn Node,
     state: Option<NodeState>,
     branch: ThenBranch,
 }
 
-impl Node for Then {
+impl<'a> Node for Then<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         if let Some(state) = &self.state {
@@ -196,7 +196,11 @@ struct ScalarValue<T, C> {
     right: T,
 }
 
-impl<T, C> Node for ScalarValue<T, C> where T: Copy, C: cmp::Cmp<T> {
+impl<T, C> Node for ScalarValue<T, C>
+where
+    T: Copy,
+    C: cmp::Cmp<T>,
+{
     fn evaluate(&mut self, _: &Context) -> EvalResult {
         // check if node already has state
         if let Some(state) = &self.state {
@@ -232,7 +236,11 @@ struct VectorValue<T, C> {
     right: T,
 }
 
-impl<T, C> Node for VectorValue<T, C> where T: Copy, C: cmp::Cmp<T> {
+impl<T, C> Node for VectorValue<T, C>
+where
+    T: Copy,
+    C: cmp::Cmp<T>,
+{
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         if let Some(state) = &self.state {
@@ -266,7 +274,7 @@ mod tests {
 
     #[test]
     fn scalar_value_equal_fails() {
-        let v: ScalarValue<u32, cmp::Equal> = ScalarValue {
+        let mut v: ScalarValue<u32, cmp::Equal> = ScalarValue {
             c: PhantomData,
             state: None,
             is_partition: false,
@@ -274,7 +282,7 @@ mod tests {
             right: 1,
         };
 
-        let mut n: Box<dyn Node> = Box::new(v);
+        let n: &mut dyn Node = &mut v;
 
         let ctx = Context::default();
 
@@ -283,7 +291,7 @@ mod tests {
 
     #[test]
     fn scalar_value_equal() {
-        let v: ScalarValue<u32, cmp::Equal> = ScalarValue {
+        let mut v: ScalarValue<u32, cmp::Equal> = ScalarValue {
             c: PhantomData,
             state: None,
             is_partition: false,
@@ -291,7 +299,7 @@ mod tests {
             right: 1,
         };
 
-        let mut n: Box<dyn Node> = Box::new(v);
+        let n: &mut dyn Node = &mut v;
 
         let ctx = Context::default();
 
@@ -300,7 +308,7 @@ mod tests {
 
     #[test]
     fn vector_value_equal_fails() {
-        let v: VectorValue<u32, cmp::Equal> = VectorValue {
+        let mut v: VectorValue<u32, cmp::Equal> = VectorValue {
             c: PhantomData,
             state: None,
             is_partition: false,
@@ -308,7 +316,7 @@ mod tests {
             right: 1,
         };
 
-        let mut n: Box<dyn Node> = Box::new(v);
+        let n: &mut dyn Node = &mut v;
 
         let ctx = Context { row_id: 0 };
 
@@ -317,7 +325,7 @@ mod tests {
 
     #[test]
     fn vector_value_equal() {
-        let v: VectorValue<u32, cmp::Equal> = VectorValue {
+        let mut v: VectorValue<u32, cmp::Equal> = VectorValue {
             c: PhantomData,
             state: None,
             is_partition: false,
@@ -325,7 +333,7 @@ mod tests {
             right: 1,
         };
 
-        let mut n: Box<dyn Node> = Box::new(v);
+        let n: &mut dyn Node = &mut v;
 
         let ctx = Context { row_id: 1 };
 
@@ -334,26 +342,25 @@ mod tests {
 
     #[test]
     fn a_and_b() {
-        let mut q: Box<dyn Node> = Box::new(And {
+        let scalar1 = &mut ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
             state: None,
-            children: Some(vec![
-                Box::new(ScalarValue::<u32, cmp::Equal> {
-                    c: PhantomData,
-                    state: None,
-                    is_partition: false,
-                    left: 1,
-                    right: 1,
-                }),
-                Box::new(ScalarValue::<u32, cmp::Equal> {
-                    c: PhantomData,
-                    state: None,
-                    is_partition: false,
-                    left: 2,
-                    right: 2,
-                })
-            ]),
+            is_partition: false,
+            left: 1,
+            right: 1,
+        };
+        let scalar2 = &mut ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: None,
+            is_partition: false,
+            left: 2,
+            right: 2,
+        };
+        let q: &mut dyn Node = &mut And {
+            state: None,
+            children: Some(vec![scalar1, scalar2]),
             limits: None,
-        });
+        };
 
         let ctx = Context::default();
         assert_eq!(q.evaluate(&ctx), EvalResult::True(false))
@@ -368,15 +375,16 @@ fn main() {
         }]),
         count: 0,
     };*/
-
-    let mut q: Box<dyn Node> = Box::new(And {
+    let or = &mut Or {
         state: None,
-        children: Some(vec![Box::new(Or {
-            state: None,
-            children: None,
-        })]),
+        children: None,
+    };
+
+    let q: &mut dyn Node = &mut And {
+        state: None,
+        children: Some(vec![or]),
         limits: None,
-    });
+    };
     let ctx = Context::default();
 
     dbg!(q.evaluate(&ctx));
