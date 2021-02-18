@@ -7,12 +7,10 @@ struct Context {
     row_id: usize,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 enum EvalResult {
     True(bool),
     False(bool),
-    Rewind(usize),
-    ResetNode,
 }
 
 trait Node {
@@ -26,21 +24,87 @@ enum NodeState {
     False,
 }
 
-struct Limits {}
+trait Limit {
+    fn check(&mut self, matched: bool) -> Option<LimitCheckResult>;
+    fn reset(&mut self);
+}
 
-impl Limits {
-    fn check(&mut self) -> EvalResult {
-        unimplemented!("Limits::check");
+struct CountLimit {
+    min: u32,
+    max: u32,
+    current_value: u32,
+}
+
+enum LimitCheckResult {
+    True,
+    False,
+    ResetNode,
+}
+
+impl Limit for CountLimit {
+    fn check(&mut self, matched: bool) -> Option<LimitCheckResult> {
+        if matched {
+            self.current_value += 1;
+
+            if self.current_value < self.min {
+                return Some(LimitCheckResult::False);
+            } else if self.max > 0 && self.current_value > self.max {
+                return Some(LimitCheckResult::ResetNode);
+            }
+
+            return None;
+        }
+
+        if self.current_value > self.min &&
+            (self.max == 0 || self.current_value <= self.max) {
+            // node became stateful
+            return Some(LimitCheckResult::True);
+        }
+
+        return None;
     }
+
     fn reset(&mut self) {
-        unimplemented!("Limits::check");
+        self.current_value = 0;
     }
+}
+
+struct Limits<'a> {
+    limits: Vec<&'a mut dyn Limit>,
+}
+
+impl<'a> Limits<'a> {
+    pub fn check(&mut self, eval_result: EvalResult) -> Option<LimitCheckResult> {
+        let mut matched: bool = false;
+        match eval_result {
+            EvalResult::True(true) | EvalResult::False(true) => return None,
+            EvalResult::True(false) => matched = true,
+            _ => {}
+        }
+
+        let mut is_false: bool = false;
+        for l in self.limits.iter_mut() {
+            match l.check(matched) {
+                Some(LimitCheckResult::ResetNode) => return Some(LimitCheckResult::ResetNode),
+                Some(LimitCheckResult::True) => return Some(LimitCheckResult::True),
+                Some(LimitCheckResult::False) => is_false = true,
+                _ => {}
+            }
+        }
+
+        if is_false {
+            return Some(LimitCheckResult::False);
+        }
+
+        None
+    }
+    fn reset(&mut self) {}
 }
 
 struct And<'a> {
     state: Option<NodeState>,
     children: Option<Vec<&'a mut dyn Node>>,
-    limits: Option<Limits>,
+    limits: Option<&'a mut Limits<'a>>,
 }
 
 impl<'a> Node for And<'a> {
@@ -63,21 +127,23 @@ impl<'a> Node for And<'a> {
                             is_stateful = false
                         }
                     }
+                    // if some failed nodes is stateful, then it make current node failed stateful  as well
                     EvalResult::False(stateful) => {
                         if stateful {
                             self.state = Some(NodeState::False)
                         }
-                        return EvalResult::False(stateful);
+                        return self.check_limits(EvalResult::False(stateful));
                     }
-                    _ => panic!(),
                 }
             }
         }
+
         if is_stateful {
             self.state = Some(NodeState::True);
-            return EvalResult::True(true);
+            return self.check_limits(EvalResult::True(true));
         }
-        EvalResult::True(false)
+
+        self.check_limits(EvalResult::True(false))
     }
 
     fn reset(&mut self) {
@@ -90,6 +156,24 @@ impl<'a> Node for And<'a> {
         if let Some(limits) = &mut self.limits {
             limits.reset();
         }
+    }
+}
+
+impl<'a> And<'a> {
+    fn check_limits(&mut self, eval_result: EvalResult) -> EvalResult {
+        if let Some(limits) = &mut self.limits {
+            return match limits.check(eval_result) {
+                None => eval_result,
+                Some(LimitCheckResult::True) => EvalResult::True(false),
+                Some(LimitCheckResult::False) => EvalResult::False(false),
+                Some(LimitCheckResult::ResetNode) => {
+                    self.reset();
+                    EvalResult::False(false)
+                }
+            };
+        }
+
+        eval_result
     }
 }
 
