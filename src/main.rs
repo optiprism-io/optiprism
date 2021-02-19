@@ -18,7 +18,7 @@ trait Node {
     fn reset(&mut self);
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 enum NodeState {
     True,
     False,
@@ -277,6 +277,68 @@ impl<'a> Node for Then<'a> {
         self.branch = ThenBranch::Left;
         self.left.reset();
         self.right.reset();
+    }
+}
+
+struct SequenceNode<'a> {
+    node: &'a mut dyn Node,
+    limits: Option<&'a mut Limits<'a>>,
+}
+
+impl<'a> SequenceNode<'a> {
+    fn evaluate(&mut self, ctx: &Context) -> EvalResult {
+        self.node.evaluate(ctx)
+    }
+    fn check_limits(&mut self, eval_result: EvalResult) -> Option<LimitCheckResult> {
+        Some(LimitCheckResult::True)
+    }
+}
+
+struct Sequence<'a> {
+    current_node_idx: usize,
+    nodes: Vec<SequenceNode<'a>>,
+    state: Option<NodeState>,
+}
+
+impl<'a> Node for Sequence<'a> {
+    fn evaluate(&mut self, ctx: &Context) -> EvalResult {
+        // check if node already has state
+        if let Some(state) = &self.state {
+            return match state {
+                NodeState::True => EvalResult::True(true),
+                NodeState::False => EvalResult::False(true),
+            };
+        }
+
+        for (idx, node) in self.nodes.iter_mut().enumerate() {
+            if idx >= self.current_node_idx {
+                return match node.evaluate(ctx) {
+                    EvalResult::False(stateful) => {
+                        if stateful {
+                            self.state = Some(NodeState::False);
+                        }
+
+                        EvalResult::False(stateful)
+                    }
+                    EvalResult::True(_) => {
+                        // last node
+                        if idx == self.nodes.len() - 1 {
+                            self.state = Some(NodeState::True);
+                            return EvalResult::True(true);
+                        }
+
+                        self.current_node_idx += 1;
+                        EvalResult::False(false)
+                    }
+                };
+            }
+        }
+
+        panic!("unreachable code");
+    }
+
+    fn reset(&mut self) {
+        unimplemented!()
     }
 }
 
@@ -814,7 +876,7 @@ mod tests {
     }
 
     #[test]
-    fn then() {
+    fn sequence() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
             state: None,
@@ -831,16 +893,18 @@ mod tests {
             right: 2,
         };
 
-        let mut q = Then {
-            left: &mut a,
-            right: &mut b,
-            state: None,
-            branch: ThenBranch::Left,
+        let mut q = Sequence{
+            current_node_idx: 0,
+            nodes: vec![
+                SequenceNode{node:&mut a, limits: None },
+                SequenceNode{node:&mut b, limits: None },
+            ],
+            state: None
         };
 
         let ctx = Context::default();
         assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
-        assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(true));
     }
 
     #[test]
@@ -901,6 +965,72 @@ mod tests {
         let ctx = Context::default();
         assert_eq!(q.evaluate(&ctx), EvalResult::False(true));
         assert_eq!(q.evaluate(&ctx), EvalResult::False(true));
+    }
+
+    #[test]
+    fn sequence_scenario() {
+        let mut a = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: None,
+            is_partition: false,
+            left: 1,
+            right: 1,
+        };
+        let mut b_fail = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: None,
+            is_partition: false,
+            left: 2,
+            right: 1,
+        };
+        let mut b = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: None,
+            is_partition: false,
+            left: 1,
+            right: 1,
+        };
+        let mut c = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: None,
+            is_partition: false,
+            left: 1,
+            right: 1,
+        };
+
+        let mut s = Sequence {
+            current_node_idx: 0,
+            nodes: vec![
+                SequenceNode { node: &mut a, limits: None },
+                SequenceNode { node: &mut b_fail, limits: None },
+                SequenceNode { node: &mut c, limits: None },
+            ],
+            state: None,
+        };
+
+        let ctx = Context::default();
+        // pass first node
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.current_node_idx, 1);
+        assert_eq!(s.state.is_none(), true);
+        // fail at second node
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.current_node_idx, 1);
+        assert_eq!(s.state.is_none(), true);
+        // set second node to True
+        s.nodes[1].node = &mut b;
+        // pass second node
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.current_node_idx, 2);
+        assert_eq!(s.state.is_none(), true);
+        // pass third node
+        assert_eq!(s.evaluate(&ctx), EvalResult::True(true));
+        assert_eq!(s.current_node_idx, 2);
+        assert_eq!(*s.state.as_ref().unwrap(), NodeState::True);
+        // nothing changes on further evaluations
+        assert_eq!(s.evaluate(&ctx), EvalResult::True(true));
+        assert_eq!(s.current_node_idx, 2);
+        assert_eq!(s.state.unwrap(), NodeState::True);
     }
 }
 
