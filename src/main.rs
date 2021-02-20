@@ -20,6 +20,7 @@ trait Node {
 
 #[derive(PartialEq, Debug)]
 enum NodeState {
+    None,
     True,
     False,
 }
@@ -102,44 +103,42 @@ impl<'a> Limits<'a> {
 }
 
 struct And<'a> {
-    state: Option<NodeState>,
-    children: Option<Vec<&'a mut dyn Node>>,
+    state: NodeState,
+    children: Vec<&'a mut dyn Node>,
     limits: Option<&'a mut Limits<'a>>,
 }
 
 impl<'a> Node for And<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
-        if let Some(state) = &self.state {
-            return match state {
-                NodeState::True => EvalResult::True(true),
-                NodeState::False => EvalResult::False(true),
-            };
-        }
+        match self.state {
+            NodeState::True => return EvalResult::True(true),
+            NodeState::False => return EvalResult::False(true),
+            _ => {}
+        };
+
         // node is stateful by default
         let mut is_stateful: bool = true;
-        if let Some(children) = &mut self.children {
-            for c in children.iter_mut() {
-                match c.evaluate(ctx) {
-                    EvalResult::True(stateful) => {
-                        // node is stateful only if all evaluations are true and stateful
-                        if !stateful {
-                            is_stateful = false
-                        }
+        for c in self.children.iter_mut() {
+            match c.evaluate(ctx) {
+                EvalResult::True(stateful) => {
+                    // node is stateful only if all evaluations are true and stateful
+                    if !stateful {
+                        is_stateful = false
                     }
-                    // if some failed nodes is stateful, then it make current node failed stateful  as well
-                    EvalResult::False(stateful) => {
-                        if stateful {
-                            self.state = Some(NodeState::False)
-                        }
-                        return self.check_limits(EvalResult::False(stateful));
+                }
+                // if some failed nodes is stateful, then it make current node failed stateful  as well
+                EvalResult::False(stateful) => {
+                    if stateful {
+                        self.state = NodeState::False;
                     }
+                    return self.check_limits(EvalResult::False(stateful));
                 }
             }
         }
 
         if is_stateful {
-            self.state = Some(NodeState::True);
+            self.state = NodeState::True;
             return self.check_limits(EvalResult::True(true));
         }
 
@@ -147,11 +146,9 @@ impl<'a> Node for And<'a> {
     }
 
     fn reset(&mut self) {
-        self.state = None;
-        if let Some(children) = &mut self.children {
-            for c in children.iter_mut() {
-                c.reset()
-            }
+        self.state = NodeState::None;
+        for c in self.children.iter_mut() {
+            c.reset()
         }
         if let Some(limits) = &mut self.limits {
             limits.reset();
@@ -178,47 +175,43 @@ impl<'a> And<'a> {
 }
 
 struct Or<'a> {
-    state: Option<NodeState>,
-    children: Option<Vec<&'a mut dyn Node>>,
+    state: NodeState,
+    children: Vec<&'a mut dyn Node>,
 }
 
 impl<'a> Node for Or<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
-        if let Some(state) = &self.state {
-            return match state {
-                NodeState::True => EvalResult::True(true),
-                NodeState::False => EvalResult::False(true),
-            };
-        }
+        match self.state {
+            NodeState::True => return EvalResult::True(true),
+            NodeState::False => return EvalResult::False(true),
+            _ => {}
+        };
+
         let mut is_stateful: bool = true;
-        if let Some(children) = &mut self.children {
-            for c in children.iter_mut() {
-                match c.evaluate(ctx) {
-                    EvalResult::True(stateful) => {
-                        if stateful {
-                            self.state = Some(NodeState::True);
-                        }
-                        return EvalResult::True(stateful);
+        for c in self.children.iter_mut() {
+            match c.evaluate(ctx) {
+                EvalResult::True(stateful) => {
+                    if stateful {
+                        self.state = NodeState::True;
                     }
-                    EvalResult::False(stateful) => {
-                        if !stateful {
-                            is_stateful = false;
-                        }
-                    }
-                    _ => panic!(),
+                    return EvalResult::True(stateful);
                 }
+                EvalResult::False(stateful) => {
+                    if !stateful {
+                        is_stateful = false;
+                    }
+                }
+                _ => panic!(),
             }
         }
         EvalResult::False(is_stateful)
     }
 
     fn reset(&mut self) {
-        self.state = None;
-        if let Some(children) = &mut self.children {
-            for c in children.iter_mut() {
-                c.reset()
-            }
+        self.state = NodeState::None;
+        for c in self.children.iter_mut() {
+            c.reset()
         }
     }
 }
@@ -227,7 +220,7 @@ enum ThenBranch {
     Left,
     Right,
 }
-
+/*
 struct Then<'a> {
     left: &'a mut dyn Node,
     right: &'a mut dyn Node,
@@ -278,7 +271,7 @@ impl<'a> Node for Then<'a> {
         self.left.reset();
         self.right.reset();
     }
-}
+}*/
 
 struct SequenceNode<'a> {
     node: &'a mut dyn Node,
@@ -297,25 +290,24 @@ impl<'a> SequenceNode<'a> {
 struct Sequence<'a> {
     current_node_idx: usize,
     nodes: Vec<SequenceNode<'a>>,
-    state: Option<NodeState>,
+    state: NodeState,
 }
 
 impl<'a> Node for Sequence<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
-        if let Some(state) = &self.state {
-            return match state {
-                NodeState::True => EvalResult::True(true),
-                NodeState::False => EvalResult::False(true),
-            };
-        }
+        match self.state {
+            NodeState::True => return EvalResult::True(true),
+            NodeState::False => return EvalResult::False(true),
+            _ => {}
+        };
 
         for (idx, node) in self.nodes.iter_mut().enumerate() {
             if idx >= self.current_node_idx {
                 return match node.evaluate(ctx) {
                     EvalResult::False(stateful) => {
                         if stateful {
-                            self.state = Some(NodeState::False);
+                            self.state = NodeState::False;
                         }
 
                         EvalResult::False(stateful)
@@ -323,7 +315,7 @@ impl<'a> Node for Sequence<'a> {
                     EvalResult::True(_) => {
                         // last node
                         if idx == self.nodes.len() - 1 {
-                            self.state = Some(NodeState::True);
+                            self.state = NodeState::True;
                             return EvalResult::True(true);
                         }
 
@@ -344,7 +336,7 @@ impl<'a> Node for Sequence<'a> {
 
 struct ScalarValue<T, C> {
     c: PhantomData<C>,
-    state: Option<NodeState>,
+    state: NodeState,
     is_partition: bool,
     left: T,
     right: T,
@@ -353,34 +345,34 @@ struct ScalarValue<T, C> {
 impl<T, C> Node for ScalarValue<T, C> where T: Copy, C: cmp::Cmp<T> {
     fn evaluate(&mut self, _: &Context) -> EvalResult {
         // check if node already has state
-        if let Some(state) = &self.state {
-            return match state {
-                NodeState::True => EvalResult::True(true),
-                NodeState::False => EvalResult::False(true),
-            };
-        }
+        match self.state {
+            NodeState::True => return EvalResult::True(true),
+            NodeState::False => return EvalResult::False(true),
+            _ => {}
+        };
+
         if C::is_true(self.left, self.right) {
             if self.is_partition {
-                self.state = Some(NodeState::True);
+                self.state = NodeState::True;
                 return EvalResult::True(true);
             }
             return EvalResult::True(false);
         }
         if self.is_partition {
-            self.state = Some(NodeState::False);
+            self.state = NodeState::False;
             return EvalResult::False(true);
         }
         EvalResult::False(false)
     }
 
     fn reset(&mut self) {
-        self.state = None;
+        self.state = NodeState::None;
     }
 }
 
 struct VectorValue<T, C> {
     c: PhantomData<C>,
-    state: Option<NodeState>,
+    state: NodeState,
     is_partition: bool,
     left: Vec<T>,
     right: T,
@@ -389,28 +381,27 @@ struct VectorValue<T, C> {
 impl<T, C> Node for VectorValue<T, C> where T: Copy, C: cmp::Cmp<T> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
-        if let Some(state) = &self.state {
-            return match state {
-                NodeState::True => EvalResult::True(true),
-                NodeState::False => EvalResult::False(true),
-            };
-        }
+        match self.state {
+            NodeState::True => return EvalResult::True(true),
+            NodeState::False => return EvalResult::False(true),
+            _ => {}
+        };
         if C::is_true(self.left[ctx.row_id], self.right) {
             if self.is_partition {
-                self.state = Some(NodeState::True);
+                self.state = NodeState::True;
                 return EvalResult::True(true);
             }
             return EvalResult::True(false);
         }
         if self.is_partition {
-            self.state = Some(NodeState::False);
+            self.state = NodeState::False;
             return EvalResult::False(true);
         }
         EvalResult::False(false)
     }
 
     fn reset(&mut self) {
-        self.state = None;
+        self.state = NodeState::None;
     }
 }
 
@@ -422,7 +413,7 @@ mod tests {
     fn scalar_value_equal_fails() {
         let mut n = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2,
             right: 1,
@@ -438,7 +429,7 @@ mod tests {
     fn scalar_value_equal() {
         let mut n = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 1,
             right: 1,
@@ -454,7 +445,7 @@ mod tests {
     fn scalar_value_equal_fails_stateful() {
         let mut n = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: 2,
             right: 1,
@@ -470,7 +461,7 @@ mod tests {
     fn scalar_value_stateful() {
         let mut n = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: 1,
             right: 1,
@@ -485,7 +476,7 @@ mod tests {
     fn vector_value_equal_fails() {
         let mut n = VectorValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: vec![0, 1],
             right: 1,
@@ -499,7 +490,7 @@ mod tests {
     fn vector_value_equal() {
         let mut n = VectorValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: vec![0, 1],
             right: 1,
@@ -513,7 +504,7 @@ mod tests {
     fn vector_value_equal_fails_stateful() {
         let mut n = VectorValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: vec![0, 1],
             right: 1,
@@ -527,7 +518,7 @@ mod tests {
     fn vector_value_equal_stateful() {
         let mut n = VectorValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: vec![0, 1],
             right: 1,
@@ -541,7 +532,7 @@ mod tests {
     fn a_and_b_fails() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 1,
             right: 2,
@@ -549,17 +540,17 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2,
             right: 2,
         };
         let mut q = And {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
             limits: None,
         };
 
@@ -571,25 +562,25 @@ mod tests {
     fn a_and_b() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 1,
             right: 1,
         };
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2,
             right: 2,
         };
 
         let mut q = And {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
             limits: None,
         };
 
@@ -601,7 +592,7 @@ mod tests {
     fn a_stateful_and_b() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: 1,
             right: 1,
@@ -609,18 +600,18 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2,
             right: 2,
         };
 
         let mut q = And {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
             limits: None,
         };
 
@@ -632,7 +623,7 @@ mod tests {
     fn a_stateful_and_b_stateful() {
         let mut a = VectorValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: vec![1, 2],
             right: 1,
@@ -640,18 +631,18 @@ mod tests {
 
         let mut b = VectorValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: vec![2, 3],
             right: 2,
         };
 
         let mut q = And {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
             limits: None,
         };
 
@@ -666,7 +657,7 @@ mod tests {
     fn a_stateful_and_b_stateful_fails() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: 1,
             right: 2,
@@ -674,18 +665,18 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: 2,
             right: 2,
         };
 
         let mut q = And {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
             limits: None,
         };
 
@@ -697,7 +688,7 @@ mod tests {
     fn a_or_b() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2, //fails
             right: 1,
@@ -705,18 +696,18 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2,
             right: 2,
         };
 
         let mut q = Or {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
         };
 
         let ctx = Context::default();
@@ -727,7 +718,7 @@ mod tests {
     fn a_or_b_fails() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2, //fails
             right: 1,
@@ -735,18 +726,18 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2,
             right: 1,
         };
 
         let mut q = Or {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
         };
 
         let ctx = Context::default();
@@ -757,7 +748,7 @@ mod tests {
     fn a_or_stateful_b() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 1,
             right: 1,
@@ -765,18 +756,18 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: 1,
             right: 1,
         };
 
         let mut q = Or {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
         };
 
         let ctx = Context::default();
@@ -787,7 +778,7 @@ mod tests {
     fn a_or_stateful_b_stateful() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2, //fails
             right: 1,
@@ -795,18 +786,18 @@ mod tests {
 
         let mut b = VectorValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: vec![1, 2],
             right: 1,
         };
 
         let mut q = Or {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
         };
 
         let mut ctx = Context { row_id: 0 };
@@ -819,7 +810,7 @@ mod tests {
     fn a_or_stateful_b_fails() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2, //fails
             right: 1,
@@ -827,18 +818,18 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: 1,
             right: 2,
         };
 
         let mut q = Or {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
         };
 
         let ctx = Context::default();
@@ -849,7 +840,7 @@ mod tests {
     fn stateful_a_or_stateful_b_fails() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: 2, //fails
             right: 1,
@@ -857,18 +848,18 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: 1,
             right: 2,
         };
 
         let mut q = Or {
-            state: None,
-            children: Some(vec![
+            state: NodeState::None,
+            children: vec![
                 &mut a,
                 &mut b,
-            ]),
+            ],
         };
 
         let ctx = Context::default();
@@ -879,7 +870,7 @@ mod tests {
     fn sequence() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 1,
             right: 1,
@@ -887,19 +878,19 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2,
             right: 2,
         };
 
-        let mut q = Sequence{
+        let mut q = Sequence {
             current_node_idx: 0,
             nodes: vec![
-                SequenceNode{node:&mut a, limits: None },
-                SequenceNode{node:&mut b, limits: None },
+                SequenceNode { node: &mut a, limits: None },
+                SequenceNode { node: &mut b, limits: None },
             ],
-            state: None
+            state: NodeState::None,
         };
 
         let ctx = Context::default();
@@ -907,11 +898,11 @@ mod tests {
         assert_eq!(q.evaluate(&ctx), EvalResult::True(true));
     }
 
-    #[test]
+    /*#[test]
     fn then_right_fail() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 1,
             right: 1,
@@ -919,7 +910,7 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 1,
             right: 2,
@@ -928,7 +919,7 @@ mod tests {
         let mut q = Then {
             left: &mut a,
             right: &mut b,
-            state: None,
+            state: NodeState::None,
             branch: ThenBranch::Left,
         };
 
@@ -941,7 +932,7 @@ mod tests {
     fn then_left_stateful_fail() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: true,
             left: 1,
             right: 2,
@@ -949,7 +940,7 @@ mod tests {
 
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2,
             right: 2,
@@ -958,41 +949,41 @@ mod tests {
         let mut q = Then {
             left: &mut a,
             right: &mut b,
-            state: None,
+            state: NodeState::None,
             branch: ThenBranch::Left,
         };
 
         let ctx = Context::default();
         assert_eq!(q.evaluate(&ctx), EvalResult::False(true));
         assert_eq!(q.evaluate(&ctx), EvalResult::False(true));
-    }
+    }*/
 
     #[test]
     fn sequence_scenario() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 1,
             right: 1,
         };
         let mut b_fail = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 2,
             right: 1,
         };
         let mut b = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 1,
             right: 1,
         };
         let mut c = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
-            state: None,
+            state: NodeState::None,
             is_partition: false,
             left: 1,
             right: 1,
@@ -1005,32 +996,32 @@ mod tests {
                 SequenceNode { node: &mut b_fail, limits: None },
                 SequenceNode { node: &mut c, limits: None },
             ],
-            state: None,
+            state: NodeState::None,
         };
 
         let ctx = Context::default();
         // pass first node
         assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
         assert_eq!(s.current_node_idx, 1);
-        assert_eq!(s.state.is_none(), true);
+        assert_eq!(s.state, NodeState::None);
         // fail at second node
         assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
         assert_eq!(s.current_node_idx, 1);
-        assert_eq!(s.state.is_none(), true);
+        assert_eq!(s.state, NodeState::None);
         // set second node to True
         s.nodes[1].node = &mut b;
         // pass second node
         assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
         assert_eq!(s.current_node_idx, 2);
-        assert_eq!(s.state.is_none(), true);
+        assert_eq!(s.state, NodeState::None);
         // pass third node
         assert_eq!(s.evaluate(&ctx), EvalResult::True(true));
         assert_eq!(s.current_node_idx, 2);
-        assert_eq!(*s.state.as_ref().unwrap(), NodeState::True);
+        assert_eq!(s.state, NodeState::True);
         // nothing changes on further evaluations
         assert_eq!(s.evaluate(&ctx), EvalResult::True(true));
         assert_eq!(s.current_node_idx, 2);
-        assert_eq!(s.state.unwrap(), NodeState::True);
+        assert_eq!(s.state, NodeState::True);
     }
 }
 
