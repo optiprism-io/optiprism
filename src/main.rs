@@ -1202,10 +1202,10 @@ mod tests {
     #[test]
     fn absolute_time_window_limit() {
         let from = Some(DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(1, 0), Utc));
-        let to = Some(DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(3, 0), Utc));
+        let to = Some(DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(2, 0), Utc));
 
         let vals: Vec<u32> = vec![0, 1, 2, 3, 4];
-        let limit = &mut AbsoluteTimeWindowLimit::new(&vals, from, to);
+        let mut limit = AbsoluteTimeWindowLimit::new(&vals, from, to);
         let mut ctx = Context { row_id: 0 };
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::False);
         ctx.row_id = 1;
@@ -1213,8 +1213,6 @@ mod tests {
         ctx.row_id = 2;
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
         ctx.row_id = 3;
-        assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
-        ctx.row_id = 4;
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::ResetNode);
     }
 }
