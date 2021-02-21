@@ -1,4 +1,7 @@
 use std::marker::PhantomData;
+use std::time::{Instant};
+use chrono::{DateTime, Utc, NaiveDateTime};
+use std::convert::{From, TryInto, TryFrom};
 
 mod cmp;
 
@@ -26,8 +29,15 @@ enum NodeState {
 }
 
 trait Limit {
-    fn check(&mut self, matched: bool) -> Option<LimitCheckResult>;
+    fn check(&mut self, ctx: &Context, matched: bool) -> LimitCheckResult;
     fn reset(&mut self);
+}
+
+#[derive(PartialEq, Debug)]
+enum LimitCheckResult {
+    True,
+    False,
+    ResetNode,
 }
 
 struct CountLimit {
@@ -36,13 +46,7 @@ struct CountLimit {
     current_value: u32,
 }
 
-enum LimitCheckResult {
-    True,
-    False,
-    ResetNode,
-}
-
-impl Limit for CountLimit {
+/*impl Limit for CountLimit {
     fn check(&mut self, matched: bool) -> Option<LimitCheckResult> {
         if matched {
             self.current_value += 1;
@@ -70,13 +74,103 @@ impl Limit for CountLimit {
     }
 }
 
+struct RowLimit {
+    min: u32,
+    max: u32,
+    current_value: u32,
+}
+
+impl Limit for RowLimit {
+    fn check(&mut self, matched: bool) -> Option<LimitCheckResult> {
+        if matched {
+            self.current_value += 1;
+
+            if self.current_value < self.min {
+                return Some(LimitCheckResult::False);
+            } else if self.max > 0 && self.current_value > self.max {
+                return Some(LimitCheckResult::ResetNode);
+            }
+
+            return None;
+        }
+
+        if self.current_value > self.min &&
+            (self.max == 0 || self.current_value <= self.max) {
+            // node became stateful
+            return Some(LimitCheckResult::True);
+        }
+
+        return None;
+    }
+
+    fn reset(&mut self) {
+        self.current_value = 0;
+    }
+}
+*/
+struct AbsoluteTimeWindowLimit<'a, T> {
+    from: Option<T>,
+    to: Option<T>,
+    values: &'a [T],
+}
+
+fn example(v: i8) -> i32 {
+    i32::try_from(v).unwrap()
+}
+
+impl<'a, T: TryFrom<i64>> AbsoluteTimeWindowLimit<'a, T> {
+    pub fn new<Tz: chrono::TimeZone>(values: &'a [T], from: Option<chrono::DateTime<Tz>>, to: Option<chrono::DateTime<Tz>>) -> Self {
+        let mut obj = AbsoluteTimeWindowLimit {
+            from: None,
+            to: None,
+            values,
+        };
+
+        if let Some(t) = from {
+            obj.from = t.timestamp().try_into().ok();
+        }
+
+        if let Some(t) = to {
+            obj.to = t.timestamp().try_into().ok();
+        }
+
+        obj
+    }
+}
+
+impl<'a, T> Limit for AbsoluteTimeWindowLimit<'a, T> where T: PartialOrd + Copy {
+    fn check(&mut self, ctx: &Context, matched: bool) -> LimitCheckResult {
+        let ts = self.values[ctx.row_id];
+
+        if let Some(from) = self.from {
+            if ts < from {
+                return LimitCheckResult::False;
+            }
+        }
+
+        if let Some(to) = self.to {
+            if ts <= to {
+                return LimitCheckResult::True;
+            }
+
+            return LimitCheckResult::ResetNode;
+        }
+
+        panic!("unreachable code");
+    }
+
+    fn reset(&mut self) {}
+}
+
+
 struct Limits<'a> {
     limits: Vec<&'a mut dyn Limit>,
 }
 
 impl<'a> Limits<'a> {
     pub fn check(&mut self, eval_result: EvalResult) -> Option<LimitCheckResult> {
-        let mut matched: bool = false;
+        panic!("unimplemented");
+        /*let mut matched: bool = false;
         match eval_result {
             EvalResult::True(true) | EvalResult::False(true) => return None,
             EvalResult::True(false) => matched = true,
@@ -97,7 +191,7 @@ impl<'a> Limits<'a> {
             return Some(LimitCheckResult::False);
         }
 
-        None
+        None*/
     }
     fn reset(&mut self) {}
 }
@@ -159,15 +253,15 @@ impl<'a> Node for And<'a> {
 impl<'a> And<'a> {
     fn check_limits(&mut self, eval_result: EvalResult) -> EvalResult {
         if let Some(limits) = &mut self.limits {
-            return match limits.check(eval_result) {
-                None => eval_result,
-                Some(LimitCheckResult::True) => EvalResult::True(false),
-                Some(LimitCheckResult::False) => EvalResult::False(false),
-                Some(LimitCheckResult::ResetNode) => {
-                    self.reset();
-                    EvalResult::False(false)
-                }
-            };
+            /*            return match limits.check(eval_result) {
+                            None => eval_result,
+                            Some(LimitCheckResult::True) => EvalResult::True(false),
+                            Some(LimitCheckResult::False) => EvalResult::False(false),
+                            Some(LimitCheckResult::ResetNode) => {
+                                self.reset();
+                                EvalResult::False(false)
+                            }
+                        };*/
         }
 
         eval_result
@@ -303,7 +397,7 @@ impl<'a> Node for Sequence<'a> {
         };
 
         for (idx, node) in self.nodes.iter_mut().enumerate() {
-            if idx >= self.current_node_idx {
+            if idx == self.current_node_idx {
                 return match node.evaluate(ctx) {
                     EvalResult::False(stateful) => {
                         if stateful {
@@ -405,9 +499,26 @@ impl<T, C> Node for VectorValue<T, C> where T: Copy, C: cmp::Cmp<T> {
     }
 }
 
+struct TestValue {
+    is_partition: bool,
+    value: bool,
+}
+
+impl Node for TestValue {
+    fn evaluate(&mut self, _: &Context) -> EvalResult {
+        if self.value {
+            return EvalResult::True(self.is_partition);
+        }
+        return EvalResult::False(self.is_partition);
+    }
+
+    fn reset(&mut self) {}
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use chrono::DateTime;
 
     #[test]
     fn scalar_value_equal_fails() {
@@ -1022,6 +1133,89 @@ mod tests {
         assert_eq!(s.evaluate(&ctx), EvalResult::True(true));
         assert_eq!(s.current_node_idx, 2);
         assert_eq!(s.state, NodeState::True);
+    }
+
+    /*#[test]
+    fn sequence_limits() {
+        let mut a = TestValue {
+            is_partition: false,
+            value: true,
+        };
+        let mut b = TestValue {
+            is_partition: false,
+            value: false,
+        };
+        let mut c = TestValue {
+            is_partition: false,
+            value: false,
+        };
+
+        let mut a_count_limit = CountLimit {
+            min: 0,
+            max: 2,
+            current_value: 0,
+        };
+        let mut a_row_limit = RowLimit {
+            min: 1,
+            max: 3,
+            current_value: 0,
+        };
+
+        let mut a_limits = Limits {
+            limits: vec![&mut a_count_limit, &mut a_row_limit],
+        };
+
+
+        let mut b_count_limit = CountLimit {
+            min: 0,
+            max: 2,
+            current_value: 0,
+        };
+
+        let mut b_row_limit = RowLimit {
+            min: 1,
+            max: 3,
+            current_value: 0,
+        };
+
+        let mut b_limits = Limits {
+            limits: vec![&mut b_count_limit, &mut b_row_limit],
+        };
+
+        let mut s = Sequence {
+            current_node_idx: 0,
+            nodes: vec![
+                SequenceNode { node: &mut a, limits: Some(&mut a_limits) },
+                SequenceNode { node: &mut b, limits: Some(&mut b_limits) },
+                SequenceNode { node: &mut c, limits: None },
+            ],
+            state: NodeState::None,
+        };
+
+        let ctx = Context::default();
+        // pass first node
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.current_node_idx, 0);
+        assert_eq!(s.state, NodeState::None);
+    }*/
+
+    #[test]
+    fn absolute_time_window_limit() {
+        let from = Some(DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(1, 0), Utc));
+        let to = Some(DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(3, 0), Utc));
+
+        let vals: Vec<u32> = vec![0, 1, 2, 3, 4];
+        let limit = &mut AbsoluteTimeWindowLimit::new(&vals, from, to);
+        let mut ctx = Context { row_id: 0 };
+        assert_eq!(limit.check(&ctx, false), LimitCheckResult::False);
+        ctx.row_id = 1;
+        assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
+        ctx.row_id = 2;
+        assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
+        ctx.row_id = 3;
+        assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
+        ctx.row_id = 4;
+        assert_eq!(limit.check(&ctx, false), LimitCheckResult::ResetNode);
     }
 }
 
