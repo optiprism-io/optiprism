@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::time::{Instant};
 use chrono::{DateTime, Utc, NaiveDateTime};
 use std::convert::{From, TryInto, TryFrom};
+use crate::cmp::Cmp;
 
 mod cmp;
 
@@ -108,18 +109,35 @@ impl Limit for RowLimit {
     }
 }
 */
+
+enum CmpValue<T> {
+    None,
+    Equal(T),
+    NotEqual(T),
+    Less(T),
+    LessEqual(T),
+    Greater(T),
+    GreaterEqual(T),
+}
+
 struct AbsoluteTimeWindowLimit<'a, T> {
     from: Option<T>,
     to: Option<T>,
     values: &'a [T],
 }
 
-fn example(v: i8) -> i32 {
-    i32::try_from(v).unwrap()
+enum TimeLimitArg<Tz: chrono::TimeZone> {
+    None,
+    Equal(chrono::DateTime<Tz>),
+    NotEqual(chrono::DateTime<Tz>),
+    Less(chrono::DateTime<Tz>),
+    LessEqual(chrono::DateTime<Tz>),
+    Greater(chrono::DateTime<Tz>),
+    GreaterEqual(chrono::DateTime<Tz>),
 }
 
 impl<'a, T: TryFrom<i64>> AbsoluteTimeWindowLimit<'a, T> {
-    pub fn new<Tz: chrono::TimeZone>(values: &'a [T], from: Option<chrono::DateTime<Tz>>, to: Option<chrono::DateTime<Tz>>) -> Self {
+    pub fn new<Tz: chrono::TimeZone>(values: &'a [T], from: TimeLimitArg<Tz>, to: TimeLimitArg<Tz>) -> Self {
         let mut obj = AbsoluteTimeWindowLimit {
             from: None,
             to: None,
@@ -436,7 +454,19 @@ struct ScalarValue<T, C> {
     right: T,
 }
 
-impl<T, C> Node for ScalarValue<T, C> where T: Copy, C: cmp::Cmp<T> {
+impl<T, C> ScalarValue<T, C> {
+    pub fn new(left: T, right: T) -> Self {
+        ScalarValue {
+            c: PhantomData,
+            state: NodeState::None,
+            is_partition: false,
+            left,
+            right,
+        }
+    }
+}
+
+impl<T, C> Node for ScalarValue<T, C> where C: Cmp<T> {
     fn evaluate(&mut self, _: &Context) -> EvalResult {
         // check if node already has state
         match self.state {
@@ -518,7 +548,30 @@ impl Node for TestValue {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use chrono::DateTime;
+    use chrono::{DateTime, TimeZone};
+
+    #[test]
+    fn cmp() {
+        assert_eq!(<cmp::Equal as cmp::Cmp<u32>>::is_true(1, 2), false);
+        assert_eq!(<cmp::Equal as cmp::Cmp<u32>>::is_true(1, 1), true);
+
+        assert_eq!(<cmp::Less as cmp::Cmp<u32>>::is_true(1, 2), true);
+        assert_eq!(<cmp::Less as cmp::Cmp<u32>>::is_true(1, 1), false);
+
+        assert_eq!(<cmp::LessEqual as cmp::Cmp<u32>>::is_true(1, 2), true);
+        assert_eq!(<cmp::LessEqual as cmp::Cmp<u32>>::is_true(2, 2), true);
+        assert_eq!(<cmp::LessEqual as cmp::Cmp<u32>>::is_true(3, 2), false);
+
+        assert_eq!(<cmp::Greater as cmp::Cmp<u32>>::is_true(2, 1), true);
+        assert_eq!(<cmp::Greater as cmp::Cmp<u32>>::is_true(1, 1), false);
+
+        assert_eq!(<cmp::GreaterEqual as cmp::Cmp<u32>>::is_true(2, 1), true);
+        assert_eq!(<cmp::GreaterEqual as cmp::Cmp<u32>>::is_true(2, 2), true);
+        assert_eq!(<cmp::GreaterEqual as cmp::Cmp<u32>>::is_true(2, 3), false);
+
+        assert_eq!(<cmp::NotEqual as cmp::Cmp<u32>>::is_true(1, 2), true);
+        assert_eq!(<cmp::NotEqual as cmp::Cmp<u32>>::is_true(1, 1), false);
+    }
 
     #[test]
     fn scalar_value_equal_fails() {
@@ -1201,11 +1254,11 @@ mod tests {
 
     #[test]
     fn absolute_time_window_limit() {
-        let from = Some(DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(1, 0), Utc));
-        let to = Some(DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(2, 0), Utc));
+        let from = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(1, 0), Utc);
+        let to = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(2, 0), Utc);
 
         let vals: Vec<u32> = vec![0, 1, 2, 3, 4];
-        let mut limit = AbsoluteTimeWindowLimit::new(&vals, from, to);
+        let mut limit = AbsoluteTimeWindowLimit::new(&vals, TimeLimitArg::GreaterEqual(from), TimeLimitArg::LessEqual(to));
         let mut ctx = Context { row_id: 0 };
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::False);
         ctx.row_id = 1;
