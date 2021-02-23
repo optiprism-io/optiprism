@@ -3,6 +3,7 @@ use std::time::{Instant};
 use chrono::{DateTime, Utc, NaiveDateTime};
 use std::convert::{From, TryInto, TryFrom};
 use crate::cmp::Cmp;
+use std::fmt;
 
 mod cmp;
 
@@ -110,6 +111,14 @@ impl Limit for RowLimit {
 }
 */
 
+
+struct AbsoluteTimeWindowLimit<'a, T> {
+    from: CmpValue<T>,
+    to: CmpValue<T>,
+    values: &'a [T],
+}
+
+#[derive(Debug, Copy, Clone)]
 enum CmpValue<T> {
     None,
     Equal(T),
@@ -120,55 +129,108 @@ enum CmpValue<T> {
     GreaterEqual(T),
 }
 
-struct AbsoluteTimeWindowLimit<'a, T> {
-    from: Option<T>,
-    to: Option<T>,
-    values: &'a [T],
-}
-
-#[derive(PartialEq, Debug)]
-enum CmpValueArg<T> {
-    None,
-    Equal(T),
-    NotEqual(T),
-    Less(T),
-    LessEqual(T),
-    Greater(T),
-    GreaterEqual(T),
-}
-
-impl<Tz> CmpValueArg<DateTime<Tz>> where Tz: chrono::TimeZone {
-    pub fn date_time_to_timestamp<C: TryFrom<i64>>(self) -> Option<C> {
+impl<T> CmpValue<T> where T: Copy + PartialEq + PartialOrd {
+    pub fn value(self) -> Option<T> {
         return match self {
-            CmpValueArg::None => None,
-            CmpValueArg::Equal(t) | CmpValueArg::NotEqual(t) |
-            CmpValueArg::Less(t) | CmpValueArg::LessEqual(t) |
-            CmpValueArg::Greater(t) |
-            CmpValueArg::GreaterEqual(t) => Some(t.timestamp().try_into().ok().unwrap()),
+            CmpValue::None => None,
+            CmpValue::Equal(v) | CmpValue::NotEqual(v) |
+            CmpValue::Less(v) | CmpValue::LessEqual(v) |
+            CmpValue::Greater(v) |
+            CmpValue::GreaterEqual(v) => Some(v),
+        };
+    }
+    pub fn is_set(self) -> bool {
+        return match self {
+            CmpValue::None => false,
+            _ => true,
+        };
+    }
+    pub fn cmp(self, left: T) -> bool {
+        return match self {
+            CmpValue::None => true,
+            CmpValue::Equal(right) => cmp::Equal::is_true(left, right),
+            CmpValue::NotEqual(right) => cmp::NotEqual::is_true(left, right),
+            CmpValue::Less(right) => cmp::Less::is_true(left, right),
+            CmpValue::LessEqual(right) => cmp::LessEqual::is_true(left, right),
+            CmpValue::Greater(right) => cmp::GreaterEqual::is_true(left, right),
+            CmpValue::GreaterEqual(right) => cmp::GreaterEqual::is_true(left, right),
+        };
+    }
+}
+
+impl<T> CmpValue<T> {
+    pub fn to<C: TryFrom<T>>(self) -> CmpValue<C> {
+        return match self {
+            CmpValue::None => CmpValue::None,
+            CmpValue::Equal(t) => CmpValue::Equal(t.try_into().ok().unwrap()),
+            CmpValue::NotEqual(t) => CmpValue::NotEqual(t.try_into().ok().unwrap()),
+            CmpValue::Less(t) => CmpValue::Less(t.try_into().ok().unwrap()),
+            CmpValue::LessEqual(t) => CmpValue::LessEqual(t.try_into().ok().unwrap()),
+            CmpValue::Greater(t) => CmpValue::Greater(t.try_into().ok().unwrap()),
+            CmpValue::GreaterEqual(t) => CmpValue::GreaterEqual(t.try_into().ok().unwrap()),
         };
     }
 }
 
 impl<'a, T: TryFrom<i64>> AbsoluteTimeWindowLimit<'a, T> {
-    pub fn new<Tz: chrono::TimeZone>(values: &'a [T], from: CmpValueArg<DateTime<Tz>>, to: CmpValueArg<DateTime<Tz>>) -> Self {
+    pub fn new(values: &'a [T], from: CmpValue<i64>, to: CmpValue<i64>) -> Self {
         let mut obj = AbsoluteTimeWindowLimit {
-            from: None,
-            to: None,
+            from: from.to(),
+            to: to.to(),
             values,
         };
-
-        obj.from = from.date_time_to_timestamp();
-        obj.to = to.date_time_to_timestamp();
 
         obj
     }
 }
 
-impl<'a, T> Limit for AbsoluteTimeWindowLimit<'a, T> where T: PartialOrd + Copy {
-    fn check(&mut self, ctx: &Context, matched: bool) -> LimitCheckResult {
+impl<'a, T> Limit for AbsoluteTimeWindowLimit<'a, T> where T: Copy + PartialEq + PartialOrd {
+    fn check(&mut self, ctx: &Context, _: bool) -> LimitCheckResult {
+        println!();
         let ts = self.values[ctx.row_id];
 
-        if let Some(from) = self.from {
+
+        let left = self.from.cmp(ts);
+        let right = self.to.cmp(ts);
+        if left && right {
+            return LimitCheckResult::True;
+        }
+
+
+        if self.to.is_set() && !right {
+            return LimitCheckResult::ResetNode;
+        }
+
+        return LimitCheckResult::False;
+    }
+
+    fn reset(&mut self) {}
+}
+
+struct TrueCountLimit<T> {
+    from: Option<T>,
+    to: Option<T>,
+    count: u32,
+}
+/*
+impl<T: TryFrom<i64>> TrueCountLimit<T> {
+    pub fn new<Tz: chrono::TimeZone>(from: CmpValue<u32>, to: CmpValue<u32>) -> Self {
+        let mut obj = TrueCountLimit {
+            from: None,
+            to: None,
+            count: 0,
+        };
+
+        obj.from = from.value();
+        obj.to = to.value();
+
+        obj
+    }
+}
+*/
+impl<T> Limit for TrueCountLimit<T> where T: PartialOrd + Copy {
+    fn check(&mut self, ctx: &Context, matched: bool) -> LimitCheckResult {
+        /*if let Some(from) = self.from {
             if ts < from {
                 return LimitCheckResult::False;
             }
@@ -180,14 +242,13 @@ impl<'a, T> Limit for AbsoluteTimeWindowLimit<'a, T> where T: PartialOrd + Copy 
             }
 
             return LimitCheckResult::ResetNode;
-        }
+        }*/
 
         panic!("unreachable code");
     }
 
     fn reset(&mut self) {}
 }
-
 
 struct Limits<'a> {
     limits: Vec<&'a mut dyn Limit>,
@@ -1262,20 +1323,15 @@ mod tests {
 
     #[test]
     fn absolute_time_window_limit() {
-        let from = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(1, 0), Utc);
-        let to = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(2, 0), Utc);
-
-        let vals: Vec<u32> = vec![0, 1, 2, 1, 3, 4];
-        let mut limit = AbsoluteTimeWindowLimit::new(&vals, CmpValueArg::GreaterEqual(from), CmpValueArg::LessEqual(to));
+        let mut limit = AbsoluteTimeWindowLimit::new(&[0u32; 1], CmpValue::GreaterEqual(1), CmpValue::LessEqual(2));
         let mut ctx = Context { row_id: 0 };
+
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::False);
-        ctx.row_id = 1;
+        limit.values = &[1u32; 1];
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
-        ctx.row_id = 2;
+        limit.values = &[2u32; 1];
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
-        ctx.row_id = 3;
-        assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
-        ctx.row_id = 4;
+        limit.values = &[3u32; 1];
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::ResetNode);
     }
 }
