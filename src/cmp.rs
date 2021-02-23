@@ -18,15 +18,13 @@ impl Cmp<u32> for NotEqual {
     }
 }*/
 
-use std::marker::PhantomData;
-
-pub trait Cmp<T> {
+pub trait Cmp<T: Copy> {
     fn is_true(left: T, right: T) -> bool;
 }
 
 pub struct Equal;
 
-impl<T> Cmp<T> for Equal where T: PartialEq {
+impl<T: Copy> Cmp<T> for Equal where T: PartialEq {
     fn is_true(left: T, right: T) -> bool {
         return left == right;
     }
@@ -34,7 +32,7 @@ impl<T> Cmp<T> for Equal where T: PartialEq {
 
 pub struct Less;
 
-impl<T> Cmp<T> for Less where T: PartialOrd {
+impl<T: Copy> Cmp<T> for Less where T: PartialOrd {
     fn is_true(left: T, right: T) -> bool {
         return left < right;
     }
@@ -42,7 +40,7 @@ impl<T> Cmp<T> for Less where T: PartialOrd {
 
 pub struct LessEqual;
 
-impl<T> Cmp<T> for LessEqual where T: PartialOrd {
+impl<T: Copy> Cmp<T> for LessEqual where T: PartialOrd {
     fn is_true(left: T, right: T) -> bool {
         return left <= right;
     }
@@ -50,7 +48,7 @@ impl<T> Cmp<T> for LessEqual where T: PartialOrd {
 
 pub struct Greater;
 
-impl<T> Cmp<T> for Greater where T: PartialOrd {
+impl<T: Copy> Cmp<T> for Greater where T: PartialOrd {
     fn is_true(left: T, right: T) -> bool {
         return left > right;
     }
@@ -58,7 +56,7 @@ impl<T> Cmp<T> for Greater where T: PartialOrd {
 
 pub struct GreaterEqual;
 
-impl<T> Cmp<T> for GreaterEqual where T: PartialOrd {
+impl<T: Copy> Cmp<T> for GreaterEqual where T: PartialOrd {
     fn is_true(left: T, right: T) -> bool {
         return left >= right;
     }
@@ -66,7 +64,7 @@ impl<T> Cmp<T> for GreaterEqual where T: PartialOrd {
 
 pub struct NotEqual;
 
-impl<T> Cmp<T> for NotEqual where T: PartialEq {
+impl<T: Copy> Cmp<T> for NotEqual where T: PartialEq {
     fn is_true(left: T, right: T) -> bool {
         return left != right;
     }

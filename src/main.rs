@@ -126,6 +126,7 @@ struct AbsoluteTimeWindowLimit<'a, T> {
     values: &'a [T],
 }
 
+#[derive(PartialEq, Debug)]
 enum TimeLimitArg<Tz: chrono::TimeZone> {
     None,
     Equal(chrono::DateTime<Tz>),
@@ -136,6 +137,18 @@ enum TimeLimitArg<Tz: chrono::TimeZone> {
     GreaterEqual(chrono::DateTime<Tz>),
 }
 
+impl<Tz: chrono::TimeZone> TimeLimitArg<Tz> {
+    pub fn date_time_to_timestamp<T: TryFrom<i64>>(self) -> Option<T> {
+        return match self {
+            TimeLimitArg::None => None,
+            TimeLimitArg::Equal(t) | TimeLimitArg::NotEqual(t) |
+            TimeLimitArg::Less(t) | TimeLimitArg::LessEqual(t) |
+            TimeLimitArg::Greater(t) |
+            TimeLimitArg::GreaterEqual(t) => Some(t.timestamp().try_into().ok().unwrap()),
+        };
+    }
+}
+
 impl<'a, T: TryFrom<i64>> AbsoluteTimeWindowLimit<'a, T> {
     pub fn new<Tz: chrono::TimeZone>(values: &'a [T], from: TimeLimitArg<Tz>, to: TimeLimitArg<Tz>) -> Self {
         let mut obj = AbsoluteTimeWindowLimit {
@@ -144,13 +157,8 @@ impl<'a, T: TryFrom<i64>> AbsoluteTimeWindowLimit<'a, T> {
             values,
         };
 
-        if let Some(t) = from {
-            obj.from = t.timestamp().try_into().ok();
-        }
-
-        if let Some(t) = to {
-            obj.to = t.timestamp().try_into().ok();
-        }
+        obj.from = from.date_time_to_timestamp();
+        obj.to = to.date_time_to_timestamp();
 
         obj
     }
@@ -411,7 +419,7 @@ impl<'a> Node for Sequence<'a> {
         match self.state {
             NodeState::True => return EvalResult::True(true),
             NodeState::False => return EvalResult::False(true),
-            _ => {}
+            NodeState::None => {}
         };
 
         for (idx, node) in self.nodes.iter_mut().enumerate() {
@@ -466,7 +474,7 @@ impl<T, C> ScalarValue<T, C> {
     }
 }
 
-impl<T, C> Node for ScalarValue<T, C> where C: Cmp<T> {
+impl<T, C> Node for ScalarValue<T, C> where T: Copy, C: Cmp<T> {
     fn evaluate(&mut self, _: &Context) -> EvalResult {
         // check if node already has state
         match self.state {
@@ -1257,7 +1265,7 @@ mod tests {
         let from = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(1, 0), Utc);
         let to = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(2, 0), Utc);
 
-        let vals: Vec<u32> = vec![0, 1, 2, 3, 4];
+        let vals: Vec<u32> = vec![0, 1, 2, 1, 3, 4];
         let mut limit = AbsoluteTimeWindowLimit::new(&vals, TimeLimitArg::GreaterEqual(from), TimeLimitArg::LessEqual(to));
         let mut ctx = Context { row_id: 0 };
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::False);
@@ -1266,6 +1274,8 @@ mod tests {
         ctx.row_id = 2;
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
         ctx.row_id = 3;
+        assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
+        ctx.row_id = 4;
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::ResetNode);
     }
 }
