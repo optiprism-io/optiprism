@@ -159,6 +159,7 @@ impl<T> CmpValue<T> where T: Copy + PartialEq + PartialOrd {
 }
 
 impl<T> CmpValue<T> {
+    // https://github.com/rust-lang/rust/issues/50133
     pub fn to<C: TryFrom<T>>(self) -> CmpValue<C> {
         return match self {
             CmpValue::None => CmpValue::None,
