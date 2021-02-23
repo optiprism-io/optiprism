@@ -127,30 +127,30 @@ struct AbsoluteTimeWindowLimit<'a, T> {
 }
 
 #[derive(PartialEq, Debug)]
-enum TimeLimitArg<Tz: chrono::TimeZone> {
+enum CmpValueArg<T> {
     None,
-    Equal(chrono::DateTime<Tz>),
-    NotEqual(chrono::DateTime<Tz>),
-    Less(chrono::DateTime<Tz>),
-    LessEqual(chrono::DateTime<Tz>),
-    Greater(chrono::DateTime<Tz>),
-    GreaterEqual(chrono::DateTime<Tz>),
+    Equal(T),
+    NotEqual(T),
+    Less(T),
+    LessEqual(T),
+    Greater(T),
+    GreaterEqual(T),
 }
 
-impl<Tz: chrono::TimeZone> TimeLimitArg<Tz> {
-    pub fn date_time_to_timestamp<T: TryFrom<i64>>(self) -> Option<T> {
+impl<Tz> CmpValueArg<DateTime<Tz>> where Tz: chrono::TimeZone {
+    pub fn date_time_to_timestamp<C: TryFrom<i64>>(self) -> Option<C> {
         return match self {
-            TimeLimitArg::None => None,
-            TimeLimitArg::Equal(t) | TimeLimitArg::NotEqual(t) |
-            TimeLimitArg::Less(t) | TimeLimitArg::LessEqual(t) |
-            TimeLimitArg::Greater(t) |
-            TimeLimitArg::GreaterEqual(t) => Some(t.timestamp().try_into().ok().unwrap()),
+            CmpValueArg::None => None,
+            CmpValueArg::Equal(t) | CmpValueArg::NotEqual(t) |
+            CmpValueArg::Less(t) | CmpValueArg::LessEqual(t) |
+            CmpValueArg::Greater(t) |
+            CmpValueArg::GreaterEqual(t) => Some(t.timestamp().try_into().ok().unwrap()),
         };
     }
 }
 
 impl<'a, T: TryFrom<i64>> AbsoluteTimeWindowLimit<'a, T> {
-    pub fn new<Tz: chrono::TimeZone>(values: &'a [T], from: TimeLimitArg<Tz>, to: TimeLimitArg<Tz>) -> Self {
+    pub fn new<Tz: chrono::TimeZone>(values: &'a [T], from: CmpValueArg<DateTime<Tz>>, to: CmpValueArg<DateTime<Tz>>) -> Self {
         let mut obj = AbsoluteTimeWindowLimit {
             from: None,
             to: None,
@@ -1266,7 +1266,7 @@ mod tests {
         let to = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(2, 0), Utc);
 
         let vals: Vec<u32> = vec![0, 1, 2, 1, 3, 4];
-        let mut limit = AbsoluteTimeWindowLimit::new(&vals, TimeLimitArg::GreaterEqual(from), TimeLimitArg::LessEqual(to));
+        let mut limit = AbsoluteTimeWindowLimit::new(&vals, CmpValueArg::GreaterEqual(from), CmpValueArg::LessEqual(to));
         let mut ctx = Context { row_id: 0 };
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::False);
         ctx.row_id = 1;
