@@ -112,12 +112,6 @@ impl Limit for RowLimit {
 */
 
 
-struct AbsoluteTimeWindowLimit<'a, T> {
-    from: CmpValue<T>,
-    to: CmpValue<T>,
-    values: &'a [T],
-}
-
 #[derive(Debug, Copy, Clone)]
 enum CmpValue<T> {
     None,
@@ -185,9 +179,14 @@ impl<'a, T: TryFrom<i64>> AbsoluteTimeWindowLimit<'a, T> {
     }
 }
 
+struct AbsoluteTimeWindowLimit<'a, T> {
+    from: CmpValue<T>,
+    to: CmpValue<T>,
+    values: &'a [T],
+}
+
 impl<'a, T> Limit for AbsoluteTimeWindowLimit<'a, T> where T: Copy + PartialEq + PartialOrd {
     fn check(&mut self, ctx: &Context, _: bool) -> LimitCheckResult {
-        println!();
         let ts = self.values[ctx.row_id];
 
 
@@ -208,44 +207,40 @@ impl<'a, T> Limit for AbsoluteTimeWindowLimit<'a, T> where T: Copy + PartialEq +
     fn reset(&mut self) {}
 }
 
-struct TrueCountLimit<T> {
-    from: Option<T>,
-    to: Option<T>,
+struct TrueCountLimit {
+    from: CmpValue<u32>,
+    to: CmpValue<u32>,
     count: u32,
 }
-/*
-impl<T: TryFrom<i64>> TrueCountLimit<T> {
-    pub fn new<Tz: chrono::TimeZone>(from: CmpValue<u32>, to: CmpValue<u32>) -> Self {
-        let mut obj = TrueCountLimit {
-            from: None,
-            to: None,
+
+impl TrueCountLimit {
+    pub fn new(from: CmpValue<u32>, to: CmpValue<u32>) -> Self {
+        TrueCountLimit {
+            from,
+            to,
             count: 0,
-        };
-
-        obj.from = from.value();
-        obj.to = to.value();
-
-        obj
+        }
     }
 }
-*/
-impl<T> Limit for TrueCountLimit<T> where T: PartialOrd + Copy {
-    fn check(&mut self, ctx: &Context, matched: bool) -> LimitCheckResult {
-        /*if let Some(from) = self.from {
-            if ts < from {
-                return LimitCheckResult::False;
-            }
+
+impl Limit for TrueCountLimit {
+    fn check(&mut self, _: &Context, matched: bool) -> LimitCheckResult {
+        if matched {
+            self.count += 1;
         }
 
-        if let Some(to) = self.to {
-            if ts <= to {
-                return LimitCheckResult::True;
-            }
+        let left = self.from.cmp(self.count);
+        let right = self.to.cmp(self.count);
+        if left && right {
+            return LimitCheckResult::True;
+        }
 
+
+        if self.to.is_set() && !right {
             return LimitCheckResult::ResetNode;
-        }*/
+        }
 
-        panic!("unreachable code");
+        return LimitCheckResult::False;
     }
 
     fn reset(&mut self) {}
@@ -1334,6 +1329,17 @@ mod tests {
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::True);
         limit.values = &[3u32; 1];
         assert_eq!(limit.check(&ctx, false), LimitCheckResult::ResetNode);
+    }
+
+    #[test]
+    fn true_count_limit() {
+        let mut limit = TrueCountLimit::new(CmpValue::GreaterEqual(1), CmpValue::LessEqual(2));
+        let mut ctx = Context { row_id: 0 };
+
+        assert_eq!(limit.check(&ctx, false), LimitCheckResult::False);
+        assert_eq!(limit.check(&ctx, true), LimitCheckResult::True);
+        assert_eq!(limit.check(&ctx, true), LimitCheckResult::True);
+        assert_eq!(limit.check(&ctx, true), LimitCheckResult::ResetNode);
     }
 }
 
