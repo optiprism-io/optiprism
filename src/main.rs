@@ -243,7 +243,9 @@ impl Limit for TrueCountLimit {
         return LimitCheckResult::False;
     }
 
-    fn reset(&mut self) {}
+    fn reset(&mut self) {
+        self.count = 0;
+    }
 }
 
 struct Limits<'a> {
@@ -251,32 +253,38 @@ struct Limits<'a> {
 }
 
 impl<'a> Limits<'a> {
-    pub fn check(&mut self, eval_result: EvalResult) -> Option<LimitCheckResult> {
-        panic!("unimplemented");
-        /*let mut matched: bool = false;
+    pub fn new(limits: Vec<&'a mut dyn Limit>) -> Self {
+        Limits { limits }
+    }
+
+    pub fn check(&mut self, ctx: &Context, eval_result: EvalResult) -> LimitCheckResult {
+        let mut matched: bool = false;
         match eval_result {
-            EvalResult::True(true) | EvalResult::False(true) => return None,
+            EvalResult::True(true) | EvalResult::False(true) => return LimitCheckResult::True,
             EvalResult::True(false) => matched = true,
             _ => {}
         }
 
-        let mut is_false: bool = false;
+        let mut ret = LimitCheckResult::True;
+
         for l in self.limits.iter_mut() {
-            match l.check(matched) {
-                Some(LimitCheckResult::ResetNode) => return Some(LimitCheckResult::ResetNode),
-                Some(LimitCheckResult::True) => return Some(LimitCheckResult::True),
-                Some(LimitCheckResult::False) => is_false = true,
+            match l.check(ctx, matched) {
+                LimitCheckResult::False => ret = LimitCheckResult::False,
+                LimitCheckResult::ResetNode => {
+                    self.reset();
+                    return LimitCheckResult::ResetNode;
+                }
                 _ => {}
             }
         }
 
-        if is_false {
-            return Some(LimitCheckResult::False);
-        }
-
-        None*/
+        return ret;
     }
-    fn reset(&mut self) {}
+    fn reset(&mut self) {
+        for l in self.limits.iter_mut() {
+            l.reset();
+        }
+    }
 }
 
 struct And<'a> {
@@ -1340,6 +1348,21 @@ mod tests {
         assert_eq!(limit.check(&ctx, true), LimitCheckResult::True);
         assert_eq!(limit.check(&ctx, true), LimitCheckResult::True);
         assert_eq!(limit.check(&ctx, true), LimitCheckResult::ResetNode);
+    }
+
+    #[test]
+    fn limits() {
+        let mut window_limit = AbsoluteTimeWindowLimit::new(&[0u32; 1], CmpValue::GreaterEqual(2), CmpValue::LessEqual(4));
+        let mut true_count_limit = TrueCountLimit::new(CmpValue::GreaterEqual(1), CmpValue::LessEqual(2));
+        let mut limits = Limits::new(vec![&mut window_limit, &mut true_count_limit]);
+        let mut ctx = Context { row_id: 0 };
+        // window_limit.values = &[0u32; 1];
+        assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::False);
+        assert_eq!(true_count_limit.count, 1);
+        assert_eq!(limits.check(&ctx, EvalResult::False(false)), LimitCheckResult::False);
+        assert_eq!(true_count_limit.count, 1);
+        assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::False);
+        assert_eq!(true_count_limit.count, 2);
     }
 }
 
