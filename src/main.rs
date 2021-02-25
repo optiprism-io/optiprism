@@ -1354,15 +1354,30 @@ mod tests {
     fn limits() {
         let mut window_limit = AbsoluteTimeWindowLimit::new(&[0u32; 1], CmpValue::GreaterEqual(2), CmpValue::LessEqual(4));
         let mut true_count_limit = TrueCountLimit::new(CmpValue::GreaterEqual(1), CmpValue::LessEqual(2));
-        let mut limits = Limits::new(vec![&mut window_limit, &mut true_count_limit]);
         let mut ctx = Context { row_id: 0 };
         // window_limit.values = &[0u32; 1];
-        assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::False);
-        assert_eq!(true_count_limit.count, 1);
-        assert_eq!(limits.check(&ctx, EvalResult::False(false)), LimitCheckResult::False);
-        assert_eq!(true_count_limit.count, 1);
-        assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::False);
-        assert_eq!(true_count_limit.count, 2);
+
+        {
+            let mut limits = Limits::new(vec![&mut window_limit, &mut true_count_limit]);
+            assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::False);
+            assert_eq!(true_count_limit.count, 1);
+        }
+        {
+            let mut limits = Limits::new(vec![&mut window_limit, &mut true_count_limit]);
+            assert_eq!(limits.check(&ctx, EvalResult::False(false)), LimitCheckResult::False);
+            assert_eq!(true_count_limit.count, 1);
+        }
+        {
+            let mut limits = Limits::new(vec![&mut window_limit, &mut true_count_limit]);
+            assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::False);
+            assert_eq!(true_count_limit.count, 2);
+        }
+
+        {
+            let mut limits = Limits::new(vec![&mut window_limit, &mut true_count_limit]);
+            assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::ResetNode);
+            assert_eq!(true_count_limit.count, 0);
+        }
     }
 }
 
