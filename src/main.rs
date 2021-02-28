@@ -35,6 +35,11 @@ trait Limit {
     fn reset(&mut self);
 }
 
+trait SpanLimit {
+    fn check(&mut self, ctx: &Context) -> LimitCheckResult;
+    fn reset(&mut self);
+}
+
 #[derive(PartialEq, Debug)]
 enum LimitCheckResult {
     True,
@@ -248,6 +253,44 @@ impl Limit for TrueCountLimit {
     }
 }
 
+struct RowLimit {
+    from: CmpValue<u32>,
+    to: CmpValue<u32>,
+    count: u32,
+}
+
+impl RowLimit {
+    pub fn new(from: CmpValue<u32>, to: CmpValue<u32>) -> Self {
+        RowLimit {
+            from,
+            to,
+            count: 0,
+        }
+    }
+}
+
+impl Limit for RowLimit {
+    fn check(&mut self, _: &Context, _: bool) -> LimitCheckResult {
+        self.count += 1;
+        let left = self.from.cmp(self.count);
+        let right = self.to.cmp(self.count);
+        if left && right {
+            return LimitCheckResult::True;
+        }
+
+
+        if self.to.is_set() && !right {
+            return LimitCheckResult::ResetNode;
+        }
+
+        return LimitCheckResult::False;
+    }
+
+    fn reset(&mut self) {
+        self.count = 0;
+    }
+}
+
 struct Limits<'a> {
     limits: Vec<&'a mut dyn Limit>,
 }
@@ -271,7 +314,6 @@ impl<'a> Limits<'a> {
             match l.check(ctx, matched) {
                 LimitCheckResult::False => ret = LimitCheckResult::False,
                 LimitCheckResult::ResetNode => {
-                    self.reset();
                     return LimitCheckResult::ResetNode;
                 }
                 _ => {}
@@ -284,6 +326,73 @@ impl<'a> Limits<'a> {
         for l in self.limits.iter_mut() {
             l.reset();
         }
+    }
+}
+
+struct SpanLimits<'a> {
+    limits: Vec<&'a mut dyn SpanLimit>,
+}
+
+impl<'a> SpanLimits<'a> {
+    pub fn new(limits: Vec<&'a mut dyn SpanLimit>) -> Self {
+        SpanLimits { limits }
+    }
+
+    pub fn check(&mut self, ctx: &Context) -> LimitCheckResult {
+        let mut ret = LimitCheckResult::True;
+        for l in self.limits.iter_mut() {
+            match l.check(ctx) {
+                LimitCheckResult::False => ret = LimitCheckResult::False,
+                LimitCheckResult::ResetNode => {
+                    return LimitCheckResult::ResetNode;
+                }
+                _ => {}
+            }
+        }
+
+        return ret;
+    }
+    fn reset(&mut self) {
+        for l in self.limits.iter_mut() {
+            l.reset();
+        }
+    }
+}
+
+struct RowCountSpanLimit {
+    from: CmpValue<u32>,
+    to: CmpValue<u32>,
+    count: u32,
+}
+
+impl RowCountSpanLimit {
+    pub fn new(from: CmpValue<u32>, to: CmpValue<u32>) -> Self {
+        RowCountSpanLimit {
+            from,
+            to,
+            count: 0,
+        }
+    }
+}
+
+impl SpanLimit for RowCountSpanLimit {
+    fn check(&mut self, _: &Context) -> LimitCheckResult {
+        self.count += 1;
+        let left = self.from.cmp(self.count);
+        let right = self.to.cmp(self.count);
+        if left && right {
+            return LimitCheckResult::True;
+        }
+
+        if self.to.is_set() && !right {
+            return LimitCheckResult::ResetNode;
+        }
+
+        return LimitCheckResult::False;
+    }
+
+    fn reset(&mut self) {
+        self.count = 0;
     }
 }
 
@@ -317,17 +426,17 @@ impl<'a> Node for And<'a> {
                     if stateful {
                         self.state = NodeState::False;
                     }
-                    return self.check_limits(EvalResult::False(stateful));
+                    return self.check_limits(ctx, EvalResult::False(stateful));
                 }
             }
         }
 
         if is_stateful {
             self.state = NodeState::True;
-            return self.check_limits(EvalResult::True(true));
+            return self.check_limits(ctx, EvalResult::True(true));
         }
 
-        self.check_limits(EvalResult::True(false))
+        self.check_limits(ctx, EvalResult::True(false))
     }
 
     fn reset(&mut self) {
@@ -342,17 +451,16 @@ impl<'a> Node for And<'a> {
 }
 
 impl<'a> And<'a> {
-    fn check_limits(&mut self, eval_result: EvalResult) -> EvalResult {
+    fn check_limits(&mut self, ctx: &Context, eval_result: EvalResult) -> EvalResult {
         if let Some(limits) = &mut self.limits {
-            /*            return match limits.check(eval_result) {
-                            None => eval_result,
-                            Some(LimitCheckResult::True) => EvalResult::True(false),
-                            Some(LimitCheckResult::False) => EvalResult::False(false),
-                            Some(LimitCheckResult::ResetNode) => {
-                                self.reset();
-                                EvalResult::False(false)
-                            }
-                        };*/
+            return match limits.check(ctx, eval_result) {
+                LimitCheckResult::True => eval_result,
+                LimitCheckResult::False => EvalResult::False(false),
+                LimitCheckResult::ResetNode => {
+                    self.reset();
+                    EvalResult::False(false)
+                }
+            };
         }
 
         eval_result
@@ -362,6 +470,7 @@ impl<'a> And<'a> {
 struct Or<'a> {
     state: NodeState,
     children: Vec<&'a mut dyn Node>,
+    limits: Option<&'a mut Limits<'a>>,
 }
 
 impl<'a> Node for Or<'a> {
@@ -380,17 +489,16 @@ impl<'a> Node for Or<'a> {
                     if stateful {
                         self.state = NodeState::True;
                     }
-                    return EvalResult::True(stateful);
+                    return self.check_limits(ctx, EvalResult::True(stateful));
                 }
                 EvalResult::False(stateful) => {
                     if !stateful {
                         is_stateful = false;
                     }
                 }
-                _ => panic!(),
             }
         }
-        EvalResult::False(is_stateful)
+        self.check_limits(ctx, EvalResult::False(is_stateful))
     }
 
     fn reset(&mut self) {
@@ -398,124 +506,87 @@ impl<'a> Node for Or<'a> {
         for c in self.children.iter_mut() {
             c.reset()
         }
+        if let Some(limits) = &mut self.limits {
+            limits.reset();
+        }
     }
 }
 
-enum ThenBranch {
-    Left,
-    Right,
-}
-/*
-struct Then<'a> {
-    left: &'a mut dyn Node,
-    right: &'a mut dyn Node,
-    state: Option<NodeState>,
-    branch: ThenBranch,
-}
-
-impl<'a> Node for Then<'a> {
-    fn evaluate(&mut self, ctx: &Context) -> EvalResult {
-        // check if node already has state
-        if let Some(state) = &self.state {
-            return match state {
-                NodeState::True => EvalResult::True(true),
-                NodeState::False => EvalResult::False(true),
-            };
-        }
-
-        if let ThenBranch::Left = self.branch {
-            return match self.left.evaluate(ctx) {
-                EvalResult::True(_) => {
-                    self.branch = ThenBranch::Right;
-                    EvalResult::False(false)
-                }
-                EvalResult::False(true) => {
-                    EvalResult::False(true)
-                }
-                _ => {
+impl<'a> Or<'a> {
+    fn check_limits(&mut self, ctx: &Context, eval_result: EvalResult) -> EvalResult {
+        if let Some(limits) = &mut self.limits {
+            return match limits.check(ctx, eval_result) {
+                LimitCheckResult::True => eval_result,
+                LimitCheckResult::False => EvalResult::False(false),
+                LimitCheckResult::ResetNode => {
+                    self.reset();
                     EvalResult::False(false)
                 }
             };
         }
 
-        if let ThenBranch::Right = self.branch {
-            let result = self.right.evaluate(ctx);
-            if let EvalResult::True(true) = result {
-                self.state = Some(NodeState::True);
-            }
-
-            return result;
-        }
-
-        return EvalResult::False(false);
+        eval_result
     }
-
-    fn reset(&mut self) {
-        self.state = None;
-        self.branch = ThenBranch::Left;
-        self.left.reset();
-        self.right.reset();
-    }
-}*/
-
-struct SequenceNode<'a> {
-    node: &'a mut dyn Node,
-    limits: Option<&'a mut Limits<'a>>,
 }
 
-impl<'a> SequenceNode<'a> {
-    fn evaluate(&mut self, ctx: &Context) -> EvalResult {
-        self.node.evaluate(ctx)
-    }
-    fn check_limits(&mut self, eval_result: EvalResult) -> Option<LimitCheckResult> {
-        Some(LimitCheckResult::True)
-    }
+#[derive(PartialEq, Debug, Copy, Clone)]
+enum SequenceState {
+    True,
+    False,
+    LeftNode,
+    RightNode,
 }
 
 struct Sequence<'a> {
-    current_node_idx: usize,
-    nodes: Vec<SequenceNode<'a>>,
-    state: NodeState,
+    left_node: &'a mut dyn Node,
+    right_node: &'a mut dyn Node,
+    span_limits: Option<&'a mut SpanLimits<'a>>,
+    state: SequenceState,
 }
 
 impl<'a> Node for Sequence<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
-        // check if node already has state
         match self.state {
-            NodeState::True => return EvalResult::True(true),
-            NodeState::False => return EvalResult::False(true),
-            NodeState::None => {}
-        };
-
-        for (idx, node) in self.nodes.iter_mut().enumerate() {
-            if idx == self.current_node_idx {
-                return match node.evaluate(ctx) {
-                    EvalResult::False(stateful) => {
-                        if stateful {
-                            self.state = NodeState::False;
-                        }
-
-                        EvalResult::False(stateful)
-                    }
+            SequenceState::True => {
+                return EvalResult::True(true);
+            }
+            SequenceState::False => {
+                return EvalResult::False(true);
+            }
+            SequenceState::LeftNode => {
+                return match self.left_node.evaluate(ctx) {
                     EvalResult::True(_) => {
-                        // last node
-                        if idx == self.nodes.len() - 1 {
-                            self.state = NodeState::True;
-                            return EvalResult::True(true);
-                        }
-
-                        self.current_node_idx += 1;
+                        self.state = SequenceState::RightNode;
                         EvalResult::False(false)
                     }
+                    EvalResult::False(true) => {
+                        self.state = SequenceState::False;
+                        EvalResult::False(true)
+                    }
+                    EvalResult::False(false) => EvalResult::False(false),
+                };
+            }
+
+            SequenceState::RightNode => {
+                return match self.right_node.evaluate(ctx) {
+                    EvalResult::True(_) => {
+                        self.state = SequenceState::True;
+                        EvalResult::True(true)
+                    }
+                    EvalResult::False(true) => {
+                        self.state = SequenceState::False;
+                        EvalResult::False(true)
+                    }
+                    EvalResult::False(false) => EvalResult::False(false),
                 };
             }
         }
-
-        panic!("unreachable code");
     }
 
     fn reset(&mut self) {
-        unimplemented!()
+        self.state = SequenceState::LeftNode;
+        self.left_node.reset();
+        self.right_node.reset();
     }
 }
 
@@ -622,6 +693,7 @@ impl Node for TestValue {
 mod tests {
     use crate::*;
     use chrono::{DateTime, TimeZone};
+    use crate::Limits;
 
     #[test]
     fn cmp() {
@@ -945,6 +1017,7 @@ mod tests {
                 &mut a,
                 &mut b,
             ],
+            limits: None,
         };
 
         let ctx = Context::default();
@@ -975,6 +1048,7 @@ mod tests {
                 &mut a,
                 &mut b,
             ],
+            limits: None,
         };
 
         let ctx = Context::default();
@@ -1005,6 +1079,7 @@ mod tests {
                 &mut a,
                 &mut b,
             ],
+            limits: None,
         };
 
         let ctx = Context::default();
@@ -1035,6 +1110,7 @@ mod tests {
                 &mut a,
                 &mut b,
             ],
+            limits: None,
         };
 
         let mut ctx = Context { row_id: 0 };
@@ -1067,6 +1143,7 @@ mod tests {
                 &mut a,
                 &mut b,
             ],
+            limits: None,
         };
 
         let ctx = Context::default();
@@ -1097,6 +1174,7 @@ mod tests {
                 &mut a,
                 &mut b,
             ],
+            limits: None,
         };
 
         let ctx = Context::default();
@@ -1122,12 +1200,10 @@ mod tests {
         };
 
         let mut q = Sequence {
-            current_node_idx: 0,
-            nodes: vec![
-                SequenceNode { node: &mut a, limits: None },
-                SequenceNode { node: &mut b, limits: None },
-            ],
-            state: NodeState::None,
+            left_node: &mut a,
+            right_node: &mut b,
+            span_limits: None,
+            state: SequenceState::LeftNode,
         };
 
         let ctx = Context::default();
@@ -1218,112 +1294,27 @@ mod tests {
             left: 1,
             right: 1,
         };
-        let mut c = ScalarValue::<u32, cmp::Equal> {
-            c: PhantomData,
-            state: NodeState::None,
-            is_partition: false,
-            left: 1,
-            right: 1,
-        };
 
         let mut s = Sequence {
-            current_node_idx: 0,
-            nodes: vec![
-                SequenceNode { node: &mut a, limits: None },
-                SequenceNode { node: &mut b_fail, limits: None },
-                SequenceNode { node: &mut c, limits: None },
-            ],
-            state: NodeState::None,
+            left_node: &mut a,
+            right_node: &mut b_fail,
+            span_limits: None,
+            state: SequenceState::LeftNode,
         };
 
         let ctx = Context::default();
         // pass first node
         assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
-        assert_eq!(s.current_node_idx, 1);
-        assert_eq!(s.state, NodeState::None);
+        assert_eq!(s.state, SequenceState::RightNode);
         // fail at second node
         assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
-        assert_eq!(s.current_node_idx, 1);
-        assert_eq!(s.state, NodeState::None);
+        assert_eq!(s.state, SequenceState::RightNode);
         // set second node to True
-        s.nodes[1].node = &mut b;
+        s.right_node = &mut b;
         // pass second node
-        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
-        assert_eq!(s.current_node_idx, 2);
-        assert_eq!(s.state, NodeState::None);
-        // pass third node
         assert_eq!(s.evaluate(&ctx), EvalResult::True(true));
-        assert_eq!(s.current_node_idx, 2);
-        assert_eq!(s.state, NodeState::True);
-        // nothing changes on further evaluations
-        assert_eq!(s.evaluate(&ctx), EvalResult::True(true));
-        assert_eq!(s.current_node_idx, 2);
-        assert_eq!(s.state, NodeState::True);
+        assert_eq!(s.state, SequenceState::True);
     }
-
-    /*#[test]
-    fn sequence_limits() {
-        let mut a = TestValue {
-            is_partition: false,
-            value: true,
-        };
-        let mut b = TestValue {
-            is_partition: false,
-            value: false,
-        };
-        let mut c = TestValue {
-            is_partition: false,
-            value: false,
-        };
-
-        let mut a_count_limit = CountLimit {
-            min: 0,
-            max: 2,
-            current_value: 0,
-        };
-        let mut a_row_limit = RowLimit {
-            min: 1,
-            max: 3,
-            current_value: 0,
-        };
-
-        let mut a_limits = Limits {
-            limits: vec![&mut a_count_limit, &mut a_row_limit],
-        };
-
-
-        let mut b_count_limit = CountLimit {
-            min: 0,
-            max: 2,
-            current_value: 0,
-        };
-
-        let mut b_row_limit = RowLimit {
-            min: 1,
-            max: 3,
-            current_value: 0,
-        };
-
-        let mut b_limits = Limits {
-            limits: vec![&mut b_count_limit, &mut b_row_limit],
-        };
-
-        let mut s = Sequence {
-            current_node_idx: 0,
-            nodes: vec![
-                SequenceNode { node: &mut a, limits: Some(&mut a_limits) },
-                SequenceNode { node: &mut b, limits: Some(&mut b_limits) },
-                SequenceNode { node: &mut c, limits: None },
-            ],
-            state: NodeState::None,
-        };
-
-        let ctx = Context::default();
-        // pass first node
-        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
-        assert_eq!(s.current_node_idx, 0);
-        assert_eq!(s.state, NodeState::None);
-    }*/
 
     #[test]
     fn absolute_time_window_limit() {
@@ -1352,11 +1343,9 @@ mod tests {
 
     #[test]
     fn limits() {
-        let mut window_limit = AbsoluteTimeWindowLimit::new(&[0u32; 1], CmpValue::GreaterEqual(2), CmpValue::LessEqual(4));
-        let mut true_count_limit = TrueCountLimit::new(CmpValue::GreaterEqual(1), CmpValue::LessEqual(2));
+        let mut window_limit = AbsoluteTimeWindowLimit::new(&[0u32; 1], CmpValue::GreaterEqual(0), CmpValue::LessEqual(1));
+        let mut true_count_limit = TrueCountLimit::new(CmpValue::GreaterEqual(2), CmpValue::LessEqual(3));
         let mut ctx = Context { row_id: 0 };
-        // window_limit.values = &[0u32; 1];
-
         {
             let mut limits = Limits::new(vec![&mut window_limit, &mut true_count_limit]);
             assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::False);
@@ -1369,16 +1358,162 @@ mod tests {
         }
         {
             let mut limits = Limits::new(vec![&mut window_limit, &mut true_count_limit]);
-            assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::False);
+            assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::True);
             assert_eq!(true_count_limit.count, 2);
         }
-
+        {
+            let mut limits = Limits::new(vec![&mut window_limit, &mut true_count_limit]);
+            assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::True);
+            assert_eq!(true_count_limit.count, 3);
+        }
         {
             let mut limits = Limits::new(vec![&mut window_limit, &mut true_count_limit]);
             assert_eq!(limits.check(&ctx, EvalResult::True(false)), LimitCheckResult::ResetNode);
-            assert_eq!(true_count_limit.count, 0);
+            assert_eq!(true_count_limit.count, 4);
         }
     }
+
+    #[test]
+    fn and_limits() {
+        let mut a = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: NodeState::None,
+            is_partition: false,
+            left: 1,
+            right: 1,
+        };
+
+        let mut b = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: NodeState::None,
+            is_partition: false,
+            left: 2,
+            right: 2,
+        };
+
+        let mut true_count_limit = TrueCountLimit::new(CmpValue::GreaterEqual(2), CmpValue::LessEqual(3));
+        let mut limits = Limits::new(vec![&mut true_count_limit]);
+
+        let mut q = And {
+            state: NodeState::None,
+            children: vec![
+                &mut a,
+                &mut b,
+            ],
+            limits: Some(&mut limits),
+        };
+
+        let ctx = Context::default();
+        // 1st iteration
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+        // 2nd iteration, after node reset
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+    }
+
+    #[test]
+    fn or_limits() {
+        let mut a = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: NodeState::None,
+            is_partition: false,
+            left: 1,
+            right: 1,
+        };
+
+        let mut b = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: NodeState::None,
+            is_partition: false,
+            left: 2,
+            right: 2,
+        };
+
+        let mut true_count_limit = TrueCountLimit::new(CmpValue::GreaterEqual(2), CmpValue::LessEqual(3));
+        let mut limits = Limits::new(vec![&mut true_count_limit]);
+
+        let mut q = Or {
+            state: NodeState::None,
+            children: vec![
+                &mut a,
+                &mut b,
+            ],
+            limits: Some(&mut limits),
+        };
+
+        let ctx = Context::default();
+        // 1st iteration
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+        // 2nd iteration, after node reset
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
+        assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
+    }
+
+    /*#[test]
+    fn sequence_limits() {
+        let mut a = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: NodeState::None,
+            is_partition: false,
+            left: 1,
+            right: 1,
+        };
+
+        let mut b = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: NodeState::None,
+            is_partition: false,
+            left: 1,
+            right: 1,
+        };
+        let mut c = ScalarValue::<u32, cmp::Equal> {
+            c: PhantomData,
+            state: NodeState::None,
+            is_partition: false,
+            left: 1,
+            right: 1,
+        };
+
+        let mut true_count_limit = TrueCountLimit::new(CmpValue::GreaterEqual(2), CmpValue::LessEqual(3));
+        let mut limits = Limits::new(vec![&mut true_count_limit]);
+
+        let mut true_count_limit2 = TrueCountLimit::new(CmpValue::GreaterEqual(2), CmpValue::LessEqual(3));
+        let mut limits2 = Limits::new(vec![&mut true_count_limit2]);
+
+        let mut true_count_limit3 = TrueCountLimit::new(CmpValue::GreaterEqual(2), CmpValue::LessEqual(3));
+        let mut limits3 = Limits::new(vec![&mut true_count_limit3]);
+
+        let mut s = Sequence {
+            current_node_idx: 0,
+            nodes: vec![
+                SequenceNode { node: &mut a, limits: Some(&mut limits) },
+                SequenceNode { node: &mut b, limits: Some(&mut limits2) },
+                SequenceNode { node: &mut c, limits: Some(&mut limits3) },
+            ],
+            state: NodeState::None,
+        };
+
+        let ctx = Context::default();
+        // pass first node
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.current_node_idx, 1);
+        assert_eq!(s.state, NodeState::None);
+        // fail at second node
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.current_node_idx, 1);
+        assert_eq!(s.state, NodeState::None);
+        // set second node to True
+    }*/
 }
 
 fn main() {}
