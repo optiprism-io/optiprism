@@ -81,14 +81,14 @@ impl<'a> Node for Sequence<'a> {
 }
 
 #[cfg(test)]
-
 mod tests {
     use super::*;
     use crate::expression::scalar_value::ScalarValue;
-    use crate::expression::cmp::Equal;
+    use crate::expression::cmp::{Equal, CmpValue};
     use std::marker::PhantomData;
     use crate::expression::node::NodeState;
     use crate::expression::test_value::{FalseValue, TrueValue};
+    use crate::expression::true_count_limit::TrueCountLimit;
 
     #[test]
     fn sequence() {
@@ -141,6 +141,27 @@ mod tests {
         // set second node to True
         s.right_node = &mut b;
         // pass second node
+        assert_eq!(s.evaluate(&ctx), EvalResult::True(true));
+        assert_eq!(s.state, SequenceState::True);
+    }
+
+    #[test]
+    fn sequence_with_true_limit() {
+        let mut a = TrueValue::new();
+        let mut a_true_limit = TrueCountLimit::new(&mut a, CmpValue::GreaterEqual(3), CmpValue::LessEqual(3));
+        let mut b = TrueValue::new();
+        let mut b_true_limit = TrueCountLimit::new(&mut b, CmpValue::GreaterEqual(2), CmpValue::LessEqual(3));
+        let mut s = Sequence::new(&mut a_true_limit, &mut b_true_limit);
+        let ctx = Context::default();
+
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.state, SequenceState::LeftNode);
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.state, SequenceState::LeftNode);
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.state, SequenceState::RightNode);
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.state, SequenceState::RightNode);
         assert_eq!(s.evaluate(&ctx), EvalResult::True(true));
         assert_eq!(s.state, SequenceState::True);
     }
