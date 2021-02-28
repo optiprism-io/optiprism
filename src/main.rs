@@ -544,6 +544,17 @@ struct Sequence<'a> {
     state: SequenceState,
 }
 
+impl<'a> Sequence<'a> {
+    fn new(left: &'a mut dyn Node, right: &'a mut dyn Node) -> Self {
+        Sequence {
+            left_node: left,
+            right_node: right,
+            span_limits: None,
+            state: SequenceState::LeftNode,
+        }
+    }
+}
+
 impl<'a> Node for Sequence<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         match self.state {
@@ -1199,20 +1210,15 @@ mod tests {
             right: 2,
         };
 
-        let mut q = Sequence {
-            left_node: &mut a,
-            right_node: &mut b,
-            span_limits: None,
-            state: SequenceState::LeftNode,
-        };
+        let mut q = Sequence::new(&mut a, &mut b);
 
         let ctx = Context::default();
         assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
         assert_eq!(q.evaluate(&ctx), EvalResult::True(true));
     }
 
-    /*#[test]
-    fn then_right_fail() {
+    #[test]
+    fn sequence_right_fail() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
             state: NodeState::None,
@@ -1229,12 +1235,7 @@ mod tests {
             right: 2,
         };
 
-        let mut q = Then {
-            left: &mut a,
-            right: &mut b,
-            state: NodeState::None,
-            branch: ThenBranch::Left,
-        };
+        let mut q = Sequence::new(&mut a, &mut b);
 
         let ctx = Context::default();
         assert_eq!(q.evaluate(&ctx), EvalResult::False(false));
@@ -1242,7 +1243,7 @@ mod tests {
     }
 
     #[test]
-    fn then_left_stateful_fail() {
+    fn sequence_left_stateful_fail() {
         let mut a = ScalarValue::<u32, cmp::Equal> {
             c: PhantomData,
             state: NodeState::None,
@@ -1259,17 +1260,12 @@ mod tests {
             right: 2,
         };
 
-        let mut q = Then {
-            left: &mut a,
-            right: &mut b,
-            state: NodeState::None,
-            branch: ThenBranch::Left,
-        };
+        let mut q = Sequence::new(&mut a, &mut b);
 
         let ctx = Context::default();
         assert_eq!(q.evaluate(&ctx), EvalResult::False(true));
         assert_eq!(q.evaluate(&ctx), EvalResult::False(true));
-    }*/
+    }
 
     #[test]
     fn sequence_scenario() {
@@ -1295,12 +1291,7 @@ mod tests {
             right: 1,
         };
 
-        let mut s = Sequence {
-            left_node: &mut a,
-            right_node: &mut b_fail,
-            span_limits: None,
-            state: SequenceState::LeftNode,
-        };
+        let mut s = Sequence::new(&mut a, &mut b_fail);
 
         let ctx = Context::default();
         // pass first node
