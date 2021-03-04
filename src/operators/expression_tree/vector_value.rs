@@ -1,7 +1,7 @@
-use crate::expression::node::{NodeState, EvalResult, Node};
+use super::node::{NodeState, EvalResult, Node};
 use std::marker::PhantomData;
-use crate::expression::context::Context;
-use crate::expression::cmp::{Cmp, Equal};
+use super::context::Context;
+use super::cmp::{Cmp, Equal};
 
 pub struct VectorValue<T, C = Equal> {
     c: PhantomData<C>,
@@ -59,7 +59,7 @@ impl<T, C> Node for VectorValue<T, C> where T: Copy, C: Cmp<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::cmp::Equal;
+    use super::cmp::Equal;
 
     #[test]
     fn vector_value_equal_fails() {

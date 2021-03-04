@@ -1,8 +1,8 @@
-use crate::expression::node::{NodeState, Node, EvalResult};
-use crate::expression::cmp::CmpValue;
-use crate::expression::context::Context;
+use super::node::{NodeState, Node, EvalResult};
+use super::cmp::CmpValue;
+use super::context::Context;
 
-pub struct TrueCountLimit<'a> {
+pub struct RowLimit<'a> {
     state: NodeState,
     from: CmpValue<u32>,
     to: CmpValue<u32>,
@@ -11,9 +11,9 @@ pub struct TrueCountLimit<'a> {
     is_grouped: bool,
 }
 
-impl<'a> TrueCountLimit<'a> {
+impl<'a> RowLimit<'a> {
     pub fn new(node: &'a mut dyn Node, from: CmpValue<u32>, to: CmpValue<u32>) -> Self {
-        TrueCountLimit {
+        RowLimit {
             state: NodeState::None,
             node,
             from,
@@ -24,7 +24,7 @@ impl<'a> TrueCountLimit<'a> {
     }
 
     pub fn new_grouped(node: &'a mut dyn Node, from: CmpValue<u32>, to: CmpValue<u32>) -> Self {
-        TrueCountLimit {
+        RowLimit {
             state: NodeState::None,
             node,
             from,
@@ -35,7 +35,7 @@ impl<'a> TrueCountLimit<'a> {
     }
 }
 
-impl<'a> Node for TrueCountLimit<'a> {
+impl<'a> Node for RowLimit<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         match self.state {
@@ -45,14 +45,13 @@ impl<'a> Node for TrueCountLimit<'a> {
         };
 
         let result = self.node.evaluate(ctx);
+        self.count += 1;
         match result {
             EvalResult::True(true) => {
                 self.state = NodeState::True;
                 return EvalResult::True(true);
             }
-            EvalResult::True(false) => {
-                self.count += 1;
-            }
+            EvalResult::True(false) => {}
             EvalResult::False(true) => {
                 self.state = NodeState::False;
                 return EvalResult::False(true);
@@ -93,14 +92,15 @@ impl<'a> Node for TrueCountLimit<'a> {
 }
 
 #[cfg(test)]
+
 mod tests {
     use super::*;
-    use crate::expression::test_value::TrueValue;
+    use super::test_value::TrueValue;
 
     #[test]
-    fn true_count_limit() {
+    fn row_count_limit() {
         let mut node = TrueValue::new();
-        let mut limit = TrueCountLimit::new_grouped(&mut node, CmpValue::GreaterEqual(2), CmpValue::LessEqual(3));
+        let mut limit = RowLimit::new_grouped(&mut node, CmpValue::GreaterEqual(2), CmpValue::LessEqual(3));
         let mut ctx = Context { row_id: 0 };
 
         assert_eq!(limit.evaluate(&ctx), EvalResult::False(false));

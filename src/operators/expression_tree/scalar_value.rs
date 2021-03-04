@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
-use crate::expression::node::{NodeState, Node, EvalResult};
-use crate::expression::context::Context;
-use crate::expression::cmp::Cmp;
+use super::node::{NodeState, Node, EvalResult};
+use super::context::Context;
+use super::cmp::Cmp;
 pub struct ScalarValue<T, C> {
     c: PhantomData<C>,
     state: NodeState,
@@ -59,7 +59,7 @@ impl<T, C> Node for ScalarValue<T, C> where T: Copy, C: Cmp<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::cmp::Equal;
+    use super::cmp::Equal;
 
     #[test]
     fn scalar_value_equal_fails() {

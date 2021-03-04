@@ -1,5 +1,5 @@
-use crate::expression::node::{NodeState, Node, EvalResult};
-use crate::expression::context::Context;
+use super::node::{NodeState, Node, EvalResult};
+use super::context::Context;
 
 pub struct Or<'a> {
     state: NodeState,
@@ -71,10 +71,10 @@ impl<'a> Node for Or<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::scalar_value::ScalarValue;
-    use crate::expression::cmp::Equal;
+    use super::scalar_value::ScalarValue;
+    use super::cmp::Equal;
     use std::marker::PhantomData;
-    use crate::expression::test_value::{FalseValue, TrueValue};
+    use super::test_value::{FalseValue, TrueValue};
 
     #[test]
     fn a_or_b() {

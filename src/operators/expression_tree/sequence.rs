@@ -1,5 +1,5 @@
-use crate::expression::node::{Node, EvalResult};
-use crate::expression::context::Context;
+use super::node::{Node, EvalResult};
+use super::context::Context;
 
 pub struct Sequence<'a> {
     left_node: &'a mut dyn Node,
@@ -83,14 +83,14 @@ impl<'a> Node for Sequence<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::scalar_value::ScalarValue;
-    use crate::expression::cmp::{Equal, CmpValue};
+    use super::scalar_value::ScalarValue;
+    use super::cmp::{Equal, CmpValue};
     use std::marker::PhantomData;
-    use crate::expression::node::NodeState;
-    use crate::expression::test_value::{FalseValue, TrueValue};
-    use crate::expression::true_count_limit::TrueCountLimit;
-    use crate::expression::and::And;
-    use crate::expression::and_not::AndNot;
+    use super::node::NodeState;
+    use super::test_value::{FalseValue, TrueValue};
+    use super::true_count_limit::TrueCountLimit;
+    use super::and::And;
+    use super::and_not::AndNot;
 
     #[test]
     fn sequence() {

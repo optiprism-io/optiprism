@@ -1,5 +1,5 @@
-use crate::expression::node::{Node, EvalResult};
-use crate::expression::context::Context;
+use super::node::{Node, EvalResult};
+use super::context::Context;
 
 pub struct AndNot<'a> {
     not_node: &'a mut dyn Node,
@@ -33,7 +33,7 @@ impl<'a> Node for AndNot<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::test_value::{TrueValue, FalseValue};
+    use super::super::test_value::{TrueValue, FalseValue};
 
     #[test]
     fn and_not_false() {

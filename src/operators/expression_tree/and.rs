@@ -1,5 +1,5 @@
-use crate::expression::node::{Node, NodeState, EvalResult};
-use crate::expression::context::Context;
+use super::node::{Node, NodeState, EvalResult};
+use super::context::Context;
 
 pub struct And<'a> {
     state: NodeState,
@@ -80,9 +80,9 @@ impl<'a> Node for And<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::test_value::{FalseValue, TrueValue};
-    use crate::expression::vector_value::VectorValue;
-    use crate::expression::cmp::Equal;
+    use super::test_value::{FalseValue, TrueValue};
+    use super::vector_value::VectorValue;
+    use super::cmp::Equal;
 
     #[test]
     fn a_and_b_fails() {

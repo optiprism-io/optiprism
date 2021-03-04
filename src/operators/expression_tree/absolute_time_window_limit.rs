@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
-use crate::expression::node::{Node, NodeState, EvalResult};
-use crate::expression::context::Context;
-use crate::expression::cmp::CmpValue;
+use super::node::{Node, NodeState, EvalResult};
+use super::context::Context;
+use super::cmp::CmpValue;
 
 pub struct AbsoluteTimeWindowLimit<'a, T> {
     from: CmpValue<T>,
@@ -96,8 +96,8 @@ impl<'a, T> Node for AbsoluteTimeWindowLimit<'a, T> where T: Copy + PartialEq + 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::test_value::TrueValue;
-    use crate::expression::true_count_limit::TrueCountLimit;
+    use super::test_value::TrueValue;
+    use super::true_count_limit::TrueCountLimit;
 
     #[test]
     fn absolute_time_window_limit() {

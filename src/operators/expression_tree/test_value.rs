@@ -1,5 +1,5 @@
-use crate::expression::node::{Node, EvalResult};
-use crate::expression::context::Context;
+use super::node::{Node, EvalResult};
+use super::context::Context;
 
 pub struct TrueValue {
     is_partition: bool,
@@ -9,7 +9,6 @@ impl TrueValue {
     pub fn new() -> Self {
         TrueValue { is_partition: false }
     }
-
     pub fn new_partitioned() -> Self {
         TrueValue { is_partition: true }
     }
