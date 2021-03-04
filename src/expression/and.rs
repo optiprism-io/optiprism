@@ -4,6 +4,7 @@ use crate::expression::context::Context;
 pub struct And<'a> {
     state: NodeState,
     nodes: Vec<&'a mut dyn Node>,
+    is_grouped: bool,
 }
 
 impl<'a> And<'a> {
@@ -11,6 +12,15 @@ impl<'a> And<'a> {
         And {
             state: NodeState::None,
             nodes,
+            is_grouped: false,
+        }
+    }
+
+    pub fn new_grouped(nodes: Vec<&'a mut dyn Node>) -> Self {
+        And {
+            state: NodeState::None,
+            nodes,
+            is_grouped: false,
         }
     }
 }
@@ -42,6 +52,9 @@ impl<'a> Node for And<'a> {
                     return EvalResult::False(stateful);
                 }
                 EvalResult::ResetNode => {
+                    if self.is_grouped {
+                        return EvalResult::ResetNode;
+                    }
                     self.reset();
                     return EvalResult::False(false);
                 }
@@ -67,7 +80,6 @@ impl<'a> Node for And<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::marker::PhantomData;
     use crate::expression::test_value::{FalseValue, TrueValue};
     use crate::expression::vector_value::VectorValue;
     use crate::expression::cmp::Equal;

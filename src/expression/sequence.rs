@@ -89,6 +89,8 @@ mod tests {
     use crate::expression::node::NodeState;
     use crate::expression::test_value::{FalseValue, TrueValue};
     use crate::expression::true_count_limit::TrueCountLimit;
+    use crate::expression::and::And;
+    use crate::expression::and_not::AndNot;
 
     #[test]
     fn sequence() {
@@ -164,5 +166,20 @@ mod tests {
         assert_eq!(s.state, SequenceState::RightNode);
         assert_eq!(s.evaluate(&ctx), EvalResult::True(true));
         assert_eq!(s.state, SequenceState::True);
+    }
+
+    #[test]
+    fn sequence_with_and_not() {
+        let mut a = TrueValue::new();
+        let mut b = TrueValue::new();
+        let mut not = FalseValue::new();
+        let mut and_not = AndNot::new(&mut b, &mut not);
+        let mut s = Sequence::new(&mut a, &mut and_not);
+        let ctx = Context::default();
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        assert_eq!(s.state, SequenceState::RightNode);
+        assert_eq!(s.evaluate(&ctx), EvalResult::False(false));
+        // sequence reset
+        assert_eq!(s.state, SequenceState::LeftNode);
     }
 }

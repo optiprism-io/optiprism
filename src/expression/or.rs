@@ -4,6 +4,7 @@ use crate::expression::context::Context;
 pub struct Or<'a> {
     state: NodeState,
     nodes: Vec<&'a mut dyn Node>,
+    is_grouped: bool,
 }
 
 impl<'a> Or<'a> {
@@ -11,6 +12,15 @@ impl<'a> Or<'a> {
         Or {
             state: NodeState::None,
             nodes,
+            is_grouped: false,
+        }
+    }
+
+    pub fn new_grouped(nodes: Vec<&'a mut dyn Node>) -> Self {
+        Or {
+            state: NodeState::None,
+            nodes,
+            is_grouped: true,
         }
     }
 }
@@ -39,6 +49,9 @@ impl<'a> Node for Or<'a> {
                     }
                 }
                 EvalResult::ResetNode => {
+                    if self.is_grouped {
+                        return EvalResult::ResetNode;
+                    }
                     self.reset();
                     return EvalResult::False(false);
                 }
