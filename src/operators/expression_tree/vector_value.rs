@@ -2,6 +2,7 @@ use super::node::{NodeState, EvalResult, Node};
 use std::marker::PhantomData;
 use super::context::Context;
 use super::cmp::{Cmp, Equal};
+use arrow::array::{ArrayRef};
 
 pub struct VectorValue<T, C = Equal> {
     c: PhantomData<C>,
@@ -63,7 +64,7 @@ mod tests {
 
     #[test]
     fn vector_value_equal_fails() {
-        let mut n = VectorValue::<_,Equal>::new(vec![0u64, 1], 1u64);
+        let mut n = VectorValue::<_, Equal>::new(vec![0u64, 1], 1u64);
         let ctx = Context { row_id: 0 };
         assert_eq!(n.evaluate(&ctx), EvalResult::False(false))
     }

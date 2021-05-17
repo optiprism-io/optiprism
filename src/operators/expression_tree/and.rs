@@ -80,9 +80,9 @@ impl<'a> Node for And<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::test_value::{FalseValue, TrueValue};
-    use super::vector_value::VectorValue;
-    use super::cmp::Equal;
+    use super::super::test_value::{FalseValue, TrueValue};
+    use super::super::vector_value::VectorValue;
+    use super::super::cmp::Equal;
 
     #[test]
     fn a_and_b_fails() {

@@ -83,14 +83,14 @@ impl<'a> Node for Sequence<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::scalar_value::ScalarValue;
-    use super::cmp::{Equal, CmpValue};
+    use super::super::scalar_value::ScalarValue;
+    use super::super::cmp::{Equal, CmpValue};
     use std::marker::PhantomData;
-    use super::node::NodeState;
-    use super::test_value::{FalseValue, TrueValue};
-    use super::true_count_limit::TrueCountLimit;
-    use super::and::And;
-    use super::and_not::AndNot;
+    use super::super::node::NodeState;
+    use super::super::test_value::{FalseValue, TrueValue};
+    use super::super::true_count_limit::TrueCountLimit;
+    use super::super::and::And;
+    use super::super::and_not::AndNot;
 
     #[test]
     fn sequence() {
