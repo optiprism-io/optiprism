@@ -1,36 +1,36 @@
-use super::node::{Node, NodeState, EvalResult};
+use super::expr::{Expr, ExprState, EvalResult};
 use super::context::Context;
 
 pub struct And<'a> {
-    state: NodeState,
-    nodes: Vec<&'a mut dyn Node>,
+    state: ExprState,
+    nodes: Vec<&'a mut dyn Expr>,
     is_grouped: bool,
 }
 
 impl<'a> And<'a> {
-    pub fn new(nodes: Vec<&'a mut dyn Node>) -> Self {
+    pub fn new(nodes: Vec<&'a mut dyn Expr>) -> Self {
         And {
-            state: NodeState::None,
+            state: ExprState::None,
             nodes,
             is_grouped: false,
         }
     }
 
-    pub fn new_grouped(nodes: Vec<&'a mut dyn Node>) -> Self {
+    pub fn new_grouped(nodes: Vec<&'a mut dyn Expr>) -> Self {
         And {
-            state: NodeState::None,
+            state: ExprState::None,
             nodes,
-            is_grouped: false,
+            is_grouped: true,
         }
     }
 }
 
-impl<'a> Node for And<'a> {
+impl<'a> Expr for And<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         match self.state {
-            NodeState::True => return EvalResult::True(true),
-            NodeState::False => return EvalResult::False(true),
+            ExprState::True => return EvalResult::True(true),
+            ExprState::False => return EvalResult::False(true),
             _ => {}
         };
 
@@ -47,7 +47,7 @@ impl<'a> Node for And<'a> {
                 EvalResult::False(stateful) => {
                     // if some failed nodes is stateful, then it make current node failed stateful  as well
                     if stateful {
-                        self.state = NodeState::False;
+                        self.state = ExprState::False;
                     }
                     return EvalResult::False(stateful);
                 }
@@ -62,7 +62,7 @@ impl<'a> Node for And<'a> {
         }
 
         if is_stateful {
-            self.state = NodeState::True;
+            self.state = ExprState::True;
             return EvalResult::True(true);
         }
 
@@ -70,7 +70,7 @@ impl<'a> Node for And<'a> {
     }
 
     fn reset(&mut self) {
-        self.state = NodeState::None;
+        self.state = ExprState::None;
         for c in self.nodes.iter_mut() {
             c.reset()
         }
@@ -81,7 +81,7 @@ impl<'a> Node for And<'a> {
 mod tests {
     use super::*;
     use super::super::test_value::{FalseValue, TrueValue};
-    use super::super::vector_value::VectorValue;
+    use super::super::predicate::Predicate;
     use super::super::cmp::Equal;
 
     #[test]
@@ -89,7 +89,7 @@ mod tests {
         let mut a = FalseValue::new();
         let mut b = TrueValue::new();
         let mut q = And::new(vec![&mut a, &mut b]);
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::False(false))
     }
 
@@ -98,7 +98,7 @@ mod tests {
         let mut a = TrueValue::new();
         let mut b = TrueValue::new();
         let mut q = And::new(vec![&mut a, &mut b]);
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::True(false))
     }
 
@@ -107,16 +107,16 @@ mod tests {
         let mut a = TrueValue::new_partitioned();
         let mut b = TrueValue::new();
         let mut q = And::new(vec![&mut a, &mut b]);
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
     }
 
     #[test]
     fn a_stateful_and_b_stateful() {
-        let mut a = VectorValue::<u32, Equal>::new_partitioned(vec![1, 2], 1);
-        let mut b = VectorValue::<_, Equal>::new_partitioned(vec![2, 3], 2);
+        let mut a = TrueValue::new_partitioned();
+        let mut b = TrueValue::new_partitioned();
         let mut q = And::new(vec![&mut a, &mut b]);
-        let mut ctx = Context::default();
+        let mut ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::True(true));
         ctx.row_id = 1;
         // check for stateful
@@ -128,7 +128,7 @@ mod tests {
         let mut a = FalseValue::new_partitioned();
         let mut b = TrueValue::new_partitioned();
         let mut q = And::new(vec![&mut a, &mut b]);
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::False(true))
     }
 }

@@ -1,16 +1,16 @@
 use std::convert::{From, TryInto, TryFrom};
-use arrow::array::{Array, Int8Array};
+use arrow::array::{Array, ArrayRef,Int8Array};
 use datafusion::scalar::ScalarValue;
 
-pub trait Cmp<L: Array> {
-    fn is_true<R>(row_id: usize, left: L, right: R) -> bool;
+pub trait Cmp<T> {
+    fn is_true(row_id: usize, left: &ArrayRef, right: T) -> bool;
 }
 
 pub struct Equal;
 
-impl Cmp<Int8Array> for Equal {
-    fn is_true(row_id: usize, left: Int8Array, right: i8) -> bool {
-        return left.value(row_id) == right;
+impl Cmp<i8> for Equal {
+    fn is_true(row_id: usize, left: &ArrayRef, right: i8) -> bool {
+        return left.as_any().downcast_ref::<Int8Array>().unwrap().value(row_id) == right;
     }
 }
 /*

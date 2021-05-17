@@ -83,7 +83,6 @@ impl<'a> Node for Sequence<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::scalar_value::ScalarValue;
     use super::super::cmp::{Equal, CmpValue};
     use std::marker::PhantomData;
     use super::super::node::NodeState;

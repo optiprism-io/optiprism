@@ -1,4 +1,4 @@
-use super::node::{NodeState, EvalResult, Node};
+use super::expr::{ExprState, EvalResult, Expr};
 use std::marker::PhantomData;
 use super::context::Context;
 use super::cmp::{Cmp, Equal};
@@ -14,19 +14,19 @@ use arrow::datatypes::ArrowPrimitiveType;
 use std::ops::Deref;
 use std::any::Any;
 
-pub struct Value<T, Op> {
+pub struct Predicate<T, Op> {
     c: PhantomData<Op>,
-    state: NodeState,
+    state: ExprState,
     is_stateful: bool,
     left_col: usize,
     right_value: Option<T>,
 }
 
-impl<T, Op> Value<T, Op> where Op: Cmp<T> {
+impl<T, Op> Predicate<T, Op> where Op: Cmp<T> {
     pub fn try_new(schema: SchemaRef, left_col_name: &str, right_value: Option<T>, is_stateful: bool) -> Result<Self> {
-        Ok(Value {
+        Ok(Predicate {
             c: PhantomData,
-            state: NodeState::None,
+            state: ExprState::None,
             is_stateful,
             left_col: schema.index_of(left_col_name)?,
             right_value,
@@ -34,12 +34,12 @@ impl<T, Op> Value<T, Op> where Op: Cmp<T> {
     }
 }
 
-impl<T: Copy, Op> Node for Value<T, Op> where Op: Cmp<T> {
+impl<T: Copy, Op> Expr for Predicate<T, Op> where Op: Cmp<T> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         match self.state {
-            NodeState::True => return EvalResult::True(true),
-            NodeState::False => return EvalResult::False(true),
+            ExprState::True => return EvalResult::True(true),
+            ExprState::False => return EvalResult::False(true),
             _ => {}
         };
 
@@ -49,14 +49,14 @@ impl<T: Copy, Op> Node for Value<T, Op> where Op: Cmp<T> {
             match self.right_value {
                 None => {
                     if self.is_stateful {
-                        self.state = NodeState::True;
+                        self.state = ExprState::True;
                         return EvalResult::True(true);
                     }
                     return EvalResult::True(false);
                 }
                 Some(_) => {
                     if self.is_stateful {
-                        self.state = NodeState::False;
+                        self.state = ExprState::False;
                         return EvalResult::False(true);
                     }
                     return EvalResult::False(false);
@@ -64,7 +64,7 @@ impl<T: Copy, Op> Node for Value<T, Op> where Op: Cmp<T> {
             }
         } else if let None = self.right_value {
             if self.is_stateful {
-                self.state = NodeState::False;
+                self.state = ExprState::False;
                 return EvalResult::False(true);
             }
             return EvalResult::False(false);
@@ -72,20 +72,20 @@ impl<T: Copy, Op> Node for Value<T, Op> where Op: Cmp<T> {
 
         if Op::is_true(ctx.row_id, col, self.right_value.unwrap()) {
             if self.is_stateful {
-                self.state = NodeState::True;
+                self.state = ExprState::True;
                 return EvalResult::True(true);
             }
             return EvalResult::True(false);
         }
         if self.is_stateful {
-            self.state = NodeState::False;
+            self.state = ExprState::False;
             return EvalResult::False(true);
         }
         EvalResult::False(false)
     }
 
     fn reset(&mut self) {
-        self.state = NodeState::None;
+        self.state = ExprState::None;
     }
 }
 
@@ -112,7 +112,7 @@ mod tests {
             ],
         )?;
 
-        let mut op = Value::<_, Equal>::try_new(schema.clone(), "c", Some(1i8), false)?;
+        let mut op = Predicate::<_, Equal>::try_new(schema.clone(), "c", Some(1i8), false)?;
         let mut ctx = Context {
             batch,
             row_id: 0,
@@ -124,7 +124,7 @@ mod tests {
 
         ctx.row_id = 0;
 
-        let mut null_op = Value::<_, Equal>::try_new(schema.clone(), "c", None, false)?;
+        let mut null_op = Predicate::<_, Equal>::try_new(schema.clone(), "c", None, false)?;
 
         ctx.row_id = 0;
         assert_eq!(null_op.evaluate(&ctx), EvalResult::False(false));
@@ -148,7 +148,7 @@ mod tests {
             ],
         )?;
 
-        let mut op = Value::<_, Equal>::try_new(schema.clone(), "c", Some(1i8), true)?;
+        let mut op = Predicate::<_, Equal>::try_new(schema.clone(), "c", Some(1i8), true)?;
         let mut ctx = Context {
             batch,
             row_id: 0,

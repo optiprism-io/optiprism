@@ -1,36 +1,36 @@
-use super::node::{NodeState, Node, EvalResult};
+use super::expr::{ExprState, Expr, EvalResult};
 use super::context::Context;
 
 pub struct Or<'a> {
-    state: NodeState,
-    nodes: Vec<&'a mut dyn Node>,
+    state: ExprState,
+    nodes: Vec<&'a mut dyn Expr>,
     is_grouped: bool,
 }
 
 impl<'a> Or<'a> {
-    pub fn new(nodes: Vec<&'a mut dyn Node>) -> Self {
+    pub fn new(nodes: Vec<&'a mut dyn Expr>) -> Self {
         Or {
-            state: NodeState::None,
+            state: ExprState::None,
             nodes,
             is_grouped: false,
         }
     }
 
-    pub fn new_grouped(nodes: Vec<&'a mut dyn Node>) -> Self {
+    pub fn new_grouped(nodes: Vec<&'a mut dyn Expr>) -> Self {
         Or {
-            state: NodeState::None,
+            state: ExprState::None,
             nodes,
             is_grouped: true,
         }
     }
 }
 
-impl<'a> Node for Or<'a> {
+impl<'a> Expr for Or<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         match self.state {
-            NodeState::True => return EvalResult::True(true),
-            NodeState::False => return EvalResult::False(true),
+            ExprState::True => return EvalResult::True(true),
+            ExprState::False => return EvalResult::False(true),
             _ => {}
         };
 
@@ -39,7 +39,7 @@ impl<'a> Node for Or<'a> {
             match c.evaluate(ctx) {
                 EvalResult::True(stateful) => {
                     if stateful {
-                        self.state = NodeState::True;
+                        self.state = ExprState::True;
                     }
                     return EvalResult::True(stateful);
                 }
@@ -61,7 +61,7 @@ impl<'a> Node for Or<'a> {
     }
 
     fn reset(&mut self) {
-        self.state = NodeState::None;
+        self.state = ExprState::None;
         for c in self.nodes.iter_mut() {
             c.reset()
         }
@@ -71,17 +71,16 @@ impl<'a> Node for Or<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::scalar_value::ScalarValue;
-    use super::cmp::Equal;
+    use super::super::cmp::Equal;
     use std::marker::PhantomData;
-    use super::test_value::{FalseValue, TrueValue};
+    use super::super::test_value::{FalseValue, TrueValue};
 
     #[test]
     fn a_or_b() {
         let mut a = FalseValue::new();
         let mut b = TrueValue::new();
         let mut q = Or::new(vec![&mut a, &mut b]);
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::True(false))
     }
 
@@ -90,7 +89,7 @@ mod tests {
         let mut a = FalseValue::new();
         let mut b = TrueValue::new();
         let mut q = Or::new(vec![&mut a, &mut b]);
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::True(false))
     }
 
@@ -99,7 +98,7 @@ mod tests {
         let mut a = FalseValue::new_partitioned();
         let mut b = TrueValue::new();
         let mut q = Or::new(vec![&mut a, &mut b]);
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::True(false))
     }
 
@@ -108,7 +107,7 @@ mod tests {
         let mut a = FalseValue::new_partitioned();
         let mut b = TrueValue::new_partitioned();
         let mut q = Or::new(vec![&mut a, &mut b]);
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::True(true));
     }
 
@@ -117,7 +116,7 @@ mod tests {
         let mut a = FalseValue::new();
         let mut b = FalseValue::new_partitioned();
         let mut q = Or::new(vec![&mut a, &mut b]);
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::False(false))
     }
 
@@ -126,7 +125,7 @@ mod tests {
         let mut a = FalseValue::new_partitioned();
         let mut b = FalseValue::new_partitioned();
         let mut q = Or::new(vec![&mut a, &mut b]);
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::False(true))
     }
 }

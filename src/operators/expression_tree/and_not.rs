@@ -1,13 +1,13 @@
-use super::node::{Node, EvalResult};
+use super::expr::{Expr, EvalResult};
 use super::context::Context;
 
 pub struct AndNot<'a> {
-    not_node: &'a mut dyn Node,
-    node: &'a mut dyn Node,
+    not_node: &'a mut dyn Expr,
+    node: &'a mut dyn Expr,
 }
 
 impl<'a> AndNot<'a> {
-    pub fn new(node: &'a mut dyn Node, not_node: &'a mut dyn Node) -> Self {
+    pub fn new(node: &'a mut dyn Expr, not_node: &'a mut dyn Expr) -> Self {
         AndNot {
             node,
             not_node,
@@ -15,7 +15,7 @@ impl<'a> AndNot<'a> {
     }
 }
 
-impl<'a> Node for AndNot<'a> {
+impl<'a> Expr for AndNot<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         if let EvalResult::False(_) = self.not_node.evaluate(ctx) {
             return EvalResult::ResetNode;
@@ -41,7 +41,7 @@ mod tests {
         let mut b = FalseValue::new();
         let mut q = AndNot::new(&mut a, &mut b);
 
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::ResetNode);
     }
 
@@ -51,7 +51,7 @@ mod tests {
         let mut b = TrueValue::new();
         let mut q = AndNot::new(&mut a, &mut b);
 
-        let ctx = Context::default();
+        let ctx = Context::new_empty();
         assert_eq!(q.evaluate(&ctx), EvalResult::True(false));
     }
 }
