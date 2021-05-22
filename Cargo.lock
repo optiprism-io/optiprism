@@ -382,6 +382,7 @@ dependencies = [
  "chrono",
  "datafusion",
  "num",
+ "tokio",
 ]
 
 [[package]]

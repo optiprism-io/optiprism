@@ -1,36 +1,36 @@
-use super::expr::{Expr, ExprState, EvalResult};
+use super::expr::{Node, NodeState, EvalResult};
 use super::context::Context;
 
 pub struct And<'a> {
-    state: ExprState,
-    nodes: Vec<&'a mut dyn Expr>,
+    state: NodeState,
+    nodes: Vec<&'a mut dyn Node>,
     is_grouped: bool,
 }
 
 impl<'a> And<'a> {
-    pub fn new(nodes: Vec<&'a mut dyn Expr>) -> Self {
+    pub fn new(nodes: Vec<&'a mut dyn Node>) -> Self {
         And {
-            state: ExprState::None,
+            state: NodeState::None,
             nodes,
             is_grouped: false,
         }
     }
 
-    pub fn new_grouped(nodes: Vec<&'a mut dyn Expr>) -> Self {
+    pub fn new_grouped(nodes: Vec<&'a mut dyn Node>) -> Self {
         And {
-            state: ExprState::None,
+            state: NodeState::None,
             nodes,
             is_grouped: true,
         }
     }
 }
 
-impl<'a> Expr for And<'a> {
+impl<'a> Node for And<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         match self.state {
-            ExprState::True => return EvalResult::True(true),
-            ExprState::False => return EvalResult::False(true),
+            NodeState::True => return EvalResult::True(true),
+            NodeState::False => return EvalResult::False(true),
             _ => {}
         };
 
@@ -47,7 +47,7 @@ impl<'a> Expr for And<'a> {
                 EvalResult::False(stateful) => {
                     // if some failed nodes is stateful, then it make current node failed stateful  as well
                     if stateful {
-                        self.state = ExprState::False;
+                        self.state = NodeState::False;
                     }
                     return EvalResult::False(stateful);
                 }
@@ -62,7 +62,7 @@ impl<'a> Expr for And<'a> {
         }
 
         if is_stateful {
-            self.state = ExprState::True;
+            self.state = NodeState::True;
             return EvalResult::True(true);
         }
 
@@ -70,7 +70,7 @@ impl<'a> Expr for And<'a> {
     }
 
     fn reset(&mut self) {
-        self.state = ExprState::None;
+        self.state = NodeState::None;
         for c in self.nodes.iter_mut() {
             c.reset()
         }

@@ -1,13 +1,13 @@
-use super::expr::{Expr, EvalResult};
+use super::expr::{Node, EvalResult};
 use super::context::Context;
 
 pub struct AndNot<'a> {
-    not_node: &'a mut dyn Expr,
-    node: &'a mut dyn Expr,
+    not_node: &'a mut dyn Node,
+    node: &'a mut dyn Node,
 }
 
 impl<'a> AndNot<'a> {
-    pub fn new(node: &'a mut dyn Expr, not_node: &'a mut dyn Expr) -> Self {
+    pub fn new(node: &'a mut dyn Node, not_node: &'a mut dyn Node) -> Self {
         AndNot {
             node,
             not_node,
@@ -15,7 +15,7 @@ impl<'a> AndNot<'a> {
     }
 }
 
-impl<'a> Expr for AndNot<'a> {
+impl<'a> Node for AndNot<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         if let EvalResult::False(_) = self.not_node.evaluate(ctx) {
             return EvalResult::ResetNode;

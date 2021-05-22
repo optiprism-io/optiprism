@@ -1,36 +1,36 @@
-use super::expr::{ExprState, Expr, EvalResult};
+use super::expr::{NodeState, Node, EvalResult};
 use super::context::Context;
 
 pub struct Or<'a> {
-    state: ExprState,
-    nodes: Vec<&'a mut dyn Expr>,
+    state: NodeState,
+    nodes: Vec<&'a mut dyn Node>,
     is_grouped: bool,
 }
 
 impl<'a> Or<'a> {
-    pub fn new(nodes: Vec<&'a mut dyn Expr>) -> Self {
+    pub fn new(nodes: Vec<&'a mut dyn Node>) -> Self {
         Or {
-            state: ExprState::None,
+            state: NodeState::None,
             nodes,
             is_grouped: false,
         }
     }
 
-    pub fn new_grouped(nodes: Vec<&'a mut dyn Expr>) -> Self {
+    pub fn new_grouped(nodes: Vec<&'a mut dyn Node>) -> Self {
         Or {
-            state: ExprState::None,
+            state: NodeState::None,
             nodes,
             is_grouped: true,
         }
     }
 }
 
-impl<'a> Expr for Or<'a> {
+impl<'a> Node for Or<'a> {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult {
         // check if node already has state
         match self.state {
-            ExprState::True => return EvalResult::True(true),
-            ExprState::False => return EvalResult::False(true),
+            NodeState::True => return EvalResult::True(true),
+            NodeState::False => return EvalResult::False(true),
             _ => {}
         };
 
@@ -39,7 +39,7 @@ impl<'a> Expr for Or<'a> {
             match c.evaluate(ctx) {
                 EvalResult::True(stateful) => {
                     if stateful {
-                        self.state = ExprState::True;
+                        self.state = NodeState::True;
                     }
                     return EvalResult::True(stateful);
                 }
@@ -61,7 +61,7 @@ impl<'a> Expr for Or<'a> {
     }
 
     fn reset(&mut self) {
-        self.state = ExprState::None;
+        self.state = NodeState::None;
         for c in self.nodes.iter_mut() {
             c.reset()
         }

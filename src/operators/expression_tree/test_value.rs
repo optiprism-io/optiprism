@@ -1,4 +1,4 @@
-use super::expr::{Expr, EvalResult};
+use super::expr::{Node, EvalResult};
 use super::context::Context;
 
 pub struct TrueValue {
@@ -14,7 +14,7 @@ impl TrueValue {
     }
 }
 
-impl Expr for TrueValue {
+impl Node for TrueValue {
     fn evaluate(&mut self, _: &Context) -> EvalResult {
         EvalResult::True(self.is_partition)
     }
@@ -36,7 +36,7 @@ impl FalseValue {
     }
 }
 
-impl Expr for FalseValue {
+impl Node for FalseValue {
     fn evaluate(&mut self, _: &Context) -> EvalResult {
         EvalResult::False(self.is_partition)
     }

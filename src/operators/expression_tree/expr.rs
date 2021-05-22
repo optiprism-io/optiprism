@@ -8,13 +8,23 @@ pub enum EvalResult {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum ExprState {
+pub enum NodeState {
     None,
     True,
     False,
 }
 
-pub trait Expr {
+pub trait Node {
     fn evaluate(&mut self, ctx: &Context) -> EvalResult;
     fn reset(&mut self);
+}
+
+enum ExprResult<T> {
+    True(bool, T),
+    False(bool, T),
+    ResetNode(T),
+}
+
+pub trait Expr<T> {
+    fn evaluate(&mut self, ctx: &Context) -> T;
 }

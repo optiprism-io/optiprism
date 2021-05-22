@@ -10,3 +10,5 @@ mod cmp;
 // mod sequence;
 mod and_not;
 mod predicate;
+mod segments;
+mod binary_op;
