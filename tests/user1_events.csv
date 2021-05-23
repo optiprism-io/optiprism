@@ -1,0 +1,7 @@
+user_id,timestamp,name,prop,prop2
+1,2020-01-01 00:00:00 UTC,search,rock,0
+1,2020-01-01 00:10:00 UTC,play,rock,0
+1,2020-01-01 00:20:00 UTC,buy,rock,12
+1,2020-01-01 00:30:00 UTC,search,pop,0
+1,2020-01-01 00:40:00 UTC,play,pop,0
+1,2020-01-01 00:45:00 UTC,buy,pop,5

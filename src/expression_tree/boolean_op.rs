@@ -2,13 +2,7 @@ pub trait BooleanOp<T> {
     fn perform(left: T, right: T) -> bool;
 }
 
-struct And;
-
-/*impl BooleanOp<Option<bool>> for And {
-    fn perform(left: Option<bool>, right: Option<bool>) -> bool {
-        return left && right;
-    }
-}*/
+pub struct And;
 
 impl BooleanOp<bool> for And {
     fn perform(left: bool, right: bool) -> bool {
@@ -16,7 +10,7 @@ impl BooleanOp<bool> for And {
     }
 }
 
-struct Or;
+pub struct Or;
 
 impl BooleanOp<bool> for Or {
     fn perform(left: bool, right: bool) -> bool {
@@ -24,10 +18,33 @@ impl BooleanOp<bool> for Or {
     }
 }
 
-pub struct Equal;
+impl BooleanOp<Option<&str>> for Or {
+    fn perform(left: Option<&str>, right: Option<&str>) -> bool {
+        return left == right;
+    }
+}
 
-impl<T> BooleanOp<T> for Equal where T:PartialEq{
+
+pub struct Eq;
+
+impl<T> BooleanOp<T> for Eq where T: PartialEq {
     fn perform(left: T, right: T) -> bool {
         return left == right;
+    }
+}
+
+pub struct Gt;
+
+impl<T> BooleanOp<T> for Gt where T: Ord {
+    fn perform(left: T, right: T) -> bool {
+        return left > right;
+    }
+}
+
+pub struct Lt;
+
+impl<T> BooleanOp<T> for Lt where T: Ord {
+    fn perform(left: T, right: T) -> bool {
+        return left < right;
     }
 }

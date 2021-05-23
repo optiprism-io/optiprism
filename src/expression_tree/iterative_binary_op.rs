@@ -4,12 +4,22 @@ use arrow::record_batch::RecordBatch;
 use std::ops::{Add, AddAssign};
 use crate::expression_tree::boolean_op::BooleanOp;
 
-struct IterativeBinaryOp<T, Op> {
+pub struct IterativeBinaryOp<T, Op> {
     left: Box<dyn Expr<T>>,
     op: PhantomData<Op>,
     right: T,
     break_on_false: bool,
-    batch_len: usize,
+}
+
+impl<T, Op> IterativeBinaryOp<T, Op> {
+    pub fn new(left: Box<dyn Expr<T>>, right: T, break_on_false: bool) -> Self {
+        IterativeBinaryOp {
+            left,
+            op: PhantomData,
+            right,
+            break_on_false,
+        }
+    }
 }
 
 impl<T, Op> Expr<bool> for IterativeBinaryOp<T, Op> where Op: BooleanOp<T>, T: Default + AddAssign + Copy {
