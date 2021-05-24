@@ -2,3 +2,17 @@
 mod arrow;
 mod csv;
 mod expression_tree;
+mod str;
+
+use datafusion::error::Result;
+use std::any::Any;
+
+
+struct V(i8);
+#[tokio::main]
+async fn main() -> Result<()> {
+    let a = &V(0);
+    let b = a as &dyn Any;
+
+    Ok(())
+}

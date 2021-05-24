@@ -18,8 +18,8 @@ impl BooleanOp<bool> for Or {
     }
 }
 
-impl BooleanOp<Option<&str>> for Or {
-    fn perform(left: Option<&str>, right: Option<&str>) -> bool {
+impl<'a> BooleanOp<Option<&'a str>> for Or {
+    fn perform(left: Option<&'a str>, right: Option<&'a str>) -> bool {
         return left == right;
     }
 }

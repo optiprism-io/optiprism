@@ -7,9 +7,10 @@ mod binary_op;
 mod literal;
 mod cond_value;
 mod iterative_binary_op;
-mod value_op;
+// mod value_op;
 mod iterative_count;
 mod iterative_sum;
+mod value_op;
 // mod relation_op;
 // mod count;
 // mod iterative_binary_op;
@@ -25,12 +26,12 @@ mod tests {
     use crate::expression_tree::boolean_op::{And, Gt, Or, Lt, Eq};
     use crate::expression_tree::iterative_binary_op::IterativeBinaryOp;
     use crate::expression_tree::iterative_count::IterativeCountOp;
-    use crate::expression_tree::value_op::ValueOp;
+    // use crate::expression_tree::value_op::ValueOp;
     use crate::expression_tree::iterative_sum::IterativeSumOp;
     use arrow::alloc::free_aligned;
     use crate::expression_tree::expr::Expr;
 
-    #[tokio::test]
+/*    #[tokio::test]
     async fn test() -> Result<()> {
         let mut ctx = ExecutionContext::new();
         let batches = ctx.read_csv("tests/events.csv", CsvReadOptions::new())?.collect().await?;
@@ -57,5 +58,5 @@ mod tests {
 
         assert_eq!(true, a.evaluate(&batches[0], 0));
         Ok(())
-    }
+    }*/
 }
