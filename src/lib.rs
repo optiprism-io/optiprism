@@ -3,6 +3,7 @@ mod arrow;
 mod csv;
 mod expression_tree;
 mod str;
+mod error;
 
 use datafusion::error::Result;
 use std::any::Any;

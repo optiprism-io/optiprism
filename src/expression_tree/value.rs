@@ -15,21 +15,19 @@ use crate::expression_tree::expr::{Expr};
 use arrow::record_batch::RecordBatch;
 use crate::expression_tree::boolean_op::BooleanOp;
 
-pub struct Value<T> {
+pub struct Value {
     col_id: usize,
-    v: PhantomData<T>,
 }
 
-impl<T> Value<T> {
+impl Value {
     pub fn new(col_id: usize) -> Self {
         Value {
             col_id,
-            v: PhantomData,
         }
     }
 }
 
-impl Expr<Option<i8>> for Value<i8> {
+impl Expr<Option<i8>> for Value {
     fn evaluate(&self, batch: &RecordBatch, row_id: usize) -> Option<i8> {
         let arr = batch.columns()[self.col_id].as_ref();
         if arr.is_null(row_id) {
@@ -62,7 +60,7 @@ mod tests {
             ],
         )?;
 
-        let op = Value::<i8>::new(0);
+        let op = Value::new(0);
         assert_eq!(Some(1), op.evaluate(&batch, 0));
         assert_eq!(Some(2), op.evaluate(&batch, 1));
         assert_eq!(None, op.evaluate(&batch, 2));
