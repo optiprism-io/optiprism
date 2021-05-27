@@ -24,9 +24,8 @@ impl<Op> IterativeCountOp<Op> {
 
 impl<Op> Expr<bool> for IterativeCountOp<Op> where Op: BooleanOp<i64> {
     fn evaluate(&self, batch: &RecordBatch, _: usize) -> bool {
-        let len = batch.columns()[0].len();
         let mut left: i64 = 0;
-        for row_id in 0..len {
+        for row_id in 0..batch.num_rows(){
             match self.expr.evaluate(batch, row_id) {
                 true => {
                     left += 1;

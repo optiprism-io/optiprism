@@ -12,6 +12,7 @@ mod value_op;
 mod scalar;
 mod count;
 mod sum;
+mod sequence;
 
 #[cfg(test)]
 mod tests {
