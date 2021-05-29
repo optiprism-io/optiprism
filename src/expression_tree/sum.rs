@@ -31,7 +31,9 @@ impl Expr<i8> for Sum {
         {
             let b = ar.as_any().downcast_ref::<BooleanArray>().unwrap();
             let v = batch.columns()[self.col_id].as_any().downcast_ref::<Int8Array>().unwrap();
-            return b.iter().enumerate()
+            return b
+                .iter()
+                .enumerate()
                 .filter(|(i, x)| x.is_some() && x.unwrap() && !v.data_ref().is_null(*i))
                 .map(|(i, _)| v.value(i))
                 .fold(0i8, |acc, x| acc + x);
