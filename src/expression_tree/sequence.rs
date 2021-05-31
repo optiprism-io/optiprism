@@ -2,24 +2,39 @@ use crate::expression_tree::expr::Expr;
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::{PhysicalExpr, ColumnarValue};
 use std::sync::Arc;
-use arrow::array::{BooleanArray, Array, ArrayRef, Int8Array};
+use arrow::array::{BooleanArray, Array, ArrayRef, Int8Array, TimestampSecondArray};
 use std::borrow::Borrow;
 use std::ops::Deref;
 use arrow::array;
 use arrow::datatypes::DataType;
+use chrono::Duration;
 
 pub struct Sequence {
     steps: Vec<Arc<dyn PhysicalExpr>>,
     exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>>,
     constants: Option<Vec<usize>>,
+    timestamp_col_id: usize,
+    window: Duration,
 }
 
+type ColID = usize;
+type StepID = usize;
+
+// TODO: add drop off from step and time-to-convert
 impl Sequence {
-    pub fn new(steps: Vec<Arc<dyn PhysicalExpr>>, exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>>, constants: Option<Vec<usize>>) -> Self {
+    pub fn new(
+        steps: Vec<Arc<dyn PhysicalExpr>>,
+        exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<StepID>)>>,
+        constants: Option<Vec<usize>>,
+        timestamp_col_id: usize,
+        window: Duration,
+    ) -> Self {
         Self {
             steps,
             exclude,
             constants,
+            timestamp_col_id,
+            window,
         }
     }
 }
@@ -84,11 +99,36 @@ impl Expr<bool> for Sequence {
             }
         }
 
+        let ts_col = batch.columns()[self.timestamp_col_id].as_any().downcast_ref::<TimestampSecondArray>().unwrap();
+
         let mut step_id: usize = 0;
         let mut row_id: usize = 0;
         let mut step_row_id: Vec<usize> = vec![0; steps.len()];
+        let mut window_start_ts: i64 = 0;
 
         while row_id < batch.num_rows() {
+            // window
+            if step_id > 0 {
+                let cur_ts = ts_col.value(row_id);
+                if cur_ts - window_start_ts > self.window.num_seconds() {
+                    let mut found = false;
+                    // search next first step occurrence
+                    for i in (step_row_id[0] + 1)..batch.num_rows() {
+                        if steps[0].value(i) {
+                            step_id = 0;
+                            row_id = i;
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        return false;
+                    }
+                }
+            }
+
+            // check value
             if steps[step_id].value(row_id) {
                 if step_id > 0 {
                     if let Some(constants) = &self.constants {
@@ -98,7 +138,12 @@ impl Expr<bool> for Sequence {
                         }
                     }
                 }
+
                 step_row_id[step_id] = row_id;
+                if step_id == 0 {
+                    window_start_ts = ts_col.value(row_id);
+                }
+
                 step_id += 1;
                 if step_id >= steps.len() {
                     return true;
@@ -107,6 +152,7 @@ impl Expr<bool> for Sequence {
                 continue;
             }
 
+            // exclude
             // perf: use just regular loop with index, do not spawn exclude[step_id].iter() each time
             for i in 0..exclude[step_id].len() {
                 if exclude[step_id][i].value(row_id) {
@@ -127,8 +173,8 @@ impl Expr<bool> for Sequence {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use arrow::datatypes::{Schema, Field, DataType};
-    use arrow::array::Int8Array;
+    use arrow::datatypes::{Schema, Field, DataType, TimeUnit};
+    use arrow::array::{Int8Array, TimestampSecondArray};
     use arrow::record_batch::RecordBatch;
     use datafusion::physical_plan::expressions::{Column, Literal, BinaryExpr};
     use datafusion::scalar::ScalarValue;
@@ -139,17 +185,19 @@ mod tests {
     use crate::expression_tree::sequence::Sequence;
     use crate::expression_tree::expr::Expr;
     use datafusion::physical_plan::PhysicalExpr;
+    use chrono::Duration;
 
-    /// returns a table with 3 columns of i32 in memory
-    fn build_table_i8(
+    fn build_table(
         a: (&str, &Vec<i8>),
         b: (&str, &Vec<i8>),
         c: (&str, &Vec<i8>),
+        ts: (&str, &Vec<i64>),
     ) -> RecordBatch {
         let schema = Schema::new(vec![
             Field::new(a.0, DataType::Int8, false),
             Field::new(b.0, DataType::Int8, false),
             Field::new(c.0, DataType::Int8, false),
+            Field::new(c.0, DataType::Timestamp(TimeUnit::Second, None), false),
         ]);
 
         RecordBatch::try_new(
@@ -158,54 +206,10 @@ mod tests {
                 Arc::new(Int8Array::from(a.1.clone())),
                 Arc::new(Int8Array::from(b.1.clone())),
                 Arc::new(Int8Array::from(c.1.clone())),
+                Arc::new(TimestampSecondArray::from(ts.1.clone())),
             ],
         )
             .unwrap()
-    }
-
-    fn build_table(
-        a: (&str, &Vec<i8>),
-        b: (&str, &Vec<i8>),
-        c: (&str, &Vec<i8>),
-    ) -> RecordBatch {
-        return build_table_i8(a, b, c);
-    }
-
-    #[test]
-    fn test() -> Result<()> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("a", DataType::Int8, false),
-        ]));
-
-        let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-            ],
-        )?;
-
-        let step1 = {
-            let left = Column::new("a");
-            let right = Literal::new(ScalarValue::Int8(Some(1)));
-            BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
-        };
-
-        let step2 = {
-            let left = Column::new("a");
-            let right = Literal::new(ScalarValue::Int8(Some(2)));
-            BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
-        };
-
-        let step3 = {
-            let left = Column::new("a");
-            let right = Literal::new(ScalarValue::Int8(Some(3)));
-            BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
-        };
-
-        let op = Sequence::new(vec![Arc::new(step1), Arc::new(step2), Arc::new(step3)], None, None);
-        assert_eq!(true, op.evaluate(&batch, 0));
-        Ok(())
     }
 
     fn build_steps() -> (Arc<BinaryExpr>, Arc<BinaryExpr>, Arc<BinaryExpr>) {
@@ -230,35 +234,49 @@ mod tests {
     }
 
     #[test]
-    fn test_exclude() -> Result<()> {
+    fn test() -> Result<()> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
         ]));
 
-        let a = Arc::new(Int8Array::from(vec![7, 1, 5, 4, 2, 5, 3, 1, 2, 4, 3]));
+        let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![1, 2, 3]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
                 a.clone(),
+                ts.clone(),
             ],
         )?;
-        let step1 = Arc::new({
-            let left = Column::new("a");
-            let right = Literal::new(ScalarValue::Int8(Some(1)));
-            BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
-        });
 
-        let step2 = Arc::new({
-            let left = Column::new("a");
-            let right = Literal::new(ScalarValue::Int8(Some(2)));
-            BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
-        });
+        let (step1, step2, step3) = build_steps();
 
-        let step3 = Arc::new({
-            let left = Column::new("a");
-            let right = Literal::new(ScalarValue::Int8(Some(3)));
-            BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
-        });
+        let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, None, 1, Duration::seconds(100));
+        assert_eq!(true, op.evaluate(&batch, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_exclude() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]));
+
+        let a = Arc::new(Int8Array::from(vec![7, 1, 5, 4, 2, 5, 3, 1, 2, 4, 3]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+                ts.clone(),
+            ],
+        )?;
+
+        let (step1, step2, step3) = build_steps();
+
         {
             let exclude1 = {
                 let left = Column::new("a");
@@ -273,7 +291,7 @@ mod tests {
             };
 
             let exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>> = Some(vec![(Arc::new(exclude1), vec![1]), (Arc::new(exclude2), vec![1, 2])]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], exclude, None);
+            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], exclude, None, 1, Duration::seconds(100));
             assert_eq!(true, op.evaluate(&batch, 0));
         }
 
@@ -291,7 +309,7 @@ mod tests {
             };
 
             let exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>> = Some(vec![(Arc::new(exclude1), vec![2]), (Arc::new(exclude2), vec![1, 2])]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], exclude, None);
+            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], exclude, None, 1, Duration::seconds(100));
             assert_eq!(false, op.evaluate(&batch, 0));
         }
         Ok(())
@@ -302,54 +320,102 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         {
-            let batch = build_table(("a", &vec![1, 2, 3]), ("b", &vec![1, 1, 1]), ("c", &vec![2, 2, 2]));
+            let batch = build_table(("a", &vec![1, 2, 3]), ("b", &vec![1, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
             let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants);
+            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
             assert_eq!(true, op.evaluate(&batch, 0));
         }
 
         {
-            let batch = build_table(("a", &vec![1, 2, 3]), ("b", &vec![2, 1, 1]), ("c", &vec![2, 2, 2]));
+            let batch = build_table(("a", &vec![1, 2, 3]), ("b", &vec![2, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
             let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants);
+            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
             assert_eq!(false, op.evaluate(&batch, 0));
         }
 
         {
-            let batch = build_table(("a", &vec![1, 1, 2, 3]), ("b", &vec![1, 2, 2, 2]), ("c", &vec![2, 2, 2, 2]));
+            let batch = build_table(("a", &vec![1, 1, 2, 3]), ("b", &vec![1, 2, 2, 2]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants);
+            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
             assert_eq!(false, op.evaluate(&batch, 0));
         }
 
         {
-            let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 1, 1]), ("c", &vec![2, 2, 2, 2]));
+            let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 1, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants);
+            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
             assert_eq!(true, op.evaluate(&batch, 0));
         }
 
         {
-            let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 1, 1]), ("c", &vec![2, 1, 2, 2]));
+            let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 1, 1]), ("c", &vec![2, 1, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants);
+            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
             assert_eq!(true, op.evaluate(&batch, 0));
         }
 
         {
-            let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 2, 1]), ("c", &vec![2, 2, 2, 2]));
+            let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 2, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants);
+            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
             assert_eq!(true, op.evaluate(&batch, 0));
         }
 
         {
-            let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 2, 1]), ("c", &vec![2, 2, 2, 2]));
+            let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 2, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants);
+            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
             assert_eq!(false, op.evaluate(&batch, 0));
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_short_window() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]));
+
+        let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+                ts.clone(),
+            ],
+        )?;
+
+        let (step1, step2, step3) = build_steps();
+
+        let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, None, 1, Duration::seconds(2));
+        assert_eq!(false, op.evaluate(&batch, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_window_slide() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]));
+
+        let a = Arc::new(Int8Array::from(vec![1, 4, 5, 1, 4, 2, 3]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2, 3, 4, 5, 6]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+                ts.clone(),
+            ],
+        )?;
+
+        let (step1, step2, step3) = build_steps();
+
+        let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, None, 1, Duration::seconds(4));
+        assert_eq!(true, op.evaluate(&batch, 0));
         Ok(())
     }
 }
