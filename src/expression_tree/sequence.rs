@@ -10,11 +10,11 @@ use arrow::datatypes::DataType;
 use chrono::Duration;
 
 pub struct Sequence {
-    steps: Vec<Arc<dyn PhysicalExpr>>,
-    exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>>,
-    constants: Option<Vec<usize>>,
     timestamp_col_id: usize,
     window: Duration,
+    steps: Vec<Arc<dyn PhysicalExpr>>,
+    exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<StepID>)>>,
+    constants: Option<Vec<ColID>>,
 }
 
 type ColID = usize;
@@ -23,18 +23,36 @@ type StepID = usize;
 // TODO: add drop off from step and time-to-convert
 impl Sequence {
     pub fn new(
-        steps: Vec<Arc<dyn PhysicalExpr>>,
-        exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<StepID>)>>,
-        constants: Option<Vec<usize>>,
         timestamp_col_id: usize,
         window: Duration,
+        steps: Vec<Arc<dyn PhysicalExpr>>,
     ) -> Self {
         Self {
             steps,
-            exclude,
-            constants,
             timestamp_col_id,
             window,
+            exclude: None,
+            constants: None,
+        }
+    }
+
+    pub fn with_exclude(self, exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<StepID>)>) -> Self {
+        Sequence {
+            timestamp_col_id: self.timestamp_col_id,
+            window: self.window,
+            steps: self.steps,
+            exclude: Some(exclude),
+            constants: self.constants,
+        }
+    }
+
+    pub fn with_constants(self, constants: Vec<ColID>) -> Self {
+        Sequence {
+            timestamp_col_id: self.timestamp_col_id,
+            window: self.window,
+            steps: self.steps,
+            exclude: self.exclude,
+            constants: Some(constants),
         }
     }
 }
@@ -252,7 +270,7 @@ mod tests {
 
         let (step1, step2, step3) = build_steps();
 
-        let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, None, 1, Duration::seconds(100));
+        let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]);
         assert_eq!(true, op.evaluate(&batch, 0));
         Ok(())
     }
@@ -290,8 +308,8 @@ mod tests {
                 BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
             };
 
-            let exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>> = Some(vec![(Arc::new(exclude1), vec![1]), (Arc::new(exclude2), vec![1, 2])]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], exclude, None, 1, Duration::seconds(100));
+            let exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)> = vec![(Arc::new(exclude1), vec![1]), (Arc::new(exclude2), vec![1, 2])];
+            let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_exclude(exclude);
             assert_eq!(true, op.evaluate(&batch, 0));
         }
 
@@ -308,8 +326,8 @@ mod tests {
                 BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
             };
 
-            let exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>> = Some(vec![(Arc::new(exclude1), vec![2]), (Arc::new(exclude2), vec![1, 2])]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], exclude, None, 1, Duration::seconds(100));
+            let exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)> = vec![(Arc::new(exclude1), vec![2]), (Arc::new(exclude2), vec![1, 2])];
+            let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_exclude(exclude);
             assert_eq!(false, op.evaluate(&batch, 0));
         }
         Ok(())
@@ -321,50 +339,50 @@ mod tests {
 
         {
             let batch = build_table(("a", &vec![1, 2, 3]), ("b", &vec![1, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
-            let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
+            let constants = vec![1, 2];
+            let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
             assert_eq!(true, op.evaluate(&batch, 0));
         }
 
         {
             let batch = build_table(("a", &vec![1, 2, 3]), ("b", &vec![2, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
-            let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
+            let constants = vec![1, 2];
+            let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
             assert_eq!(false, op.evaluate(&batch, 0));
         }
 
         {
             let batch = build_table(("a", &vec![1, 1, 2, 3]), ("b", &vec![1, 2, 2, 2]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
-            let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
+            let constants = vec![1, 2];
+            let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
             assert_eq!(false, op.evaluate(&batch, 0));
         }
 
         {
             let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 1, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
-            let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
+            let constants = vec![1, 2];
+            let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
             assert_eq!(true, op.evaluate(&batch, 0));
         }
 
         {
             let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 1, 1]), ("c", &vec![2, 1, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
-            let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
+            let constants = vec![1, 2];
+            let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
             assert_eq!(true, op.evaluate(&batch, 0));
         }
 
         {
             let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 2, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
-            let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
+            let constants = vec![1, 2];
+            let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
             assert_eq!(true, op.evaluate(&batch, 0));
         }
 
         {
             let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 2, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
-            let constants = Some(vec![1, 2]);
-            let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, constants, 3, Duration::seconds(100));
+            let constants = vec![1, 2];
+            let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
             assert_eq!(false, op.evaluate(&batch, 0));
         }
 
@@ -390,7 +408,7 @@ mod tests {
 
         let (step1, step2, step3) = build_steps();
 
-        let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, None, 1, Duration::seconds(2));
+        let op = Sequence::new(1, Duration::seconds(2), vec![step1.clone(), step2.clone(), step3.clone()]);
         assert_eq!(false, op.evaluate(&batch, 0));
         Ok(())
     }
@@ -414,7 +432,7 @@ mod tests {
 
         let (step1, step2, step3) = build_steps();
 
-        let op = Sequence::new(vec![step1.clone(), step2.clone(), step3.clone()], None, None, 1, Duration::seconds(4));
+        let op = Sequence::new(1, Duration::seconds(4), vec![step1.clone(), step2.clone(), step3.clone()]);
         assert_eq!(true, op.evaluate(&batch, 0));
         Ok(())
     }
