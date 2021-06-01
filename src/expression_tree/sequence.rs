@@ -9,12 +9,20 @@ use arrow::array;
 use arrow::datatypes::DataType;
 use chrono::Duration;
 
+enum Filter {
+    DropOffOnAnyStep,
+    DropOffOnStep(usize),
+    TimeToConvert(Duration, Duration),
+}
+
+
 pub struct Sequence {
     timestamp_col_id: usize,
     window: Duration,
     steps: Vec<Arc<dyn PhysicalExpr>>,
     exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<StepID>)>>,
     constants: Option<Vec<ColID>>,
+    filter: Option<Filter>,
 }
 
 type ColID = usize;
@@ -33,6 +41,7 @@ impl Sequence {
             window,
             exclude: None,
             constants: None,
+            filter: None,
         }
     }
 
@@ -43,6 +52,7 @@ impl Sequence {
             steps: self.steps,
             exclude: Some(exclude),
             constants: self.constants,
+            filter: None,
         }
     }
 
@@ -53,6 +63,40 @@ impl Sequence {
             steps: self.steps,
             exclude: self.exclude,
             constants: Some(constants),
+            filter: None,
+        }
+    }
+
+    pub fn with_drop_off_on_any_step(self) -> Self {
+        Sequence {
+            timestamp_col_id: self.timestamp_col_id,
+            window: self.window,
+            steps: self.steps,
+            exclude: self.exclude,
+            constants: self.constants,
+            filter: Some(Filter::DropOffOnAnyStep),
+        }
+    }
+
+    pub fn with_drop_off_on_step(self, drop_off_step_id: usize) -> Self {
+        Sequence {
+            timestamp_col_id: self.timestamp_col_id,
+            window: self.window,
+            steps: self.steps,
+            exclude: self.exclude,
+            constants: self.constants,
+            filter: Some(Filter::DropOffOnStep(drop_off_step_id)),
+        }
+    }
+
+    pub fn with_time_to_convert(self, from: Duration, to: Duration) -> Self {
+        Sequence {
+            timestamp_col_id: self.timestamp_col_id,
+            window: self.window,
+            steps: self.steps,
+            exclude: self.exclude,
+            constants: self.constants,
+            filter: Some(Filter::TimeToConvert(from, to)),
         }
     }
 }
@@ -84,9 +128,10 @@ fn check_constants(batch: &RecordBatch, row_id: usize, constants: &Vec<usize>, c
 
 impl Expr<bool> for Sequence {
     fn evaluate(&self, batch: &RecordBatch, _: usize) -> bool {
+        // make boolean array on each step
         let mut steps: Vec<&BooleanArray> = Vec::with_capacity(self.steps.len());
-
         let pre_steps: Vec<Arc<dyn Array>> = self.steps.iter().map(|x| {
+            // evaluate step
             if let ColumnarValue::Array(v) = x.evaluate(batch).unwrap() {
                 return v;
             };
@@ -98,11 +143,14 @@ impl Expr<bool> for Sequence {
             steps.push(v.as_any().downcast_ref::<BooleanArray>().unwrap())
         }
 
+        // each step has 0 or more exclusion expressions
         let mut exclude: Vec<Vec<&BooleanArray>> = vec![Vec::new(); steps.len()];
         let mut pre_exclude: Vec<(Arc<dyn Array>, &Vec<usize>)> = Vec::new();
 
+        // make exclude steps
         if let Some(e) = &self.exclude {
             for (expr, steps) in e.iter() {
+                // calculate exclusion expression for step
                 if let ColumnarValue::Array(a) = expr.evaluate(batch).unwrap() {
                     pre_exclude.push((a, steps));
                 } else {
@@ -117,74 +165,113 @@ impl Expr<bool> for Sequence {
             }
         }
 
+        // downcast timestamp column
         let ts_col = batch.columns()[self.timestamp_col_id].as_any().downcast_ref::<TimestampSecondArray>().unwrap();
 
+        // current step id
         let mut step_id: usize = 0;
+        // current row id
         let mut row_id: usize = 0;
+        // reference on row_id of each step
         let mut step_row_id: Vec<usize> = vec![0; steps.len()];
+        // timestamp of first step
         let mut window_start_ts: i64 = 0;
+        let mut is_completed = false;
 
         while row_id < batch.num_rows() {
-            // window
+            // check window
             if step_id > 0 {
                 let cur_ts = ts_col.value(row_id);
+                // calculate window
                 if cur_ts - window_start_ts > self.window.num_seconds() {
                     let mut found = false;
                     // search next first step occurrence
                     for i in (step_row_id[0] + 1)..batch.num_rows() {
                         if steps[0].value(i) {
                             step_id = 0;
+                            // rewind to next step 0
                             row_id = i;
                             found = true;
                             break;
                         }
                     }
 
+                    // break if no more first steps
                     if !found {
-                        return false;
+                        break;
                     }
                 }
             }
 
-            // check value
+            // check expression result
             if steps[step_id].value(row_id) {
+                // check constants. We do not check constants on first step
                 if step_id > 0 {
                     if let Some(constants) = &self.constants {
                         if !check_constants(batch, row_id, constants, step_row_id[0]) {
+                            // skip current value if constant doesn't match
                             row_id += 1;
                             continue;
                         }
                     }
                 }
 
+                // save reference to current step row_id
                 step_row_id[step_id] = row_id;
+                // save window start if current step is first
                 if step_id == 0 {
                     window_start_ts = ts_col.value(row_id);
                 }
 
-                step_id += 1;
-                if step_id >= steps.len() {
-                    return true;
+                if step_id == steps.len() - 1 {
+                    is_completed = true;
+                    break;
                 }
+                // move to next step
+                step_id += 1;
+
+                // increment current row
                 row_id += 1;
                 continue;
             }
 
-            // exclude
+            // check exclude
             // perf: use just regular loop with index, do not spawn exclude[step_id].iter() each time
-            for i in 0..exclude[step_id].len() {
-                if exclude[step_id][i].value(row_id) {
-                    if step_id > 0 {
+            if step_id > 0 {
+                for i in 0..exclude[step_id].len() {
+                    if exclude[step_id][i].value(row_id) {
                         step_id -= 1;
-                    }
 
-                    break;
+                        break;
+                    }
                 }
             }
 
             row_id += 1;
         }
-        false
+
+
+        // check filter
+        if let Some(filter) = &self.filter {
+            return match filter {
+                Filter::DropOffOnAnyStep => {
+                    !is_completed
+                }
+                Filter::DropOffOnStep(drop_off_step_id) => {
+                    if is_completed {
+                        return false;
+                    }
+
+                    step_id == *drop_off_step_id
+                }
+                Filter::TimeToConvert(from, to) => {
+                    let spent = ts_col.value(row_id) - window_start_ts;
+                    spent >= from.num_seconds() && spent <= to.num_seconds()
+                }
+            };
+        }
+
+        is_completed
     }
 }
 
@@ -408,7 +495,7 @@ mod tests {
 
         let (step1, step2, step3) = build_steps();
 
-        let op = Sequence::new(1, Duration::seconds(2), vec![step1.clone(), step2.clone(), step3.clone()]);
+        let op = Sequence::new(1, Duration::seconds(1), vec![step1.clone(), step2.clone(), step3.clone()]);
         assert_eq!(false, op.evaluate(&batch, 0));
         Ok(())
     }
@@ -434,6 +521,174 @@ mod tests {
 
         let op = Sequence::new(1, Duration::seconds(4), vec![step1.clone(), step2.clone(), step3.clone()]);
         assert_eq!(true, op.evaluate(&batch, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_drop_off_on_step1() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]));
+
+        let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+                ts.clone(),
+            ],
+        )?;
+
+        let (step1, step2, step3) = build_steps();
+
+        let op = Sequence::new(1, Duration::seconds(1), vec![step1.clone(), step2.clone(), step3.clone()]).with_drop_off_on_step(2);
+        assert_eq!(true, op.evaluate(&batch, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_drop_off_on_step2() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]));
+
+        let a = Arc::new(Int8Array::from(vec![1, 2, 4, 5]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2, 3]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+                ts.clone(),
+            ],
+        )?;
+
+        let (step1, step2, step3) = build_steps();
+
+        let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_drop_off_on_step(2);
+        assert_eq!(true, op.evaluate(&batch, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_drop_off_on_step3() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]));
+
+        let a = Arc::new(Int8Array::from(vec![1, 3, 4, 5]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2, 3]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+                ts.clone(),
+            ],
+        )?;
+
+        let (step1, step2, step3) = build_steps();
+
+        let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_drop_off_on_step(1);
+        assert_eq!(true, op.evaluate(&batch, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_drop_off_on_step4() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]));
+
+        let a = Arc::new(Int8Array::from(vec![6, 3, 4, 5]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2, 3]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+                ts.clone(),
+            ],
+        )?;
+
+        let (step1, step2, step3) = build_steps();
+
+        let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_drop_off_on_step(0);
+        assert_eq!(true, op.evaluate(&batch, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_drop_off_on_any_step() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]));
+
+        let a = Arc::new(Int8Array::from(vec![1, 3, 4, 5]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2, 3]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+                ts.clone(),
+            ],
+        )?;
+
+        let (step1, step2, step3) = build_steps();
+
+        let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_drop_off_on_any_step();
+        assert_eq!(true, op.evaluate(&batch, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_with_time_to_convert() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]));
+
+        let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+                ts.clone(),
+            ],
+        )?;
+
+        let (step1, step2, step3) = build_steps();
+
+        let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_time_to_convert(Duration::seconds(1), Duration::seconds(2));
+        assert_eq!(true, op.evaluate(&batch, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn test_with_time_to_convert2() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]));
+
+        let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 20]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+                ts.clone(),
+            ],
+        )?;
+
+        let (step1, step2, step3) = build_steps();
+
+        let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_time_to_convert(Duration::seconds(1), Duration::seconds(2));
+        assert_eq!(false, op.evaluate(&batch, 0));
         Ok(())
     }
 }
