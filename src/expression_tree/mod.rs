@@ -1,16 +1,16 @@
-mod expr;
+pub mod expr;
 mod context;
 // mod binary_op;
 mod value;
-mod boolean_op;
-mod binary_op;
+pub mod boolean_op;
+pub mod binary_op;
 mod literal;
 mod cond_value;
-mod iterative_count_op;
+pub mod iterative_count_op;
 mod iterative_sum_op;
-mod value_op;
+pub mod value_op;
 mod scalar;
-mod count;
+pub mod count;
 mod sum;
 mod sequence;
 
@@ -43,13 +43,11 @@ mod tests {
                     )),
                 )),
                 1,
-                false,
             )),
             Box::new(IterativeSumOp::<_, Lt>::new(
                 Box::new(ValueOp::<_, Eq>::new(2, Some("buy"))),
                 4,
                 100i64,
-                false,
             )),
         );
 

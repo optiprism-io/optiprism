@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use crate::expression_tree::expr::Expr;
 use arrow::record_batch::RecordBatch;
-use arrow::array::{Int8Array, StringArray, ArrayRef, BooleanArray};
+use arrow::array::{Int8Array, StringArray, ArrayRef, BooleanArray, Int64Array};
 use crate::expression_tree::boolean_op::BooleanOp;
 use datafusion::{
     error::{Result},
@@ -46,6 +46,18 @@ impl<Op> Expr<bool> for ValueOp<Option<i8>, Op> where Op: BooleanOp<Option<i8>> 
             Op::perform(None, self.right)
         } else {
             Op::perform(Some(col.as_any().downcast_ref::<Int8Array>().unwrap().value(row_id)), self.right)
+        };
+    }
+}
+
+impl<Op> Expr<bool> for ValueOp<Option<i64>, Op> where Op: BooleanOp<Option<i64>> {
+    fn evaluate(&self, batch: &RecordBatch, row_id: usize) -> bool {
+        let col = batch.columns()[self.left_col_id].as_ref();
+        return if col.is_null(row_id) {
+            Op::perform(None, self.right)
+        } else {
+            let val = col.as_any().downcast_ref::<Int64Array>().unwrap().value(row_id);
+            Op::perform(Some(val), self.right)
         };
     }
 }
@@ -158,7 +170,7 @@ mod tests {
             ],
         )?;
 
-        let v1 = ValueOp::<_, Gt>::new(0, Some(1));
+        let v1 = ValueOp::<Option<i8>, Gt>::new(0, Some(1i8));
         assert_eq!(false, v1.evaluate(&batch, 0));
         assert_eq!(true, v1.evaluate(&batch, 1));
         assert_eq!(false, v1.evaluate(&batch, 2));

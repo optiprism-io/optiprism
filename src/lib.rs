@@ -1,7 +1,7 @@
 // mod operators;
 mod arrow;
 mod csv;
-mod expression_tree;
+pub mod expression_tree;
 mod str;
 mod error;
 
