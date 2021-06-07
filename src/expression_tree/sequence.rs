@@ -8,6 +8,7 @@ use std::ops::Deref;
 use arrow::array;
 use arrow::datatypes::DataType;
 use chrono::Duration;
+use crate::physical_plan::utils::into_array;
 
 enum Filter {
     DropOffOnAnyStep,
@@ -119,7 +120,7 @@ fn check_constants(batch: &RecordBatch, row_id: usize, constants: &Vec<usize>, c
                     return false;
                 }
             }
-            _ => { panic!("unimplemented") }
+            _ => { unimplemented!() }
         }
     }
 
@@ -129,16 +130,13 @@ fn check_constants(batch: &RecordBatch, row_id: usize, constants: &Vec<usize>, c
 impl Expr<bool> for Sequence {
     fn evaluate(&self, batch: &RecordBatch, _: usize) -> bool {
         // make boolean array on each step
-        let mut steps: Vec<&BooleanArray> = Vec::with_capacity(self.steps.len());
         let pre_steps: Vec<Arc<dyn Array>> = self.steps.iter().map(|x| {
             // evaluate step
-            if let ColumnarValue::Array(v) = x.evaluate(batch).unwrap() {
-                return v;
-            };
-            panic!("unexpected");
+            into_array(x.evaluate(batch).unwrap())
         }).collect();
 
 
+        let mut steps: Vec<&BooleanArray> = Vec::with_capacity(self.steps.len());
         for v in pre_steps.iter() {
             steps.push(v.as_any().downcast_ref::<BooleanArray>().unwrap())
         }
@@ -151,11 +149,7 @@ impl Expr<bool> for Sequence {
         if let Some(e) = &self.exclude {
             for (expr, steps) in e.iter() {
                 // calculate exclusion expression for step
-                if let ColumnarValue::Array(a) = expr.evaluate(batch).unwrap() {
-                    pre_exclude.push((a, steps));
-                } else {
-                    panic!("unexpected");
-                }
+                pre_exclude.push((into_array(expr.evaluate(batch).unwrap()), steps));
             }
 
             for (arr, steps) in pre_exclude.iter() {

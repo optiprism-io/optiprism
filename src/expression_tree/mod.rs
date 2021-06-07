@@ -13,6 +13,7 @@ mod scalar;
 pub mod count;
 mod sum;
 mod sequence;
+mod multi_batch;
 
 #[cfg(test)]
 mod tests {

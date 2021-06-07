@@ -7,6 +7,7 @@ use crate::expression_tree::expr::Expr;
 use arrow::compute::kernels::arithmetic::{
     add, divide, divide_scalar, multiply, subtract,
 };
+use crate::physical_plan::utils::into_array;
 
 pub struct Count {
     predicate: Arc<dyn PhysicalExpr>,
@@ -22,15 +23,12 @@ impl Count {
 
 impl Expr<i64> for Count {
     fn evaluate(&self, batch: &RecordBatch, _: usize) -> i64 {
-        if let ColumnarValue::Array(ar) = self.predicate.evaluate(batch).unwrap()
-        {
-            let b = ar.as_any().downcast_ref::<BooleanArray>().unwrap();
-            return b
-                .iter()
-                .filter(|x| x.is_some() && x.unwrap())
-                .count() as i64;
-        };
-        panic!("unexpected columnar value");  // todo: return result
+        let ar = into_array(self.predicate.evaluate(batch).unwrap());
+        let b = ar.as_any().downcast_ref::<BooleanArray>().unwrap();
+        return b
+            .iter()
+            .filter(|x| x.is_some() && x.unwrap())
+            .count() as i64;
     }
 }
 
