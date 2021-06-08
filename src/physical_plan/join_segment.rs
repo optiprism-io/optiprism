@@ -11,11 +11,12 @@ use std::pin::Pin;
 use arrow::record_batch::RecordBatch;
 use arrow::error::{Result as ArrowResult, ArrowError};
 use datafusion::physical_plan::expressions::col;
-use arrow::array::{ArrayRef, Int8Array, Array};
+use arrow::array::{ArrayRef, Int8Array, Array, DynComparator};
 use crate::physical_plan::utils::into_array;
 use datafusion::logical_plan::Operator;
 use crate::expression_tree::expr::Expr;
 use arrow::compute::kernels;
+use std::collections::HashMap;
 
 pub type JoinOn = (String, String);
 
@@ -30,7 +31,8 @@ pub struct JoinSegmentExec {
     on_left: String,
     on_right: String,
     /// The schema once the join is applied
-    schema: SchemaRef,
+    left_schema: SchemaRef,
+    right_schema: SchemaRef,
 }
 
 impl JoinSegmentExec {
@@ -40,16 +42,9 @@ impl JoinSegmentExec {
         on: &JoinOn,
         left_expr: Option<(Arc<dyn Expr<bool>>, Vec<usize>)>,
         right_expr: Option<(Arc<dyn Expr<bool>>, Vec<usize>)>,
+        left_schema: SchemaRef,
+        right_schema: SchemaRef,
     ) -> Result<Self> {
-        let left_schema = left.schema();
-        let right_schema = right.schema();
-
-        let schema = Arc::new(build_join_schema(
-            &left_schema,
-            &right_schema,
-            on,
-        ));
-
         let on = (on.0.clone(), on.1.clone());
 
         Ok(JoinSegmentExec {
@@ -59,7 +54,8 @@ impl JoinSegmentExec {
             right,
             on_left: on.0.to_owned(),
             on_right: on.1.to_owned(),
-            schema,
+            left_schema,
+            right_schema,
         })
     }
     pub fn try_new(
@@ -68,16 +64,9 @@ impl JoinSegmentExec {
         on: &JoinOn,
         left_expr: Option<(Arc<dyn Expr<bool>>, SchemaRef)>,
         right_expr: Option<(Arc<dyn Expr<bool>>, SchemaRef)>,
+        left_schema: SchemaRef,
+        right_schema: SchemaRef,
     ) -> Result<Self> {
-        let left_schema = left.schema();
-        let right_schema = right.schema();
-
-        let schema = Arc::new(build_join_schema(
-            &left_schema,
-            &right_schema,
-            on,
-        ));
-
         let on = (on.0.clone(), on.1.clone());
 
         let left_expr = left_expr.map(|(expr, s)| {
@@ -95,7 +84,8 @@ impl JoinSegmentExec {
             right,
             on_left: on.0.to_owned(),
             on_right: on.1.to_owned(),
-            schema,
+            left_schema,
+            right_schema,
         })
     }
 
@@ -156,15 +146,14 @@ impl ExecutionPlan for JoinSegmentExec {
             left_expr: self.left_expr.clone(),
             left_input: left,
             left_batch: None,
-            left_join_predicate: None,
             right_expr: self.right_expr.clone(),
             right_input: right,
             right_batch: None,
-            right_join_predicate: None,
             right_idx: 0,
             on_left: self.on_left.clone(),
             on_right: self.on_right.clone(),
-            schema: self.schema.clone(),
+            left_schema: self.left_schema.clone(),
+            right_schema: self.right_schema.clone(),
             left_idx: 0,
         }))
     }
@@ -181,17 +170,16 @@ struct JoinSegmentStream {
     left_expr: Option<(Arc<dyn Expr<bool>>, Vec<usize>)>,
     left_input: SendableRecordBatchStream,
     left_batch: Option<RecordBatch>,
-    left_join_predicate: Option<ArrayRef>,
     left_idx: usize,
     right_expr: Option<(Arc<dyn Expr<bool>>, Vec<usize>)>,
     right_input: SendableRecordBatchStream,
     right_batch: Option<RecordBatch>,
-    right_join_predicate: Option<ArrayRef>,
     right_idx: usize,
     on_left: String,
     on_right: String,
     /// The schema once the join is applied
-    schema: SchemaRef,
+    left_schema: SchemaRef,
+    right_schema: SchemaRef,
 }
 
 impl RecordBatchStream for JoinSegmentStream {
@@ -200,32 +188,10 @@ impl RecordBatchStream for JoinSegmentStream {
     }
 }
 
-impl JoinSegmentStream {
-    fn compare_predicates(self) -> CmpResult {
-        let left = self.left_join_predicate.unwrap();
-        let right = self.right_join_predicate.unwrap();
-
-        match left.data_type() {
-            DataType::Int8 => {
-                let l = left.as_any().downcast_ref::<Int8Array>().unwrap();
-                let r = right.as_any().downcast_ref::<Int8Array>().unwrap();
-                if l.value(self.left_idx) == r.value(self.right_idx) {
-                    CmpResult::Eq
-                } else if l.value(self.left_idx) < r.value(self.right_idx) {
-                    CmpResult::Lt
-                } else {
-                    CmpResult::Gt
-                }
-            }
-            _ => panic!("unimplemented")
-        }
-    }
-}
-
-fn concat_batches(take_cols: Vec<usize>, from_id: usize, to_id: usize, batches: Vec<RecordBatch>) -> Vec<ArrayRef> {
+fn concat_batches(take_cols: &[usize], from_id: usize, to_id: usize, batches: &[RecordBatch]) -> Vec<ArrayRef> {
     match batches.len() {
         1 => {
-            take_cols.iter().map(|x| batches[0][*x].slice(from_id, to_id - from_id)).collect()
+            take_cols.iter().map(|x| (*x, batches[0][*x].slice(from_id, to_id - from_id))).collect()
         }
         _ => {
             take_cols.iter().map(|col_id| {
@@ -245,6 +211,55 @@ fn concat_batches(take_cols: Vec<usize>, from_id: usize, to_id: usize, batches: 
     }
 }
 
+enum ColKind {
+    Expr,
+    Take,
+}
+
+impl JoinSegmentStream {
+    fn evaluate_partition(&self, from_idx: usize, to_idx: usize, right_batches: &[RecordBatch], right_cols: Vec<(Vec<ColKind>, usize)>) -> Option<RecordBatch> {
+        if let Some((expr, _)) = &self.left_expr {
+            if let Some(batch) = &self.left_batch {
+                let cols = take_cols.iter().map(|x| batch.columns()[*x]).collect();
+                if !expr.evaluate(cols, self.left_idx) {
+                    return None;
+                }
+            }
+        }
+
+        let mut final_cols: Vec<Option<ArrayRef>> = vec![None; self.right_schema.fields().len()];
+        let mut expr_cols: Vec<ArrayRef> = vec![];
+
+
+        if let Some((expr, _)) = &self.right_expr {
+            let take_cols = right_cols.iter().enumerate().filter_map(|(i, x)| {
+                return if x.0.contains(&ColKind::Expr) {
+                    Some(i)
+                } else {
+                    None
+                };
+            }).collect();
+            expr_cols = concat_batches(&take_cols, from_idx, to_idx, right_batches);
+            if !expr.evaluate(&expr_cols.iter().map(|x| x.1).collect(), self.right_idx) {
+                return None;
+            }
+            let mut r: usize = 0;
+            right_cols.iter().enumerate().for_each(|(i, x)| {
+                if x.0.contains(&ColKind::Take) && x.0.contains(&ColKind::Expr) {
+                    final_cols[x.1] = Some(expr_cols[r].clone());
+                    r += 1;
+                }
+            });
+        }
+
+        right_cols.iter().
+        let left_schema = self.left_schema.fields().iter().map(|x| x.).collect();
+        let right_schema = self.right_schema.fields().iter().map(|x| x.).collect();
+        let batch = RecordBatch::try_new(self.left_schema.)
+        None
+    }
+}
+
 impl Stream for JoinSegmentStream {
     type Item = ArrowResult<RecordBatch>;
 
@@ -254,6 +269,8 @@ impl Stream for JoinSegmentStream {
         let mut partition_end_idx: usize = 0;
         let mut partition_len: usize = 0;
         let mut right_buffer: Vec<RecordBatch> = vec![];
+        let mut to_cmp = false;
+        let mut cmp: DynComparator;
 
         loop {
             if self.left_batch.is_none() || self.left_idx >= self.left_batch.unwrap().num_rows() {
@@ -262,6 +279,7 @@ impl Stream for JoinSegmentStream {
                         self.left_idx = 0;
                         self.left_batch = Some(batch.clone());
                         self.left_join_predicate = Some(into_array(col(&self.on_left).evaluate(&batch)?));
+                        to_cmp = true;
                     }
                     other => return other,
                 }
@@ -275,19 +293,30 @@ impl Stream for JoinSegmentStream {
                         self.right_batch = Some(batch.clone());
                         right_buffer.push(batch.clone());
                         self.right_join_predicate = Some(into_array(col(&self.on_right).evaluate(&batch)?));
+                        to_cmp = true;
                     }
                     Poll::Ready(None) => {
                         if is_processing {
-                            // todo: return of unfinished user
+                            if let Some(batch) = self.evaluate_partition() {
+                                return Poll::Ready(Some(batch.clone()));
+                            }
+
+                            return Poll::Ready(None);
                         }
                     }
                     other => return other,
                 }
             }
 
-            let res = self.compare_predicates();
-            match res {
-                CmpResult::Eq => {
+            if to_cmp {
+                let l = into_array(col(&self.on_left).evaluate(&self.left_batch.unwrap())?);
+                let r = into_array(col(&self.on_right).evaluate(&self.right_batch.unwrap())?);
+                cmp = arrow::array::build_compare(l.as_ref(), r.as_ref())?;
+                to_cmp = false;
+            }
+            let cmp_result = (cmp)(self.left_idx, self.right_idx);
+            match cmp_result {
+                std::cmp::Ordering::Equal => {
                     if is_processing {
                         partition_len += 1;
                     } else {
@@ -297,17 +326,19 @@ impl Stream for JoinSegmentStream {
                     }
                     self.right_idx += 1;
                 }
-                CmpResult::Lt | CmpResult::Gt => {
+                std::cmp::Ordering::Less | std::cmp::Ordering::Greater => {
                     if is_processing {
                         is_processing = false;
                         partition_end_idx = self.right_idx;
-                        return Poll::Ready(concat_batches());
-                    }
-
-                    match res {
-                        CmpResult::Lt => self.left_idx += 1,
-                        CmpResult::Gt => self.right_idx += 1,
-                        _ => panic!("unexpected")
+                        if let Some(batch) = self.evaluate_partition() {
+                            return Poll::Ready(Some(batch.clone()));
+                        }
+                    } else {
+                        match cmp_result {
+                            std::cmp::Ordering::Less => self.left_idx += 1,
+                            std::cmp::Ordering::Greater => self.right_idx += 1,
+                            _ => panic!("unexpected")
+                        }
                     }
                 }
             }
