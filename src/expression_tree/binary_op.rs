@@ -1,18 +1,18 @@
 use crate::expression_tree::expr::{Expr};
 use std::marker::PhantomData;
-use crate::expression_tree::context::Context;
 use std::rc::Rc;
 use arrow::record_batch::RecordBatch;
 use crate::expression_tree::boolean_op::BooleanOp;
+use arrow::array::ArrayRef;
 
-pub struct BinaryOp<T, Op> {
-    left: Box<dyn Expr<T>>,
+pub struct BinaryOp<Op> {
+    left: Box<dyn Expr>,
     op: PhantomData<Op>,
-    right: Box<dyn Expr<T>>,
+    right: Box<dyn Expr>,
 }
 
-impl<T, Op> BinaryOp<T, Op> {
-    pub fn new(left: Box<dyn Expr<T>>, right: Box<dyn Expr<T>>) -> Self {
+impl<Op> BinaryOp<Op> {
+    pub fn new(left: Box<dyn Expr>, right: Box<dyn Expr>) -> Self {
         BinaryOp {
             left,
             op: PhantomData,
@@ -21,9 +21,9 @@ impl<T, Op> BinaryOp<T, Op> {
     }
 }
 
-impl<T, Op> Expr<bool> for BinaryOp<T, Op> where Op: BooleanOp<T> {
-    fn evaluate(&self, batch: &RecordBatch, row_id: usize) -> bool {
-        Op::perform(self.left.evaluate(batch, row_id), self.right.evaluate(batch, row_id))
+impl<Op> Expr for BinaryOp<Op> where Op: BooleanOp<bool> {
+    fn evaluate(&self, batches:  &[&RecordBatch]) -> bool {
+        Op::perform(self.left.evaluate(batches), self.right.evaluate(batches))
     }
 }
 
@@ -33,30 +33,39 @@ mod tests {
         error::{Result},
     };
     use crate::expression_tree::binary_op::BinaryOp;
-    use crate::expression_tree::scalar::Scalar;
     use crate::expression_tree::boolean_op::{Eq};
     use crate::expression_tree::expr::Expr;
+    use crate::expression_tree::test_value::{True, False};
     use arrow::record_batch::RecordBatch;
-    use arrow::datatypes::Schema;
+    use arrow::datatypes::{Schema, Field, DataType};
     use std::sync::Arc;
+    use arrow::array::{ArrayRef, Int8Array};
 
     #[test]
     fn test() -> Result<()> {
-        let b = RecordBatch::new_empty(Arc::new(Schema::empty()));
-
-        let op1 = BinaryOp::<_, Eq>::new(
-            Box::new(Scalar::new(1)),
-            Box::new(Scalar::new(1)),
+        let op1 = BinaryOp::<Eq>::new(
+            Box::new(True::new()),
+            Box::new(True::new()),
         );
 
-        assert_eq!(true, op1.evaluate(&b, 0));
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+        ]));
+        let a = Arc::new(Int8Array::from(vec![1, 3, 1]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                a.clone(),
+            ],
+        )?;
+        assert_eq!(true, op1.evaluate(vec![&batch].as_slice()));
 
-        let op2 = BinaryOp::<_, Eq>::new(
-            Box::new(Scalar::new(1)),
-            Box::new(Scalar::new(2)),
+        let op2 = BinaryOp::<Eq>::new(
+            Box::new(True::new()),
+            Box::new(False::new()),
         );
 
-        assert_eq!(false, op2.evaluate(&b, 0));
+        assert_eq!(false, op2.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 }

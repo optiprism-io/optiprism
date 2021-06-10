@@ -7,36 +7,55 @@ use crate::expression_tree::expr::Expr;
 use arrow::compute::kernels::arithmetic::{
     add, divide, divide_scalar, multiply, subtract,
 };
-use crate::expression_tree::value::Value;
 use std::ops::{Add, AddAssign};
-use crate::physical_plan::utils::into_array;
+use crate::expression_tree::utils::{into_array, break_on_true, break_on_false};
+use std::marker::PhantomData;
+use crate::expression_tree::boolean_op::BooleanOp;
 
-pub struct Sum {
-    col_id: usize,
-    predicate: Arc<dyn PhysicalExpr>,
+pub struct Sum<L, R, Op> {
+    expr: Arc<dyn PhysicalExpr>,
+    lt: PhantomData<L>,
+    left_col_id: usize,
+    op: PhantomData<Op>,
+    right: R,
 }
 
-impl Sum {
-    pub fn new(col_id: usize, predicate: Arc<dyn PhysicalExpr>) -> Self {
+impl<L, R, Op> Sum<L, R, Op> {
+    pub fn new(left_col_id: usize, expr: Arc<dyn PhysicalExpr>, right: R) -> Self {
         Sum {
-            col_id,
-            predicate,
+            expr,
+            lt: PhantomData,
+            left_col_id,
+            op: PhantomData,
+            right,
         }
     }
 }
 
 
-impl Expr<i8> for Sum {
-    fn evaluate(&self, batch: &RecordBatch, _: usize) -> i8 {
-        let ar = into_array(self.predicate.evaluate(batch).unwrap());
-        let b = ar.as_any().downcast_ref::<BooleanArray>().unwrap();
-        let v = batch.columns()[self.col_id].as_any().downcast_ref::<Int8Array>().unwrap();
-        return b
-            .iter()
-            .enumerate()
-            .filter(|(i, x)| x.is_some() && x.unwrap() && !v.data_ref().is_null(*i))
-            .map(|(i, _)| v.value(i))
-            .fold(0i8, |acc, x| acc + x);
+impl<Op> Expr for Sum<i8, i64, Op> where Op: BooleanOp<i64> {
+    fn evaluate(&self, batches: &[&RecordBatch]) -> bool {
+        let mut acc: i64 = 0;
+
+        for batch in batches.iter() {
+            let ar = into_array(self.expr.evaluate(batch).unwrap());
+            let b = ar.as_any().downcast_ref::<BooleanArray>().unwrap();
+            let v = batch.columns()[self.left_col_id].as_any().downcast_ref::<Int8Array>().unwrap();
+            acc += b
+                .iter()
+                .enumerate()
+                .filter(|(i, x)| x.is_some() && x.unwrap() && !v.data_ref().is_null(*i))
+                .map(|(i, _)| v.value(i))
+                .fold(0i64, |a, x| a + x as i64);
+            let res = Op::perform(acc, self.right);
+            if res && break_on_true(Op::op()) {
+                return true;
+            } else if !res && break_on_false(Op::op()) {
+                return false;
+            }
+        }
+
+        Op::perform(acc, self.right)
     }
 }
 
@@ -55,27 +74,35 @@ mod tests {
     use datafusion::scalar::ScalarValue;
     use crate::expression_tree::expr::Expr;
     use crate::expression_tree::sum::Sum;
+    use crate::expression_tree::boolean_op::{Eq, Gt, Lt};
 
     #[test]
     fn test() -> Result<()> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Int8, false),
+            Field::new("b", DataType::Int8, false),
         ]));
 
-        let a = Arc::new(Int8Array::from(vec![1, 3, 1]));
+        let a = Arc::new(Int8Array::from(vec![1, 2, 1]));
+        let b = Arc::new(Int8Array::from(vec![127, 100, 127]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
                 a.clone(),
+                b.clone(),
             ],
         )?;
 
         let left = Column::new("a");
         let right = Literal::new(ScalarValue::Int8(Some(1)));
-        let bo = BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right));
-        let c = Sum::new(0, Arc::new(bo));
+        let bo = Arc::new(BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right)));
+        let op = Sum::<i8, i64, Eq>::new(
+            1,
+            bo.clone(),
+            254,
+        );
 
-        assert_eq!(2, c.evaluate(&batch, 0));
+        assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 }
