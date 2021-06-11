@@ -5,3 +5,4 @@ pub mod count;
 mod utils;
 mod test_value;
 mod sum;
+mod sequence;
