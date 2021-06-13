@@ -3,13 +3,13 @@ use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::{PhysicalExpr, ColumnarValue};
 use std::sync::Arc;
 use arrow::array::{BooleanArray, Array, ArrayRef, Int8Array, TimestampSecondArray};
-use std::borrow::Borrow;
+use std::borrow::{Borrow, BorrowMut};
 use std::ops::Deref;
 use arrow::array;
 use arrow::datatypes::DataType;
 use chrono::Duration;
-use crate::physical_plan::utils::into_array;
 use crate::expression_tree::utils::into_array;
+use std::rc::Rc;
 
 enum Filter {
     DropOffOnAnyStep,
@@ -135,40 +135,51 @@ fn check_constants(batches: &[&RecordBatch], row: &Row, constants: &Vec<usize>, 
     return true;
 }
 
+fn inc_row(row: &mut Row, batches: &[&RecordBatch]) -> bool {
+    if row.row_id == batches[row.batch_id.clone()].num_rows() - 1 {
+        if row.batch_id == batches.len() - 1 {
+            return false;
+        }
+        row.batch_id += 1;
+        row.row_id = 0;
+    } else {
+        row.row_id += 1;
+    }
+
+    true
+}
+
 impl Expr for Sequence {
     fn evaluate(&self, batches: &[&RecordBatch]) -> bool {
-        let mut _refs: Vec<Arc<dyn Array>> = vec![];
+        let pre_steps = self.steps.iter().map(|step| {
+            batches.iter().map(|batch| into_array(step.evaluate(batch).unwrap())).collect()
+        }).collect::<Vec<Vec<ArrayRef>>>();
 
-        // make boolean array on each step
-        let steps: Vec<Vec<Arc<&BooleanArray>>> = batches.iter().map(|batch| {
-            self.steps.iter().map(|step| {
-                let a = into_array(step.evaluate(batch).unwrap());
-                let v = a.as_any().downcast_ref::<BooleanArray>().unwrap();
-                Arc::new(v)
-            }).collect()
-        }).collect();
+        let steps = pre_steps.iter().map(|x| {
+            x.iter().map(|a| a.as_any().downcast_ref::<BooleanArray>().unwrap()).collect()
+        }).collect::<Vec<Vec<&BooleanArray>>>();
+
 
         // each step has 0 or more exclusion expressions
-        let mut exclude: Option<Vec<Vec<Option<Arc<&BooleanArray>>>>> = self.exclude.map(|x| {
-            batches.iter().map(|batch| {
-                let mut ret: Vec<Vec<Arc<&BooleanArray>>> = vec![Vec::new(); steps.len()];
+        let mut pre_exclude: Vec<(Vec<Arc<dyn Array>>, &Vec<usize>)> = Vec::new();
+        let mut exclude: Vec<Vec<Vec<&BooleanArray>>> = vec![Vec::new(); steps.len()];
 
-                x.iter().for_each(|(expr, expr_steps)| {
-                    let a = into_array(expr.evaluate(batch).unwrap());
-                    let v = Arc::new(a.as_any().downcast_ref::<BooleanArray>().unwrap());
-                    for expr_step in expr_steps {
-                        ret[*expr_step].push(v.clone())
-                    }
-                });
+        // make exclude steps
+        if let Some(e) = &self.exclude {
+            for (expr, steps) in e.iter() {
+                let b = batches.iter().map(|x| into_array(expr.evaluate(x).unwrap())).collect();
+                // calculate exclusion expression for step
+                pre_exclude.push((b, steps));
+            }
 
-                ret.iter().map(|x| {
-                    match x.len() {
-                        0 => None,
-                        _ => Some(x),
-                    }
-                }).collect()
-            }).collect()
-        });
+
+            for (arrs, steps) in pre_exclude.iter() {
+                for step_id in *steps {
+                    let b = arrs.iter().map(|x| x.as_any().downcast_ref::<BooleanArray>().unwrap()).collect();
+                    exclude[*step_id].push(b);
+                }
+            }
+        }
 
         // downcast timestamp column
 
@@ -186,20 +197,24 @@ impl Expr for Sequence {
         let mut window_start_ts: i64 = 0;
         let mut is_completed = false;
 
-        while row < batch.num_rows() {
+        loop {
             // check window
             if step_id > 0 {
-                let cur_ts = ts_col.value(row);
+                let cur_ts = ts_col[row.batch_id.clone()].value(row.row_id.clone());
                 // calculate window
                 if cur_ts - window_start_ts > self.window.num_seconds() {
                     let mut found = false;
+                    let mut f_row = Row { batch_id: step_row[0].batch_id, row_id: step_row[0].row_id+1 };
                     // search next first step occurrence
-                    for i in (step_row[0] + 1)..batch.num_rows() {
-                        if steps[0].value(i) {
+
+                    loop {
+                        if steps[f_row.batch_id.clone()][0].value(f_row.row_id.clone()) {
                             step_id = 0;
-                            // rewind to next step 0
-                            row = i;
+                            row = f_row.clone();
                             found = true;
+                            break;
+                        }
+                        if !inc_row(&mut f_row, batches) {
                             break;
                         }
                     }
@@ -212,23 +227,25 @@ impl Expr for Sequence {
             }
 
             // check expression result
-            if steps[step_id].value(row) {
+            if steps[step_id][row.batch_id.clone()].value(row.row_id.clone()) {
                 // check constants. We do not check constants on first step
                 if step_id > 0 {
                     if let Some(constants) = &self.constants {
-                        if !check_constants(batch, row, constants, step_row[0]) {
+                        if !check_constants(batches, &row, constants, &step_row[0]) {
                             // skip current value if constant doesn't match
-                            row += 1;
+                            if !inc_row(&mut row, batches) {
+                                break;
+                            }
                             continue;
                         }
                     }
                 }
 
-                // save reference to current step row_id
-                step_row[step_id] = row;
+                // save reference to current step
+                step_row[step_id] = row.clone();
                 // save window start if current step is first
                 if step_id == 0 {
-                    window_start_ts = ts_col.value(row);
+                    window_start_ts = ts_col[row.batch_id.clone()].value(row.row_id.clone());
                 }
 
                 if step_id == steps.len() - 1 {
@@ -239,23 +256,28 @@ impl Expr for Sequence {
                 step_id += 1;
 
                 // increment current row
-                row += 1;
+                if !inc_row(&mut row, batches) {
+                    break;
+                }
                 continue;
             }
 
             // check exclude
             // perf: use just regular loop with index, do not spawn exclude[step_id].iter() each time
             if step_id > 0 {
-                for i in 0..exclude[step_id].len() {
-                    if exclude[step_id][i].value(row) {
-                        step_id -= 1;
-
-                        break;
+                if !exclude.is_empty() {
+                    for e in &exclude[step_id] {
+                        if e[row.batch_id].value(row.row_id.clone()) {
+                            step_id -= 1;
+                            break;
+                        }
                     }
                 }
             }
 
-            row += 1;
+            if !inc_row(&mut row, batches) {
+                break;
+            }
         }
 
 
@@ -273,7 +295,7 @@ impl Expr for Sequence {
                     step_id == *drop_off_step_id
                 }
                 Filter::TimeToConvert(from, to) => {
-                    let spent = ts_col.value(row) - window_start_ts;
+                    let spent = ts_col[row.batch_id.clone()].value(row.row_id) - window_start_ts;
                     spent >= from.num_seconds() && spent <= to.num_seconds()
                 }
             };
@@ -366,7 +388,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]);
-        assert_eq!(true, op.evaluate(&batch, 0));
+        assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 
@@ -405,7 +427,7 @@ mod tests {
 
             let exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)> = vec![(Arc::new(exclude1), vec![1]), (Arc::new(exclude2), vec![1, 2])];
             let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_exclude(exclude);
-            assert_eq!(true, op.evaluate(&batch, 0));
+            assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         }
 
         {
@@ -423,7 +445,7 @@ mod tests {
 
             let exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)> = vec![(Arc::new(exclude1), vec![2]), (Arc::new(exclude2), vec![1, 2])];
             let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_exclude(exclude);
-            assert_eq!(false, op.evaluate(&batch, 0));
+            assert_eq!(false, op.evaluate(vec![&batch].as_slice()));
         }
         Ok(())
     }
@@ -436,49 +458,49 @@ mod tests {
             let batch = build_table(("a", &vec![1, 2, 3]), ("b", &vec![1, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
             let constants = vec![1, 2];
             let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
-            assert_eq!(true, op.evaluate(&batch, 0));
+            assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         }
 
         {
             let batch = build_table(("a", &vec![1, 2, 3]), ("b", &vec![2, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
             let constants = vec![1, 2];
             let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
-            assert_eq!(false, op.evaluate(&batch, 0));
+            assert_eq!(false, op.evaluate(vec![&batch].as_slice()));
         }
 
         {
             let batch = build_table(("a", &vec![1, 1, 2, 3]), ("b", &vec![1, 2, 2, 2]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = vec![1, 2];
             let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
-            assert_eq!(false, op.evaluate(&batch, 0));
+            assert_eq!(false, op.evaluate(vec![&batch].as_slice()));
         }
 
         {
             let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 1, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = vec![1, 2];
             let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
-            assert_eq!(true, op.evaluate(&batch, 0));
+            assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         }
 
         {
             let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 1, 1]), ("c", &vec![2, 1, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = vec![1, 2];
             let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
-            assert_eq!(true, op.evaluate(&batch, 0));
+            assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         }
 
         {
             let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 2, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = vec![1, 2];
             let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
-            assert_eq!(true, op.evaluate(&batch, 0));
+            assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         }
 
         {
             let batch = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 2, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = vec![1, 2];
             let op = Sequence::new(3, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_constants(constants);
-            assert_eq!(false, op.evaluate(&batch, 0));
+            assert_eq!(false, op.evaluate(vec![&batch].as_slice()));
         }
 
         Ok(())
@@ -504,7 +526,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::new(1, Duration::seconds(1), vec![step1.clone(), step2.clone(), step3.clone()]);
-        assert_eq!(false, op.evaluate(&batch, 0));
+        assert_eq!(false, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 
@@ -528,7 +550,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::new(1, Duration::seconds(4), vec![step1.clone(), step2.clone(), step3.clone()]);
-        assert_eq!(true, op.evaluate(&batch, 0));
+        assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 
@@ -552,7 +574,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::new(1, Duration::seconds(1), vec![step1.clone(), step2.clone(), step3.clone()]).with_drop_off_on_step(2);
-        assert_eq!(true, op.evaluate(&batch, 0));
+        assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 
@@ -576,7 +598,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_drop_off_on_step(2);
-        assert_eq!(true, op.evaluate(&batch, 0));
+        assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 
@@ -600,7 +622,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_drop_off_on_step(1);
-        assert_eq!(true, op.evaluate(&batch, 0));
+        assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 
@@ -624,7 +646,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_drop_off_on_step(0);
-        assert_eq!(true, op.evaluate(&batch, 0));
+        assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 
@@ -648,7 +670,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_drop_off_on_any_step();
-        assert_eq!(true, op.evaluate(&batch, 0));
+        assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 
@@ -672,7 +694,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_time_to_convert(Duration::seconds(1), Duration::seconds(2));
-        assert_eq!(true, op.evaluate(&batch, 0));
+        assert_eq!(true, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 
@@ -696,7 +718,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::new(1, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()]).with_time_to_convert(Duration::seconds(1), Duration::seconds(2));
-        assert_eq!(false, op.evaluate(&batch, 0));
+        assert_eq!(false, op.evaluate(vec![&batch].as_slice()));
         Ok(())
     }
 }
