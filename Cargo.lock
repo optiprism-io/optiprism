@@ -460,6 +460,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
+name = "enum_dispatch"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd53b3fde38a39a06b2e66dc282f3e86191e53bd04cc499929c15742beae3df8"
+dependencies = [
+ "once_cell",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "exprtree"
 version = "0.1.0"
 dependencies = [
@@ -468,6 +480,7 @@ dependencies = [
  "chrono",
  "criterion",
  "datafusion",
+ "enum_dispatch",
  "futures",
  "num 0.3.1",
  "tokio",

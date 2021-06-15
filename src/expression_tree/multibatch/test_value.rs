@@ -1,6 +1,7 @@
-use crate::expression_tree::expr::Expr;
+use crate::expression_tree::multibatch::expr::Expr;
 use arrow::array::ArrayRef;
 use arrow::record_batch::RecordBatch;
+use datafusion::error::{Result as DatafusionResult};
 
 pub struct True;
 
@@ -11,8 +12,8 @@ impl True {
 }
 
 impl Expr for True {
-    fn evaluate(&self, _:  &[&RecordBatch]) -> bool {
-        true
+    fn evaluate(&self, _: &[&RecordBatch]) -> DatafusionResult<bool> {
+        Ok(true)
     }
 }
 
@@ -25,7 +26,7 @@ impl False {
 }
 
 impl Expr for False {
-    fn evaluate(&self, _:  &[&RecordBatch]) -> bool {
-        false
+    fn evaluate(&self, _: &[&RecordBatch]) -> DatafusionResult<bool> {
+        Ok(false)
     }
 }

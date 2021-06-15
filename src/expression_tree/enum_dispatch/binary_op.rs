@@ -1,18 +1,18 @@
-use crate::expression_tree::expr::{Expr};
+use crate::expression_tree::enum_dispatch::expr::{Expr, ExprEnum};
 use std::marker::PhantomData;
-use crate::expression_tree::context::Context;
+use crate::expression_tree::enum_dispatch::context::Context;
 use std::rc::Rc;
 use arrow::record_batch::RecordBatch;
-use crate::expression_tree::boolean_op::BooleanOp;
+use crate::expression_tree::enum_dispatch::boolean_op::BooleanOp;
 
 pub struct BinaryOp<T, Op> {
-    left: Box<dyn Expr<T>>,
+    left: ExprEnum,
     op: PhantomData<Op>,
-    right: Box<dyn Expr<T>>,
+    right: ExprEnum,
 }
 
 impl<T, Op> BinaryOp<T, Op> {
-    pub fn new(left: Box<dyn Expr<T>>, right: Box<dyn Expr<T>>) -> Self {
+    pub fn new(left: ExprEnum, right: ExprEnum) -> Self {
         BinaryOp {
             left,
             op: PhantomData,
@@ -32,10 +32,10 @@ mod tests {
     use datafusion::{
         error::{Result},
     };
-    use crate::expression_tree::binary_op::BinaryOp;
-    use crate::expression_tree::scalar::Scalar;
-    use crate::expression_tree::boolean_op::{Eq};
-    use crate::expression_tree::expr::Expr;
+    use crate::expression_tree::enum_dispatch::binary_op::BinaryOp;
+    use crate::expression_tree::enum_dispatch::scalar::Scalar;
+    use crate::expression_tree::enum_dispatch::boolean_op::{Eq};
+    use crate::expression_tree::enum_dispatch::expr::Expr;
     use arrow::record_batch::RecordBatch;
     use arrow::datatypes::Schema;
     use std::sync::Arc;

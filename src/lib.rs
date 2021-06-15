@@ -8,8 +8,7 @@ mod error;
 
 use datafusion::error::Result;
 use std::any::Any;
-
-
+#[macro_use] extern crate enum_dispatch;
 struct V(i8);
 #[tokio::main]
 async fn main() -> Result<()> {

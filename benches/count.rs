@@ -14,7 +14,7 @@ use exprtree::expression_tree::iterative_count_op::IterativeCountOp;
 use exprtree::expression_tree::value_op::ValueOp;
 use exprtree::expression_tree::binary_op::BinaryOp;
 
-fn create_batch<'a>(num_cols: usize, size: usize) -> Box<RecordBatch> {
+fn create_batch(num_cols: usize, size: usize) -> Box<RecordBatch> {
     let mut fields: Vec<Field> = vec![];
 
     for i in 0..num_cols {
