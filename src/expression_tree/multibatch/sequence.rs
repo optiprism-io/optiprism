@@ -19,8 +19,6 @@ enum Filter {
     TimeToConvert(Duration, Duration),
 }
 
-type ColID = usize;
-type StepID = usize;
 
 #[derive(Clone)]
 struct Row {
@@ -33,8 +31,8 @@ pub struct Sequence {
     ts_col_id: usize,
     window: Duration,
     steps: Vec<Arc<dyn PhysicalExpr>>,
-    exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<StepID>)>>,
-    constants: Option<Vec<ColID>>,
+    exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>>, // expr and vec of step ids
+    constants: Option<Vec<usize>>, // vec of col ids
     filter: Option<Filter>,
 }
 
@@ -45,7 +43,7 @@ impl Sequence {
         window: Duration,
         steps: Vec<Arc<dyn PhysicalExpr>>,
     ) -> DatafusionResult<Self> {
-        let (ts_col_id, ts_field) = schema.column_with_name(timestamp_col).ok_or_else(|| DataFusionError::Plan(format!("column {} not found", timestamp_col)))?;
+        let (ts_col_id, ts_field) = schema.column_with_name(timestamp_col).ok_or_else(|| DataFusionError::Plan(format!("Column {} not found", timestamp_col)))?;
         match ts_field.data_type() {
             DataType::Timestamp(TimeUnit::Second, _) => {}
             other => return Err(DataFusionError::Plan(format!(
@@ -55,7 +53,7 @@ impl Sequence {
         };
 
         if window.is_zero() || window.num_seconds() < 0 {
-            return Err(DataFusionError::Plan("Invalid window".to_string()));
+            return Err(DataFusionError::Plan(format!("Invalid window {:?}",window)));
         }
 
         if steps.is_empty() {
@@ -141,7 +139,7 @@ impl Sequence {
         }
         let c: Vec<usize> = constants.iter().map(|x| {
             return match self.schema.column_with_name(*x) {
-                None => Err(DataFusionError::Plan("column not found".to_string())),
+                None => Err(DataFusionError::Plan(format!("Column {} not found", *x))),
                 Some((i, f)) => Ok(i),
             };
         }).collect::<DatafusionResult<Vec<usize>>>()?;
@@ -263,7 +261,7 @@ impl Expr for Sequence {
 
         // each step has 0 or more exclusion expressions
         let mut pre_exclude: Vec<(Vec<Arc<dyn Array>>, &Vec<usize>)> = Vec::new();
-        let mut exclude: Vec<Vec<Vec<&BooleanArray>>> = vec![Vec::new(); steps.len()];
+        let mut exclude: StepVec<Vec<Vec<&BooleanArray>>> = vec![Vec::new(); steps.len()];
 
         // make exclude steps
         if let Some(e) = &self.exclude {

@@ -24,7 +24,7 @@ pub struct Sum<L, R, Op> {
 
 impl<L, R, Op> Sum<L, R, Op> {
     pub fn try_new(schema: &Schema, left_col: &str, predicate: Arc<dyn PhysicalExpr>, right: R) -> DatafusionResult<Self> {
-        let (left_col_id, left_field) = schema.column_with_name(left_col).ok_or_else(|| DataFusionError::Plan("column not found".to_string()))?;
+        let (left_col_id, left_field) = schema.column_with_name(left_col).ok_or_else(|| DataFusionError::Plan(format!("Column {} not found", left_col)))?;
         match left_field.data_type() {
             DataType::Int8 => {}
             other => return Err(DataFusionError::Plan(format!(
