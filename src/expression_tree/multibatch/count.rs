@@ -9,7 +9,7 @@ use arrow::compute::kernels::arithmetic::{
 };
 use crate::expression_tree::utils::into_array;
 use std::marker::PhantomData;
-use crate::expression_tree::multibatch::boolean_op::BooleanOp;
+use crate::expression_tree::boolean_op::BooleanOp;
 use crate::expression_tree::utils::{break_on_true, break_on_false};
 use datafusion::error::{DataFusionError, Result as DatafusionResult};
 use arrow::datatypes::{SchemaRef, DataType, Schema};
@@ -73,7 +73,7 @@ mod tests {
     use datafusion::logical_plan::Operator;
     use datafusion::scalar::ScalarValue;
     use crate::expression_tree::multibatch::expr::Expr;
-    use crate::expression_tree::multibatch::boolean_op::{Eq, Gt, Lt};
+    use crate::expression_tree::boolean_op::{Eq, Gt, Lt};
 
     #[test]
     fn test() -> Result<()> {

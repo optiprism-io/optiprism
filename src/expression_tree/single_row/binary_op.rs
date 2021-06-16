@@ -1,10 +1,10 @@
-use crate::expression_tree::multibatch::expr::{Expr};
+use crate::expression_tree::single_row::expr::{Expr};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use arrow::record_batch::RecordBatch;
+use crate::expression_tree::boolean_op::BooleanOp;
 use arrow::array::ArrayRef;
 use datafusion::error::{Result as DatafusionResult};
-use crate::expression_tree::boolean_op::BooleanOp;
 
 pub struct BinaryOp<Op> {
     left: Box<dyn Expr>,
@@ -23,8 +23,8 @@ impl<Op> BinaryOp<Op> {
 }
 
 impl<Op> Expr for BinaryOp<Op> where Op: BooleanOp<bool> {
-    fn evaluate(&self, batches:  &[&RecordBatch]) -> DatafusionResult<bool> {
-        Ok(Op::perform(self.left.evaluate(batches)?, self.right.evaluate(batches)?))
+    fn evaluate(&self, batch: &RecordBatch, row_id: usize) -> DatafusionResult<bool> {
+        Ok(Op::perform(self.left.evaluate(batch, row_id)?, self.right.evaluate(batch, row_id)?))
     }
 }
 
@@ -33,10 +33,10 @@ mod tests {
     use datafusion::{
         error::{Result},
     };
-    use crate::expression_tree::multibatch::binary_op::BinaryOp;
+    use crate::expression_tree::single_row::binary_op::BinaryOp;
     use crate::expression_tree::boolean_op::{Eq};
-    use crate::expression_tree::multibatch::expr::Expr;
-    use crate::expression_tree::multibatch::test_value::{True, False};
+    use crate::expression_tree::single_row::expr::Expr;
+    use crate::expression_tree::single_row::test_value::{True, False};
     use arrow::record_batch::RecordBatch;
     use arrow::datatypes::{Schema, Field, DataType};
     use std::sync::Arc;
@@ -59,14 +59,14 @@ mod tests {
                 a.clone(),
             ],
         )?;
-        assert_eq!(true, op1.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op1.evaluate(&batch, 0)?);
 
         let op2 = BinaryOp::<Eq>::new(
             Box::new(True::new()),
             Box::new(False::new()),
         );
 
-        assert_eq!(false, op2.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(false, op2.evaluate(&batch, 0)?);
         Ok(())
     }
 }

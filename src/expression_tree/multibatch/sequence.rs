@@ -261,7 +261,7 @@ impl Expr for Sequence {
 
         // each step has 0 or more exclusion expressions
         let mut pre_exclude: Vec<(Vec<Arc<dyn Array>>, &Vec<usize>)> = Vec::new();
-        let mut exclude: StepVec<Vec<Vec<&BooleanArray>>> = vec![Vec::new(); steps.len()];
+        let mut exclude: Vec<Vec<Vec<&BooleanArray>>> = vec![Vec::new(); steps.len()];
 
         // make exclude steps
         if let Some(e) = &self.exclude {

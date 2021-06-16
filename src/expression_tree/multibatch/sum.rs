@@ -10,9 +10,9 @@ use arrow::compute::kernels::arithmetic::{
 use std::ops::{Add, AddAssign};
 use crate::expression_tree::utils::{into_array, break_on_true, break_on_false};
 use std::marker::PhantomData;
-use crate::expression_tree::multibatch::boolean_op::BooleanOp;
 use datafusion::error::{DataFusionError, Result as DatafusionResult};
 use arrow::datatypes::{DataType, Schema};
+use crate::expression_tree::boolean_op::BooleanOp;
 
 pub struct Sum<L, R, Op> {
     predicate: Arc<dyn PhysicalExpr>,
@@ -91,7 +91,7 @@ mod tests {
     use datafusion::scalar::ScalarValue;
     use crate::expression_tree::multibatch::expr::Expr;
     use crate::expression_tree::multibatch::sum::Sum;
-    use crate::expression_tree::multibatch::boolean_op::{Eq, Gt, Lt};
+    use crate::expression_tree::boolean_op::{Eq, Gt, Lt};
 
     #[test]
     fn test() -> Result<()> {

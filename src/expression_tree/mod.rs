@@ -15,4 +15,5 @@ mod sum;
 mod sequence;
 mod utils;
 // mod enum_dispatch;
-mod multibatch;
+pub mod multibatch;
+pub mod single_row;

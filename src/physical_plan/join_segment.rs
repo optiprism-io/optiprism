@@ -14,15 +14,15 @@ use datafusion::physical_plan::expressions::col;
 use arrow::array::{ArrayRef, Int8Array, Array, DynComparator};
 use crate::physical_plan::utils::into_array;
 use datafusion::logical_plan::Operator;
-use crate::expression_tree::expr::Expr;
+use crate::expression_tree::multibatch::expr::Expr;
 use arrow::compute::kernels;
 use std::collections::HashMap;
 
 pub type JoinOn = (String, String);
 
 pub struct JoinSegmentExec {
-    left_expr: Option<(Arc<dyn Expr<bool>>, Vec<usize>)>,
-    right_expr: Option<(Arc<dyn Expr<bool>>, Vec<usize>)>,
+    left_expr: Option<Arc<dyn Expr>>,
+    right_expr: Option<Arc<dyn Expr>>,
     /// left (build) side
     left: Arc<dyn ExecutionPlan>,
     /// right (probe) side which are filtered by the Merge Sort
@@ -216,8 +216,20 @@ enum ColKind {
     Take,
 }
 
+fn shrink_batches<'a>(from_idx: usize, to_idx: usize, batches: &'a [&'a RecordBatch]) -> &'a [&'a RecordBatch] {
+    batches.iter().enumerate().map(|(idx, batch)| {
+        if idx == 0 && (from_idx > 0 || to_idx > 0) {
+            batch.columns().iter().map(|c| c.slice(from_idx, to_idx - from_idx)).collect()
+        } else if idx == batches.len() - 1 && to_idx > 0 {
+            batch.columns().iter().map(|c| c.slice(0, to_idx)).collect()
+        } else {
+            batch.columns().iter().map(|c| c).collect()
+        }
+    }).collect()
+}
+
 impl JoinSegmentStream {
-    fn evaluate_partition(&self, from_idx: usize, to_idx: usize, right_batches: &[RecordBatch], right_cols: Vec<(Vec<ColKind>, usize)>) -> Option<RecordBatch> {
+    fn evaluate_partition(&self, right_batches: &[RecordBatch]) -> Option<RecordBatch> {
         if let Some((expr, _)) = &self.left_expr {
             if let Some(batch) = &self.left_batch {
                 let cols = take_cols.iter().map(|x| batch.columns()[*x]).collect();
@@ -331,7 +343,7 @@ impl Stream for JoinSegmentStream {
                         is_processing = false;
                         partition_end_idx = self.right_idx;
                         if let Some(batch) = self.evaluate_partition() {
-                            return Poll::Ready(Some(batch.clone()));
+                            return Poll::Ready(Some(is_processing));
                         }
                     } else {
                         match cmp_result {
