@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream, RecordBatchStream, ColumnarValue};
+use datafusion::physical_plan::{ExecutionPlan, Partitioning, SendableRecordBatchStream, RecordBatchStream, ColumnarValue, PhysicalExpr};
 use arrow::datatypes::{SchemaRef, Schema, Field, DataType};
 use std::any::Any;
 use async_trait::async_trait;
@@ -11,17 +11,19 @@ use std::pin::Pin;
 use arrow::record_batch::RecordBatch;
 use arrow::error::{Result as ArrowResult, ArrowError};
 use datafusion::physical_plan::expressions::col;
-use arrow::array::{ArrayRef, Int8Array, Array, DynComparator};
+use arrow::array::{ArrayRef, Int8Array, Array, DynComparator, BooleanArray};
 use crate::physical_plan::utils::into_array;
 use datafusion::logical_plan::Operator;
 use crate::expression_tree::multibatch::expr::Expr;
 use arrow::compute::kernels;
 use std::collections::HashMap;
+use arrow::ipc::SchemaBuilder;
+use std::borrow::BorrowMut;
 
 pub type JoinOn = (String, String);
 
 pub struct JoinSegmentExec {
-    left_expr: Option<Arc<dyn Expr>>,
+    left_expr: Option<Arc<dyn PhysicalExpr>>,
     right_expr: Option<Arc<dyn Expr>>,
     /// left (build) side
     left: Arc<dyn ExecutionPlan>,
@@ -33,6 +35,7 @@ pub struct JoinSegmentExec {
     /// The schema once the join is applied
     left_schema: SchemaRef,
     right_schema: SchemaRef,
+    schema: SchemaRef,
 }
 
 impl JoinSegmentExec {
@@ -40,13 +43,11 @@ impl JoinSegmentExec {
         left: Arc<dyn ExecutionPlan>,
         right: Arc<dyn ExecutionPlan>,
         on: &JoinOn,
-        left_expr: Option<(Arc<dyn Expr<bool>>, Vec<usize>)>,
-        right_expr: Option<(Arc<dyn Expr<bool>>, Vec<usize>)>,
+        left_expr: Option<Arc<dyn PhysicalExpr>>,
+        right_expr: Option<Arc<dyn Expr>>,
         left_schema: SchemaRef,
         right_schema: SchemaRef,
     ) -> Result<Self> {
-        let on = (on.0.clone(), on.1.clone());
-
         Ok(JoinSegmentExec {
             left_expr,
             right_expr,
@@ -56,26 +57,19 @@ impl JoinSegmentExec {
             on_right: on.1.to_owned(),
             left_schema,
             right_schema,
+            schema: Arc::new(build_join_schema(left_schema.as_ref(), right_schema.as_ref(), on)),
         })
     }
     pub fn try_new(
         left: Arc<dyn ExecutionPlan>,
         right: Arc<dyn ExecutionPlan>,
         on: &JoinOn,
-        left_expr: Option<(Arc<dyn Expr<bool>>, SchemaRef)>,
-        right_expr: Option<(Arc<dyn Expr<bool>>, SchemaRef)>,
+        left_expr: Option<Arc<dyn PhysicalExpr>>,
+        right_expr: Option<Arc<dyn Expr>>,
         left_schema: SchemaRef,
         right_schema: SchemaRef,
     ) -> Result<Self> {
         let on = (on.0.clone(), on.1.clone());
-
-        let left_expr = left_expr.map(|(expr, s)| {
-            (expr, left_schema.fields().iter().filter_map(|f| s.index_of(f.name()).ok()).collect())
-        });
-
-        let right_expr = right_expr.map(|(expr, s)| {
-            (expr, right_schema.fields().iter().filter_map(|f| s.index_of(f.name()).ok()).collect())
-        });
 
         Ok(JoinSegmentExec {
             left_expr,
@@ -152,7 +146,7 @@ impl ExecutionPlan for JoinSegmentExec {
             right_idx: 0,
             on_left: self.on_left.clone(),
             on_right: self.on_right.clone(),
-            left_schema: self.left_schema.clone(),
+            schema: SchemaBuilder::self.left_schema.,
             right_schema: self.right_schema.clone(),
             left_idx: 0,
         }))
@@ -167,19 +161,19 @@ enum CmpResult {
 }
 
 struct JoinSegmentStream {
-    left_expr: Option<(Arc<dyn Expr<bool>>, Vec<usize>)>,
+    left_expr: Option<Arc<dyn PhysicalExpr>>,
+    left_expr_result: Option<ArrayRef>,
     left_input: SendableRecordBatchStream,
     left_batch: Option<RecordBatch>,
     left_idx: usize,
-    right_expr: Option<(Arc<dyn Expr<bool>>, Vec<usize>)>,
+    right_expr: Option<Arc<dyn Expr>>,
     right_input: SendableRecordBatchStream,
     right_batch: Option<RecordBatch>,
     right_idx: usize,
     on_left: String,
     on_right: String,
     /// The schema once the join is applied
-    left_schema: SchemaRef,
-    right_schema: SchemaRef,
+    schema: SchemaRef,
 }
 
 impl RecordBatchStream for JoinSegmentStream {
@@ -216,28 +210,21 @@ enum ColKind {
     Take,
 }
 
-fn shrink_batches<'a>(from_idx: usize, to_idx: usize, batches: &'a [&'a RecordBatch]) -> &'a [&'a RecordBatch] {
-    batches.iter().enumerate().map(|(idx, batch)| {
-        if idx == 0 && (from_idx > 0 || to_idx > 0) {
-            batch.columns().iter().map(|c| c.slice(from_idx, to_idx - from_idx)).collect()
-        } else if idx == batches.len() - 1 && to_idx > 0 {
-            batch.columns().iter().map(|c| c.slice(0, to_idx)).collect()
-        } else {
-            batch.columns().iter().map(|c| c).collect()
-        }
-    }).collect()
-}
-
 impl JoinSegmentStream {
-    fn evaluate_partition(&self, right_batches: &[RecordBatch]) -> Option<RecordBatch> {
-        if let Some((expr, _)) = &self.left_expr {
-            if let Some(batch) = &self.left_batch {
-                let cols = take_cols.iter().map(|x| batch.columns()[*x]).collect();
-                if !expr.evaluate(cols, self.left_idx) {
-                    return None;
-                }
+    fn evaluate_partition(&self, span: &Span) -> Result<Option<RecordBatch>> {
+        if let Some(expr) = &self.left_expr_result {
+            let a = expr.as_any().downcast_ref::<BooleanArray>().unwrap();
+            if !a.value(self.left_idx) {
+                return Ok(None);
             }
         }
+
+        if let Some(expr) = &self.right_expr {
+            if !expr.evaluate(&span.buffer)? {
+                return Ok(None);
+            }
+        }
+
 
         let mut final_cols: Vec<Option<ArrayRef>> = vec![None; self.right_schema.fields().len()];
         let mut expr_cols: Vec<ArrayRef> = vec![];
@@ -272,15 +259,31 @@ impl JoinSegmentStream {
     }
 }
 
+pub struct Span {
+    is_processing: bool,
+    start_idx: usize,
+    end_idx: usize,
+    len: usize,
+    buffer: Vec<RecordBatch>,
+}
+
+impl Span {
+    fn new() -> Self {
+        Span {
+            is_processing: false,
+            start_idx: 0,
+            end_idx: 0,
+            len: 0,
+            buffer: vec![],
+        }
+    }
+}
+
 impl Stream for JoinSegmentStream {
     type Item = ArrowResult<RecordBatch>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut is_processing = false;
-        let mut partition_start_idx: usize = 0;
-        let mut partition_end_idx: usize = 0;
-        let mut partition_len: usize = 0;
-        let mut right_buffer: Vec<RecordBatch> = vec![];
+        let mut span = Span::new();
         let mut to_cmp = false;
         let mut cmp: DynComparator;
 
@@ -290,13 +293,15 @@ impl Stream for JoinSegmentStream {
                     Poll::Ready(Some(Ok(batch))) => {
                         self.left_idx = 0;
                         self.left_batch = Some(batch.clone());
-                        self.left_join_predicate = Some(into_array(col(&self.on_left).evaluate(&batch)?));
+                        if let Some(expr) = &self.left_expr {
+                            self.left_expr_result = Some(into_array(expr.evaluate(&batch)?));
+                            left_expr_result = Some(self.left_expr_result.unwrap().as_any().downcast_ref::<BooleanArray>().unwrap())
+                        }
                         to_cmp = true;
                     }
                     other => return other,
                 }
             }
-
 
             if self.right_batch.is_none() || self.right_idx >= self.right_batch.unwrap().num_rows() {
                 match self.right_input.poll_next_unpin(cx) {
@@ -304,7 +309,6 @@ impl Stream for JoinSegmentStream {
                         self.right_idx = 0;
                         self.right_batch = Some(batch.clone());
                         right_buffer.push(batch.clone());
-                        self.right_join_predicate = Some(into_array(col(&self.on_right).evaluate(&batch)?));
                         to_cmp = true;
                     }
                     Poll::Ready(None) => {

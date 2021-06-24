@@ -198,7 +198,7 @@ impl Sequence {
     }
 }
 
-fn check_constants(batches: &[&RecordBatch], row: &Row, constants: &Vec<usize>, const_row: &Row) -> DatafusionResult<bool> {
+fn check_constants(batches: &[RecordBatch], row: &Row, constants: &Vec<usize>, const_row: &Row) -> DatafusionResult<bool> {
     for col_id in constants {
         let col = &batches[row.batch_id].columns()[*col_id];
         // current col and const col are the same, but they can be in different batches
@@ -225,7 +225,7 @@ fn check_constants(batches: &[&RecordBatch], row: &Row, constants: &Vec<usize>, 
     Ok(true)
 }
 
-fn inc_row(row: &mut Row, batches: &[&RecordBatch]) -> bool {
+fn inc_row(row: &mut Row, batches: &[RecordBatch]) -> bool {
     if row.row_id == batches[row.batch_id.clone()].num_rows() - 1 {
         if row.batch_id == batches.len() - 1 {
             return false;
@@ -240,7 +240,7 @@ fn inc_row(row: &mut Row, batches: &[&RecordBatch]) -> bool {
 }
 
 impl Expr for Sequence {
-    fn evaluate(&self, batches: &[&RecordBatch]) -> DatafusionResult<bool> {
+    fn evaluate(&self, batches: &[RecordBatch]) -> DatafusionResult<bool> {
         let pre_steps = self.steps
             .iter()
             .map(|step| {

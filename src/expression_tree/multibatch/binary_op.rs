@@ -23,7 +23,7 @@ impl<Op> BinaryOp<Op> {
 }
 
 impl<Op> Expr for BinaryOp<Op> where Op: BooleanOp<bool> {
-    fn evaluate(&self, batches:  &[&RecordBatch]) -> DatafusionResult<bool> {
+    fn evaluate(&self, batches:  &[RecordBatch]) -> DatafusionResult<bool> {
         Ok(Op::perform(self.left.evaluate(batches)?, self.right.evaluate(batches)?))
     }
 }

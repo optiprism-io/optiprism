@@ -12,7 +12,7 @@ impl True {
 }
 
 impl Expr for True {
-    fn evaluate(&self, _: &[&RecordBatch]) -> DatafusionResult<bool> {
+    fn evaluate(&self, _: &[RecordBatch]) -> DatafusionResult<bool> {
         Ok(true)
     }
 }
@@ -26,7 +26,7 @@ impl False {
 }
 
 impl Expr for False {
-    fn evaluate(&self, _: &[&RecordBatch]) -> DatafusionResult<bool> {
+    fn evaluate(&self, _: &[RecordBatch]) -> DatafusionResult<bool> {
         Ok(false)
     }
 }

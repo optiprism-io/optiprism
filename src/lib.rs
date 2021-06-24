@@ -2,7 +2,7 @@
 mod arrow;
 mod csv;
 pub mod expression_tree;
-// pub mod physical_plan;
+pub mod physical_plan;
 mod str;
 mod error;
 

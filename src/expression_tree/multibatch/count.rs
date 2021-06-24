@@ -37,7 +37,7 @@ impl<Op> Count<Op> {
 }
 
 impl<Op> Expr for Count<Op> where Op: BooleanOp<i64> {
-    fn evaluate(&self, batches: &[&RecordBatch]) -> DatafusionResult<bool> {
+    fn evaluate(&self, batches: &[RecordBatch]) -> DatafusionResult<bool> {
         let mut acc: i64 = 0;
 
         for batch in batches.iter() {

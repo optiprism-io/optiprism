@@ -5,5 +5,5 @@ use arrow::array::ArrayRef;
 use datafusion::error::{Result as DatafusionResult};
 
 pub trait Expr {
-    fn evaluate(&self, batches: &[&RecordBatch]) -> DatafusionResult<bool>;
+    fn evaluate(&self, batches: &[RecordBatch]) -> DatafusionResult<bool>;
 }

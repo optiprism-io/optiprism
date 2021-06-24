@@ -18,24 +18,29 @@ pub struct ValueOp<T, Op> {
     op: PhantomData<Op>,
     right: T,
 }
+
+trait TypeOf {
+
+}
 impl<T, Op> ValueOp<T, Op> {
     pub fn try_new(schema: &Schema, left_col: &str, right: T) -> DatafusionResult<Self> {
+        let a = std::any::type_name::<T>();
+
         let (left_col_id, left_field) = schema.column_with_name(left_col).ok_or_else(|| DataFusionError::Plan(format!("Column {} not found", left_col)))?;
 
-        match (left_field.data_type(), left_field.is_nullable()) {
+        // todo make validation
+        /*match (left_field.data_type(), left_field.is_nullable()) {
             (DataType::Int8, true) => {
-
-
-                if TypeId::of::<&right>() != TypeId::of::<Option<i8>>() {
+                /*if TypeId::of::<&right>() != TypeId::of::<Option<i8>>() {
                     return Err(DataFusionError::Plan("Left column must be comparable, not Option<i8>".to_string()));
-                }
+                }*/
             }
             (DataType::Int8, false) => {}
             other => return Err(DataFusionError::Plan(format!(
                 "Left column must be comparable, not {:?}",
                 other,
             )))
-        };
+        };*/
         Ok(ValueOp {
             left_col_id,
             op: PhantomData,
