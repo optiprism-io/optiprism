@@ -14,6 +14,7 @@ use datafusion::error::{DataFusionError, Result as DatafusionResult};
 use arrow::datatypes::{DataType, Schema};
 use crate::expression_tree::boolean_op::BooleanOp;
 
+#[derive(Debug)]
 pub struct Sum<L, R, Op> {
     predicate: Arc<dyn PhysicalExpr>,
     lt: PhantomData<L>,
@@ -76,6 +77,12 @@ impl<Op> Expr for Sum<i8, i64, Op> where Op: BooleanOp<i64> {
     }
 }
 
+impl<Op: BooleanOp<i64>> std::fmt::Display for Sum<i8, i64, Op> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "Sum")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -120,7 +127,7 @@ mod tests {
             254,
         )?;
 
-        assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 }

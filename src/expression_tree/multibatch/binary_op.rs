@@ -6,6 +6,7 @@ use arrow::array::ArrayRef;
 use datafusion::error::{Result as DatafusionResult};
 use crate::expression_tree::boolean_op::BooleanOp;
 
+#[derive(Debug)]
 pub struct BinaryOp<Op> {
     left: Box<dyn Expr>,
     op: PhantomData<Op>,
@@ -23,8 +24,14 @@ impl<Op> BinaryOp<Op> {
 }
 
 impl<Op> Expr for BinaryOp<Op> where Op: BooleanOp<bool> {
-    fn evaluate(&self, batches:  &[RecordBatch]) -> DatafusionResult<bool> {
+    fn evaluate(&self, batches: &[RecordBatch]) -> DatafusionResult<bool> {
         Ok(Op::perform(self.left.evaluate(batches)?, self.right.evaluate(batches)?))
+    }
+}
+
+impl<Op: BooleanOp<bool>> std::fmt::Display for BinaryOp<Op> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "BinaryOp")
     }
 }
 
@@ -59,14 +66,14 @@ mod tests {
                 a.clone(),
             ],
         )?;
-        assert_eq!(true, op1.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op1.evaluate(vec![batch.clone()].as_slice())?);
 
         let op2 = BinaryOp::<Eq>::new(
             Box::new(True::new()),
             Box::new(False::new()),
         );
 
-        assert_eq!(false, op2.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(false, op2.evaluate(vec![batch.clone()].as_slice())?);
         Ok(())
     }
 }

@@ -13,6 +13,7 @@ use std::rc::Rc;
 use datafusion::error::{DataFusionError, Result as DatafusionResult};
 use futures::{TryStreamExt, TryFutureExt};
 
+#[derive(Debug)]
 enum Filter {
     DropOffOnAnyStep,
     DropOffOnStep(usize),
@@ -26,13 +27,16 @@ struct Row {
     row_id: usize,
 }
 
+#[derive(Debug)]
 pub struct Sequence {
     schema: SchemaRef,
     ts_col_id: usize,
     window: Duration,
     steps: Vec<Arc<dyn PhysicalExpr>>,
-    exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>>, // expr and vec of step ids
-    constants: Option<Vec<usize>>, // vec of col ids
+    exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>>,
+    // expr and vec of step ids
+    constants: Option<Vec<usize>>,
+    // vec of col ids
     filter: Option<Filter>,
 }
 
@@ -53,7 +57,7 @@ impl Sequence {
         };
 
         if window.is_zero() || window.num_seconds() < 0 {
-            return Err(DataFusionError::Plan(format!("Invalid window {:?}",window)));
+            return Err(DataFusionError::Plan(format!("Invalid window {:?}", window)));
         }
 
         if steps.is_empty() {
@@ -197,6 +201,13 @@ impl Sequence {
         })
     }
 }
+
+impl std::fmt::Display for Sequence {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "Sequence")
+    }
+}
+
 
 fn check_constants(batches: &[RecordBatch], row: &Row, constants: &Vec<usize>, const_row: &Row) -> DatafusionResult<bool> {
     for col_id in constants {
@@ -489,7 +500,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?;
-        assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 
@@ -528,7 +539,7 @@ mod tests {
 
             let exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)> = vec![(Arc::new(exclude1), vec![1]), (Arc::new(exclude2), vec![1, 2])];
             let op = Sequence::try_new(schema.clone(), "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_exclude(exclude)?;
-            assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+            assert_eq!(true, op.evaluate(vec![batch.clone()].as_slice())?);
         }
 
         {
@@ -546,7 +557,7 @@ mod tests {
 
             let exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)> = vec![(Arc::new(exclude1), vec![2]), (Arc::new(exclude2), vec![1, 2])];
             let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_exclude(exclude)?;
-            assert_eq!(false, op.evaluate(vec![&batch].as_slice())?);
+            assert_eq!(false, op.evaluate(vec![batch.clone()].as_slice())?);
         }
         Ok(())
     }
@@ -559,49 +570,49 @@ mod tests {
             let (schema, batch) = build_table(("a", &vec![1, 2, 3]), ("b", &vec![1, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
             let constants = vec!["b", "c"];
             let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
-            assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+            assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
             let (schema, batch) = build_table(("a", &vec![1, 2, 3]), ("b", &vec![2, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
             let constants = vec!["b", "c"];
             let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
-            assert_eq!(false, op.evaluate(vec![&batch].as_slice())?);
+            assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
             let (schema, batch) = build_table(("a", &vec![1, 1, 2, 3]), ("b", &vec![1, 2, 2, 2]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = vec!["b", "c"];
             let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
-            assert_eq!(false, op.evaluate(vec![&batch].as_slice())?);
+            assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
             let (schema, batch) = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 1, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = vec!["b", "c"];
             let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
-            assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+            assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
             let (schema, batch) = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 1, 1]), ("c", &vec![2, 1, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = vec!["b", "c"];
             let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
-            assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+            assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
             let (schema, batch) = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 2, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = vec!["b", "c"];
             let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
-            assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+            assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
             let (schema, batch) = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 2, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
             let constants = vec!["b", "c"];
             let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
-            assert_eq!(false, op.evaluate(vec![&batch].as_slice())?);
+            assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         }
 
         Ok(())
@@ -627,7 +638,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(1), vec![step1.clone(), step2.clone(), step3.clone()])?;
-        assert_eq!(false, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 
@@ -651,7 +662,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(4), vec![step1.clone(), step2.clone(), step3.clone()])?;
-        assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 
@@ -675,7 +686,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(1), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(2)?;
-        assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 
@@ -699,7 +710,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(2)?;
-        assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 
@@ -723,7 +734,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(1)?;
-        assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 
@@ -747,7 +758,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(0)?;
-        assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 
@@ -771,7 +782,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_any_step();
-        assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 
@@ -795,7 +806,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
-        assert_eq!(true, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 
@@ -819,7 +830,7 @@ mod tests {
         let (step1, step2, step3) = build_steps();
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
-        assert_eq!(false, op.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
 }

@@ -13,7 +13,9 @@ use crate::expression_tree::boolean_op::BooleanOp;
 use crate::expression_tree::utils::{break_on_true, break_on_false};
 use datafusion::error::{DataFusionError, Result as DatafusionResult};
 use arrow::datatypes::{SchemaRef, DataType, Schema};
+use crate::expression_tree::multibatch::binary_op::BinaryOp;
 
+#[derive(Debug)]
 pub struct Count<Op> {
     predicate: Arc<dyn PhysicalExpr>,
     op: PhantomData<Op>,
@@ -59,6 +61,13 @@ impl<Op> Expr for Count<Op> where Op: BooleanOp<i64> {
     }
 }
 
+impl<Op: BooleanOp<i64>> std::fmt::Display for Count<Op> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "Count")
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -99,7 +108,7 @@ mod tests {
             2,
         )?;
 
-        assert_eq!(true, op1.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op1.evaluate(vec![batch.clone()].as_slice())?);
 
         let op2 = Count::<Lt>::try_new(
             &schema,
@@ -107,7 +116,7 @@ mod tests {
             1,
         )?;
 
-        assert_eq!(false, op2.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(false, op2.evaluate(vec![batch.clone()].as_slice())?);
 
         let op3 = Count::<Lt>::try_new(
             &schema,
@@ -115,7 +124,7 @@ mod tests {
             1,
         )?;
 
-        assert_eq!(false, op3.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(false, op3.evaluate(vec![batch.clone()].as_slice())?);
 
         let op4 = Count::<Gt>::try_new(
             &schema,
@@ -123,7 +132,7 @@ mod tests {
             1,
         )?;
 
-        assert_eq!(true, op4.evaluate(vec![&batch].as_slice())?);
+        assert_eq!(true, op4.evaluate(vec![batch.clone()].as_slice())?);
 
         Ok(())
     }
