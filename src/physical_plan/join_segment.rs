@@ -11,7 +11,7 @@ use std::pin::Pin;
 use arrow::record_batch::RecordBatch;
 use arrow::error::{Result as ArrowResult, ArrowError};
 use datafusion::physical_plan::expressions::col;
-use arrow::array::{ArrayRef, Int8Array, Array, DynComparator, BooleanArray, StringArray, MutableArrayData};
+use arrow::array::{ArrayRef, Int8Array, Array, DynComparator, BooleanArray, StringArray, MutableArrayData, build_compare};
 use crate::physical_plan::utils::into_array;
 use datafusion::logical_plan::Operator;
 use crate::expression_tree::multibatch::expr::Expr;
@@ -24,6 +24,7 @@ use arrow::buffer::MutableBuffer;
 use std::ops::Deref;
 use std::cmp::Ordering;
 use datafusion::physical_plan::common;
+use std::cell::RefCell;
 
 pub type JoinOn = (String, String);
 
@@ -262,12 +263,6 @@ impl JoinSegmentStream {
     fn evaluate_partition(&self, right_span: &Span, output: &mut Vec<Vec<ArrayRef>>) -> Result<()> {
         let shrinked_buffer = right_span.shrink_buffers()?;
 
-        /*let shrinked_buffer = if self.right_expr.is_some() || self.take_right_cols.is_some() {
-            right_span.shrink_buffers()?
-        } else {
-            vec![]
-        };*/
-
         let mut columns: Vec<Vec<ArrayRef>> = Vec::with_capacity(self.schema.fields().len() + 1);
 
         for (s_idx, segment) in self.segments.iter().enumerate() {
@@ -349,134 +344,118 @@ fn concat_batches(schema: SchemaRef, output_buffer: &Vec<Vec<ArrayRef>>) -> Arro
     RecordBatch::try_new(schema.clone(), cols)
 }
 
+
 impl Stream for JoinSegmentStream {
     type Item = ArrowResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let a = Arc::new(Int8Array::from(vec![0i8]));
-        let b = Arc::new(Int8Array::from(vec![0i8]));
-
         let mut span = Span::new();
         let mut output_buffer: Vec<Vec<ArrayRef>> = Vec::new();
-        let mut left_cmp_col = into_array(col(&self.on_left).evaluate(&self.left_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
-        let mut right_cmp_col = into_array(col(&self.on_right).evaluate(&self.right_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
-        let mut cmp = match arrow::array::build_compare(left_cmp_col.as_ref(), right_cmp_col.as_ref()) {
-            Ok(a) => a,
-            Err(err) => return Poll::Ready(Some(Err(err))),
-        };
 
-        let mut to_cmp = false;
 
         loop {
-            if self.left_idx >= self.left_batch.num_rows() {
-                match self.left_input.poll_next_unpin(cx) {
-                    Poll::Ready(Some(Ok(batch))) => {
-                        self.left_idx = 0;
-                        self.left_batch = batch.clone();
-                        cmp = match arrow::array::build_compare(a.as_ref(), b.as_ref()) {
-                            Ok(a) => a,
-                            Err(err) => return Poll::Ready(Some(Err(err))),
-                        };
-                        left_cmp_col = match col(&self.on_left).evaluate(&self.left_batch) {
-                            Ok(cv) => into_array(cv),
-                            Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error()))),
-                        };
+            let mut left_cmp_col = into_array(col(&self.on_left).evaluate(&self.left_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
+            let mut right_cmp_col = into_array(col(&self.on_right).evaluate(&self.right_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
+            let mut cmp = match build_compare(left_cmp_col.as_ref(), right_cmp_col.as_ref()) {
+                Ok(a) => a,
+                Err(err) => return Poll::Ready(Some(Err(err))),
+            };
+            let mut to_cmp = false;
 
-                        let res = self.segments.iter().map(|s| {
-                            match &s.left_expr {
-                                Some(expr) => {
-                                    match expr.evaluate(&batch) {
-                                        Ok(cv) => Ok(Some(into_array(cv))),
-                                        Err(err) => Err(err)
+
+            'inner: loop {
+                if self.left_idx >= self.left_batch.num_rows() {
+                    match self.left_input.poll_next_unpin(cx) {
+                        Poll::Ready(Some(Ok(batch))) => {
+                            self.left_idx = 0;
+                            self.left_batch = batch.clone();
+                            let res = self.segments.iter().map(|s| {
+                                match &s.left_expr {
+                                    Some(expr) => {
+                                        match expr.evaluate(&batch) {
+                                            Ok(cv) => Ok(Some(into_array(cv))),
+                                            Err(err) => Err(err)
+                                        }
                                     }
+                                    None => Ok(None),
                                 }
-                                None => Ok(None),
+                            }).collect::<Result<Vec<Option<ArrayRef>>>>();
+
+                            match res {
+                                Ok(res) => self.left_expr_result = res,
+                                Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error())))
                             }
-                        }).collect::<Result<Vec<Option<ArrayRef>>>>();
 
-                        match res {
-                            Ok(res) => self.left_expr_result = res,
-                            Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error())))
+                            to_cmp = true;
+
                         }
-
-                        to_cmp = true;
+                        other => return other,
                     }
-                    other => return other,
                 }
-            }
 
-            if self.right_idx >= self.right_batch.clone().num_rows() {
-                match self.right_input.poll_next_unpin(cx) {
-                    Poll::Ready(Some(Ok(batch))) => {
-                        self.right_idx = 0;
-                        self.right_batch = batch.clone();
-                        span.buffer.push(batch.clone());
+                if self.right_idx >= self.right_batch.num_rows() {
+                    match self.right_input.poll_next_unpin(cx) {
+                        Poll::Ready(Some(Ok(batch))) => {
+                            self.right_idx = 0;
+                            self.right_batch = batch.clone();
+                            span.buffer.push(batch.clone());
 
-                        right_cmp_col = match col(&self.on_right).evaluate(&self.right_batch) {
-                            Ok(cv) => into_array(cv),
-                            Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error()))),
-                        };
+                            to_cmp = true;
+                        }
+                        Poll::Ready(None) => {
+                            return if span.is_processing {
+                                match self.evaluate_partition(&span, &mut output_buffer) {
+                                    Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error()))),
+                                    _ => {}
+                                }
 
-                        to_cmp = true;
+                                if !output_buffer.is_empty() {
+                                    Poll::Ready(Some(concat_batches(self.schema.clone(), &output_buffer)))
+                                } else {
+                                    Poll::Ready(None)
+                                }
+                            } else {
+                                Poll::Ready(None)
+                            };
+                        }
+                        other => return other,
                     }
-                    Poll::Ready(None) => {
-                        return if span.is_processing {
+                }
+
+                if to_cmp {
+                    break 'inner;
+                }
+                let cmp_result = (cmp)(self.left_idx, self.right_idx);
+                match cmp_result {
+                    std::cmp::Ordering::Equal => {
+                        if span.is_processing {
+                            span.len += 1;
+                        } else {
+                            span.is_processing = true;
+                            span.start_idx = self.right_idx;
+                            span.len = 0;
+                        }
+                        self.right_idx += 1;
+                    }
+                    std::cmp::Ordering::Less | std::cmp::Ordering::Greater => {
+                        if span.is_processing {
+                            span.is_processing = false;
+                            span.end_idx = self.right_idx;
                             match self.evaluate_partition(&span, &mut output_buffer) {
                                 Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error()))),
                                 _ => {}
                             }
-
-                            if !output_buffer.is_empty() {
+                            return if output_buffer.len() > 1000 {
                                 Poll::Ready(Some(concat_batches(self.schema.clone(), &output_buffer)))
                             } else {
                                 Poll::Ready(None)
+                            };
+                        } else {
+                            match cmp_result {
+                                std::cmp::Ordering::Less => self.left_idx += 1,
+                                std::cmp::Ordering::Greater => self.right_idx += 1,
+                                _ => panic!("unexpected")
                             }
-                        } else {
-                            Poll::Ready(None)
-                        };
-                    }
-                    other => return other,
-                }
-            }
-
-            if to_cmp {
-                cmp = match arrow::array::build_compare(left_cmp_col.as_ref(), right_cmp_col.as_ref()) {
-                    Ok(a) => a,
-                    Err(err) => return Poll::Ready(Some(Err(err))),
-                };
-                to_cmp = false;
-            }
-
-            let cmp_result = (cmp)(self.left_idx, self.right_idx);
-            match cmp_result {
-                std::cmp::Ordering::Equal => {
-                    if span.is_processing {
-                        span.len += 1;
-                    } else {
-                        span.is_processing = true;
-                        span.start_idx = self.right_idx;
-                        span.len = 0;
-                    }
-                    self.right_idx += 1;
-                }
-                std::cmp::Ordering::Less | std::cmp::Ordering::Greater => {
-                    if span.is_processing {
-                        span.is_processing = false;
-                        span.end_idx = self.right_idx;
-                        match self.evaluate_partition(&span, &mut output_buffer) {
-                            Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error()))),
-                            _ => {}
-                        }
-                        return if output_buffer.len() > 1000 {
-                            Poll::Ready(Some(concat_batches(self.schema.clone(), &output_buffer)))
-                        } else {
-                            Poll::Ready(None)
-                        };
-                    } else {
-                        match cmp_result {
-                            std::cmp::Ordering::Less => self.left_idx += 1,
-                            std::cmp::Ordering::Greater => self.right_idx += 1,
-                            _ => panic!("unexpected")
                         }
                     }
                 }
