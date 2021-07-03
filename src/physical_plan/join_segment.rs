@@ -30,15 +30,13 @@ pub type JoinOn = (String, String);
 
 #[derive(Debug, Clone)]
 pub struct Segment {
-    name: String,
     left_expr: Option<Arc<dyn PhysicalExpr>>,
     right_expr: Option<Arc<dyn Expr>>,
 }
 
 impl Segment {
-    fn new(name: &str, left_expr: Option<Arc<dyn PhysicalExpr>>, right_expr: Option<Arc<dyn Expr>>) -> Self {
+    fn new(left_expr: Option<Arc<dyn PhysicalExpr>>, right_expr: Option<Arc<dyn Expr>>) -> Self {
         Segment {
-            name: name.to_string(),
             left_expr,
             right_expr,
         }
@@ -61,6 +59,7 @@ pub struct JoinSegmentExec {
     right_schema: Option<SchemaRef>,
     take_right_cols: Option<Vec<usize>>,
     schema: SchemaRef,
+    segment_names: bool,
 }
 
 impl JoinSegmentExec {
@@ -79,22 +78,27 @@ impl JoinSegmentExec {
             (None, None) => Err(DataFusionError::Execution("empty schema".to_string()))
         }?;
 
+        let mut segment_names = false;
         let take_left_cols = if let Some(schema) = &left_schema {
             let batch_schema = left.schema();
             Some(schema
                 .fields()
                 .iter()
                 .enumerate()
-                .map(|(idx, f)|
+                .filter_map(|(idx, f)| {
+                    if f.name().to_lowercase().eq("segment") {
+                        segment_names = true;
+                        return None;
+                    }
                     match batch_schema.column_with_name(f.name()) {
-                        None => Err(DataFusionError::Plan(format!("Column {} not found in left expression schema", f.name()))),
-                        Some(_) => Ok(idx)
-                    })
+                        None => Some(Err(DataFusionError::Plan(format!("Column {} not found in left expression schema", f.name())))),
+                        Some(_) => Some(Ok(idx))
+                    }
+                })
                 .collect::<Result<Vec<usize>>>()?)
         } else {
             None
         };
-
         let take_right_cols = if let Some(schema) = &right_schema {
             let batch_schema = right.schema();
             Some(schema
@@ -110,7 +114,6 @@ impl JoinSegmentExec {
         } else {
             None
         };
-
         Ok(JoinSegmentExec {
             segments,
             left,
@@ -122,6 +125,7 @@ impl JoinSegmentExec {
             right_schema,
             take_right_cols,
             schema,
+            segment_names,
         })
     }
 
@@ -178,18 +182,20 @@ impl ExecutionPlan for JoinSegmentExec {
         let mut right_batch: Option<RecordBatch> = None;
 
         match left.try_next().await? {
-            None => return Ok(Box::pin(EmptyJoinSegmentStream::new(self.schema.clone()))),
+            None => {
+                return Ok(Box::pin(EmptyJoinSegmentStream::new(self.schema.clone())));
+            }
             Some(b) => {
                 left_batch = Some(b.clone());
 
                 match right.try_next().await? {
-                    Name => return Ok(Box::pin(EmptyJoinSegmentStream::new(self.schema.clone()))),
+                    None => return Ok(Box::pin(EmptyJoinSegmentStream::new(self.schema.clone()))),
                     Some(b) => right_batch = Some(b.clone()),
                 }
             }
         }
 
-        Ok(Box::pin(JoinSegmentStream {
+        let mut ret = JoinSegmentStream {
             segments: self.segments.clone(),
             left_expr_result: vec![],
             left_input: left,
@@ -205,7 +211,12 @@ impl ExecutionPlan for JoinSegmentExec {
             right_schema: self.right_schema.clone(),
             take_right_cols: self.take_right_cols.clone(),
             schema: self.schema.clone(),
-        }))
+            segment_names: self.segment_names,
+        };
+
+        ret.evaluate_left_expr()?;
+
+        Ok(Box::pin(ret))
     }
 }
 
@@ -251,6 +262,7 @@ struct JoinSegmentStream {
     take_right_cols: Option<Vec<usize>>,
     // chunked columns
     schema: SchemaRef,
+    segment_names: bool,
 }
 
 impl RecordBatchStream for JoinSegmentStream {
@@ -260,13 +272,33 @@ impl RecordBatchStream for JoinSegmentStream {
 }
 
 impl JoinSegmentStream {
+    fn evaluate_left_expr(&mut self) -> Result<()> {
+        let expr_result = self.segments.iter().map(|s| {
+            match &s.left_expr {
+                Some(expr) => {
+                    match expr.evaluate(&self.left_batch) {
+                        Ok(cv) => Ok(Some(into_array(cv))),
+                        Err(err) => Err(err)
+                    }
+                }
+                None => Ok(None),
+            }
+        }).collect::<Result<Vec<Option<ArrayRef>>>>();
+
+        self.left_expr_result = match expr_result {
+            Ok(res) => res,
+            Err(err) => return Err(err)
+        };
+        Ok(())
+    }
+
     fn evaluate_partition(&self, right_span: &Span, output: &mut Vec<Vec<ArrayRef>>) -> Result<()> {
         let shrinked_buffer = right_span.shrink_buffers()?;
 
-        let mut columns: Vec<Vec<ArrayRef>> = Vec::with_capacity(self.schema.fields().len() + 1);
+        let mut columns: Vec<Vec<ArrayRef>> = Vec::with_capacity(self.schema.fields().len());
 
-        for (s_idx, segment) in self.segments.iter().enumerate() {
-            if let Some(expr) = &self.left_expr_result[s_idx] {
+        for (idx, segment) in self.segments.iter().enumerate() {
+            if let Some(expr) = &self.left_expr_result[idx] {
                 let a = expr.as_any().downcast_ref::<BooleanArray>().unwrap();
                 if !a.value(self.left_idx) {
                     continue;
@@ -279,12 +311,14 @@ impl JoinSegmentStream {
                 }
             }
 
-            columns.push(vec![ScalarValue::Utf8(Some(segment.name.clone())).to_array_of_size(right_span.len)]);
+            if self.segment_names {
+                columns.push(vec![ScalarValue::Int8(Some(idx as i8)).to_array_of_size(right_span.len)]);
+            }
             if let Some(ids) = &self.take_left_cols {
-                for (cidx, idx) in ids.iter().enumerate() {
-                    let batch_col = self.left_batch.columns()[*idx].clone();
+                for (dst_idx, src_idx) in ids.iter().enumerate() {
+                    let batch_col = self.left_batch.columns()[*src_idx].clone();
                     let col = ScalarValue::try_from_array(&batch_col, self.left_idx)?.to_array_of_size(right_span.len);
-                    output[cidx].push(col);
+                    output[dst_idx].push(col);
                 }
             }
 
@@ -311,13 +345,13 @@ pub struct Span {
 }
 
 impl Span {
-    fn new() -> Self {
+    fn new(first_batch: RecordBatch) -> Self {
         Span {
             is_processing: false,
             start_idx: 0,
             end_idx: 0,
             len: 0,
-            buffer: vec![],
+            buffer: vec![first_batch],
         }
     }
 
@@ -349,7 +383,7 @@ impl Stream for JoinSegmentStream {
     type Item = ArrowResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut span = Span::new();
+        let mut span = Span::new(self.right_batch.clone());
         let mut output_buffer: Vec<Vec<ArrayRef>> = Vec::new();
 
 
@@ -367,27 +401,14 @@ impl Stream for JoinSegmentStream {
                 if self.left_idx >= self.left_batch.num_rows() {
                     match self.left_input.poll_next_unpin(cx) {
                         Poll::Ready(Some(Ok(batch))) => {
-                            self.left_idx = 0;
                             self.left_batch = batch.clone();
-                            let res = self.segments.iter().map(|s| {
-                                match &s.left_expr {
-                                    Some(expr) => {
-                                        match expr.evaluate(&batch) {
-                                            Ok(cv) => Ok(Some(into_array(cv))),
-                                            Err(err) => Err(err)
-                                        }
-                                    }
-                                    None => Ok(None),
-                                }
-                            }).collect::<Result<Vec<Option<ArrayRef>>>>();
-
-                            match res {
-                                Ok(res) => self.left_expr_result = res,
-                                Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error())))
+                            self.left_idx = 0;
+                            match self.evaluate_left_expr() {
+                                Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error()))),
+                                _ => {}
                             }
 
                             to_cmp = true;
-
                         }
                         other => return other,
                     }
@@ -396,8 +417,8 @@ impl Stream for JoinSegmentStream {
                 if self.right_idx >= self.right_batch.num_rows() {
                     match self.right_input.poll_next_unpin(cx) {
                         Poll::Ready(Some(Ok(batch))) => {
-                            self.right_idx = 0;
                             self.right_batch = batch.clone();
+                            self.right_idx = 0;
                             span.buffer.push(batch.clone());
 
                             to_cmp = true;
@@ -503,6 +524,7 @@ mod tests {
     use arrow::datatypes::{Schema, DataType, Field};
     use arrow::ipc::BoolArgs;
     use arrow::array::{BooleanArray, Int32Array};
+    use std::collections::BTreeMap;
 
     fn build_table(
         a: (&str, &Vec<i32>),
@@ -586,24 +608,32 @@ mod tests {
             Segment::new("a", Some(Arc::new(left_expr)), Some(Arc::new(right_expr)))
         };
 
+        let mut sf = Field::new("segment", DataType::Utf8, false);
         let left_schema = Schema::new(vec![
             Field::new("segment", DataType::Utf8, false),
-            Field::new("a1", DataType::Int32, false),
-            Field::new("b1", DataType::Int32, false),
+            Field::new("u1", DataType::Int32, false),
+            Field::new("a1", DataType::Boolean, false),
+            Field::new("b1", DataType::Boolean, false),
         ]);
 
         let right_schema = Schema::new(vec![
-            Field::new("b2", DataType::Int32, false),
-            Field::new("c2", DataType::Int32, false),
+            Field::new("u2", DataType::Int32, false),
+            Field::new("a2", DataType::Boolean, false),
+            Field::new("b2", DataType::Boolean, false),
         ]);
+
         let join = JoinSegmentExec::try_new(
-            left_plan,
-            right_plan,
+            left_plan.clone(),
+            right_plan.clone(),
             on,
             vec![s1, s2],
             Some(Arc::new(left_schema)),
             Some(Arc::new(right_schema)),
         )?;
+
+        let s1 = right_plan.execute(0).await?;
+        let b1 = common::collect(s1).await?;
+        println!("{}", arrow::util::pretty::pretty_format_batches(&b1)?);
 
         let stream = join.execute(0).await?;
         let batches = common::collect(stream).await?;
