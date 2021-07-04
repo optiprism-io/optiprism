@@ -54,9 +54,7 @@ pub struct JoinSegmentExec {
     on_left: String,
     on_right: String,
     /// The schema once the join is applied
-    left_schema: Option<SchemaRef>,
     take_left_cols: Option<Vec<usize>>,
-    right_schema: Option<SchemaRef>,
     take_right_cols: Option<Vec<usize>>,
     schema: SchemaRef,
     segment_names: bool,
@@ -68,64 +66,39 @@ impl JoinSegmentExec {
         right: Arc<dyn ExecutionPlan>,
         on: &JoinOn,
         segments: Vec<Segment>,
-        left_schema: Option<SchemaRef>,
-        right_schema: Option<SchemaRef>,
+        schema: SchemaRef,
     ) -> Result<Self> {
-        let schema = match (&left_schema, &right_schema) {
-            (Some(l), Some(r)) => Ok(Arc::new(build_join_schema(&l, &r, on))),
-            (Some(l), None) => Ok(l.clone()),
-            (None, Some(r)) => Ok(r.clone()),
-            (None, None) => Err(DataFusionError::Execution("empty schema".to_string()))
-        }?;
+        if schema.fields().len() == 0 {
+            return Err(DataFusionError::Plan("empty schema".to_string()));
+        }
 
-        let mut segment_names = false;
-        let take_left_cols = if let Some(schema) = &left_schema {
-            let batch_schema = left.schema();
-            Some(schema
-                .fields()
-                .iter()
-                .enumerate()
-                .filter_map(|(idx, f)| {
-                    if f.name().to_lowercase().eq("segment") {
-                        segment_names = true;
-                        return None;
+        let mut take_left_cols: Vec<usize> = vec![];
+        let mut take_right_cols: Vec<usize> = vec![];
+        for field in schema.fields().iter() {
+            if field.name().eq("segment") {
+                continue;
+            }
+            match left.schema().index_of(field.name()) {
+                Ok(idx) => take_left_cols.push(idx),
+                _ => {
+                    match right.schema().index_of(field.name()) {
+                        Ok(idx) => take_right_cols.push(idx),
+                        Err(_) => return Err(DataFusionError::Plan(format!("Column {} not found", field.name()))),
                     }
-                    match batch_schema.column_with_name(f.name()) {
-                        None => Some(Err(DataFusionError::Plan(format!("Column {} not found in left expression schema", f.name())))),
-                        Some(_) => Some(Ok(idx))
-                    }
-                })
-                .collect::<Result<Vec<usize>>>()?)
-        } else {
-            None
-        };
-        let take_right_cols = if let Some(schema) = &right_schema {
-            let batch_schema = right.schema();
-            Some(schema
-                .fields()
-                .iter()
-                .enumerate()
-                .map(|(idx, f)|
-                    match batch_schema.column_with_name(f.name()) {
-                        None => Err(DataFusionError::Plan(format!("Column {} not found in right expression schema", f.name()))),
-                        Some(_) => Ok(idx)
-                    })
-                .collect::<Result<Vec<usize>>>()?)
-        } else {
-            None
-        };
+                }
+            }
+        }
+
         Ok(JoinSegmentExec {
             segments,
             left,
             right,
             on_left: on.0.to_owned(),
             on_right: on.1.to_owned(),
-            left_schema,
-            take_left_cols,
-            right_schema,
-            take_right_cols,
-            schema,
-            segment_names,
+            take_left_cols: if take_left_cols.is_empty() { None } else { Some(take_left_cols) },
+            take_right_cols: if take_right_cols.is_empty() { None } else { Some(take_right_cols) },
+            schema: schema.clone(),
+            segment_names: schema.fields()[0].name().eq("segment"),
         })
     }
 
@@ -165,8 +138,7 @@ impl ExecutionPlan for JoinSegmentExec {
                 children[1].clone(),
                 &(self.on_left.clone(), self.on_right.clone()),
                 self.segments.clone(),
-                self.left_schema.clone(),
-                self.right_schema.clone(),
+                self.schema.clone(),
             )?)),
             _ => Err(DataFusionError::Internal(
                 "JoinSegmentExec wrong number of children".to_string(),
@@ -206,9 +178,7 @@ impl ExecutionPlan for JoinSegmentExec {
             right_idx: 0,
             on_left: self.on_left.clone(),
             on_right: self.on_right.clone(),
-            left_schema: self.left_schema.clone(),
             take_left_cols: self.take_left_cols.clone(),
-            right_schema: self.right_schema.clone(),
             take_right_cols: self.take_right_cols.clone(),
             schema: self.schema.clone(),
             segment_names: self.segment_names,
@@ -256,9 +226,7 @@ struct JoinSegmentStream {
     on_left: String,
     on_right: String,
     /// The schema once the join is applied
-    left_schema: Option<SchemaRef>,
     take_left_cols: Option<Vec<usize>>,
-    right_schema: Option<SchemaRef>,
     take_right_cols: Option<Vec<usize>>,
     // chunked columns
     schema: SchemaRef,
@@ -324,9 +292,9 @@ impl JoinSegmentStream {
 
 
             if let Some(ids) = &self.take_right_cols {
-                for (cidx, idx) in ids.iter().enumerate() {
+                for (src_idx, dst_idx) in ids.iter().enumerate() {
                     for batch in shrinked_buffer.iter() {
-                        output[cidx].push(batch.columns()[*idx].clone())
+                        output[src_idx].push(batch.columns()[*dst_idx].clone())
                     }
                 }
             }
@@ -384,7 +352,7 @@ impl Stream for JoinSegmentStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut span = Span::new(self.right_batch.clone());
-        let mut output_buffer: Vec<Vec<ArrayRef>> = Vec::new();
+        let mut output_buffer: Vec<Vec<ArrayRef>> = vec![Vec::new(); self.schema.fields().len()];
 
 
         loop {
@@ -523,13 +491,13 @@ mod tests {
     use arrow::record_batch::RecordBatch;
     use arrow::datatypes::{Schema, DataType, Field};
     use arrow::ipc::BoolArgs;
-    use arrow::array::{BooleanArray, Int32Array};
+    use arrow::array::{BooleanArray, Int32Array, Int8Array};
     use std::collections::BTreeMap;
 
     fn build_table(
         a: (&str, &Vec<i32>),
-        b: (&str, &Vec<bool>),
-        c: (&str, &Vec<bool>),
+        b: (&str, &Vec<i8>),
+        c: (&str, &Vec<i8>),
     ) -> Arc<dyn ExecutionPlan> {
         let batch = build_table_i32(a, b, c);
         let schema = batch.schema();
@@ -538,21 +506,21 @@ mod tests {
 
     pub fn build_table_i32(
         a: (&str, &Vec<i32>),
-        b: (&str, &Vec<bool>),
-        c: (&str, &Vec<bool>),
+        b: (&str, &Vec<i8>),
+        c: (&str, &Vec<i8>),
     ) -> RecordBatch {
         let schema = Schema::new(vec![
             Field::new(a.0, DataType::Int32, false),
-            Field::new(b.0, DataType::Boolean, false),
-            Field::new(c.0, DataType::Boolean, false),
+            Field::new(b.0, DataType::Int8, false),
+            Field::new(c.0, DataType::Int8, false),
         ]);
 
         RecordBatch::try_new(
             Arc::new(schema),
             vec![
                 Arc::new(Int32Array::from(a.1.clone())),
-                Arc::new(BooleanArray::from(b.1.clone())),
-                Arc::new(BooleanArray::from(c.1.clone())),
+                Arc::new(Int8Array::from(b.1.clone())),
+                Arc::new(Int8Array::from(c.1.clone())),
             ],
         )
             .unwrap()
@@ -562,64 +530,60 @@ mod tests {
     async fn test() -> Result<()> {
         let left_plan = build_table(
             ("u1", &vec![1, 2, 3]),
-            ("a1", &vec![true, false, false]), // 7 does not exist on the right
-            ("b1", &vec![true, false, false]),
+            ("a1", &vec![1, 0, 0]), // 7 does not exist on the right
+            ("b1", &vec![1, 0, 0]),
         );
         let right_plan = build_table(
             ("u2", &vec![1, 2, 3]),
-            ("a2", &vec![true, false, false]),
-            ("b2", &vec![true, false, false]),
+            ("a2", &vec![1, 0, 0]),
+            ("b2", &vec![1, 0, 0]),
         );
         let on = &("a1".to_string(), "a2".to_string());
 
         let s1 = {
             let left_expr = {
                 let left = Column::new("a1");
-                let right = Literal::new(ScalarValue::Boolean(Some(true)));
+                let right = Literal::new(ScalarValue::Int8(Some(1)));
                 BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
             };
 
             let right_expr = {
                 let lhs = Column::new("a2");
-                let rhs = Literal::new(ScalarValue::Boolean(Some(true)));
+                let rhs = Literal::new(ScalarValue::Int8(Some(1)));
                 let op = BinaryExpr::new(Arc::new(lhs), Operator::Eq, Arc::new(rhs));
                 Count::<Gt>::try_new(&right_plan.schema(), Arc::new(op), 0)?
             };
 
 
-            Segment::new("a", Some(Arc::new(left_expr)), Some(Arc::new(right_expr)))
+            Segment::new(Some(Arc::new(left_expr)), Some(Arc::new(right_expr)))
         };
 
         let s2 = {
             let left_expr = {
                 let lhs = Column::new("b1");
-                let rhs = Literal::new(ScalarValue::Boolean(Some(true)));
+                let rhs = Literal::new(ScalarValue::Int8(Some(1)));
                 BinaryExpr::new(Arc::new(lhs), Operator::Eq, Arc::new(rhs))
             };
 
             let right_expr = {
                 let lhs = Column::new("b2");
-                let rhs = Literal::new(ScalarValue::Boolean(Some(true)));
+                let rhs = Literal::new(ScalarValue::Int8(Some(1)));
                 let op = BinaryExpr::new(Arc::new(lhs), Operator::Eq, Arc::new(rhs));
                 Count::<Gt>::try_new(&right_plan.schema(), Arc::new(op), 0)?
             };
 
 
-            Segment::new("a", Some(Arc::new(left_expr)), Some(Arc::new(right_expr)))
+            Segment::new(Some(Arc::new(left_expr)), Some(Arc::new(right_expr)))
         };
 
         let mut sf = Field::new("segment", DataType::Utf8, false);
-        let left_schema = Schema::new(vec![
+        let schema = Schema::new(vec![
             Field::new("segment", DataType::Utf8, false),
             Field::new("u1", DataType::Int32, false),
-            Field::new("a1", DataType::Boolean, false),
-            Field::new("b1", DataType::Boolean, false),
-        ]);
-
-        let right_schema = Schema::new(vec![
-            Field::new("u2", DataType::Int32, false),
-            Field::new("a2", DataType::Boolean, false),
-            Field::new("b2", DataType::Boolean, false),
+            Field::new("a1", DataType::Int8, false),
+            Field::new("b1", DataType::Int8, false),
+            Field::new("a2", DataType::Int8, false),
+            Field::new("b2", DataType::Int8, false),
         ]);
 
         let join = JoinSegmentExec::try_new(
@@ -627,18 +591,17 @@ mod tests {
             right_plan.clone(),
             on,
             vec![s1, s2],
-            Some(Arc::new(left_schema)),
-            Some(Arc::new(right_schema)),
+            Arc::new(schema),
         )?;
 
         let s1 = right_plan.execute(0).await?;
         let b1 = common::collect(s1).await?;
-        println!("{}", arrow::util::pretty::pretty_format_batches(&b1)?);
+        // println!("{}", arrow::util::pretty::pretty_format_batches(&b1)?);
 
         let stream = join.execute(0).await?;
         let batches = common::collect(stream).await?;
 
-        println!("{}", arrow::util::pretty::pretty_format_batches(&batches)?);
+        // println!("{}", arrow::util::pretty::pretty_format_batches(&batches)?);
         Ok(())
     }
 }
