@@ -262,9 +262,6 @@ impl JoinSegmentStream {
 
     fn evaluate_partition(&self, right_span: &Span, output: &mut Vec<Vec<ArrayRef>>) -> Result<()> {
         let shrinked_buffer = right_span.shrink_buffers()?;
-
-        let mut columns: Vec<Vec<ArrayRef>> = Vec::with_capacity(self.schema.fields().len());
-
         for (idx, segment) in self.segments.iter().enumerate() {
             if let Some(expr) = &self.left_expr_result[idx] {
                 let a = expr.as_any().downcast_ref::<BooleanArray>().unwrap();
@@ -279,22 +276,25 @@ impl JoinSegmentStream {
                 }
             }
 
+            let mut offset: usize = 0;
             if self.segment_names {
-                columns.push(vec![ScalarValue::Int8(Some(idx as i8)).to_array_of_size(right_span.len)]);
+                output[0].push(ScalarValue::Int8(Some(idx as i8)).to_array_of_size(right_span.len));
+                offset += 1;
             }
             if let Some(ids) = &self.take_left_cols {
                 for (dst_idx, src_idx) in ids.iter().enumerate() {
                     let batch_col = self.left_batch.columns()[*src_idx].clone();
                     let col = ScalarValue::try_from_array(&batch_col, self.left_idx)?.to_array_of_size(right_span.len);
-                    output[dst_idx].push(col);
+                    output[dst_idx + offset].push(col);
                 }
+                offset += ids.len();
             }
 
 
             if let Some(ids) = &self.take_right_cols {
-                for (src_idx, dst_idx) in ids.iter().enumerate() {
+                for (dst_idx, src_idx) in ids.iter().enumerate() {
                     for batch in shrinked_buffer.iter() {
-                        output[src_idx].push(batch.columns()[*dst_idx].clone())
+                        output[dst_idx + offset].push(batch.columns()[*src_idx].clone())
                     }
                 }
             }
@@ -313,35 +313,51 @@ pub struct Span {
 }
 
 impl Span {
-    fn new(first_batch: RecordBatch) -> Self {
+    fn new() -> Self {
         Span {
             is_processing: false,
             start_idx: 0,
             end_idx: 0,
             len: 0,
-            buffer: vec![first_batch],
+            buffer: vec![],
         }
     }
 
     fn shrink_buffers(&self) -> ArrowResult<Vec<RecordBatch>> {
-        self.buffer.iter().enumerate().map(|(idx, batch)| {
-            let cols = if idx == 0 && (self.start_idx > 0 || self.end_idx > 0) {
-                batch.columns().iter().map(|c| c.slice(self.start_idx, self.end_idx - self.start_idx)).collect()
-            } else if idx == self.buffer.len() - 1 && self.end_idx > 0 {
-                batch.columns().iter().map(|c| c.slice(0, self.end_idx)).collect()
+        let mut resp: Vec<RecordBatch> = vec![];
+        let mut row_id = self.start_idx;
+        let mut r_len = self.len;
+        for batch in self.buffer.iter() {
+            if row_id + r_len > batch.columns()[0].len() {
+                if row_id == 0 {
+                    resp.push(batch.clone())
+                } else {
+                    let cols = batch.columns().iter().map(|c| c.slice(row_id, c.len() - row_id)).collect();
+                    resp.push(RecordBatch::try_new(self.buffer[0].schema().clone(), cols)?);
+                }
+                r_len -= batch.columns()[0].len() - row_id;
+                row_id = 0;
             } else {
-                batch.columns().to_vec()
-            };
+                if row_id == 0 && r_len == batch.columns()[0].len() {
+                    resp.push(batch.clone())
+                } else {
+                    let cols = batch.columns().iter().map(|c| c.slice(row_id, r_len)).collect();
+                    resp.push(RecordBatch::try_new(self.buffer[0].schema().clone(), cols)?);
+                }
+                break;
+            }
+        }
 
-            RecordBatch::try_new(batch.schema().clone(), cols)
-        }).collect::<ArrowResult<Vec<RecordBatch>>>()
+        Ok(resp)
     }
 }
 
 fn concat_batches(schema: SchemaRef, output_buffer: &Vec<Vec<ArrayRef>>) -> ArrowResult<RecordBatch> {
     let cols = output_buffer.
         iter().
-        map(|chunks| kernels::concat::concat(&chunks.iter().map(|c| c.as_ref()).collect::<Vec<_>>())).
+        map(|chunks| {
+            kernels::concat::concat(&chunks.iter().map(|c| c.as_ref()).collect::<Vec<_>>())
+        }).
         collect::<ArrowResult<Vec<ArrayRef>>>()?;
     RecordBatch::try_new(schema.clone(), cols)
 }
@@ -351,7 +367,7 @@ impl Stream for JoinSegmentStream {
     type Item = ArrowResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut span = Span::new(self.right_batch.clone());
+        let mut span = Span::new();
         let mut output_buffer: Vec<Vec<ArrayRef>> = vec![Vec::new(); self.schema.fields().len()];
 
 
@@ -366,22 +382,6 @@ impl Stream for JoinSegmentStream {
 
 
             'inner: loop {
-                if self.left_idx >= self.left_batch.num_rows() {
-                    match self.left_input.poll_next_unpin(cx) {
-                        Poll::Ready(Some(Ok(batch))) => {
-                            self.left_batch = batch.clone();
-                            self.left_idx = 0;
-                            match self.evaluate_left_expr() {
-                                Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error()))),
-                                _ => {}
-                            }
-
-                            to_cmp = true;
-                        }
-                        other => return other,
-                    }
-                }
-
                 if self.right_idx >= self.right_batch.num_rows() {
                     match self.right_input.poll_next_unpin(cx) {
                         Poll::Ready(Some(Ok(batch))) => {
@@ -411,18 +411,42 @@ impl Stream for JoinSegmentStream {
                     }
                 }
 
+                if self.left_idx >= self.left_batch.num_rows() {
+                    match self.left_input.poll_next_unpin(cx) {
+                        Poll::Ready(Some(Ok(batch))) => {
+                            self.left_batch = batch.clone();
+                            self.left_idx = 0;
+                            match self.evaluate_left_expr() {
+                                Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error()))),
+                                _ => {}
+                            }
+
+                            to_cmp = true;
+                        }
+                        other => {
+                            return other;
+                        }
+                    }
+                }
+
                 if to_cmp {
                     break 'inner;
                 }
+
+
+                let lv = left_cmp_col.as_any().downcast_ref::<Int8Array>().unwrap().value(self.left_idx);
+                let rv = right_cmp_col.as_any().downcast_ref::<Int8Array>().unwrap().value(self.right_idx);
                 let cmp_result = (cmp)(self.left_idx, self.right_idx);
                 match cmp_result {
                     std::cmp::Ordering::Equal => {
                         if span.is_processing {
                             span.len += 1;
+                            span.end_idx = self.right_idx;
                         } else {
                             span.is_processing = true;
                             span.start_idx = self.right_idx;
-                            span.len = 0;
+                            span.len = 1;
+                            span.buffer = vec![self.right_batch.clone()];
                         }
                         self.right_idx += 1;
                     }
@@ -434,15 +458,18 @@ impl Stream for JoinSegmentStream {
                                 Err(err) => return Poll::Ready(Some(Err(err.into_arrow_external_error()))),
                                 _ => {}
                             }
-                            return if output_buffer.len() > 1000 {
-                                Poll::Ready(Some(concat_batches(self.schema.clone(), &output_buffer)))
-                            } else {
-                                Poll::Ready(None)
-                            };
+
+                            if output_buffer.len() > 1000 {
+                                return Poll::Ready(Some(concat_batches(self.schema.clone(), &output_buffer)));
+                            }
                         } else {
                             match cmp_result {
-                                std::cmp::Ordering::Less => self.left_idx += 1,
-                                std::cmp::Ordering::Greater => self.right_idx += 1,
+                                std::cmp::Ordering::Less => {
+                                    self.left_idx += 1;
+                                }
+                                std::cmp::Ordering::Greater => {
+                                    self.right_idx += 1;
+                                }
                                 _ => panic!("unexpected")
                             }
                         }
@@ -453,30 +480,9 @@ impl Stream for JoinSegmentStream {
     }
 }
 
-/// Creates a schema for a join operation.
-/// The fields from the left side are first
-pub fn build_join_schema(
-    left: &Schema,
-    right: &Schema,
-    on: &JoinOn,
-) -> Schema {
-    let fields: Vec<Field> = {
-        let left_fields = left.fields().iter();
-
-        let right_fields = right
-            .fields()
-            .iter()
-            .filter(|f| !(&on.0 == &on.1 && &on.0 == f.name()));
-
-        // left then right
-        left_fields.chain(right_fields).cloned().collect()
-    };
-    Schema::new(fields)
-}
-
 #[cfg(test)]
 mod tests {
-    use datafusion::{
+    pub use datafusion::{
         error::{Result},
     };
     use datafusion::physical_plan::{ExecutionPlan, common};
@@ -489,58 +495,184 @@ mod tests {
     use crate::expression_tree::multibatch::count::Count;
     use crate::expression_tree::boolean_op::Gt;
     use arrow::record_batch::RecordBatch;
-    use arrow::datatypes::{Schema, DataType, Field};
+    use arrow::datatypes::{Schema, DataType, Field, SchemaRef};
     use arrow::ipc::BoolArgs;
-    use arrow::array::{BooleanArray, Int32Array, Int8Array};
+    use arrow::array::{BooleanArray, Int32Array, Int8Array, ArrayRef};
     use std::collections::BTreeMap;
 
-    fn build_table(
-        a: (&str, &Vec<i32>),
-        b: (&str, &Vec<i8>),
-        c: (&str, &Vec<i8>),
-    ) -> Arc<dyn ExecutionPlan> {
-        let batch = build_table_i32(a, b, c);
-        let schema = batch.schema();
-        Arc::new(MemoryExec::try_new(&[vec![batch]], schema, None).unwrap())
+    pub fn build_batches(schema: SchemaRef, input: &Vec<Vec<Vec<i8>>>) -> Vec<RecordBatch> {
+        let mut batches: Vec<RecordBatch> = vec![];
+
+        for raw_batch in input.iter() {
+            let mut cols: Vec<Vec<i8>> = vec![vec![]; input[0][0].len()];
+            for row in raw_batch.iter() {
+                for (idx, value) in row.iter().enumerate() {
+                    cols[idx].push(*value);
+                }
+            }
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                cols.iter().map(|x| Arc::new(Int8Array::from(x.clone())) as ArrayRef).collect::<Vec<ArrayRef>>(),
+            ).unwrap();
+            batches.push(batch);
+        }
+        batches
     }
 
-    pub fn build_table_i32(
-        a: (&str, &Vec<i32>),
-        b: (&str, &Vec<i8>),
-        c: (&str, &Vec<i8>),
-    ) -> RecordBatch {
-        let schema = Schema::new(vec![
-            Field::new(a.0, DataType::Int32, false),
-            Field::new(b.0, DataType::Int8, false),
-            Field::new(c.0, DataType::Int8, false),
-        ]);
-
-        RecordBatch::try_new(
-            Arc::new(schema),
-            vec![
-                Arc::new(Int32Array::from(a.1.clone())),
-                Arc::new(Int8Array::from(b.1.clone())),
-                Arc::new(Int8Array::from(c.1.clone())),
-            ],
-        )
-            .unwrap()
-    }
+    #[test]
+    fn shrink_buffers() {}
 
     #[tokio::test]
     async fn test() -> Result<()> {
-        let left_plan = build_table(
-            ("u1", &vec![1, 2, 3]),
-            ("a1", &vec![1, 0, 0]), // 7 does not exist on the right
-            ("b1", &vec![1, 0, 0]),
-        );
-        let right_plan = build_table(
-            ("u2", &vec![1, 2, 3]),
-            ("a2", &vec![1, 0, 0]),
-            ("b2", &vec![1, 0, 0]),
-        );
-        let on = &("a1".to_string(), "a2".to_string());
+        /*
+            +----+----+----+----+----+--------+
+            | a1 | b1 | u2 | a2 | b2 |        |
+            +----+----+----+----+----+--------+
+            | 1  |    |    |    |    | 1      |
+            |    |    |    | 1  |    | 2      |
+            | 1  |    |    | 1  |    | 1, 2, 3|
+            |    | 1  |    |    | 1  | 4      |
+            +----+----+----+----+----+--------+
+         */
+
+        let users: Vec<Vec<Vec<i8>>> = vec![
+            //       u1 a1 b1
+            vec![
+                vec![1, 1, 1],
+                vec![3, 0, 0],
+                vec![4, 1, 0],
+            ],
+            vec![
+                vec![5, 1, 0],
+            ],
+            vec![
+                vec![6, 0, 0],
+                vec![7, 1, 0],
+            ],
+            vec![
+                vec![8, 0, 1],
+                vec![9, 1, 1],
+            ]
+        ];
+
+        let events: Vec<Vec<Vec<i8>>> = vec![
+            //        u2 a2 b2
+            vec![
+                vec![2, 1, 1],
+            ],
+            vec![
+                vec![2, 1, 1],
+                vec![3, 0, 0],
+                vec![3, 0, 0],
+            ],
+            vec![
+                vec![4, 0, 0],
+                vec![6, 1, 0],
+            ],
+            vec![
+                vec![6, 1, 0],
+                vec![6, 1, 0],
+                vec![7, 1, 0],
+            ],
+            vec![
+                vec![7, 1, 0],
+            ],
+            vec![
+                vec![8, 0, 1],
+                vec![8, 0, 1],
+            ],
+            vec![
+                vec![9, 0, 0],
+                vec![9, 1, 0],
+                vec![9, 0, 1],
+            ],
+            vec![
+                vec![9, 1, 1],
+            ],
+        ];
+
+        let exp: Vec<Vec<Vec<i8>>> = vec![
+            //       s  u1 a1 b1 a2 b2
+            vec![
+                vec![0, 4, 1, 0, 0, 0],
+                vec![1, 6, 0, 0, 1, 0],
+                vec![1, 6, 0, 0, 1, 0],
+                vec![1, 6, 0, 0, 1, 0],
+            ],
+            vec![
+                vec![0, 7, 1, 0, 1, 0],
+                vec![0, 7, 1, 0, 1, 0],
+                vec![1, 7, 1, 0, 1, 0],
+                vec![1, 7, 1, 0, 1, 0],
+                vec![2, 7, 1, 0, 1, 0],
+                vec![2, 7, 1, 0, 1, 0],
+            ],
+            vec![
+                vec![3, 8, 0, 1, 0, 1],
+                vec![3, 8, 0, 1, 0, 1],
+            ],
+            vec![
+                vec![0, 9, 1, 1, 0, 0],
+                vec![0, 9, 1, 1, 1, 0],
+                vec![0, 9, 1, 1, 0, 1],
+                vec![0, 9, 1, 1, 1, 1],
+                vec![1, 9, 1, 1, 0, 0],
+                vec![1, 9, 1, 1, 1, 0],
+                vec![1, 9, 1, 1, 0, 1],
+                vec![1, 9, 1, 1, 1, 1],
+                vec![2, 9, 1, 1, 0, 0],
+                vec![2, 9, 1, 1, 1, 0],
+                vec![2, 9, 1, 1, 0, 1],
+                vec![2, 9, 1, 1, 1, 1],
+                vec![3, 9, 1, 1, 0, 0],
+                vec![3, 9, 1, 1, 1, 0],
+                vec![3, 9, 1, 1, 0, 1],
+                vec![3, 9, 1, 1, 1, 1],
+            ],
+        ];
+
+        let left_plan = {
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("u1", DataType::Int8, false),
+                Field::new("a1", DataType::Int8, false),
+                Field::new("b1", DataType::Int8, false),
+            ]));
+            let batches = build_batches(schema.clone(), &users);
+            Arc::new(MemoryExec::try_new(&[batches], schema.clone(), None).unwrap())
+        };
+
+        let right_plan = {
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("u2", DataType::Int8, false),
+                Field::new("a2", DataType::Int8, false),
+                Field::new("b2", DataType::Int8, false),
+            ]));
+            let batches = build_batches(schema.clone(), &events);
+            Arc::new(MemoryExec::try_new(&[batches], schema.clone(), None).unwrap())
+        };
 
         let s1 = {
+            let left_expr = {
+                let lhs = Column::new("a1");
+                let rhs = Literal::new(ScalarValue::Int8(Some(1)));
+                BinaryExpr::new(Arc::new(lhs), Operator::Eq, Arc::new(rhs))
+            };
+
+            Segment::new(Some(Arc::new(left_expr)), None)
+        };
+
+        let s2 = {
+            let right_expr = {
+                let lhs = Column::new("a2");
+                let rhs = Literal::new(ScalarValue::Int8(Some(1)));
+                let op = BinaryExpr::new(Arc::new(lhs), Operator::Eq, Arc::new(rhs));
+                Count::<Gt>::try_new(&right_plan.schema(), Arc::new(op), 0)?
+            };
+
+            Segment::new(None, Some(Arc::new(right_expr)))
+        };
+
+        let s3 = {
             let left_expr = {
                 let left = Column::new("a1");
                 let right = Literal::new(ScalarValue::Int8(Some(1)));
@@ -558,7 +690,7 @@ mod tests {
             Segment::new(Some(Arc::new(left_expr)), Some(Arc::new(right_expr)))
         };
 
-        let s2 = {
+        let s4 = {
             let left_expr = {
                 let lhs = Column::new("b1");
                 let rhs = Literal::new(ScalarValue::Int8(Some(1)));
@@ -576,32 +708,31 @@ mod tests {
             Segment::new(Some(Arc::new(left_expr)), Some(Arc::new(right_expr)))
         };
 
-        let mut sf = Field::new("segment", DataType::Utf8, false);
-        let schema = Schema::new(vec![
-            Field::new("segment", DataType::Utf8, false),
-            Field::new("u1", DataType::Int32, false),
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("segment", DataType::Int8, false),
+            Field::new("u1", DataType::Int8, false),
             Field::new("a1", DataType::Int8, false),
             Field::new("b1", DataType::Int8, false),
             Field::new("a2", DataType::Int8, false),
             Field::new("b2", DataType::Int8, false),
-        ]);
+        ]));
 
         let join = JoinSegmentExec::try_new(
             left_plan.clone(),
             right_plan.clone(),
-            on,
-            vec![s1, s2],
-            Arc::new(schema),
+            &("u1".to_string(), "u2".to_string()),
+            vec![s1, s2, s3, s4],
+            schema.clone(),
         )?;
-
-        let s1 = right_plan.execute(0).await?;
-        let b1 = common::collect(s1).await?;
-        // println!("{}", arrow::util::pretty::pretty_format_batches(&b1)?);
 
         let stream = join.execute(0).await?;
         let batches = common::collect(stream).await?;
 
-        // println!("{}", arrow::util::pretty::pretty_format_batches(&batches)?);
+        let exp_batches = build_batches(schema.clone(), &exp);
+
+        for (id, batch) in batches.iter().enumerate() {
+            assert_eq!(arrow::util::pretty::pretty_format_batches(&[batches[id].clone()])?,arrow::util::pretty::pretty_format_batches(&[batch.clone()])?);
+        }
         Ok(())
     }
 }
