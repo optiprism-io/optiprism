@@ -1,3 +1,4 @@
+#![allow(warnings)]
 // mod operators;
 mod arrow;
 mod csv;
