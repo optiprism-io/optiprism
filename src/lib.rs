@@ -1,14 +1,16 @@
 #![allow(warnings)]
-// mod operators;
-mod arrow;
-mod csv;
-pub mod expression_tree;
-pub mod physical_plan;
-mod str;
-mod error;
+
+use std::any::Any;
 
 use datafusion::error::Result;
-use std::any::Any;
+
+// mod operators;
+mod csv;
+pub mod segment;
+mod str;
+mod error;
+pub mod utils;
+
 #[macro_use] extern crate enum_dispatch;
 struct V(i8);
 #[tokio::main]
