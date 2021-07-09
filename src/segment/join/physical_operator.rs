@@ -44,7 +44,7 @@ impl Segment {
 }
 
 #[derive(Debug)]
-pub struct JoinSegmentExec {
+pub struct JoinExec {
     segments: Vec<Segment>,
     /// left (build) side
     left: Arc<dyn ExecutionPlan>,
@@ -61,7 +61,7 @@ pub struct JoinSegmentExec {
     target_batch_size: usize,
 }
 
-impl JoinSegmentExec {
+impl JoinExec {
     pub fn try_new(
         left: Arc<dyn ExecutionPlan>,
         right: Arc<dyn ExecutionPlan>,
@@ -91,7 +91,7 @@ impl JoinSegmentExec {
             }
         }
 
-        Ok(JoinSegmentExec {
+        Ok(JoinExec {
             segments,
             left,
             right,
@@ -117,7 +117,7 @@ impl JoinSegmentExec {
 }
 
 #[async_trait]
-impl ExecutionPlan for JoinSegmentExec {
+impl ExecutionPlan for JoinExec {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -136,7 +136,7 @@ impl ExecutionPlan for JoinSegmentExec {
 
     fn with_new_children(&self, children: Vec<Arc<dyn ExecutionPlan>>) -> Result<Arc<dyn ExecutionPlan>> {
         match children.len() {
-            2 => Ok(Arc::new(JoinSegmentExec::try_new(
+            2 => Ok(Arc::new(JoinExec::try_new(
                 children[0].clone(),
                 children[1].clone(),
                 &(self.on_left.clone(), self.on_right.clone()),
@@ -159,19 +159,19 @@ impl ExecutionPlan for JoinSegmentExec {
 
         match left.try_next().await? {
             None => {
-                return Ok(Box::pin(EmptyJoinSegmentStream::new(self.schema.clone())));
+                return Ok(Box::pin(EmptyJoinStream::new(self.schema.clone())));
             }
             Some(b) => {
                 left_batch = Some(b.clone());
 
                 match right.try_next().await? {
-                    None => return Ok(Box::pin(EmptyJoinSegmentStream::new(self.schema.clone()))),
+                    None => return Ok(Box::pin(EmptyJoinStream::new(self.schema.clone()))),
                     Some(b) => right_batch = Some(b.clone()),
                 }
             }
         }
 
-        let mut ret = JoinSegmentStream {
+        let mut ret = JoinStream {
             segments: self.segments.clone(),
             left_expr_result: vec![],
             left_input: left,
@@ -195,23 +195,23 @@ impl ExecutionPlan for JoinSegmentExec {
     }
 }
 
-struct EmptyJoinSegmentStream {
+struct EmptyJoinStream {
     schema: SchemaRef,
 }
 
-impl EmptyJoinSegmentStream {
+impl EmptyJoinStream {
     fn new(schema: SchemaRef) -> Self {
-        EmptyJoinSegmentStream { schema }
+        EmptyJoinStream { schema }
     }
 }
 
-impl RecordBatchStream for EmptyJoinSegmentStream {
+impl RecordBatchStream for EmptyJoinStream {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
 }
 
-impl Stream for EmptyJoinSegmentStream {
+impl Stream for EmptyJoinStream {
     type Item = ArrowResult<RecordBatch>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -219,7 +219,7 @@ impl Stream for EmptyJoinSegmentStream {
     }
 }
 
-struct JoinSegmentStream {
+struct JoinStream {
     segments: Vec<Segment>,
     left_expr_result: Vec<Option<ArrayRef>>,
     left_input: SendableRecordBatchStream,
@@ -239,13 +239,13 @@ struct JoinSegmentStream {
     target_batch_size: usize,
 }
 
-impl RecordBatchStream for JoinSegmentStream {
+impl RecordBatchStream for JoinStream {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
 }
 
-impl JoinSegmentStream {
+impl JoinStream {
     fn evaluate_left_expr(&mut self) -> Result<()> {
         let expr_result = self.segments.iter().map(|s| {
             match &s.left_expr {
@@ -409,7 +409,7 @@ impl OutputBuffer {
     }
 }
 
-impl Stream for JoinSegmentStream {
+impl Stream for JoinStream {
     type Item = ArrowResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -533,7 +533,7 @@ mod tests {
     use datafusion::physical_plan::{ExecutionPlan, common};
     use std::sync::Arc;
     use datafusion::physical_plan::memory::MemoryExec;
-    use crate::segment::join_segment::{JoinSegmentExec, Segment};
+    use crate::segment::join::physical_operator::{JoinExec, Segment};
     use datafusion::physical_plan::expressions::{Column, Literal, BinaryExpr};
     use datafusion::scalar::ScalarValue;
     use datafusion::logical_plan::Operator;
@@ -762,7 +762,7 @@ mod tests {
             Field::new("b2", DataType::Int8, false),
         ]));
 
-        let join = JoinSegmentExec::try_new(
+        let join = JoinExec::try_new(
             left_plan.clone(),
             right_plan.clone(),
             &("u1".to_string(), "u2".to_string()),
