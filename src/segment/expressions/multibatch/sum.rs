@@ -117,7 +117,7 @@ mod tests {
             ],
         )?;
 
-        let left = Column::new("a");
+        let left = Column::new_with_schema("a",&schema).unwrap();
         let right = Literal::new(ScalarValue::Int8(Some(1)));
         let bo = Arc::new(BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right)));
         let op = Sum::<i8, i64, Eq>::try_new(

@@ -459,21 +459,21 @@ mod tests {
             .unwrap())
     }
 
-    fn build_steps() -> (Arc<BinaryExpr>, Arc<BinaryExpr>, Arc<BinaryExpr>) {
+    fn build_steps(schema: &Schema) -> (Arc<BinaryExpr>, Arc<BinaryExpr>, Arc<BinaryExpr>) {
         let step1 = {
-            let left = Column::new("a");
+            let left = Column::new_with_schema("a",schema).unwrap();
             let right = Literal::new(ScalarValue::Int8(Some(1)));
             BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
         };
 
         let step2 = {
-            let left = Column::new("a");
+            let left = Column::new_with_schema("a",schema).unwrap();
             let right = Literal::new(ScalarValue::Int8(Some(2)));
             BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
         };
 
         let step3 = {
-            let left = Column::new("a");
+            let left = Column::new_with_schema("a",schema).unwrap();
             let right = Literal::new(ScalarValue::Int8(Some(3)));
             BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
         };
@@ -497,7 +497,7 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
@@ -522,17 +522,17 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         {
             let exclude1 = {
-                let left = Column::new("a");
+                let left = Column::new_with_schema("a",&schema).unwrap();
                 let right = Literal::new(ScalarValue::Int8(Some(4)));
                 BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
             };
 
             let exclude2 = {
-                let left = Column::new("a");
+                let left = Column::new_with_schema("a",&schema).unwrap();
                 let right = Literal::new(ScalarValue::Int8(Some(5)));
                 BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
             };
@@ -544,13 +544,13 @@ mod tests {
 
         {
             let exclude1 = {
-                let left = Column::new("a");
+                let left = Column::new_with_schema("a",&schema).unwrap();
                 let right = Literal::new(ScalarValue::Int8(Some(4)));
                 BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
             };
 
             let exclude2 = {
-                let left = Column::new("a");
+                let left = Column::new_with_schema("a",&schema).unwrap();
                 let right = Literal::new(ScalarValue::Int8(Some(5)));
                 BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
             };
@@ -564,7 +564,14 @@ mod tests {
 
     #[test]
     fn test_constants() -> Result<()> {
-        let (step1, step2, step3) = build_steps();
+        let schema = Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
+            Field::new("b", DataType::Int8, false),
+            Field::new("c", DataType::Int8, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Second, None), false),
+        ]);
+
+        let (step1, step2, step3) = build_steps(&schema);
 
         {
             let (schema, batch) = build_table(("a", &vec![1, 2, 3]), ("b", &vec![1, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
@@ -635,7 +642,7 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(1), vec![step1.clone(), step2.clone(), step3.clone()])?;
         assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
@@ -659,7 +666,7 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(4), vec![step1.clone(), step2.clone(), step3.clone()])?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
@@ -683,7 +690,7 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(1), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(2)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
@@ -707,7 +714,7 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(2)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
@@ -731,7 +738,7 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(1)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
@@ -755,7 +762,7 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(0)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
@@ -779,7 +786,7 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_any_step();
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
@@ -803,7 +810,7 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
@@ -827,7 +834,7 @@ mod tests {
             ],
         )?;
 
-        let (step1, step2, step3) = build_steps();
+        let (step1, step2, step3) = build_steps(&schema);
 
         let op = Sequence::try_new(schema, "ts", Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
         assert_eq!(false, op.evaluate(vec![batch].as_slice())?);

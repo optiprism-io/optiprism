@@ -4,13 +4,12 @@ use arrow::datatypes::{SchemaRef, Schema, Field, DataType};
 use std::any::Any;
 use async_trait::async_trait;
 use datafusion::error::{DataFusionError, Result};
-use datafusion::physical_plan::merge::MergeExec;
 use futures::{Stream, StreamExt, TryStreamExt, TryStream};
 use std::task::{Context, Poll};
 use std::pin::Pin;
 use arrow::record_batch::RecordBatch;
 use arrow::error::{Result as ArrowResult, ArrowError};
-use datafusion::physical_plan::expressions::col;
+use datafusion::physical_plan::expressions::{col, Column};
 use arrow::array::{ArrayRef, Int8Array, Array, DynComparator, BooleanArray, StringArray, MutableArrayData, build_compare};
 use crate::utils::into_array;
 use datafusion::logical_plan::Operator;
@@ -182,6 +181,8 @@ impl ExecutionPlan for JoinExec {
             right_idx: 0,
             on_left: self.on_left.clone(),
             on_right: self.on_right.clone(),
+            left_col_expr: Arc::new(Column::new_with_schema(&self.on_left, &self.left.schema())?),
+            right_col_expr: Arc::new(Column::new_with_schema(&self.on_right, &self.right.schema())?),
             take_left_cols: self.take_left_cols.clone(),
             take_right_cols: self.take_right_cols.clone(),
             schema: self.schema.clone(),
@@ -230,6 +231,8 @@ struct JoinStream {
     right_idx: usize,
     on_left: String,
     on_right: String,
+    left_col_expr: Arc<dyn PhysicalExpr>,
+    right_col_expr: Arc<dyn PhysicalExpr>,
     /// The schema once the join is applied
     take_left_cols: Option<Vec<usize>>,
     take_right_cols: Option<Vec<usize>>,
@@ -418,8 +421,8 @@ impl Stream for JoinStream {
 
 
         loop {
-            let mut left_cmp_col = into_array(col(&self.on_left).evaluate(&self.left_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
-            let mut right_cmp_col = into_array(col(&self.on_right).evaluate(&self.right_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
+            let mut left_cmp_col = into_array(self.left_col_expr.evaluate(&self.left_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
+            let mut right_cmp_col = into_array(self.right_col_expr.evaluate(&self.right_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
             let mut cmp = match build_compare(left_cmp_col.as_ref(), right_cmp_col.as_ref()) {
                 Ok(a) => a,
                 Err(err) => return Poll::Ready(Some(Err(err))),
@@ -534,7 +537,7 @@ mod tests {
     use std::sync::Arc;
     use datafusion::physical_plan::memory::MemoryExec;
     use crate::segment::join::physical_operator::{JoinExec, Segment};
-    use datafusion::physical_plan::expressions::{Column, Literal, BinaryExpr};
+    use datafusion::physical_plan::expressions::{Column, Literal, BinaryExpr, col};
     use datafusion::scalar::ScalarValue;
     use datafusion::logical_plan::Operator;
     use crate::segment::expressions::multibatch::count::Count;
@@ -563,9 +566,6 @@ mod tests {
         }
         batches
     }
-
-    #[test]
-    fn shrink_buffers() {}
 
     #[tokio::test]
     async fn test() -> Result<()> {
@@ -698,7 +698,7 @@ mod tests {
 
         let s1 = {
             let left_expr = {
-                let lhs = Column::new("a1");
+                let lhs = Column::new_with_schema("a1", &left_plan.schema())?;
                 let rhs = Literal::new(ScalarValue::Int8(Some(1)));
                 BinaryExpr::new(Arc::new(lhs), Operator::Eq, Arc::new(rhs))
             };
@@ -708,7 +708,7 @@ mod tests {
 
         let s2 = {
             let right_expr = {
-                let lhs = Column::new("a2");
+                let lhs = Column::new_with_schema("a2", &right_plan.schema())?;
                 let rhs = Literal::new(ScalarValue::Int8(Some(1)));
                 let op = BinaryExpr::new(Arc::new(lhs), Operator::Eq, Arc::new(rhs));
                 Count::<Gt>::try_new(&right_plan.schema(), Arc::new(op), 0)?
@@ -719,13 +719,13 @@ mod tests {
 
         let s3 = {
             let left_expr = {
-                let left = Column::new("a1");
+                let left = Column::new_with_schema("a1", &left_plan.schema())?;
                 let right = Literal::new(ScalarValue::Int8(Some(1)));
                 BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
             };
 
             let right_expr = {
-                let lhs = Column::new("a2");
+                let lhs = Column::new_with_schema("a2", &right_plan.schema())?;
                 let rhs = Literal::new(ScalarValue::Int8(Some(1)));
                 let op = BinaryExpr::new(Arc::new(lhs), Operator::Eq, Arc::new(rhs));
                 Count::<Gt>::try_new(&right_plan.schema(), Arc::new(op), 0)?
@@ -737,13 +737,13 @@ mod tests {
 
         let s4 = {
             let left_expr = {
-                let lhs = Column::new("b1");
+                let lhs = Column::new_with_schema("b1", &left_plan.schema())?;
                 let rhs = Literal::new(ScalarValue::Int8(Some(1)));
                 BinaryExpr::new(Arc::new(lhs), Operator::Eq, Arc::new(rhs))
             };
 
             let right_expr = {
-                let lhs = Column::new("b2");
+                let lhs = Column::new_with_schema("b2", &right_plan.schema())?;
                 let rhs = Literal::new(ScalarValue::Int8(Some(1)));
                 let op = BinaryExpr::new(Arc::new(lhs), Operator::Eq, Arc::new(rhs));
                 Count::<Gt>::try_new(&right_plan.schema(), Arc::new(op), 0)?

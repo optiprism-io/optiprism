@@ -61,7 +61,7 @@ mod tests {
             ],
         )?;
 
-        let left = Column::new("a");
+        let left = Column::new_with_schema("a", &schema)?;
         let right = Literal::new(ScalarValue::Int8(Some(1)));
         let bo = BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right));
         let c = Count::new(Arc::new(bo));
