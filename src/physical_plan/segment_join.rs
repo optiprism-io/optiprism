@@ -25,12 +25,12 @@ use std::cmp::Ordering;
 use datafusion::physical_plan::common;
 use std::cell::RefCell;
 
-pub type JoinOn = (String, String);
+pub type JoinOn = (Column, Column);
 
 #[derive(Debug, Clone)]
 pub struct Segment {
-    left_expr: Option<Arc<dyn PhysicalExpr>>,
-    right_expr: Option<Arc<dyn Expr>>,
+    pub left_expr: Option<Arc<dyn PhysicalExpr>>,
+    pub right_expr: Option<Arc<dyn Expr>>,
 }
 
 impl Segment {
@@ -50,8 +50,7 @@ pub struct JoinExec {
     /// right (probe) side which are filtered by the Merge Sort
     right: Arc<dyn ExecutionPlan>,
     /// pair of common columns used to join on
-    on_left: String,
-    on_right: String,
+    on: JoinOn,
     /// The schema once the join is applied
     take_left_cols: Option<Vec<usize>>,
     take_right_cols: Option<Vec<usize>>,
@@ -64,7 +63,7 @@ impl JoinExec {
     pub fn try_new(
         left: Arc<dyn ExecutionPlan>,
         right: Arc<dyn ExecutionPlan>,
-        on: &JoinOn,
+        on: JoinOn,
         segments: Vec<Segment>,
         schema: SchemaRef,
         target_batch_size: usize,
@@ -94,8 +93,7 @@ impl JoinExec {
             segments,
             left,
             right,
-            on_left: on.0.to_owned(),
-            on_right: on.1.to_owned(),
+            on: on.clone(),
             take_left_cols: if take_left_cols.is_empty() { None } else { Some(take_left_cols) },
             take_right_cols: if take_right_cols.is_empty() { None } else { Some(take_right_cols) },
             schema: schema.clone(),
@@ -138,7 +136,7 @@ impl ExecutionPlan for JoinExec {
             2 => Ok(Arc::new(JoinExec::try_new(
                 children[0].clone(),
                 children[1].clone(),
-                &(self.on_left.clone(), self.on_right.clone()),
+                self.on.clone(),
                 self.segments.clone(),
                 self.schema.clone(),
                 self.target_batch_size,
@@ -179,10 +177,7 @@ impl ExecutionPlan for JoinExec {
             right_input: right,
             right_batch: right_batch.clone().unwrap(),
             right_idx: 0,
-            on_left: self.on_left.clone(),
-            on_right: self.on_right.clone(),
-            left_col_expr: Arc::new(Column::new_with_schema(&self.on_left, &self.left.schema())?),
-            right_col_expr: Arc::new(Column::new_with_schema(&self.on_right, &self.right.schema())?),
+            on: self.on.clone(),
             take_left_cols: self.take_left_cols.clone(),
             take_right_cols: self.take_right_cols.clone(),
             schema: self.schema.clone(),
@@ -229,10 +224,7 @@ struct JoinStream {
     right_input: SendableRecordBatchStream,
     right_batch: RecordBatch,
     right_idx: usize,
-    on_left: String,
-    on_right: String,
-    left_col_expr: Arc<dyn PhysicalExpr>,
-    right_col_expr: Arc<dyn PhysicalExpr>,
+    on: JoinOn,
     /// The schema once the join is applied
     take_left_cols: Option<Vec<usize>>,
     take_right_cols: Option<Vec<usize>>,
@@ -421,8 +413,8 @@ impl Stream for JoinStream {
 
 
         loop {
-            let mut left_cmp_col = into_array(self.left_col_expr.evaluate(&self.left_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
-            let mut right_cmp_col = into_array(self.right_col_expr.evaluate(&self.right_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
+            let mut left_cmp_col = into_array(self.on.0.evaluate(&self.left_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
+            let mut right_cmp_col = into_array(self.on.1.evaluate(&self.right_batch).or_else(|e| Err(e.into_arrow_external_error()))?);
             let mut cmp = match build_compare(left_cmp_col.as_ref(), right_cmp_col.as_ref()) {
                 Ok(a) => a,
                 Err(err) => return Poll::Ready(Some(Err(err))),
@@ -536,7 +528,7 @@ mod tests {
     use datafusion::physical_plan::{ExecutionPlan, common};
     use std::sync::Arc;
     use datafusion::physical_plan::memory::MemoryExec;
-    use crate::segment::join::physical_operator::{JoinExec, Segment};
+    use crate::physical_plan::segment_join::{JoinExec, Segment};
     use datafusion::physical_plan::expressions::{Column, Literal, BinaryExpr, col};
     use datafusion::scalar::ScalarValue;
     use datafusion::logical_plan::Operator;
@@ -765,7 +757,7 @@ mod tests {
         let join = JoinExec::try_new(
             left_plan.clone(),
             right_plan.clone(),
-            &("u1".to_string(), "u2".to_string()),
+            (Column::new_with_schema("u1", &left_plan.schema())?, Column::new_with_schema("u2", &right_plan.schema())?),
             vec![s1, s2, s3, s4],
             schema.clone(),
             2,
