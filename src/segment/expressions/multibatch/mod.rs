@@ -3,4 +3,4 @@ pub mod count;
 mod test_value;
 pub mod sum;
 pub mod sequence;
-mod binary_op;
+pub mod binary_op;

@@ -13,7 +13,6 @@ use crate::segment::expressions::boolean_op::BooleanOp;
 use crate::segment::expressions::utils::{break_on_true, break_on_false};
 use datafusion::error::{DataFusionError, Result as DatafusionResult};
 use arrow::datatypes::{SchemaRef, DataType, Schema};
-use crate::segment::expressions::multibatch::binary_op::BinaryOp;
 
 #[derive(Debug)]
 pub struct Count<Op> {

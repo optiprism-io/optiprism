@@ -55,7 +55,7 @@ pub struct JoinExec {
     take_left_cols: Option<Vec<usize>>,
     take_right_cols: Option<Vec<usize>>,
     schema: SchemaRef,
-    segment_names: bool,
+    segment_col: bool,
     target_batch_size: usize,
 }
 
@@ -97,7 +97,7 @@ impl JoinExec {
             take_left_cols: if take_left_cols.is_empty() { None } else { Some(take_left_cols) },
             take_right_cols: if take_right_cols.is_empty() { None } else { Some(take_right_cols) },
             schema: schema.clone(),
-            segment_names: schema.fields()[0].name().eq("segment"),
+            segment_col: schema.fields()[0].name().eq("segment"),
             target_batch_size,
         })
     }
@@ -181,7 +181,7 @@ impl ExecutionPlan for JoinExec {
             take_left_cols: self.take_left_cols.clone(),
             take_right_cols: self.take_right_cols.clone(),
             schema: self.schema.clone(),
-            segment_names: self.segment_names,
+            segment_names: self.segment_col,
             target_batch_size: self.target_batch_size,
         };
 
@@ -531,7 +531,7 @@ mod tests {
     use crate::physical_plan::segment_join::{JoinExec, Segment};
     use datafusion::physical_plan::expressions::{Column, Literal, BinaryExpr, col};
     use datafusion::scalar::ScalarValue;
-    use datafusion::logical_plan::Operator;
+    use datafusion::logical_plan::{Operator, LogicalPlan, LogicalPlanBuilder, Column as LogicalColumn, DFSchema};
     use crate::segment::expressions::multibatch::count::Count;
     use crate::segment::expressions::boolean_op::Gt;
     use arrow::record_batch::RecordBatch;
@@ -539,6 +539,12 @@ mod tests {
     use arrow::ipc::BoolArgs;
     use arrow::array::{BooleanArray, Int32Array, Int8Array, ArrayRef};
     use std::collections::BTreeMap;
+    use crate::execution::context::make_context;
+    use datafusion::datasource::MemTable;
+    use crate::logical_plan::segment_join::{SegmentExpr, JoinPlanNode, Segment as LogicalSegment};
+    use std::convert::TryInto;
+    use std::convert::TryFrom;
+    use datafusion::logical_plan::Expr as LogicalExpr;
 
     pub fn build_batches(schema: SchemaRef, input: &Vec<Vec<Vec<i8>>>) -> Vec<RecordBatch> {
         let mut batches: Vec<RecordBatch> = vec![];
@@ -559,20 +565,19 @@ mod tests {
         batches
     }
 
-    #[tokio::test]
-    async fn test() -> Result<()> {
-        /*
-            +----+----+----+----+----+--------+
-            | a1 | b1 | u2 | a2 | b2 |        |
-            +----+----+----+----+----+--------+
-            | 1  |    |    |    |    | 1      |
-            |    |    |    | 1  |    | 2      |
-            | 1  |    |    | 1  |    | 1, 2, 3|
-            |    | 1  |    |    | 1  | 4      |
-            +----+----+----+----+----+--------+
-         */
+    /*
+          +----+----+----+----+----+--------+
+          | a1 | b1 | u2 | a2 | b2 |        |
+          +----+----+----+----+----+--------+
+          | 1  |    |    |    |    | 1      |
+          |    |    |    | 1  |    | 2      |
+          | 1  |    |    | 1  |    | 1, 2, 3|
+          |    | 1  |    |    | 1  | 4      |
+          +----+----+----+----+----+--------+
+       */
 
-        let users: Vec<Vec<Vec<i8>>> = vec![
+    pub fn users() -> Vec<Vec<Vec<i8>>> {
+        vec![
             //       u1 a1 b1
             vec![
                 vec![1, 1, 1],
@@ -590,9 +595,11 @@ mod tests {
                 vec![8, 0, 1],
                 vec![9, 1, 1],
             ]
-        ];
+        ]
+    }
 
-        let events: Vec<Vec<Vec<i8>>> = vec![
+    pub fn events() -> Vec<Vec<Vec<i8>>> {
+        vec![
             //        u2 a2 b2
             vec![
                 vec![2, 1, 1],
@@ -626,9 +633,11 @@ mod tests {
             vec![
                 vec![9, 1, 1],
             ],
-        ];
+        ]
+    }
 
-        let exp: Vec<Vec<Vec<i8>>> = vec![
+    pub fn exp() -> Vec<Vec<Vec<i8>>> {
+        vec![
             //       s  u1 a1 b1 a2 b2
             vec![
                 vec![0, 4, 1, 0, 0, 0],
@@ -666,15 +675,18 @@ mod tests {
                 vec![3, 9, 1, 1, 0, 1],
                 vec![3, 9, 1, 1, 1, 1],
             ],
-        ];
+        ]
+    }
 
+    #[tokio::test]
+    async fn test_exec() -> Result<()> {
         let left_plan = {
             let schema = Arc::new(Schema::new(vec![
                 Field::new("u1", DataType::Int8, false),
                 Field::new("a1", DataType::Int8, false),
                 Field::new("b1", DataType::Int8, false),
             ]));
-            let batches = build_batches(schema.clone(), &users);
+            let batches = build_batches(schema.clone(), &users());
             Arc::new(MemoryExec::try_new(&[batches], schema.clone(), None).unwrap())
         };
 
@@ -684,7 +696,7 @@ mod tests {
                 Field::new("a2", DataType::Int8, false),
                 Field::new("b2", DataType::Int8, false),
             ]));
-            let batches = build_batches(schema.clone(), &events);
+            let batches = build_batches(schema.clone(), &events());
             Arc::new(MemoryExec::try_new(&[batches], schema.clone(), None).unwrap())
         };
 
@@ -766,7 +778,7 @@ mod tests {
         let stream = join.execute(0).await?;
         let batches = common::collect(stream).await?;
 
-        let exp_batches = build_batches(schema.clone(), &exp);
+        let exp_batches = build_batches(schema.clone(), &exp());
 
         assert_eq!(exp_batches.len(), batches.len());
 
@@ -776,6 +788,138 @@ mod tests {
                 arrow::util::pretty::pretty_format_batches(&[batch.clone()])?,
             );
         }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_plan() -> Result<()> {
+        let mut ctx = make_context();
+
+        let left_plan = {
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("u1", DataType::Int8, false),
+                Field::new("a1", DataType::Int8, false),
+                Field::new("b1", DataType::Int8, false),
+            ]));
+            let batches = build_batches(schema.clone(), &users());
+            Arc::new(LogicalPlanBuilder::scan_memory(vec![batches], schema.clone(), None)?.build()?)
+        };
+
+        let right_plan = {
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("u2", DataType::Int8, false),
+                Field::new("a2", DataType::Int8, false),
+                Field::new("b2", DataType::Int8, false),
+            ]));
+            let batches = build_batches(schema.clone(), &events());
+            Arc::new(LogicalPlanBuilder::scan_memory(vec![batches], schema.clone(), None)?.build()?)
+        };
+
+        let schema = Schema::new(vec![
+            Field::new("segment", DataType::Int8, false),
+            Field::new("u1", DataType::Int8, false),
+            Field::new("a1", DataType::Int8, false),
+            Field::new("b1", DataType::Int8, false),
+            Field::new("a2", DataType::Int8, false),
+            Field::new("b2", DataType::Int8, false),
+        ]);
+
+        let s1 = {
+            let left_expr = {
+                LogicalExpr::BinaryExpr {
+                    left: Box::new(LogicalExpr::Column(LogicalColumn::from_qualified_name("a1"))),
+                    op: Operator::Eq,
+                    right: Box::new(LogicalExpr::Literal(ScalarValue::Int8(Some(1)))),
+                }
+            };
+
+            LogicalSegment::new(Some(left_expr), None)
+        };
+
+        let s2 = {
+            let right_expr = {
+                let p = LogicalExpr::BinaryExpr {
+                    left: Box::new(LogicalExpr::Column(LogicalColumn::from_qualified_name("a2"))),
+                    op: Operator::Eq,
+                    right: Box::new(LogicalExpr::Literal(ScalarValue::Int8(Some(1)))),
+                };
+
+                SegmentExpr::Count {
+                    predicate: Box::new(p),
+                    op: Operator::Gt,
+                    right: 0,
+                }
+            };
+
+            LogicalSegment::new(None, Some(right_expr))
+        };
+
+        let s3 = {
+            let left_expr = {
+                LogicalExpr::BinaryExpr {
+                    left: Box::new(LogicalExpr::Column(LogicalColumn::from_qualified_name("a1"))),
+                    op: Operator::Eq,
+                    right: Box::new(LogicalExpr::Literal(ScalarValue::Int8(Some(1)))),
+                }
+            };
+
+            let right_expr = {
+                let p = LogicalExpr::BinaryExpr {
+                    left: Box::new(LogicalExpr::Column(LogicalColumn::from_qualified_name("a2"))),
+                    op: Operator::Eq,
+                    right: Box::new(LogicalExpr::Literal(ScalarValue::Int8(Some(1)))),
+                };
+
+                SegmentExpr::Count {
+                    predicate: Box::new(p),
+                    op: Operator::Gt,
+                    right: 0,
+                }
+            };
+
+            LogicalSegment::new(Some(left_expr), Some(right_expr))
+        };
+
+        let s4 = {
+            let left_expr = {
+                LogicalExpr::BinaryExpr {
+                    left: Box::new(LogicalExpr::Column(LogicalColumn::from_qualified_name("b1"))),
+                    op: Operator::Eq,
+                    right: Box::new(LogicalExpr::Literal(ScalarValue::Int8(Some(1)))),
+                }
+            };
+
+            let right_expr = {
+                let p = LogicalExpr::BinaryExpr {
+                    left: Box::new(LogicalExpr::Column(LogicalColumn::from_qualified_name("b2"))),
+                    op: Operator::Eq,
+                    right: Box::new(LogicalExpr::Literal(ScalarValue::Int8(Some(1)))),
+                };
+
+                SegmentExpr::Count {
+                    predicate: Box::new(p),
+                    op: Operator::Gt,
+                    right: 0,
+                }
+            };
+
+            LogicalSegment::new(Some(left_expr), Some(right_expr))
+        };
+
+        let join_node = JoinPlanNode::try_new(
+            left_plan.clone(),
+            right_plan.clone(),
+            (LogicalColumn::from_qualified_name("u1"), LogicalColumn::from_qualified_name("u2")),
+            vec![s1, s2, s3, s4],
+            Arc::new(DFSchema::try_from(schema.clone())?),
+            2,
+        )?;
+
+        let join = LogicalPlan::Extension {
+            node: Arc::new(join_node.clone())
+        };
+
+        println!("{:?}", join_node.clone());
         Ok(())
     }
 }

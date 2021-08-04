@@ -5,16 +5,17 @@ use arrow::record_batch::RecordBatch;
 use arrow::array::ArrayRef;
 use datafusion::error::{Result as DatafusionResult};
 use crate::segment::expressions::boolean_op::BooleanOp;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct BinaryOp<Op> {
-    left: Box<dyn Expr>,
+    left: Arc<dyn Expr>,
     op: PhantomData<Op>,
-    right: Box<dyn Expr>,
+    right: Arc<dyn Expr>,
 }
 
 impl<Op> BinaryOp<Op> {
-    pub fn new(left: Box<dyn Expr>, right: Box<dyn Expr>) -> Self {
+    pub fn new(left: Arc<dyn Expr>, right: Arc<dyn Expr>) -> Self {
         BinaryOp {
             left,
             op: PhantomData,
@@ -52,8 +53,8 @@ mod tests {
     #[test]
     fn test() -> Result<()> {
         let op1 = BinaryOp::<Eq>::new(
-            Box::new(True::new()),
-            Box::new(True::new()),
+            Arc::new(True::new()),
+            Arc::new(True::new()),
         );
 
         let schema = Arc::new(Schema::new(vec![
@@ -69,8 +70,8 @@ mod tests {
         assert_eq!(true, op1.evaluate(vec![batch.clone()].as_slice())?);
 
         let op2 = BinaryOp::<Eq>::new(
-            Box::new(True::new()),
-            Box::new(False::new()),
+            Arc::new(True::new()),
+            Arc::new(False::new()),
         );
 
         assert_eq!(false, op2.evaluate(vec![batch.clone()].as_slice())?);

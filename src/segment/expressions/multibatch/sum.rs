@@ -13,19 +13,21 @@ use std::marker::PhantomData;
 use datafusion::error::{DataFusionError, Result as DatafusionResult};
 use arrow::datatypes::{DataType, Schema};
 use crate::segment::expressions::boolean_op::BooleanOp;
+use datafusion::physical_plan::expressions::Column;
+use datafusion::logical_plan::ToDFSchema;
 
 #[derive(Debug)]
 pub struct Sum<L, R, Op> {
     predicate: Arc<dyn PhysicalExpr>,
     lt: PhantomData<L>,
-    left_col_id: usize,
+    left_col: Column,
     op: PhantomData<Op>,
     right: R,
 }
 
 impl<L, R, Op> Sum<L, R, Op> {
-    pub fn try_new(schema: &Schema, left_col: &str, predicate: Arc<dyn PhysicalExpr>, right: R) -> DatafusionResult<Self> {
-        let (left_col_id, left_field) = schema.column_with_name(left_col).ok_or_else(|| DataFusionError::Plan(format!("Column {} not found", left_col)))?;
+    pub fn try_new(schema: &Schema, left_col: Column, predicate: Arc<dyn PhysicalExpr>, right: R) -> DatafusionResult<Self> {
+        let (left_field) = schema.field_with_name(left_col.name())?;
         match left_field.data_type() {
             DataType::Int8 => {}
             other => return Err(DataFusionError::Plan(format!(
@@ -38,7 +40,7 @@ impl<L, R, Op> Sum<L, R, Op> {
             DataType::Boolean => Ok(Sum {
                 predicate,
                 lt: PhantomData,
-                left_col_id,
+                left_col: left_col.clone(),
                 op: PhantomData,
                 right,
             }),
@@ -58,7 +60,8 @@ impl<Op> Expr for Sum<i8, i64, Op> where Op: BooleanOp<i64> {
         for batch in batches.iter() {
             let ar = into_array(self.predicate.evaluate(batch).unwrap());
             let b = ar.as_any().downcast_ref::<BooleanArray>().ok_or_else(|| DataFusionError::Internal("failed to downcast to BooleanArray".to_string()))?;
-            let v = batch.columns()[self.left_col_id].as_any().downcast_ref::<Int8Array>().ok_or_else(|| DataFusionError::Internal("failed to downcast to Int8Array".to_string()))?;
+            let v = into_array(self.left_col.evaluate(&batch).or_else(|e| Err(e.into_arrow_external_error()))?);
+            let v = v.as_any().downcast_ref::<Int8Array>().ok_or_else(|| DataFusionError::Internal("failed to downcast to Int8Array".to_string()))?;
             acc += b
                 .iter()
                 .enumerate()
@@ -117,12 +120,12 @@ mod tests {
             ],
         )?;
 
-        let left = Column::new_with_schema("a",&schema).unwrap();
+        let left = Column::new_with_schema("a", &schema).unwrap();
         let right = Literal::new(ScalarValue::Int8(Some(1)));
         let bo = Arc::new(BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right)));
         let op = Sum::<i8, i64, Eq>::try_new(
             &schema,
-            "b",
+            Column::new_with_schema("b", &schema)?,
             bo.clone(),
             254,
         )?;
