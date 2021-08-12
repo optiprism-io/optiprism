@@ -51,9 +51,9 @@ impl fmt::Debug for SegmentExpr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             SegmentExpr::BinaryOp { left, op, right } =>
-                write!(f, "{:?} {:?} {:?}", left, op, right),
+                write!(f, "{:?} {} {:?}", left, op, right),
             SegmentExpr::Count { predicate, op, right } =>
-                write!(f, "COUNT() {:?} {} WHERE {:?}", predicate, op, right),
+                write!(f, "COUNT() {} {:?} WHERE {:?}", op, right, predicate),
             SegmentExpr::Sum { predicate, left, op, right } =>
                 write!(f, "SUM({:?}) {:?} {} WHERE {:?}", left, op, right, predicate),
             SegmentExpr::Sequence {
@@ -185,13 +185,13 @@ impl UserDefinedLogicalNode for JoinPlanNode {
     }
 
     fn fmt_for_explain(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "SegmentJoin: {} = {}", self.on.0.name, self.on.1.name)?;
+        writeln!(f, "SegmentJoin: {} = {}", self.on.0.name, self.on.1.name)?;
         for (id, segment) in self.segments.iter().enumerate() {
             if let Some(expr) = &segment.left_expr {
-                write!(f, " #{:?} left: ", expr)?;
+                writeln!(f, " #{} left: {:?}", id, expr)?;
             }
             if let Some(expr) = &segment.right_expr {
-                write!(f, " #{:?} right: ", expr)?;
+                writeln!(f, " #{} right: {:?}", id, expr)?;
             }
         }
         Ok(())

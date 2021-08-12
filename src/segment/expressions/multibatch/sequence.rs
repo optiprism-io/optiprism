@@ -297,11 +297,16 @@ impl Expr for Sequence {
         // downcast timestamp column
 
 
-        let mut ts_col_tmp = batches.iter().map(|batch| {
-            Ok(into_array(self.ts_col.evaluate(batch)?))
-        }).collect::<DatafusionResult<Vec<Arc<dyn Array>>>>()?;
+        let mut ts_col_tmp = batches
+            .iter()
+            .map(|batch| {
+                Ok(into_array(self.ts_col.evaluate(batch)?))
+            }).collect::<DatafusionResult<Vec<Arc<dyn Array>>>>()?;
 
-        let ts_col: Vec<Arc<&TimestampSecondArray>> = ts_col_tmp.iter().map(|a| Arc::new(a.as_any().downcast_ref::<TimestampSecondArray>().unwrap())).collect();
+        let ts_col: Vec<Arc<&TimestampSecondArray>> = ts_col_tmp.
+            iter().
+            map(|a| Arc::new(a.as_any().downcast_ref::<TimestampSecondArray>().unwrap()))
+            .collect();
 
         // current step id
         let mut step_id: usize = 0;
