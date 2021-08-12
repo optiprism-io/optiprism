@@ -16,7 +16,7 @@ struct User {
     password_hash: String,
 }
 
-struct UserWithPermissions {
+struct UserPermissions {
     user_id: u64,
     roles: Vec<Role>,
     permissions: Vec<Permission>,
@@ -52,7 +52,7 @@ struct Project {
     id: u64,
     name: String,
     description: String,
-    users: Vec<UserWithPermissions>,
+    users: Vec<UserPermissions>,
 }
 
 trait ProjectProvider {
@@ -64,7 +64,7 @@ trait ProjectProvider {
 }
 
 struct Organization {
-    users: Vec<UserWithPermissions>,
+    users: Vec<UserPermissions>,
     projects: Vec<u64>,
     teams: Vec<u64>,
 }
