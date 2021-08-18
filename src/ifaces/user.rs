@@ -16,7 +16,7 @@ pub struct User {
 }
 
 trait UserProvider {
-    fn map_to_internal_id(&mut self, id: String) -> Result<u64>;
+    fn u(&mut self, id: String) -> Result<u64>;
     fn map_from_internal_id(&mut self, id: u64) -> Result<String>;
     fn get_user_by_id(&mut self, id: u64) -> Result<User>;
     fn create_user(&mut self, user: &User) -> Result<User>;

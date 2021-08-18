@@ -11,5 +11,5 @@ struct Geo {
 }
 
 trait GeoProvider {
-    fn parse_ip(&self, ip: IpAddr) -> Result<Geo>;
+    fn lookup(&self, ip: IpAddr) -> Result<Geo>;
 }
