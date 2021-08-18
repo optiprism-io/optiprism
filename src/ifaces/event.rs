@@ -8,7 +8,7 @@ struct Property {
 }
 
 pub struct Event {
-    id: u64,
+    typ: u64,
     created_at: Date<Utc>,
     user_id: u64,
     device_id: Option<u64>,
