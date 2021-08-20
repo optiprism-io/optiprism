@@ -30,6 +30,8 @@ pub struct UserProperty {
     name: String,
     typ: DataType,
     nullable: bool,
+    is_dictionary: bool,
+    dictionary_type: Option<DataType>,
 }
 
 pub enum EventStatus {
@@ -48,6 +50,8 @@ pub struct EventProperty {
     name: String,
     typ: DataType,
     nullable: bool,
+    is_dictionary: bool,
+    dictionary_type: Option<DataType>,
 }
 
 pub struct Event {
