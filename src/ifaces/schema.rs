@@ -22,6 +22,7 @@ pub struct User {
 
 pub struct UserProperty {
     id: u64,
+    schema_id: u64,
     created_at: Date<Utc>,
     updated_at: Option<Date<Utc>>,
     created_by: u64,
