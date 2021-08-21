@@ -3,6 +3,7 @@ use chrono::{Date, Utc};
 
 mod event_segmentation;
 mod segment;
+mod funnel;
 
 use arrow::datatypes::DataType;
 use crate::ifaces::query::event_segmentation::EventSegmentation;
@@ -38,32 +39,12 @@ pub struct PropertyOpValue {
     value: PropertyValue,
 }
 
-pub enum Property {
-    User(String),
-    // string - имя свойства
-    Event(String),
-}
 
 pub struct Event {
     name: String,
     properties: Vec<PropertyOpValue>,
 }
 
-pub enum Expr {
-    Count(Property),
-    DistinctCount(Property),
-    Sum(Property),
-    Avg(Property),
-    Mul {
-        left: Box<Expr>,
-        right: Box<Expr>,
-    },
-    Div {
-        left: Box<Expr>,
-        right: Box<Expr>,
-    },
-    Lit(ScalarValue),
-}
 
 pub enum Order {
     Property(Property),
