@@ -1,7 +1,8 @@
 use datafusion::scalar::ScalarValue;
 use chrono::{Date, Utc};
-use super::{Operator, Event, Order, OrderDirection, TimeRange, TimeBucket};
-use super::segment::Segment;
+use super::{Operator, Event, TimeRange, TimeGroup};
+use super::user_segment::UserSegment;
+use crate::ifaces::query::Property;
 
 
 pub enum Expr {
@@ -20,32 +21,27 @@ pub enum Expr {
     Lit(ScalarValue),
 }
 
-
-pub enum Property {
-    User {
-        property_name: String,
-    },
-    Event {
-        event_name: String,
-        property_name: String,
-    },
-}
-
 enum Group {
-    EventName(String),
-    Property {
-        event_name: String,
-        property: Property,
-    },
+    Property(Property),
+    UserSegment(UserSegment),
 }
 
-pub struct EventSegmentation {
+pub enum Order {
+    Property(Property),
+    Expr(Expr),
+}
+
+pub enum OrderDirection {
+    Asc,
+    Desc,
+}
+
+pub struct EventSegmentationRequest {
     events: Vec<Event>,
     group_by: Vec<Group>,
     aggregate_by: Vec<Expr>,
-    order_by: Vec<(Order, OrderDirection)>,
-    segments: Vec<Segment>,
+    order_by: Option<Vec<(Order, OrderDirection)>>,
+    user_segments: Option<Vec<UserSegment>>,
     time_range: TimeRange,
-    group_by_time: TimeBucket,
+    group_by_time: TimeGroup,
 }
-

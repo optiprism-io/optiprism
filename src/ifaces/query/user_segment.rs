@@ -29,7 +29,7 @@ pub enum With {
         op: Operator,
         value: usize,
     },
-    Sequence {
+    Funnel {
         window: Duration,
         steps: Vec<Event>,
         exclude: Option<Vec<(Event, Vec<usize>)>>,
@@ -80,6 +80,6 @@ pub enum Condition {
     AndNot(Vec<Action>),
 }
 
-pub struct Segment {
+pub struct UserSegment {
     conditions: Vec<Condition>,
 }

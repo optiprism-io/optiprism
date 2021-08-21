@@ -7,4 +7,4 @@ pub mod user;
 mod ingest;
 mod auth;
 mod org;
-mod query;
+pub mod query;

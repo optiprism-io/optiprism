@@ -2,7 +2,7 @@ use datafusion::scalar::ScalarValue;
 use chrono::{Date, Utc};
 
 mod event_segmentation;
-mod segment;
+mod user_segment;
 mod funnel;
 
 use arrow::datatypes::DataType;
@@ -27,6 +27,17 @@ pub enum PropertyValue {
     OneOf(Vec<ScalarValue>),
 }
 
+pub enum Property {
+    User {
+        property_name: String,
+    },
+    Event {
+        event_name: String,
+        property_name: String,
+    },
+}
+
+
 pub enum PropertyScope {
     User,
     Event,
@@ -46,17 +57,7 @@ pub struct Event {
 }
 
 
-pub enum Order {
-    Property(Property),
-    Expr(Expr),
-}
-
-pub enum OrderDirection {
-    Asc,
-    Desc,
-}
-
-pub enum TimeBucket {
+pub enum TimeGroup {
     Hourly,
     Daily,
     Weekly,
