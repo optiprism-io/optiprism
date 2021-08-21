@@ -1,44 +1,16 @@
 use datafusion::scalar::ScalarValue;
+use chrono::{Date, Utc};
+use super::{Operator, Event, Property, Expr, Order, OrderDirection, TimeRange, TimeBucket};
+use super::segment::Segment;
 
-enum Operator {
-    Eq,
-    Neq,
-    Gt,
-    Gte,
-    Lt,
-    Lte,
-}
 
-enum Aggregate {
-    Count(distinct),
-
-}
-
-enum Property {
-    User {
-        name: String,
-        op: Operator,
-        value: ScalarValue,
-    },
-    Event {
-        name: String,
-        op: Operator,
-        value: ScalarValue,
-    },
-}
-
-enum GroupBy {
-    User(String), // string - имя свойства
-    Event(String),
-}
-
-struct Event {
-    name: String,
-    properties: Vec<Property>,
-    group_by: Vec<Property>,
-    aggregate_by: Vec<Aggregate>,
-}
-
-struct EventSegmentation {
+pub struct EventSegmentation {
     events: Vec<Event>,
+    group_by: Vec<Property>,
+    aggregate_by: Vec<Expr>,
+    order_by: Vec<(Order, OrderDirection)>,
+    segments: Vec<Segment>,
+    time_range: TimeRange,
+    group_by_time: TimeBucket,
 }
+
