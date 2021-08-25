@@ -1,0 +1,32 @@
+use datafusion::scalar::ScalarValue;
+use chrono::{Date, Utc};
+use crate::exprtree::ifaces::event;
+use crate::exprtree::ifaces::user;
+use crate::exprtree::error::{Result, Error};
+
+struct Property {
+    name: String,
+    value: ScalarValue,
+}
+
+struct Event {
+    event_name: String,
+    created_at: Option<Date<Utc>>,
+    user_id: String,
+    device: Option<String>,
+    country: Option<String>,
+    user_props: Vec<Property>,
+    event_props: Vec<Property>,
+}
+
+struct User {
+    id: String,
+    created_at: Date<Utc>,
+    device: Option<String>,
+    country: Option<String>,
+}
+
+trait Resolver {
+    fn resolve_event(&self, event: &Event) -> Result<event::Event>;
+    fn resolve_user(&self, user: &User) -> Result<user::User>;
+}

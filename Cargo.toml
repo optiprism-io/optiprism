@@ -1,6 +1,7 @@
 [package]
-name = "api"
+name = "exprtree"
 version = "0.1.0"
+authors = ["Maxim Bogdanov <maxim.bogdanov@coins.ph>"]
 edition = "2018"
 
 [profile.release]
@@ -9,17 +10,38 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
-actix-http = "3.0.0-beta.9"
+actix-http = { version = "3.0.0-beta.9", default-features = false, features = [
+	"openssl",
+	"rustls",
+	"compress-brotli",
+	"compress-gzip",
+] }
 actix-service = "2.0.0"
 actix-utils = "3.0.0"
-actix-web = "4.0.0-beta.8"
+actix-web = { version = "4.0.0-beta.8", default-features = false, features = [
+	"compress-brotli",
+	"compress-gzip",
+	"cookies",
+] }
 futures = "0.3.16"
 serde = { version = "1.0.129", features = ["derive"] }
 serde_json = "1.0.66"
+chrono = "0.4.19"
+num = "0.3"
+arrow = "5.2.0"
+datafusion = "5.0.0"
+tokio = { version = "1.10.1", features = [
+	"macros",
+	"rt",
+	"rt-multi-thread",
+	"sync",
+] }
+async-trait = "0.1.51"
+enum_dispatch = "0.3.7"
 
-[workspace]
-members = [
-	".",
-	"exprtree",
-	"storage",
-]
+[dev-dependencies]
+criterion = "0.3.5"
+
+[[bench]]
+name = "count"
+harness = false
