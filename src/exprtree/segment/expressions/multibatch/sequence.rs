@@ -1,18 +1,18 @@
 use crate::exprtree::segment::expressions::multibatch::expr::Expr;
+use crate::exprtree::segment::expressions::utils::into_array;
+use arrow::array;
+use arrow::array::{Array, ArrayRef, BooleanArray, Int8Array, TimestampSecondArray};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use arrow::record_batch::RecordBatch;
-use datafusion::physical_plan::{PhysicalExpr, ColumnarValue};
-use std::sync::Arc;
-use arrow::array::{BooleanArray, Array, ArrayRef, Int8Array, TimestampSecondArray};
+use chrono::Duration;
+use datafusion::error::{DataFusionError, Result as DatafusionResult};
+use datafusion::physical_plan::expressions::Column;
+use datafusion::physical_plan::{ColumnarValue, PhysicalExpr};
+use futures::{TryFutureExt, TryStreamExt};
 use std::borrow::{Borrow, BorrowMut};
 use std::ops::{Deref, Neg};
-use arrow::array;
-use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit, Field};
-use chrono::Duration;
-use crate::exprtree::segment::expressions::utils::into_array;
 use std::rc::Rc;
-use datafusion::error::{DataFusionError, Result as DatafusionResult};
-use futures::{TryStreamExt, TryFutureExt};
-use datafusion::physical_plan::expressions::Column;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub enum Filter {
@@ -20,7 +20,6 @@ pub enum Filter {
     DropOffOnStep(usize),
     TimeToConvert(Duration, Duration),
 }
-
 
 #[derive(Clone)]
 struct Row {
@@ -51,14 +50,19 @@ impl Sequence {
         let (ts_field) = schema.field_with_name(timestamp_col.name())?;
         match ts_field.data_type() {
             DataType::Timestamp(TimeUnit::Second, _) => {}
-            other => return Err(DataFusionError::Plan(format!(
-                "Timestamp column must be Timestamp, not {:?}",
-                other,
-            )))
+            other => {
+                return Err(DataFusionError::Plan(format!(
+                    "Timestamp column must be Timestamp, not {:?}",
+                    other,
+                )))
+            }
         };
 
         if window.is_zero() || window.num_seconds() < 0 {
-            return Err(DataFusionError::Plan(format!("Invalid window {:?}", window)));
+            return Err(DataFusionError::Plan(format!(
+                "Invalid window {:?}",
+                window
+            )));
         }
 
         if steps.is_empty() {
@@ -67,10 +71,12 @@ impl Sequence {
         for step in steps.iter() {
             match step.data_type(&schema)? {
                 DataType::Boolean => {}
-                other => return Err(DataFusionError::Plan(format!(
-                    "Step expression must return boolean values, not {:?}",
-                    other,
-                )))
+                other => {
+                    return Err(DataFusionError::Plan(format!(
+                        "Step expression must return boolean values, not {:?}",
+                        other,
+                    )))
+                }
             }
         }
         Ok(Self {
@@ -84,7 +90,10 @@ impl Sequence {
         })
     }
 
-    pub fn with_exclude(self, exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>) -> DatafusionResult<Self> {
+    pub fn with_exclude(
+        self,
+        exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>,
+    ) -> DatafusionResult<Self> {
         if exclude.is_empty() {
             return Err(DataFusionError::Plan("Empty exclude".to_string()));
         }
@@ -97,12 +106,14 @@ impl Sequence {
             match expr.data_type(&self.schema) {
                 Ok(t) => match t {
                     DataType::Boolean => {}
-                    other => return Err(DataFusionError::Plan(format!(
-                        "Exclude expression must return boolean values, not {:?}",
-                        other,
-                    )))
-                }
-                Err(e) => return Err(e)
+                    other => {
+                        return Err(DataFusionError::Plan(format!(
+                            "Exclude expression must return boolean values, not {:?}",
+                            other,
+                        )))
+                    }
+                },
+                Err(e) => return Err(e),
             }
 
             if steps.is_empty() {
@@ -113,10 +124,12 @@ impl Sequence {
         for (expr, steps) in exclude.iter() {
             match expr.data_type(&self.schema)? {
                 DataType::Boolean => {}
-                other => return Err(DataFusionError::Plan(format!(
-                    "Exclude expression must return boolean values, not {:?}",
-                    other,
-                )))
+                other => {
+                    return Err(DataFusionError::Plan(format!(
+                        "Exclude expression must return boolean values, not {:?}",
+                        other,
+                    )))
+                }
             }
             if steps.is_empty() {
                 return Err(DataFusionError::Plan("Empty steps in exclude".to_string()));
@@ -142,12 +155,15 @@ impl Sequence {
         if constants.is_empty() {
             return Err(DataFusionError::Plan("Empty constants".to_string()));
         }
-        let c: Vec<usize> = constants.iter().map(|x| {
-            return match self.schema.column_with_name(*x) {
-                None => Err(DataFusionError::Plan(format!("Column {} not found", *x))),
-                Some((i, f)) => Ok(i),
-            };
-        }).collect::<DatafusionResult<Vec<usize>>>()?;
+        let c: Vec<usize> = constants
+            .iter()
+            .map(|x| {
+                return match self.schema.column_with_name(*x) {
+                    None => Err(DataFusionError::Plan(format!("Column {} not found", *x))),
+                    Some((i, f)) => Ok(i),
+                };
+            })
+            .collect::<DatafusionResult<Vec<usize>>>()?;
 
         Ok(Sequence {
             schema: self.schema,
@@ -209,8 +225,12 @@ impl std::fmt::Display for Sequence {
     }
 }
 
-
-fn check_constants(batches: &[RecordBatch], row: &Row, constants: &Vec<usize>, const_row: &Row) -> DatafusionResult<bool> {
+fn check_constants(
+    batches: &[RecordBatch],
+    row: &Row,
+    constants: &Vec<usize>,
+    const_row: &Row,
+) -> DatafusionResult<bool> {
     for col_id in constants {
         let col = &batches[row.batch_id].columns()[*col_id];
         // current col and const col are the same, but they can be in different batches
@@ -224,13 +244,26 @@ fn check_constants(batches: &[RecordBatch], row: &Row, constants: &Vec<usize>, c
 
         match col.data_type() {
             DataType::Int8 => {
-                let left = const_col.as_any().downcast_ref::<Int8Array>().unwrap().value(const_row.row_id);
-                let right = col.as_any().downcast_ref::<Int8Array>().unwrap().value(row.row_id);
+                let left = const_col
+                    .as_any()
+                    .downcast_ref::<Int8Array>()
+                    .unwrap()
+                    .value(const_row.row_id);
+                let right = col
+                    .as_any()
+                    .downcast_ref::<Int8Array>()
+                    .unwrap()
+                    .value(row.row_id);
                 if left != right {
                     return Ok(false);
                 }
             }
-            other => return Err(DataFusionError::Internal(format!("Unsupported format {:?}", other)))
+            other => {
+                return Err(DataFusionError::Internal(format!(
+                    "Unsupported format {:?}",
+                    other
+                )))
+            }
         }
     }
 
@@ -253,7 +286,8 @@ fn inc_row(row: &mut Row, batches: &[RecordBatch]) -> bool {
 
 impl Expr for Sequence {
     fn evaluate(&self, batches: &[RecordBatch]) -> DatafusionResult<bool> {
-        let pre_steps = self.steps
+        let pre_steps = self
+            .steps
             .iter()
             .map(|step| {
                 batches
@@ -266,10 +300,11 @@ impl Expr for Sequence {
         let steps = pre_steps
             .iter()
             .map(|x| {
-                x.iter().map(|a| a.as_any().downcast_ref::<BooleanArray>().unwrap()).collect()
+                x.iter()
+                    .map(|a| a.as_any().downcast_ref::<BooleanArray>().unwrap())
+                    .collect()
             })
             .collect::<Vec<Vec<&BooleanArray>>>();
-
 
         // each step has 0 or more exclusion expressions
         let mut pre_exclude: Vec<(Vec<Arc<dyn Array>>, &Vec<usize>)> = Vec::new();
@@ -280,15 +315,18 @@ impl Expr for Sequence {
             for (expr, steps) in e.iter() {
                 let b = batches
                     .iter()
-                    .map(|batch| expr.evaluate(batch).map(|v| into_array(v))).collect::<DatafusionResult<Vec<ArrayRef>>>()?;
+                    .map(|batch| expr.evaluate(batch).map(|v| into_array(v)))
+                    .collect::<DatafusionResult<Vec<ArrayRef>>>()?;
                 // calculate exclusion expression for step
                 pre_exclude.push((b, steps));
             }
 
-
             for (arrs, steps) in pre_exclude.iter() {
                 for step_id in *steps {
-                    let b = arrs.iter().map(|x| x.as_any().downcast_ref::<BooleanArray>().unwrap()).collect();
+                    let b = arrs
+                        .iter()
+                        .map(|x| x.as_any().downcast_ref::<BooleanArray>().unwrap())
+                        .collect();
                     exclude[*step_id].push(b);
                 }
             }
@@ -296,24 +334,31 @@ impl Expr for Sequence {
 
         // downcast timestamp column
 
-
         let mut ts_col_tmp = batches
             .iter()
-            .map(|batch| {
-                Ok(into_array(self.ts_col.evaluate(batch)?))
-            }).collect::<DatafusionResult<Vec<Arc<dyn Array>>>>()?;
+            .map(|batch| Ok(into_array(self.ts_col.evaluate(batch)?)))
+            .collect::<DatafusionResult<Vec<Arc<dyn Array>>>>()?;
 
-        let ts_col: Vec<Arc<&TimestampSecondArray>> = ts_col_tmp.
-            iter().
-            map(|a| Arc::new(a.as_any().downcast_ref::<TimestampSecondArray>().unwrap()))
+        let ts_col: Vec<Arc<&TimestampSecondArray>> = ts_col_tmp
+            .iter()
+            .map(|a| Arc::new(a.as_any().downcast_ref::<TimestampSecondArray>().unwrap()))
             .collect();
 
         // current step id
         let mut step_id: usize = 0;
         // current row id
-        let mut row: Row = Row { batch_id: 0, row_id: 0 };
+        let mut row: Row = Row {
+            batch_id: 0,
+            row_id: 0,
+        };
         // reference on row_id of each step
-        let mut step_row: Vec<Row> = vec![Row { batch_id: 0, row_id: 0 }; steps.len()];
+        let mut step_row: Vec<Row> = vec![
+            Row {
+                batch_id: 0,
+                row_id: 0
+            };
+            steps.len()
+        ];
         // timestamp of first step
         let mut window_start_ts: i64 = 0;
         let mut is_completed = false;
@@ -325,7 +370,10 @@ impl Expr for Sequence {
                 // calculate window
                 if cur_ts - window_start_ts > self.window.num_seconds() {
                     let mut found = false;
-                    let mut f_row = Row { batch_id: step_row[0].batch_id, row_id: step_row[0].row_id + 1 };
+                    let mut f_row = Row {
+                        batch_id: step_row[0].batch_id,
+                        row_id: step_row[0].row_id + 1,
+                    };
                     // search next first step occurrence
 
                     loop {
@@ -401,13 +449,10 @@ impl Expr for Sequence {
             }
         }
 
-
         // check filter
         if let Some(filter) = &self.filter {
             return match filter {
-                Filter::DropOffOnAnyStep => {
-                    Ok(!is_completed)
-                }
+                Filter::DropOffOnAnyStep => Ok(!is_completed),
                 Filter::DropOffOnStep(drop_off_step_id) => {
                     if is_completed {
                         return Ok(false);
@@ -428,20 +473,18 @@ impl Expr for Sequence {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use arrow::datatypes::{Schema, Field, DataType, TimeUnit, SchemaRef};
-    use arrow::array::{Int8Array, TimestampSecondArray};
-    use arrow::record_batch::RecordBatch;
-    use datafusion::physical_plan::expressions::{Column, Literal, BinaryExpr};
-    use datafusion::scalar::ScalarValue;
-    use datafusion::logical_plan::Operator;
-    use datafusion::{
-        error::{Result},
-    };
-    use crate::exprtree::segment::expressions::multibatch::sequence::Sequence;
     use crate::exprtree::segment::expressions::multibatch::expr::Expr;
-    use datafusion::physical_plan::PhysicalExpr;
+    use crate::exprtree::segment::expressions::multibatch::sequence::Sequence;
+    use arrow::array::{Int8Array, TimestampSecondArray};
+    use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
+    use arrow::record_batch::RecordBatch;
     use chrono::Duration;
+    use datafusion::error::Result;
+    use datafusion::logical_plan::Operator;
+    use datafusion::physical_plan::expressions::{BinaryExpr, Column, Literal};
+    use datafusion::physical_plan::PhysicalExpr;
+    use datafusion::scalar::ScalarValue;
+    use std::sync::Arc;
 
     fn build_table(
         a: (&str, &Vec<i8>),
@@ -456,16 +499,19 @@ mod tests {
             Field::new(ts.0, DataType::Timestamp(TimeUnit::Second, None), false),
         ]);
 
-        (Arc::new(schema.clone()), RecordBatch::try_new(
+        (
             Arc::new(schema.clone()),
-            vec![
-                Arc::new(Int8Array::from(a.1.clone())),
-                Arc::new(Int8Array::from(b.1.clone())),
-                Arc::new(Int8Array::from(c.1.clone())),
-                Arc::new(TimestampSecondArray::from(ts.1.clone())),
-            ],
+            RecordBatch::try_new(
+                Arc::new(schema.clone()),
+                vec![
+                    Arc::new(Int8Array::from(a.1.clone())),
+                    Arc::new(Int8Array::from(b.1.clone())),
+                    Arc::new(Int8Array::from(c.1.clone())),
+                    Arc::new(TimestampSecondArray::from(ts.1.clone())),
+                ],
+            )
+            .unwrap(),
         )
-            .unwrap())
     }
 
     fn build_steps(schema: &Schema) -> (Arc<BinaryExpr>, Arc<BinaryExpr>, Arc<BinaryExpr>) {
@@ -498,17 +544,16 @@ mod tests {
 
         let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
         let ts = Arc::new(TimestampSecondArray::from(vec![1, 2, 3]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
-        let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?;
+        let op = Sequence::try_new(
+            schema.clone(),
+            Column::new_with_schema("ts", &schema)?,
+            Duration::seconds(100),
+            vec![step1.clone(), step2.clone(), step3.clone()],
+        )?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -521,15 +566,11 @@ mod tests {
         ]));
 
         let a = Arc::new(Int8Array::from(vec![7, 1, 5, 4, 2, 5, 3, 1, 2, 4, 3]));
-        let ts = Arc::new(TimestampSecondArray::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]));
+        let ts = Arc::new(TimestampSecondArray::from(vec![
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+        ]));
 
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
@@ -546,8 +587,17 @@ mod tests {
                 BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
             };
 
-            let exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)> = vec![(Arc::new(exclude1), vec![1]), (Arc::new(exclude2), vec![1, 2])];
-            let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_exclude(exclude)?;
+            let exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)> = vec![
+                (Arc::new(exclude1), vec![1]),
+                (Arc::new(exclude2), vec![1, 2]),
+            ];
+            let op = Sequence::try_new(
+                schema.clone(),
+                Column::new_with_schema("ts", &schema)?,
+                Duration::seconds(100),
+                vec![step1.clone(), step2.clone(), step3.clone()],
+            )?
+            .with_exclude(exclude)?;
             assert_eq!(true, op.evaluate(vec![batch.clone()].as_slice())?);
         }
 
@@ -564,8 +614,17 @@ mod tests {
                 BinaryExpr::new(Arc::new(left), Operator::Eq, Arc::new(right))
             };
 
-            let exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)> = vec![(Arc::new(exclude1), vec![2]), (Arc::new(exclude2), vec![1, 2])];
-            let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_exclude(exclude)?;
+            let exclude: Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)> = vec![
+                (Arc::new(exclude1), vec![2]),
+                (Arc::new(exclude2), vec![1, 2]),
+            ];
+            let op = Sequence::try_new(
+                schema.clone(),
+                Column::new_with_schema("ts", &schema)?,
+                Duration::seconds(100),
+                vec![step1.clone(), step2.clone(), step3.clone()],
+            )?
+            .with_exclude(exclude)?;
             assert_eq!(false, op.evaluate(vec![batch.clone()].as_slice())?);
         }
         Ok(())
@@ -583,51 +642,128 @@ mod tests {
         let (step1, step2, step3) = build_steps(&schema);
 
         {
-            let (schema, batch) = build_table(("a", &vec![1, 2, 3]), ("b", &vec![1, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
+            let (schema, batch) = build_table(
+                ("a", &vec![1, 2, 3]),
+                ("b", &vec![1, 1, 1]),
+                ("c", &vec![2, 2, 2]),
+                ("ts", &vec![0, 1, 2]),
+            );
             let constants = vec!["b", "c"];
-            let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
+            let op = Sequence::try_new(
+                schema.clone(),
+                Column::new_with_schema("ts", &schema)?,
+                Duration::seconds(100),
+                vec![step1.clone(), step2.clone(), step3.clone()],
+            )?
+            .with_constants(constants)?;
             assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
-            let (schema, batch) = build_table(("a", &vec![1, 2, 3]), ("b", &vec![2, 1, 1]), ("c", &vec![2, 2, 2]), ("ts", &vec![0, 1, 2]));
+            let (schema, batch) = build_table(
+                ("a", &vec![1, 2, 3]),
+                ("b", &vec![2, 1, 1]),
+                ("c", &vec![2, 2, 2]),
+                ("ts", &vec![0, 1, 2]),
+            );
             let constants = vec!["b", "c"];
-            let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
+            let op = Sequence::try_new(
+                schema.clone(),
+                Column::new_with_schema("ts", &schema)?,
+                Duration::seconds(100),
+                vec![step1.clone(), step2.clone(), step3.clone()],
+            )?
+            .with_constants(constants)?;
             assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
-            let (schema, batch) = build_table(("a", &vec![1, 1, 2, 3]), ("b", &vec![1, 2, 2, 2]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
+            let (schema, batch) = build_table(
+                ("a", &vec![1, 1, 2, 3]),
+                ("b", &vec![1, 2, 2, 2]),
+                ("c", &vec![2, 2, 2, 2]),
+                ("ts", &vec![0, 1, 2, 3]),
+            );
             let constants = vec!["b", "c"];
-            let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
+            let op = Sequence::try_new(
+                schema.clone(),
+                Column::new_with_schema("ts", &schema)?,
+                Duration::seconds(100),
+                vec![step1.clone(), step2.clone(), step3.clone()],
+            )?
+            .with_constants(constants)?;
             assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
-            let (schema, batch) = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 1, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
+            let (schema, batch) = build_table(
+                ("a", &vec![1, 2, 2, 3]),
+                ("b", &vec![1, 2, 1, 1]),
+                ("c", &vec![2, 2, 2, 2]),
+                ("ts", &vec![0, 1, 2, 3]),
+            );
             let constants = vec!["b", "c"];
-            let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
+            let op = Sequence::try_new(
+                schema.clone(),
+                Column::new_with_schema("ts", &schema)?,
+                Duration::seconds(100),
+                vec![step1.clone(), step2.clone(), step3.clone()],
+            )?
+            .with_constants(constants)?;
             assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
-            let (schema, batch) = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 1, 1]), ("c", &vec![2, 1, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
+            let (schema, batch) = build_table(
+                ("a", &vec![1, 2, 2, 3]),
+                ("b", &vec![1, 1, 1, 1]),
+                ("c", &vec![2, 1, 2, 2]),
+                ("ts", &vec![0, 1, 2, 3]),
+            );
             let constants = vec!["b", "c"];
-            let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
+            let op = Sequence::try_new(
+                schema.clone(),
+                Column::new_with_schema("ts", &schema)?,
+                Duration::seconds(100),
+                vec![step1.clone(), step2.clone(), step3.clone()],
+            )?
+            .with_constants(constants)?;
             assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
-            let (schema, batch) = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 1, 2, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
+            let (schema, batch) = build_table(
+                ("a", &vec![1, 2, 2, 3]),
+                ("b", &vec![1, 1, 2, 1]),
+                ("c", &vec![2, 2, 2, 2]),
+                ("ts", &vec![0, 1, 2, 3]),
+            );
             let constants = vec!["b", "c"];
-            let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
+            let op = Sequence::try_new(
+                schema.clone(),
+                Column::new_with_schema("ts", &schema)?,
+                Duration::seconds(100),
+                vec![step1.clone(), step2.clone(), step3.clone()],
+            )?
+            .with_constants(constants)?;
             assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
         {
-            let (schema, batch) = build_table(("a", &vec![1, 2, 2, 3]), ("b", &vec![1, 2, 2, 1]), ("c", &vec![2, 2, 2, 2]), ("ts", &vec![0, 1, 2, 3]));
+            let (schema, batch) = build_table(
+                ("a", &vec![1, 2, 2, 3]),
+                ("b", &vec![1, 2, 2, 1]),
+                ("c", &vec![2, 2, 2, 2]),
+                ("ts", &vec![0, 1, 2, 3]),
+            );
             let constants = vec!["b", "c"];
-            let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_constants(constants)?;
+            let op = Sequence::try_new(
+                schema.clone(),
+                Column::new_with_schema("ts", &schema)?,
+                Duration::seconds(100),
+                vec![step1.clone(), step2.clone(), step3.clone()],
+            )?
+            .with_constants(constants)?;
             assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         }
 
@@ -643,17 +779,16 @@ mod tests {
 
         let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
         let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
-        let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(1), vec![step1.clone(), step2.clone(), step3.clone()])?;
+        let op = Sequence::try_new(
+            schema.clone(),
+            Column::new_with_schema("ts", &schema)?,
+            Duration::seconds(1),
+            vec![step1.clone(), step2.clone(), step3.clone()],
+        )?;
         assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -667,17 +802,16 @@ mod tests {
 
         let a = Arc::new(Int8Array::from(vec![1, 4, 5, 1, 4, 2, 3]));
         let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2, 3, 4, 5, 6]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
-        let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(4), vec![step1.clone(), step2.clone(), step3.clone()])?;
+        let op = Sequence::try_new(
+            schema.clone(),
+            Column::new_with_schema("ts", &schema)?,
+            Duration::seconds(4),
+            vec![step1.clone(), step2.clone(), step3.clone()],
+        )?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -691,17 +825,17 @@ mod tests {
 
         let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
         let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
-        let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(1), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(2)?;
+        let op = Sequence::try_new(
+            schema.clone(),
+            Column::new_with_schema("ts", &schema)?,
+            Duration::seconds(1),
+            vec![step1.clone(), step2.clone(), step3.clone()],
+        )?
+        .with_drop_off_on_step(2)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -715,17 +849,17 @@ mod tests {
 
         let a = Arc::new(Int8Array::from(vec![1, 2, 4, 5]));
         let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2, 3]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
-        let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(2)?;
+        let op = Sequence::try_new(
+            schema.clone(),
+            Column::new_with_schema("ts", &schema)?,
+            Duration::seconds(100),
+            vec![step1.clone(), step2.clone(), step3.clone()],
+        )?
+        .with_drop_off_on_step(2)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -739,17 +873,17 @@ mod tests {
 
         let a = Arc::new(Int8Array::from(vec![1, 3, 4, 5]));
         let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2, 3]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
-        let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(1)?;
+        let op = Sequence::try_new(
+            schema.clone(),
+            Column::new_with_schema("ts", &schema)?,
+            Duration::seconds(100),
+            vec![step1.clone(), step2.clone(), step3.clone()],
+        )?
+        .with_drop_off_on_step(1)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -763,17 +897,17 @@ mod tests {
 
         let a = Arc::new(Int8Array::from(vec![6, 3, 4, 5]));
         let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2, 3]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
-        let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_step(0)?;
+        let op = Sequence::try_new(
+            schema.clone(),
+            Column::new_with_schema("ts", &schema)?,
+            Duration::seconds(100),
+            vec![step1.clone(), step2.clone(), step3.clone()],
+        )?
+        .with_drop_off_on_step(0)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -787,17 +921,17 @@ mod tests {
 
         let a = Arc::new(Int8Array::from(vec![1, 3, 4, 5]));
         let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2, 3]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
-        let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_drop_off_on_any_step();
+        let op = Sequence::try_new(
+            schema.clone(),
+            Column::new_with_schema("ts", &schema)?,
+            Duration::seconds(100),
+            vec![step1.clone(), step2.clone(), step3.clone()],
+        )?
+        .with_drop_off_on_any_step();
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -811,17 +945,17 @@ mod tests {
 
         let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
         let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 2]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
-        let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
+        let op = Sequence::try_new(
+            schema.clone(),
+            Column::new_with_schema("ts", &schema)?,
+            Duration::seconds(100),
+            vec![step1.clone(), step2.clone(), step3.clone()],
+        )?
+        .with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -835,17 +969,17 @@ mod tests {
 
         let a = Arc::new(Int8Array::from(vec![1, 2, 3]));
         let ts = Arc::new(TimestampSecondArray::from(vec![0, 1, 20]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-                ts.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone(), ts.clone()])?;
 
         let (step1, step2, step3) = build_steps(&schema);
 
-        let op = Sequence::try_new(schema.clone(), Column::new_with_schema("ts", &schema)?, Duration::seconds(100), vec![step1.clone(), step2.clone(), step3.clone()])?.with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
+        let op = Sequence::try_new(
+            schema.clone(),
+            Column::new_with_schema("ts", &schema)?,
+            Duration::seconds(100),
+            vec![step1.clone(), step2.clone(), step3.clone()],
+        )?
+        .with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
         assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }

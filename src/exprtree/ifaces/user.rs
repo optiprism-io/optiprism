@@ -1,6 +1,6 @@
-use datafusion::scalar::ScalarValue;
-use crate::exprtree::error::{Result, Error};
+use crate::exprtree::error::{Error, Result};
 use chrono::{Date, Utc};
+use datafusion::scalar::ScalarValue;
 
 struct Property {
     id: u64,
@@ -22,9 +22,25 @@ trait UserProvider {
     fn create_user(&mut self, user: &User) -> Result<User>;
     fn update_user(&mut self, user: &User) -> Result<User>;
     fn delete_user(&mut self, id: u64) -> Result<()>;
-    fn get_value(&mut self, user_id: u64, property_id: u64, value: ScalarValue) -> Result<ScalarValue>;
+    fn get_value(
+        &mut self,
+        user_id: u64,
+        property_id: u64,
+        value: ScalarValue,
+    ) -> Result<ScalarValue>;
     fn update_value(&mut self, user_id: u64, property_id: u64, value: ScalarValue) -> Result<()>;
-    fn append_value_to_list(&mut self, user_id: u64, property_id: u64, value: ScalarValue) -> Result<()>;
-    fn remove_value_to_list(&mut self, user_id: u64, property_id: u64, value: ScalarValue) -> Result<()>;
-    fn increment_value(&mut self, user_id: u64, property_id: u64, delta: ScalarValue) -> Result<()>;
+    fn append_value_to_list(
+        &mut self,
+        user_id: u64,
+        property_id: u64,
+        value: ScalarValue,
+    ) -> Result<()>;
+    fn remove_value_to_list(
+        &mut self,
+        user_id: u64,
+        property_id: u64,
+        value: ScalarValue,
+    ) -> Result<()>;
+    fn increment_value(&mut self, user_id: u64, property_id: u64, delta: ScalarValue)
+        -> Result<()>;
 }

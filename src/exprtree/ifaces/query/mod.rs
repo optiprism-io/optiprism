@@ -1,13 +1,12 @@
-use datafusion::scalar::ScalarValue;
-use chrono::{Date, Utc};
-
 mod event_segmentation;
-mod user_segment;
 mod funnel;
+mod user_segment;
 
+use super::dquery::EventSegmentation;
 use arrow::datatypes::DataType;
-use crate::exprtree::ifaces::query::event_segmentation::EventSegmentation;
+use chrono::{Date, Utc};
 use datafusion::error::Result;
+use datafusion::scalar::ScalarValue;
 
 trait Query {
     fn event_segmentation(&self, query: &EventSegmentation) -> Result<QueryResult>;
@@ -37,7 +36,6 @@ pub enum Property {
     },
 }
 
-
 pub enum PropertyScope {
     User,
     Event,
@@ -50,12 +48,10 @@ pub struct PropertyOpValue {
     value: PropertyValue,
 }
 
-
 pub struct Event {
     name: String,
     properties: Vec<PropertyOpValue>,
 }
-
 
 pub enum TimeGroup {
     Hourly,

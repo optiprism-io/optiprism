@@ -1,6 +1,6 @@
+use crate::exprtree::error::{Error, Result};
 use crate::exprtree::ifaces::dictionary::Record;
 use std::net::IpAddr;
-use crate::exprtree::error::{Result, Error};
 
 struct Geo {
     country: Option<Record>,

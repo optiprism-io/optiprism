@@ -1,4 +1,4 @@
-use crate::exprtree::error::{Result, Error};
+use crate::exprtree::error::{Error, Result};
 
 pub struct Record {
     id: u64,

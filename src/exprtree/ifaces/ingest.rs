@@ -1,8 +1,8 @@
-use datafusion::scalar::ScalarValue;
-use chrono::{Date, Utc};
+use crate::exprtree::error::{Error, Result};
 use crate::exprtree::ifaces::event;
 use crate::exprtree::ifaces::user;
-use crate::exprtree::error::{Result, Error};
+use chrono::{Date, Utc};
+use datafusion::scalar::ScalarValue;
 
 struct Property {
     name: String,

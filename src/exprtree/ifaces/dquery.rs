@@ -19,7 +19,7 @@ struct Event {
     properties: Vec<Property>,
 }
 
-struct EventSegmentation {
+pub struct EventSegmentation {
     events: Vec<Event>,
 }
 

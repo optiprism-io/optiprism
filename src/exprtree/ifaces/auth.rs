@@ -1,4 +1,4 @@
-use crate::exprtree::error::{Result, Error};
+use crate::exprtree::error::{Error, Result};
 
 enum Role {
     Admin,
@@ -7,7 +7,7 @@ enum Role {
 }
 
 enum Permission {
-    List
+    List,
 }
 
 struct User {

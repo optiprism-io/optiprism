@@ -1,20 +1,20 @@
-use datafusion::execution::context::{QueryPlanner, ExecutionContextState};
-use datafusion::logical_plan::{LogicalPlan, UserDefinedLogicalNode, Expr, DFSchemaRef, Operator};
-use datafusion::physical_plan::{ExecutionPlan, PhysicalPlanner};
-use datafusion::physical_plan::planner::{DefaultPhysicalPlanner, ExtensionPlanner};
-use std::sync::Arc;
-use datafusion::optimizer::optimizer::OptimizerRule;
-use std::fmt::{Formatter, Debug};
-use std::any::Any;
-use datafusion::logical_plan::Column;
-use arrow::datatypes::SchemaRef;
-use std::fmt;
-use datafusion::error::{Result, DataFusionError};
-use datafusion::scalar::ScalarValue;
-use chrono::Duration;
-use crate::exprtree::segment::expressions::multibatch::sequence;
 use crate::exprtree::segment::expressions::binary_op::BinaryOp;
 use crate::exprtree::segment::expressions::expr as PhysicalSegmentExpr;
+use crate::exprtree::segment::expressions::multibatch::sequence;
+use arrow::datatypes::SchemaRef;
+use chrono::Duration;
+use datafusion::error::{DataFusionError, Result};
+use datafusion::execution::context::{ExecutionContextState, QueryPlanner};
+use datafusion::logical_plan::Column;
+use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, Operator, UserDefinedLogicalNode};
+use datafusion::optimizer::optimizer::OptimizerRule;
+use datafusion::physical_plan::planner::{DefaultPhysicalPlanner, ExtensionPlanner};
+use datafusion::physical_plan::{ExecutionPlan, PhysicalPlanner};
+use datafusion::scalar::ScalarValue;
+use std::any::Any;
+use std::fmt;
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 
 pub type JoinOn = (Column, Column);
 
@@ -50,12 +50,22 @@ pub enum SegmentExpr {
 impl fmt::Debug for SegmentExpr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            SegmentExpr::BinaryOp { left, op, right } =>
-                write!(f, "{:?} {} {:?}", left, op, right),
-            SegmentExpr::Count { predicate, op, right } =>
-                write!(f, "COUNT() {} {:?} WHERE {:?}", op, right, predicate),
-            SegmentExpr::Sum { predicate, left, op, right } =>
-                write!(f, "SUM({:?}) {:?} {} WHERE {:?}", left, op, right, predicate),
+            SegmentExpr::BinaryOp { left, op, right } => write!(f, "{:?} {} {:?}", left, op, right),
+            SegmentExpr::Count {
+                predicate,
+                op,
+                right,
+            } => write!(f, "COUNT() {} {:?} WHERE {:?}", op, right, predicate),
+            SegmentExpr::Sum {
+                predicate,
+                left,
+                op,
+                right,
+            } => write!(
+                f,
+                "SUM({:?}) {:?} {} WHERE {:?}",
+                left, op, right, predicate
+            ),
             SegmentExpr::Sequence {
                 schema,
                 ts_col,
@@ -145,12 +155,15 @@ impl JoinPlanNode {
             }
             match left.schema().index_of(field.name()) {
                 Ok(idx) => take_left_cols.push(idx),
-                _ => {
-                    match right.schema().index_of(field.name()) {
-                        Ok(idx) => take_right_cols.push(idx),
-                        Err(_) => return Err(DataFusionError::Plan(format!("Column {} not found", field.name()))),
+                _ => match right.schema().index_of(field.name()) {
+                    Ok(idx) => take_right_cols.push(idx),
+                    Err(_) => {
+                        return Err(DataFusionError::Plan(format!(
+                            "Column {} not found",
+                            field.name()
+                        )))
                     }
-                }
+                },
             }
         }
 
@@ -159,8 +172,16 @@ impl JoinPlanNode {
             left,
             right,
             on: on.clone(),
-            take_left_cols: if take_left_cols.is_empty() { None } else { Some(take_left_cols) },
-            take_right_cols: if take_right_cols.is_empty() { None } else { Some(take_right_cols) },
+            take_left_cols: if take_left_cols.is_empty() {
+                None
+            } else {
+                Some(take_left_cols)
+            },
+            take_right_cols: if take_right_cols.is_empty() {
+                None
+            } else {
+                Some(take_right_cols)
+            },
             schema: schema.clone(),
             target_batch_size,
         })
@@ -197,7 +218,11 @@ impl UserDefinedLogicalNode for JoinPlanNode {
         Ok(())
     }
 
-    fn from_template(&self, exprs: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+    fn from_template(
+        &self,
+        exprs: &[Expr],
+        inputs: &[LogicalPlan],
+    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
         panic!("unimplemented");
     }
 }

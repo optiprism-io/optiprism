@@ -7,13 +7,14 @@ pub struct Scalar<T> {
 
 impl<T> Scalar<T> {
     pub fn new(value: T) -> Self {
-        Self {
-            value
-        }
+        Self { value }
     }
 }
 
-impl<T> Expr<T> for Scalar<T> where T: Copy {
+impl<T> Expr<T> for Scalar<T>
+where
+    T: Copy,
+{
     fn evaluate(&self, _: &RecordBatch, _: usize) -> T {
         self.value
     }

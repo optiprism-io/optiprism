@@ -1,9 +1,9 @@
-use super::Operator;
-use datafusion::scalar::ScalarValue;
-use chrono::{Date, Utc, Duration};
-use crate::exprtree::ifaces::query::{PropertyOpValue, TimeRange, Property};
-use super::Event;
 use super::user_segment::UserSegment;
+use super::Event;
+use super::Operator;
+use crate::exprtree::ifaces::query::{Property, PropertyOpValue, TimeRange};
+use chrono::{Date, Duration, Utc};
+use datafusion::scalar::ScalarValue;
 
 pub enum Filter {
     DropOffOnAnyStep,

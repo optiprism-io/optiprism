@@ -1,6 +1,6 @@
-use actix_web::{get, web, App, HttpServer};
-use std::env::var;
+mod exprtree;
 
+use actix_web::{get, web, App, HttpServer};
 use arrow::array::{ArrayRef, Int32Array, StringArray};
 use arrow::datatypes::DataType::Utf8;
 use arrow::datatypes::{DataType, Field, Schema};
@@ -10,10 +10,9 @@ use datafusion::datasource::CsvReadOptions;
 use datafusion::error::Result;
 use datafusion::logical_plan::{and, case, col, count, lit, when, JoinType};
 use datafusion::prelude::ExecutionContext;
+use std::env::var;
 use std::ops::Deref;
 use std::sync::Arc;
-
-mod exprtree;
 
 #[get("/")]
 async fn index() -> &'static str {

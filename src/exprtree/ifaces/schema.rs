@@ -1,12 +1,10 @@
-use chrono::{Date, Utc};
-
+use crate::exprtree::error::{Error, Result};
 use arrow::datatypes::DataType;
-use crate::exprtree::error::{Result, Error};
+use chrono::{Date, Utc};
+use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::DFSchema;
 use datafusion::prelude::DataFrame;
-use datafusion::datasource::TableProvider;
 use std::sync::Arc;
-
 
 pub struct Schema {
     // todo usize or u64 for entity identifier?

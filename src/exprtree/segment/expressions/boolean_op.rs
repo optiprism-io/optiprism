@@ -1,5 +1,5 @@
 use datafusion::logical_plan::Operator;
-use std::fmt::{Display, Debug};
+use std::fmt::{Debug, Display};
 
 pub trait BooleanOp<T>: Send + Sync + Display + Debug {
     fn perform(left: T, right: T) -> bool;
@@ -54,11 +54,13 @@ impl<'a> BooleanOp<Option<&'a str>> for Or {
     }
 }
 
-
 #[derive(Debug)]
 pub struct Eq;
 
-impl<T> BooleanOp<T> for Eq where T: PartialEq {
+impl<T> BooleanOp<T> for Eq
+where
+    T: PartialEq,
+{
     fn perform(left: T, right: T) -> bool {
         return left == right;
     }
@@ -77,7 +79,10 @@ impl std::fmt::Display for Eq {
 #[derive(Debug)]
 pub struct Gt;
 
-impl<T> BooleanOp<T> for Gt where T: Ord {
+impl<T> BooleanOp<T> for Gt
+where
+    T: Ord,
+{
     fn perform(left: T, right: T) -> bool {
         return left > right;
     }
@@ -96,7 +101,10 @@ impl std::fmt::Display for Gt {
 #[derive(Debug)]
 pub struct Lt;
 
-impl<T> BooleanOp<T> for Lt where T: Ord {
+impl<T> BooleanOp<T> for Lt
+where
+    T: Ord,
+{
     fn perform(left: T, right: T) -> bool {
         return left < right;
     }

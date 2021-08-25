@@ -1,9 +1,9 @@
-use crate::exprtree::segment::expressions::expr::{Expr};
-use std::marker::PhantomData;
-use arrow::record_batch::RecordBatch;
-use std::ops::{Add, AddAssign};
 use crate::exprtree::segment::expressions::boolean_op::BooleanOp;
+use crate::exprtree::segment::expressions::expr::Expr;
+use arrow::record_batch::RecordBatch;
 use datafusion::logical_plan::Operator;
+use std::marker::PhantomData;
+use std::ops::{Add, AddAssign};
 
 pub struct IterativeCountOp<Op> {
     expr: Box<dyn Expr<bool>>,
@@ -23,35 +23,30 @@ impl<Op> IterativeCountOp<Op> {
 
 pub fn break_on_false(op: Operator) -> bool {
     match op {
-        Operator::Eq | Operator::NotEq => {
-            false
+        Operator::Eq | Operator::NotEq => false,
+        Operator::Lt | Operator::LtEq => true,
+        Operator::Gt | Operator::GtEq => false,
+        _ => {
+            panic!("unexpected")
         }
-        Operator::Lt | Operator::LtEq => {
-            true
-        }
-        Operator::Gt | Operator::GtEq => {
-            false
-        }
-        _ => { panic!("unexpected") }
     }
 }
 
 pub fn break_on_true(op: Operator) -> bool {
     match op {
-        Operator::Eq | Operator::NotEq => {
-            true
+        Operator::Eq | Operator::NotEq => true,
+        Operator::Lt | Operator::LtEq => false,
+        Operator::Gt | Operator::GtEq => true,
+        _ => {
+            panic!("unexpected")
         }
-        Operator::Lt | Operator::LtEq => {
-            false
-        }
-        Operator::Gt | Operator::GtEq => {
-            true
-        }
-        _ => { panic!("unexpected") }
     }
 }
 
-impl<Op> Expr<bool> for IterativeCountOp<Op> where Op: BooleanOp<i64> {
+impl<Op> Expr<bool> for IterativeCountOp<Op>
+where
+    Op: BooleanOp<i64>,
+{
     fn evaluate(&self, batch: &RecordBatch, _: usize) -> bool {
         let mut left: i64 = 0;
         let break_on_false = break_on_false(Op::op());
@@ -79,32 +74,23 @@ impl<Op> Expr<bool> for IterativeCountOp<Op> where Op: BooleanOp<i64> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use arrow::datatypes::{Schema, DataType, Field};
-    use arrow::record_batch::RecordBatch;
-    use arrow::array::{BooleanArray, Int64Array};
-    use crate::exprtree::segment::expressions::iterative_sum_op::IterativeSumOp;
-    use datafusion::{
-        error::{Result},
-    };
-    use crate::exprtree::segment::expressions::boolean_op::{Gt, Eq, Lt};
-    use crate::exprtree::segment::expressions::value_op::ValueOp;
+    use crate::exprtree::segment::expressions::boolean_op::{Eq, Gt, Lt};
     use crate::exprtree::segment::expressions::expr::Expr;
     use crate::exprtree::segment::expressions::iterative_count_op::IterativeCountOp;
+    use crate::exprtree::segment::expressions::iterative_sum_op::IterativeSumOp;
+    use crate::exprtree::segment::expressions::value_op::ValueOp;
+    use arrow::array::{BooleanArray, Int64Array};
+    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::record_batch::RecordBatch;
+    use datafusion::error::Result;
+    use std::sync::Arc;
 
     #[test]
     fn test() -> Result<()> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("a", DataType::Boolean, false),
-        ]));
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, false)]));
 
         let a = Arc::new(BooleanArray::from(vec![true, false, true]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                a.clone(),
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![a.clone()])?;
 
         let op1 = IterativeCountOp::<Eq>::new(
             Box::new(ValueOp::<Option<bool>, Eq>::new(0, Some(true))),

@@ -1,23 +1,16 @@
-use datafusion::scalar::ScalarValue;
-use chrono::{Date, Utc};
-use super::{Operator, Event, TimeRange, TimeGroup};
 use super::user_segment::UserSegment;
+use super::{Event, Operator, TimeGroup, TimeRange};
 use crate::exprtree::ifaces::query::Property;
-
+use chrono::{Date, Utc};
+use datafusion::scalar::ScalarValue;
 
 pub enum Expr {
     Count(Property),
     DistinctCount(Property),
     Sum(Property),
     Avg(Property),
-    Mul {
-        left: Box<Expr>,
-        right: Box<Expr>,
-    },
-    Div {
-        left: Box<Expr>,
-        right: Box<Expr>,
-    },
+    Mul { left: Box<Expr>, right: Box<Expr> },
+    Div { left: Box<Expr>, right: Box<Expr> },
     Lit(ScalarValue),
 }
 
