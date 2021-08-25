@@ -23,7 +23,13 @@ enum Query {
     Frequency {},
 }
 
+enum Count {
+    Uniques,
+    Totals,
+}
+
 pub struct FunnelRequest {
+    count: Count,
     query: Query,
     group_by: Group,
     time_range: TimeRange,
