@@ -2,10 +2,14 @@ use super::{
     dbutils::get_next_id,
     error::{Result, ERR_TODO},
 };
+use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
 use rocksdb::DB;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
+
+const KEY_PREFIX: &[u8] = b"organization:";
+const SEQUENCE_KEY: &[u8] = b"organization_sequence_number";
 
 #[derive(Serialize, Deserialize)]
 pub struct Organization {
@@ -42,7 +46,7 @@ impl Provider {
     pub fn create(&self, request: CreateRequest) -> Result<Organization> {
         let id = {
             let _guard = self.sequence_guard.lock().unwrap();
-            get_next_id(&self.db, b"organization_sequence_number")?
+            get_next_id(&self.db, SEQUENCE_KEY)?
         };
         let org = Organization {
             id,
@@ -52,8 +56,8 @@ impl Provider {
         };
         self.db
             .put(
-                [b"organization:".as_ref(), id.to_le_bytes().as_ref()].concat(),
-                serde_json::to_vec(&org).unwrap(),
+                [KEY_PREFIX, id.to_le_bytes().as_ref()].concat(),
+                serialize(&org).unwrap(),
             )
             .unwrap();
         Ok(org)
@@ -62,10 +66,10 @@ impl Provider {
     pub fn get_by_id(&self, id: u64) -> Result<Organization> {
         let value = self
             .db
-            .get([b"organization:".as_ref(), id.to_le_bytes().as_ref()].concat())
+            .get([KEY_PREFIX, id.to_le_bytes().as_ref()].concat())
             .unwrap();
         if let Some(value) = value {
-            return Ok(serde_json::from_slice(&value).unwrap());
+            return Ok(deserialize(&value).unwrap());
         }
         return Err(ERR_TODO.into());
     }

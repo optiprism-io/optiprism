@@ -4,6 +4,7 @@ use super::{
     error::{Result, ERR_TODO},
     rbac::{Permission, Role, Scope},
 };
+use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
 use rocksdb::DB;
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,9 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+
+const KEY_PREFIX: &[u8] = b"account:";
+const SEQUENCE_KEY: &[u8] = b"account_sequence_number";
 
 #[derive(Serialize, Deserialize)]
 pub struct Account {
@@ -58,7 +62,7 @@ impl Provider {
     pub fn create(&self, request: CreateRequest) -> Result<Account> {
         let id = {
             let _guard = self.sequence_guard.lock().unwrap();
-            get_next_id(&self.db, b"account_sequence_number")?
+            get_next_id(&self.db, SEQUENCE_KEY)?
         };
         let salt = make_salt();
         let password = make_password_hash(&request.password, &salt);
@@ -76,8 +80,8 @@ impl Provider {
         };
         self.db
             .put(
-                [b"account:".as_ref(), id.to_le_bytes().as_ref()].concat(),
-                serde_json::to_vec(&acc).unwrap(),
+                [KEY_PREFIX, id.to_le_bytes().as_ref()].concat(),
+                serialize(&acc).unwrap(),
             )
             .unwrap();
         Ok(acc)
@@ -86,10 +90,10 @@ impl Provider {
     pub fn get_by_id(&self, id: u64) -> Result<Account> {
         let value = self
             .db
-            .get([b"account:".as_ref(), id.to_le_bytes().as_ref()].concat())
+            .get([KEY_PREFIX, id.to_le_bytes().as_ref()].concat())
             .unwrap();
         if let Some(value) = value {
-            return Ok(serde_json::from_slice(&value).unwrap());
+            return Ok(deserialize(&value).unwrap());
         }
         return Err(ERR_TODO.into());
     }
