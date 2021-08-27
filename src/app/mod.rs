@@ -16,6 +16,10 @@ use std::{env::var, io::Result, sync::Arc};
 pub fn init(db: Arc<DB>) -> Result<Server> {
     let organization_provider = Data::new(organization::Provider::new(db.clone()));
     let account_provider = Data::new(account::Provider::new(db.clone()));
+    let auth_provider = Data::new(auth::Provider::new(
+        organization_provider.clone().into_inner(),
+        account_provider.clone().into_inner(),
+    ));
     Ok(HttpServer::new(move || {
         App::new()
             .wrap_fn(|request, service| {
@@ -28,6 +32,7 @@ pub fn init(db: Arc<DB>) -> Result<Server> {
             })
             .app_data(organization_provider.clone())
             .app_data(account_provider.clone())
+            .app_data(auth_provider.clone())
             .configure(http::configure)
     })
     .bind(var("FNP_BIND_ADDRESS").unwrap())?

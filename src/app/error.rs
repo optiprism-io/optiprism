@@ -70,6 +70,8 @@ impl ResponseError for Error {
     }
 }
 
+pub const ERR_TODO: InternalError = InternalError::new("00000", StatusCode::INTERNAL_SERVER_ERROR);
+
 pub const ERR_INTERNAL_CONTEXT_REQUIRED: InternalError =
     InternalError::new("IN001", StatusCode::INTERNAL_SERVER_ERROR);
 

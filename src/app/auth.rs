@@ -35,12 +35,12 @@ pub struct SignUpRequest {
 }
 
 #[derive(Deserialize)]
-struct RefreshRequest {
+pub struct RefreshRequest {
     pub refresh_token: String,
 }
 
 #[derive(Deserialize)]
-struct RecoverRequest {
+pub struct RecoverRequest {
     pub email: String,
 }
 
@@ -65,18 +65,18 @@ pub struct RefreshClaims {
 }
 
 pub struct Provider {
-    account_provider: Arc<account::Provider>,
     organization_provider: Arc<organization::Provider>,
+    account_provider: Arc<account::Provider>,
 }
 
 impl Provider {
     pub fn new(
-        account_provider: Arc<account::Provider>,
         organization_provider: Arc<organization::Provider>,
+        account_provider: Arc<account::Provider>,
     ) -> Self {
         Self {
-            account_provider,
             organization_provider,
+            account_provider,
         }
     }
 
@@ -89,9 +89,10 @@ impl Provider {
         let mut roles = HashMap::new();
         roles.insert(Scope::Organization, Role::Owner);
         let acc = self.account_provider.create(account::CreateRequest {
+            admin: false,
+            password: request.password,
             organization_id: org.id,
             username: request.username,
-            password: request.password,
             roles: Some(roles),
             permissions: None,
         })?;

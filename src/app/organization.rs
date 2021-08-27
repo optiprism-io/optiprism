@@ -1,8 +1,13 @@
-use super::error::Result;
+use super::error::{Result, ERR_TODO};
 use chrono::{DateTime, Utc};
 use rocksdb::DB;
-use std::sync::Arc;
+use serde::{Deserialize, Serialize};
+use std::{
+    convert::TryInto,
+    sync::{Arc, Mutex},
+};
 
+#[derive(Serialize, Deserialize)]
 pub struct Organization {
     pub id: u64,
     pub created_at: DateTime<Utc>,
@@ -23,19 +28,56 @@ pub struct List {
 
 pub struct Provider {
     db: Arc<DB>,
+    sequence_guard: Mutex<()>,
 }
 
 impl Provider {
     pub fn new(db: Arc<DB>) -> Self {
-        Provider { db }
+        Provider {
+            db,
+            sequence_guard: Mutex::new(()),
+        }
     }
 
     pub fn create(&self, request: CreateRequest) -> Result<Organization> {
-        unimplemented!()
+        let id = {
+            let _guard = self.sequence_guard.lock().unwrap();
+            self.db
+                .merge("organization_sequence_number", 1u64.to_le_bytes())
+                .unwrap();
+            u64::from_le_bytes(
+                self.db
+                    .get("organization_sequence_number")
+                    .unwrap()
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
+            )
+        };
+        let org = Organization {
+            id,
+            created_at: Utc::now(),
+            updated_at: None,
+            name: request.name,
+        };
+        self.db
+            .put(
+                [b"organization:".as_ref(), id.to_le_bytes().as_ref()].concat(),
+                serde_json::to_vec(&org).unwrap(),
+            )
+            .unwrap();
+        Ok(org)
     }
 
     pub fn get_by_id(&self, id: u64) -> Result<Organization> {
-        unimplemented!()
+        let value = self
+            .db
+            .get([b"organization:".as_ref(), id.to_le_bytes().as_ref()].concat())
+            .unwrap();
+        if let Some(value) = value {
+            return Ok(serde_json::from_slice(&value).unwrap());
+        }
+        return Err(ERR_TODO.into());
     }
 
     pub fn list(&self) -> Result<List> {
