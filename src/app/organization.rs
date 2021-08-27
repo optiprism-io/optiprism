@@ -1,11 +1,11 @@
-use super::error::{Result, ERR_TODO};
+use super::{
+    dbutils::get_next_id,
+    error::{Result, ERR_TODO},
+};
 use chrono::{DateTime, Utc};
 use rocksdb::DB;
 use serde::{Deserialize, Serialize};
-use std::{
-    convert::TryInto,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 #[derive(Serialize, Deserialize)]
 pub struct Organization {
@@ -42,17 +42,7 @@ impl Provider {
     pub fn create(&self, request: CreateRequest) -> Result<Organization> {
         let id = {
             let _guard = self.sequence_guard.lock().unwrap();
-            self.db
-                .merge("organization_sequence_number", 1u64.to_le_bytes())
-                .unwrap();
-            u64::from_le_bytes(
-                self.db
-                    .get("organization_sequence_number")
-                    .unwrap()
-                    .unwrap()
-                    .try_into()
-                    .unwrap(),
-            )
+            get_next_id(&self.db, b"organization_sequence_number")?
         };
         let org = Organization {
             id,

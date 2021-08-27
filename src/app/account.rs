@@ -1,5 +1,6 @@
 use super::{
     auth::{make_password_hash, make_salt},
+    dbutils::get_next_id,
     error::{Result, ERR_TODO},
     rbac::{Permission, Role, Scope},
 };
@@ -8,7 +9,6 @@ use rocksdb::DB;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    convert::TryInto,
     sync::{Arc, Mutex},
 };
 
@@ -58,17 +58,7 @@ impl Provider {
     pub fn create(&self, request: CreateRequest) -> Result<Account> {
         let id = {
             let _guard = self.sequence_guard.lock().unwrap();
-            self.db
-                .merge("account_sequence_number", 1u64.to_le_bytes())
-                .unwrap();
-            u64::from_le_bytes(
-                self.db
-                    .get("account_sequence_number")
-                    .unwrap()
-                    .unwrap()
-                    .try_into()
-                    .unwrap(),
-            )
+            get_next_id(&self.db, b"account_sequence_number")?
         };
         let salt = make_salt();
         let password = make_password_hash(&request.password, &salt);

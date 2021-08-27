@@ -5,6 +5,7 @@ mod error;
 mod http;
 mod organization;
 mod rbac;
+mod dbutils;
 
 use actix_http::{header, HttpMessage};
 use actix_service::Service;
