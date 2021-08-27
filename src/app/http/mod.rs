@@ -1,10 +1,8 @@
-use super::{FindRequest, ListPublicProfile, Service, UserPublicProfile};
-use crate::context::ContextExtractor;
-use actix_web::{get, web, HttpResponse};
+mod auth;
 
-fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(internal_find_users)
-        .service(internal_find_user_by_id)
-        .service(find_users)
-        .service(find_user_by_id);
+use super::auth as auth_provider;
+use actix_web::web::ServiceConfig;
+
+pub fn configure(cfg: &mut ServiceConfig) {
+    auth::configure(cfg);
 }

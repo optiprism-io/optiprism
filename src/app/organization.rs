@@ -8,11 +8,17 @@ pub struct Organization {
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
     pub name: String,
+    // TODO: add organization fields
+}
+
+pub struct CreateRequest {
+    pub name: String,
+    // TODO: add organization fields
 }
 
 pub struct List {
-   pub data: Vec<Organization>,
-   pub total: u64,
+    pub data: Vec<Organization>,
+    pub total: u64,
 }
 
 pub struct Provider {
@@ -24,7 +30,7 @@ impl Provider {
         Provider { db }
     }
 
-    pub fn create(&mut self, user: &Organization) -> Result<Organization> {
+    pub fn create(&self, request: CreateRequest) -> Result<Organization> {
         unimplemented!()
     }
 

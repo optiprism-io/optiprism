@@ -12,7 +12,7 @@ use std::{
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
-struct InternalError {
+pub struct InternalError {
     code: &'static str,
     status_code: StatusCode,
 }
@@ -71,12 +71,10 @@ impl ResponseError for Error {
 }
 
 pub const ERR_INTERNAL_CONTEXT_REQUIRED: InternalError =
-    InternalError::new("00001", StatusCode::INTERNAL_SERVER_ERROR);
+    InternalError::new("IN001", StatusCode::INTERNAL_SERVER_ERROR);
 
-pub const ERR_AUTH_LOG_IN_USER_NOT_FOUND: InternalError =
-    InternalError::new("A1001", StatusCode::FORBIDDEN);
 pub const ERR_AUTH_LOG_IN_INVALID_PASSWORD: InternalError =
-    InternalError::new("A1002", StatusCode::FORBIDDEN);
+    InternalError::new("AU001", StatusCode::FORBIDDEN);
 
-pub const ERR_USER_CREATE_CONFLICT: InternalError =
-    InternalError::new("U1001", StatusCode::CONFLICT);
+pub const ERR_ACCOUNT_CREATE_CONFLICT: InternalError =
+    InternalError::new("AC001", StatusCode::CONFLICT);

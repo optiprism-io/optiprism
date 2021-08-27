@@ -2,33 +2,39 @@ use super::{
     auth,
     error::{Error, ERR_INTERNAL_CONTEXT_REQUIRED},
 };
-use actix_http::{
-    body::{Body, MessageBody},
-    header,
-};
-use actix_service::{
-    apply, apply_fn_factory, IntoServiceFactory, ServiceFactory, ServiceFactoryExt, Transform,
-};
+use actix_http::header;
 use actix_utils::future::{err, ok, Ready};
-use actix_web::{
-    dev::Payload,
-    dev::{ServiceRequest, ServiceResponse},
-    get,
-    web::{Data, ServiceConfig},
-    App, FromRequest, HttpRequest, HttpServer,
-};
-use std::{future::Future, ops::Deref, rc::Rc};
+use actix_web::{dev::Payload, App, FromRequest, HttpRequest};
+use std::{ops::Deref, rc::Rc};
 
 #[derive(Debug, Default)]
-struct Context {
-    user_id: u64,
+pub struct Context {
+    organization_id: u64,
+    account_id: u64,
+}
+
+impl Context {
+    pub fn from_token(token: Option<&header::HeaderValue>) -> Self {
+        let mut ctx = Context::default();
+        if let Some(value) = token {
+            if let Ok(value) = value.to_str() {
+                if let Some(token) = value.strip_prefix("Bearer ") {
+                    if let Ok(claims) = auth::parse_access_token(token) {
+                        ctx.organization_id = claims.organization_id;
+                        ctx.account_id = claims.account_id;
+                    }
+                }
+            }
+        }
+        ctx
+    }
 }
 
 #[derive(Debug)]
-struct ContextExtractor(Rc<Context>);
+pub struct ContextExtractor(Rc<Context>);
 
 impl ContextExtractor {
-    fn new(state: Context) -> ContextExtractor {
+    pub fn new(state: Context) -> ContextExtractor {
         ContextExtractor(Rc::new(state))
     }
 
@@ -58,30 +64,4 @@ impl FromRequest for ContextExtractor {
             err(ERR_INTERNAL_CONTEXT_REQUIRED.into())
         }
     }
-}
-
-pub fn middleware<B, T, R>(request: ServiceRequest, service: &T::Service) -> R
-where
-    B: MessageBody,
-    T: ServiceFactory<
-        ServiceRequest,
-        Config = (),
-        Response = ServiceResponse<B>,
-        Error = Error,
-        InitError = (),
-    >,
-    R: Future<Output = Result<ServiceResponse<B>, Error>> + Clone,
-{
-    let mut ctx = Context::default();
-    if let Some(value) = request.headers().get(header::AUTHORIZATION) {
-        if let Ok(value) = value.to_str() {
-            if let Some(token) = value.strip_prefix("Bearer ") {
-                if let Ok(claims) = auth::parse_jwt_access_token(token) {
-                    ctx.user_id = claims.user_id;
-                }
-            }
-        }
-    }
-    request.extensions_mut().insert(ContextExtractor::new(ctx));
-    service.call(request)
 }

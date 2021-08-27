@@ -26,7 +26,7 @@ actix-web = { version = "4.0.0-beta.8", default-features = false, features = [
 futures = "0.3.16"
 serde = { version = "1.0.129", features = ["derive"] }
 serde_json = "1.0.66"
-chrono = "0.4.19"
+chrono = { version = "0.4.19", features = ["serde"] }
 arrow = "5.2.0"
 datafusion = "5.0.0"
 tokio = { version = "1.10.1", features = [

@@ -1,38 +1,37 @@
-use super::error::Result;
+use super::{
+    error::Result,
+    rbac::{Permission, Role, Scope},
+};
 use chrono::{DateTime, Utc};
 use rocksdb::DB;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-enum Role {
-    Admin,
-    Owner,
-    Reader,
-}
-
-enum Permission {
-    List,
-}
-
-pub struct CreateRequest {
-    pub organization_id: u64,
-    pub username: String,
-    pub password: String,
-    pub roles: HashMap<String, Role>,
-    pub permissions: HashMap<String, Vec<Permission>>,
-}
-
+#[derive(Serialize, Deserialize)]
 pub struct Account {
     pub id: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub salt: String,
+    pub password: String,
+    pub admin: bool,
+    pub organization_id: u64,
+    pub username: String,
+    pub roles: Option<HashMap<Scope, Role>>,
+    pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateRequest {
     pub organization_id: u64,
     pub username: String,
     pub password: String,
-    pub roles: HashMap<String, Role>,
-    pub permissions: HashMap<String, Vec<Permission>>,
+    pub roles: Option<HashMap<Scope, Role>>,
+    pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
 }
 
+#[derive(Deserialize)]
 struct List {
     pub data: Vec<Account>,
     pub total: u64,
@@ -47,11 +46,15 @@ impl Provider {
         Provider { db }
     }
 
-    pub fn create(&mut self, user: &Account) -> Result<Account> {
+    pub fn create(&self, request: CreateRequest) -> Result<Account> {
         unimplemented!()
     }
 
     pub fn get_by_id(&self, id: u64) -> Result<Account> {
+        unimplemented!()
+    }
+
+    pub fn get_by_email(&self, email: String) -> Result<Account> {
         unimplemented!()
     }
 
