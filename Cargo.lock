@@ -801,6 +801,7 @@ dependencies = [
  "arrow",
  "async-trait",
  "bincode",
+ "byteorder",
  "chrono",
  "criterion",
  "datafusion",

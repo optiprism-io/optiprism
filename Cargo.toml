@@ -36,17 +36,18 @@ tokio = { version = "1.10.1", features = [
 	"sync",
 ] }
 async-trait = "0.1.51"
-rocksdb = { version = "0.17.0", features = ["multi-threaded-cf"] }
+rocksdb = { version = "0.17.0" }
 jsonwebtoken = "7.2.0"
 lazy_static = "1.4.0"
 rand = "0.8.4"
 sha3 = "0.9.1"
 hex = "0.4.3"
 bincode = "1.3.3"
+byteorder = "1"
 
 [dev-dependencies]
 criterion = "0.3.5"
 
-# [[bench]]
-# name = "count"
-# harness = false
+[[bench]]
+name = "rocksdb_users"
+harness = false
