@@ -12,7 +12,7 @@ fn bincode_insert(c: &mut Criterion) {
     let mut i: u64 = 0;
 
     for cols in vec![5, 10, 20] {
-        let path = format!("bincode_insert_{}", cols);
+        let path = format!("/tmp/bincode_insert_{}", cols);
         let db = DB::open_default(path.clone()).unwrap();
         c.bench_with_input(BenchmarkId::new("bincode insert", format!("{} cols", cols)), &cols, |b, cc| {
             b.iter(|| {
@@ -35,7 +35,7 @@ fn bincode_insert(c: &mut Criterion) {
 
 fn cf_insert(c: &mut Criterion) {
     for cols in vec![5, 10, 20] {
-        let path = format!("cf_insert{}", cols);
+        let path = format!("/tmp/cf_insert{}", cols);
         let mut cf_opts = Options::default();
         cf_opts.set_max_write_buffer_number(16);
         let mut cfs: Vec<ColumnFamilyDescriptor> = vec![];
@@ -67,7 +67,7 @@ fn cf_insert(c: &mut Criterion) {
 
 fn bincode_query(c: &mut Criterion) {
     for cols in vec![1, 3, 5] {
-        let path = format!("bincode_query_{}", cols);
+        let path = format!("/tmp/bincode_query_{}", cols);
         let db = DB::open_default(path.clone()).unwrap();
 
         let mut w = Row {
@@ -102,7 +102,7 @@ fn bincode_query(c: &mut Criterion) {
 
 fn cf_query(c: &mut Criterion) {
     for cols in vec![1, 3, 5] {
-        let path = format!("cf_query_{}", cols);
+        let path = format!("/tmp/cf_query_{}", cols);
         let mut cf_opts = Options::default();
         cf_opts.set_max_write_buffer_number(16);
         let mut cfs: Vec<ColumnFamilyDescriptor> = vec![];

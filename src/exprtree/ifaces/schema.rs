@@ -28,6 +28,8 @@ pub struct UserProperty {
     tags: Vec<String>,
     name: String,
     typ: DataType,
+    // this is relative column id against its type
+    relative_column_id: usize,
     nullable: bool,
     is_dictionary: bool,
     dictionary_type: Option<DataType>,
