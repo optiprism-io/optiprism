@@ -3,6 +3,7 @@ use super::{
     entity_utils::List,
     error::{Result, ERR_ACCOUNT_CREATE_CONFLICT, ERR_ACCOUNT_NOT_FOUND, ERR_TODO},
     rbac::{Permission, Role, Scope},
+    sequence::Sequence,
 };
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
@@ -48,7 +49,7 @@ pub struct Provider {
     db: Arc<DB>,
     primary_cf: Arc<ColumnFamily>,
     secondary_cf: Arc<ColumnFamily>,
-    sequence_guard: Mutex<()>,
+    sequence: Sequence,
     create_guard: Mutex<()>,
 }
 
@@ -67,40 +68,18 @@ impl Provider {
             None => return Err(ERR_TODO.into()),
         };
         let secondary_cf: Arc<ColumnFamily> = unsafe { std::mem::transmute(bcf) };
+        let sequence = Sequence::new(db.clone(), secondary_cf.clone(), SEQUENCE_KEY);
         Ok(Self {
             db,
             primary_cf,
             secondary_cf,
-            sequence_guard: Mutex::new(()),
+            sequence,
             create_guard: Mutex::new(()),
         })
     }
 
     pub fn create(&self, request: CreateRequest) -> Result<Account> {
-        let id = {
-            let _guard = match self.sequence_guard.lock() {
-                Ok(guard) => guard,
-                Err(_err) => return Err(ERR_TODO.into()),
-            };
-            let mut id = 1u64;
-            let value = match self.db.get_cf(self.secondary_cf.as_ref(), SEQUENCE_KEY) {
-                Ok(value) => value,
-                Err(_err) => return Err(ERR_TODO.into()),
-            };
-            if let Some(value) = value {
-                id += u64::from_le_bytes(match value.try_into() {
-                    Ok(value) => value,
-                    Err(_err) => return Err(ERR_TODO.into()),
-                });
-            }
-            let result = self
-                .db
-                .put_cf(self.secondary_cf.as_ref(), SEQUENCE_KEY, id.to_le_bytes());
-            if result.is_err() {
-                return Err(ERR_TODO.into());
-            }
-            id
-        };
+        let id = self.sequence.next()?;
         let salt = make_salt();
         let password = make_password_hash(&request.password, &salt);
         let acc = Account {

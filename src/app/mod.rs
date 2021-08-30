@@ -6,6 +6,7 @@ mod error;
 mod http;
 mod organization;
 mod rbac;
+mod sequence;
 
 use actix_http::{header, HttpMessage};
 use actix_service::Service;
