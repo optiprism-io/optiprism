@@ -1,7 +1,7 @@
 mod app;
 mod exprtree;
 
-use rocksdb::DB;
+use rocksdb::{ColumnFamilyDescriptor, Options, DB};
 use std::{env::var, sync::Arc};
 
 #[actix_web::main]
@@ -16,7 +16,12 @@ async fn main() -> std::io::Result<()> {
         std::env::set_var("FNP_REFRESH_TOKEN_KEY", "key");
     }
 
-    let db = Arc::new(DB::open_default(var("FNP_DB_PATH").unwrap()).unwrap());
+    let mut options = Options::default();
+    options.create_if_missing(true);
+    options.create_missing_column_families(true);
+    let db = Arc::new(
+        DB::open_cf_descriptors(&options, var("FNP_DB_PATH").unwrap(), app::get_cfs()).unwrap(),
+    );
 
     app::init(db)?.await
 }

@@ -12,9 +12,19 @@ use actix_http::{header, HttpMessage};
 use actix_service::Service;
 use actix_web::{dev::Server, web::Data, App, HttpServer};
 use context::{Context, ContextExtractor};
-use rocksdb::DB;
+use rocksdb::{ColumnFamilyDescriptor, Options, DB};
 use std::{env::var, io::Result, sync::Arc};
 
+pub fn get_cfs() -> Vec<ColumnFamilyDescriptor> {
+    vec![
+        ColumnFamilyDescriptor::new(sequence::COLUMN_FAMILY, Options::default()),
+        ColumnFamilyDescriptor::new(organization::COLUMN_FAMILY, Options::default()),
+        ColumnFamilyDescriptor::new(account::PRIMARY_CF, Options::default()),
+        ColumnFamilyDescriptor::new(account::SECONDARY_CF, Options::default()),
+    ]
+}
+
+// TODO: return err
 pub fn init(db: Arc<DB>) -> Result<Server> {
     let organization_provider = Data::new(organization::Provider::new(db.clone()).unwrap());
     let account_provider = Data::new(account::Provider::new(db.clone()).unwrap());
