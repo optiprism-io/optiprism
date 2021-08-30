@@ -29,7 +29,7 @@ pub struct UserProperty {
     name: String,
     typ: DataType,
     // this is relative column id against its type
-    relative_column_id: usize,
+    column_index: usize,
     nullable: bool,
     is_dictionary: bool,
     dictionary_type: Option<DataType>,
