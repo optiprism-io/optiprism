@@ -1,16 +1,19 @@
 use super::{
     auth,
     error::{Error, ERR_INTERNAL_CONTEXT_REQUIRED},
+    rbac::{Permission, Role, Scope},
 };
 use actix_http::header;
 use actix_utils::future::{err, ok, Ready};
-use actix_web::{dev::Payload, App, FromRequest, HttpRequest};
-use std::{ops::Deref, rc::Rc};
+use actix_web::{dev::Payload, FromRequest, HttpRequest};
+use std::{collections::HashMap, ops::Deref, rc::Rc};
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Context {
-    organization_id: u64,
-    account_id: u64,
+    pub organization_id: u64,
+    pub account_id: u64,
+    pub roles: Option<HashMap<Scope, Role>>,
+    pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
 }
 
 impl Context {
@@ -22,6 +25,8 @@ impl Context {
                     if let Ok(claims) = auth::parse_access_token(token) {
                         ctx.organization_id = claims.organization_id;
                         ctx.account_id = claims.account_id;
+                        ctx.roles = claims.roles;
+                        ctx.permissions = claims.permissions;
                     }
                 }
             }
@@ -30,16 +35,11 @@ impl Context {
     }
 }
 
-#[derive(Debug)]
 pub struct ContextExtractor(Rc<Context>);
 
 impl ContextExtractor {
     pub fn new(state: Context) -> ContextExtractor {
         ContextExtractor(Rc::new(state))
-    }
-
-    fn into_inner(self) -> Rc<Context> {
-        self.0
     }
 }
 

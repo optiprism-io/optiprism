@@ -2,7 +2,7 @@ use super::{
     account,
     error::{Result, ERR_AUTH_LOG_IN_INVALID_PASSWORD},
     organization,
-    rbac::{Role, Scope},
+    rbac::{Permission, Role, Scope},
 };
 use chrono::{Duration, Utc};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -52,9 +52,11 @@ pub struct TokensResponse {
 
 #[derive(Serialize, Deserialize)]
 pub struct AccessClaims {
+    pub exp: i64,
     pub organization_id: u64,
     pub account_id: u64,
-    pub exp: i64,
+    pub roles: Option<HashMap<Scope, Role>>,
+    pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -112,9 +114,11 @@ fn make_token_response(acc: account::Account) -> Result<TokensResponse> {
     Ok(TokensResponse {
         access_token: make_token(
             AccessClaims {
+                exp: Utc::now().add(ACCESS_TOKEN_DURATION.clone()).timestamp(),
                 organization_id: acc.organization_id,
                 account_id: acc.id,
-                exp: Utc::now().add(ACCESS_TOKEN_DURATION.clone()).timestamp(),
+                roles: acc.roles,
+                permissions: acc.permissions,
             },
             ACCESS_TOKEN_KEY.as_bytes(),
         )?,
