@@ -7,7 +7,7 @@ use super::{
 use chrono::{Duration, Utc};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use sha3::{Digest, Sha3_256};
+use sha3::{Digest, Sha3_256, Sha3_512};
 use std::{collections::HashMap, env::var, ops::Add, sync::Arc};
 
 lazy_static::lazy_static! {
@@ -178,7 +178,7 @@ pub fn make_salt() -> String {
 }
 
 pub fn make_password_hash(password: &str, salt: &str) -> String {
-    let mut hasher = Sha3_256::new();
+    let mut hasher = Sha3_512::new();
     hasher.update(vec![password, salt, &COMMON_SALT].concat());
     hex::encode(hasher.finalize())
 }
