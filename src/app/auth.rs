@@ -30,7 +30,6 @@ pub struct LogInRequest {
 pub struct SignUpRequest {
     pub organization_name: String,
     pub email: String,
-    pub username: String,
     pub password: String,
 }
 
@@ -94,7 +93,7 @@ impl Provider {
             admin: false,
             password: request.password,
             organization_id: org.id,
-            username: request.username,
+            email: request.email,
             roles: Some(roles),
             permissions: None,
         })?;

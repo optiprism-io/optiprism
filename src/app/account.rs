@@ -1,9 +1,8 @@
 use super::{
     auth::{make_password_hash, make_salt},
     entity_utils::List,
-    error::{Result, ERR_ACCOUNT_NOT_FOUND, ERR_TODO},
+    error::{Result, ERR_ACCOUNT_CREATE_CONFLICT, ERR_ACCOUNT_NOT_FOUND, ERR_TODO},
     rbac::{Permission, Role, Scope},
-    sequence::Sequence,
 };
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
@@ -11,11 +10,13 @@ use rocksdb::{ColumnFamily, DB};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    convert::TryInto,
     sync::{Arc, Mutex},
 };
 
-pub const COLUMN_FAMILY: &str = "account";
-const SEQUENCE_KEY: &'static [u8] = b"account";
+pub const PRIMARY_CF: &str = "account";
+pub const SECONDARY_CF: &str = "account_sec";
+const SEQUENCE_KEY: &'static [u8] = b"_id";
 
 #[derive(Serialize, Deserialize)]
 pub struct Account {
@@ -26,7 +27,7 @@ pub struct Account {
     pub salt: String,
     pub password: String,
     pub organization_id: u64,
-    pub username: String,
+    pub email: String,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
     // TODO: add account fields
@@ -37,7 +38,7 @@ pub struct CreateRequest {
     pub admin: bool,
     pub password: String,
     pub organization_id: u64,
-    pub username: String,
+    pub email: String,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
     // TODO: add create account fields
@@ -45,29 +46,58 @@ pub struct CreateRequest {
 
 pub struct Provider {
     db: Arc<DB>,
-    cf: Arc<ColumnFamily>,
-    sequence: Sequence,
+    primary_cf: Arc<ColumnFamily>,
+    secondary_cf: Arc<ColumnFamily>,
+    sequence_guard: Mutex<()>,
     create_guard: Mutex<()>,
 }
 
 impl Provider {
     pub fn new(db: Arc<DB>) -> Result<Self> {
-        let sequence = Sequence::new(db.clone(), SEQUENCE_KEY)?;
-        let dcf = match db.cf_handle(COLUMN_FAMILY) {
-            Some(dfc) => dfc,
+        let bcf = match db.cf_handle(PRIMARY_CF) {
+            Some(bcf) => bcf,
             None => return Err(ERR_TODO.into()),
         };
-        let cf: Arc<ColumnFamily> = unsafe { std::mem::transmute(dcf) };
+        let primary_cf: Arc<ColumnFamily> = unsafe { std::mem::transmute(bcf) };
+        let bcf = match db.cf_handle(SECONDARY_CF) {
+            Some(bcf) => bcf,
+            None => return Err(ERR_TODO.into()),
+        };
+        let secondary_cf: Arc<ColumnFamily> = unsafe { std::mem::transmute(bcf) };
         Ok(Self {
             db,
-            cf,
-            sequence,
+            primary_cf,
+            secondary_cf,
+            sequence_guard: Mutex::new(()),
             create_guard: Mutex::new(()),
         })
     }
 
     pub fn create(&self, request: CreateRequest) -> Result<Account> {
-        let id = self.sequence.next()?;
+        let id = {
+            let _guard = match self.sequence_guard.lock() {
+                Ok(guard) => guard,
+                Err(_err) => return Err(ERR_TODO.into()),
+            };
+            let mut id = 1u64;
+            let value = match self.db.get_cf(self.secondary_cf.as_ref(), SEQUENCE_KEY) {
+                Ok(value) => value,
+                Err(_err) => return Err(ERR_TODO.into()),
+            };
+            if let Some(value) = value {
+                id += u64::from_le_bytes(match value.try_into() {
+                    Ok(value) => value,
+                    Err(_err) => return Err(ERR_TODO.into()),
+                });
+            }
+            let result = self
+                .db
+                .put_cf(self.secondary_cf.as_ref(), SEQUENCE_KEY, id.to_le_bytes());
+            if result.is_err() {
+                return Err(ERR_TODO.into());
+            }
+            id
+        };
         let salt = make_salt();
         let password = make_password_hash(&request.password, &salt);
         let acc = Account {
@@ -78,24 +108,50 @@ impl Provider {
             salt,
             password,
             organization_id: request.organization_id,
-            username: request.username,
+            email: request.email,
             roles: request.roles,
             permissions: request.permissions,
         };
-        self.db
-            .put_cf(
-                self.cf.as_ref(),
+        {
+            let _guard = match self.create_guard.lock() {
+                Ok(guard) => guard,
+                Err(_err) => return Err(ERR_TODO.into()),
+            };
+            match self
+                .db
+                .get_cf(self.secondary_cf.as_ref(), acc.email.as_bytes())
+            {
+                Ok(value) => {
+                    if value.is_some() {
+                        return Err(ERR_ACCOUNT_CREATE_CONFLICT.into());
+                    }
+                }
+                Err(_err) => return Err(ERR_TODO.into()),
+            }
+            let result = self.db.put_cf(
+                self.primary_cf.as_ref(),
                 id.to_le_bytes().as_ref(),
                 serialize(&acc).unwrap(),
-            )
-            .unwrap();
+            );
+            if result.is_err() {
+                return Err(ERR_TODO.into());
+            }
+            let result = self.db.put_cf(
+                self.secondary_cf.as_ref(),
+                acc.email.as_bytes(),
+                id.to_le_bytes(),
+            );
+            if result.is_err() {
+                return Err(ERR_TODO.into());
+            }
+        }
         Ok(acc)
     }
 
     pub fn get_by_id(&self, id: u64) -> Result<Account> {
         let value = self
             .db
-            .get_cf(self.cf.as_ref(), id.to_le_bytes().as_ref())
+            .get_cf(self.primary_cf.as_ref(), id.to_le_bytes().as_ref())
             .unwrap();
         if let Some(value) = value {
             return Ok(deserialize(&value).unwrap());
@@ -104,7 +160,18 @@ impl Provider {
     }
 
     pub fn get_by_email(&self, email: String) -> Result<Account> {
-        unimplemented!()
+        let value = match self.db.get_cf(self.secondary_cf.as_ref(), email.as_bytes()) {
+            Ok(value) => match value {
+                Some(value) => value,
+                None => return Err(ERR_ACCOUNT_NOT_FOUND.into()),
+            },
+            Err(_err) => return Err(ERR_TODO.into()),
+        };
+        let id = u64::from_le_bytes(match value.try_into() {
+            Ok(value) => value,
+            Err(_err) => return Err(ERR_TODO.into()),
+        });
+        self.get_by_id(id)
     }
 
     pub fn list(&self) -> Result<List<Account>> {
