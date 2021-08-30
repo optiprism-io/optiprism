@@ -75,8 +75,17 @@ pub const ERR_TODO: InternalError = InternalError::new("00000", StatusCode::INTE
 pub const ERR_INTERNAL_CONTEXT_REQUIRED: InternalError =
     InternalError::new("IN001", StatusCode::INTERNAL_SERVER_ERROR);
 
+// Auth error
 pub const ERR_AUTH_LOG_IN_INVALID_PASSWORD: InternalError =
     InternalError::new("AU001", StatusCode::FORBIDDEN);
 
+// Account error
 pub const ERR_ACCOUNT_CREATE_CONFLICT: InternalError =
     InternalError::new("AC001", StatusCode::CONFLICT);
+pub const ERR_ACCOUNT_NOT_FOUND: InternalError = InternalError::new("AC002", StatusCode::NOT_FOUND);
+
+// Organization error
+pub const ERR_ORGANIZATION_CREATE_CONFLICT: InternalError =
+    InternalError::new("OR001", StatusCode::CONFLICT);
+pub const ERR_ORGANIZATION_NOT_FOUND: InternalError =
+    InternalError::new("OR002", StatusCode::NOT_FOUND);

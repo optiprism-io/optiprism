@@ -1,11 +1,12 @@
 mod account;
 mod auth;
 mod context;
+mod sequence;
+mod entity_utils;
 mod error;
 mod http;
 mod organization;
 mod rbac;
-mod dbutils;
 
 use actix_http::{header, HttpMessage};
 use actix_service::Service;
@@ -15,13 +16,13 @@ use rocksdb::DB;
 use std::{env::var, io::Result, sync::Arc};
 
 pub fn init(db: Arc<DB>) -> Result<Server> {
-    let organization_provider = Data::new(organization::Provider::new(db.clone()));
-    let account_provider = Data::new(account::Provider::new(db.clone()));
-    let auth_provider = Data::new(auth::Provider::new(
-        organization_provider.clone().into_inner(),
-        account_provider.clone().into_inner(),
-    ));
     Ok(HttpServer::new(move || {
+        let organization_provider = Data::new(organization::Provider::new(db.clone()).unwrap());
+        let account_provider = Data::new(account::Provider::new(db.clone()).unwrap());
+        let auth_provider = Data::new(auth::Provider::new(
+            organization_provider.clone().into_inner(),
+            account_provider.clone().into_inner(),
+        ));
         App::new()
             .wrap_fn(|request, service| {
                 request

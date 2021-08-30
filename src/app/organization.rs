@@ -1,15 +1,16 @@
 use super::{
-    dbutils::get_next_id,
-    error::{Result, ERR_TODO},
+    entity_utils::List,
+    error::{Result, ERR_ORGANIZATION_NOT_FOUND, ERR_TODO},
+    sequence::Sequence,
 };
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
-use rocksdb::DB;
+use rocksdb::{ColumnFamily, DB};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-const KEY_PREFIX: &[u8] = b"organization:";
-const SEQUENCE_KEY: &[u8] = b"organization_sequence_number";
+pub const COLUMN_FAMILY: &str = "organization";
+const SEQUENCE_KEY: &'static [u8] = b"organization";
 
 #[derive(Serialize, Deserialize)]
 pub struct Organization {
@@ -22,32 +23,28 @@ pub struct Organization {
 
 pub struct CreateRequest {
     pub name: String,
-    // TODO: add organization fields
-}
-
-pub struct List {
-    pub data: Vec<Organization>,
-    pub total: u64,
+    // TODO: add create organization fields
 }
 
 pub struct Provider {
     db: Arc<DB>,
-    sequence_guard: Mutex<()>,
+    cf: Arc<ColumnFamily>,
+    sequence: Sequence,
 }
 
 impl Provider {
-    pub fn new(db: Arc<DB>) -> Self {
-        Provider {
-            db,
-            sequence_guard: Mutex::new(()),
-        }
+    pub fn new(db: Arc<DB>) -> Result<Self> {
+        let sequence = Sequence::new(db.clone(), SEQUENCE_KEY)?;
+        let dcf = match db.cf_handle(COLUMN_FAMILY) {
+            Some(dfc) => dfc,
+            None => return Err(ERR_TODO.into()),
+        };
+        let cf: Arc<ColumnFamily> = unsafe { std::mem::transmute(dcf) };
+        Ok(Self { db, cf, sequence })
     }
 
     pub fn create(&self, request: CreateRequest) -> Result<Organization> {
-        let id = {
-            let _guard = self.sequence_guard.lock().unwrap();
-            get_next_id(&self.db, SEQUENCE_KEY)?
-        };
+        let id = self.sequence.next()?;
         let org = Organization {
             id,
             created_at: Utc::now(),
@@ -55,8 +52,9 @@ impl Provider {
             name: request.name,
         };
         self.db
-            .put(
-                [KEY_PREFIX, id.to_le_bytes().as_ref()].concat(),
+            .put_cf(
+                self.cf.as_ref(),
+                id.to_le_bytes().as_ref(),
                 serialize(&org).unwrap(),
             )
             .unwrap();
@@ -66,15 +64,15 @@ impl Provider {
     pub fn get_by_id(&self, id: u64) -> Result<Organization> {
         let value = self
             .db
-            .get([KEY_PREFIX, id.to_le_bytes().as_ref()].concat())
+            .get_cf(self.cf.as_ref(), id.to_le_bytes().as_ref())
             .unwrap();
         if let Some(value) = value {
             return Ok(deserialize(&value).unwrap());
         }
-        return Err(ERR_TODO.into());
+        return Err(ERR_ORGANIZATION_NOT_FOUND.into());
     }
 
-    pub fn list(&self) -> Result<List> {
+    pub fn list(&self) -> Result<List<Organization>> {
         unimplemented!()
     }
 

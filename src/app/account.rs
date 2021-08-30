@@ -1,20 +1,21 @@
 use super::{
     auth::{make_password_hash, make_salt},
-    dbutils::get_next_id,
-    error::{Result, ERR_TODO},
+    entity_utils::List,
+    error::{Result, ERR_ACCOUNT_NOT_FOUND, ERR_TODO},
     rbac::{Permission, Role, Scope},
+    sequence::Sequence,
 };
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
-use rocksdb::DB;
+use rocksdb::{ColumnFamily, DB};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
 
-const KEY_PREFIX: &[u8] = b"account:";
-const SEQUENCE_KEY: &[u8] = b"account_sequence_number";
+pub const COLUMN_FAMILY: &str = "account";
+const SEQUENCE_KEY: &'static [u8] = b"account";
 
 #[derive(Serialize, Deserialize)]
 pub struct Account {
@@ -28,6 +29,7 @@ pub struct Account {
     pub username: String,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
+    // TODO: add account fields
 }
 
 #[derive(Deserialize)]
@@ -38,32 +40,34 @@ pub struct CreateRequest {
     pub username: String,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
-}
-
-#[derive(Deserialize)]
-struct List {
-    pub data: Vec<Account>,
-    pub total: u64,
+    // TODO: add create account fields
 }
 
 pub struct Provider {
     db: Arc<DB>,
-    sequence_guard: Mutex<()>,
+    cf: Arc<ColumnFamily>,
+    sequence: Sequence,
+    create_guard: Mutex<()>,
 }
 
 impl Provider {
-    pub fn new(db: Arc<DB>) -> Self {
-        Provider {
+    pub fn new(db: Arc<DB>) -> Result<Self> {
+        let sequence = Sequence::new(db.clone(), SEQUENCE_KEY)?;
+        let dcf = match db.cf_handle(COLUMN_FAMILY) {
+            Some(dfc) => dfc,
+            None => return Err(ERR_TODO.into()),
+        };
+        let cf: Arc<ColumnFamily> = unsafe { std::mem::transmute(dcf) };
+        Ok(Self {
             db,
-            sequence_guard: Mutex::new(()),
-        }
+            cf,
+            sequence,
+            create_guard: Mutex::new(()),
+        })
     }
 
     pub fn create(&self, request: CreateRequest) -> Result<Account> {
-        let id = {
-            let _guard = self.sequence_guard.lock().unwrap();
-            get_next_id(&self.db, SEQUENCE_KEY)?
-        };
+        let id = self.sequence.next()?;
         let salt = make_salt();
         let password = make_password_hash(&request.password, &salt);
         let acc = Account {
@@ -79,8 +83,9 @@ impl Provider {
             permissions: request.permissions,
         };
         self.db
-            .put(
-                [KEY_PREFIX, id.to_le_bytes().as_ref()].concat(),
+            .put_cf(
+                self.cf.as_ref(),
+                id.to_le_bytes().as_ref(),
                 serialize(&acc).unwrap(),
             )
             .unwrap();
@@ -90,19 +95,19 @@ impl Provider {
     pub fn get_by_id(&self, id: u64) -> Result<Account> {
         let value = self
             .db
-            .get([KEY_PREFIX, id.to_le_bytes().as_ref()].concat())
+            .get_cf(self.cf.as_ref(), id.to_le_bytes().as_ref())
             .unwrap();
         if let Some(value) = value {
             return Ok(deserialize(&value).unwrap());
         }
-        return Err(ERR_TODO.into());
+        return Err(ERR_ACCOUNT_NOT_FOUND.into());
     }
 
     pub fn get_by_email(&self, email: String) -> Result<Account> {
         unimplemented!()
     }
 
-    pub fn list(&self) -> Result<List> {
+    pub fn list(&self) -> Result<List<Account>> {
         unimplemented!()
     }
 
