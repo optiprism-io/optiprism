@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Mutex};
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use datafusion::scalar::ScalarValue;
@@ -11,12 +11,21 @@ use std::cell::RefCell;
 
 struct Oplog {
     // we use btreemap to be able to sort values by key
-    columns: Vec<RefCell<BTreeMap<u64, ScalarValue>>>,
+    columns: Vec<BTreeMap<u64, ScalarValue>>,
+}
+
+impl Oplog {
+    pub fn new(cols: usize) -> Self {
+        Oplog {
+            columns: vec![BTreeMap::new(); cols]
+        }
+    }
 }
 
 struct Store {
+    columns: Vec<DataType>,
     db: Arc<DB>,
-    oplog: RwLock<Oplog>,
+    oplog: Mutex<Oplog>,
 }
 
 struct ColumnDescriptor {
@@ -60,7 +69,7 @@ impl Store {
     // todo think about transactions
     pub fn set(&mut self, index: usize, values: Vec<(&ColumnDescriptor, &ScalarValue)>) -> Result<()> {
         // lock oplog for write
-        let oplog = self.oplog.write().unwrap();
+        let oplog = self.oplog.lock().unwrap();
         let mut batch = WriteBatch::default();
         for (cd, value) in values.iter() {
             let data_value = DataValue::from(*value);
@@ -97,5 +106,11 @@ impl Store {
                 Err(err) => Err(err)
             }
         }).collect()?
+    }
+
+    fn merge(&mut self) -> Result<()> {
+        let mut guard = self.oplog.lock().unwrap();
+        let oplog = std::mem::replace(&mut *guard, Oplog::new(self.columns.len()));
+        Ok(())
     }
 }
