@@ -32,6 +32,9 @@ pub struct Provider {
     sequence: Sequence,
 }
 
+unsafe impl Send for Provider {}
+unsafe impl Sync for Provider {}
+
 impl Provider {
     pub fn new(db: Arc<DB>) -> Result<Self> {
         let sequence = Sequence::new(db.clone(), SEQUENCE_KEY)?;

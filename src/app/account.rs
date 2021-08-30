@@ -52,6 +52,9 @@ pub struct Provider {
     create_guard: Mutex<()>,
 }
 
+unsafe impl Send for Provider {}
+unsafe impl Sync for Provider {}
+
 impl Provider {
     pub fn new(db: Arc<DB>) -> Result<Self> {
         let bcf = match db.cf_handle(PRIMARY_CF) {
