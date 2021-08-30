@@ -1,16 +1,19 @@
 use super::{
     entity_utils::List,
     error::{Result, ERR_ORGANIZATION_NOT_FOUND, ERR_TODO},
-    sequence::Sequence,
 };
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
 use rocksdb::{ColumnFamily, DB};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::{
+    convert::TryInto,
+    sync::{Arc, Mutex},
+};
 
-pub const COLUMN_FAMILY: &str = "organization";
-const SEQUENCE_KEY: &'static [u8] = b"organization";
+pub const PRIMARY_CF: &str = "organization";
+pub const SECONDARY_CF: &str = "organization_sec";
+const SEQUENCE_KEY: &'static [u8] = b"_id";
 
 #[derive(Serialize, Deserialize)]
 pub struct Organization {
@@ -28,8 +31,10 @@ pub struct CreateRequest {
 
 pub struct Provider {
     db: Arc<DB>,
-    cf: Arc<ColumnFamily>,
-    sequence: Sequence,
+    primary_cf: Arc<ColumnFamily>,
+    secondary_cf: Arc<ColumnFamily>,
+    sequence_guard: Mutex<()>,
+    create_guard: Mutex<()>,
 }
 
 unsafe impl Send for Provider {}
@@ -37,37 +42,71 @@ unsafe impl Sync for Provider {}
 
 impl Provider {
     pub fn new(db: Arc<DB>) -> Result<Self> {
-        let sequence = Sequence::new(db.clone(), SEQUENCE_KEY)?;
-        let dcf = match db.cf_handle(COLUMN_FAMILY) {
-            Some(dfc) => dfc,
+        let bcf = match db.cf_handle(PRIMARY_CF) {
+            Some(bcf) => bcf,
             None => return Err(ERR_TODO.into()),
         };
-        let cf: Arc<ColumnFamily> = unsafe { std::mem::transmute(dcf) };
-        Ok(Self { db, cf, sequence })
+        let primary_cf: Arc<ColumnFamily> = unsafe { std::mem::transmute(bcf) };
+        let bcf = match db.cf_handle(SECONDARY_CF) {
+            Some(bcf) => bcf,
+            None => return Err(ERR_TODO.into()),
+        };
+        let secondary_cf: Arc<ColumnFamily> = unsafe { std::mem::transmute(bcf) };
+        Ok(Self {
+            db,
+            primary_cf,
+            secondary_cf,
+            sequence_guard: Mutex::new(()),
+            create_guard: Mutex::new(()),
+        })
     }
 
     pub fn create(&self, request: CreateRequest) -> Result<Organization> {
-        let id = self.sequence.next()?;
+        let id = {
+            let _guard = match self.sequence_guard.lock() {
+                Ok(guard) => guard,
+                Err(_err) => return Err(ERR_TODO.into()),
+            };
+            let mut id = 1u64;
+            let value = match self.db.get_cf(self.secondary_cf.as_ref(), SEQUENCE_KEY) {
+                Ok(value) => value,
+                Err(_err) => return Err(ERR_TODO.into()),
+            };
+            if let Some(value) = value {
+                id += u64::from_le_bytes(match value.try_into() {
+                    Ok(value) => value,
+                    Err(_err) => return Err(ERR_TODO.into()),
+                });
+            }
+            let result = self
+                .db
+                .put_cf(self.secondary_cf.as_ref(), SEQUENCE_KEY, id.to_le_bytes());
+            if result.is_err() {
+                return Err(ERR_TODO.into());
+            }
+            id
+        };
         let org = Organization {
             id,
             created_at: Utc::now(),
             updated_at: None,
             name: request.name,
         };
-        self.db
-            .put_cf(
-                self.cf.as_ref(),
-                id.to_le_bytes().as_ref(),
-                serialize(&org).unwrap(),
-            )
-            .unwrap();
+        let result = self.db.put_cf(
+            self.primary_cf.as_ref(),
+            id.to_le_bytes().as_ref(),
+            serialize(&org).unwrap(),
+        );
+        if result.is_err() {
+            return Err(ERR_TODO.into());
+        }
         Ok(org)
     }
 
     pub fn get_by_id(&self, id: u64) -> Result<Organization> {
         let value = self
             .db
-            .get_cf(self.cf.as_ref(), id.to_le_bytes().as_ref())
+            .get_cf(self.primary_cf.as_ref(), id.to_le_bytes().as_ref())
             .unwrap();
         if let Some(value) = value {
             return Ok(deserialize(&value).unwrap());

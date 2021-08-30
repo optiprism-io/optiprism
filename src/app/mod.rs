@@ -6,7 +6,6 @@ mod error;
 mod http;
 mod organization;
 mod rbac;
-mod sequence;
 
 use actix_http::{header, HttpMessage};
 use actix_service::Service;
@@ -17,8 +16,8 @@ use std::{env::var, io::Result, sync::Arc};
 
 pub fn get_cfs() -> Vec<ColumnFamilyDescriptor> {
     vec![
-        ColumnFamilyDescriptor::new(sequence::COLUMN_FAMILY, Options::default()),
-        ColumnFamilyDescriptor::new(organization::COLUMN_FAMILY, Options::default()),
+        ColumnFamilyDescriptor::new(organization::PRIMARY_CF, Options::default()),
+        ColumnFamilyDescriptor::new(organization::SECONDARY_CF, Options::default()),
         ColumnFamilyDescriptor::new(account::PRIMARY_CF, Options::default()),
         ColumnFamilyDescriptor::new(account::SECONDARY_CF, Options::default()),
     ]
