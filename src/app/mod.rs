@@ -7,6 +7,7 @@ mod http;
 mod organization;
 mod rbac;
 mod sequence;
+mod dictionary;
 
 use actix_http::{header, HttpMessage};
 use actix_service::Service;
