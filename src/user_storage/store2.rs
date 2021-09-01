@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock, Mutex};
+use std::sync::{Arc, RwLock, Mutex, RwLockWriteGuard};
 use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use datafusion::scalar::ScalarValue;
@@ -7,25 +7,54 @@ use super::{
 };
 use arrow::datatypes::{DataType, SchemaRef};
 use rocksdb::{DB, WriteBatch, Error};
-use std::cell::RefCell;
+use arrow::array::ArrayRef;
 
 struct Oplog {
-    // we use btreemap to be able to sort values by key
+    chunk_size: usize,
+    // each column contains oplog
     columns: Vec<BTreeMap<u64, ScalarValue>>,
 }
 
 impl Oplog {
-    pub fn new(cols: usize) -> Self {
+    pub fn set(&mut self, col_id: usize, index: u64, value: ScalarValue) {
+        let batch_id = index / self.chunk_size;
+        let offset = index % self.chunk_size;
+
+        self.columns[col_id as usize][batch_id as usize].insert(offset, value);
+    }
+}
+
+impl Oplog {
+    pub fn new(cols: usize, chunks: usize, chunk_size: usize) -> Self {
         Oplog {
-            columns: vec![BTreeMap::new(); cols]
+            chunk_size,
+            columns: vec![BTreeMap::new(); cols],
         }
     }
 }
 
+enum ChunkData {
+    Empty,
+    Arrow(ArrayRef),
+}
+
+struct Chunk {
+    data: ChunkData,
+    min_key: u64,
+    max_key: u64,
+}
+
+struct Column {
+    data_type: DataType,
+    chunks: Vec<RwLock<Chunk>>,
+}
+
 struct Store {
-    columns: Vec<DataType>,
+    columns: Vec<Column>,
     db: Arc<DB>,
     oplog: Mutex<Oplog>,
+    chunk_size: usize,
+    len: usize,
 }
 
 struct ColumnDescriptor {
@@ -96,14 +125,9 @@ impl Store {
         let keys = vec![index; rocks_cds.len()];
 
         self.db.multi_get_cf(&[rocks_cds, keys]).iter().map(|value| {
-            match value {
-                Ok(v) => {
-                    match v {
-                        None => Ok(None),
-                        Some(v) => Ok(Some(DataValue::deserialize(&v).unwrap().into()))
-                    }
-                }
-                Err(err) => Err(err)
+            match value.or_else(|e| e).unwrap() {
+                None => Ok(None),
+                Some(v) => Ok(Some(DataValue::deserialize(&v).unwrap().into()))
             }
         }).collect()?
     }
@@ -111,6 +135,26 @@ impl Store {
     fn merge(&mut self) -> Result<()> {
         let mut guard = self.oplog.lock().unwrap();
         let oplog = std::mem::replace(&mut *guard, Oplog::new(self.columns.len()));
+        for (col_id, chunks) in oplog.columns.iter().enumerate() {
+            for (chunk_id, chunk) in chunks.iter().enumerate() {
+                let mut data_chunk = self.columns[col_id].chunks[chunk_id].write().unwrap();
+
+
+                match data_chunk {}
+            }
+            let mut chunk_id: usize = 0;
+            let mut chunk_guard: Option<RwLockWriteGuard<Chunk>> = None;
+            for (index, v) in col_data.iter() {
+                match chunk_guard {
+                    None => {
+                        chunk_guard = Some()
+                    }
+                    Some(_) => {}
+                }
+                chunk_id = index / self.chunk_size;
+            }
+        }
+
         Ok(())
     }
 }
