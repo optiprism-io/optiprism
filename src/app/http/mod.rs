@@ -3,7 +3,7 @@ mod auth;
 mod organization;
 
 use super::{
-    account as account_provider, auth as auth_provider, context::ContextExtractor,
+    account as account_provider, auth as auth_provider, context::ContextExtractor, error,
     organization as organization_provider,
 };
 use actix_web::web::ServiceConfig;

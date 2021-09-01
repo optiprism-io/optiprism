@@ -32,6 +32,9 @@ pub struct SignUpRequest {
     pub organization_name: String,
     pub email: String,
     pub password: String,
+    pub first_name: Option<String>,
+    pub middle_name: Option<String>,
+    pub last_name: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -103,6 +106,9 @@ impl Provider {
                 email: request.email,
                 roles: Some(roles),
                 permissions: None,
+                first_name: request.first_name,
+                middle_name: request.middle_name,
+                last_name: request.last_name,
             },
         )?;
         make_token_response(acc)

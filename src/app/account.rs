@@ -29,6 +29,9 @@ pub struct Account {
     pub email: String,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
+    pub first_name: Option<String>,
+    pub middle_name: Option<String>,
+    pub last_name: Option<String>,
     // TODO: add account fields
 }
 
@@ -40,7 +43,19 @@ pub struct CreateRequest {
     pub email: String,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
+    pub first_name: Option<String>,
+    pub middle_name: Option<String>,
+    pub last_name: Option<String>,
     // TODO: add create account fields
+}
+
+#[derive(Deserialize)]
+pub struct UpdateRequest {
+    pub id: u64,
+    pub first_name: Option<String>,
+    pub middle_name: Option<String>,
+    pub last_name: Option<String>,
+    // TODO: add update account fields
 }
 
 pub struct Provider {
@@ -91,6 +106,9 @@ impl Provider {
             email: request.email,
             roles: request.roles,
             permissions: request.permissions,
+            first_name: request.first_name,
+            middle_name: request.middle_name,
+            last_name: request.last_name,
         };
         {
             let _guard = self.create_guard.lock();
@@ -108,7 +126,10 @@ impl Provider {
             let result = self.db.put_cf(
                 self.primary_cf.as_ref(),
                 id.to_le_bytes().as_ref(),
-                serialize(&acc).unwrap(),
+                match serialize(&acc) {
+                    Ok(value) => value,
+                    Err(_) => return Err(ERR_TODO.into()),
+                },
             );
             if let Err(_) = result {
                 return Err(ERR_TODO.into());
@@ -126,16 +147,18 @@ impl Provider {
     }
 
     pub fn get_by_id(&self, ctx: Rc<Context>, id: u64) -> Result<Account> {
-        let value = self
+        let value = match self
             .db
             .get_cf(self.primary_cf.as_ref(), id.to_le_bytes().as_ref())
-            .unwrap();
-        let value = match value {
-            Some(value) => match deserialize(&value) {
-                Ok(value) => value,
-                Err(_) => return Err(ERR_TODO.into()),
+        {
+            Ok(value) => match value {
+                Some(value) => match deserialize(&value) {
+                    Ok(value) => value,
+                    Err(_) => return Err(ERR_TODO.into()),
+                },
+                None => return Err(ERR_ACCOUNT_NOT_FOUND.into()),
             },
-            None => return Err(ERR_ACCOUNT_NOT_FOUND.into()),
+            Err(_) => return Err(ERR_TODO.into()),
         };
         Ok(value)
     }
@@ -174,11 +197,56 @@ impl Provider {
         Ok(list)
     }
 
-    pub fn update(&mut self, user: &Account) -> Result<Account> {
-        unimplemented!()
+    pub fn update(&self, ctx: Rc<Context>, request: UpdateRequest) -> Result<Account> {
+        let mut acc = self.get_by_id(ctx, request.id)?;
+        let mut updated = false;
+        if let Some(value) = &request.first_name {
+            updated = true;
+            acc.first_name = if value.is_empty() {
+                None
+            } else {
+                Some(value.to_string())
+            };
+        }
+        if let Some(value) = &request.middle_name {
+            updated = true;
+            acc.middle_name = if value.is_empty() {
+                None
+            } else {
+                Some(value.to_string())
+            };
+        }
+        if let Some(value) = &request.last_name {
+            updated = true;
+            acc.last_name = if value.is_empty() {
+                None
+            } else {
+                Some(value.to_string())
+            };
+        }
+        if updated {
+            let result = self.db.put_cf(
+                self.primary_cf.as_ref(),
+                acc.id.to_le_bytes().as_ref(),
+                match serialize(&acc) {
+                    Ok(value) => value,
+                    Err(_) => return Err(ERR_TODO.into()),
+                },
+            );
+            if let Err(_) = result {
+                return Err(ERR_TODO.into());
+            }
+        }
+        Ok(acc)
     }
 
-    pub fn delete(&mut self, id: u64) -> Result<()> {
-        unimplemented!()
+    pub fn delete(&self, ctx: Rc<Context>, id: u64) -> Result<()> {
+        let result = self
+            .db
+            .delete_cf(self.primary_cf.as_ref(), id.to_le_bytes().as_ref());
+        if let Err(_) = result {
+            return Err(ERR_TODO.into());
+        }
+        Ok(())
     }
 }
