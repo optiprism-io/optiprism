@@ -5,9 +5,10 @@ use super::{
 };
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
+use parking_lot::Mutex;
 use rocksdb::{ColumnFamily, DB};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub const PRIMARY_CF: &str = "organization";
 pub const SECONDARY_CF: &str = "organization_sec";

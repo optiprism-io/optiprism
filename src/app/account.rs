@@ -7,13 +7,10 @@ use super::{
 };
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
+use parking_lot::Mutex;
 use rocksdb::{ColumnFamily, DB};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    convert::TryInto,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, convert::TryInto, sync::Arc};
 
 pub const PRIMARY_CF: &str = "account";
 pub const SECONDARY_CF: &str = "account_sec";
@@ -95,10 +92,7 @@ impl Provider {
             permissions: request.permissions,
         };
         {
-            let _guard = match self.create_guard.lock() {
-                Ok(guard) => guard,
-                Err(_err) => return Err(ERR_TODO.into()),
-            };
+            let _guard = self.create_guard.lock();
             match self
                 .db
                 .get_cf(self.secondary_cf.as_ref(), acc.email.as_bytes())

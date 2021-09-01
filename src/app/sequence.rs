@@ -1,9 +1,7 @@
 use super::error::{Result, ERR_TODO};
+use parking_lot::Mutex;
 use rocksdb::{ColumnFamily, DB};
-use std::{
-    convert::TryInto,
-    sync::{Arc, Mutex},
-};
+use std::{convert::TryInto, sync::Arc};
 
 pub struct Sequence {
     db: Arc<DB>,
@@ -19,10 +17,7 @@ impl Sequence {
     }
 
     pub fn next(&self) -> Result<u64> {
-        let _guard = match self.guard.lock() {
-            Ok(guard) => guard,
-            Err(_err) => return Err(ERR_TODO.into()),
-        };
+        let _guard = self.guard.lock();
         let mut id = 1u64;
         let value = match self.db.get_cf(self.cf.as_ref(), self.key) {
             Ok(value) => value,
