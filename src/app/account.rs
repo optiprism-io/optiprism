@@ -9,7 +9,7 @@ use super::{
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
-use rocksdb::{ColumnFamily, DB};
+use rocksdb::{ColumnFamily, IteratorMode, DB};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, rc::Rc, sync::Arc};
 
@@ -103,14 +103,14 @@ impl Provider {
                         return Err(ERR_ACCOUNT_CREATE_CONFLICT.into());
                     }
                 }
-                Err(_err) => return Err(ERR_TODO.into()),
+                Err(_) => return Err(ERR_TODO.into()),
             }
             let result = self.db.put_cf(
                 self.primary_cf.as_ref(),
                 id.to_le_bytes().as_ref(),
                 serialize(&acc).unwrap(),
             );
-            if result.is_err() {
+            if let Err(_) = result {
                 return Err(ERR_TODO.into());
             }
             let result = self.db.put_cf(
@@ -118,7 +118,7 @@ impl Provider {
                 acc.email.as_bytes(),
                 id.to_le_bytes(),
             );
-            if result.is_err() {
+            if let Err(_) = result {
                 return Err(ERR_TODO.into());
             }
         }
@@ -130,10 +130,14 @@ impl Provider {
             .db
             .get_cf(self.primary_cf.as_ref(), id.to_le_bytes().as_ref())
             .unwrap();
-        if let Some(value) = value {
-            return Ok(deserialize(&value).unwrap());
-        }
-        Err(ERR_ACCOUNT_NOT_FOUND.into())
+        let value = match value {
+            Some(value) => match deserialize(&value) {
+                Ok(value) => value,
+                Err(_) => return Err(ERR_TODO.into()),
+            },
+            None => return Err(ERR_ACCOUNT_NOT_FOUND.into()),
+        };
+        Ok(value)
     }
 
     pub fn get_by_email(&self, ctx: Rc<Context>, email: String) -> Result<Account> {
@@ -142,17 +146,32 @@ impl Provider {
                 Some(value) => value,
                 None => return Err(ERR_ACCOUNT_NOT_FOUND.into()),
             },
-            Err(_err) => return Err(ERR_TODO.into()),
+            Err(_) => return Err(ERR_TODO.into()),
         };
         let id = u64::from_le_bytes(match value.try_into() {
             Ok(value) => value,
-            Err(_err) => return Err(ERR_TODO.into()),
+            Err(_) => return Err(ERR_TODO.into()),
         });
         self.get_by_id(ctx, id)
     }
 
-    pub fn list(&self) -> Result<List<Account>> {
-        unimplemented!()
+    pub fn list(&self, ctx: Rc<Context>) -> Result<List<Account>> {
+        // TODO: add filter
+        let mut list = List {
+            data: Vec::new(),
+            total: 0,
+        };
+        for (_, value) in self
+            .db
+            .iterator_cf(self.primary_cf.as_ref(), IteratorMode::Start)
+        {
+            list.total += 1;
+            list.data.push(match deserialize(&value) {
+                Ok(value) => value,
+                Err(_) => return Err(ERR_TODO.into()),
+            });
+        }
+        Ok(list)
     }
 
     pub fn update(&mut self, user: &Account) -> Result<Account> {

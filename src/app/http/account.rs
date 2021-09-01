@@ -5,6 +5,12 @@ use actix_web::{
     Error, HttpResponse,
 };
 
+#[get("/v1/accounts")]
+async fn list(ctx: ContextExtractor, provider: Data<Provider>) -> Result<HttpResponse, Error> {
+    let list = provider.list(ctx.into_inner())?;
+    Ok(HttpResponse::Ok().json(list))
+}
+
 #[get("/v1/accounts/{id}")]
 async fn get_by_id(
     ctx: ContextExtractor,
