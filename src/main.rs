@@ -1,4 +1,5 @@
 mod exprtree;
+mod storage;
 
 use actix_web::{get, web, App, HttpServer};
 use arrow::array::{ArrayRef, Int32Array, StringArray};

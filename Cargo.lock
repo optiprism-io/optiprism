@@ -746,6 +746,7 @@ dependencies = [
  "num 0.3.1",
  "serde",
  "serde_json",
+ "skiplist",
  "tokio",
 ]
 
@@ -1981,6 +1982,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "skiplist"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa37347a2b4609765d113afe55f16636ccd42dadc1ad0d29030908d1bac4c95b"
+dependencies = [
+ "rand",
 ]
 
 [[package]]
