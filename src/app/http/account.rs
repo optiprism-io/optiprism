@@ -1,4 +1,4 @@
-use super::account_provider::Provider;
+use super::{account_provider::Provider, ContextExtractor};
 use actix_web::{
     get,
     web::{Data, Path, ServiceConfig},
@@ -6,8 +6,12 @@ use actix_web::{
 };
 
 #[get("/v1/accounts/{id}")]
-async fn get_by_id(provider: Data<Provider>, id: Path<u64>) -> Result<HttpResponse, Error> {
-    let acc = provider.get_by_id(id.into_inner())?;
+async fn get_by_id(
+    ctx: ContextExtractor,
+    provider: Data<Provider>,
+    id: Path<u64>,
+) -> Result<HttpResponse, Error> {
+    let acc = provider.get_by_id(ctx.into_inner(), id.into_inner())?;
     Ok(HttpResponse::Ok().json(acc))
 }
 

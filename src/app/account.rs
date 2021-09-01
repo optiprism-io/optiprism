@@ -1,5 +1,6 @@
 use super::{
     auth::{make_password_hash, make_salt},
+    context::Context,
     entity_utils::List,
     error::{Result, ERR_ACCOUNT_CREATE_CONFLICT, ERR_ACCOUNT_NOT_FOUND, ERR_TODO},
     rbac::{Permission, Role, Scope},
@@ -10,7 +11,7 @@ use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
 use rocksdb::{ColumnFamily, DB};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, convert::TryInto, sync::Arc};
+use std::{collections::HashMap, convert::TryInto, rc::Rc, sync::Arc};
 
 pub const PRIMARY_CF: &str = "account";
 pub const SECONDARY_CF: &str = "account_sec";
@@ -75,7 +76,7 @@ impl Provider {
         })
     }
 
-    pub fn create(&self, request: CreateRequest) -> Result<Account> {
+    pub fn create(&self, ctx: Rc<Context>, request: CreateRequest) -> Result<Account> {
         let id = self.sequence.next()?;
         let salt = make_salt();
         let password = make_password_hash(&request.password, &salt);
@@ -124,7 +125,7 @@ impl Provider {
         Ok(acc)
     }
 
-    pub fn get_by_id(&self, id: u64) -> Result<Account> {
+    pub fn get_by_id(&self, ctx: Rc<Context>, id: u64) -> Result<Account> {
         let value = self
             .db
             .get_cf(self.primary_cf.as_ref(), id.to_le_bytes().as_ref())
@@ -135,7 +136,7 @@ impl Provider {
         return Err(ERR_ACCOUNT_NOT_FOUND.into());
     }
 
-    pub fn get_by_email(&self, email: String) -> Result<Account> {
+    pub fn get_by_email(&self, ctx: Rc<Context>, email: String) -> Result<Account> {
         let value = match self.db.get_cf(self.secondary_cf.as_ref(), email.as_bytes()) {
             Ok(value) => match value {
                 Some(value) => value,
@@ -147,7 +148,7 @@ impl Provider {
             Ok(value) => value,
             Err(_err) => return Err(ERR_TODO.into()),
         });
-        self.get_by_id(id)
+        self.get_by_id(ctx, id)
     }
 
     pub fn list(&self) -> Result<List<Account>> {

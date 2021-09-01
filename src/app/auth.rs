@@ -1,5 +1,6 @@
 use super::{
     account,
+    context::Context,
     error::{Result, ERR_AUTH_LOG_IN_INVALID_PASSWORD},
     organization,
     rbac::{Permission, Role, Scope},
@@ -8,7 +9,7 @@ use chrono::{Duration, Utc};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256, Sha3_512};
-use std::{collections::HashMap, env::var, ops::Add, sync::Arc};
+use std::{collections::HashMap, env::var, ops::Add, rc::Rc, sync::Arc};
 
 lazy_static::lazy_static! {
     static ref COMMON_SALT: String = var("FNP_COMMON_SALT").unwrap();
@@ -81,7 +82,11 @@ impl Provider {
         }
     }
 
-    pub async fn sign_up(&self, request: SignUpRequest) -> Result<TokensResponse> {
+    pub async fn sign_up(
+        &self,
+        ctx: Rc<Context>,
+        request: SignUpRequest,
+    ) -> Result<TokensResponse> {
         let org = self
             .organization_provider
             .create(organization::CreateRequest {
@@ -89,19 +94,22 @@ impl Provider {
             })?;
         let mut roles = HashMap::new();
         roles.insert(Scope::Organization, Role::Owner);
-        let acc = self.account_provider.create(account::CreateRequest {
-            admin: false,
-            password: request.password,
-            organization_id: org.id,
-            email: request.email,
-            roles: Some(roles),
-            permissions: None,
-        })?;
+        let acc = self.account_provider.create(
+            ctx,
+            account::CreateRequest {
+                admin: false,
+                password: request.password,
+                organization_id: org.id,
+                email: request.email,
+                roles: Some(roles),
+                permissions: None,
+            },
+        )?;
         make_token_response(acc)
     }
 
-    pub fn log_in(&self, request: LogInRequest) -> Result<TokensResponse> {
-        let acc = self.account_provider.get_by_email(request.email)?;
+    pub fn log_in(&self, ctx: Rc<Context>, request: LogInRequest) -> Result<TokensResponse> {
+        let acc = self.account_provider.get_by_email(ctx, request.email)?;
         if !is_valid_password(&request.password, &acc.salt, &acc.password) {
             return Err(ERR_AUTH_LOG_IN_INVALID_PASSWORD.into());
         }

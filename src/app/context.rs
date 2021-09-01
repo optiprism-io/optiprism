@@ -41,6 +41,10 @@ impl ContextExtractor {
     pub fn new(state: Context) -> ContextExtractor {
         ContextExtractor(Rc::new(state))
     }
+
+    pub fn into_inner(self) -> Rc<Context> {
+        self.0
+    }
 }
 
 impl Deref for ContextExtractor {
