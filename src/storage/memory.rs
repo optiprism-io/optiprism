@@ -30,7 +30,7 @@ impl Memory {
     }
 }
 
-fn sort_by<'a>(order: Vec<Order>) -> impl Fn(&Row, &Row) -> Ordering {
+fn sort_by(order: Vec<Order>) -> impl Fn(&Row, &Row) -> Ordering {
     move |a, b| {
         let mut iter = order.iter();
         let mut res = {
