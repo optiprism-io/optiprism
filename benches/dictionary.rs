@@ -85,12 +85,12 @@ impl DictionaryAtomic {
         {
             let _guard = self.guard.read();
             if let Some(value) = self.index.get(value) {
-                return value.clone();
+                return *value;
             }
         }
         let _guard = self.guard.write();
         if let Some(value) = self.index.get(value) {
-            return value.clone();
+            return *value;
         }
         self.log.push(value.clone());
         self.next_index += 1;
@@ -110,9 +110,7 @@ impl DictionaryAtomic {
 
 fn dictionary_bench(c: &mut Criterion) {
     let foo = &String::from("foo");
-    let foo_tiny = &TinyStrAuto::from_str(foo).unwrap();
     let bar = &String::from("bar");
-    let bar_tiny = &TinyStrAuto::from_str(bar).unwrap();
 
     let mut raw_dict = {
         let mut dict = Dictionary::new();
