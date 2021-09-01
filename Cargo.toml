@@ -52,7 +52,6 @@ criterion = "0.3.5"
 # name = "count"
 # harness = false
 
-
 [[bench]]
 name = "dictionary"
 harness = false

@@ -1,13 +1,13 @@
 mod account;
 mod auth;
 mod context;
+mod dictionary;
 mod entity_utils;
 mod error;
 mod http;
 mod organization;
 mod rbac;
 mod sequence;
-mod dictionary;
 
 use actix_http::{header, HttpMessage};
 use actix_service::Service;
@@ -28,7 +28,7 @@ pub fn get_cfs() -> Vec<ColumnFamilyDescriptor> {
 // TODO: return err
 pub fn init(db: Arc<DB>) -> Result<Server> {
     let organization_provider = Data::new(organization::Provider::new(db.clone()).unwrap());
-    let account_provider = Data::new(account::Provider::new(db.clone()).unwrap());
+    let account_provider = Data::new(account::Provider::new(db).unwrap());
     let auth_provider = Data::new(auth::Provider::new(
         organization_provider.clone().into_inner(),
         account_provider.clone().into_inner(),

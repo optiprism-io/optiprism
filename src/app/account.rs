@@ -133,7 +133,7 @@ impl Provider {
         if let Some(value) = value {
             return Ok(deserialize(&value).unwrap());
         }
-        return Err(ERR_ACCOUNT_NOT_FOUND.into());
+        Err(ERR_ACCOUNT_NOT_FOUND.into())
     }
 
     pub fn get_by_email(&self, ctx: Rc<Context>, email: String) -> Result<Account> {

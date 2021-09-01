@@ -121,7 +121,7 @@ fn make_token_response(acc: account::Account) -> Result<TokensResponse> {
     Ok(TokensResponse {
         access_token: make_token(
             AccessClaims {
-                exp: Utc::now().add(ACCESS_TOKEN_DURATION.clone()).timestamp(),
+                exp: Utc::now().add(*ACCESS_TOKEN_DURATION).timestamp(),
                 organization_id: acc.organization_id,
                 account_id: acc.id,
                 roles: acc.roles,
@@ -133,7 +133,7 @@ fn make_token_response(acc: account::Account) -> Result<TokensResponse> {
             RefreshClaims {
                 organization_id: acc.organization_id,
                 account_id: acc.id,
-                exp: Utc::now().add(REFRESH_TOKEN_DURATION.clone()).timestamp(),
+                exp: Utc::now().add(*REFRESH_TOKEN_DURATION).timestamp(),
             },
             REFRESH_TOKEN_KEY.as_bytes(),
         )?,
@@ -141,8 +141,10 @@ fn make_token_response(acc: account::Account) -> Result<TokensResponse> {
 }
 
 fn make_token<T: Serialize>(claims: T, key: &[u8]) -> Result<String> {
-    let mut header = jsonwebtoken::Header::default();
-    header.alg = jsonwebtoken::Algorithm::HS512;
+    let header = jsonwebtoken::Header {
+        alg: jsonwebtoken::Algorithm::HS512,
+        ..Default::default()
+    };
     Ok(jsonwebtoken::encode(
         &header,
         &claims,
@@ -152,7 +154,7 @@ fn make_token<T: Serialize>(claims: T, key: &[u8]) -> Result<String> {
 
 pub fn parse_access_token(value: &str) -> Result<AccessClaims> {
     let token = jsonwebtoken::decode(
-        &value,
+        value,
         &jsonwebtoken::DecodingKey::from_secret(ACCESS_TOKEN_KEY.as_bytes()),
         &jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS512),
     )?;
@@ -161,7 +163,7 @@ pub fn parse_access_token(value: &str) -> Result<AccessClaims> {
 
 pub fn parse_refresh_token(value: &str) -> Result<RefreshClaims> {
     let token = jsonwebtoken::decode(
-        &value,
+        value,
         &jsonwebtoken::DecodingKey::from_secret(REFRESH_TOKEN_KEY.as_bytes()),
         &jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS512),
     )?;

@@ -88,7 +88,7 @@ impl Provider {
         if let Some(value) = value {
             return Ok(deserialize(&value).unwrap());
         }
-        return Err(ERR_ORGANIZATION_NOT_FOUND.into());
+        Err(ERR_ORGANIZATION_NOT_FOUND.into())
     }
 
     pub fn list(&self) -> Result<List<Organization>> {

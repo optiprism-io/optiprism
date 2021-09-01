@@ -16,7 +16,7 @@ impl Dictionary {
         }
     }
 
-    pub fn get_by_id(&self, id: usize) -> Option<&String> {
+    pub fn get_by_id(&self, id: usize) -> Option<&str> {
         let _guard = self.guard.read();
         if id > self.values.len() {
             return None;
@@ -24,20 +24,20 @@ impl Dictionary {
         Some(&self.values[id - 1])
     }
 
-    pub fn set(&mut self, value: &String) -> usize {
+    pub fn set(&mut self, value: &str) -> usize {
         {
             let _guard = self.guard.read();
             if let Some(value) = self.index.get(value) {
-                return value.clone();
+                return *value;
             }
         }
         let _guard = self.guard.write();
         if let Some(value) = self.index.get(value) {
-            return value.clone();
+            return *value;
         }
-        self.values.push(value.clone());
+        self.values.push(value.to_string());
         let id = self.values.len();
-        self.index.insert(value.clone(), id);
+        self.index.insert(value.to_string(), id);
         id
     }
 }

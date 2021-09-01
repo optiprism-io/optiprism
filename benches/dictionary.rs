@@ -3,7 +3,6 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use parking_lot::RwLock;
 use std::{
     collections::HashMap,
-    str::FromStr,
     sync::atomic::{AtomicPtr, Ordering},
 };
 
@@ -22,7 +21,7 @@ impl Dictionary {
         }
     }
 
-    pub fn get(&self, id: usize) -> Option<&String> {
+    pub fn get(&self, id: usize) -> Option<&str> {
         let _guard = self.guard.read();
         if id > self.values.len() {
             return None;
@@ -30,20 +29,20 @@ impl Dictionary {
         Some(&self.values[id - 1])
     }
 
-    pub fn set(&mut self, value: &String) -> usize {
+    pub fn set(&mut self, value: &str) -> usize {
         {
             let _guard = self.guard.read();
             if let Some(value) = self.index.get(value) {
-                return value.clone();
+                return *value;
             }
         }
         let _guard = self.guard.write();
         if let Some(value) = self.index.get(value) {
-            return value.clone();
+            return *value;
         }
-        self.values.push(value.clone());
+        self.values.push(value.to_string());
         let id = self.values.len();
-        self.index.insert(value.clone(), id);
+        self.index.insert(value.to_string(), id);
         id
     }
 }
@@ -67,7 +66,7 @@ impl DictionaryAtomic {
         }
     }
 
-    pub fn get(&self, id: usize) -> Option<&String> {
+    pub fn get(&self, id: usize) -> Option<&str> {
         let values = unsafe { &*self.values.load(Ordering::Relaxed) };
         let len = values.len();
         let index = id - 1;
@@ -81,7 +80,7 @@ impl DictionaryAtomic {
         None
     }
 
-    pub fn set(&mut self, value: &String) -> usize {
+    pub fn set(&mut self, value: &str) -> usize {
         {
             let _guard = self.guard.read();
             if let Some(value) = self.index.get(value) {
@@ -92,10 +91,10 @@ impl DictionaryAtomic {
         if let Some(value) = self.index.get(value) {
             return *value;
         }
-        self.log.push(value.clone());
+        self.log.push(value.to_string());
         self.next_index += 1;
         let id = self.next_index;
-        self.index.insert(value.clone(), id);
+        self.index.insert(value.to_string(), id);
         id
     }
 
@@ -109,8 +108,8 @@ impl DictionaryAtomic {
 }
 
 fn dictionary_bench(c: &mut Criterion) {
-    let foo = &String::from("foo");
-    let bar = &String::from("bar");
+    let foo = "foo";
+    let bar = "bar";
 
     let mut raw_dict = {
         let mut dict = Dictionary::new();
