@@ -1,1 +1,2 @@
 mod memory;
+mod error;
