@@ -6,44 +6,48 @@ use arrow::datatypes::{Schema, SchemaRef, DataType};
 use arrow::array::{BooleanArray, Int8Builder, Int8BufferBuilder, BooleanBufferBuilder, BooleanBuilder, ArrayRef, ArrayBuilder};
 use super::error::Result;
 use std::sync::Arc;
+use crate::storage::storage::{Row, Order};
 
-type Row = Vec<ScalarValue>;
-
-#[derive(Clone)]
-enum Order {
-    Asc(usize),
-    Desc(usize),
-}
-
-struct Memory {
+pub struct Memory {
     rows: skiplist::OrderedSkipList<Row>,
-    cols: usize,
-    len: usize,
+    order: Vec<Order>,
+    schema: SchemaRef,
 }
 
 impl Memory {
-    fn new(order: Vec<Order>, cols: usize) -> Self {
+    fn new(order: Vec<Order>, schema: SchemaRef) -> Self {
         let mut m = Memory {
             rows: skiplist::OrderedSkipList::new(),
-            cols,
-            len: 0,
+            schema: schema.clone(),
+            order: order.clone(),
         };
 
-        unsafe { m.rows.sort_by(sort_by(order)); }
+        unsafe { m.rows.sort_by(sort_by(order.clone())); }
         m
     }
 
-    fn insert(&mut self, row: Row) {
-        self.rows.insert(row);
-        self.len += 1;
+    pub fn new_empty(&self) -> Self {
+        let mut m = Memory {
+            rows: skiplist::OrderedSkipList::new(),
+            order: self.order.clone(),
+            schema: self.schema.clone(),
+        };
+
+        unsafe { m.rows.sort_by(sort_by(self.order.clone())); }
+        m
     }
 
-    fn record_batch(&mut self, schema: SchemaRef) -> RecordBatch {
-        let cols = (0..self.cols).map(|col_id| {
-            match schema.fields()[col_id].data_type() {
+    pub fn insert(&mut self, row: &Row) -> Result<()> {
+        self.rows.insert(row.clone());
+        Ok(())
+    }
+
+    pub fn record_batch(&self) -> RecordBatch {
+        let cols = self.schema.fields().iter().enumerate().map(|(col_id, field)| {
+            match field.data_type() {
                 DataType::Boolean => {
                     // use buffer because standard is slower
-                    let mut builder = BooleanBuilder::new(self.len);
+                    let mut builder = BooleanBuilder::new(self.rows.len());
                     for row in self.rows.iter() {
                         // columns can't be deleted within current memory instance, so we can check column presence like this
                         if col_id < row.len() - 1 {
@@ -56,7 +60,7 @@ impl Memory {
                     Arc::new(builder.finish()) as ArrayRef
                 }
                 DataType::Int8 => {
-                    let mut builder = Int8Builder::new(self.len);
+                    let mut builder = Int8Builder::new(self.rows.len());
                     for row in self.rows.iter() {
                         if col_id < row.len() - 1 {
                             let v = if let ScalarValue::Int8(v) = row[col_id] { v } else { panic!("error casting to Int8") };
@@ -71,12 +75,15 @@ impl Memory {
             }
         }).collect();
 
-        RecordBatch::try_new(schema.clone(), cols).unwrap()
+        RecordBatch::try_new(self.schema.clone(), cols).unwrap()
+    }
+
+    pub fn len(&self) -> usize {
+        self.rows.len()
     }
 
     fn clear(&mut self) {
         self.rows.clear();
-        self.len = 0;
     }
 }
 
@@ -103,16 +110,18 @@ fn sort_by(order: Vec<Order>) -> impl Fn(&Row, &Row) -> Ordering {
 mod tests {
     use crate::storage::memory::{Memory, Order};
     use datafusion::scalar::ScalarValue;
+    use arrow::datatypes::{Schema, Field, DataType};
 
     #[test]
     fn test() {
-        let mut mem = Memory::new(vec![Order::Asc(0), Order::Desc(1)], 2);
-        mem.insert(vec![ScalarValue::Int8(Some(2)), ScalarValue::Int8(Some(1))]);
-        mem.insert(vec![ScalarValue::Int8(Some(2)), ScalarValue::Int8(Some(2))]);
-        mem.insert(vec![ScalarValue::Int8(Some(2)), ScalarValue::Int8(Some(3))]);
-        mem.insert(vec![ScalarValue::Int8(Some(1)), ScalarValue::Int8(Some(2))]);
-        mem.insert(vec![ScalarValue::Int8(Some(1)), ScalarValue::Int8(Some(3))]);
-        mem.insert(vec![ScalarValue::Int8(Some(1)), ScalarValue::Int8(Some(1))]);
+        let schema = Schema::new(vec![Field::new("1", DataType::Int8, true), Field::new("2", DataType::Int8, true)]);
+        let mut mem = Memory::new(vec![Order::Asc(0), Order::Desc(1)], schema);
+        mem.insert(&vec![ScalarValue::Int8(Some(2)), ScalarValue::Int8(Some(1))]);
+        mem.insert(&vec![ScalarValue::Int8(Some(2)), ScalarValue::Int8(Some(2))]);
+        mem.insert(&vec![ScalarValue::Int8(Some(2)), ScalarValue::Int8(Some(3))]);
+        mem.insert(&vec![ScalarValue::Int8(Some(1)), ScalarValue::Int8(Some(2))]);
+        mem.insert(&vec![ScalarValue::Int8(Some(1)), ScalarValue::Int8(Some(3))]);
+        mem.insert(&vec![ScalarValue::Int8(Some(1)), ScalarValue::Int8(Some(1))]);
 
         for v in mem.rows.iter() {
             println!("{:?}", v);

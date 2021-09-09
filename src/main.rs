@@ -1,5 +1,8 @@
+#![allow(warnings, unused)]
+
 mod exprtree;
 mod storage;
+mod user_storage;
 
 use actix_web::{get, web, App, HttpServer};
 use arrow::array::{ArrayRef, Int32Array, StringArray};
@@ -14,7 +17,6 @@ use datafusion::prelude::ExecutionContext;
 use std::env::var;
 use std::ops::Deref;
 use std::sync::Arc;
-
 #[get("/")]
 async fn index() -> &'static str {
     "Hello, World!"
