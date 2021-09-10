@@ -92,7 +92,7 @@ impl JoinExec {
                         return Err(DataFusionError::Plan(format!(
                             "Column {} not found",
                             field.name()
-                        )))
+                        )));
                     }
                 },
             }
@@ -442,6 +442,7 @@ impl Stream for JoinStream {
         let mut output_buffer = OutputBuffer::new(&self.schema);
 
         loop {
+            // todo cache this
             let mut left_cmp_col = into_array(
                 self.on
                     .0
@@ -476,7 +477,7 @@ impl Stream for JoinStream {
                                     Err(err) => {
                                         return Poll::Ready(Some(Err(
                                             err.into_arrow_external_error()
-                                        )))
+                                        )));
                                     }
                                     _ => {}
                                 }
@@ -504,7 +505,7 @@ impl Stream for JoinStream {
                             self.left_idx = 0;
                             match self.evaluate_left_expr() {
                                 Err(err) => {
-                                    return Poll::Ready(Some(Err(err.into_arrow_external_error())))
+                                    return Poll::Ready(Some(Err(err.into_arrow_external_error())));
                                 }
                                 _ => {}
                             }
@@ -550,7 +551,7 @@ impl Stream for JoinStream {
                             span.is_processing = false;
                             match self.evaluate_partition(&span, &mut output_buffer) {
                                 Err(err) => {
-                                    return Poll::Ready(Some(Err(err.into_arrow_external_error())))
+                                    return Poll::Ready(Some(Err(err.into_arrow_external_error())));
                                 }
                                 _ => {}
                             }
@@ -623,7 +624,7 @@ mod tests {
                     .map(|x| Arc::new(Int8Array::from(x.clone())) as ArrayRef)
                     .collect::<Vec<ArrayRef>>(),
             )
-            .unwrap();
+                .unwrap();
             batches.push(batch);
         }
         batches
