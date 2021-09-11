@@ -1,5 +1,5 @@
-use crate::user_storage::memory::{Op, Memory, OpsBucket};
-use arrow::datatypes::{Schema, SchemaRef, DataType};
+use crate::user_storage::memory::{Memory};
+use arrow::datatypes::{Schema, SchemaRef, DataType, Field};
 use datafusion::scalar::ScalarValue;
 use super::error::Result;
 use core::mem;
@@ -15,18 +15,20 @@ use parquet::file::writer::SerializedFileWriter;
 use parquet::arrow::{ParquetFileArrowReader, ArrowReader, ArrowWriter};
 use std::fs::File;
 use std::path::Path;
-use arrow::array::{build_compare, Array, ArrayRef, BooleanArray, DynComparator, Int8Array, MutableArrayData, StringArray, UInt8Array, BooleanBuilder};
+use arrow::array::{build_compare, Array, ArrayRef, BooleanArray, DynComparator, Int8Array, MutableArrayData, StringArray, UInt8Array, BooleanBuilder, Int8Builder, UInt64Array};
+use std::ops::{Add, AddAssign, SubAssign};
+use arrow::datatypes::DataType::UInt64;
 
 #[derive(Clone)]
-pub struct PropertyValue {
-    property_id: usize,
+pub struct Value {
+    col_id: usize,
     value: ScalarValue,
 }
 
-impl PropertyValue {
-    fn new(property_id: usize, value: ScalarValue) -> Self {
-        PropertyValue {
-            property_id,
+impl Value {
+    fn new(col_id: usize, value: ScalarValue) -> Self {
+        Value {
+            col_id,
             value,
         }
     }
@@ -34,60 +36,55 @@ impl PropertyValue {
 
 #[derive(Clone)]
 pub enum Op {
-    PutValues(Vec<PropertyValue>),
+    PutValues(Vec<Option<ScalarValue>>),
     IncrementValue {
-        property_id: usize,
+        col_id: usize,
         delta: ScalarValue,
     },
     DecrementValue {
-        property_id: usize,
+        col_id: usize,
         delta: ScalarValue,
     },
-    DeleteUser(),
-    // for buffer
+    DeleteKey,
     None,
 }
 
 #[derive(Clone)]
 pub struct OrderedOp {
     order: usize,
-    user_id: u64,
+    key: u64,
     pub op: Op,
 }
 
 impl OrderedOp {
-    pub fn new(order: usize, user_id: u64, op: Op) -> Self {
+    pub fn new(order: usize, key_id: u64, op: Op) -> Self {
         OrderedOp {
             order,
-            user_id,
+            key: key_id,
             op,
         }
     }
 
-    pub fn new_empty() -> Self {
-        OrderedOp { order: 0, user_id: 0, op: Op::None }
-    }
-
-    pub fn user_id_op(&self) -> (u64, Op) {
-        (self.user_id, self.op.clone())
+    pub fn keyed_op(&self) -> (u64, Op) {
+        (self.key, self.op.clone())
     }
 }
 
 impl PartialOrd for OrderedOp {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.user_id.partial_cmp(&other.user_id).unwrap().then(self.order.partial_cmp(&other.order).unwrap()))
+        Some(self.key.partial_cmp(&other.key).unwrap().then(self.order.partial_cmp(&other.order).unwrap()))
     }
 }
 
 impl PartialEq for OrderedOp {
     fn eq(&self, other: &Self) -> bool {
-        self.user_id == other.user_id && self.order == other.order
+        self.key == other.key && self.order == other.order
     }
 }
 
 impl Ord for OrderedOp {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.user_id.partial_cmp(&other.user_id).unwrap().then(self.order.partial_cmp(&other.order).unwrap())
+        self.key.partial_cmp(&other.key).unwrap().then(self.order.partial_cmp(&other.order).unwrap())
     }
 }
 
@@ -96,32 +93,172 @@ impl Eq for OrderedOp {}
 #[derive(Clone)]
 pub struct OpsBucket {
     pub idx: usize,
-    pub schema: SchemaRef,
-    pub users_count: usize,
-    pub min_user_id: u64,
-    pub max_user_id: u64,
+    pub schema: Schema,
+    pub keys_count: usize,
+    pub min_key: u64,
+    pub max_key: u64,
     pub ops: Vec<(u64, Op)>,
+}
+
+impl OpsBucket {
+    pub fn to_record_batch(&self) -> Result<RecordBatch> {
+        let mut key_col = UInt64Array::builder(self.keys_count);
+        let mut cols: Vec<ArrayRef> = Vec::new();
+
+        let mut cols: Vec<ArrayRef> = self.schema.fields().iter().enumerate().map(|(col_id, field)| {
+            match field.data_type() {
+                DataType::Boolean => {
+                    // use buffer because standard is slower
+                    let mut builder = BooleanBuilder::new(self.keys_count);
+                    let mut last_key: u64 = 0;
+                    let mut value = MergeValue::<bool>::new();
+                    for (key, op) in self.ops.iter() {
+                        if *key != last_key {
+                            if value.is_set {
+                                if value.is_null {
+                                    builder.append_null();
+                                } else {
+                                    builder.append_value(value.value.clone()).unwrap();
+                                }
+                                value.reset();
+                                last_key = *key;
+                                if col_id == 1 {
+                                    key_col.append_value(*key);
+                                }
+                            }
+                        }
+
+                        match op {
+                            Op::PutValues(vals) => {
+                                if col_id <= vals.len() - 1 && vals[col_id].is_some() {
+                                    if let ScalarValue::Boolean(v) = vals[col_id].clone().unwrap() {
+                                        value.set_option(v);
+                                    }
+                                }
+                            }
+                            Op::IncrementValue { .. } => unreachable!(),
+                            Op::DecrementValue { .. } => unreachable!(),
+                            Op::DeleteKey => value.unset(),
+                            Op::None => {}
+                        }
+                    }
+
+                    if value.is_set {
+                        if value.is_null {
+                            builder.append_null();
+                        } else {
+                            builder.append_value(value.value.clone()).unwrap();
+                        }
+                        if col_id == 1 {
+                            key_col.append_value(last_key);
+                        }
+                    }
+                    Arc::new(builder.finish()) as ArrayRef
+                }
+                DataType::Int8 => {
+                    // use buffer because standard is slower
+                    let mut builder = Int8Builder::new(self.keys_count);
+                    let mut last_key: u64 = 0;
+                    let mut value = MergeValue::<i8>::new();
+                    let mut first = true;
+                    for (key, op) in self.ops.iter() {
+                        if *key != last_key {
+                            if !first {
+                                if value.is_set {
+                                    if value.is_null {
+                                        builder.append_null();
+                                    } else {
+                                        builder.append_value(value.value.clone()).unwrap();
+                                    }
+                                    if col_id == 1 {
+                                        key_col.append_value(last_key);
+                                    }
+                                }
+                            }
+                            value.reset();
+                            last_key = *key;
+                            first = false;
+                        }
+
+                        match op {
+                            Op::PutValues(vals) => {
+                                if col_id <= vals.len() - 1 && vals[col_id].is_some() {
+                                    if let ScalarValue::Int8(v) = vals[col_id].clone().unwrap() {
+                                        value.set_option(v);
+                                    }
+                                }
+                            }
+                            Op::IncrementValue { col_id: inc_col_id, delta } => {
+                                if col_id == *inc_col_id {
+                                    if let ScalarValue::Int8(v) = delta {
+                                        value.inc(v.unwrap());
+                                    }
+                                }
+                            }
+                            Op::DecrementValue { col_id: inc_col_id, delta } => {
+                                if col_id == *inc_col_id {
+                                    if let ScalarValue::Int8(v) = delta {
+                                        value.dec(v.unwrap());
+                                    }
+                                }
+                            }
+                            Op::DeleteKey => {
+                                value.unset();
+                            }
+                            Op::None => {}
+                        }
+                    }
+
+                    if value.is_set {
+                        if value.is_null {
+                            builder.append_null();
+                        } else {
+                            builder.append_value(value.value.clone()).unwrap();
+                        }
+                        if col_id == 1 {
+                            key_col.append_value(last_key);
+                        }
+                    }
+
+                    Arc::new(builder.finish()) as ArrayRef
+                }
+                _ => unimplemented!()
+            }
+        }).collect();
+
+
+        let schema = Schema::try_merge(
+            vec![
+                Schema::new(vec![Field::new("key", DataType::UInt64, false)]),
+                self.schema.clone(),
+            ],
+        ).unwrap();
+
+        let mut final_cols = vec![Arc::new(key_col.finish()) as ArrayRef];
+        final_cols.append(&mut cols);
+        Ok(RecordBatch::try_new(Arc::new(schema), final_cols).unwrap())
+    }
 }
 
 #[derive(Clone)]
 struct Bucket {
     id: usize,
-    min_user_id: u64,
-    max_user_id: u64,
+    min_key: u64,
+    max_key: u64,
 }
 
 impl Bucket {
-    pub fn new(id: usize, min_user_id: u64, max_user_id: u64) -> Self {
+    pub fn new(id: usize, min_key: u64, max_key: u64) -> Self {
         Bucket {
             id,
-            min_user_id,
-            max_user_id,
+            min_key,
+            max_key,
         }
     }
 }
 
 pub struct Storage {
-    schema: SchemaRef,
+    schema: Schema,
     memory: Memory,
     flush_memory_buffer_sender: Sender<Memory>,
     flush_memory_buffer_receiver: Receiver<Memory>,
@@ -146,13 +283,75 @@ impl MergeOpsBucket {
     }
 }
 
-impl Storage {
-    pub fn put_values(&mut self, user_id: u64, props: Vec<PropertyValue>) -> Result<()> {
-        self.insert_op(user_id, Op::PutValues(props))
+struct MergeValue<T: Clone> {
+    is_set: bool,
+    is_null: bool,
+    value: T,
+}
+
+impl<T: Default + Clone> MergeValue<T> {
+    fn new() -> Self {
+        MergeValue {
+            is_set: true,
+            is_null: true,
+            value: T::default(),
+        }
+    }
+    pub fn reset(&mut self) {
+        self.is_set = true;
+        self.is_null = true;
+        self.value = T::default();
+    }
+    pub fn unset(&mut self) {
+        self.is_set = false;
+        self.is_null = false;
     }
 
-    fn insert_op(&mut self, user_id: u64, op: Op) -> Result<()> {
-        self.memory.insert_op(user_id, op)?;
+    pub fn set_option(&mut self, value: Option<T>) {
+        self.is_set = true;
+        match value {
+            None => self.is_null = true,
+            Some(v) => {
+                self.is_null = false;
+                self.value = v;
+            }
+        }
+    }
+
+    pub fn set(&mut self, value: T) {
+        self.is_set = true;
+        self.value = value;
+        self.is_null = false;
+    }
+
+    pub fn make_null(&mut self) {
+        self.is_null = true;
+    }
+
+    pub fn inc(&mut self, delta: T) where T: AddAssign {
+        self.is_set = true;
+        self.is_null = false;
+        self.value += delta;
+    }
+
+    pub fn dec(&mut self, delta: T) where T: SubAssign {
+        self.is_set = true;
+        self.is_null = false;
+        self.value -= delta;
+    }
+}
+
+impl Storage {
+    pub fn put_values(&mut self, key: u64, values: Vec<Value>) -> Result<()> {
+        let mut res: Vec<Option<ScalarValue>> = vec![None; self.schema.fields().len()];
+        for v in values.iter() {
+            res[v.col_id] = Some(v.value.clone());
+        }
+        self.insert_op(key, Op::PutValues(res))
+    }
+
+    fn insert_op(&mut self, key: u64, op: Op) -> Result<()> {
+        self.memory.insert_op(key, op)?;
 
         if self.memory.len() >= self.write_buffer_size {
             self.flush();
@@ -180,51 +379,52 @@ impl Storage {
         let mut iter = ordered_ops.iter();
         let mut bucket_index: usize = 0;
         // bucket vars
-        let mut users_count: usize = 0;
-        let mut last_user_id: u64 = 0;
-        let mut min_user_id: u64 = u64::MAX;
-        let mut max_user_id: u64 = 0;
+        let mut keys_count: usize = 0;
+        let mut lat_key: u64 = 0;
+        let mut min_key: u64 = u64::MAX;
+        let mut max_key: u64 = 0;
+        let mut end = false;
         ops.truncate(0);
 
         for op in ordered_ops.iter() {
-            if last_user_id != op.user_id {
-                users_count += 1;
+            if lat_key != op.key {
+                keys_count += 1;
             }
-            if op.user_id < min_user_id {
-                min_user_id = op.user_id;
+            if op.key < min_key {
+                min_key = op.key;
             }
-            if op.user_id > max_user_id {
-                max_user_id = op.user_id;
+            if op.key > max_key {
+                max_key = op.key;
             }
 
-            if bucket_index != op.user_id as usize % self.bucket_size {
+            if bucket_index != op.key as usize % self.bucket_size {
                 if !ops.is_empty() {
                     let ops_bucket = OpsBucket {
                         idx: bucket_index,
                         schema: self.schema.clone(),
-                        users_count,
-                        min_user_id,
-                        max_user_id,
+                        keys_count,
+                        min_key,
+                        max_key,
                         ops: ops.clone(),
                     };
                     ret.push(Arc::new(ops_bucket));
                     ops.truncate(0);
-                    users_count = 0;
-                    min_user_id = u64::MAX;
-                    max_user_id = 0;
+                    keys_count = 0;
+                    min_key = u64::MAX;
+                    max_key = 0;
                 }
-                bucket_index = op.user_id as usize % self.bucket_size;
+                bucket_index = op.key as usize % self.bucket_size;
             }
-            ops.push(op.user_id_op());
+            ops.push(op.keyed_op());
         }
 
         if !ops.is_empty() {
             let ops_bucket = OpsBucket {
                 idx: bucket_index,
                 schema: self.schema.clone(),
-                users_count,
-                min_user_id,
-                max_user_id,
+                keys_count,
+                min_key,
+                max_key,
                 ops: ops.clone(),
             };
             ret.push(Arc::new(ops_bucket));
@@ -235,7 +435,7 @@ impl Storage {
     }
 
     fn merge_ops_bucket(&mut self, merge: MergeOpsBucket) -> Result<()> {
-        let mut cur_data = RecordBatch::new_empty(self.schema.clone());
+        let mut cur_data = RecordBatch::new_empty(Arc::new(self.schema.clone()));
         match self.get_bucket_by_index(merge.ops_bucket.idx)? {
             None => {
                 self.write_ops_bucket(merge.ops_bucket.clone())?
@@ -254,125 +454,17 @@ impl Storage {
         let mut record_batch_reader = arrow_reader.get_record_reader(2048).unwrap();
 
         let out_file = File::create("parquet.file").unwrap();
-        let mut rb_writer = ArrowWriter::try_new(out_file, ops_bucket.schema.clone(), None).unwrap();
+        let mut rb_writer = ArrowWriter::try_new(out_file, Arc::new(ops_bucket.schema.clone()), None).unwrap();
         for b in record_batch_reader {
             let batch = b.unwrap();
         }
         Ok(())
     }
 
+
     fn write_ops_bucket(&mut self, bucket: Arc<OpsBucket>) -> Result<()> {
         let out_file = File::create(Path::new(&bucket.idx.to_string())).unwrap();
-        let mut rb_writer = ArrowWriter::try_new(out_file, bucket.schema.clone(), None).unwrap();
-        /*let mut row: Vec<ScalarValue> = ops_bucket.schema.fields().iter().map(|field| {
-            match field.data_type() {
-                DataType::Int8 => {
-                    ScalarValue::Int8(None)
-                }
-                _ => {
-                    todo!();
-                }
-            }
-        }).collect();
-
-        let mut out = ops_bucket.schema.fields().iter().map(|field| {
-            match field.data_type() {
-                DataType::Int8 => Int8Array::builder(ops_bucket.ops.len()),
-                _ => {
-                    todo!();
-                }
-            }
-        }).collect();
-        let last_user_id: u64 = 0;
-        for (idx, (user_id, op)) in ops_bucket.ops.iter().enumerate() {
-            if idx > 0 && last_user_id != *user_id {
-                for (idx, v) in row.iter_mut().enumerate() {
-                    match v.get_datatype() {
-                        DataType::Int8 => {
-                            ScalarValue::Int8(None);
-                        }
-                        _ => {
-                            todo!();
-                        }
-                    }
-                }
-                let d = row.iter().map(|v| {}).collect();
-            }
-            match op {
-                Op::PutValues(props) => {}
-                Op::IncrementValue { .. } => {}
-                Op::DecrementValue { .. } => {}
-                Op::DeleteUser() => {}
-                Op::None => {}
-            }
-            rb_writer.write().unwrap();
-        }*/
-
-        let mut pre_cols = vec![0usize; self.schema.fields().len()];
-        for (_, op) in bucket.ops.iter() {
-            match op {
-                Op::PutValues(props) => {
-                    for v in props.iter() {
-                        pre_cols[v.property_id] += 1;
-                    }
-                }
-                Op::IncrementValue { property_id, delta } => {
-                    pre_cols[*property_id] += 1;
-                }
-                Op::DecrementValue { property_id, delta } => {
-                    pre_cols[*property_id] += 1;
-                }
-                _ => {}
-            }
-        }
-        cols = pre_cols.iter().enumerate().filter_map(| (col_id, n) | {
-
-        });
-
-        let users_count: usize = 0;
-        let cols = self.schema.fields().iter().enumerate().map(|(col_id, field)| {
-            match field.data_type() {
-                DataType::Boolean => {
-                    // use buffer because standard is slower
-                    let mut builder = BooleanBuilder::new(bucket.users_count);
-                    let mut v = ScalarValue::Boolean(None);
-                    let mut last_user_id: u64 = 0;
-                    for (user_id, op) in bucket.ops.iter() {
-                        if *user_id != last_user_id {}
-                        match op {
-                            Op::PutValues(v) => {}
-                            Op::IncrementValue { .. } => {}
-                            Op::DecrementValue { .. } => {}
-                            Op::DeleteUser() => {}
-                            Op::None => {}
-                        }
-                        // columns can't be deleted within current memory instance, so we can check column presence like this
-                        if col_id < row.len() - 1 {
-                            let v = if let ScalarValue::Boolean(v) = row[col_id] { v } else { panic!("error casting to Boolean") };
-                            builder.append_option(v).unwrap();
-                        } else {
-                            builder.append_null();
-                        }
-                    }
-                    Arc::new(builder.finish()) as ArrayRef
-                }
-                DataType::Int8 => {
-                    let mut builder = Int8Builder::new(self.rows.len());
-                    for row in self.rows.iter() {
-                        if col_id < row.len() - 1 {
-                            let v = if let ScalarValue::Int8(v) = row[col_id] { v } else { panic!("error casting to Int8") };
-                            builder.append_option(v).unwrap();
-                        } else {
-                            builder.append_null();
-                        }
-                    }
-                    Arc::new(builder.finish()) as ArrayRef
-                }
-                _ => unimplemented!()
-            }
-        }).collect();
-
-        RecordBatch::try_new(self.schema.clone(), cols).unwrap()
+        let mut rb_writer = ArrowWriter::try_new(out_file, Arc::new(bucket.schema.clone()), None).unwrap();
 
         Ok(())
     }
@@ -388,5 +480,71 @@ impl Storage {
         } else {
             Ok(Some(buckets[idx].clone()))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::user_storage::storage::{OpsBucket, Op};
+    use datafusion::scalar::ScalarValue;
+    use arrow::datatypes::{Schema, Field, DataType};
+    use std::sync::Arc;
+    use arrow::record_batch::RecordBatch;
+
+    #[test]
+    fn op_bucket_to_record_batch() {
+        let mut ops: Vec<(u64, Op)> = Vec::new();
+        ops.push((1, Op::PutValues(vec![None, Some(ScalarValue::Int8(Some(1)))])));
+        ops.push((1, Op::PutValues(vec![None, Some(ScalarValue::Int8(Some(2)))])));
+        ops.push((1, Op::PutValues(vec![Some(ScalarValue::Int8(Some(2))), Some(ScalarValue::Int8(Some(3)))])));
+        ops.push((1, Op::PutValues(vec![None, Some(ScalarValue::Int8(Some(1)))])));
+
+        ops.push((2, Op::PutValues(vec![Some(ScalarValue::Int8(Some(1)))])));
+
+        ops.push((3, Op::PutValues(vec![None, Some(ScalarValue::Int8(Some(2)))])));
+
+        ops.push((4, Op::IncrementValue { col_id: 0, delta: ScalarValue::Int8(Some(1)) }));
+        ops.push((4, Op::IncrementValue { col_id: 0, delta: ScalarValue::Int8(Some(3)) }));
+        ops.push((4, Op::DecrementValue { col_id: 0, delta: ScalarValue::Int8(Some(1)) }));
+        ops.push((4, Op::IncrementValue { col_id: 1, delta: ScalarValue::Int8(Some(1)) }));
+        ops.push((4, Op::DeleteKey));
+
+        ops.push((5, Op::IncrementValue { col_id: 0, delta: ScalarValue::Int8(Some(1)) }));
+        ops.push((5, Op::IncrementValue { col_id: 0, delta: ScalarValue::Int8(Some(3)) }));
+        ops.push((5, Op::DecrementValue { col_id: 0, delta: ScalarValue::Int8(Some(1)) }));
+        ops.push((5, Op::IncrementValue { col_id: 1, delta: ScalarValue::Int8(Some(1)) }));
+
+        let schema = Schema::new(vec![
+            Field::new("b", DataType::Int8, false),
+            Field::new("c", DataType::Int8, false),
+        ]);
+
+        let mut bucket = OpsBucket {
+            idx: 0,
+            schema: schema.clone(),
+            keys_count: 0,
+            min_key: 0,
+            max_key: 0,
+            ops: ops.clone(),
+        };
+
+        let rb = bucket.to_record_batch().unwrap();
+
+        let exp = vec![
+            "+-----+---+---+",
+            "| key | b | c |",
+            "+-----+---+---+",
+            "| 1   | 2 | 1 |",
+            "| 2   | 1 |   |",
+            "| 3   |   | 2 |",
+            "| 5   | 3 | 1 |",
+            "+-----+---+---+\n",
+        ];
+
+
+        assert_eq!(
+            exp.join("\n"),
+            arrow::util::pretty::pretty_format_batches(&[rb.clone()]).unwrap(),
+        );
     }
 }

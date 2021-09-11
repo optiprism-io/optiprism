@@ -111,11 +111,12 @@ mod tests {
     use crate::storage::memory::{Memory, Order};
     use datafusion::scalar::ScalarValue;
     use arrow::datatypes::{Schema, Field, DataType};
+    use std::sync::Arc;
 
     #[test]
     fn test() {
         let schema = Schema::new(vec![Field::new("1", DataType::Int8, true), Field::new("2", DataType::Int8, true)]);
-        let mut mem = Memory::new(vec![Order::Asc(0), Order::Desc(1)], schema);
+        let mut mem = Memory::new(vec![Order::Asc(0), Order::Desc(1)], Arc::new(schema));
         mem.insert(&vec![ScalarValue::Int8(Some(2)), ScalarValue::Int8(Some(1))]);
         mem.insert(&vec![ScalarValue::Int8(Some(2)), ScalarValue::Int8(Some(2))]);
         mem.insert(&vec![ScalarValue::Int8(Some(2)), ScalarValue::Int8(Some(3))]);
