@@ -398,7 +398,7 @@ struct ChunkedArray<'a, T> {
 impl<'a, T: Array> ChunkedArray<'a, T> {
     fn new(chunks: Vec<&'a T>) -> Self {
         Self {
-            chunks,
+            chunks: chunks.clone(),
             len: chunks.iter().fold(0, |acc, &x| acc + x.len()),
         }
     }
@@ -607,6 +607,8 @@ impl Storage {
                                 value.value = right_col.value(right_idx);
                                 merge_i8_value(&left.ops, left_key, &mut left_idx, &mut value, col_id);
                                 final_key = left_key;
+                                left_idx += 1;
+                                right_idx += 1;
                             }
                             Ordering::Greater => {
                                 value.is_null = right_col.is_null(right_idx);
