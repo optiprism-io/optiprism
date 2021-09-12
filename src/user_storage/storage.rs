@@ -15,9 +15,11 @@ use parquet::file::writer::SerializedFileWriter;
 use parquet::arrow::{ParquetFileArrowReader, ArrowReader, ArrowWriter};
 use std::fs::File;
 use std::path::Path;
-use arrow::array::{build_compare, Array, ArrayRef, BooleanArray, DynComparator, Int8Array, MutableArrayData, StringArray, UInt8Array, BooleanBuilder, Int8Builder, UInt64Array};
+use arrow::array::{build_compare, Array, ArrayRef, BooleanArray, DynComparator, Int8Array, MutableArrayData, StringArray, UInt8Array, BooleanBuilder, Int8Builder, UInt64Array, Int64Array};
 use std::ops::{Add, AddAssign, SubAssign};
 use arrow::datatypes::DataType::UInt64;
+use std::ops::{Index, IndexMut};
+
 
 #[derive(Clone)]
 pub struct Value {
@@ -103,7 +105,6 @@ pub struct OpsBucket {
 impl OpsBucket {
     pub fn to_record_batch(&self) -> Result<RecordBatch> {
         let mut key_col = UInt64Array::builder(self.keys_count);
-        let mut cols: Vec<ArrayRef> = Vec::new();
 
         let mut cols: Vec<ArrayRef> = self.schema.fields().iter().enumerate().map(|(col_id, field)| {
             match field.data_type() {
@@ -111,7 +112,7 @@ impl OpsBucket {
                     // use buffer because standard is slower
                     let mut builder = BooleanBuilder::new(self.keys_count);
                     let mut last_key: u64 = 0;
-                    let mut value = MergeValue::<bool>::new();
+                    let mut value = MergeValue::<bool>::new_null();
                     for (key, op) in self.ops.iter() {
                         if *key != last_key {
                             if value.is_set {
@@ -159,7 +160,7 @@ impl OpsBucket {
                     // use buffer because standard is slower
                     let mut builder = Int8Builder::new(self.keys_count);
                     let mut last_key: u64 = 0;
-                    let mut value = MergeValue::<i8>::new();
+                    let mut value = MergeValue::<i8>::new_null();
                     let mut first = true;
                     for (key, op) in self.ops.iter() {
                         if *key != last_key {
@@ -240,6 +241,47 @@ impl OpsBucket {
     }
 }
 
+fn merge_i8_value(ops: &[(u64, Op)], key: u64, idx: &mut usize, value: &mut MergeValue<i8>, col_id: usize) {
+    while *idx <= ops.len() - 1 {
+        let (_, op) = &ops[*idx];
+        match op {
+            Op::PutValues(vals) => {
+                if col_id <= vals.len() - 1 && vals[col_id].is_some() {
+                    if let ScalarValue::Int8(v) = vals[col_id].clone().unwrap() {
+                        value.set_option(v.clone());
+                    }
+                }
+            }
+            Op::IncrementValue { col_id: inc_col_id, delta } => {
+                if col_id == *inc_col_id {
+                    if let ScalarValue::Int8(v) = delta {
+                        value.inc(v.unwrap());
+                    }
+                }
+            }
+            Op::DecrementValue { col_id: inc_col_id, delta } => {
+                if col_id == *inc_col_id {
+                    if let ScalarValue::Int8(v) = delta {
+                        value.dec(v.unwrap());
+                    }
+                }
+            }
+            Op::DeleteKey => {
+                value.unset();
+            }
+            Op::None => {}
+        }
+
+        if *idx + 1 > ops.len() - 1 {
+            return;
+        }
+        if ops[*idx + 1].0 != key {
+            return;
+        }
+        *idx += 1;
+    }
+}
+
 #[derive(Clone)]
 struct Bucket {
     id: usize,
@@ -290,7 +332,7 @@ struct MergeValue<T: Clone> {
 }
 
 impl<T: Default + Clone> MergeValue<T> {
-    fn new() -> Self {
+    pub fn new_null() -> Self {
         MergeValue {
             is_set: true,
             is_null: true,
@@ -339,6 +381,85 @@ impl<T: Default + Clone> MergeValue<T> {
         self.is_null = false;
         self.value -= delta;
     }
+}
+
+
+trait ChunkIndex<V> {
+    fn value(&self, i: usize) -> V;
+    fn is_null(&self, i: usize) -> bool;
+    fn len(&self) -> usize;
+}
+
+struct ChunkedArray<'a, T> {
+    chunks: Vec<&'a T>,
+    len: usize,
+}
+
+impl<'a, T: Array> ChunkedArray<'a, T> {
+    fn new(chunks: Vec<&'a T>) -> Self {
+        Self {
+            chunks,
+            len: chunks.iter().fold(0, |acc, &x| acc + x.len()),
+        }
+    }
+}
+
+impl<'a> ChunkIndex<i8> for ChunkedArray<'a, Int8Array> {
+    fn value(&self, mut i: usize) -> i8 {
+        for chunk in self.chunks.iter() {
+            if i <= chunk.len() - 1 {
+                return chunk.value(i);
+            }
+            i -= chunk.len() - 1;
+        }
+        unreachable!();
+    }
+
+    fn is_null(&self, mut i: usize) -> bool {
+        for chunk in self.chunks.iter() {
+            if i <= chunk.len() - 1 {
+                return chunk.is_null(i);
+            }
+            i -= chunk.len() - 1;
+        }
+        unreachable!();
+    }
+
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl<'a> ChunkIndex<u64> for ChunkedArray<'a, UInt64Array> {
+    fn value(&self, mut i: usize) -> u64 {
+        for chunk in self.chunks.iter() {
+            if i <= chunk.len() - 1 {
+                return chunk.value(i);
+            }
+            i -= chunk.len() - 1;
+        }
+        unreachable!();
+    }
+
+    fn is_null(&self, mut i: usize) -> bool {
+        for chunk in self.chunks.iter() {
+            if i <= chunk.len() - 1 {
+                return chunk.is_null(i);
+            }
+            i -= chunk.len() - 1;
+        }
+        unreachable!();
+    }
+
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+enum Merge {
+    TakeLeft,
+    TakeRight,
+    Merge,
 }
 
 impl Storage {
@@ -445,6 +566,118 @@ impl Storage {
             }
         }
         Ok(())
+    }
+
+    fn merge(&mut self, left: Arc<OpsBucket>, right: &[RecordBatch]) -> Result<RecordBatch> {
+        let mut key_col = UInt64Array::builder(self.bucket_size);
+        let mut cols: Vec<ArrayRef> = Vec::new();
+
+        let mut cols: Vec<ArrayRef> = left.schema.fields().iter().enumerate().map(|(col_id, field)| {
+            match field.data_type() {
+                DataType::Int8 => {
+                    // use buffer because standard is slower
+                    let mut res_builder = Int8Builder::new(self.bucket_size);
+                    let mut left_idx: usize = 0;
+
+                    let right_chunks: Vec<&Int8Array> = right.iter().map(|x| {
+                        x.column(col_id).as_any().downcast_ref::<Int8Array>().unwrap()
+                    }).collect();
+                    let right_col: Box<dyn ChunkIndex<i8>> = Box::new(ChunkedArray::new(right_chunks));
+                    let mut right_idx: usize = 0;
+
+                    let right_key_chunks: Vec<&UInt64Array> = right.iter().map(|x| {
+                        x.column(0).as_any().downcast_ref::<UInt64Array>().unwrap()
+                    }).collect();
+                    let right_key_col: Box<dyn ChunkIndex<u64>> = Box::new(ChunkedArray::new(right_key_chunks));
+
+                    let mut value = MergeValue::<i8>::new_null();
+                    while left_idx <= left.ops.len() - 1 && right_idx <= right_col.len() - 1 {
+                        value.reset();
+                        let left_key = left.ops[left_idx].0;
+                        let right_key = right_key_col.value(right_idx);
+                        let mut final_key: u64 = 0;
+                        match left_key.cmp(&right_key) {
+                            Ordering::Less => {
+                                merge_i8_value(&left.ops, left_key, &mut left_idx, &mut value, col_id);
+                                final_key = left_key;
+                                left_idx += 1;
+                            }
+                            Ordering::Equal => {
+                                value.is_null = right_col.is_null(right_idx);
+                                value.value = right_col.value(right_idx);
+                                merge_i8_value(&left.ops, left_key, &mut left_idx, &mut value, col_id);
+                                final_key = left_key;
+                            }
+                            Ordering::Greater => {
+                                value.is_null = right_col.is_null(right_idx);
+                                value.value = right_col.value(right_idx);
+                                final_key = right_key;
+                                right_idx += 1;
+                                continue;
+                            }
+                        }
+
+                        if value.is_set {
+                            if value.is_null {
+                                res_builder.append_null();
+                            } else {
+                                res_builder.append_value(value.value.clone()).unwrap();
+                            }
+                            if col_id == 0 {
+                                key_col.append_value(final_key);
+                            }
+                        }
+                    }
+
+                    while left_idx <= left.ops.len() - 1 {
+                        let key = left.ops[left_idx].0;
+                        merge_i8_value(&left.ops, key, &mut left_idx, &mut value, col_id);
+                        left_idx += 1;
+                        if value.is_set {
+                            if value.is_null {
+                                res_builder.append_null();
+                            } else {
+                                res_builder.append_value(value.value.clone()).unwrap();
+                            }
+                            if col_id == 0 {
+                                key_col.append_value(key);
+                            }
+                        }
+                    }
+
+                    while right_idx <= right_col.len() - 1 {
+                        value.is_null = right_col.is_null(right_idx);
+                        value.value = right_col.value(right_idx);
+                        right_idx += 1;
+                        if value.is_set {
+                            if value.is_null {
+                                res_builder.append_null();
+                            } else {
+                                res_builder.append_value(value.value.clone()).unwrap();
+                            }
+                            if col_id == 0 {
+                                key_col.append_value(right_key_col.value(right_idx));
+                            }
+                        }
+                    }
+
+                    Arc::new(res_builder.finish()) as ArrayRef
+                }
+                _ => unimplemented!()
+            }
+        }).collect();
+
+
+        let schema = Schema::try_merge(
+            vec![
+                Schema::new(vec![Field::new("key", DataType::UInt64, false)]),
+                self.schema.clone(),
+            ],
+        ).unwrap();
+
+        let mut final_cols = vec![Arc::new(key_col.finish()) as ArrayRef];
+        final_cols.append(&mut cols);
+        Ok(RecordBatch::try_new(Arc::new(schema), final_cols).unwrap())
     }
 
     fn merge_ops_bucket_with_existing(&mut self, bucket: Bucket, ops_bucket: Arc<OpsBucket>) -> Result<()> {
