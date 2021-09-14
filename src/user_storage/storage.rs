@@ -19,6 +19,7 @@ use arrow::array::{build_compare, Array, ArrayRef, BooleanArray, DynComparator, 
 use std::ops::{Add, AddAssign, SubAssign};
 use arrow::datatypes::DataType::UInt64;
 use std::ops::{Index, IndexMut};
+use arrow::compute::kernels;
 
 
 #[derive(Clone)]
@@ -95,6 +96,7 @@ impl Eq for OrderedOp {}
 #[derive(Clone)]
 pub struct OpsBucket {
     pub idx: usize,
+    // schema for current bucket (noref)
     pub schema: Schema,
     pub keys_count: usize,
     pub min_key: u64,
@@ -570,9 +572,50 @@ impl Storage {
 
     fn merge(&mut self, left: Arc<OpsBucket>, right: &[RecordBatch]) -> Result<RecordBatch> {
         let mut key_col = UInt64Array::builder(self.bucket_size);
-        let mut cols: Vec<ArrayRef> = Vec::new();
 
-        let mut cols: Vec<ArrayRef> = left.schema.fields().iter().enumerate().map(|(col_id, field)| {
+        let left_schema = left.schema.clone();
+        let right_schema = Schema::new(right[0].schema().fields().iter().skip(1).map(|f| f.clone()).collect());
+        // merge bucket schema with batch (right) schema
+        let schema = Schema::try_merge(vec![left.schema.clone(), right_schema.clone()]).unwrap();
+        let mut cols: Vec<ArrayRef> = Vec::new();
+        // iterate over each column
+        let mut cols: Vec<ArrayRef> = schema.fields().iter().enumerate().map(|(col_id, field)| {
+            if let Some((idx, _)) = left_schema.column_with_name(field.name()) {
+                // if there is no such column in batch then just merge everything from bucket into new column
+                if let None = right_schema.column_with_name(field.name()) {
+                    match field.data_type() {
+                        DataType::Int8 => {
+                            let mut res_builder = Int8Builder::new(self.bucket_size);
+                            let mut left_idx = 0;
+                            let mut left_key = left.ops[left_idx].0;
+                            let mut value = MergeValue::<i8>::new_null();
+                            while left_idx <= left.ops.len() - 1 {
+                                merge_i8_value(&left.ops, left_key, &mut left_idx, &mut value, idx);
+                                if value.is_set {
+                                    if value.is_null {
+                                        res_builder.append_null();
+                                    } else {
+                                        res_builder.append_value(value.value.clone()).unwrap();
+                                    }
+                                    if col_id == 0 {
+                                        key_col.append_value(left_key);
+                                    }
+                                }
+                            }
+                            return Arc::new(res_builder.finish()) as ArrayRef;
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+            } else if let None = left_schema.column_with_name(field.name()) {
+                // if there is no column in left schema then just return column from right one
+                if let Some((idx, _)) = right_schema.column_with_name(field.name()) {
+                    let t = right.iter().map(|batch| batch.column(idx).clone()).collect::<Vec<ArrayRef>>();
+                    return kernels::concat::concat(&right.iter().map(|batch| batch.column(idx).as_ref()).collect::<Vec<_>>()).unwrap();
+                }
+            }
+
+            // merge only if both bucket and batch have this column
             match field.data_type() {
                 DataType::Int8 => {
                     // use buffer because standard is slower
@@ -580,6 +623,7 @@ impl Storage {
                     let mut left_idx: usize = 0;
 
                     let right_chunks: Vec<&Int8Array> = right.iter().map(|x| {
+                        // we use col_id safely because it assumes that batch schema is less or equal to bucket schema
                         x.column(col_id).as_any().downcast_ref::<Int8Array>().unwrap()
                     }).collect();
                     let right_col: Box<dyn ChunkIndex<i8>> = Box::new(ChunkedArray::new(right_chunks));
@@ -725,6 +769,8 @@ mod tests {
     use arrow::datatypes::{Schema, Field, DataType};
     use std::sync::Arc;
     use arrow::record_batch::RecordBatch;
+    use arrow::array::{ArrayRef, UInt64Builder, Int8Builder};
+    use arrow::datatypes::DataType::UInt64;
 
     #[test]
     fn op_bucket_to_record_batch() {
@@ -750,8 +796,8 @@ mod tests {
         ops.push((5, Op::IncrementValue { col_id: 1, delta: ScalarValue::Int8(Some(1)) }));
 
         let schema = Schema::new(vec![
+            Field::new("a", DataType::Int8, false),
             Field::new("b", DataType::Int8, false),
-            Field::new("c", DataType::Int8, false),
         ]);
 
         let mut bucket = OpsBucket {
@@ -767,7 +813,7 @@ mod tests {
 
         let exp = vec![
             "+-----+---+---+",
-            "| key | b | c |",
+            "| key | a | b |",
             "+-----+---+---+",
             "| 1   | 2 | 1 |",
             "| 2   | 1 |   |",
@@ -781,5 +827,111 @@ mod tests {
             exp.join("\n"),
             arrow::util::pretty::pretty_format_batches(&[rb.clone()]).unwrap(),
         );
+    }
+
+    fn build_columns(vals: &[ScalarValue], cols: usize) -> Vec<ArrayRef> {
+        let len = vals.len() / cols;
+        (0..cols).into_iter().map(|col_id| {
+            match vals[col_id].get_datatype() {
+                DataType::UInt64 => {
+                    let mut arr = UInt64Builder::new(len);
+                    vals.iter().skip(col_id).step_by(cols).for_each(|sv| {
+                        if let ScalarValue::UInt64(v) = sv {
+                            arr.append_option(v.clone());
+                        }
+                    });
+                    Arc::new(arr.finish()) as ArrayRef
+                }
+                DataType::Int8 => {
+                    let mut arr = Int8Builder::new(len);
+                    vals.iter().skip(col_id).step_by(cols).for_each(|sv| {
+                        if let ScalarValue::Int8(v) = sv {
+                            arr.append_option(v.clone());
+                        }
+                    });
+                    Arc::new(arr.finish()) as ArrayRef
+                }
+                _ => unimplemented!(),
+            }
+        }).collect()
+    }
+
+    #[test]
+    fn merge() {
+        let mut ops: Vec<(u64, Op)> = Vec::new();
+        ops.push((1, Op::PutValues(vec![None, Some(ScalarValue::Int8(Some(1)))])));
+        ops.push((1, Op::PutValues(vec![None, Some(ScalarValue::Int8(Some(2)))])));
+        ops.push((1, Op::PutValues(vec![Some(ScalarValue::Int8(Some(2))), Some(ScalarValue::Int8(Some(3)))])));
+        ops.push((1, Op::PutValues(vec![None, Some(ScalarValue::Int8(Some(1)))])));
+
+        ops.push((2, Op::PutValues(vec![Some(ScalarValue::Int8(Some(1)))])));
+
+        ops.push((3, Op::PutValues(vec![None, Some(ScalarValue::Int8(Some(2)))])));
+
+        ops.push((4, Op::IncrementValue { col_id: 0, delta: ScalarValue::Int8(Some(1)) }));
+        ops.push((4, Op::IncrementValue { col_id: 0, delta: ScalarValue::Int8(Some(3)) }));
+        ops.push((4, Op::DecrementValue { col_id: 0, delta: ScalarValue::Int8(Some(1)) }));
+        ops.push((4, Op::IncrementValue { col_id: 1, delta: ScalarValue::Int8(Some(1)) }));
+        ops.push((4, Op::DeleteKey));
+
+        ops.push((5, Op::IncrementValue { col_id: 0, delta: ScalarValue::Int8(Some(1)) }));
+        ops.push((5, Op::IncrementValue { col_id: 0, delta: ScalarValue::Int8(Some(3)) }));
+        ops.push((5, Op::DecrementValue { col_id: 0, delta: ScalarValue::Int8(Some(1)) }));
+        ops.push((5, Op::IncrementValue { col_id: 1, delta: ScalarValue::Int8(Some(1)) }));
+
+        ops.push((7, Op::IncrementValue { col_id: 1, delta: ScalarValue::Int8(Some(1)) }));
+
+        let schema = Schema::new(vec![
+            Field::new("a", DataType::Int8, true),
+            Field::new("b", DataType::Int8, true),
+        ]);
+
+        let mut bucket = OpsBucket {
+            idx: 0,
+            schema: schema.clone(),
+            keys_count: 0,
+            min_key: 0,
+            max_key: 0,
+            ops: ops.clone(),
+        };
+
+        let batch_schema = Arc::new(Schema::new(vec![
+            Field::new("key", DataType::UInt64, false),
+            Field::new("a", DataType::Int8, true),
+            Field::new("c", DataType::Int8, true),
+        ]));
+
+        let batches = {
+            let cols1 = vec![
+                //           key                           a                           c
+                ScalarValue::UInt64(Some(1)), ScalarValue::Int8(Some(1)), ScalarValue::Int8(Some(3)),
+                ScalarValue::UInt64(Some(2)), ScalarValue::Int8(None), ScalarValue::Int8(Some(4)),
+                ScalarValue::UInt64(Some(3)), ScalarValue::Int8(Some(1)), ScalarValue::Int8(Some(3)),
+                ScalarValue::UInt64(Some(4)), ScalarValue::Int8(Some(1)), ScalarValue::Int8(Some(1)),
+                ScalarValue::UInt64(Some(5)), ScalarValue::Int8(Some(5)), ScalarValue::Int8(Some(3)),
+                ScalarValue::UInt64(Some(6)), ScalarValue::Int8(Some(6)), ScalarValue::Int8(Some(6)),
+            ];
+
+            RecordBatch::try_new(batch_schema.clone());
+            let batch1=build_columns(&build_columns(cols1))
+            
+            /*let batch1 = RecordBatch::try_new(
+                batch_schema.clone(),
+                vec
+            )*/
+        };
+
+        let exp = vec![
+            "+-----+---+---+---+",
+            "| key | a | b | c |",
+            "+-----+---+---+---+",
+            "| 1   | 2 | 1 | 3 |",
+            "| 2   | 1 |   | 4 |",
+            "| 3   | 1 | 2 | 3 |",
+            "| 5   | 8 | 1 | 3 |",
+            "| 6   | 6 |   | 6 |",
+            "| 7   | 1 |   |   |",
+            "+-----+---+---+---+\n",
+        ];
     }
 }
