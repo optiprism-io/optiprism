@@ -21,6 +21,7 @@ use arrow::datatypes::DataType::UInt64;
 use std::ops::{Index, IndexMut};
 use arrow::compute::kernels;
 use std::io::{stdout, Write};
+use std::rc::Rc;
 
 
 #[derive(Clone)]
@@ -243,14 +244,14 @@ impl OpsBucket {
         Ok(RecordBatch::try_new(Arc::new(schema), final_cols).unwrap())
     }
 
-    fn merge_i8_column(&self,
-                       field: &Field,
-                       left_col_id: usize,
-                       right_col: &ChunkedArray<Int8Array>,
-                       right_key_col: &ChunkedArray<UInt64Array>,
-                       result_key_col: &mut PrimitiveBuilder<UInt64Type>,
-                       bucket_size: usize,
-                       is_first: bool,
+    fn merge_i8_columns(&self,
+                        field: &Field,
+                        left_col_id: usize,
+                        right_col: &ChunkedArray<Int8Array>,
+                        right_key_col: &ChunkedArray<UInt64Array>,
+                        result_key_col: &mut PrimitiveBuilder<UInt64Type>,
+                        bucket_size: usize,
+                        is_first: bool,
     ) -> Int8Array {
         // use buffer because standard is slower
         let mut res_builder = Int8Builder::new(bucket_size);
@@ -258,7 +259,7 @@ impl OpsBucket {
         let mut right_idx: usize = 0;
 
         let mut value = MergeValue::<i8>::new_null();
-        while left_idx <= self.ops.len() - 1 && right_idx <= right_col.len() - 1 {
+        while left_idx <= self.ops.len() - 1 && right_idx <= right_key_col.len() - 1 {
             value.reset();
             let left_key = self.ops[left_idx].0;
             let right_key = right_key_col.value(right_idx);
@@ -273,6 +274,7 @@ impl OpsBucket {
                     value.is_null = right_col.is_null(right_idx);
                     value.value = right_col.value(right_idx);
                     merge_i8_value(&self.ops, left_key, &mut left_idx, &mut value, left_col_id);
+
                     final_key = left_key;
                     left_idx += 1;
                     right_idx += 1;
@@ -289,7 +291,6 @@ impl OpsBucket {
                 if value.is_null {
                     res_builder.append_null();
                 } else {
-                    println!("{}", value.value);
                     res_builder.append_value(value.value.clone()).unwrap();
                 }
                 if is_first {
@@ -299,6 +300,7 @@ impl OpsBucket {
         }
 
         while left_idx <= self.ops.len() - 1 {
+            value.reset();
             let key = self.ops[left_idx].0;
             merge_i8_value(&self.ops, key, &mut left_idx, &mut value, left_col_id);
             left_idx += 1;
@@ -332,6 +334,160 @@ impl OpsBucket {
 
         res_builder.finish()
     }
+
+    fn apply_left_i8_column(&self,
+                            field: &Field,
+                            left_col_id: usize,
+                            right_key_col: &ChunkedArray<UInt64Array>,
+                            result_key_col: &mut PrimitiveBuilder<UInt64Type>,
+                            bucket_size: usize,
+                            is_first: bool,
+    ) -> Int8Array {
+        // use buffer because standard is slower
+        let mut res_builder = Int8Builder::new(bucket_size);
+        let mut left_idx: usize = 0;
+        let mut right_idx: usize = 0;
+
+        let mut value = MergeValue::<i8>::new_null();
+        while left_idx <= self.ops.len() - 1 && right_idx <= right_key_col.len() - 1 {
+            value.reset();
+            let left_key = self.ops[left_idx].0;
+            let right_key = right_key_col.value(right_idx);
+            let mut final_key: u64 = 0;
+            match left_key.cmp(&right_key) {
+                Ordering::Less => {
+                    merge_i8_value(&self.ops, left_key, &mut left_idx, &mut value, left_col_id);
+                    final_key = left_key;
+                    left_idx += 1;
+                }
+                Ordering::Equal => {
+                    merge_i8_value(&self.ops, left_key, &mut left_idx, &mut value, left_col_id);
+                    final_key = left_key;
+                    left_idx += 1;
+                    right_idx += 1;
+                }
+                Ordering::Greater => {
+                    final_key = right_key;
+                    right_idx += 1;
+                }
+            }
+
+            if value.is_set {
+                if value.is_null {
+                    res_builder.append_null();
+                } else {
+                    res_builder.append_value(value.value.clone()).unwrap();
+                }
+                if is_first {
+                    result_key_col.append_value(final_key);
+                }
+            }
+        }
+
+        while left_idx <= self.ops.len() - 1 {
+            let key = self.ops[left_idx].0;
+            merge_i8_value(&self.ops, key, &mut left_idx, &mut value, left_col_id);
+            left_idx += 1;
+            if value.is_set {
+                if value.is_null {
+                    res_builder.append_null();
+                } else {
+                    res_builder.append_value(value.value.clone()).unwrap();
+                }
+                if is_first {
+                    result_key_col.append_value(key);
+                }
+            }
+        }
+
+        res_builder.finish()
+    }
+
+    fn apply_right_i8_column(&self,
+                             field: &Field,
+                             right_col: &ChunkedArray<Int8Array>,
+                             right_key_col: &ChunkedArray<UInt64Array>,
+                             result_key_col: &mut PrimitiveBuilder<UInt64Type>,
+                             bucket_size: usize,
+                             is_first: bool,
+    ) -> Int8Array {
+        // use buffer because standard is slower
+        let mut res_builder = Int8Builder::new(bucket_size);
+        let mut left_idx: usize = 0;
+        let mut right_idx: usize = 0;
+
+        let mut value = MergeValue::<i8>::new_null();
+        while left_idx <= self.ops.len() - 1 && right_idx <= right_key_col.len() - 1 {
+            value.reset();
+            let left_key = self.ops[left_idx].0;
+            let right_key = right_key_col.value(right_idx);
+            let mut final_key: u64 = 0;
+            match left_key.cmp(&right_key) {
+                Ordering::Less => {
+                    apply_right_i8_value(&self.ops, left_key, &mut left_idx, &mut value);
+                    final_key = left_key;
+                    left_idx += 1;
+                }
+                Ordering::Equal => {
+                    value.is_null = right_col.is_null(right_idx);
+                    value.value = right_col.value(right_idx);
+                    apply_right_i8_value(&self.ops, left_key, &mut left_idx, &mut value);
+
+                    final_key = left_key;
+                    left_idx += 1;
+                    right_idx += 1;
+                }
+                Ordering::Greater => {
+                    value.is_null = right_col.is_null(right_idx);
+                    value.value = right_col.value(right_idx);
+                    final_key = right_key;
+                    right_idx += 1;
+                }
+            }
+
+            if value.is_set {
+                if value.is_null {
+                    res_builder.append_null();
+                } else {
+                    res_builder.append_value(value.value.clone()).unwrap();
+                }
+                if is_first {
+                    result_key_col.append_value(final_key);
+                }
+            }
+        }
+
+        while left_idx <= self.ops.len() - 1 {
+            let key = self.ops[left_idx].0;
+            apply_right_i8_value(&self.ops, key, &mut left_idx, &mut value);
+            left_idx += 1;
+            if value.is_set {
+                res_builder.append_null();
+                if is_first {
+                    result_key_col.append_value(key);
+                }
+            }
+        }
+
+        while right_idx <= right_col.len() - 1 {
+            value.is_null = right_col.is_null(right_idx);
+            value.value = right_col.value(right_idx);
+            right_idx += 1;
+            if value.is_set {
+                if value.is_null {
+                    res_builder.append_null();
+                } else {
+                    res_builder.append_value(value.value.clone()).unwrap();
+                }
+                if is_first {
+                    result_key_col.append_value(right_key_col.value(right_idx));
+                }
+            }
+        }
+
+        res_builder.finish()
+    }
+
     pub fn merge(&self, right: &[RecordBatch], bucket_size: usize) -> Result<RecordBatch> {
         let mut key_col = UInt64Array::builder(bucket_size);
 
@@ -348,139 +504,47 @@ impl OpsBucket {
 
         // iterate over each column
         let mut cols: Vec<ArrayRef> = schema.fields().iter().skip(1).enumerate().map(|(col_idx, field)| {
-            if let Some((idx, _)) = left_schema.column_with_name(field.name()) {
-                // if there is no such column in batch then just merge everything from bucket into new column
-                if let None = right_schema.column_with_name(field.name()) {
-                    let nulls = Int8Array::from(vec![None; right.iter().fold(0, |acc, x| acc + x.column(0).len())]);
-                    let arr = ChunkedArray::new(vec![&nulls]);
-                    let res = self.merge_i8_column(field, idx, &arr, &right_key_col, &mut key_col, bucket_size, col_idx == 0);
-                    return Arc::new(res) as ArrayRef;
-                }
-            } else if let None = left_schema.column_with_name(field.name()) {
-                // if there is no column in left schema then just return column from right one
-                if let Some((idx, _)) = right_schema.column_with_name(field.name()) {
-                    return kernels::concat::concat(&right.iter().map(|batch| batch.column(idx).as_ref()).collect::<Vec<_>>()).unwrap();
-                }
-            }
-
-            let (left_col_id, _) = left_schema.column_with_name(field.name()).unwrap();
-            let (right_col_id, _) = right_schema.column_with_name(field.name()).unwrap();
+            let left_col_id = left_schema.column_with_name(field.name()).map(|(col_id, _)| col_id);
+            let right_col_id = right_schema.column_with_name(field.name()).map(|(col_id, _)| col_id);
 
             match field.data_type() {
                 DataType::Int8 => {
-                    let right_chunks: Vec<&Int8Array> = right.iter().map(|x| {
-                        // we use col_id safely because it assumes that batch schema is less or equal to bucket schema
-                        x.column(right_col_id).as_any().downcast_ref::<Int8Array>().unwrap()
-                    }).collect();
-                    let arr = ChunkedArray::new(right_chunks);
-                    let res = self.merge_i8_column(field, left_col_id, &arr, &right_key_col, &mut key_col, bucket_size, col_idx == 0);
-                    return Arc::new(res) as ArrayRef;
+                    match (left_col_id, right_col_id) {
+                        (Some(left_col_id), Some(right_col_id)) => {
+                            let right_chunks: Vec<&Int8Array> = right.iter().map(|x| {
+                                // we use col_id safely because it assumes that batch schema is less or equal to bucket schema
+                                x.column(right_col_id).as_any().downcast_ref::<Int8Array>().unwrap()
+                            }).collect();
+                            let right_col = ChunkedArray::new(right_chunks);
+                            let res = self.merge_i8_columns(field, left_col_id, &right_col, &right_key_col, &mut key_col, bucket_size, col_idx == 0);
+
+                            Arc::new(res) as ArrayRef
+                        }
+                        (Some(left_col_id), None) => {
+                            let res = self.apply_left_i8_column(field, left_col_id, &right_key_col, &mut key_col, bucket_size, col_idx == 0);
+
+                            Arc::new(res) as ArrayRef
+                        }
+                        (None, Some(right_col_id)) => {
+                            let right_chunks: Vec<&Int8Array> = right.iter().map(|x| {
+                                // we use col_id safely because it assumes that batch schema is less or equal to bucket schema
+                                x.column(right_col_id).as_any().downcast_ref::<Int8Array>().unwrap()
+                            }).collect();
+                            let right_col = ChunkedArray::new(right_chunks);
+                            let res = self.apply_right_i8_column(field, &right_col, &right_key_col, &mut key_col, bucket_size, col_idx == 0);
+
+                            Arc::new(res) as ArrayRef
+                        }
+                        (None, None) => unimplemented!()
+                    }
                 }
                 _ => unimplemented!(),
             }
-            /*
-            // merge only if both bucket and batch have this column
-            match field.data_type() {
-                DataType::Int8 => {
-                    // use buffer because standard is slower
-                    let mut res_builder = Int8Builder::new(bucket_size);
-                    let mut left_idx: usize = 0;
-
-                    let right_col: Box<dyn ChunkIndex<i8>> = if right_col_exist {
-                        let right_chunks: Vec<&Int8Array> = right.iter().map(|x| {
-                            // we use col_id safely because it assumes that batch schema is less or equal to bucket schema
-                            x.column(right_col_id).as_any().downcast_ref::<Int8Array>().unwrap()
-                        }).collect();
-                        Box::new(ChunkedArray::new(right_chunks))
-                    } else {
-                        Box::new(ChunkedArray::new(vec![&null_arr]))
-                    };
-
-                    let mut right_idx: usize = 0;
-
-                    let mut value = MergeValue::<i8>::new_null();
-                    while left_idx <= self.ops.len() - 1 && right_idx <= right_col.len() - 1 {
-                        value.reset();
-                        let left_key = self.ops[left_idx].0;
-                        let right_key = right_key_col.value(right_idx);
-                        let mut final_key: u64 = 0;
-                        match left_key.cmp(&right_key) {
-                            Ordering::Less => {
-                                merge_i8_value(&self.ops, left_key, &mut left_idx, &mut value, left_col_id);
-                                final_key = left_key;
-                                left_idx += 1;
-                            }
-                            Ordering::Equal => {
-                                value.is_null = right_col.is_null(right_idx);
-                                value.value = right_col.value(right_idx);
-                                merge_i8_value(&self.ops, left_key, &mut left_idx, &mut value, left_col_id);
-                                final_key = left_key;
-                                left_idx += 1;
-                                right_idx += 1;
-                            }
-                            Ordering::Greater => {
-                                value.is_null = right_col.is_null(right_idx);
-                                value.value = right_col.value(right_idx);
-                                final_key = right_key;
-                                right_idx += 1;
-                            }
-                        }
-
-                        if value.is_set {
-                            if value.is_null {
-                                res_builder.append_null();
-                            } else {
-                                println!("{}", value.value);
-                                res_builder.append_value(value.value.clone()).unwrap();
-                            }
-                            if col_idx == 0 {
-                                key_col.append_value(final_key);
-                            }
-                        }
-                    }
-
-                    while left_idx <= self.ops.len() - 1 {
-                        let key = self.ops[left_idx].0;
-                        merge_i8_value(&self.ops, key, &mut left_idx, &mut value, left_col_id);
-                        left_idx += 1;
-                        if value.is_set {
-                            if value.is_null {
-                                res_builder.append_null();
-                            } else {
-                                res_builder.append_value(value.value.clone()).unwrap();
-                            }
-                            if col_idx == 0 {
-                                key_col.append_value(key);
-                            }
-                        }
-                    }
-
-                    while right_idx <= right_col.len() - 1 {
-                        value.is_null = right_col.is_null(right_idx);
-                        value.value = right_col.value(right_idx);
-                        right_idx += 1;
-                        if value.is_set {
-                            if value.is_null {
-                                res_builder.append_null();
-                            } else {
-                                res_builder.append_value(value.value.clone()).unwrap();
-                            }
-                            if col_idx == 0 {
-                                key_col.append_value(right_key_col.value(right_idx));
-                            }
-                        }
-                    }
-
-                    Arc::new(res_builder.finish()) as ArrayRef
-                }
-                _ => unimplemented!()
-            }*/
         }).collect();
 
 
         let mut final_cols = vec![Arc::new(key_col.finish()) as ArrayRef];
         final_cols.append(&mut cols);
-        println!("{:?} {:?}", schema, final_cols);
         Ok(RecordBatch::try_new(Arc::new(schema), final_cols).unwrap())
     }
 }
@@ -514,6 +578,67 @@ fn merge_i8_value(ops: &[(u64, Op)], key: u64, idx: &mut usize, value: &mut Merg
                 value.unset();
             }
             Op::None => {}
+        }
+
+        if *idx + 1 > ops.len() - 1 {
+            return;
+        }
+        if ops[*idx + 1].0 != key {
+            return;
+        }
+        *idx += 1;
+    }
+}
+
+fn apply_left_i8_value(ops: &[(u64, Op)], key: u64, idx: &mut usize, value: &mut MergeValue<i8>, col_id: usize) {
+    while *idx <= ops.len() - 1 {
+        let (_, op) = &ops[*idx];
+        match op {
+            Op::PutValues(vals) => {
+                if col_id <= vals.len() - 1 && vals[col_id].is_some() {
+                    if let ScalarValue::Int8(v) = vals[col_id].clone().unwrap() {
+                        value.set_option(v.clone());
+                    }
+                }
+            }
+            Op::IncrementValue { col_id: inc_col_id, delta } => {
+                if col_id == *inc_col_id {
+                    if let ScalarValue::Int8(v) = delta {
+                        value.inc(v.unwrap());
+                    }
+                }
+            }
+            Op::DecrementValue { col_id: inc_col_id, delta } => {
+                if col_id == *inc_col_id {
+                    if let ScalarValue::Int8(v) = delta {
+                        value.dec(v.unwrap());
+                    }
+                }
+            }
+            Op::DeleteKey => {
+                value.unset();
+            }
+            Op::None => {}
+        }
+
+        if *idx + 1 > ops.len() - 1 {
+            return;
+        }
+        if ops[*idx + 1].0 != key {
+            return;
+        }
+        *idx += 1;
+    }
+}
+
+fn apply_right_i8_value(ops: &[(u64, Op)], key: u64, idx: &mut usize, value: &mut MergeValue<i8>) {
+    while *idx <= ops.len() - 1 {
+        let (_, op) = &ops[*idx];
+        match op {
+            Op::DeleteKey => {
+                value.unset();
+            }
+            _ => {}
         }
 
         if *idx + 1 > ops.len() - 1 {
@@ -1026,7 +1151,7 @@ mod tests {
             "| 3   | 1 | 3 | 2 |",
             "| 5   | 8 | 3 | 1 |",
             "| 6   | 6 | 6 |   |",
-            "| 7   | 1 |   |   |",
+            "| 7   |   |   | 1 |",
             "+-----+---+---+---+\n",
         ];
 
