@@ -590,46 +590,6 @@ fn merge_i8_value(ops: &[(u64, Op)], key: u64, idx: &mut usize, value: &mut Merg
     }
 }
 
-fn apply_left_i8_value(ops: &[(u64, Op)], key: u64, idx: &mut usize, value: &mut MergeValue<i8>, col_id: usize) {
-    while *idx <= ops.len() - 1 {
-        let (_, op) = &ops[*idx];
-        match op {
-            Op::PutValues(vals) => {
-                if col_id <= vals.len() - 1 && vals[col_id].is_some() {
-                    if let ScalarValue::Int8(v) = vals[col_id].clone().unwrap() {
-                        value.set_option(v.clone());
-                    }
-                }
-            }
-            Op::IncrementValue { col_id: inc_col_id, delta } => {
-                if col_id == *inc_col_id {
-                    if let ScalarValue::Int8(v) = delta {
-                        value.inc(v.unwrap());
-                    }
-                }
-            }
-            Op::DecrementValue { col_id: inc_col_id, delta } => {
-                if col_id == *inc_col_id {
-                    if let ScalarValue::Int8(v) = delta {
-                        value.dec(v.unwrap());
-                    }
-                }
-            }
-            Op::DeleteKey => {
-                value.unset();
-            }
-            Op::None => {}
-        }
-
-        if *idx + 1 > ops.len() - 1 {
-            return;
-        }
-        if ops[*idx + 1].0 != key {
-            return;
-        }
-        *idx += 1;
-    }
-}
 
 fn apply_right_i8_value(ops: &[(u64, Op)], key: u64, idx: &mut usize, value: &mut MergeValue<i8>) {
     while *idx <= ops.len() - 1 {
