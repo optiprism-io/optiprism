@@ -6,14 +6,19 @@ pub enum Scope {
     Project(u64),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq)]
+pub enum Permission {
+    AccountGetById,
+    List,
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
 pub enum Role {
     Owner,
     Manager,
     Reader,
 }
 
-#[derive(Serialize, Deserialize)]
-pub enum Permission {
-    List,
-}
+pub const MANAGER_PERMISSIONS: [Permission; 1] = [Permission::AccountGetById];
+
+pub const READER_PERMISSIONS: [Permission; 1] = [Permission::AccountGetById];

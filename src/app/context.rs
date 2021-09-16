@@ -1,7 +1,7 @@
 use super::{
     auth,
     error::{Error, ERR_INTERNAL_CONTEXT_REQUIRED},
-    rbac::{Permission, Role, Scope},
+    rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS},
 };
 use actix_http::header;
 use actix_utils::future::{err, ok, Ready};
@@ -33,6 +33,69 @@ impl Context {
         }
         ctx
     }
+
+    pub fn is_permitted(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        permission: Permission,
+    ) -> bool {
+        if organization_id != self.organization_id {
+            return false;
+        }
+        if let Some(roles) = &self.roles {
+            for (scope, role) in roles {
+                if let Scope::Project(id) = scope {
+                    if *id != project_id {
+                        continue;
+                    }
+                }
+                match role {
+                    Role::Owner => return true,
+                    Role::Manager => {
+                        if check_permissions(project_id, &MANAGER_PERMISSIONS, &permission) {
+                            return true;
+                        }
+                    }
+                    Role::Reader => {
+                        if check_permissions(project_id, &READER_PERMISSIONS, &permission) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        check_scoped_permissions(project_id, &self.permissions, &permission)
+    }
+}
+
+fn check_scoped_permissions(
+    project_id: u64,
+    permissions: &Option<HashMap<Scope, Vec<Permission>>>,
+    permission: &Permission,
+) -> bool {
+    if let Some(permissions) = &permissions {
+        for (scope, permissions) in permissions {
+            if let Scope::Project(id) = scope {
+                if *id != project_id {
+                    continue;
+                }
+            }
+            if check_permissions(project_id, permissions, permission) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn check_permissions(project_id: u64, permissions: &[Permission], permission: &Permission) -> bool {
+    for p in permissions {
+        if *p == *permission {
+            return true;
+        }
+    }
+    false
 }
 
 pub struct ContextExtractor(Rc<Context>);

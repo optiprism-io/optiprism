@@ -147,7 +147,7 @@ impl Provider {
     }
 
     pub fn get_by_id(&self, ctx: Rc<Context>, id: u64) -> Result<Account> {
-        let value = match self
+        let acc: Account = match self
             .db
             .get_cf(self.primary_cf.as_ref(), id.to_le_bytes().as_ref())
         {
@@ -160,7 +160,12 @@ impl Provider {
             },
             Err(_) => return Err(ERR_TODO.into()),
         };
-        Ok(value)
+        if acc.id != ctx.account_id
+            && !ctx.is_permitted(acc.organization_id, 0, Permission::AccountGetById)
+        {
+            return Err(ERR_TODO.into());
+        }
+        Ok(acc)
     }
 
     pub fn get_by_email(&self, ctx: Rc<Context>, email: String) -> Result<Account> {
