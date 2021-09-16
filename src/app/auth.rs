@@ -98,7 +98,7 @@ impl Provider {
         let mut roles = HashMap::new();
         roles.insert(Scope::Organization, Role::Owner);
         let acc = self.account_provider.create(
-            ctx,
+            Rc::new(Context::with_permission(org.id, Permission::AccountCreate)),
             account::CreateRequest {
                 admin: false,
                 password: request.password,

@@ -92,6 +92,9 @@ impl Provider {
     }
 
     pub fn create(&self, ctx: Rc<Context>, request: CreateRequest) -> Result<Account> {
+        if !ctx.is_permitted(request.organization_id, 0, Permission::AccountCreate) {
+            return Err(ERR_TODO.into());
+        }
         let id = self.sequence.next()?;
         let salt = make_salt();
         let password = make_password_hash(&request.password, &salt);

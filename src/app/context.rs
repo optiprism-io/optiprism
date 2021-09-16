@@ -17,6 +17,15 @@ pub struct Context {
 }
 
 impl Context {
+    pub fn with_permission(organization_id: u64, permission: Permission) -> Self {
+        let mut ctx = Context::default();
+        ctx.organization_id = organization_id;
+        let mut permissions = HashMap::new();
+        permissions.insert(Scope::Organization, vec![permission]);
+        ctx.permissions = Some(permissions);
+        ctx
+    }
+
     pub fn from_token(token: Option<&header::HeaderValue>) -> Self {
         let mut ctx = Context::default();
         if let Some(value) = token {

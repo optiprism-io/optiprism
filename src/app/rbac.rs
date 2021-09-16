@@ -8,8 +8,11 @@ pub enum Scope {
 
 #[derive(Serialize, Deserialize, PartialEq)]
 pub enum Permission {
+    AccountCreate,
     AccountGetById,
-    List,
+    AccountList,
+    AccountUpdate,
+    AccountDelete,
 }
 
 #[derive(Serialize, Deserialize, PartialEq)]
@@ -19,6 +22,13 @@ pub enum Role {
     Reader,
 }
 
-pub const MANAGER_PERMISSIONS: [Permission; 1] = [Permission::AccountGetById];
+pub const MANAGER_PERMISSIONS: [Permission; 5] = [
+    Permission::AccountCreate,
+    Permission::AccountGetById,
+    Permission::AccountList,
+    Permission::AccountUpdate,
+    Permission::AccountDelete,
+];
 
-pub const READER_PERMISSIONS: [Permission; 1] = [Permission::AccountGetById];
+pub const READER_PERMISSIONS: [Permission; 2] =
+    [Permission::AccountGetById, Permission::AccountList];
