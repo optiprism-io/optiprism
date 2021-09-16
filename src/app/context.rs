@@ -53,43 +53,35 @@ impl Context {
                 match role {
                     Role::Owner => return true,
                     Role::Manager => {
-                        if check_permissions(project_id, &MANAGER_PERMISSIONS, &permission) {
+                        if check_permissions(&MANAGER_PERMISSIONS, &permission) {
                             return true;
                         }
                     }
                     Role::Reader => {
-                        if check_permissions(project_id, &READER_PERMISSIONS, &permission) {
+                        if check_permissions(&READER_PERMISSIONS, &permission) {
                             return true;
                         }
                     }
                 }
             }
         }
-        check_scoped_permissions(project_id, &self.permissions, &permission)
-    }
-}
-
-fn check_scoped_permissions(
-    project_id: u64,
-    permissions: &Option<HashMap<Scope, Vec<Permission>>>,
-    permission: &Permission,
-) -> bool {
-    if let Some(permissions) = &permissions {
-        for (scope, permissions) in permissions {
-            if let Scope::Project(id) = scope {
-                if *id != project_id {
-                    continue;
+        if let Some(permissions) = &self.permissions {
+            for (scope, permissions) in permissions {
+                if let Scope::Project(id) = scope {
+                    if *id != project_id {
+                        continue;
+                    }
+                }
+                if check_permissions(permissions, &permission) {
+                    return true;
                 }
             }
-            if check_permissions(project_id, permissions, permission) {
-                return true;
-            }
         }
+        false
     }
-    false
 }
 
-fn check_permissions(project_id: u64, permissions: &[Permission], permission: &Permission) -> bool {
+fn check_permissions(permissions: &[Permission], permission: &Permission) -> bool {
     for p in permissions {
         if *p == *permission {
             return true;
