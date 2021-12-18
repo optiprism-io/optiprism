@@ -1,5 +1,5 @@
 use crate::exprtree::error::{Error, Result};
-use crate::exprtree::ifaces::dictionary::Record;
+use crate::ifaces::dictionary::Record;
 use std::net::IpAddr;
 
 struct Geo {

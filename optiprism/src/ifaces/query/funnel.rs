@@ -1,7 +1,7 @@
 use super::user_segment::UserSegment;
 use super::Event;
 use super::Operator;
-use crate::exprtree::ifaces::query::{Property, PropertyOpValue, TimeRange};
+use crate::ifaces::query::{Property, PropertyOpValue, TimeRange};
 use chrono::{Date, Duration, Utc};
 use datafusion::scalar::ScalarValue;
 

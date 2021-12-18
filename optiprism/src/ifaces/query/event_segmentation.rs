@@ -1,6 +1,6 @@
 use super::user_segment::UserSegment;
 use super::{Event, Operator, TimeGroup, TimeRange};
-use crate::exprtree::ifaces::query::Property;
+use crate::ifaces::query::Property;
 use chrono::{Date, Utc};
 use datafusion::scalar::ScalarValue;
 

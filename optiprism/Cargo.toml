@@ -1,0 +1,57 @@
+[package]
+name = "optiprism"
+version = "0.1.0"
+authors = ["Maxim Bogdanov <maxim.bogdanov@coins.ph>"]
+edition = "2018"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+opt-level = 3
+
+[dependencies]
+actix-http = { version = "3.0.0-beta.9", default-features = false, features = [
+	"openssl",
+	"rustls",
+	"compress-brotli",
+	"compress-gzip",
+] }
+actix-service = "2.0.0"
+actix-utils = "3.0.0"
+actix-web = { version = "4.0.0-beta.8", default-features = false, features = [
+	"compress-brotli",
+	"compress-gzip",
+	"cookies",
+] }
+futures = "0.3.16"
+serde = { version = "1.0.129", features = ["derive"] }
+serde_json = "1.0.66"
+chrono = { version = "0.4.19", features = ["serde"] }
+arrow = "5.2.0"
+datafusion = "6.0.0"
+tokio = { version = "1.10.1", features = [
+	"macros",
+	"rt",
+	"rt-multi-thread",
+	"sync",
+] }
+async-trait = "0.1.51"
+rocksdb = { version = "0.17.0", features = ["multi-threaded-cf"] }
+jsonwebtoken = "7.2.0"
+lazy_static = "1.4.0"
+rand = "0.8.4"
+sha3 = "0.9.1"
+hex = "0.4.3"
+bincode = "1.3.3"
+parking_lot = "0.11.2"
+mockall = "0.10.1"
+[dev-dependencies]
+criterion = "0.3.5"
+
+# [[bench]]
+# name = "count"
+# harness = false
+
+#[[bench]]
+#name = "dictionary"
+#harness = false

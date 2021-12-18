@@ -5,6 +5,11 @@ use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::DFSchema;
 use datafusion::prelude::DataFrame;
 use std::sync::Arc;
+use arrow::datatypes;
+
+pub mod event_fields {
+    pub const CREATED_AT: &str = "created_at";
+}
 
 pub struct Schema {
     // todo usize or u64 for entity identifier?
@@ -14,6 +19,17 @@ pub struct Schema {
     events: Vec<Event>,
 }
 
+impl Schema {
+    pub fn get_event_by_name(&self, event_name: &str) -> Result<Event> {}
+    pub fn get_event_property_by_name(&self, event_name: &str, property_name: &str) -> Result<Event> {}
+    pub fn data_schema(&self) -> datatypes::Schema {}
+}
+
+trait SchemaProvider {
+    fn get_event_by_name(&self, event_name: &str) -> Result<Event>
+    fn get_event_property_by_name(&self, event_name: &str, property_name: &str) -> Result<Event>
+    fn data_schema(&self) -> datatypes::Schema
+}
 pub struct User {
     properties: Vec<u64>,
 }
@@ -67,7 +83,7 @@ pub struct Event {
     properties: Option<Vec<u64>>,
 }
 
-trait SchemaProvider {
+/*trait SchemaProvider {
     fn update_user(&self, user: &User) -> Result<User>;
     fn create_user_property(&self, prop: &UserProperty) -> Result<UserProperty>;
     fn update_user_property(&self, prop: &UserProperty) -> Result<UserProperty>;
@@ -95,3 +111,4 @@ trait SchemaProvider {
     fn list_event_properties(&self, event_id: u64) -> Result<Vec<EventProperty>>;
     fn event_property_table_provider(&self) -> Arc<dyn TableProvider>;
 }
+*/

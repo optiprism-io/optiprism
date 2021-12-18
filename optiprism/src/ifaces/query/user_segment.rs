@@ -1,6 +1,6 @@
 use super::Event;
 use super::Operator;
-use crate::exprtree::ifaces::query::PropertyOpValue;
+use crate::ifaces::query::PropertyOpValue;
 use chrono::{Date, Duration, Utc};
 use datafusion::scalar::ScalarValue;
 
