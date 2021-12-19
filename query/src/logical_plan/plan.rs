@@ -1,12 +1,25 @@
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::{DFSchemaRef, LogicalPlan as DFLogicalPlan, Expr as DFExpr};
 use crate::error::Result;
 use crate::logical_plan::expr::Expr;
+use crate::logical_plan::nodes::FastAggregateNode;
+use crate::logical_plan::plan::LogicalPlan::FastAggregate;
 
 #[derive(Clone)]
 pub enum LogicalPlan {
     Aggregate {
+        /// The incoming logical plan
+        input: Arc<LogicalPlan>,
+        /// Grouping expressions
+        group_expr: Vec<Expr>,
+        /// Aggregate expressions
+        aggr_expr: Vec<Expr>,
+        /// The schema description of the aggregate output
+        schema: DFSchemaRef,
+    },
+    FastAggregate {
         /// The incoming logical plan
         input: Arc<LogicalPlan>,
         /// Grouping expressions
@@ -48,7 +61,90 @@ pub enum LogicalPlan {
 }
 
 impl LogicalPlan {
+    /// Get a reference to the logical plan's schema
+    pub fn schema(&self) -> &DFSchemaRef {
+        match self {
+            LogicalPlan::TableScan {
+                projected_schema, ..
+            } => projected_schema,
+            LogicalPlan::Filter { input, .. } => input.schema(),
+            LogicalPlan::Aggregate { schema, .. } => schema,
+            LogicalPlan::FastAggregate { schema, .. } => schema,
+        }
+    }
+
+    /// returns all inputs of this `LogicalPlan` node. Does not
+    /// include inputs to inputs.
+    pub fn inputs(self: &LogicalPlan) -> Vec<&LogicalPlan> {
+        match self {
+            LogicalPlan::Filter { input, .. } => vec![input],
+            LogicalPlan::Aggregate { input, .. } => vec![input],
+            LogicalPlan::FastAggregate { input, .. } => vec![input],
+            // plans without inputs
+            LogicalPlan::TableScan { .. } => vec![],
+        }
+    }
+
+    /// returns all expressions (non-recursively) in the current
+    /// logical plan node. This does not include expressions in any
+    /// children
+    pub fn expressions(self: &LogicalPlan) -> Vec<Expr> {
+        match self {
+            LogicalPlan::Filter { predicate, .. } => vec![predicate.clone()],
+            LogicalPlan::Aggregate {
+                group_expr,
+                aggr_expr,
+                ..
+            } => group_expr.iter().chain(aggr_expr.iter()).cloned().collect(),
+            LogicalPlan::FastAggregate {
+                group_expr,
+                aggr_expr,
+                ..
+            } => group_expr.iter().chain(aggr_expr.iter()).cloned().collect(),
+            // plans without expressions
+            LogicalPlan::TableScan { .. } => vec![],
+        }
+    }
+
+
+    pub fn to_df_logical_plan(&self) -> DFLogicalPlan {
+        match self {
+            LogicalPlan::Aggregate { input, group_expr, aggr_expr, schema } => {
+                DFLogicalPlan::Aggregate {
+                    input: Arc::new(input.to_df_logical_plan()),
+                    group_expr: vec![],
+                    aggr_expr: vec![],
+                    schema: input.schema().clone(),
+                }
+            }
+            LogicalPlan::FastAggregate { input, group_expr, aggr_expr, schema } => {
+                let node = FastAggregateNode::new(input.clone(),group_expr.clone(),aggr_expr.clone(),schema.clone());
+                DFLogicalPlan::Extension {
+                    node: Arc::new(node)
+                }
+            }
+            LogicalPlan::TableScan { table_name, source, projection, projected_schema, filters, limit } => {
+                DFLogicalPlan::TableScan {
+                    table_name: table_name.clone(),
+                    source: source.clone(),
+                    projection: projection.clone(),
+                    projected_schema: projected_schema.clone(),
+                    filters: filters.iter().map(|f| f.to_owned().into()).collect(),
+                    limit: limit.clone(),
+                }
+            }
+            LogicalPlan::Filter { predicate, input } => {
+                DFLogicalPlan::Filter { predicate: predicate.clone().into(), input: Arc::new(input.to_df_logical_plan()) }
+            }
+        }
+    }
     pub fn build(&self) -> Result<LogicalPlan> {
         Ok(self.clone())
+    }
+}
+
+impl Debug for LogicalPlan {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.to_df_logical_plan().fmt(f)
     }
 }

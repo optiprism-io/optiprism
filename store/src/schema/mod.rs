@@ -9,6 +9,7 @@ use datafusion::arrow::datatypes::{DataType, Schema as ArrowSchema};
 pub mod event_fields {
     pub const EVENT_NAME: &str = "event_name";
     pub const CREATED_AT: &str = "created_at";
+    pub const USER_ID: &str = "user_id";
 }
 
 pub struct MockSchema {
@@ -200,21 +201,25 @@ fn datatype_db_name(dt: &DataType) -> String {
     }
 }
 
+fn db_col_name(db_col: &DBCol, typ: &DataType, dictionary_type: &Option<DataType>) -> String {
+    match db_col {
+        DBCol::Named(name) => name.clone(),
+        DBCol::Order(order) => match dictionary_type {
+            None => format!("{}_{}", *order, datatype_db_name(typ)),
+            Some(t) => format!("{}_{}", *order, datatype_db_name(t))
+        }
+    }
+}
+
 impl UserProperty {
     pub fn db_col_name(&self) -> String {
-        match &self.db_col {
-            DBCol::Named(name) => name.clone(),
-            DBCol::Order(order) => format!("{}_{}", *order, datatype_db_name(&self.typ))
-        }
+        db_col_name(&self.db_col, &self.typ, &self.dictionary_type)
     }
 }
 
 impl EventProperty {
     pub fn db_col_name(&self) -> String {
-        match &self.db_col {
-            DBCol::Named(name) => name.clone(),
-            DBCol::Order(order) => format!("{}_{}", *order, datatype_db_name(&self.typ))
-        }
+        db_col_name(&self.db_col, &self.typ, &self.dictionary_type)
     }
 }
 
