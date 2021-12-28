@@ -107,34 +107,34 @@ impl LogicalPlan {
     }
 
 
-    pub fn to_df_logical_plan(&self) -> DFLogicalPlan {
+    pub fn to_df_plan(&self) -> Result<DFLogicalPlan> {
         match self {
             LogicalPlan::Aggregate { input, group_expr, aggr_expr, schema } => {
-                DFLogicalPlan::Aggregate {
-                    input: Arc::new(input.to_df_logical_plan()),
-                    group_expr: vec![],
-                    aggr_expr: vec![],
-                    schema: input.schema().clone(),
-                }
+                Ok(DFLogicalPlan::Aggregate {
+                    input: Arc::new(input.to_df_plan()?),
+                    group_expr: group_expr.iter().map(|e| e.to_owned().to_df_expr(input.schema())).collect::<Result<_>>()?,
+                    aggr_expr: aggr_expr.iter().map(|e| e.to_owned().to_df_expr(input.schema())).collect::<Result<_>>()?,
+                    schema: schema.clone(),
+                })
             }
             LogicalPlan::FastAggregate { input, group_expr, aggr_expr, schema } => {
-                let node = FastAggregateNode::new(input.clone(),group_expr.clone(),aggr_expr.clone(),schema.clone());
-                DFLogicalPlan::Extension {
+                let node = FastAggregateNode::try_new(input.clone(), group_expr.clone(), aggr_expr.clone(), input.schema().clone())?;
+                Ok(DFLogicalPlan::Extension {
                     node: Arc::new(node)
-                }
+                })
             }
             LogicalPlan::TableScan { table_name, source, projection, projected_schema, filters, limit } => {
-                DFLogicalPlan::TableScan {
+                Ok(DFLogicalPlan::TableScan {
                     table_name: table_name.clone(),
                     source: source.clone(),
                     projection: projection.clone(),
                     projected_schema: projected_schema.clone(),
-                    filters: filters.iter().map(|f| f.to_owned().into()).collect(),
+                    filters: filters.iter().map(|f| f.to_owned().to_df_expr(self.schema())).collect::<Result<_>>()?,
                     limit: limit.clone(),
-                }
+                })
             }
             LogicalPlan::Filter { predicate, input } => {
-                DFLogicalPlan::Filter { predicate: predicate.clone().into(), input: Arc::new(input.to_df_logical_plan()) }
+                Ok(DFLogicalPlan::Filter { predicate: predicate.clone().to_df_expr(self.schema())?, input: Arc::new(input.to_df_plan()?) })
             }
         }
     }
@@ -145,6 +145,6 @@ impl LogicalPlan {
 
 impl Debug for LogicalPlan {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.to_df_logical_plan().fmt(f)
+        self.to_df_plan().fmt(f)
     }
 }

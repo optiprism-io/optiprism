@@ -8,7 +8,6 @@ use datafusion::arrow::record_batch::RecordBatch;
 #[tokio::main]
 async fn main() -> datafusion::error::Result<()> {
     // register the table
-    println!("{}", env::current_dir()?.display());
     let mut ctx = ExecutionContext::new();
     ctx.register_csv("events", "/Users/ravlio/work/rust/exprtree/tests/events.csv", CsvReadOptions::new()).await?;
     // create a plan to run a SQL query

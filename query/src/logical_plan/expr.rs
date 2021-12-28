@@ -3,15 +3,15 @@ use std::fmt::Formatter;
 use std::sync::Arc;
 use datafusion::arrow::datatypes::DataType;
 use datafusion::error::DataFusionError;
-use datafusion::logical_plan::{Column, Literal, Operator, lit as df_lit, Expr as DFExpr, DFSchema, normalize_cols, create_udaf, DFField};
+use datafusion::logical_plan::{Column, Literal, Operator, lit as df_lit, Expr as DFExpr, DFSchema, create_udaf, DFField};
 use datafusion::physical_plan::{Accumulator, aggregates};
-use datafusion::physical_plan::aggregates::{AccumulatorFunctionImplementation, StateTypeFunction};
-use datafusion::physical_plan::expressions::binary_operator_data_type;
+use datafusion::physical_plan::aggregates::{AccumulatorFunctionImplementation, return_type, StateTypeFunction};
+use datafusion::physical_plan::expressions::{binary_operator_data_type, sum_return_type};
 use datafusion::physical_plan::functions::{ReturnTypeFunction, Signature, TypeSignature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::prelude::right;
 use datafusion::scalar::ScalarValue;
-use crate::physical_plan::expressions::mean::GeometricMean;
+use crate::physical_plan::expressions::aggregate_partitioned::{PartitionedAggregateAccumulator};
 use crate::error::Result;
 
 #[derive(Clone)]
@@ -137,38 +137,49 @@ impl Expr {
         }
     }
 
-    pub fn to_df_expr(&self) -> DFExpr {
+    pub fn to_df_expr(&self, input_schema: &DFSchema) -> Result<DFExpr> {
         match self {
-            Expr::Column(column) => DFExpr::Column(column.clone()),
-            Expr::Literal(v) => DFExpr::Literal(v.clone()),
-            Expr::BinaryExpr { left, op, right } => DFExpr::BinaryExpr { left: Box::new(left.to_df_expr()), op: op.clone(), right: Box::new(right.to_df_expr()) },
-            Expr::IsNotNull(expr) => DFExpr::IsNotNull(Box::new(expr.to_df_expr())),
-            Expr::IsNull(expr) => DFExpr::IsNull(Box::new(expr.to_df_expr())),
-            Expr::AggregateFunction { fun, args, distinct } => DFExpr::AggregateFunction {
+            Expr::Column(column) => Ok(DFExpr::Column(column.clone())),
+            Expr::Literal(v) => Ok(DFExpr::Literal(v.clone())),
+            Expr::BinaryExpr { left, op, right } => Ok(DFExpr::BinaryExpr {
+                left: Box::new(left.to_df_expr(input_schema)?),
+                op: op.clone(),
+                right: Box::new(right.to_df_expr(input_schema)?),
+            }),
+            Expr::IsNotNull(expr) => Ok(DFExpr::IsNotNull(Box::new(expr.to_df_expr(input_schema)?))),
+            Expr::IsNull(expr) => Ok(DFExpr::IsNull(Box::new(expr.to_df_expr(input_schema)?))),
+            Expr::AggregateFunction { fun, args, distinct } => Ok(DFExpr::AggregateFunction {
                 fun: fun.clone(),
-                args: args.iter().map(|e| e.to_df_expr()).collect(),
+                args: args.iter().map(|e| e.to_df_expr(input_schema)).collect::<Result<_>>()?,
                 distinct: *distinct,
-            },
+            }),
             Expr::AggregatePartitionedFunction { partition_by, fun, outer_fun, args, distinct } => {
-                let return_type: ReturnTypeFunction = Arc::new(|v| Ok(Arc::new(v[0].clone())));
-                let state_type: StateTypeFunction = Arc::new(|v| Ok(Arc::new(vec![v.clone()])));
+                let data_types = args.iter().map(|x| x.get_type(input_schema)).collect::<Result<Vec<DataType>>>()?;
+                let rtype = return_type(outer_fun, &data_types)?;
+                let acc = Box::new(PartitionedAggregateAccumulator::try_new(
+                    &partition_by.get_type(input_schema).unwrap(),
+                    &rtype,
+                    fun,
+                    outer_fun,
+                )?);
+                // let state_types = acc.state()?.iter().map(|s| s.get_datatype()).collect();
 
-                let acc = GeometricMean::new();
-                let acc_fn: AccumulatorFunctionImplementation = Arc::new(move || Ok(Box::new(acc)));
-                let udf = AggregateUDF {
-                    name: "AggregatePartitioned".to_string(),
-                    signature: Signature { type_signature: TypeSignature::Any(1), volatility: Volatility::Volatile },
-                    return_type,
-                    accumulator: acc_fn,
-                    state_type,
-                };
-                DFExpr::AggregateUDF {
+                let udf = create_udaf(
+                    "aggregatePartitioned",
+                    args[0].get_type(input_schema)?,
+                    Arc::new(rtype),
+                    Volatility::Immutable,
+                    Arc::new(move || Ok(acc.clone())),
+                    Arc::new(vec![]),
+                );
+
+                Ok(DFExpr::AggregateUDF {
                     fun: Arc::new(udf),
-                    args: args.iter().map(|e| e.to_df_expr()).collect(),
-                }
+                    args: args.iter().map(|e| e.to_df_expr(input_schema)).collect::<Result<_>>()?,
+                })
             }
-            Expr::Wildcard => DFExpr::Wildcard,
-            Expr::Alias(e, n) => DFExpr::Alias(Box::new(e.to_df_expr()), n.clone())
+            Expr::Wildcard => Ok(DFExpr::Wildcard),
+            Expr::Alias(e, n) => Ok(DFExpr::Alias(Box::new(e.to_df_expr(input_schema)?), n.clone()))
         }
     }
 
@@ -191,12 +202,12 @@ impl Expr {
                     .collect::<Result<Vec<_>>>()?;
                 Ok(aggregates::return_type(fun, &data_types)?)
             }
-            Expr::AggregatePartitionedFunction { partition_by, fun, outer_fun, args, distinct } => {
+            Expr::AggregatePartitionedFunction { outer_fun, args, .. } => {
                 let data_types = args
                     .iter()
                     .map(|e| e.get_type(schema))
                     .collect::<Result<Vec<_>>>()?;
-                Ok(aggregates::return_type(fun, &data_types)?)
+                Ok(aggregates::return_type(outer_fun, &data_types)?)
             }
             Expr::IsNull(_) => Ok(DataType::Boolean),
             Expr::IsNotNull(_) => Ok(DataType::Boolean),
@@ -264,12 +275,6 @@ impl Expr {
     }
 }
 
-impl Into<DFExpr> for Expr {
-    fn into(self) -> DFExpr {
-        self.to_df_expr()
-    }
-}
-
 fn fmt_partitioned_function(
     f: &mut fmt::Formatter,
     partition_by: &Expr,
@@ -278,7 +283,6 @@ fn fmt_partitioned_function(
     distinct: bool,
     args: &[Expr],
 ) -> fmt::Result {
-    println!("!");
     let args: Vec<String> = args.iter().map(|arg| format!("{:?}", arg)).collect();
     let distinct_str = match distinct {
         true => "DISTINCT ",
@@ -369,7 +373,7 @@ pub fn lit<T: Literal>(n: T) -> Expr {
 }
 
 pub fn lit_timestamp(ts: i64) -> Expr {
-    lit(ScalarValue::TimestampSecond(Some(ts)))
+    lit(ScalarValue::TimestampMicrosecond(Some(ts)))
 }
 
 pub fn is_null(col: Expr) -> Expr {

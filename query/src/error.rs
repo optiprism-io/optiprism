@@ -8,6 +8,7 @@ pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    Internal(String),
     DataFusionError(DataFusionError),
     ArrowError(ArrowError),
     StoreError(StoreError),

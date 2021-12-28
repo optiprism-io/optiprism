@@ -1947,12 +1947,13 @@ dependencies = [
 name = "query"
 version = "0.1.0"
 dependencies = [
- "arrow 5.5.0",
+ "arrow 6.3.0",
  "chrono",
  "datafusion",
  "mockall",
  "optiprism",
  "store",
+ "tokio",
 ]
 
 [[package]]

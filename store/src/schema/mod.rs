@@ -68,16 +68,6 @@ pub struct Schema {
     events: Vec<Event>,
 }
 
-pub enum EventKind {
-    Regular(Event),
-    Custom(CustomEvent),
-}
-
-pub enum EventPropertyKind {
-    Regular(EventProperty),
-    Custom(EventCustomProperty),
-}
-
 pub struct CustomEvent {}
 
 pub struct EventCustomProperty {}
@@ -111,9 +101,11 @@ pub struct UserProperty {
     pub is_system: bool,
     pub tags: Vec<String>,
     pub name: String,
+    pub description: String,
     pub typ: DataType,
     pub db_col: DBCol,
     pub nullable: bool,
+    pub is_array: bool,
     pub is_dictionary: bool,
     pub dictionary_type: Option<DataType>,
 }
@@ -154,11 +146,13 @@ pub struct EventProperty {
     pub is_global: bool,
     pub tags: Vec<String>,
     pub name: String,
+    pub description: String,
     pub display_name: String,
     pub typ: DataType,
     pub db_col: DBCol,
     pub status: EventPropertyStatus,
-    pub nullable: bool,
+    pub nullable: bool, // this also defines whether property is required or not
+    pub is_array: bool,
     pub is_dictionary: bool,
     pub dictionary_type: Option<DataType>,
 }

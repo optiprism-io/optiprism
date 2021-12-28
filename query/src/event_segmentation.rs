@@ -187,6 +187,21 @@ pub enum Query {
 }
 
 #[derive(Clone)]
+pub struct NamedQuery {
+    agg: Query,
+    name: Option<String>,
+}
+
+impl NamedQuery {
+    pub fn new(agg: Query, name: Option<String>) -> Self {
+        NamedQuery {
+            name: name.clone(),
+            agg: agg.clone(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum PropertyRef {
     User(String),
     UserCustom(String),
@@ -209,6 +224,7 @@ impl PropertyRef {
 pub enum Value {
     Int8(i8),
     Int16(i16),
+    Float64(f64),
     Boolean(bool),
     Utf8(String),
 }
@@ -247,11 +263,11 @@ pub struct Event {
     event: EventRef,
     filters: Option<Vec<EventFilter>>,
     breakdowns: Option<Vec<Breakdown>>,
-    queries: Vec<Query>,
+    queries: Vec<NamedQuery>,
 }
 
 impl Event {
-    pub fn new(event: EventRef, filters: Option<Vec<EventFilter>>, breakdowns: Option<Vec<Breakdown>>, queries: Vec<Query>) -> Self {
+    pub fn new(event: EventRef, filters: Option<Vec<EventFilter>>, breakdowns: Option<Vec<Breakdown>>, queries: Vec<NamedQuery>) -> Self {
         Event {
             event,
             filters,
@@ -270,7 +286,7 @@ pub struct Segment {
 
 pub struct EventSegmentation {
     time: QueryTime,
-    group_col: String,
+    group: String,
     interval_unit: TimeUnit,
     chart_type: ChartType,
     analysis: Analysis,
@@ -304,6 +320,7 @@ fn named_property_expression(col_name: &str, operation: &Operation, values: &Opt
                 let sv = match value {
                     Value::Int8(v) => ScalarValue::from(*v),
                     Value::Int16(v) => ScalarValue::from(*v),
+                    Value::Float64(v) => ScalarValue::from(*v),
                     Value::Boolean(v) => ScalarValue::from(*v),
                     Value::Utf8(v) => ScalarValue::from(v.as_str()),
                 };
@@ -381,13 +398,13 @@ fn time_expression(time: &QueryTime) -> Expr {
             let left = binary_expr(
                 ts_col.clone(),
                 Operator::GtEq,
-                lit_timestamp(from.timestamp()),
+                lit_timestamp(from.timestamp_nanos() / 1_000),
             );
 
             let right = binary_expr(
                 ts_col,
                 Operator::LtEq,
-                lit_timestamp(to.timestamp()),
+                lit_timestamp(to.timestamp_nanos() / 1_000),
             );
 
             and(left, right)
@@ -396,7 +413,7 @@ fn time_expression(time: &QueryTime) -> Expr {
             binary_expr(
                 ts_col,
                 Operator::GtEq,
-                lit_timestamp(from.timestamp()),
+                lit_timestamp(from.timestamp_nanos() / 1_000),
             )
         }
         QueryTime::Last { n: last, unit } => {
@@ -501,13 +518,13 @@ fn breakdown_expr(schema: Arc<dyn SchemaProvider>, event: &Event, breakdown: &Br
             PropertyRef::User(prop_name) => {
                 let prop = schema.get_user_property_by_name(prop_name).unwrap();
                 let col_name = prop.db_col_name();
-                return Ok(col(&col_name));
+                return Ok(Expr::Alias(Box::new(col(&col_name)), prop.name));
             }
             PropertyRef::UserCustom(_) => unimplemented!(),
             PropertyRef::Event(prop_name) => {
                 let prop = schema.get_event_property_by_name(event.event.name().as_ref(), prop_name).unwrap();
                 let col_name = prop.db_col_name();
-                return Ok(col(&col_name));
+                return Ok(Expr::Alias(Box::new(col(&col_name)), prop.name));
             }
             PropertyRef::EventCustom(_) => unimplemented!()
         }
@@ -531,7 +548,7 @@ fn plan_agg(input: Arc<LogicalPlan>, es: &EventSegmentation, schema: Arc<dyn Sch
     }
 
     let aggr_expr = event.queries.iter().enumerate().map(|(id, query)| {
-        let q = match query {
+        let q = match &query.agg {
             Query::CountEvents => {
                 Expr::AggregateFunction {
                     fun: AggregateFunction::Count,
@@ -542,7 +559,7 @@ fn plan_agg(input: Arc<LogicalPlan>, es: &EventSegmentation, schema: Arc<dyn Sch
             Query::CountUniqueGroups | Query::DailyActiveGroups => {
                 Expr::AggregateFunction {
                     fun: AggregateFunction::Count,
-                    args: vec![col(es.group_col.as_ref())],
+                    args: vec![col(es.group.as_ref())],
                     distinct: true,
                 }
             }
@@ -550,7 +567,7 @@ fn plan_agg(input: Arc<LogicalPlan>, es: &EventSegmentation, schema: Arc<dyn Sch
             Query::MonthlyActiveGroups => unimplemented!(),
             Query::CountPerGroup { aggregate } => {
                 Expr::AggregatePartitionedFunction {
-                    partition_by: Box::new(col(es.group_col.as_ref())),
+                    partition_by: Box::new(col(es.group.as_ref())),
                     fun: AggregateFunction::Count,
                     outer_fun: aggregate.clone(),
                     args: vec![col(event_fields::USER_ID)],
@@ -559,7 +576,7 @@ fn plan_agg(input: Arc<LogicalPlan>, es: &EventSegmentation, schema: Arc<dyn Sch
             }
             Query::AggregatePropertyPerGroup { property, aggregate_per_group, aggregate } => {
                 Expr::AggregatePartitionedFunction {
-                    partition_by: Box::new(col(es.group_col.as_ref())),
+                    partition_by: Box::new(col(es.group.as_ref())),
                     fun: aggregate_per_group.clone(),
                     outer_fun: aggregate.clone(),
                     args: vec![col(property_db_col_name(schema.clone(), event.event.name().as_ref(), property).as_ref())],
@@ -576,7 +593,10 @@ fn plan_agg(input: Arc<LogicalPlan>, es: &EventSegmentation, schema: Arc<dyn Sch
             Query::QueryFormula { .. } => unimplemented!()
         };
 
-        Expr::Alias(Box::new(q), format!("agg_{}", id))
+        match &query.name {
+            None => Expr::Alias(Box::new(q), format!("agg_{}", id)),
+            Some(name) => Expr::Alias(Box::new(q), name.clone())
+        }
     }).collect::<Vec<Expr>>();
 
     // todo create own normalizer or get rid normalizer at all
@@ -594,12 +614,11 @@ fn plan_agg(input: Arc<LogicalPlan>, es: &EventSegmentation, schema: Arc<dyn Sch
         DFSchema::new(exprlist_to_fields(all_expr, input.schema())?)?;
 
 
-    let expr = LogicalPlan::FastAggregate {
+    println!("aggr_schema {:?}", aggr_schema);
+    let expr = LogicalPlan::Aggregate {
         input: input.clone(),
-        // group_expr: group_expr.iter().map(|e| Expr::from_df_expr(e)).collect(),
-        // aggr_expr: aggr_expr.iter().map(|e| Expr::from_df_expr(e)).collect(),
-        group_expr: group_expr,
-        aggr_expr: aggr_expr,
+        group_expr,
+        aggr_expr,
         schema: Arc::new(aggr_schema),
     };
 
@@ -613,52 +632,44 @@ pub fn create_event_logical_plan(
     dict_provider: Arc<dyn DictionaryProvider>,
     event: &Event,
 ) -> Result<LogicalPlan> {
+    println!("ii {:?}", input.schema());
     let filter = plan_filter(input.clone(), es, schema.clone(), dict_provider, event)?;
     let agg = plan_agg(Arc::new(filter), es, schema.clone(), event)?;
     Ok(agg)
 }
 
-/*pub fn create_logical_plan(
-    es: &EventSegmentation,
-    schema: Arc<dyn SchemaProvider>,
-    events_provider: Arc<dyn TableProvider>,
-    users_provider: Arc<dyn TableProvider>,
-    dict_provider: Arc<dyn DictionaryProvider>,
-) -> Result<LogicalPlan> {
-
-    let queries = es.events.iter().map(|event|{
-        create_event_logical_plan
-    })
-    for event in es.events.iter() {}
-    Ok(plan.build()?)
-}
-*/
 #[cfg(test)]
 mod tests {
     use std::ops::Sub;
     use std::sync::Arc;
-    use chrono::{Duration, Utc};
-    use datafusion::arrow::array::{Int32Array, UInt16Array, UInt64Array, Float64Array, StringArray, BooleanArray, TimestampSecondArray};
+    use chrono::{DateTime, Duration, Utc};
+    use datafusion::arrow::array::{Int32Array, UInt16Array, UInt64Array, Float64Array, StringArray, BooleanArray, TimestampMicrosecondArray, Int8Array};
     use datafusion::arrow::datatypes::*;
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::datasource::{MemTable, TableProvider};
-    use datafusion::logical_plan::LogicalPlan::CreateMemoryTable;
+    use datafusion::datasource::object_store::local::LocalFileSystem;
+    use datafusion::logical_plan::{LogicalPlan as DFLogicalPlan};
     use crate::error::Result;
-    use crate::event_segmentation::{Analysis, Breakdown, ChartType, create_event_logical_plan, Event, EventFilter, EventRef, EventSegmentation, Operation, PropertyRef, Query, QueryTime, TimeUnit, Value};
+    use crate::event_segmentation::{NamedQuery, Analysis, Breakdown, ChartType, create_event_logical_plan, Event, EventFilter, EventRef, EventSegmentation, Operation, PropertyRef, Query, QueryTime, TimeUnit, Value};
     use optiprism::*;
     use datafusion::arrow::datatypes;
     use datafusion::arrow::datatypes::DataType::Dictionary;
-    use datafusion::logical_plan::{DFField, DFSchema};
-    use datafusion::physical_plan::aggregates;
+    use datafusion::execution::context::ExecutionContextState;
+    use datafusion::logical_plan::{DFField, DFSchema, LogicalPlanBuilder};
+    use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
+    use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
+    use datafusion::prelude::{CsvReadOptions, ExecutionContext};
     use store::*;
     use store::dictionary::{DictionaryProvider, MockDictionary};
     use store::schema::{DBCol, event_fields, EventPropertyStatus, MockSchema};
+    use crate::logical_plan::expr::Expr;
     use crate::logical_plan::expr::Expr::AggregateFunction;
     use crate::logical_plan::plan::LogicalPlan;
+    use datafusion::arrow::util::pretty::print_batches;
 
     fn users_provider() -> Result<MemTable> {
         let schema = Arc::new(Schema::new(vec![
-            Field::new("created_at", DataType::Timestamp(datafusion::arrow::datatypes::TimeUnit::Second, None), false),
+            Field::new("created_at", DataType::Timestamp(datafusion::arrow::datatypes::TimeUnit::Microsecond, None), false),
             Field::new("b", DataType::Int32, false),
             Field::new("c", DataType::Int32, false),
             Field::new("d", DataType::Int32, true),
@@ -667,7 +678,7 @@ mod tests {
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
-                Arc::new(TimestampSecondArray::from(vec![1, 2, 3])),
+                Arc::new(TimestampMicrosecondArray::from(vec![1, 2, 3])),
                 Arc::new(Int32Array::from(vec![4, 5, 6])),
                 Arc::new(Int32Array::from(vec![7, 8, 9])),
                 Arc::new(Int32Array::from(vec![None, None, Some(9)])),
@@ -677,123 +688,87 @@ mod tests {
         Ok(MemTable::try_new(schema, vec![vec![batch]])?)
     }
 
-    fn events_provider() -> Result<MemTable> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new(event_fields::EVENT_NAME, DataType::UInt16, false),
+    fn events_schema() -> Schema {
+        Schema::new(vec![
             Field::new(event_fields::USER_ID, DataType::UInt64, false),
-            Field::new(event_fields::CREATED_AT, DataType::Timestamp(datafusion::arrow::datatypes::TimeUnit::Second, None), false),
-            Field::new("0_float64", DataType::Float64, true),
-            Field::new("1_uint16", DataType::Float64, true),
+            Field::new(event_fields::CREATED_AT, DataType::Timestamp(datafusion::arrow::datatypes::TimeUnit::Microsecond, None), false),
+            Field::new(event_fields::EVENT_NAME, DataType::UInt16, false),
             Field::new("country", DataType::Utf8, true),
             Field::new("device", DataType::Utf8, true),
-            Field::new("2_bool", DataType::Boolean, true),
-        ]));
+            Field::new("0_float64", DataType::Float64, true),
+            Field::new("1_utf8", DataType::Utf8, true),
+            Field::new("2_int8", DataType::Int8, true),
+        ])
+    }
 
+    async fn events_provider() -> Result<LogicalPlan> {
+        let schema = Arc::new(events_schema());
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
-                Arc::new(UInt16Array::from(vec![0u16; 0])),
                 Arc::new(UInt64Array::from(vec![0u64; 0])),
-                Arc::new(TimestampSecondArray::from(vec![0i64; 0])),
-                Arc::new(Float64Array::from(vec![0f64; 0])),
-                Arc::new(Float64Array::from(vec![0f64; 0])),
+                Arc::new(TimestampMicrosecondArray::from(vec![0i64; 0])),
+                Arc::new(UInt16Array::from(vec![0u16; 0])),
                 Arc::new(StringArray::from(vec!["".to_string(); 0])),
                 Arc::new(StringArray::from(vec!["".to_string(); 0])),
-                Arc::new(BooleanArray::from(vec![true; 0])),
+                Arc::new(Float64Array::from(vec![0f64; 0])),
+                Arc::new(StringArray::from(vec!["".to_string(); 0])),
+                Arc::new(Int8Array::from(vec![0i8; 0])),
             ],
         )?;
 
-        Ok(MemTable::try_new(schema, vec![vec![batch]])?)
+        let prov = MemTable::try_new(schema.clone(), vec![vec![batch]])?;
+        let path = "/Users/ravlio/work/rust/exprtree/tests/events.csv";
+
+        let schema = events_schema();
+        let options = CsvReadOptions::new().schema(&schema);
+        let df_input = LogicalPlanBuilder::scan_csv(
+            Arc::new(LocalFileSystem {}),
+            path,
+            options,
+            None,
+            1,
+        ).await?;
+
+        Ok(match df_input.build()? {
+            DFLogicalPlan::TableScan {
+                table_name,
+                source,
+                projection,
+                projected_schema,
+                filters,
+                limit,
+            } => LogicalPlan::TableScan {
+                table_name,
+                source,
+                projection,
+                projected_schema,
+                filters: filters.iter().map(|e| Expr::from_df_expr(e)).collect(),
+                limit,
+            },
+            _ => unreachable!()
+        })
     }
 
-    #[test]
-    fn test() -> Result<()> {
-        let es = EventSegmentation {
-            time: QueryTime::Between { from: Utc::now().sub(Duration::days(10)), to: Utc::now() },
-            group_col: event_fields::USER_ID.to_string(),
-            interval_unit: TimeUnit::Day,
-            chart_type: ChartType::Line,
-            analysis: Analysis::Linear,
-            compare: None,
-            events: vec![
-                Event::new(
-                    EventRef::Regular("Buy Product".to_string()),
-                    Some(vec![
-                        EventFilter::Property {
-                            property: PropertyRef::Event("revenue".to_string()),
-                            operation: Operation::IsNull,
-                            value: None,
-                        },
-                        EventFilter::Property {
-                            property: PropertyRef::Event("revenue".to_string()),
-                            operation: Operation::Eq,
-                            value: Some(vec![
-                                Value::Int8(1),
-                                Value::Int8(2),
-                                Value::Int8(3),
-                            ]),
-                        },
-                        EventFilter::Property {
-                            property: PropertyRef::User("country".to_string()),
-                            operation: Operation::IsNull,
-                            value: None,
-                        },
-                        EventFilter::Property {
-                            property: PropertyRef::User("country".to_string()),
-                            operation: Operation::Eq,
-                            value: Some(vec![
-                                Value::Utf8("Spain".to_string()),
-                                Value::Utf8("France".to_string()),
-                            ]),
-                        },
-                    ]),
-                    Some(vec![Breakdown::Property(PropertyRef::Event("Product Name".to_string()))]),
-                    vec![
-                        Query::CountEvents,
-                        Query::CountUniqueGroups,
-                        Query::CountPerGroup { aggregate: aggregates::AggregateFunction::Avg },
-                        Query::AggregatePropertyPerGroup {
-                            property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: aggregates::AggregateFunction::Avg,
-                            aggregate: aggregates::AggregateFunction::Avg,
-                        },
-                        Query::AggregatePropertyPerGroup {
-                            property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: aggregates::AggregateFunction::Min,
-                            aggregate: aggregates::AggregateFunction::Avg,
-                        },
-                        Query::AggregateProperty { property: PropertyRef::Event("revenue".to_string()), aggregate: aggregates::AggregateFunction::Sum },
-                    ],
-                ),
-            ],
-            filters: Some(vec![
-                EventFilter::Property {
-                    property: PropertyRef::User("device".to_string()),
-                    operation: Operation::Eq,
-                    value: Some(vec![
-                        Value::Utf8("Iphone".to_string()),
-                    ]),
-                },
-                EventFilter::Property {
-                    property: PropertyRef::User("is_premium".to_string()),
-                    operation: Operation::Eq,
-                    value: Some(vec![
-                        Value::Boolean(true),
-                    ]),
-                },
-            ]),
-            breakdowns: Some(vec![
-                Breakdown::Property(PropertyRef::User("device".to_string())),
-            ]),
-            segments: None,
-        };
-
-        let mut mock_schema = MockSchema::new();
-
+    fn create_schema_mock() -> MockSchema {
         fn get_event_by_name(event_name: &str) -> store::error::Result<store::schema::Event> {
             match event_name {
-                "Buy Product" => Ok(store::schema::Event {
+                "View Product" => Ok(store::schema::Event {
                     id: 1,
+                    created_at: Utc::now(),
+                    updated_at: None,
+                    created_by: 0,
+                    updated_by: 0,
+                    project_id: 0,
+                    is_system: false,
+                    tags: vec![],
+                    name: "View Product".to_string(),
+                    description: "".to_string(),
+                    status: store::schema::EventStatus::Enabled,
+                    properties: None,
+                }),
+                "Buy Product" => Ok(store::schema::Event {
+                    id: 2,
                     created_at: Utc::now(),
                     updated_at: None,
                     created_by: 0,
@@ -823,11 +798,13 @@ mod tests {
                         is_global: true,
                         tags: vec![],
                         name: "revenue".to_string(),
+                        description: "".to_string(),
                         display_name: "Revenue".to_string(),
                         typ: DataType::Float64,
                         db_col: DBCol::Order(0),
                         status: EventPropertyStatus::Enabled,
                         nullable: false,
+                        is_array: false,
                         is_dictionary: false,
                         dictionary_type: None,
                     }
@@ -843,13 +820,15 @@ mod tests {
                         is_global: true,
                         tags: vec![],
                         name: "product name".to_string(),
+                        description: "".to_string(),
                         display_name: "Product Name".to_string(),
                         typ: DataType::Utf8,
                         db_col: DBCol::Order(1),
                         status: EventPropertyStatus::Enabled,
                         nullable: false,
+                        is_array: false,
                         is_dictionary: false,
-                        dictionary_type: Some(DataType::UInt16),
+                        dictionary_type: None,
                     }
                 ),
                 _ => panic!()
@@ -869,9 +848,11 @@ mod tests {
                         is_system: false,
                         tags: vec![],
                         name: "country".to_string(),
+                        description: "".to_string(),
                         typ: DataType::Utf8,
                         db_col: DBCol::Named("country".to_string()),
                         nullable: false,
+                        is_array: false,
                         is_dictionary: false,
                         dictionary_type: None,
                     }
@@ -887,9 +868,11 @@ mod tests {
                         is_system: false,
                         tags: vec![],
                         name: "device".to_string(),
+                        description: "".to_string(),
                         typ: DataType::Utf8,
                         db_col: DBCol::Named("device".to_string()),
                         nullable: false,
+                        is_array: false,
                         is_dictionary: false,
                         dictionary_type: None,
                     }
@@ -905,9 +888,11 @@ mod tests {
                         is_system: false,
                         tags: vec![],
                         name: "is_premium".to_string(),
-                        typ: DataType::Boolean,
+                        description: "".to_string(),
+                        typ: DataType::Int8,
                         db_col: DBCol::Order(2),
                         nullable: false,
+                        is_array: false,
                         is_dictionary: false,
                         dictionary_type: None,
                     }
@@ -915,36 +900,197 @@ mod tests {
                 _ => panic!()
             }
         }
+        let mut mock_schema = MockSchema::new();
         mock_schema.get_event_by_name = Some(get_event_by_name);
         mock_schema.get_event_property_by_name = Some(get_event_property_by_name);
         mock_schema.get_user_property_by_name = Some(get_user_property_by_name);
-        let schema = Arc::new(mock_schema);
 
-        let input = LogicalPlan::TableScan {
-            table_name: "".to_string(),
-            source: Arc::new(events_provider()?),
-            projection: None,
-            projected_schema: Arc::new(DFSchema::try_from_qualified_schema("", events_provider()?.schema().as_ref())?),
-            filters: vec![],
-            limit: None,
+        mock_schema
+    }
+
+    #[tokio::test]
+    async fn test_filters() -> Result<()> {
+        let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00").unwrap().with_timezone(&Utc);
+        let es = EventSegmentation {
+            time: QueryTime::Between { from: to.clone().sub(Duration::days(10)), to: to.clone() },
+            group: event_fields::USER_ID.to_string(),
+            interval_unit: TimeUnit::Day,
+            chart_type: ChartType::Line,
+            analysis: Analysis::Linear,
+            compare: None,
+            events: vec![
+                Event::new(
+                    EventRef::Regular("Buy Product".to_string()),
+                    Some(vec![
+                        EventFilter::Property {
+                            property: PropertyRef::Event("revenue".to_string()),
+                            operation: Operation::IsNull,
+                            value: None,
+                        },
+                        EventFilter::Property {
+                            property: PropertyRef::Event("revenue".to_string()),
+                            operation: Operation::Eq,
+                            value: Some(vec![
+                                Value::Float64(1.0),
+                                Value::Float64(2.0),
+                                Value::Float64(3.0),
+                            ]),
+                        },
+                        EventFilter::Property {
+                            property: PropertyRef::User("country".to_string()),
+                            operation: Operation::IsNull,
+                            value: None,
+                        },
+                        EventFilter::Property {
+                            property: PropertyRef::User("country".to_string()),
+                            operation: Operation::Eq,
+                            value: Some(vec![
+                                Value::Utf8("Spain".to_string()),
+                                Value::Utf8("France".to_string()),
+                            ]),
+                        },
+                    ]),
+                    Some(vec![Breakdown::Property(PropertyRef::Event("Product Name".to_string()))]),
+                    vec![
+                        NamedQuery::new(Query::CountEvents, Some("count".to_string())),
+                        NamedQuery::new(Query::CountUniqueGroups, Some("count_unique_users".to_string())),
+                        NamedQuery::new(Query::CountPerGroup { aggregate: aggregates::AggregateFunction::Avg }, Some("count_per_user".to_string())),
+                        NamedQuery::new(Query::AggregatePropertyPerGroup {
+                            property: PropertyRef::Event("revenue".to_string()),
+                            aggregate_per_group: aggregates::AggregateFunction::Avg,
+                            aggregate: aggregates::AggregateFunction::Avg,
+                        }, Some("avg_revenue_per_user".to_string())),
+                        NamedQuery::new(Query::AggregatePropertyPerGroup {
+                            property: PropertyRef::Event("revenue".to_string()),
+                            aggregate_per_group: aggregates::AggregateFunction::Min,
+                            aggregate: aggregates::AggregateFunction::Avg,
+                        }, Some("min_revenue_per_user".to_string())),
+                        NamedQuery::new(Query::AggregateProperty {
+                            property: PropertyRef::Event("revenue".to_string()),
+                            aggregate: aggregates::AggregateFunction::Sum,
+                        }, Some("sum_revenue".to_string())),
+                    ],
+                ),
+            ],
+            filters: Some(vec![
+                EventFilter::Property {
+                    property: PropertyRef::User("device".to_string()),
+                    operation: Operation::Eq,
+                    value: Some(vec![
+                        Value::Utf8("Iphone".to_string()),
+                    ]),
+                },
+                EventFilter::Property {
+                    property: PropertyRef::User("is_premium".to_string()),
+                    operation: Operation::Eq,
+                    value: Some(vec![
+                        Value::Int8(1),
+                    ]),
+                },
+            ]),
+            breakdowns: Some(vec![
+                Breakdown::Property(PropertyRef::User("device".to_string())),
+            ]),
+            segments: None,
         };
 
-        let mut dict_mock = MockDictionary::new();
+        let schema = Arc::new(create_schema_mock());
 
+        let mut dict_mock = MockDictionary::new();
         fn get_u16_by_key(table: &str, key: &str) -> store::error::Result<u16> {
             Ok(1)
         }
-
         dict_mock.get_u16_by_key = Some(get_u16_by_key);
 
         let plan = create_event_logical_plan(
-            Arc::new(input),
+            Arc::new(events_provider().await?),
             &es,
             schema.clone(),
             Arc::new(dict_mock),
             &es.events[0],
-        );
-        println!("{:?}", plan);
+        )?;
+        let df_plan = plan.to_df_plan()?;
+        println!("{:?}", df_plan);
+
+        let mut ctx_state = ExecutionContextState::new();
+        ctx_state.config.target_partitions = 1;
+        let planner = DefaultPhysicalPlanner::default();
+        let physical_plan = planner.create_physical_plan(&df_plan, &ctx_state).await?;
+
+        let result = collect(physical_plan).await?;
+
+        print_batches(&result)?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_query() -> Result<()> {
+        let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00").unwrap().with_timezone(&Utc);
+        let es = EventSegmentation {
+            time: QueryTime::Between { from: to.clone().sub(Duration::days(10)), to: to.clone() },
+            group: event_fields::USER_ID.to_string(),
+            interval_unit: TimeUnit::Day,
+            chart_type: ChartType::Line,
+            analysis: Analysis::Linear,
+            compare: None,
+            events: vec![
+                Event::new(
+                    EventRef::Regular("Buy Product".to_string()),
+                    None,
+                    None,//Some(vec![Breakdown::Property(PropertyRef::Event("Product Name".to_string()))]),
+                    vec![
+                        NamedQuery::new(Query::CountEvents, Some("count".to_string())),
+                        NamedQuery::new(Query::CountUniqueGroups, Some("count_unique_users".to_string())),
+                        NamedQuery::new(Query::CountPerGroup { aggregate: aggregates::AggregateFunction::Avg }, Some("count_per_user".to_string())),
+                        NamedQuery::new(Query::AggregatePropertyPerGroup {
+                            property: PropertyRef::Event("revenue".to_string()),
+                            aggregate_per_group: aggregates::AggregateFunction::Sum,
+                            aggregate: aggregates::AggregateFunction::Avg,
+                        }, Some("avg_revenue_per_user".to_string())),
+                        NamedQuery::new(Query::AggregateProperty {
+                            property: PropertyRef::Event("revenue".to_string()),
+                            aggregate: aggregates::AggregateFunction::Sum,
+                        }, Some("sum_revenue".to_string())),
+                    ],
+                ),
+            ],
+            filters: None,
+            breakdowns: Some(vec![
+                Breakdown::Property(PropertyRef::User("country".to_string())),
+            ]),
+            segments: None,
+        };
+
+        let schema = Arc::new(create_schema_mock());
+
+        let mut dict_mock = MockDictionary::new();
+        fn get_u16_by_key(table: &str, key: &str) -> store::error::Result<u16> {
+            Ok(match key {
+                "View Product" => 1,
+                "Buy Product" => 2,
+                _ => panic!()
+            })
+        }
+        dict_mock.get_u16_by_key = Some(get_u16_by_key);
+
+        let plan = create_event_logical_plan(
+            Arc::new(events_provider().await?),
+            &es,
+            schema.clone(),
+            Arc::new(dict_mock),
+            &es.events[0],
+        )?;
+        let df_plan = plan.to_df_plan()?;
+        println!("{:?}", df_plan);
+
+        let mut ctx_state = ExecutionContextState::new();
+        ctx_state.config.target_partitions = 1;
+        let planner = DefaultPhysicalPlanner::default();
+        let physical_plan = planner.create_physical_plan(&df_plan, &ctx_state).await?;
+
+        let result = collect(physical_plan).await?;
+
+        print_batches(&result)?;
         Ok(())
     }
 }

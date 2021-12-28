@@ -5,6 +5,7 @@ use std::sync::Arc;
 use datafusion::logical_plan::{DFSchemaRef, Expr as DFExpr, LogicalPlan as DFLogicalPlan, UserDefinedLogicalNode};
 use crate::logical_plan::expr::{Expr};
 use crate::logical_plan::plan::LogicalPlan;
+use crate::error::Result;
 
 pub struct FastAggregateNode {
     input: Arc<LogicalPlan>,
@@ -56,18 +57,17 @@ impl UserDefinedLogicalNode for FastAggregateNode {
 }
 
 impl FastAggregateNode {
-    pub fn new(
+    pub fn try_new(
         input: Arc<LogicalPlan>,
         group_expr: Vec<Expr>,
         aggr_expr: Vec<Expr>,
-        schema: DFSchemaRef) -> Self {
-        let df_input = input.to_df_logical_plan();
-        FastAggregateNode {
-            input,
+        schema: DFSchemaRef) -> Result<Self> {
+        Ok(FastAggregateNode {
+            input: input.clone(),
             group_expr,
             aggr_expr,
             schema,
-            df_input: Arc::new(df_input),
-        }
+            df_input: Arc::new(input.to_df_plan()?),
+        })
     }
 }
