@@ -21,21 +21,21 @@ use std::any::Any;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
+use crate::error::{Error, Result};
+use crate::physical_plan::expressions::sum::{sum, sum_batch};
+use crate::physical_plan::PartitionedAccumulator;
 use arrow::compute;
-use datafusion::arrow::datatypes::DataType;
 use arrow::{
     array::{ArrayRef, UInt64Array},
     datatypes::Field,
 };
+use datafusion::arrow::datatypes::DataType;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::PhysicalExpr;
 use datafusion::scalar::ScalarValue;
-use crate::error::{Error, Result};
-use crate::physical_plan::expressions::sum::{sum, sum_batch};
-use crate::physical_plan::PartitionedAccumulator;
 
 /// An accumulator to compute the average
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AvgAccumulator {
     // sum is used for null
     sum: ScalarValue,
@@ -74,19 +74,39 @@ impl PartitionedAccumulator for AvgAccumulator {
         Ok(())
     }
 
+    fn merge(&mut self, states: &[ScalarValue]) -> Result<()> {
+        let count = &states[0];
+        // counts are summed
+        if let ScalarValue::UInt64(Some(c)) = count {
+            self.count += c
+        } else {
+            unreachable!()
+        };
+
+        // sums are summed
+        self.sum = sum(&self.sum, &states[1])?;
+        Ok(())
+    }
+
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
+        let counts = states[0].as_any().downcast_ref::<UInt64Array>().unwrap();
+        // counts are summed
+        self.count += compute::sum(counts).unwrap_or(0);
+
+        // sums are summed
+        self.sum = sum(&self.sum, &sum_batch(&states[1])?)?;
+        Ok(())
+    }
+
     fn evaluate(&self) -> Result<ScalarValue> {
         match self.sum {
-            ScalarValue::Float64(e) => {
-                Ok(ScalarValue::Float64(e.map(|f| f / self.count as f64)))
-            }
-            _ => Err(Error::Internal(
-                "Sum should be f64 on average".to_string(),
-            )),
+            ScalarValue::Float64(e) => Ok(ScalarValue::Float64(e.map(|f| f / self.count as f64))),
+            _ => Err(Error::Internal("Sum should be f64 on average".to_string())),
         }
     }
 
     fn reset(&mut self) {
-        self.sum = ScalarValue::Float64(Some(0f64));
+        self.sum = ScalarValue::try_from(&self.sum.get_datatype()).unwrap();
         self.count = 0;
     }
 }

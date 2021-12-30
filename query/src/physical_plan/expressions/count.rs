@@ -21,6 +21,7 @@ use std::any::Any;
 use std::sync::Arc;
 
 use crate::error::Result;
+use crate::physical_plan::PartitionedAccumulator;
 use arrow::compute;
 use arrow::datatypes::DataType;
 use arrow::{
@@ -28,10 +29,8 @@ use arrow::{
     datatypes::Field,
 };
 use datafusion::scalar::ScalarValue;
-use crate::physical_plan::PartitionedAccumulator;
 
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CountAccumulator {
     count: u64,
 }
@@ -56,10 +55,28 @@ impl PartitionedAccumulator for CountAccumulator {
         Ok(())
     }
 
-
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
         let array = &values[0];
         self.count += (array.len() - array.data().null_count()) as u64;
+        Ok(())
+    }
+
+    fn merge(&mut self, states: &[ScalarValue]) -> Result<()> {
+        let count = &states[0];
+        if let ScalarValue::UInt64(Some(delta)) = count {
+            self.count += *delta;
+        } else {
+            unreachable!()
+        }
+        Ok(())
+    }
+
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
+        let counts = states[0].as_any().downcast_ref::<UInt64Array>().unwrap();
+        let delta = &compute::sum(counts);
+        if let Some(d) = delta {
+            self.count += *d;
+        }
         Ok(())
     }
 

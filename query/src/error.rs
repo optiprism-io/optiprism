@@ -1,7 +1,7 @@
-use std::fmt::{Display, Formatter};
-use std::{fmt, result};
 use datafusion::arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
+use std::fmt::{Display, Formatter};
+use std::{fmt, result};
 use store::error::StoreError;
 
 pub type Result<T> = result::Result<T, Error>;
@@ -14,6 +14,17 @@ pub enum Error {
     StoreError(StoreError),
 }
 
+impl Error {
+    /// Wraps this [Error] as an [datafusion::error::DataFusionError::Execution].
+    pub fn into_datafusion_execution_error(self) -> DataFusionError {
+        DataFusionError::Execution(self.to_string())
+    }
+
+    /// Wraps this [Error] as an [datafusion::error::DataFusionError::Plan].
+    pub fn into_datafusion_plan_error(self) -> DataFusionError {
+        DataFusionError::Plan(self.to_string())
+    }
+}
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self)

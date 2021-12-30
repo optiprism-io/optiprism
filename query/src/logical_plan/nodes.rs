@@ -1,11 +1,13 @@
+use crate::error::Result;
+use crate::logical_plan::expr::Expr;
+use crate::logical_plan::plan::LogicalPlan;
+use datafusion::logical_plan::{
+    DFSchemaRef, Expr as DFExpr, LogicalPlan as DFLogicalPlan, UserDefinedLogicalNode,
+};
 use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use datafusion::logical_plan::{DFSchemaRef, Expr as DFExpr, LogicalPlan as DFLogicalPlan, UserDefinedLogicalNode};
-use crate::logical_plan::expr::{Expr};
-use crate::logical_plan::plan::LogicalPlan;
-use crate::error::Result;
 
 pub struct FastAggregateNode {
     input: Arc<LogicalPlan>,
@@ -51,7 +53,11 @@ impl UserDefinedLogicalNode for FastAggregateNode {
         Ok(())
     }
 
-    fn from_template(&self, exprs: &[DFExpr], inputs: &[DFLogicalPlan]) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+    fn from_template(
+        &self,
+        exprs: &[DFExpr],
+        inputs: &[DFLogicalPlan],
+    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
         panic!("unimplemented");
     }
 }
@@ -61,7 +67,8 @@ impl FastAggregateNode {
         input: Arc<LogicalPlan>,
         group_expr: Vec<Expr>,
         aggr_expr: Vec<Expr>,
-        schema: DFSchemaRef) -> Result<Self> {
+        schema: DFSchemaRef,
+    ) -> Result<Self> {
         Ok(FastAggregateNode {
             input: input.clone(),
             group_expr,

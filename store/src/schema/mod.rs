@@ -1,10 +1,10 @@
-use crate::error::{StoreError, Result};
+use crate::error::{Result, StoreError};
 use chrono::{Date, DateTime, Utc};
+use datafusion::arrow::datatypes::{DataType, Schema as ArrowSchema};
 use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::DFSchema;
 use datafusion::prelude::DataFrame;
 use std::sync::Arc;
-use datafusion::arrow::datatypes::{DataType, Schema as ArrowSchema};
 
 pub mod event_fields {
     pub const EVENT_NAME: &str = "event_name";
@@ -14,10 +14,13 @@ pub mod event_fields {
 
 pub struct MockSchema {
     pub get_event_by_name: Option<fn(event_name: &str) -> Result<Event>>,
-    pub get_event_property_by_name: Option<fn(event_name: &str, property_name: &str) -> Result<EventProperty>>,
-    pub get_event_custom_property_by_name: Option<fn(event_name: &str, property_name: &str) -> Result<EventCustomProperty>>,
+    pub get_event_property_by_name:
+        Option<fn(event_name: &str, property_name: &str) -> Result<EventProperty>>,
+    pub get_event_custom_property_by_name:
+        Option<fn(event_name: &str, property_name: &str) -> Result<EventCustomProperty>>,
     pub get_user_property_by_name: Option<fn(property_name: &str) -> Result<UserProperty>>,
-    pub get_user_custom_property_by_name: Option<fn(property_name: &str) -> Result<UserCustomProperty>>,
+    pub get_user_custom_property_by_name:
+        Option<fn(property_name: &str) -> Result<UserCustomProperty>>,
     pub schema: Option<fn() -> ArrowSchema>,
 }
 
@@ -39,11 +42,19 @@ impl SchemaProvider for MockSchema {
         self.get_event_by_name.unwrap()(event_name)
     }
 
-    fn get_event_property_by_name(&self, event_name: &str, property_name: &str) -> Result<EventProperty> {
+    fn get_event_property_by_name(
+        &self,
+        event_name: &str,
+        property_name: &str,
+    ) -> Result<EventProperty> {
         self.get_event_property_by_name.unwrap()(event_name, property_name)
     }
 
-    fn get_event_custom_property_by_name(&self, event_name: &str, property_name: &str) -> Result<EventCustomProperty> {
+    fn get_event_custom_property_by_name(
+        &self,
+        event_name: &str,
+        property_name: &str,
+    ) -> Result<EventCustomProperty> {
         self.get_event_custom_property_by_name.unwrap()(event_name, property_name)
     }
 
@@ -54,7 +65,6 @@ impl SchemaProvider for MockSchema {
     fn get_user_custom_property_by_name(&self, property_name: &str) -> Result<UserCustomProperty> {
         self.get_user_custom_property_by_name.unwrap()(property_name)
     }
-
 
     fn schema(&self) -> ArrowSchema {
         self.schema.unwrap()()
@@ -74,8 +84,16 @@ pub struct EventCustomProperty {}
 
 pub trait SchemaProvider {
     fn get_event_by_name(&self, event_name: &str) -> Result<Event>;
-    fn get_event_property_by_name(&self, event_name: &str, property_name: &str) -> Result<EventProperty>;
-    fn get_event_custom_property_by_name(&self, event_name: &str, property_name: &str) -> Result<EventCustomProperty>;
+    fn get_event_property_by_name(
+        &self,
+        event_name: &str,
+        property_name: &str,
+    ) -> Result<EventProperty>;
+    fn get_event_custom_property_by_name(
+        &self,
+        event_name: &str,
+        property_name: &str,
+    ) -> Result<EventCustomProperty>;
     fn get_user_property_by_name(&self, property_name: &str) -> Result<UserProperty>;
     fn get_user_custom_property_by_name(&self, property_name: &str) -> Result<UserCustomProperty>;
     fn schema(&self) -> ArrowSchema;
@@ -185,13 +203,15 @@ fn datatype_db_name(dt: &DataType) -> String {
         DataType::Utf8 => "utf8".to_string(),
         DataType::LargeUtf8 => "large_utf8".to_string(),
         DataType::List(f) => format!("list_{}", datatype_db_name(f.data_type())),
-        DataType::FixedSizeList(f, _) => format!("fixed_size_list_{}", datatype_db_name(f.data_type())),
+        DataType::FixedSizeList(f, _) => {
+            format!("fixed_size_list_{}", datatype_db_name(f.data_type()))
+        }
         DataType::LargeList(f) => format!("large_list_{}", datatype_db_name(f.data_type())),
         DataType::Struct(_) => "struct".to_string(),
         DataType::Union(_) => "union".to_string(),
         DataType::Dictionary(_, _) => "dictionary".to_string(),
         DataType::Decimal(_, _) => "decimal".to_string(),
-        DataType::Map(_, _) => unimplemented!()
+        DataType::Map(_, _) => unimplemented!(),
     }
 }
 
@@ -200,8 +220,8 @@ fn db_col_name(db_col: &DBCol, typ: &DataType, dictionary_type: &Option<DataType
         DBCol::Named(name) => name.clone(),
         DBCol::Order(order) => match dictionary_type {
             None => format!("{}_{}", *order, datatype_db_name(typ)),
-            Some(t) => format!("{}_{}", *order, datatype_db_name(t))
-        }
+            Some(t) => format!("{}_{}", *order, datatype_db_name(t)),
+        },
     }
 }
 

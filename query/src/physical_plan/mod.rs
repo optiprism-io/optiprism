@@ -1,12 +1,13 @@
-use std::fmt::Debug;
-use arrow::array::ArrayRef;
-use datafusion::scalar::ScalarValue;
 use crate::error::Result;
+use arrow::array::ArrayRef;
 use datafusion::error::{DataFusionError, Result as DFResult};
+use datafusion::scalar::ScalarValue;
+use std::fmt::Debug;
 
 pub mod expressions;
 
-pub trait PartitionedAccumulator: Debug + Send + Sync {
+// PartitionedAccumulator extends Accumulator trait with reset
+pub trait PartitionedAccumulator: Debug {
     /// Returns the state of the accumulator at the end of the accumulation.
     // in the case of an average on which we track `sum` and `n`, this function should return a vector
     // of two values, sum and n.
@@ -29,7 +30,25 @@ pub trait PartitionedAccumulator: Debug + Send + Sync {
         })
     }
 
+    /// updates the accumulator's state from a vector of scalars.
+    fn merge(&mut self, states: &[ScalarValue]) -> Result<()>;
+
+    /// updates the accumulator's state from a vector of states.
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
+        if states.is_empty() {
+            return Ok(());
+        };
+        (0..states[0].len()).try_for_each(|index| {
+            let v = states
+                .iter()
+                .map(|array| ScalarValue::try_from_array(array, index))
+                .collect::<DFResult<Vec<_>>>()?;
+            self.merge(&v)
+        })
+    }
+
     /// returns its value based on its current state.
     fn evaluate(&self) -> Result<ScalarValue>;
+    // resets accumulator state
     fn reset(&mut self);
 }

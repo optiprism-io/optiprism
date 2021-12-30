@@ -21,23 +21,22 @@ use std::any::Any;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use datafusion::scalar::ScalarValue;
+use crate::error::{Error, Result};
+use crate::physical_plan::PartitionedAccumulator;
 use arrow::compute;
 use arrow::datatypes::DataType;
 use arrow::{
     array::{
-        ArrayRef, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array,
-        Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+        ArrayRef, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
+        UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
     datatypes::Field,
 };
-use crate::physical_plan::{PartitionedAccumulator};
-use crate::error::{Error, Result};
+use datafusion::scalar::ScalarValue;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SumAccumulator {
     sum: ScalarValue,
-    data_type: DataType,
 }
 
 impl SumAccumulator {
@@ -45,7 +44,6 @@ impl SumAccumulator {
     pub fn try_new(data_type: &DataType) -> Result<Self> {
         Ok(Self {
             sum: ScalarValue::try_from(data_type)?,
-            data_type: data_type.clone(),
         })
     }
 }
@@ -67,15 +65,24 @@ impl PartitionedAccumulator for SumAccumulator {
         Ok(())
     }
 
+    fn merge(&mut self, states: &[ScalarValue]) -> Result<()> {
+        // sum(sum1, sum2) = sum1 + sum2
+        self.update(states)
+    }
+
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
+        // sum(sum1, sum2, sum3, ...) = sum1 + sum2 + sum3 + ...
+        self.update_batch(states)
+    }
+
     fn evaluate(&self) -> Result<ScalarValue> {
         Ok(self.sum.clone())
     }
 
     fn reset(&mut self) {
-        self.sum = ScalarValue::try_from(&self.data_type).unwrap();
+        self.sum = ScalarValue::try_from(&self.sum.get_datatype()).unwrap();
     }
 }
-
 
 // returns the new value after sum with the new values, taking nullability into account
 macro_rules! typed_sum_delta_batch {
