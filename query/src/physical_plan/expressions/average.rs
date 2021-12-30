@@ -17,17 +17,13 @@
 
 //! Defines physical expressions that can evaluated at runtime during query execution
 
-
 use std::convert::TryFrom;
-
 
 use crate::error::{Error, Result};
 use crate::physical_plan::expressions::sum::{sum, sum_batch};
 use crate::physical_plan::PartitionedAccumulator;
+use arrow::array::{ArrayRef, UInt64Array};
 use arrow::compute;
-use arrow::{
-    array::{ArrayRef, UInt64Array},
-};
 use datafusion::arrow::datatypes::DataType;
 
 use datafusion::physical_plan::PhysicalExpr;

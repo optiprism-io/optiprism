@@ -1,21 +1,17 @@
 use crate::error::{Error, Result};
-use crate::physical_plan::expressions::aggregate::{
-    state_types, PartitionedAggregate,
-};
+use crate::physical_plan::expressions::aggregate::{state_types, PartitionedAggregate};
 use datafusion::arrow::datatypes::DataType;
 
 use datafusion::logical_plan::{
     lit as df_lit, Column, DFField, DFSchema, Expr as DFExpr, Literal, Operator,
 };
+use datafusion::physical_plan::aggregates;
 use datafusion::physical_plan::aggregates::{
     return_type, AccumulatorFunctionImplementation, StateTypeFunction,
 };
-use datafusion::physical_plan::expressions::{binary_operator_data_type};
-use datafusion::physical_plan::functions::{
-    ReturnTypeFunction, Signature, Volatility,
-};
+use datafusion::physical_plan::expressions::binary_operator_data_type;
+use datafusion::physical_plan::functions::{ReturnTypeFunction, Signature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion::physical_plan::{aggregates};
 
 use datafusion::scalar::ScalarValue;
 use std::fmt;

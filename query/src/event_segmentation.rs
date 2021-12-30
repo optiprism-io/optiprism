@@ -4,12 +4,12 @@ use crate::logical_plan::expr::{
     and, binary_expr, col, is_not_null, is_null, lit, lit_timestamp, or, Expr,
 };
 use chrono::{DateTime, Duration, Utc};
-use datafusion::datasource::{TableProvider};
+use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::{Column, DFField, DFSchema, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::scalar::ScalarValue;
 
-use std::ops::{Sub};
+use std::ops::Sub;
 use std::sync::Arc;
 use store::dictionary::DictionaryProvider;
 use store::schema::{event_fields, SchemaProvider};
@@ -698,15 +698,14 @@ mod tests {
         EventSegmentation, NamedQuery, Operation, PropertyRef, Query, QueryTime, TimeUnit, Value,
     };
     use crate::logical_plan::expr::Expr;
-    
+
     use crate::logical_plan::plan::LogicalPlan;
     use chrono::{DateTime, Duration, Utc};
     use datafusion::arrow::array::{
-        Float64Array, Int32Array, Int8Array, StringArray, TimestampMicrosecondArray,
-        UInt16Array, UInt64Array,
+        Float64Array, Int32Array, Int8Array, StringArray, TimestampMicrosecondArray, UInt16Array,
+        UInt64Array,
     };
-    
-    
+
     use datafusion::arrow::datatypes::*;
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::arrow::util::pretty::print_batches;
@@ -714,16 +713,15 @@ mod tests {
     use datafusion::datasource::{MemTable, TableProvider};
     use datafusion::execution::context::ExecutionContextState;
     use datafusion::logical_plan::LogicalPlan as DFLogicalPlan;
-    use datafusion::logical_plan::{LogicalPlanBuilder};
+    use datafusion::logical_plan::LogicalPlanBuilder;
     use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
     use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
-    use datafusion::prelude::{CsvReadOptions};
-    
+    use datafusion::prelude::CsvReadOptions;
+
     use std::ops::Sub;
     use std::sync::Arc;
     use store::dictionary::{DictionaryProvider, MockDictionary};
     use store::schema::{event_fields, DBCol, EventPropertyStatus, MockSchema};
-    
 
     fn users_provider() -> Result<MemTable> {
         let schema = Arc::new(Schema::new(vec![

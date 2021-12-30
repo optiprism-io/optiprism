@@ -26,16 +26,11 @@ use crate::physical_plan::expressions::count::CountAccumulator;
 use crate::physical_plan::expressions::sum::SumAccumulator;
 use crate::physical_plan::PartitionedAccumulator;
 
-use arrow::datatypes::{DataType};
-use arrow::{
-    array::{
-        ArrayRef,
-    },
-};
-use datafusion::error::{Result as DFResult};
+use arrow::array::ArrayRef;
+use arrow::datatypes::DataType;
+use datafusion::error::Result as DFResult;
 
 use datafusion::physical_plan::aggregates::AggregateFunction;
-
 
 use datafusion::physical_plan::{Accumulator, AggregateExpr, PhysicalExpr};
 use datafusion::scalar::ScalarValue;
@@ -47,7 +42,6 @@ enum PartitionedAccumulatorEnum {
     Avg(AvgAccumulator),
     Count(CountAccumulator),
 }
-
 
 impl PartitionedAccumulator for PartitionedAccumulatorEnum {
     fn state(&self) -> Result<Vec<ScalarValue>> {
@@ -176,12 +170,8 @@ impl PartitionedAggregateAccumulator {
 
     // get the last value from acc and put it into outer_acc. This is called from state()
     fn finalize(&mut self) -> Result<()> {
-        let res = self
-            .acc
-            .evaluate()?;
-        self
-            .outer_acc
-            .update(&[res])
+        let res = self.acc.evaluate()?;
+        self.outer_acc.update(&[res])
     }
 
     // outer state
@@ -197,8 +187,12 @@ impl Accumulator for PartitionedAggregateAccumulator {
     fn state(&self) -> DFResult<Vec<ScalarValue>> {
         // we should clone the accumulator because state is immutable and we can't simply mutate it
         let mut outer_acc = self.clone();
-        outer_acc.finalize().map_err(Error::into_datafusion_execution_error)?;
-        return outer_acc.outer_state().map_err(Error::into_datafusion_execution_error);
+        outer_acc
+            .finalize()
+            .map_err(Error::into_datafusion_execution_error)?;
+        return outer_acc
+            .outer_state()
+            .map_err(Error::into_datafusion_execution_error);
     }
 
     // this function receives one entry per argument of this accumulator.

@@ -17,16 +17,11 @@
 
 //! Defines physical expressions that can evaluated at runtime during query execution
 
-
-
-
 use crate::error::Result;
 use crate::physical_plan::PartitionedAccumulator;
 use arrow::compute;
 
-use arrow::{
-    array::{ArrayRef, UInt64Array},
-};
+use arrow::array::{ArrayRef, UInt64Array};
 use datafusion::scalar::ScalarValue;
 
 #[derive(Debug, Clone)]

@@ -1,6 +1,6 @@
 use crate::error::Result;
 use arrow::array::ArrayRef;
-use datafusion::error::{Result as DFResult};
+use datafusion::error::Result as DFResult;
 use datafusion::scalar::ScalarValue;
 use std::fmt::Debug;
 
