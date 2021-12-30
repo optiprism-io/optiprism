@@ -8,6 +8,7 @@ mod http;
 mod organization;
 mod rbac;
 mod sequence;
+mod event_segmentation;
 
 use actix_http::{header, HttpMessage};
 use actix_service::Service;

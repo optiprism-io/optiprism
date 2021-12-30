@@ -1,6 +1,6 @@
 use crate::exprtree::error::{Error, Result};
-use crate::exprtree::ifaces::event;
-use crate::exprtree::ifaces::user;
+use crate::ifaces::event;
+use crate::ifaces::user;
 use chrono::{Date, Utc};
 use datafusion::scalar::ScalarValue;
 

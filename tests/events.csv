@@ -1,11 +1,17 @@
-user_id,timestamp,name,prop
-1,2020-01-01 00:00:00 UTC,search,rock
-1,2020-01-01 00:10:00 UTC,play,rock
-1,2020-01-01 00:20:00 UTC,buy,rock
-1,2020-01-01 00:30:00 UTC,search,pop
-1,2020-01-01 00:40:00 UTC,play,pop
-3,2020-01-01 00:00:00 UTC,search,rock
-3,2020-01-01 00:10:00 UTC,play,rock
-3,2020-01-01 00:20:00 UTC,search,pop
-3,2020-01-01 00:30:00 UTC,play,pop
-3,2020-01-01 00:40:00 UTC,buy,pop
+user_id,created_at,event_name,country,device,0_float64,1_utf8,2_bool,comment
+1,"2021-09-08T13:42:00.000000+00:00",1,"spain","iphone",,"google pixel",,view
+1,"2021-09-08T13:43:00.000000+00:00",2,"spain","iphone",533,"google pixel",,buy
+1,"2021-09-08T13:44:00.000000+00:00",1,"spain","iphone",,"samsung s9",,view
+1,"2021-09-08T13:45:00.000000+00:00",2,"spain","iphone",576,"samsung s9",,buy
+2,"2021-09-08T13:43:00.000000+00:00",1,"spain","android",,"google pixel",,view
+2,"2021-09-08T13:45:00.000000+00:00",2,"spain","android",533.5,"google pixel",,buy
+3,"2021-09-08T13:42:00.000000+00:00",1,"german","android",,"iphone 13",,view
+3,"2021-09-08T13:46:00.000000+00:00",1,"german","android",,"samsung s9",,view
+3,"2021-09-08T13:47:00.000000+00:00",2,"german","android",999.9,"iphone 13",,buy
+3,"2021-09-08T13:48:00.000000+00:00",1,"german","android",,"iphone case",,view
+3,"2021-09-08T13:49:00.000000+00:00",2,"german","android",10.4,"iphone case",,buy
+4,"2021-09-08T13:43:00.000000+00:00",2,"spain","iphone",,"samsung s9",,buy
+5,"2021-09-08T13:43:00.000000+00:00",2,"uk","android",5.3,"samsung case",,buy
+6,"2021-09-08T13:42:00.000000+00:00",1,"spain","iphone",,"google pixel",,view
+6,"2021-09-08T13:48:00.000000+00:00",1,"spain","iphone",,"google pixel",,view
+6,"2021-09-08T13:49:00.000000+00:00",2,"spain","iphone",533,"google pixel",,buy
