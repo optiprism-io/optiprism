@@ -32,7 +32,7 @@ use datafusion::error::Result as DFResult;
 
 use datafusion::physical_plan::aggregates::AggregateFunction;
 
-use datafusion::physical_plan::{Accumulator, AggregateExpr, PhysicalExpr};
+use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
 
 // enum storage for accumulator for fast static dispatching and easy translating between threads
@@ -75,7 +75,7 @@ impl PartitionedAccumulator for PartitionedAccumulatorEnum {
         }
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self) -> Result<()> {
         match self {
             PartitionedAccumulatorEnum::Sum(acc) => acc.reset(),
             PartitionedAccumulatorEnum::Avg(acc) => acc.reset(),
@@ -168,22 +168,22 @@ impl PartitionedAggregateAccumulator {
         })
     }
 
-    // get the last value from acc and put it into outer_acc. This is called from state()
+    /// get the last value from acc and put it into outer_acc. This is called from state()
     fn finalize(&mut self) -> Result<()> {
         let res = self.acc.evaluate()?;
         self.outer_acc.update(&[res])
     }
 
-    // outer state
+    /// outer state
     fn outer_state(&self) -> Result<Vec<ScalarValue>> {
         self.outer_acc.state()
     }
 }
 
 impl Accumulator for PartitionedAggregateAccumulator {
-    // this function finalizes and serializes our state to `ScalarValue`, which DataFusion uses
-    // to pass this state between execution stages.
-    // Note that this can be arbitrary data.
+    /// this function finalizes and serializes our state to `ScalarValue`, which DataFusion uses
+    /// to pass this state between execution stages.
+    /// Note that this can be arbitrary data.
     fn state(&self) -> DFResult<Vec<ScalarValue>> {
         // we should clone the accumulator because state is immutable and we can't simply mutate it
         let mut outer_acc = self.clone();
@@ -195,9 +195,9 @@ impl Accumulator for PartitionedAggregateAccumulator {
             .map_err(Error::into_datafusion_execution_error);
     }
 
-    // this function receives one entry per argument of this accumulator.
-    // DataFusion calls this function on every row, and expects this function to update the accumulator's state.
-    // TODO: leverage update_batch
+    /// this function receives one entry per argument of this accumulator.
+    /// DataFusion calls this function on every row, and expects this function to update the accumulator's state.
+    /// TODO: leverage update_batch
     fn update(&mut self, values: &[ScalarValue]) -> DFResult<()> {
         if self.first_row {
             self.last_partition_value = values[0].clone();
@@ -215,7 +215,9 @@ impl Accumulator for PartitionedAggregateAccumulator {
                     self.outer_acc
                         .update(&[res])
                         .map_err(Error::into_datafusion_execution_error)?;
-                    self.acc.reset();
+                    self.acc
+                        .reset()
+                        .map_err(Error::into_datafusion_execution_error)?;
                     self.last_partition_value = values[0].clone();
                 }
 
@@ -229,8 +231,8 @@ impl Accumulator for PartitionedAggregateAccumulator {
         Ok(())
     }
 
-    // this function receives states from other accumulators (Vec<ScalarValue>)
-    // and updates the accumulator.
+    /// this function receives states from other accumulators (Vec<ScalarValue>)
+    /// and updates the accumulator.
     fn merge(&mut self, states: &[ScalarValue]) -> DFResult<()> {
         self.outer_acc
             .merge(states)

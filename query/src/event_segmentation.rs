@@ -4,7 +4,6 @@ use crate::logical_plan::expr::{
     and, binary_expr, col, is_not_null, is_null, lit, lit_timestamp, or, Expr,
 };
 use chrono::{DateTime, Duration, Utc};
-use datafusion::datasource::TableProvider;
 use datafusion::logical_plan::{Column, DFField, DFSchema, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::scalar::ScalarValue;
@@ -305,11 +304,34 @@ pub fn events_projection(_es: &EventSegmentation) -> Option<Vec<usize>> {
     Some(vec![0, 1, 2])
 }
 
+/// constructs database column name from property related to DFSchema
+fn property_db_col_name(
+    schema: Arc<dyn SchemaProvider>,
+    event_name: &str,
+    property: &PropertyRef,
+) -> Result<String> {
+    match property {
+        // user property
+        PropertyRef::User(prop_name) => {
+            let prop = schema.get_user_property_by_name(prop_name)?;
+            Ok(prop.db_col_name())
+        }
+        PropertyRef::UserCustom(_) => unimplemented!(),
+        // event property
+        PropertyRef::Event(prop_name) => {
+            let prop = schema.get_event_property_by_name(event_name, prop_name)?;
+            Ok(prop.db_col_name())
+        }
+        PropertyRef::EventCustom(_) => unimplemented!(),
+    }
+}
+
+/// builds "[property] [op] [values]" binary expression with already known property column name
 fn named_property_expression(
     col_name: &str,
     operation: &Operation,
     values: &Option<Vec<Value>>,
-) -> Expr {
+) -> Result<Expr> {
     let prop_col = col(col_name);
 
     match operation {
@@ -336,7 +358,7 @@ fn named_property_expression(
 
             // for only one value we just return first expression
             if values_vac.len() == 1 {
-                return exprs[0].clone();
+                return Ok(exprs[0].clone());
             }
 
             // combine multiple values with OR
@@ -348,53 +370,31 @@ fn named_property_expression(
                 expr = or(expr.clone(), vexpr.clone());
             }
 
-            expr
+            Ok(expr)
         }
-        Operation::IsNull => is_null(prop_col.clone()),
-        Operation::IsNotNull => is_not_null(prop_col.clone()),
+        // for isNull and isNotNull we don't need values at all
+        Operation::IsNull => Ok(is_null(prop_col.clone())),
+        Operation::IsNotNull => Ok(is_not_null(prop_col.clone())),
     }
 }
 
-fn property_db_col_name(
-    schema: Arc<dyn SchemaProvider>,
-    event_name: &str,
-    property: &PropertyRef,
-) -> String {
-    match property {
-        PropertyRef::User(prop_name) => {
-            let prop = schema.get_user_property_by_name(prop_name).unwrap();
-            prop.db_col_name()
-        }
-        PropertyRef::UserCustom(_) => unimplemented!(),
-        PropertyRef::Event(prop_name) => {
-            let prop = schema
-                .get_event_property_by_name(event_name, prop_name)
-                .unwrap();
-            prop.db_col_name()
-        }
-        PropertyRef::EventCustom(_) => unimplemented!(),
-    }
-}
-
-// name prop_name op value expression
+/// builds name [property] [op] [value] expression
 pub fn property_expression(
     schema: Arc<dyn SchemaProvider>,
     event_name: &str,
     property: &PropertyRef,
     operation: &Operation,
     value: &Option<Vec<Value>>,
-) -> Expr {
+) -> Result<Expr> {
     match property {
         PropertyRef::User(prop_name) => {
-            let prop = schema.get_user_property_by_name(prop_name).unwrap();
+            let prop = schema.get_user_property_by_name(prop_name)?;
             let col_name = prop.db_col_name();
             named_property_expression(&col_name, operation, value)
         }
         PropertyRef::UserCustom(_prop_name) => unimplemented!(),
         PropertyRef::Event(prop_name) => {
-            let prop = schema
-                .get_event_property_by_name(event_name, prop_name)
-                .unwrap();
+            let prop = schema.get_event_property_by_name(event_name, prop_name)?;
             let col_name = prop.db_col_name();
             named_property_expression(&col_name, operation, value)
         }
@@ -402,6 +402,85 @@ pub fn property_expression(
     }
 }
 
+/// builds event filters expression
+fn event_filters_expression(
+    schema: Arc<dyn SchemaProvider>,
+    event_name: &str,
+    filters: &Vec<EventFilter>,
+) -> Result<Expr> {
+    // vector of expression for OR
+    let filter_exprs: Vec<Expr> = vec![];
+
+    // iterate over filters
+    let filters_exprs = filters
+        .iter()
+        .map(|filter| {
+            // match filter type
+            match filter {
+                EventFilter::Property {
+                    property,
+                    operation,
+                    value,
+                } => property_expression(schema.clone(), event_name, property, operation, value),
+            }
+        })
+        .collect::<Result<Vec<Expr>>>()?;
+
+    if filters_exprs.len() == 1 {
+        return Ok(filter_exprs[0].clone());
+    } else {
+        let mut expr = and(filters_exprs[0].clone(), filters_exprs[1].clone());
+        for fexpr in filter_exprs.iter().skip(2) {
+            expr = and(expr.clone(), fexpr.clone())
+        }
+
+        Ok(expr)
+    }
+}
+
+/// builds expression for regular event
+fn regular_event_expression(
+    schema: Arc<dyn SchemaProvider>,
+    dict_provider: Arc<dyn DictionaryProvider>,
+    event_name: &str,
+    event: &Event,
+) -> Result<Expr> {
+    // add event name condition
+    let mut expr = binary_expr(
+        col(event_fields::EVENT_NAME),
+        Operator::Eq,
+        lit(dict_provider.get_u16_by_key("events", event_name)?),
+    );
+
+    // apply filters
+    if let Some(filters) = &event.filters {
+        expr = and(
+            expr.clone(),
+            event_filters_expression(schema.clone(), event_name, filters)?,
+        )
+    }
+
+    Ok(expr)
+}
+
+/// builds expression for event
+fn event_expression(
+    schema: Arc<dyn SchemaProvider>,
+    dict_provider: Arc<dyn DictionaryProvider>,
+    event: &Event,
+) -> Result<Expr> {
+    // match event type
+    match &event.event {
+        // regular event
+        EventRef::Regular(event_name) => {
+            regular_event_expression(schema.clone(), dict_provider, event_name, event)
+        }
+
+        EventRef::Custom(_event_name) => unimplemented!(),
+    }
+}
+
+/// builds expression on timestamp
 fn time_expression(time: &QueryTime) -> Expr {
     let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
     match time {
@@ -432,81 +511,7 @@ fn time_expression(time: &QueryTime) -> Expr {
     }
 }
 
-fn event_filters_expression(
-    schema: Arc<dyn SchemaProvider>,
-    event_name: &str,
-    filters: &Vec<EventFilter>,
-) -> Expr {
-    // vector of expression for OR
-    let filter_exprs: Vec<Expr> = vec![];
-
-    // iterate over filters
-    let filters_exprs = filters
-        .iter()
-        .map(|filter| {
-            // match filter type
-            match filter {
-                EventFilter::Property {
-                    property,
-                    operation,
-                    value,
-                } => property_expression(schema.clone(), event_name, property, operation, value),
-            }
-        })
-        .collect::<Vec<Expr>>();
-
-    if filters_exprs.len() == 1 {
-        return filter_exprs[0].clone();
-    } else {
-        let mut expr = and(filters_exprs[0].clone(), filters_exprs[1].clone());
-        for fexpr in filter_exprs.iter().skip(2) {
-            expr = and(expr.clone(), fexpr.clone())
-        }
-
-        expr
-    }
-}
-
-fn regular_event_expression(
-    schema: Arc<dyn SchemaProvider>,
-    dict_provider: Arc<dyn DictionaryProvider>,
-    event_name: &str,
-    event: &Event,
-) -> Result<Expr> {
-    // add event name condition
-    let mut expr = binary_expr(
-        col(event_fields::EVENT_NAME),
-        Operator::Eq,
-        lit(dict_provider.get_u16_by_key("events", event_name)?),
-    );
-
-    // apply filters
-    if let Some(filters) = &event.filters {
-        expr = and(
-            expr.clone(),
-            event_filters_expression(schema.clone(), event_name, filters),
-        )
-    }
-
-    Ok(expr)
-}
-
-fn event_expression(
-    schema: Arc<dyn SchemaProvider>,
-    dict_provider: Arc<dyn DictionaryProvider>,
-    event: &Event,
-) -> Result<Expr> {
-    // match event type
-    match &event.event {
-        // regular event
-        EventRef::Regular(event_name) => {
-            regular_event_expression(schema.clone(), dict_provider, event_name, event)
-        }
-
-        EventRef::Custom(_event_name) => unimplemented!(),
-    }
-}
-
+/// builds filter plan
 fn plan_filter(
     input: Arc<LogicalPlan>,
     es: &EventSegmentation,
@@ -529,7 +534,7 @@ fn plan_filter(
             EventRef::Regular(event_name) => {
                 expr = and(
                     expr.clone(),
-                    event_filters_expression(schema.clone(), &event_name, filters),
+                    event_filters_expression(schema.clone(), &event_name, filters)?,
                 );
             }
             EventRef::Custom(_) => unimplemented!(),
@@ -551,6 +556,7 @@ pub fn exprlist_to_fields<'a>(
     expr.into_iter().map(|e| e.to_field(input_schema)).collect()
 }
 
+// builds breakdown expression
 fn breakdown_expr(
     schema: Arc<dyn SchemaProvider>,
     event: &Event,
@@ -559,15 +565,14 @@ fn breakdown_expr(
     match breakdown {
         Breakdown::Property(prop_ref) => match prop_ref {
             PropertyRef::User(prop_name) => {
-                let prop = schema.get_user_property_by_name(prop_name).unwrap();
+                let prop = schema.get_user_property_by_name(prop_name)?;
                 let col_name = prop.db_col_name();
                 return Ok(Expr::Alias(Box::new(col(&col_name)), prop.name));
             }
             PropertyRef::UserCustom(_) => unimplemented!(),
             PropertyRef::Event(prop_name) => {
-                let prop = schema
-                    .get_event_property_by_name(event.event.name().as_ref(), prop_name)
-                    .unwrap();
+                let prop =
+                    schema.get_event_property_by_name(event.event.name().as_ref(), prop_name)?;
                 let col_name = prop.db_col_name();
                 return Ok(Expr::Alias(Box::new(col(&col_name)), prop.name));
             }
@@ -576,6 +581,7 @@ fn breakdown_expr(
     }
 }
 
+// builds logical plan for aggregate
 fn plan_agg(
     input: Arc<LogicalPlan>,
     es: &EventSegmentation,
@@ -634,7 +640,7 @@ fn plan_agg(
                         schema.clone(),
                         event.event.name().as_ref(),
                         property,
-                    )
+                    )?
                     .as_ref())],
                     distinct: false,
                 },
@@ -647,7 +653,7 @@ fn plan_agg(
                         schema.clone(),
                         event.event.name().as_ref(),
                         property,
-                    )
+                    )?
                     .as_ref())],
                     distinct: false,
                 },
@@ -655,11 +661,11 @@ fn plan_agg(
             };
 
             match &query.name {
-                None => Expr::Alias(Box::new(q), format!("agg_{}", id)),
-                Some(name) => Expr::Alias(Box::new(q), name.clone()),
+                None => Ok(Expr::Alias(Box::new(q), format!("agg_{}", id))),
+                Some(name) => Ok(Expr::Alias(Box::new(q), name.clone())),
             }
         })
-        .collect::<Vec<Expr>>();
+        .collect::<Result<Vec<Expr>>>()?;
 
     // TODO: create own normalizer or get rid normalizer at all
     // let group_expr = normalize_cols(group_expr, &input.to_df_logical_plan())?;
@@ -678,7 +684,8 @@ fn plan_agg(
     Ok(expr)
 }
 
-pub fn create_event_logical_plan(
+/// creates logical plan for event segmentation
+pub fn create_logical_plan(
     input: Arc<LogicalPlan>,
     es: &EventSegmentation,
     schema: Arc<dyn SchemaProvider>,
@@ -694,7 +701,7 @@ pub fn create_event_logical_plan(
 mod tests {
     use crate::error::Result;
     use crate::event_segmentation::{
-        create_event_logical_plan, Analysis, Breakdown, ChartType, Event, EventFilter, EventRef,
+        create_logical_plan, Analysis, Breakdown, ChartType, Event, EventFilter, EventRef,
         EventSegmentation, NamedQuery, Operation, PropertyRef, Query, QueryTime, TimeUnit, Value,
     };
     use crate::logical_plan::expr::Expr;
@@ -710,7 +717,7 @@ mod tests {
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::arrow::util::pretty::print_batches;
     use datafusion::datasource::object_store::local::LocalFileSystem;
-    use datafusion::datasource::{MemTable, TableProvider};
+    use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContextState;
     use datafusion::logical_plan::LogicalPlan as DFLogicalPlan;
     use datafusion::logical_plan::LogicalPlanBuilder;
@@ -720,7 +727,7 @@ mod tests {
 
     use std::ops::Sub;
     use std::sync::Arc;
-    use store::dictionary::{DictionaryProvider, MockDictionary};
+    use store::dictionary::MockDictionary;
     use store::schema::{event_fields, DBCol, EventPropertyStatus, MockSchema};
 
     fn users_provider() -> Result<MemTable> {
@@ -1075,7 +1082,7 @@ mod tests {
         }
         dict_mock.get_u16_by_key = Some(get_u16_by_key);
 
-        let plan = create_event_logical_plan(
+        let plan = create_logical_plan(
             Arc::new(events_provider().await?),
             &es,
             schema.clone(),
@@ -1162,7 +1169,7 @@ mod tests {
         }
         dict_mock.get_u16_by_key = Some(get_u16_by_key);
 
-        let plan = create_event_logical_plan(
+        let plan = create_logical_plan(
             Arc::new(events_provider().await?),
             &es,
             schema.clone(),

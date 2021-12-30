@@ -78,7 +78,8 @@ impl PartitionedAccumulator for CountAccumulator {
         Ok(ScalarValue::UInt64(Some(self.count)))
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self) -> Result<()> {
         self.count = 0;
+        Ok(())
     }
 }

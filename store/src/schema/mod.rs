@@ -1,9 +1,6 @@
 use crate::error::Result;
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::{DataType, Schema as ArrowSchema};
-use datafusion::datasource::TableProvider;
-
-use datafusion::prelude::DataFrame;
 
 pub mod event_fields {
     pub const EVENT_NAME: &str = "event_name";

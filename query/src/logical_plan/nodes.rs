@@ -49,8 +49,7 @@ impl UserDefinedLogicalNode for FastAggregateNode {
             f,
             "FastAggregate: groupBy=[{:?}], aggr=[{:?}]",
             self.group_expr, self.aggr_expr
-        );
-        Ok(())
+        )
     }
 
     fn from_template(

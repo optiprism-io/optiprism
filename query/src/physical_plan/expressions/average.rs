@@ -26,7 +26,6 @@ use arrow::array::{ArrayRef, UInt64Array};
 use arrow::compute;
 use datafusion::arrow::datatypes::DataType;
 
-use datafusion::physical_plan::PhysicalExpr;
 use datafusion::scalar::ScalarValue;
 
 /// An accumulator to compute the average
@@ -100,8 +99,9 @@ impl PartitionedAccumulator for AvgAccumulator {
         }
     }
 
-    fn reset(&mut self) {
-        self.sum = ScalarValue::try_from(&self.sum.get_datatype()).unwrap();
+    fn reset(&mut self) -> Result<()> {
+        self.sum = ScalarValue::try_from(&self.sum.get_datatype())?;
         self.count = 0;
+        Ok(())
     }
 }

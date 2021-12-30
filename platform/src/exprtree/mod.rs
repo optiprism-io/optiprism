@@ -1,5 +1,3 @@
-#![allow(warnings)]
-
 use std::any::Any;
 
 use datafusion::error::Result;

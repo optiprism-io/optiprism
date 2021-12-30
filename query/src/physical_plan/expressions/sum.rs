@@ -74,8 +74,9 @@ impl PartitionedAccumulator for SumAccumulator {
         Ok(self.sum.clone())
     }
 
-    fn reset(&mut self) {
-        self.sum = ScalarValue::try_from(&self.sum.get_datatype()).unwrap();
+    fn reset(&mut self) -> Result<()> {
+        self.sum = ScalarValue::try_from(&self.sum.get_datatype())?;
+        Ok(())
     }
 }
 

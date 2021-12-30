@@ -9,8 +9,8 @@ pub mod expressions;
 // PartitionedAccumulator extends Accumulator trait with reset
 pub trait PartitionedAccumulator: Debug {
     /// Returns the state of the accumulator at the end of the accumulation.
-    // in the case of an average on which we track `sum` and `n`, this function should return a vector
-    // of two values, sum and n.
+    /// in the case of an average on which we track `sum` and `n`, this function should return a vector
+    /// of two values, sum and n.
     fn state(&self) -> Result<Vec<ScalarValue>>;
 
     /// updates the accumulator's state from a vector of scalars.
@@ -49,6 +49,6 @@ pub trait PartitionedAccumulator: Debug {
 
     /// returns its value based on its current state.
     fn evaluate(&self) -> Result<ScalarValue>;
-    // resets accumulator state
-    fn reset(&mut self);
+    /// resets accumulator state
+    fn reset(&mut self) -> Result<()>;
 }
