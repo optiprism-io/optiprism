@@ -1,5 +1,5 @@
 [package]
-name = "optiprism"
+name = "platform"
 version = "0.1.0"
 authors = ["Maxim Bogdanov <maxim.bogdanov@coins.ph>"]
 edition = "2018"

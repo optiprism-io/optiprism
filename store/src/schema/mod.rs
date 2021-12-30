@@ -1,10 +1,10 @@
-use crate::error::{Result, StoreError};
-use chrono::{Date, DateTime, Utc};
+use crate::error::{Result};
+use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::{DataType, Schema as ArrowSchema};
 use datafusion::datasource::TableProvider;
-use datafusion::logical_plan::DFSchema;
+
 use datafusion::prelude::DataFrame;
-use std::sync::Arc;
+
 
 pub mod event_fields {
     pub const EVENT_NAME: &str = "event_name";

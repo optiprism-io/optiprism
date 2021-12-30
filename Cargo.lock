@@ -840,14 +840,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "exp"
-version = "0.1.0"
-dependencies = [
- "datafusion",
- "tokio",
-]
-
-[[package]]
 name = "firestorm"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1698,34 +1690,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "optiprism"
-version = "0.1.0"
-dependencies = [
- "actix-http",
- "actix-service",
- "actix-utils",
- "actix-web",
- "arrow 5.5.0",
- "async-trait",
- "bincode",
- "chrono",
- "criterion",
- "datafusion",
- "futures",
- "hex",
- "jsonwebtoken",
- "lazy_static",
- "mockall",
- "parking_lot",
- "rand",
- "rocksdb",
- "serde",
- "serde_json",
- "sha3",
- "tokio",
-]
-
-[[package]]
 name = "ordered-float"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1866,6 +1830,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58893f751c9b0412871a09abd62ecd2a00298c6c83befa223ef98c52aef40cbe"
 
 [[package]]
+name = "platform"
+version = "0.1.0"
+dependencies = [
+ "actix-http",
+ "actix-service",
+ "actix-utils",
+ "actix-web",
+ "arrow 5.5.0",
+ "async-trait",
+ "bincode",
+ "chrono",
+ "criterion",
+ "datafusion",
+ "futures",
+ "hex",
+ "jsonwebtoken",
+ "lazy_static",
+ "mockall",
+ "parking_lot",
+ "rand",
+ "rocksdb",
+ "serde",
+ "serde_json",
+ "sha3",
+ "tokio",
+]
+
+[[package]]
 name = "plotters"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1951,7 +1943,7 @@ dependencies = [
  "chrono",
  "datafusion",
  "mockall",
- "optiprism",
+ "platform",
  "store",
  "tokio",
 ]

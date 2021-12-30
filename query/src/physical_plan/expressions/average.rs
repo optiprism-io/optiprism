@@ -17,9 +17,9 @@
 
 //! Defines physical expressions that can evaluated at runtime during query execution
 
-use std::any::Any;
+
 use std::convert::TryFrom;
-use std::sync::Arc;
+
 
 use crate::error::{Error, Result};
 use crate::physical_plan::expressions::sum::{sum, sum_batch};
@@ -27,10 +27,9 @@ use crate::physical_plan::PartitionedAccumulator;
 use arrow::compute;
 use arrow::{
     array::{ArrayRef, UInt64Array},
-    datatypes::Field,
 };
 use datafusion::arrow::datatypes::DataType;
-use datafusion::error::DataFusionError;
+
 use datafusion::physical_plan::PhysicalExpr;
 use datafusion::scalar::ScalarValue;
 

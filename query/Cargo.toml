@@ -9,7 +9,7 @@ edition = "2021"
 chrono = "0.4"
 datafusion = "6.0.0"
 arrow = { version = "6.1.0", features = ["prettyprint"] }
-optiprism = { path = "../optiprism" }
+platform = { path = "../platform" }
 store = { path = "../store" }
 mockall = "0.10.1"
 tokio = { version = "1.10.1", features = [

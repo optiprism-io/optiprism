@@ -17,9 +17,9 @@
 
 //! Defines physical expressions that can evaluated at runtime during query execution
 
-use std::any::Any;
+
 use std::convert::TryFrom;
-use std::sync::Arc;
+
 
 use crate::error::{Error, Result};
 use crate::physical_plan::PartitionedAccumulator;
@@ -30,7 +30,6 @@ use arrow::{
         ArrayRef, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
         UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
-    datatypes::Field,
 };
 use datafusion::scalar::ScalarValue;
 

@@ -55,8 +55,8 @@ impl UserDefinedLogicalNode for FastAggregateNode {
 
     fn from_template(
         &self,
-        exprs: &[DFExpr],
-        inputs: &[DFLogicalPlan],
+        _exprs: &[DFExpr],
+        _inputs: &[DFLogicalPlan],
     ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
         panic!("unimplemented");
     }

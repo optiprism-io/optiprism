@@ -1,25 +1,25 @@
 use crate::error::{Error, Result};
 use crate::physical_plan::expressions::aggregate::{
-    state_types, PartitionedAggregate, PartitionedAggregateAccumulator,
+    state_types, PartitionedAggregate,
 };
 use datafusion::arrow::datatypes::DataType;
-use datafusion::error::DataFusionError;
+
 use datafusion::logical_plan::{
-    create_udaf, lit as df_lit, Column, DFField, DFSchema, Expr as DFExpr, Literal, Operator,
+    lit as df_lit, Column, DFField, DFSchema, Expr as DFExpr, Literal, Operator,
 };
 use datafusion::physical_plan::aggregates::{
-    return_type, signature, AccumulatorFunctionImplementation, StateTypeFunction,
+    return_type, AccumulatorFunctionImplementation, StateTypeFunction,
 };
-use datafusion::physical_plan::expressions::{binary_operator_data_type, sum_return_type};
+use datafusion::physical_plan::expressions::{binary_operator_data_type};
 use datafusion::physical_plan::functions::{
-    ReturnTypeFunction, Signature, TypeSignature, Volatility,
+    ReturnTypeFunction, Signature, Volatility,
 };
 use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion::physical_plan::{aggregates, Accumulator};
-use datafusion::prelude::right;
+use datafusion::physical_plan::{aggregates};
+
 use datafusion::scalar::ScalarValue;
 use std::fmt;
-use std::fmt::Formatter;
+
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -204,7 +204,7 @@ impl Expr {
                 fun,
                 outer_fun,
                 args,
-                distinct,
+                distinct: _,
             } => {
                 // determine arguments data types
                 let data_types = args

@@ -17,16 +17,15 @@
 
 //! Defines physical expressions that can evaluated at runtime during query execution
 
-use std::any::Any;
-use std::sync::Arc;
+
+
 
 use crate::error::Result;
 use crate::physical_plan::PartitionedAccumulator;
 use arrow::compute;
-use arrow::datatypes::DataType;
+
 use arrow::{
     array::{ArrayRef, UInt64Array},
-    datatypes::Field,
 };
 use datafusion::scalar::ScalarValue;
 

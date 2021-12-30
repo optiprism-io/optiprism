@@ -1,7 +1,6 @@
 [workspace]
 members = [
-    "optiprism",
+    "platform",
     "query",
     "store",
-    "exp",
 ]

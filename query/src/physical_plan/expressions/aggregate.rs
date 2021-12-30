@@ -25,20 +25,18 @@ use crate::physical_plan::expressions::average::AvgAccumulator;
 use crate::physical_plan::expressions::count::CountAccumulator;
 use crate::physical_plan::expressions::sum::SumAccumulator;
 use crate::physical_plan::PartitionedAccumulator;
-use arrow::compute;
+
 use arrow::datatypes::{DataType};
 use arrow::{
     array::{
-        ArrayRef, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
-        UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+        ArrayRef,
     },
-    datatypes::Field,
 };
-use datafusion::error::{DataFusionError, Result as DFResult};
-use datafusion::logical_plan::{DFSchema, DFSchemaRef};
+use datafusion::error::{Result as DFResult};
+
 use datafusion::physical_plan::aggregates::AggregateFunction;
-use datafusion::physical_plan::functions::{Signature, Volatility};
-use datafusion::physical_plan::udaf::AggregateUDF;
+
+
 use datafusion::physical_plan::{Accumulator, AggregateExpr, PhysicalExpr};
 use datafusion::scalar::ScalarValue;
 

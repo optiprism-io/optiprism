@@ -1,9 +1,9 @@
 use crate::error::Result;
 use crate::logical_plan::expr::Expr;
 use crate::logical_plan::nodes::FastAggregateNode;
-use crate::logical_plan::plan::LogicalPlan::FastAggregate;
+
 use datafusion::datasource::TableProvider;
-use datafusion::logical_plan::{DFSchemaRef, Expr as DFExpr, LogicalPlan as DFLogicalPlan};
+use datafusion::logical_plan::{DFSchemaRef, LogicalPlan as DFLogicalPlan};
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
@@ -129,7 +129,7 @@ impl LogicalPlan {
                 input,
                 group_expr,
                 aggr_expr,
-                schema,
+                schema: _,
             } => {
                 let node = FastAggregateNode::try_new(
                     input.clone(),

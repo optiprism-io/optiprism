@@ -3,13 +3,13 @@ use super::logical_plan::plan::LogicalPlan;
 use crate::logical_plan::expr::{
     and, binary_expr, col, is_not_null, is_null, lit, lit_timestamp, or, Expr,
 };
-use chrono::{Date, DateTime, Duration, Utc};
-use datafusion::datasource::{MemTable, TableProvider};
-use datafusion::logical_plan::{normalize_cols, Column, DFField, DFSchema, Operator};
+use chrono::{DateTime, Duration, Utc};
+use datafusion::datasource::{TableProvider};
+use datafusion::logical_plan::{Column, DFField, DFSchema, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::scalar::ScalarValue;
-use std::fmt::Pointer;
-use std::ops::{Deref, Sub};
+
+use std::ops::{Sub};
 use std::sync::Arc;
 use store::dictionary::DictionaryProvider;
 use store::schema::{event_fields, SchemaProvider};
@@ -297,11 +297,11 @@ pub struct EventSegmentation {
     segments: Option<Vec<Segment>>,
 }
 
-pub fn validate(es: &EventSegmentation) -> Result<()> {
+pub fn validate(_es: &EventSegmentation) -> Result<()> {
     Ok(())
 }
 
-pub fn events_projection(es: &EventSegmentation) -> Option<Vec<usize>> {
+pub fn events_projection(_es: &EventSegmentation) -> Option<Vec<usize>> {
     Some(vec![0, 1, 2])
 }
 
@@ -390,7 +390,7 @@ pub fn property_expression(
             let col_name = prop.db_col_name();
             named_property_expression(&col_name, operation, value)
         }
-        PropertyRef::UserCustom(prop_name) => unimplemented!(),
+        PropertyRef::UserCustom(_prop_name) => unimplemented!(),
         PropertyRef::Event(prop_name) => {
             let prop = schema
                 .get_event_property_by_name(event_name, prop_name)
@@ -438,7 +438,7 @@ fn event_filters_expression(
     filters: &Vec<EventFilter>,
 ) -> Expr {
     // vector of expression for OR
-    let mut filter_exprs: Vec<Expr> = vec![];
+    let filter_exprs: Vec<Expr> = vec![];
 
     // iterate over filters
     let filters_exprs = filters
@@ -503,7 +503,7 @@ fn event_expression(
             regular_event_expression(schema.clone(), dict_provider, event_name, event)
         }
 
-        EventRef::Custom(event_name) => unimplemented!(),
+        EventRef::Custom(_event_name) => unimplemented!(),
     }
 }
 
@@ -698,15 +698,15 @@ mod tests {
         EventSegmentation, NamedQuery, Operation, PropertyRef, Query, QueryTime, TimeUnit, Value,
     };
     use crate::logical_plan::expr::Expr;
-    use crate::logical_plan::expr::Expr::AggregateFunction;
+    
     use crate::logical_plan::plan::LogicalPlan;
     use chrono::{DateTime, Duration, Utc};
     use datafusion::arrow::array::{
-        BooleanArray, Float64Array, Int32Array, Int8Array, StringArray, TimestampMicrosecondArray,
+        Float64Array, Int32Array, Int8Array, StringArray, TimestampMicrosecondArray,
         UInt16Array, UInt64Array,
     };
-    use datafusion::arrow::datatypes;
-    use datafusion::arrow::datatypes::DataType::Dictionary;
+    
+    
     use datafusion::arrow::datatypes::*;
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::arrow::util::pretty::print_batches;
@@ -714,16 +714,16 @@ mod tests {
     use datafusion::datasource::{MemTable, TableProvider};
     use datafusion::execution::context::ExecutionContextState;
     use datafusion::logical_plan::LogicalPlan as DFLogicalPlan;
-    use datafusion::logical_plan::{DFField, DFSchema, LogicalPlanBuilder};
+    use datafusion::logical_plan::{LogicalPlanBuilder};
     use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
     use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
-    use datafusion::prelude::{CsvReadOptions, ExecutionContext};
-    use optiprism::*;
+    use datafusion::prelude::{CsvReadOptions};
+    
     use std::ops::Sub;
     use std::sync::Arc;
     use store::dictionary::{DictionaryProvider, MockDictionary};
     use store::schema::{event_fields, DBCol, EventPropertyStatus, MockSchema};
-    use store::*;
+    
 
     fn users_provider() -> Result<MemTable> {
         let schema = Arc::new(Schema::new(vec![
@@ -783,7 +783,7 @@ mod tests {
             ],
         )?;
 
-        let prov = MemTable::try_new(schema.clone(), vec![vec![batch]])?;
+        let _prov = MemTable::try_new(schema.clone(), vec![vec![batch]])?;
         let path = "/Users/ravlio/work/rust/exprtree/tests/events.csv";
 
         let schema = events_schema();
@@ -1072,7 +1072,7 @@ mod tests {
         let schema = Arc::new(create_schema_mock());
 
         let mut dict_mock = MockDictionary::new();
-        fn get_u16_by_key(table: &str, key: &str) -> store::error::Result<u16> {
+        fn get_u16_by_key(_table: &str, _key: &str) -> store::error::Result<u16> {
             Ok(1)
         }
         dict_mock.get_u16_by_key = Some(get_u16_by_key);
