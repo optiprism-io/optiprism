@@ -206,14 +206,18 @@ impl Expr {
                 args,
                 distinct,
             } => {
+                // determine arguments data types
                 let data_types = args
                     .iter()
                     .map(|x| x.get_type(input_schema))
                     .collect::<Result<Vec<DataType>>>()?;
+                // determine return type
                 let rtype = return_type(outer_fun, &data_types)?;
 
+                // determine state types
                 let state_types: Vec<DataType> = state_types(rtype.clone(), outer_fun)?;
 
+                // make partitioned aggregate factory
                 let pagg = PartitionedAggregate::try_new(
                     partition_by.get_type(input_schema)?,
                     rtype.clone(),
@@ -221,6 +225,7 @@ impl Expr {
                     outer_fun.clone(),
                 )?;
 
+                // factory closure
                 let acc_fn: AccumulatorFunctionImplementation = Arc::new(move || {
                     Ok(pagg
                         .create_accumulator()
@@ -230,24 +235,26 @@ impl Expr {
                     Arc::new(move |_| Ok(Arc::new(rtype.clone())));
                 let state_type_fn: StateTypeFunction =
                     Arc::new(move |_| Ok(Arc::new(state_types.clone())));
+
                 let udf = AggregateUDF::new(
-                    "AggregatePartitioned",
+                    "AggregatePartitioned", // TODO make name based on aggregates
                     &Signature::any(2, Volatility::Immutable),
                     &return_type_fn,
                     &acc_fn,
                     &state_type_fn,
                 );
 
-                let mut df_args1 = vec![partition_by.to_df_expr(input_schema)?];
-                let mut df_args2 = args
+                // join partition and function arguments into one vector
+                let mut df_args = vec![partition_by.to_df_expr(input_schema)?];
+                let mut df_args_more = args
                     .iter()
                     .map(|e| e.to_df_expr(input_schema))
                     .collect::<Result<Vec<DFExpr>>>()?;
-                df_args1.append(&mut df_args2);
+                df_args.append(&mut df_args_more);
 
                 Ok(DFExpr::AggregateUDF {
                     fun: Arc::new(udf),
-                    args: df_args1,
+                    args: df_args,
                 })
             }
             Expr::Wildcard => Ok(DFExpr::Wildcard),
