@@ -11,64 +11,6 @@ use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256, Sha3_512};
 use std::{collections::HashMap, env::var, ops::Add, rc::Rc, sync::Arc};
 
-lazy_static::lazy_static! {
-    static ref COMMON_SALT: String = var("FNP_COMMON_SALT").unwrap();
-    static ref EMAIL_TOKEN_KEY: String = var("FNP_EMAIL_TOKEN_KEY").unwrap();
-    static ref ACCESS_TOKEN_KEY: String = var("FNP_ACCESS_TOKEN_KEY").unwrap();
-    static ref REFRESH_TOKEN_KEY: String = var("FNP_REFRESH_TOKEN_KEY").unwrap();
-
-    static ref ACCESS_TOKEN_DURATION: Duration = Duration::hours(1);
-    static ref REFRESH_TOKEN_DURATION: Duration = Duration::days(30);
-}
-
-#[derive(Deserialize)]
-pub struct LogInRequest {
-    pub email: String,
-    pub password: String,
-}
-
-#[derive(Deserialize)]
-pub struct SignUpRequest {
-    pub organization_name: String,
-    pub email: String,
-    pub password: String,
-    pub first_name: Option<String>,
-    pub middle_name: Option<String>,
-    pub last_name: Option<String>,
-}
-
-#[derive(Deserialize)]
-pub struct RefreshRequest {
-    pub refresh_token: String,
-}
-
-#[derive(Deserialize)]
-pub struct RecoverRequest {
-    pub email: String,
-}
-
-#[derive(Serialize)]
-pub struct TokensResponse {
-    pub access_token: String,
-    pub refresh_token: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct AccessClaims {
-    pub exp: i64,
-    pub organization_id: u64,
-    pub account_id: u64,
-    pub roles: Option<HashMap<Scope, Role>>,
-    pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct RefreshClaims {
-    pub organization_id: u64,
-    pub account_id: u64,
-    pub exp: i64,
-}
-
 pub struct Provider {
     organization_provider: Arc<organization::Provider>,
     account_provider: Arc<account::Provider>,

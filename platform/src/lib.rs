@@ -1,7 +1,9 @@
 pub mod common;
 pub mod error;
 // pub mod http;
+pub mod context;
 pub mod event;
+pub mod auth;
 
 pub const SEQUENCE_NAME: &str = "sequence";
 
