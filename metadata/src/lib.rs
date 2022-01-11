@@ -1,10 +1,10 @@
-mod event;
 mod error;
+mod event;
 mod kv;
 
 use async_trait::async_trait;
-use crate::event::Event;
-use crate::error::Result;
+pub use error::Result;
+pub use event::Event;
 
 #[async_trait]
 pub trait EventProvider {

@@ -10,9 +10,9 @@ datafusion = "6.0.0"
 async-trait = "0.1.52"
 rocksdb = { version = "0.17.0", features = ["multi-threaded-cf"] }
 actix-web = { version = "4.0.0-beta.19", default-features = false, features = [
-    "compress-brotli",
-    "compress-gzip",
-    "cookies",
+	"compress-brotli",
+	"compress-gzip",
+	"cookies",
 ] }
 serde = { version = "1.0.133", features = ["derive"] }
 serde_json = "1.0.74"

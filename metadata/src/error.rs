@@ -1,9 +1,4 @@
-use actix_http::body::BoxBody;
-use actix_web::{
-    error::ResponseError,
-    http::{header, StatusCode},
-    HttpResponse,
-};
+use actix_web::http::StatusCode;
 use datafusion::error::DataFusionError;
 use std::{
     fmt::{self, Display, Formatter},
@@ -29,7 +24,6 @@ pub enum Error {
     DataFusionError(DataFusionError),
     Plan(String),
     Internal(InternalError),
-    JWTError(jsonwebtoken::errors::Error),
     BincodeError(bincode::Error),
 }
 
@@ -45,12 +39,6 @@ impl From<DataFusionError> for Error {
     }
 }
 
-impl From<jsonwebtoken::errors::Error> for Error {
-    fn from(err: jsonwebtoken::errors::Error) -> Self {
-        Self::JWTError(err)
-    }
-}
-
 impl From<InternalError> for Error {
     fn from(err: InternalError) -> Self {
         Self::Internal(err)
@@ -60,28 +48,5 @@ impl From<InternalError> for Error {
 impl From<bincode::Error> for Error {
     fn from(err: bincode::Error) -> Self {
         Self::BincodeError(err)
-    }
-}
-
-impl ResponseError for Error {
-    fn status_code(&self) -> StatusCode {
-        if let Error::Internal(err) = self {
-            return err.status_code;
-        }
-        StatusCode::INTERNAL_SERVER_ERROR
-    }
-
-    fn error_response(&self) -> HttpResponse {
-        let mut response = HttpResponse::new(self.status_code());
-        response.headers_mut().insert(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("text/plain; charset=utf-8"),
-        );
-        if let Error::Internal(err) = self {
-            response = response.set_body(BoxBody::new(err.code));
-        } else {
-            println!("{}", self);
-        }
-        response
     }
 }

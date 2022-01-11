@@ -1,11 +1,10 @@
 pub mod provider_impl;
 
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
-use async_trait::async_trait;
 use super::error::Result;
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
-#[async_trait]
 pub trait Provider {
     async fn create_event(&self, event: Event) -> Result<Event>;
     async fn update_event(&self, event: Event) -> Result<Event>;
