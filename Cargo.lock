@@ -1447,6 +1447,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "metadata"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "async-trait",
+ "bincode",
+ "chrono",
+ "datafusion",
+ "rocksdb",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"

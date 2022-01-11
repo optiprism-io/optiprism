@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "metadata",
     "common",
     "platform",
     "query",
