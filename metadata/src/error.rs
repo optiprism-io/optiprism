@@ -25,11 +25,18 @@ pub enum Error {
     Plan(String),
     Internal(InternalError),
     BincodeError(bincode::Error),
+    RocksDbError(rocksdb::Error),
 }
 
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self)
+    }
+}
+
+impl From<rocksdb::Error> for Error {
+    fn from(err: rocksdb::Error) -> Self {
+        Self::RocksDbError(err)
     }
 }
 

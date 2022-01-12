@@ -1,11 +1,13 @@
 use super::error::Result;
 use crate::kv::KV;
-use crate::EventProvider;
+use crate::{EventProvider, kv};
 use async_trait::async_trait;
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+const KV_TABLE: kv::Table = kv::Table::Events;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub enum Status {
@@ -32,12 +34,9 @@ pub struct Event {
 }
 
 pub struct Provider {
-    store: Arc<KV>,
+    kv: KV,
 }
 
-impl Provider {
-    async fn a() {}
-}
 
 #[async_trait]
 impl EventProvider for Provider {
@@ -45,12 +44,12 @@ impl EventProvider for Provider {
     async fn create_event(&self, event: Event) -> Result<Event> {
         let mut event = event.clone();
         event.created_at = Some(Utc::now());
-        event.id = 1234; // TODO: create id
-        self.store
+        event.id = self.kv.next_seq(KV_TABLE).await?;
+        self.kv
             .put(
+                KV_TABLE,
                 event.id.to_le_bytes().as_ref(),
                 serialize(&event)?.as_ref(),
-                None,
             )
             .await?;
         Ok(event)
@@ -60,30 +59,30 @@ impl EventProvider for Provider {
     async fn update_event(&self, event: Event) -> Result<Event> {
         let mut event = event.clone();
         event.updated_at = Some(Utc::now());
-        self.store
+        self.kv
             .put(
+                KV_TABLE,
                 event.id.to_le_bytes().as_ref(),
                 serialize(&event)?.as_ref(),
-                None,
             )
             .await?;
         Ok(event)
     }
 
     async fn get_event(&self, id: u64) -> Result<Option<Event>> {
-        Ok(match self.store.get(id.to_le_bytes().as_ref()).await? {
+        Ok(match self.kv.get(KV_TABLE, id.to_le_bytes().as_ref()).await? {
             None => None,
             Some(value) => Some(deserialize(&value)?),
         })
     }
 
     async fn delete_event(&self, id: u64) -> Result<()> {
-        Ok(self.store.delete(id.to_le_bytes().as_ref()).await?)
+        Ok(self.kv.delete(KV_TABLE, id.to_le_bytes().as_ref()).await?)
     }
 
     async fn list_events(&self) -> Result<Vec<Event>> {
         let list = self
-            .store
+            .kv
             .list()
             .await?
             .iter()
