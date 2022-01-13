@@ -4,16 +4,16 @@ use super::{
     REFRESH_TOKEN_KEY,
 };
 use crate::{context::Context, error::Result};
-use chrono::{Duration, Utc};
-use common::rbac::{Permission, Role, Scope};
+use chrono::Utc;
+use common::rbac::{Role, Scope};
 use metadata::{
     account::types::{Account as MetadataAccount, CreateRequest as CreateAccountRequest},
     Metadata,
 };
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sha3::{Digest, Sha3_256, Sha3_512};
-use std::{collections::HashMap, env::var, ops::Add, rc::Rc, sync::Arc};
+use std::{collections::HashMap, ops::Add, rc::Rc, sync::Arc};
 
 pub struct Provider {
     metadata: Arc<Metadata>,

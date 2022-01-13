@@ -13,9 +13,8 @@ pub struct Provider {
     kv: KV,
 }
 
-#[async_trait]
-impl super::Provider for Provider {
-    async fn create(&self, request: CreateRequest) -> Result<Account> {
+impl Provider {
+    pub async fn create(&self, request: CreateRequest) -> Result<Account> {
         let account = Account {
             id: self.kv.next_seq(KV_TABLE).await?,
             created_at: Utc::now(),
@@ -41,7 +40,7 @@ impl super::Provider for Provider {
         Ok(account)
     }
 
-    async fn get_by_id(&self, id: u64) -> Result<Option<Account>> {
+    pub async fn get_by_id(&self, id: u64) -> Result<Option<Account>> {
         Ok(
             match self.kv.get(KV_TABLE, id.to_le_bytes().as_ref()).await? {
                 None => None,
@@ -50,11 +49,11 @@ impl super::Provider for Provider {
         )
     }
 
-    async fn get_by_email(&self, email: &str) -> Result<Option<Account>> {
+    pub async fn get_by_email(&self, email: &str) -> Result<Option<Account>> {
         unimplemented!()
     }
 
-    async fn list(&self, request: ListRequest) -> Result<Vec<Account>> {
+    pub async fn list(&self, request: ListRequest) -> Result<Vec<Account>> {
         // TODO: apply limit/offset
         let list = self
             .kv
@@ -66,7 +65,7 @@ impl super::Provider for Provider {
         Ok(list)
     }
 
-    async fn update(&self, request: UpdateRequest) -> Result<Account> {
+    pub async fn update(&self, request: UpdateRequest) -> Result<Account> {
         // TODO: lock
         let mut account = match self.get_by_id(request.id).await? {
             Some(account) => account,
@@ -119,7 +118,34 @@ impl super::Provider for Provider {
         Ok(account)
     }
 
-    async fn delete(&self, id: u64) -> Result<()> {
+    pub async fn delete(&self, id: u64) -> Result<()> {
         Ok(self.kv.delete(KV_TABLE, id.to_le_bytes().as_ref()).await?)
+    }
+}
+
+#[async_trait]
+impl super::Provider for Provider {
+    async fn create(&self, request: CreateRequest) -> Result<Account> {
+        Provider::create(&self, request).await
+    }
+
+    async fn get_by_id(&self, id: u64) -> Result<Option<Account>> {
+        Provider::get_by_id(&self, id).await
+    }
+
+    async fn get_by_email(&self, email: &str) -> Result<Option<Account>> {
+        Provider::get_by_email(&self, email).await
+    }
+
+    async fn list(&self, request: ListRequest) -> Result<Vec<Account>> {
+        Provider::list(&self, request).await
+    }
+
+    async fn update(&self, request: UpdateRequest) -> Result<Account> {
+        Provider::update(&self, request).await
+    }
+
+    async fn delete(&self, id: u64) -> Result<()> {
+        Provider::delete(&self, id).await
     }
 }

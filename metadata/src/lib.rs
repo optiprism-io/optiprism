@@ -17,5 +17,5 @@ pub trait EventProvider {
 }
 
 pub struct Metadata {
-    pub account: dyn account::Provider,
+    pub account: account::provider::Provider,
 }
