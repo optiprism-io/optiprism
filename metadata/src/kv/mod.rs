@@ -20,9 +20,8 @@ pub enum Table {
 }
 
 impl Table {
-    fn to_bytes(&self) -> [u8; 8] {
-        let i = self.clone() as usize;
-        i.to_le_bytes()
+    fn to_bytes(&self) -> [u8; 1] {
+        [self.clone() as u8]
     }
 }
 
