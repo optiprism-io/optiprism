@@ -1,11 +1,11 @@
-use super::error::Result;
-use crate::kv::KV;
-use crate::{kv, EventProvider};
+use crate::{
+    kv::{self, KV},
+    EventProvider, Result,
+};
 use async_trait::async_trait;
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 const KV_TABLE: kv::Table = kv::Table::Events;
 

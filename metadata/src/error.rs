@@ -1,4 +1,3 @@
-use actix_web::http::StatusCode;
 use datafusion::error::DataFusionError;
 use std::{
     fmt::{self, Display, Formatter},
@@ -7,23 +6,11 @@ use std::{
 
 pub type Result<T> = result::Result<T, Error>;
 
-#[derive(Debug, Clone)]
-pub struct InternalError {
-    code: &'static str,
-    status_code: StatusCode,
-}
-
-impl InternalError {
-    const fn new(code: &'static str, status_code: StatusCode) -> Self {
-        Self { code, status_code }
-    }
-}
-
 #[derive(Debug)]
 pub enum Error {
+    Internal(String),
     DataFusionError(DataFusionError),
     Plan(String),
-    Internal(InternalError),
     BincodeError(bincode::Error),
     RocksDbError(rocksdb::Error),
 }
@@ -36,7 +23,7 @@ impl Display for Error {
 
 impl From<Vec<u8>> for Error {
     fn from(err: Vec<u8>) -> Self {
-        Self::Plan(unsafe { String::from_utf8_unchecked(err) })
+        Self::Internal(unsafe { String::from_utf8_unchecked(err) })
     }
 }
 
@@ -49,12 +36,6 @@ impl From<rocksdb::Error> for Error {
 impl From<DataFusionError> for Error {
     fn from(err: DataFusionError) -> Self {
         Self::DataFusionError(err)
-    }
-}
-
-impl From<InternalError> for Error {
-    fn from(err: InternalError) -> Self {
-        Self::Internal(err)
     }
 }
 

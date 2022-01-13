@@ -1,8 +1,10 @@
-use crate::error::Result;
+use crate::Result;
 use chrono::{DateTime, Utc};
 use rocksdb::{BoundColumnFamily, ColumnFamilyDescriptor, IteratorMode, Options, WriteBatch, DB};
-use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::{
+    path::Path,
+    sync::{Arc, RwLock},
+};
 
 pub struct Meta {
     expired_at: DateTime<Utc>,
