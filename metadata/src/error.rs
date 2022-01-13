@@ -34,6 +34,12 @@ impl Display for Error {
     }
 }
 
+impl From<Vec<u8>> for Error {
+    fn from(err: Vec<u8>) -> Self {
+        Self::Plan(unsafe { String::from_utf8_unchecked(err) })
+    }
+}
+
 impl From<rocksdb::Error> for Error {
     fn from(err: rocksdb::Error) -> Self {
         Self::RocksDbError(err)

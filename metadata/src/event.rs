@@ -1,6 +1,6 @@
 use super::error::Result;
 use crate::kv::KV;
-use crate::{EventProvider, kv};
+use crate::{kv, EventProvider};
 use async_trait::async_trait;
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
@@ -37,7 +37,6 @@ pub struct Provider {
     kv: KV,
 }
 
-
 #[async_trait]
 impl EventProvider for Provider {
     // TODO: create request struct
@@ -70,10 +69,12 @@ impl EventProvider for Provider {
     }
 
     async fn get_event(&self, id: u64) -> Result<Option<Event>> {
-        Ok(match self.kv.get(KV_TABLE, id.to_le_bytes().as_ref()).await? {
-            None => None,
-            Some(value) => Some(deserialize(&value)?),
-        })
+        Ok(
+            match self.kv.get(KV_TABLE, id.to_le_bytes().as_ref()).await? {
+                None => None,
+                Some(value) => Some(deserialize(&value)?),
+            },
+        )
     }
 
     async fn delete_event(&self, id: u64) -> Result<()> {
@@ -83,10 +84,10 @@ impl EventProvider for Provider {
     async fn list_events(&self) -> Result<Vec<Event>> {
         let list = self
             .kv
-            .list()
+            .list(KV_TABLE)
             .await?
             .iter()
-            .map(|v| deserialize(&v))
+            .map(|v| deserialize(v.1.as_ref()))
             .collect::<bincode::Result<_>>()?;
 
         Ok(list)

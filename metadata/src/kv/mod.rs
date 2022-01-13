@@ -1,10 +1,8 @@
-use std::path::Path;
-use std::sync::{Arc, RwLock};
 use crate::error::Result;
 use chrono::{DateTime, Utc};
-use datafusion::parquet::data_type::AsBytes;
-use rocksdb::{DB, ColumnFamilyDescriptor, Options, DBCompressionType, BlockBasedOptions, BoundColumnFamily, ColumnFamily, IteratorMode, WriteBatch};
-use serde::__private::de::IdentifierDeserializer;
+use rocksdb::{BoundColumnFamily, ColumnFamilyDescriptor, IteratorMode, Options, WriteBatch, DB};
+use std::path::Path;
+use std::sync::{Arc, RwLock};
 
 pub struct Meta {
     expired_at: DateTime<Utc>,
@@ -22,9 +20,9 @@ pub enum Table {
 }
 
 impl Table {
-    fn to_bytes(&self) -> &[u8] {
+    fn to_bytes(&self) -> [u8; 8] {
         let i = self.clone() as usize;
-        i.to_le_bytes().as_ref()
+        i.to_le_bytes()
     }
 }
 
@@ -37,18 +35,10 @@ static CF_EVENT_CUSTOM_PROPERTIES: &str = "event_custom_properties";
 
 fn cf_descriptor(t: Table) -> ColumnFamilyDescriptor {
     match t {
-        Table::Sequences => {
-            ColumnFamilyDescriptor::new(CF_NAME_SEQUENCES, Options::default())
-        }
-        Table::General => {
-            ColumnFamilyDescriptor::new(CF_NAME_GENERAL, Options::default())
-        }
-        Table::Events => {
-            ColumnFamilyDescriptor::new(CF_NAME_EVENTS, Options::default())
-        }
-        Table::CustomEvents => {
-            ColumnFamilyDescriptor::new(CF_CUSTOM_EVENTS, Options::default())
-        }
+        Table::Sequences => ColumnFamilyDescriptor::new(CF_NAME_SEQUENCES, Options::default()),
+        Table::General => ColumnFamilyDescriptor::new(CF_NAME_GENERAL, Options::default()),
+        Table::Events => ColumnFamilyDescriptor::new(CF_NAME_EVENTS, Options::default()),
+        Table::CustomEvents => ColumnFamilyDescriptor::new(CF_CUSTOM_EVENTS, Options::default()),
         Table::EventProperties => {
             ColumnFamilyDescriptor::new(CF_EVENT_PROPERTIES, Options::default())
         }
@@ -65,7 +55,6 @@ pub struct KV {
     seq_guard: Vec<RwLock<()>>,
 }
 
-
 impl KV {
     pub fn new<P: AsRef<Path>>(path: P) -> KV {
         let mut options = Options::default();
@@ -74,47 +63,36 @@ impl KV {
 
         let db = DB::open_cf_descriptors(
             &options,
-            path, vec![
+            path,
+            vec![
                 cf_descriptor(Table::Sequences),
                 cf_descriptor(Table::General),
                 cf_descriptor(Table::Events),
                 cf_descriptor(Table::CustomEvents),
                 cf_descriptor(Table::EventProperties),
                 cf_descriptor(Table::EventCustomProperties),
-            ]).unwrap();
-
-        KV { db, seq_guard: (0..5).into_iter().map(|_| RwLock::new(())).collect() }
+            ],
+        )
+        .unwrap();
+        KV {
+            db,
+            seq_guard: (0..5).into_iter().map(|_| RwLock::new(())).collect(),
+        }
     }
 
     fn cf_handle(&self, t: Table) -> Arc<BoundColumnFamily> {
         match t {
-            Table::Sequences => {
-                self.db.cf_handle(CF_NAME_SEQUENCES).unwrap()
-            }
-            Table::General => {
-                self.db.cf_handle(CF_NAME_GENERAL).unwrap()
-            }
-            Table::Events => {
-                self.db.cf_handle(CF_NAME_EVENTS).unwrap()
-            }
-            Table::CustomEvents => {
-                self.db.cf_handle(CF_CUSTOM_EVENTS).unwrap()
-            }
-            Table::EventProperties => {
-                self.db.cf_handle(CF_EVENT_PROPERTIES).unwrap()
-            }
-            Table::EventCustomProperties => {
-                self.db.cf_handle(CF_EVENT_CUSTOM_PROPERTIES).unwrap()
-            }
+            Table::Sequences => self.db.cf_handle(CF_NAME_SEQUENCES).unwrap(),
+            Table::General => self.db.cf_handle(CF_NAME_GENERAL).unwrap(),
+            Table::Events => self.db.cf_handle(CF_NAME_EVENTS).unwrap(),
+            Table::CustomEvents => self.db.cf_handle(CF_CUSTOM_EVENTS).unwrap(),
+            Table::EventProperties => self.db.cf_handle(CF_EVENT_PROPERTIES).unwrap(),
+            Table::EventCustomProperties => self.db.cf_handle(CF_EVENT_CUSTOM_PROPERTIES).unwrap(),
         }
     }
 
     pub async fn put(&self, t: Table, key: &[u8], value: &[u8]) -> Result<()> {
-        Ok(self.db.put_cf(
-            &self.cf_handle(t),
-            key,
-            value,
-        )?)
+        Ok(self.db.put_cf(&self.cf_handle(t), key, value)?)
     }
 
     pub async fn multi_put(&self, t: Table, kv: Vec<KVBytes>) -> Result<()> {
@@ -127,24 +105,19 @@ impl KV {
     }
 
     pub async fn get(&self, t: Table, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.db.get_cf(
-            &self.cf_handle(t),
-            key,
-        )?)
+        Ok(self.db.get_cf(&self.cf_handle(t), key)?)
     }
 
     pub async fn multi_get(&self, t: Table, keys: Vec<&[u8]>) -> Result<Vec<Option<Vec<u8>>>> {
         let cf = self.cf_handle(t);
-        Ok(keys.iter().map(|key| {
-            self.db.get_cf(&cf, key)
-        }).collect::<std::result::Result<_, _>>()?)
+        Ok(keys
+            .iter()
+            .map(|key| self.db.get_cf(&cf, key))
+            .collect::<std::result::Result<_, _>>()?)
     }
 
     pub async fn delete(&self, t: Table, key: &[u8]) -> Result<()> {
-        Ok(self.db.delete_cf(
-            &self.cf_handle(t),
-            key,
-        )?)
+        Ok(self.db.delete_cf(&self.cf_handle(t), key)?)
     }
 
     pub async fn multi_delete(&self, t: Table, keys: Vec<&[u8]>) -> Result<()> {
@@ -157,26 +130,19 @@ impl KV {
     }
 
     pub async fn list(&self, t: Table) -> Result<Vec<KVBytes>> {
-        let mut iter = self.db.iterator_cf(
-            &self.cf_handle(t),
-            IteratorMode::Start,
-        );
-
+        let iter = self.db.iterator_cf(&self.cf_handle(t), IteratorMode::Start);
         Ok(iter.map(|v| (v.0.clone(), v.1.clone())).collect())
     }
 
     pub async fn next_seq(&self, table: Table) -> Result<u64> {
-        let _guard = self.seq_guard[table as usize].write();
-        let cf = &self.cf_handle(Table::Sequences);
+        let _guard = self.seq_guard[table.clone() as usize].write();
+        let cf = self.cf_handle(Table::Sequences);
         let key = table.to_bytes();
         let id = self.db.get_cf(&cf, key)?;
         let result: u64 = match id {
-            Some(v) => {
-                u64::from_le_bytes(v.try_into()?) + 1
-            }
-            None => 1
+            Some(v) => u64::from_le_bytes(v.try_into()?) + 1,
+            None => 1,
         };
-
         self.db.put_cf(&cf, key, result.to_le_bytes())?;
         Ok(result)
     }
