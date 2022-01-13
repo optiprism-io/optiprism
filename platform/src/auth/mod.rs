@@ -1,5 +1,5 @@
-// mod provider;
-mod types;
+pub mod provider;
+pub mod types;
 
 use crate::error::Result;
 use chrono::Duration;

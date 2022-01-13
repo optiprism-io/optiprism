@@ -1,6 +1,9 @@
-use super::{
-    auth_provider::{LogInRequest, Provider, SignUpRequest},
-    ContextExtractor,
+use crate::{
+    auth::{
+        provider::Provider,
+        types::{LogInRequest, SignUpRequest},
+    },
+    context::ContextExtractor,
 };
 use actix_web::{
     post,

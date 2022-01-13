@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.52"
 chrono = { version = "0.4.19", features = ["serde"] }
+serde = { version = "1.0.133", features = ["derive"] }

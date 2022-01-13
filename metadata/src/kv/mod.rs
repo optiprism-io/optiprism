@@ -19,6 +19,7 @@ pub enum Table {
     CustomEvents = 3,
     EventProperties = 4,
     EventCustomProperties = 5,
+    Accounts = 6,
 }
 
 impl Table {
@@ -33,6 +34,7 @@ static CF_NAME_EVENTS: &str = "events";
 static CF_CUSTOM_EVENTS: &str = "custom_events";
 static CF_EVENT_PROPERTIES: &str = "event_properties";
 static CF_EVENT_CUSTOM_PROPERTIES: &str = "event_custom_properties";
+static CF_ACCOUNTS: &str = "accounts";
 
 fn cf_descriptor(t: Table) -> ColumnFamilyDescriptor {
     match t {
@@ -46,6 +48,7 @@ fn cf_descriptor(t: Table) -> ColumnFamilyDescriptor {
         Table::EventCustomProperties => {
             ColumnFamilyDescriptor::new(CF_EVENT_CUSTOM_PROPERTIES, Options::default())
         }
+        Table::Accounts => ColumnFamilyDescriptor::new(CF_ACCOUNTS, Options::default()),
     }
 }
 
@@ -89,6 +92,7 @@ impl KV {
             Table::CustomEvents => self.db.cf_handle(CF_CUSTOM_EVENTS).unwrap(),
             Table::EventProperties => self.db.cf_handle(CF_EVENT_PROPERTIES).unwrap(),
             Table::EventCustomProperties => self.db.cf_handle(CF_EVENT_CUSTOM_PROPERTIES).unwrap(),
+            Table::Accounts => self.db.cf_handle(CF_ACCOUNTS).unwrap(),
         }
     }
 

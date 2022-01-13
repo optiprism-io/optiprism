@@ -1,4 +1,4 @@
-use crate::common::rbac::{Permission, Role, Scope};
+use common::rbac::{Permission, Role, Scope};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

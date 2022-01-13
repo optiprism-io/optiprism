@@ -1,11 +1,8 @@
-use crate::{
-    auth,
-    common::rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS},
-    error::Error,
-};
+use crate::{auth, error::Error};
 use actix_http::header;
 use actix_utils::future::{err, ok, Ready};
 use actix_web::{dev::Payload, FromRequest, HttpRequest};
+use common::rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS};
 use std::{collections::HashMap, ops::Deref, rc::Rc};
 
 #[derive(Default)]
