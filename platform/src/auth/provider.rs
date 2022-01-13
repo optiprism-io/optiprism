@@ -1,8 +1,15 @@
-use super::types::{SignUpRequest, TokensResponse};
+use super::{
+    types::{AccessClaims, LogInRequest, RefreshClaims, SignUpRequest, TokensResponse},
+    ACCESS_TOKEN_DURATION, ACCESS_TOKEN_KEY, COMMON_SALT, REFRESH_TOKEN_DURATION,
+    REFRESH_TOKEN_KEY,
+};
 use crate::{context::Context, error::Result};
 use chrono::{Duration, Utc};
 use common::rbac::{Permission, Role, Scope};
-use metadata::{account::types::CreateRequest as CreateAccountRequest, Metadata};
+use metadata::{
+    account::types::{Account as MetadataAccount, CreateRequest as CreateAccountRequest},
+    Metadata,
+};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256, Sha3_512};
@@ -49,16 +56,19 @@ impl Provider {
         make_token_response(account)
     }
 
-    pub fn log_in(&self, ctx: Rc<Context>, request: LogInRequest) -> Result<TokensResponse> {
-        let acc = self.account_provider.get_by_email(ctx, request.email)?;
-        if !is_valid_password(&request.password, &acc.salt, &acc.password) {
-            return Err(ERR_AUTH_LOG_IN_INVALID_PASSWORD.into());
+    pub async fn log_in(&self, ctx: Rc<Context>, request: LogInRequest) -> Result<TokensResponse> {
+        let account = match self.metadata.account.get_by_email(&request.email).await? {
+            Some(account) => account,
+            None => unimplemented!(),
+        };
+        if !is_valid_password(&request.password, &account.salt, &account.password) {
+            unimplemented!();
         }
-        make_token_response(acc)
+        make_token_response(account)
     }
 }
 
-fn make_token_response(acc: account::Account) -> Result<TokensResponse> {
+fn make_token_response(acc: MetadataAccount) -> Result<TokensResponse> {
     Ok(TokensResponse {
         access_token: make_token(
             AccessClaims {

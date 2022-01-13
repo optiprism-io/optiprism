@@ -41,13 +41,17 @@ impl super::Provider for Provider {
         Ok(account)
     }
 
-    async fn get(&self, id: u64) -> Result<Option<Account>> {
+    async fn get_by_id(&self, id: u64) -> Result<Option<Account>> {
         Ok(
             match self.kv.get(KV_TABLE, id.to_le_bytes().as_ref()).await? {
                 None => None,
                 Some(value) => Some(deserialize(&value)?),
             },
         )
+    }
+
+    async fn get_by_email(&self, email: &str) -> Result<Option<Account>> {
+        unimplemented!()
     }
 
     async fn list(&self, request: ListRequest) -> Result<Vec<Account>> {
@@ -64,7 +68,7 @@ impl super::Provider for Provider {
 
     async fn update(&self, request: UpdateRequest) -> Result<Account> {
         // TODO: lock
-        let mut account = match self.get(request.id).await? {
+        let mut account = match self.get_by_id(request.id).await? {
             Some(account) => account,
             None => unimplemented!(),
         };
