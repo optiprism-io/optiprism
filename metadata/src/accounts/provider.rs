@@ -1,22 +1,24 @@
-use super::types::{Account, CreateRequest, ListRequest, UpdateRequest};
-use crate::{
-    kv::{self, KV},
-    Result,
-};
-use async_trait::async_trait;
+use crate::store::store;
+use crate::store::store::Store;
+use crate::Result;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
+use std::sync::Arc;
+use types::account::{Account, CreateRequest, ListRequest, UpdateRequest};
 
-const KV_TABLE: kv::Table = kv::Table::Accounts;
+const KV_NAMESPACE: store::Namespace = store::Namespace::Accounts;
 
 pub struct Provider {
-    kv: KV,
+    store: Arc<Store>,
 }
 
 impl Provider {
+    pub fn new(kv: Arc<Store>) -> Self {
+        Provider { store: kv.clone() }
+    }
     pub async fn create(&self, request: CreateRequest) -> Result<Account> {
         let account = Account {
-            id: self.kv.next_seq(KV_TABLE).await?,
+            id: self.store.next_seq(KV_NAMESPACE).await?,
             created_at: Utc::now(),
             updated_at: None,
             admin: request.admin,
@@ -30,19 +32,15 @@ impl Provider {
             middle_name: request.middle_name,
             last_name: request.last_name,
         };
-        self.kv
-            .put(
-                KV_TABLE,
-                account.id.to_le_bytes().as_ref(),
-                serialize(&account)?.as_ref(),
-            )
+        self.store
+            .put(KV_NAMESPACE, account.id.to_le_bytes(), serialize(&account)?)
             .await?;
         Ok(account)
     }
 
     pub async fn get_by_id(&self, id: u64) -> Result<Option<Account>> {
         Ok(
-            match self.kv.get(KV_TABLE, id.to_le_bytes().as_ref()).await? {
+            match self.store.get(KV_NAMESPACE, id.to_le_bytes()).await? {
                 None => None,
                 Some(value) => Some(deserialize(&value)?),
             },
@@ -56,8 +54,8 @@ impl Provider {
     pub async fn list(&self, request: ListRequest) -> Result<Vec<Account>> {
         // TODO: apply limit/offset
         let list = self
-            .kv
-            .list(KV_TABLE)
+            .store
+            .list(KV_NAMESPACE)
             .await?
             .iter()
             .map(|v| deserialize(v.1.as_ref()))
@@ -65,7 +63,7 @@ impl Provider {
         Ok(list)
     }
 
-    pub async fn update(&self, request: UpdateRequest) -> Result<Account> {
+    pub async fn update(&self, request: UpdateRequest) -> Result<Option<Account>> {
         // TODO: lock
         let mut account = match self.get_by_id(request.id).await? {
             Some(account) => account,
@@ -97,55 +95,31 @@ impl Provider {
             };
         }
         if updated {
-            self.kv
-                .put(
-                    KV_TABLE,
-                    account.id.to_le_bytes().as_ref(),
-                    serialize(&account)?.as_ref(),
-                )
-                .await?;
-        }
-        if updated {
             account.updated_at = Some(Utc::now());
-            self.kv
-                .put(
-                    KV_TABLE,
-                    account.id.to_le_bytes().as_ref(),
-                    serialize(&account)?.as_ref(),
-                )
-                .await?;
         }
-        Ok(account)
+
+        Ok(
+            match self
+                .store
+                .put_checked(KV_NAMESPACE, account.id.to_le_bytes(), serialize(&account)?)
+                .await?
+            {
+                None => None,
+                Some(_) => Some(account),
+            },
+        )
     }
 
-    pub async fn delete(&self, id: u64) -> Result<()> {
-        Ok(self.kv.delete(KV_TABLE, id.to_le_bytes().as_ref()).await?)
-    }
-}
-
-#[async_trait]
-impl super::Provider for Provider {
-    async fn create(&self, request: CreateRequest) -> Result<Account> {
-        Provider::create(&self, request).await
-    }
-
-    async fn get_by_id(&self, id: u64) -> Result<Option<Account>> {
-        Provider::get_by_id(&self, id).await
-    }
-
-    async fn get_by_email(&self, email: &str) -> Result<Option<Account>> {
-        Provider::get_by_email(&self, email).await
-    }
-
-    async fn list(&self, request: ListRequest) -> Result<Vec<Account>> {
-        Provider::list(&self, request).await
-    }
-
-    async fn update(&self, request: UpdateRequest) -> Result<Account> {
-        Provider::update(&self, request).await
-    }
-
-    async fn delete(&self, id: u64) -> Result<()> {
-        Provider::delete(&self, id).await
+    pub async fn delete(&self, id: u64) -> Result<Option<Account>> {
+        Ok(
+            match self
+                .store
+                .delete_checked(KV_NAMESPACE, id.to_le_bytes())
+                .await?
+            {
+                None => None,
+                Some(v) => Some(deserialize(&v)?),
+            },
+        )
     }
 }

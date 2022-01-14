@@ -7,7 +7,7 @@ use crate::{context::Context, error::Result};
 use chrono::Utc;
 use common::rbac::{Role, Scope};
 use metadata::{
-    account::types::{Account as MetadataAccount, CreateRequest as CreateAccountRequest},
+    accounts::types::{Account as MetadataAccount, CreateRequest as CreateAccountRequest},
     Metadata,
 };
 use rand::{distributions::Alphanumeric, thread_rng, Rng};

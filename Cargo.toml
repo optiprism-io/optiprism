@@ -5,4 +5,5 @@ members = [
     "platform",
     "query",
     "store",
+    "types",
 ]

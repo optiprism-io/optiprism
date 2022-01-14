@@ -1451,14 +1451,15 @@ dependencies = [
 name = "metadata"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "bincode",
  "chrono",
  "common",
- "datafusion",
  "rocksdb",
  "serde",
  "serde_json",
+ "tokio",
+ "types",
+ "uuid",
 ]
 
 [[package]]
@@ -2626,6 +2627,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b63708a265f51345575b27fe43f9500ad611579e764c79edbc2037b1121959ec"
 
 [[package]]
+name = "types"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "unicode-bidi"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2674,6 +2686,16 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
+]
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom",
+ "serde",
 ]
 
 [[package]]

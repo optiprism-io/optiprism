@@ -1,19 +1,13 @@
-use std::sync::Arc;
-use crate::{
-    kv::{self, KV},
-    Result,
-};
-use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Status {
     Enabled,
     Disabled,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Event {
     pub id: u64,
     pub created_at: Option<DateTime<Utc>>,

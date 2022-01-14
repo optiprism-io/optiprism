@@ -1,4 +1,3 @@
-use datafusion::error::DataFusionError;
 use std::{
     fmt::{self, Display, Formatter},
     result,
@@ -9,7 +8,6 @@ pub type Result<T> = result::Result<T, Error>;
 #[derive(Debug)]
 pub enum Error {
     Internal(String),
-    DataFusionError(DataFusionError),
     Plan(String),
     BincodeError(bincode::Error),
     RocksDbError(rocksdb::Error),
@@ -30,12 +28,6 @@ impl From<Vec<u8>> for Error {
 impl From<rocksdb::Error> for Error {
     fn from(err: rocksdb::Error) -> Self {
         Self::RocksDbError(err)
-    }
-}
-
-impl From<DataFusionError> for Error {
-    fn from(err: DataFusionError) -> Self {
-        Self::DataFusionError(err)
     }
 }
 
