@@ -5,6 +5,7 @@ use std::{
     path::Path,
     sync::{Arc, RwLock},
 };
+use bincode::serialize;
 
 
 pub struct Meta {
@@ -83,7 +84,7 @@ impl KV {
             .unwrap();
         KV {
             db,
-            seq_guard: (0..5).into_iter().map(|_| RwLock::new(())).collect(),
+            seq_guard: (0..cf_descriptors.len()).into_iter().map(|_| RwLock::new(())).collect(),
         }
     }
 
@@ -155,48 +156,14 @@ impl KV {
         Ok(result)
     }
 
-    pub async fn entity_insert(
-        &self,
-        table: Table,
-        value: &[u8],
-        meta: Option<Meta>,
-    ) -> Result<u64> {
-        unimplemented!()
-    }
-
-    pub async fn entity_update(
+    pub async fn put_entity<T: ?Sized>(
         &self,
         table: Table,
         id: u64,
-        value: &[u8],
-        meta: Option<Meta>,
-    ) -> Result<u64> {
-        unimplemented!()
-    }
-
-    pub async fn entity_put(
-        &self,
-        table: Table,
-        id: u64,
-        value: &[u8],
-        meta: Option<Meta>,
-    ) -> Result<()> {
-        unimplemented!()
-    }
-
-    pub async fn entity_get(&self, table: Table, id: u64) -> Result<Option<Vec<u8>>> {
-        unimplemented!()
-    }
-
-    pub async fn entity_multi_get(
-        &self,
-        table: Table,
-        id: Vec<u64>,
-    ) -> Result<Vec<Option<Vec<u8>>>> {
-        unimplemented!()
-    }
-
-    pub async fn entity_delete(&self, table: Table, id: u64) -> Result<()> {
-        unimplemented!()
+        value: &T,
+    ) -> Result<u64> where
+        T: serde::Serialize
+    {
+        self.put(table, id.to_le_bytes().as_ref(), serialize(value)?.as_ref())
     }
 }

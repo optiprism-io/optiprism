@@ -1,13 +1,13 @@
 use std::sync::Arc;
 use crate::{
-    kv::{self, KV},
     Result,
 };
 use bincode::{deserialize, serialize};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use crate::event::types::Event;
+use crate::kv::kv::{KV, Table};
 
-const KV_TABLE: kv::Table = kv::Table::Events;
+const KV_TABLE: Table = Table::Events;
 
 pub struct Provider {
     kv: Arc<KV>,
@@ -23,10 +23,10 @@ impl Provider {
         event.created_at = Some(Utc::now());
         event.id = self.kv.next_seq(KV_TABLE).await?;
         self.kv
-            .put(
+            .put_entity(
                 KV_TABLE,
-                event.id.to_le_bytes().as_ref(),
-                serialize(&event)?.as_ref(),
+                event.id,
+                &event,
             )
             .await?;
         Ok(event)
@@ -36,10 +36,10 @@ impl Provider {
         let mut event = event.clone();
         event.updated_at = Some(Utc::now());
         self.kv
-            .put(
+            .put_entity(
                 KV_TABLE,
-                event.id.to_le_bytes().as_ref(),
-                serialize(&event)?.as_ref(),
+                event.id,
+                &event,
             )
             .await?;
         Ok(event)
