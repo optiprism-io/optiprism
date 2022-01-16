@@ -1,4 +1,4 @@
-use metadata::error::{Result};
+use metadata::error::Result;
 use metadata::store::store::Store;
 use metadata::Metadata;
 use std::env::temp_dir;
@@ -63,7 +63,6 @@ async fn test_events() -> Result<()> {
 
     assert!(md.events.get_event_by_name("event1").await.is_err());
     assert_eq!(md.events.get_event_by_name("event1_new").await?.id, 1);
-
 
     assert_eq!(md.events.list_events().await?[0].id, 1);
     assert_eq!(md.events.list_events().await?[1].id, 2);

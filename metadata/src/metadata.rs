@@ -1,7 +1,7 @@
 use crate::store::store::Store;
+use crate::Result;
 use crate::{accounts, events};
 use std::sync::Arc;
-use crate::Result;
 
 pub struct Metadata {
     pub events: events::Provider,

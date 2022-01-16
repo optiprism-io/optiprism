@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use crate::error::Error;
 use crate::store::store::{Namespace, Store};
 use crate::Result;
-use crate::error::Error;
+use std::collections::HashMap;
 
 use bincode::{deserialize, serialize};
 use chrono::Utc;
@@ -80,7 +80,7 @@ impl Provider {
     pub async fn get_event_by_name(&self, name: &str) -> Result<Event> {
         match self.name_idx.get(name) {
             None => Err(Error::EventDoesNotExist),
-            Some(id) => self.get_event_by_id(id.clone()).await
+            Some(id) => self.get_event_by_id(id.clone()).await,
         }
     }
 
