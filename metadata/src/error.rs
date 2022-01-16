@@ -11,7 +11,11 @@ pub enum Error {
     Plan(String),
     BincodeError(bincode::Error),
     RocksDbError(rocksdb::Error),
+    EventWithSameNameAlreadyExist,
+    EventDoesNotExist,
 }
+
+impl std::error::Error for Error {}
 
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
