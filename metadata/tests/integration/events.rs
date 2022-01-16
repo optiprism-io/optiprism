@@ -1,9 +1,9 @@
-use metadata::error::{Error, Result};
+use metadata::error::{Result};
 use metadata::store::store::Store;
 use metadata::Metadata;
 use std::env::temp_dir;
 use std::sync::Arc;
-use anyhow::Context;
+
 use types::event::{Event, Status};
 use uuid::Uuid;
 

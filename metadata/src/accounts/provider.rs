@@ -47,11 +47,11 @@ impl Provider {
         )
     }
 
-    pub async fn get_by_email(&self, email: &str) -> Result<Option<Account>> {
+    pub async fn get_by_email(&self, _email: &str) -> Result<Option<Account>> {
         unimplemented!()
     }
 
-    pub async fn list(&self, request: ListRequest) -> Result<Vec<Account>> {
+    pub async fn list(&self, _request: ListRequest) -> Result<Vec<Account>> {
         // TODO: apply limit/offset
         let list = self
             .store

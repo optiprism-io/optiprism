@@ -2,7 +2,6 @@
 members = [
     "metadata",
     "common",
-    "platform",
     "query",
     "store",
     "types",
