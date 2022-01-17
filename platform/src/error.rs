@@ -2,7 +2,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use datafusion::error::DataFusionError;
+use jsonwebtoken::errors::Error as JWTError;
+use metadata::error::Error as MetadataError;
 use std::{
     fmt::{self, Display, Formatter},
     result,
@@ -24,28 +25,14 @@ impl InternalError {
 
 #[derive(Debug)]
 pub enum Error {
-    DataFusionError(DataFusionError),
-    Plan(String),
     Internal(InternalError),
-    JWTError(jsonwebtoken::errors::Error),
-    BincodeError(bincode::Error),
+    MetadataError(MetadataError),
+    JWTError(JWTError),
 }
 
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self)
-    }
-}
-
-impl From<DataFusionError> for Error {
-    fn from(err: DataFusionError) -> Self {
-        Self::DataFusionError(err)
-    }
-}
-
-impl From<jsonwebtoken::errors::Error> for Error {
-    fn from(err: jsonwebtoken::errors::Error) -> Self {
-        Self::JWTError(err)
     }
 }
 
@@ -55,21 +42,24 @@ impl From<InternalError> for Error {
     }
 }
 
-impl From<bincode::Error> for Error {
-    fn from(err: bincode::Error) -> Self {
-        Self::BincodeError(err)
+impl From<MetadataError> for Error {
+    fn from(err: MetadataError) -> Self {
+        Self::MetadataError(err)
+    }
+}
+
+impl From<JWTError> for Error {
+    fn from(err: JWTError) -> Self {
+        Self::JWTError(err)
     }
 }
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         if let Error::Internal(err) = self {
-            (err.status_code, err.code)
+            (err.status_code, err.code.to_string())
         } else {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("{}", self).as_str(),
-            )
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("{}", self))
         }
         .into_response()
     }
