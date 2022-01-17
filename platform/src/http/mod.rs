@@ -1,7 +1,7 @@
 mod auth;
 
-use actix_web::web::ServiceConfig;
+use axum::Router;
 
-pub fn configure(cfg: &mut ServiceConfig) {
-    auth::configure(cfg);
+pub fn configure(router: &mut Router) {
+    auth::configure(router);
 }

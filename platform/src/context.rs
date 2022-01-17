@@ -1,9 +1,11 @@
 use crate::{auth, error::Error};
-use actix_http::header;
-use actix_utils::future::{err, ok, Ready};
-use actix_web::{dev::Payload, FromRequest, HttpRequest};
+use axum::{
+    async_trait,
+    extract::{FromRequest, RequestParts, TypedHeader},
+    headers::{authorization::Bearer, Authorization},
+};
 use common::rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS};
-use std::{collections::HashMap, ops::Deref, rc::Rc};
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct Context {
@@ -20,23 +22,6 @@ impl Context {
         let mut permissions = HashMap::new();
         permissions.insert(Scope::Organization, vec![permission]);
         ctx.permissions = Some(permissions);
-        ctx
-    }
-
-    pub fn from_token(token: Option<&header::HeaderValue>) -> Self {
-        let mut ctx = Context::default();
-        if let Some(value) = token {
-            if let Ok(value) = value.to_str() {
-                if let Some(token) = value.strip_prefix("Bearer ") {
-                    if let Ok(claims) = auth::parse_access_token(token) {
-                        ctx.organization_id = claims.organization_id;
-                        ctx.account_id = claims.account_id;
-                        ctx.roles = claims.roles;
-                        ctx.permissions = claims.permissions;
-                    }
-                }
-            }
-        }
         ctx
     }
 
@@ -96,37 +81,27 @@ fn check_permissions(permissions: &[Permission], permission: &Permission) -> boo
     false
 }
 
-pub struct ContextExtractor(Rc<Context>);
+#[async_trait]
+impl<B> FromRequest<B> for Context
+where
+    B: Send,
+{
+    type Rejection = Error;
 
-impl ContextExtractor {
-    pub fn new(state: Context) -> ContextExtractor {
-        ContextExtractor(Rc::new(state))
-    }
-
-    pub fn into_inner(self) -> Rc<Context> {
-        self.0
-    }
-}
-
-impl Deref for ContextExtractor {
-    type Target = Rc<Context>;
-
-    fn deref(&self) -> &Rc<Context> {
-        &self.0
-    }
-}
-
-impl FromRequest for ContextExtractor {
-    type Error = Error;
-    type Future = Ready<Result<Self, Error>>;
-
-    #[inline]
-    fn from_request(request: &HttpRequest, _: &mut Payload) -> Self::Future {
-        if let Some(ctx) = request.req_data().get::<ContextExtractor>() {
-            ok(ContextExtractor(ctx.0.clone()))
-        } else {
-            unimplemented!();
-            // err(ERR_INTERNAL_CONTEXT_REQUIRED.into())
+    async fn from_request(request: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+        let mut ctx = Context::default();
+        if let Ok(TypedHeader(Authorization(bearer))) =
+            TypedHeader::<Authorization<Bearer>>::from_request(request).await
+        {
+            if let Some(token) = bearer.token().strip_prefix("Bearer ") {
+                if let Ok(claims) = auth::parse_access_token(token) {
+                    ctx.organization_id = claims.organization_id;
+                    ctx.account_id = claims.account_id;
+                    ctx.roles = claims.roles;
+                    ctx.permissions = claims.permissions;
+                }
+            }
         }
+        Ok(ctx)
     }
 }

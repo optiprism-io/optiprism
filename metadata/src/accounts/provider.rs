@@ -1,10 +1,8 @@
-use crate::store::store;
-use crate::store::store::Store;
-use crate::Result;
+use super::{Account, CreateRequest, ListRequest, UpdateRequest};
+use crate::{store::store, store::store::Store, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
-use types::account::{Account, CreateRequest, ListRequest, UpdateRequest};
 
 const KV_NAMESPACE: store::Namespace = store::Namespace::Accounts;
 

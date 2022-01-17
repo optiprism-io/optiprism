@@ -1,8 +1,6 @@
-use actix_http::body::BoxBody;
-use actix_web::{
-    error::ResponseError,
-    http::{header, StatusCode},
-    HttpResponse,
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use datafusion::error::DataFusionError;
 use std::{
@@ -63,25 +61,16 @@ impl From<bincode::Error> for Error {
     }
 }
 
-impl ResponseError for Error {
-    fn status_code(&self) -> StatusCode {
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
         if let Error::Internal(err) = self {
-            return err.status_code;
-        }
-        StatusCode::INTERNAL_SERVER_ERROR
-    }
-
-    fn error_response(&self) -> HttpResponse {
-        let mut response = HttpResponse::new(self.status_code());
-        response.headers_mut().insert(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("text/plain; charset=utf-8"),
-        );
-        if let Error::Internal(err) = self {
-            response = response.set_body(BoxBody::new(err.code));
+            (err.status_code, err.code)
         } else {
-            println!("{}", self);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{}", self).as_str(),
+            )
         }
-        response
+        .into_response()
     }
 }

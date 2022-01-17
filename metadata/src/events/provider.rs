@@ -1,12 +1,13 @@
-use crate::error::Error;
-use crate::store::store::{Namespace, Store};
-use crate::Result;
-use std::collections::HashMap;
-
+use super::Event;
+use crate::{
+    error::Error,
+    store::store::{Namespace, Store},
+    Result,
+};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
+use std::collections::HashMap;
 use std::sync::Arc;
-use types::event::Event;
 
 const KV_NAMESPACE: Namespace = Namespace::Events;
 

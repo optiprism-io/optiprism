@@ -1,8 +1,2 @@
 [workspace]
-members = [
-    "metadata",
-    "common",
-    "query",
-    "store",
-    "types",
-]
+members = ["metadata", "common", "query", "store", "platform"]

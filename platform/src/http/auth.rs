@@ -1,38 +1,31 @@
 use crate::{
     auth::{
         provider::Provider,
-        types::{LogInRequest, SignUpRequest},
+        types::{LogInRequest, SignUpRequest, TokensResponse},
     },
-    context::ContextExtractor,
+    context::Context,
+    error::Result,
 };
-use actix_web::{
-    post,
-    web::{Data, Json, ServiceConfig},
-    Error, HttpResponse,
-};
+use axum::{extract::Extension, routing::post, Json, Router};
 
-#[post("/v1/auth/signup")]
 async fn sign_up(
-    ctx: ContextExtractor,
-    provider: Data<Provider>,
-    request: Json<SignUpRequest>,
-) -> Result<HttpResponse, Error> {
-    let response = provider
-        .sign_up(ctx.into_inner(), request.into_inner())
-        .await?;
-    Ok(HttpResponse::Ok().json(response))
+    ctx: Context,
+    Extension(provider): Extension<Provider>,
+    Json(request): Json<SignUpRequest>,
+) -> Result<Json<TokensResponse>> {
+    Ok(Json(provider.sign_up(ctx, request).await?))
 }
 
-#[post("/v1/auth/login")]
 async fn log_in(
-    ctx: ContextExtractor,
-    provider: Data<Provider>,
-    request: Json<LogInRequest>,
-) -> Result<HttpResponse, Error> {
-    let response = provider.log_in(ctx.into_inner(), request.into_inner())?;
-    Ok(HttpResponse::Ok().json(response))
+    ctx: Context,
+    Extension(provider): Extension<Provider>,
+    Json(request): Json<LogInRequest>,
+) -> Result<Json<TokensResponse>> {
+    Ok(Json(provider.log_in(ctx, request).await?))
 }
 
-pub fn configure(cfg: &mut ServiceConfig) {
-    cfg.service(sign_up).service(log_in);
+pub fn configure(router: &mut Router) {
+    router
+        .route("/v1/auth/signup", post(sign_up))
+        .route("/v1/auth/login", post(log_in));
 }

@@ -1,7 +1,10 @@
 [package]
 name = "platform"
 version = "0.1.0"
-authors = ["Maxim Bogdanov <maxim.bogdanov@coins.ph>"]
+authors = [
+	"Maxim Bogdanov <maxim.bogdanov@coins.ph>",
+	"Aleksei Lin <aleksei@incsw.in>",
+]
 edition = "2021"
 
 [lib]
@@ -16,34 +19,19 @@ opt-level = 3
 [dependencies]
 common = { path = "../common" }
 metadata = { path = "../metadata" }
-actix-http = { version = "3.0.0-beta.18", default-features = false, features = [
-	"openssl",
-	"rustls",
-	"compress-brotli",
-	"compress-gzip",
-] }
-actix-service = "2.0.2"
-actix-utils = "3.0.0"
-actix-web = { version = "4.0.0-beta.19", default-features = false, features = [
-	"compress-brotli",
-	"compress-gzip",
-	"cookies",
-] }
+axum = { version = "0.4.3", features = ["headers"] }
+tokio = { version = "1.15.0", features = ["full"] }
+headers = "0.3.5"
+jsonwebtoken = "7.2.0"
+
 futures = "0.3.19"
 serde = { version = "1.0.133", features = ["derive"] }
 serde_json = "1.0.74"
 chrono = { version = "0.4.19", features = ["serde"] }
 arrow = "5.2.0"
 datafusion = "6.0.0"
-tokio = { version = "1.15.0", features = [
-	"macros",
-	"rt",
-	"rt-multi-thread",
-	"sync",
-] }
 async-trait = "0.1.52"
 rocksdb = { version = "0.17.0", features = ["multi-threaded-cf"] }
-jsonwebtoken = "7.2.0"
 lazy_static = "1.4.0"
 rand = "0.8.4"
 sha3 = "0.10.0"
