@@ -150,7 +150,7 @@ impl Expr {
             DFExpr::Literal(v) => Expr::Literal(v.clone()),
             DFExpr::BinaryExpr { left, op, right } => Expr::BinaryExpr {
                 left: Box::new(Expr::from_df_expr(left)),
-                op: op.clone(),
+                op: *op,
                 right: Box::new(Expr::from_df_expr(right)),
             },
             DFExpr::IsNotNull(expr) => Expr::IsNotNull(Box::new(Expr::from_df_expr(expr))),
@@ -161,7 +161,7 @@ impl Expr {
                 distinct,
             } => Expr::AggregateFunction {
                 fun: fun.clone(),
-                args: args.iter().map(|dfe| Expr::from_df_expr(dfe)).collect(),
+                args: args.iter().map(Expr::from_df_expr).collect(),
                 distinct: *distinct,
             },
             DFExpr::Wildcard => Expr::Wildcard,
@@ -176,7 +176,7 @@ impl Expr {
             Expr::Literal(v) => Ok(DFExpr::Literal(v.clone())),
             Expr::BinaryExpr { left, op, right } => Ok(DFExpr::BinaryExpr {
                 left: Box::new(left.to_df_expr(input_schema)?),
-                op: op.clone(),
+                op: *op,
                 right: Box::new(right.to_df_expr(input_schema)?),
             }),
             Expr::IsNotNull(expr) => {
@@ -223,9 +223,9 @@ impl Expr {
 
                 // factory closure
                 let acc_fn: AccumulatorFunctionImplementation = Arc::new(move || {
-                    Ok(pagg
+                    pagg
                         .create_accumulator()
-                        .map_err(Error::into_datafusion_plan_error)?)
+                        .map_err(Error::into_datafusion_plan_error)
                 });
                 let return_type_fn: ReturnTypeFunction =
                     Arc::new(move |_| Ok(Arc::new(rtype.clone())));
@@ -452,7 +452,7 @@ pub fn or(left: Expr, right: Expr) -> Expr {
 
 /// Create a column expression based on a qualified or unqualified column name
 pub fn col(ident: &str) -> Expr {
-    if ident == "" {
+    if ident.is_empty() {
         panic!()
     }
     Expr::Column(ident.into())

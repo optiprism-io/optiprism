@@ -19,7 +19,7 @@ pub struct Provider {
 impl Provider {
     pub fn try_new(kv: Arc<Store>) -> Result<Self> {
         let prov = Provider {
-            store: kv.clone(),
+            store: kv,
             name_idx: HashMap::new(),
         };
         prov.init()?;
@@ -81,7 +81,7 @@ impl Provider {
     pub async fn get_event_by_name(&self, name: &str) -> Result<Event> {
         match self.name_idx.get(name) {
             None => Err(Error::EventDoesNotExist),
-            Some(id) => self.get_event_by_id(id.clone()).await,
+            Some(id) => self.get_event_by_id(*id).await,
         }
     }
 

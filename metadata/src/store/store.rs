@@ -182,7 +182,7 @@ impl Store {
         let iter = self
             .db
             .iterator_cf(&self.cf_handle(ns), IteratorMode::Start);
-        Ok(iter.map(|v| (v.0.clone(), v.1.clone())).collect())
+        Ok(iter.map(|v| (v.0.clone(), v.1)).collect())
     }
 
     pub async fn next_seq(&self, ns: Namespace) -> Result<u64> {

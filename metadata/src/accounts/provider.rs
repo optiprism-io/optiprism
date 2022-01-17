@@ -12,7 +12,7 @@ pub struct Provider {
 
 impl Provider {
     pub fn new(kv: Arc<Store>) -> Self {
-        Provider { store: kv.clone() }
+        Provider { store: kv }
     }
     pub async fn create(&self, request: CreateRequest) -> Result<Account> {
         let account = Account {
@@ -97,14 +97,10 @@ impl Provider {
         }
 
         Ok(
-            match self
+            self
                 .store
                 .put_checked(KV_NAMESPACE, account.id.to_le_bytes(), serialize(&account)?)
-                .await?
-            {
-                None => None,
-                Some(_) => Some(account),
-            },
+                .await?.map(|_| account),
         )
     }
 
