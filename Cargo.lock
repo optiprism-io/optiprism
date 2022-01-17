@@ -1458,6 +1458,7 @@ name = "metadata"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrow 5.5.0",
  "bincode",
  "chrono",
  "common",
@@ -2381,7 +2382,6 @@ version = "0.1.0"
 dependencies = [
  "arrow 5.5.0",
  "chrono",
- "datafusion",
 ]
 
 [[package]]
@@ -2640,6 +2640,7 @@ dependencies = [
  "bincode",
  "chrono",
  "common",
+ "datafusion",
  "serde",
  "serde_json",
 ]

@@ -20,8 +20,7 @@ async fn test_events() -> Result<()> {
         updated_at: None,
         created_by: 0,
         update_by: 0,
-        project_id: 0,
-        is_system: false,
+        project_id: 1,
         tags: vec![],
         name: "".to_string(),
         display_name: None,
@@ -32,7 +31,7 @@ async fn test_events() -> Result<()> {
     };
     // try to get, delete, update unexisting event
     assert!(md.events.get_event_by_id(1).await.is_err());
-    assert!(md.events.get_event_by_name("test").await.is_err());
+    assert!(md.events.get_event_by_name(1, "test").await.is_err());
     assert!(md.events.delete_event(1).await.is_err());
     assert!(md.events.update_event(event_tpl.clone()).await.is_err());
     assert_eq!(md.events.list_events().await?, vec![]);
@@ -55,14 +54,14 @@ async fn test_events() -> Result<()> {
     assert_eq!(md.events.get_event_by_id(2).await?.id, 2);
 
     // by name
-    assert_eq!(md.events.get_event_by_name("event1").await?.id, 1);
-    assert_eq!(md.events.get_event_by_name("event2").await?.id, 2);
+    assert_eq!(md.events.get_event_by_name(1, "event1").await?.id, 1);
+    assert_eq!(md.events.get_event_by_name(1, "event2").await?.id, 2);
 
     event1.name = "event1_new".to_string();
     assert_eq!(md.events.update_event(event1.clone()).await?.id, 1);
 
-    assert!(md.events.get_event_by_name("event1").await.is_err());
-    assert_eq!(md.events.get_event_by_name("event1_new").await?.id, 1);
+    assert!(md.events.get_event_by_name(1, "event1").await.is_err());
+    assert_eq!(md.events.get_event_by_name(1, "event1_new").await?.id, 1);
 
     assert_eq!(md.events.list_events().await?[0].id, 1);
     assert_eq!(md.events.list_events().await?[1].id, 2);
@@ -74,6 +73,6 @@ async fn test_events() -> Result<()> {
     // events should gone now
     assert!(md.events.get_event_by_id(1).await.is_err());
     assert!(md.events.get_event_by_id(2).await.is_err());
-    assert!(md.events.get_event_by_name("event1_new").await.is_err());
+    assert!(md.events.get_event_by_name(1, "event1_new").await.is_err());
     Ok(())
 }
