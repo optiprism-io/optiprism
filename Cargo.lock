@@ -409,6 +409,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmd"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "common",
+ "metadata",
+ "platform",
+ "tokio",
+ "tower",
+ "tower-http",
+]
+
+[[package]]
 name = "comfy-table"
 version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

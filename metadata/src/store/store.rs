@@ -69,6 +69,7 @@ impl Store {
             cf_descriptor(Namespace::CustomEvents),
             cf_descriptor(Namespace::EventProperties),
             cf_descriptor(Namespace::EventCustomProperties),
+            cf_descriptor(Namespace::Accounts),
         ];
 
         let cfd_len = cf_descriptors.len();

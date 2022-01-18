@@ -6,3 +6,4 @@ pub mod store;
 
 use error::Result;
 pub use metadata::Metadata;
+pub use store::store::Store;
