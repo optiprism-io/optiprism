@@ -3,9 +3,10 @@ use datafusion::arrow::datatypes::DataType;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum DBCol {
-    Named(String),
-    Order(usize),
+pub enum Column {
+    Name(String),
+    Index(usize),
+    None,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -32,9 +33,9 @@ pub struct EventProperty {
     pub tags: Vec<String>,
     pub name: String,
     pub description: String,
-    pub display_name: String,
+    pub display_name: Option<String>,
     pub typ: DataType,
-    pub db_col: DBCol,
+    pub db_col: Column,
     pub status: Status,
     pub nullable: bool,
     // this also defines whether property is required or not

@@ -14,7 +14,10 @@ pub enum Error {
     EventWithSameNameAlreadyExist,
     EventDoesNotExist,
     EventPropertyWithSameNameAlreadyExist,
+    EventPropertyWithSameDisplayNameAlreadyExist,
     EventPropertyDoesNotExist,
+    EventPropertyColumnShouldBeEmpty,
+    IndexKeyExist(usize, Vec<u8>),
 }
 
 impl std::error::Error for Error {}
