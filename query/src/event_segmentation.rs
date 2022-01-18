@@ -978,7 +978,7 @@ mod tests {
         let es = EventSegmentation {
             time: QueryTime::Between {
                 from: to.sub(Duration::days(10)),
-                to: to,
+                to,
             },
             group: event_fields::USER_ID.to_string(),
             interval_unit: TimeUnit::Day,
@@ -1110,7 +1110,7 @@ mod tests {
         let es = EventSegmentation {
             time: QueryTime::Between {
                 from: to.sub(Duration::days(10)),
-                to: to,
+                to,
             },
             group: event_fields::USER_ID.to_string(),
             interval_unit: TimeUnit::Day,

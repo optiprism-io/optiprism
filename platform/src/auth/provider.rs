@@ -24,7 +24,7 @@ impl Provider {
         Self { metadata }
     }
 
-    pub async fn sign_up(&self, ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
+    pub async fn sign_up(&self, _ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
         // let org = self
         //     .organization_provider
         //     .create(organization::CreateRequest {
@@ -40,7 +40,7 @@ impl Provider {
                 admin: false,
                 salt: "".to_string(),       // TODO: make salt
                 password: request.password, // TODO: make pass hash
-                organization_id: organization_id,
+                organization_id,
                 email: request.email,
                 roles: Some(roles),
                 permissions: None,
@@ -52,7 +52,7 @@ impl Provider {
         make_token_response(account)
     }
 
-    pub async fn log_in(&self, ctx: Context, request: LogInRequest) -> Result<TokensResponse> {
+    pub async fn log_in(&self, _ctx: Context, request: LogInRequest) -> Result<TokensResponse> {
         let account = match self.metadata.accounts.get_by_email(&request.email).await? {
             Some(account) => account,
             None => unimplemented!(),
