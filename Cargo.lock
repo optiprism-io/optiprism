@@ -586,8 +586,8 @@ version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c42350b81f044f576ff88ac750419f914abb46a03831bb1747134344ee7a4e64"
 dependencies = [
- "strum 0.22.0",
- "strum_macros 0.22.0",
+ "strum",
+ "strum_macros",
  "unicode-width",
 ]
 
@@ -1465,8 +1465,6 @@ dependencies = [
  "rocksdb",
  "serde",
  "serde_json",
- "strum 0.23.0",
- "strum_macros 0.23.1",
  "tokio",
  "types",
  "uuid",
@@ -2179,12 +2177,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustversion"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
-
-[[package]]
 name = "ryu"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2399,12 +2391,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7ac893c7d471c8a21f31cfe213ec4f6d9afeed25537c772e08ef3f005f8729e"
 
 [[package]]
-name = "strum"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cae14b91c7d11c9a851d3fbc80a963198998c2a64eec840477fa92d8ce9b70bb"
-
-[[package]]
 name = "strum_macros"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2413,19 +2399,6 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
-]
-
-[[package]]
-name = "strum_macros"
-version = "0.23.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bb0dc7ee9c15cea6199cde9a127fa16a4c5819af85395457ad72d68edc85a38"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "rustversion",
  "syn",
 ]
 

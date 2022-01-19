@@ -30,9 +30,9 @@ async fn test_events() -> Result<()> {
         custom_properties: None,
     };
     // try to get, delete, update unexisting event
-    assert!(md.events.get_event_by_id(1).await.is_err());
+    assert!(md.events.get_event_by_id(1, 1).await.is_err());
     assert!(md.events.get_event_by_name(1, "test").await.is_err());
-    assert!(md.events.delete_event(1).await.is_err());
+    assert!(md.events.delete_event(1, 1).await.is_err());
     assert!(md.events.update_event(event_tpl.clone()).await.is_err());
     assert_eq!(md.events.list_events().await?, vec![]);
 
@@ -50,8 +50,8 @@ async fn test_events() -> Result<()> {
     assert_eq!(res.id, 2);
 
     // check existence by id
-    assert_eq!(md.events.get_event_by_id(1).await?.id, 1);
-    assert_eq!(md.events.get_event_by_id(2).await?.id, 2);
+    assert_eq!(md.events.get_event_by_id(1, 1).await?.id, 1);
+    assert_eq!(md.events.get_event_by_id(1, 2).await?.id, 2);
 
     // by name
     assert_eq!(md.events.get_event_by_name(1, "event1").await?.id, 1);
@@ -67,12 +67,12 @@ async fn test_events() -> Result<()> {
     assert_eq!(md.events.list_events().await?[1].id, 2);
 
     // delete events
-    assert_eq!(md.events.delete_event(1).await?.id, 1);
-    assert_eq!(md.events.delete_event(2).await?.id, 2);
+    assert_eq!(md.events.delete_event(1, 1).await?.id, 1);
+    assert_eq!(md.events.delete_event(1, 2).await?.id, 2);
 
     // events should gone now
-    assert!(md.events.get_event_by_id(1).await.is_err());
-    assert!(md.events.get_event_by_id(2).await.is_err());
+    assert!(md.events.get_event_by_id(1, 1).await.is_err());
+    assert!(md.events.get_event_by_id(1, 2).await.is_err());
     assert!(md.events.get_event_by_name(1, "event1_new").await.is_err());
     Ok(())
 }

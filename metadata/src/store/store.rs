@@ -4,32 +4,14 @@ use std::{
     path::Path,
     sync::{Arc, RwLock},
 };
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 
 use std::str::FromStr;
-use strum_macros::EnumString;
 
 
-#[derive(Clone)]
-pub enum Namespace {
-    PrimaryKeySequences = 0,
-    PropertyColumnSequences = 1,
-    // namespace for non-entities
-    General = 2,
-    Events = 3,
-    CustomEvents = 4,
-    EventProperties = 5,
-    EventCustomProperties = 6,
-    Accounts = 7,
-}
-
-enum A {
-    B,
-    C,
-}
-
-#[derive(Debug, Default, PartialEq, EnumString)]
+/*#[derive(Clone)]
 enum Entity {
-    #[strum(serialize = "pk_seq")]
     Events,
     CustomEvents,
     EventProperties,
@@ -37,57 +19,67 @@ enum Entity {
     Accounts,
 }
 
-#[derive(Debug, PartialEq, EnumString)]
-enum Namespace2 {
-    #[strum(serialize = "pk_seq")]
-    PrimaryKeySequences,
-    #[strum(serialize = "prop_col_seq")]
-    PropertyColumnSequences,
-    #[strum(serialize = "general")]
+#[derive(Clone)]
+enum Sequence {
+    EntityPrimaryKeys(Entity),
+    EventPropertyColumns,
+}
+
+#[derive(Clone)]
+enum Namespace {
+    Sequence(Sequence),
     General,
     Entity(Entity),
+    EntityPrimaryKeySequences(Entity),
     EntitySecondaryIndices(Entity),
 }
 
 impl Namespace {
-    fn to_bytes(&self) -> [u8; 1] {
-        [self.clone() as u8]
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            Namespace::General => "general",
+            Namespace::Entity(Entity::Events) => "entities:events",
+            Namespace::Entity(Entity::CustomEvents) => "entities:custom_events",
+            Namespace::Entity(Entity::EventProperties) => "entities:event_properties",
+            Namespace::Entity(Entity::EventCustomProperties) => "entities:event_custom_properties",
+            Namespace::EntitySecondaryIndices(Entity::Events) => "entities_idx:events",
+            Namespace::EntitySecondaryIndices(Entity::CustomEvents) => "entities_idx:custom_events",
+            Namespace::EntitySecondaryIndices(Entity::EventProperties) => "entities_idx:event_properties",
+            Namespace::EntitySecondaryIndices(Entity::EventCustomProperties) => "entities_idx:event_custom_properties",
+            Namespace::EntitySecondaryIndices(Entity::Accounts) => "entity_idx:accounts",
+            Namespace::Sequence(seq) => match seq {
+                Sequence::EntityPrimaryKeys(e) => match e {
+                    Entity::Events => ""
+                    Entity::CustomEvents => {}
+                    Entity::EventProperties => {}
+                    Entity::EventCustomProperties => {}
+                    Entity::Accounts => {}
+                }
+                Sequence::EventPropertyColumns => {}
+            }
+            Namespace::EntityPrimaryKeySequences(_) => {}
+        }.as_bytes()
     }
 }
-
-static CF_NAME_PRIMARY_KEY_SEQUENCES: &str = "pk_sequences";
-static CF_NAME_PROPERTY_COLUMN_SEQUENCES: &str = "prop_col_sequences";
-static CF_NAME_GENERAL: &str = "general";
-static CF_NAME_EVENTS: &str = "events";
-static CF_CUSTOM_EVENTS: &str = "custom_events";
-static CF_EVENT_PROPERTIES: &str = "event_properties";
-static CF_EVENT_CUSTOM_PROPERTIES: &str = "event_custom_properties";
-static CF_ACCOUNTS: &str = "accounts";
-
-fn cf_descriptor(ns: Namespace) -> ColumnFamilyDescriptor {
-    match ns {
-        Namespace::PrimaryKeySequences => ColumnFamilyDescriptor::new(CF_NAME_PRIMARY_KEY_SEQUENCES, Options::default()),
-        Namespace::PropertyColumnSequences => ColumnFamilyDescriptor::new(CF_NAME_PROPERTY_COLUMN_SEQUENCES, Options::default()),
-        Namespace::General => ColumnFamilyDescriptor::new(CF_NAME_GENERAL, Options::default()),
-        Namespace::Events => ColumnFamilyDescriptor::new(CF_NAME_EVENTS, Options::default()),
-        Namespace::CustomEvents => {
-            ColumnFamilyDescriptor::new(CF_CUSTOM_EVENTS, Options::default())
-        }
-        Namespace::EventProperties => {
-            ColumnFamilyDescriptor::new(CF_EVENT_PROPERTIES, Options::default())
-        }
-        Namespace::EventCustomProperties => {
-            ColumnFamilyDescriptor::new(CF_EVENT_CUSTOM_PROPERTIES, Options::default())
-        }
-        Namespace::Accounts => ColumnFamilyDescriptor::new(CF_ACCOUNTS, Options::default()),
-    }
-}
-
+*/
 type KVBytes = (Box<[u8]>, Box<[u8]>);
 
 pub struct Store {
     db: DB,
-    ns_guard: Vec<RwLock<()>>,
+}
+
+fn make_key(ns: &[u8], key: &[u8]) -> Vec<u8> {
+    [ns, b":", key].concat()
+}
+
+enum ColumnFamily {
+    General,
+}
+
+fn cf_descriptor(cf: ColumnFamily) -> ColumnFamilyDescriptor {
+    match cf {
+        ColumnFamily::General => ColumnFamilyDescriptor::new("general", Options::default()),
+    }
 }
 
 impl Store {
@@ -97,48 +89,31 @@ impl Store {
         options.create_missing_column_families(true);
 
         let cf_descriptors = vec![
-            cf_descriptor(Namespace::PrimaryKeySequences),
-            cf_descriptor(Namespace::PropertyColumnSequences),
-            cf_descriptor(Namespace::General),
-            cf_descriptor(Namespace::Events),
-            cf_descriptor(Namespace::CustomEvents),
-            cf_descriptor(Namespace::EventProperties),
-            cf_descriptor(Namespace::EventCustomProperties),
+            cf_descriptor(ColumnFamily::General),
         ];
-
-        let cfd_len = cf_descriptors.len();
 
         let db = DB::open_cf_descriptors(&options, path, cf_descriptors).unwrap();
         Store {
             db,
-            ns_guard: (0..cfd_len).into_iter().map(|_| RwLock::new(())).collect(),
         }
     }
 
-    fn cf_handle(&self, ns: Namespace) -> Arc<BoundColumnFamily> {
-        match ns {
-            Namespace::PrimaryKeySequences => self.db.cf_handle(CF_NAME_PRIMARY_KEY_SEQUENCES).unwrap(),
-            Namespace::PropertyColumnSequences => self.db.cf_handle(CF_NAME_PROPERTY_COLUMN_SEQUENCES).unwrap(),
-            Namespace::General => self.db.cf_handle(CF_NAME_GENERAL).unwrap(),
-            Namespace::Events => self.db.cf_handle(CF_NAME_EVENTS).unwrap(),
-            Namespace::CustomEvents => self.db.cf_handle(CF_CUSTOM_EVENTS).unwrap(),
-            Namespace::EventProperties => self.db.cf_handle(CF_EVENT_PROPERTIES).unwrap(),
-            Namespace::EventCustomProperties => self.db.cf_handle(CF_EVENT_CUSTOM_PROPERTIES).unwrap(),
-            Namespace::Accounts => self.db.cf_handle(CF_ACCOUNTS).unwrap(),
+    fn cf_handle(&self, cf: ColumnFamily) -> Arc<BoundColumnFamily> {
+        match cf {
+            ColumnFamily::General => self.db.cf_handle("general").unwrap(),
         }
     }
 
-    pub async fn put<K, V>(&self, ns: Namespace, key: K, value: V) -> Result<()>
+    pub async fn put<K, V>(&self, key: K, value: V) -> Result<()>
         where
             K: AsRef<[u8]>,
             V: AsRef<[u8]>,
     {
-        Ok(self.db.put_cf(&self.cf_handle(ns), key, value)?)
+        Ok(self.db.put(key.as_ref(), value.as_ref())?)
     }
 
     pub async fn put_checked<K, V>(
         &self,
-        ns: Namespace,
         key: K,
         value: V,
     ) -> Result<Option<Vec<u8>>>
@@ -146,89 +121,79 @@ impl Store {
             K: AsRef<[u8]> + Clone,
             V: AsRef<[u8]>,
     {
-        let _guard = self.ns_guard[ns.clone() as usize].write();
-
-        match self.db.get_cf(&self.cf_handle(ns.clone()), key.clone())? {
+        match self.db.get(key.as_ref())? {
             None => Ok(None),
             Some(v) => {
-                self.db.put_cf(&self.cf_handle(ns), key, value)?;
+                self.db.put(key.as_ref(), value)?;
                 Ok(Some(v))
             }
         }
     }
 
-    pub async fn multi_put(&self, ns: Namespace, kv: Vec<KVBytes>) -> Result<()> {
-        let cf = self.cf_handle(ns);
+    pub async fn multi_put(&self, kv: Vec<KVBytes>) -> Result<()> {
         let mut batch = WriteBatch::default();
         for (k, v) in kv.iter() {
-            batch.put_cf(&cf, k, v);
+            batch.put(k, v);
         }
         Ok(self.db.write(batch)?)
     }
 
-    pub async fn get<K>(&self, ns: Namespace, key: K) -> Result<Option<Vec<u8>>>
+    pub async fn get<K>(&self, key: K) -> Result<Option<Vec<u8>>>
         where
             K: AsRef<[u8]>,
     {
-        Ok(self.db.get_cf(&self.cf_handle(ns), key)?)
+        Ok(self.db.get(key.as_ref())?)
     }
 
-    pub async fn multi_get(&self, ns: Namespace, keys: Vec<&[u8]>) -> Result<Vec<Option<Vec<u8>>>> {
-        let cf = self.cf_handle(ns);
+    pub async fn multi_get(&self, keys: Vec<&[u8]>) -> Result<Vec<Option<Vec<u8>>>> {
         Ok(keys
             .iter()
-            .map(|key| self.db.get_cf(&cf, key))
+            .map(|key| self.db.get(key))
             .collect::<std::result::Result<_, _>>()?)
     }
 
-    pub async fn delete<K>(&self, ns: Namespace, key: K) -> Result<()>
+    pub async fn delete<K>(&self, key: K) -> Result<()>
         where
             K: AsRef<[u8]> + Clone,
     {
-        Ok(self.db.delete_cf(&self.cf_handle(ns), key)?)
+        Ok(self.db.delete(key.as_ref())?)
     }
 
-    pub async fn delete_checked<K>(&self, ns: Namespace, key: K) -> Result<Option<Vec<u8>>>
+    pub async fn delete_checked<K>(&self, key: K) -> Result<Option<Vec<u8>>>
         where
             K: AsRef<[u8]> + Clone,
     {
-        let _guard = self.ns_guard[ns.clone() as usize].write();
-
-        match self.db.get_cf(&self.cf_handle(ns.clone()), key.clone())? {
+        match self.db.get(key.as_ref())? {
             None => Ok(None),
             Some(v) => {
-                self.db.delete_cf(&self.cf_handle(ns), key)?;
+                self.db.delete(key.as_ref())?;
                 Ok(Some(v))
             }
         }
     }
 
-    pub async fn multi_delete(&self, ns: Namespace, keys: Vec<&[u8]>) -> Result<()> {
-        let cf = self.cf_handle(ns);
+    pub async fn multi_delete(&self, keys: Vec<&[u8]>) -> Result<()> {
         let mut batch = WriteBatch::default();
         for key in keys.iter() {
-            batch.delete_cf(&cf, key);
+            batch.delete(key);
         }
         Ok(self.db.write(batch)?)
     }
 
-    pub async fn list(&self, ns: Namespace) -> Result<Vec<KVBytes>> {
+    pub async fn list_prefix(&self, prefix: &[u8]) -> Result<Vec<KVBytes>> {
         let iter = self
             .db
-            .iterator_cf(&self.cf_handle(ns), IteratorMode::Start);
+            .prefix_iterator(prefix);
         Ok(iter.map(|v| (v.0.clone(), v.1.clone())).collect())
     }
 
-    pub async fn next_seq(&self, ns: Namespace) -> Result<u64> {
-        let _guard = self.ns_guard[ns.clone() as usize].write();
-        let cf = self.cf_handle(Namespace::PrimaryKeySequences);
-        let key = ns.to_bytes();
-        let id = self.db.get_cf(&cf, key)?;
+    pub async fn next_seq(&self, key: &[u8]) -> Result<u64> {
+        let id = self.db.get(key)?;
         let result: u64 = match id {
             Some(v) => u64::from_le_bytes(v.try_into()?) + 1,
             None => 1,
         };
-        self.db.put_cf(&cf, key, result.to_le_bytes())?;
+        self.db.put(key, result.to_le_bytes())?;
         Ok(result)
     }
 }

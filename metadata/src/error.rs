@@ -17,7 +17,8 @@ pub enum Error {
     EventPropertyWithSameDisplayNameAlreadyExist,
     EventPropertyDoesNotExist,
     EventPropertyColumnShouldBeEmpty,
-    IndexKeyExist(usize, Vec<u8>),
+    IndexKeyExist, // TODO make parametrized errors
+    IndexKeyNotFound, // TODO make parametrized errors
 }
 
 impl std::error::Error for Error {}
