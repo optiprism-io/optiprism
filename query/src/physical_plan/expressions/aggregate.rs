@@ -146,8 +146,8 @@ fn new_accumulator(
 pub fn state_types(data_type: DataType, agg: &AggregateFunction) -> Result<Vec<DataType>> {
     Ok(match agg {
         AggregateFunction::Count => vec![DataType::UInt64],
-        AggregateFunction::Sum => vec![data_type.clone()],
-        AggregateFunction::Avg => vec![DataType::UInt64, data_type.clone()],
+        AggregateFunction::Sum => vec![data_type],
+        AggregateFunction::Avg => vec![DataType::UInt64, data_type],
         _ => unimplemented!(),
     })
 }
@@ -190,9 +190,9 @@ impl Accumulator for PartitionedAggregateAccumulator {
         outer_acc
             .finalize()
             .map_err(Error::into_datafusion_execution_error)?;
-        return outer_acc
+        outer_acc
             .outer_state()
-            .map_err(Error::into_datafusion_execution_error);
+            .map_err(Error::into_datafusion_execution_error)
     }
 
     /// this function receives one entry per argument of this accumulator.

@@ -1,10 +1,8 @@
-use crate::store::store;
-use crate::store::store::Store;
-use crate::Result;
+use super::{Account, CreateRequest, ListRequest, UpdateRequest};
+use crate::{store::store, store::store::Store, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
-use types::account::{Account, CreateRequest, ListRequest, UpdateRequest};
 
 const KV_NAMESPACE: store::Namespace = store::Namespace::Accounts;
 
@@ -14,7 +12,7 @@ pub struct Provider {
 
 impl Provider {
     pub fn new(kv: Arc<Store>) -> Self {
-        Provider { store: kv.clone() }
+        Provider { store: kv }
     }
     pub async fn create(&self, request: CreateRequest) -> Result<Account> {
         let account = Account {
@@ -99,14 +97,10 @@ impl Provider {
         }
 
         Ok(
-            match self
+            self
                 .store
                 .put_checked(KV_NAMESPACE, account.id.to_le_bytes(), serialize(&account)?)
-                .await?
-            {
-                None => None,
-                Some(_) => Some(account),
-            },
+                .await?.map(|_| account),
         )
     }
 

@@ -1,12 +1,13 @@
-use crate::error::Error;
-use crate::store::store::{Namespace, Store};
-use crate::Result;
-use std::collections::HashMap;
-
+use super::Event;
+use crate::{
+    error::Error,
+    store::store::{Namespace, Store},
+    Result,
+};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
+use std::collections::HashMap;
 use std::sync::Arc;
-use types::event::Event;
 
 const KV_NAMESPACE: Namespace = Namespace::Events;
 
@@ -18,7 +19,7 @@ pub struct Provider {
 impl Provider {
     pub fn try_new(kv: Arc<Store>) -> Result<Self> {
         let prov = Provider {
-            store: kv.clone(),
+            store: kv,
             name_idx: HashMap::new(),
         };
         prov.init()?;
@@ -80,7 +81,7 @@ impl Provider {
     pub async fn get_event_by_name(&self, name: &str) -> Result<Event> {
         match self.name_idx.get(name) {
             None => Err(Error::EventDoesNotExist),
-            Some(id) => self.get_event_by_id(id.clone()).await,
+            Some(id) => self.get_event_by_id(*id).await,
         }
     }
 

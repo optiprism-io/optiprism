@@ -1,10 +1,10 @@
-use metadata::error::Result;
-use metadata::store::store::Store;
-use metadata::Metadata;
-use std::env::temp_dir;
-use std::sync::Arc;
-
-use types::event::{Event, Status};
+use metadata::{
+    error::Result,
+    events::{Event, Status},
+    store::store::Store,
+    Metadata,
+};
+use std::{env::temp_dir, sync::Arc};
 use uuid::Uuid;
 
 #[tokio::test]

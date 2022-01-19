@@ -13,7 +13,7 @@ use metadata::{
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::Serialize;
 use sha3::{Digest, Sha3_256, Sha3_512};
-use std::{collections::HashMap, ops::Add, rc::Rc, sync::Arc};
+use std::{collections::HashMap, ops::Add, sync::Arc};
 
 pub struct Provider {
     metadata: Arc<Metadata>,
@@ -24,11 +24,7 @@ impl Provider {
         Self { metadata }
     }
 
-    pub async fn sign_up(
-        &self,
-        ctx: Rc<Context>,
-        request: SignUpRequest,
-    ) -> Result<TokensResponse> {
+    pub async fn sign_up(&self, _ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
         // let org = self
         //     .organization_provider
         //     .create(organization::CreateRequest {
@@ -39,12 +35,12 @@ impl Provider {
         roles.insert(Scope::Organization, Role::Owner);
         let account = self
             .metadata
-            .account
+            .accounts
             .create(CreateAccountRequest {
                 admin: false,
                 salt: "".to_string(),       // TODO: make salt
                 password: request.password, // TODO: make pass hash
-                organization_id: organization_id,
+                organization_id,
                 email: request.email,
                 roles: Some(roles),
                 permissions: None,
@@ -56,8 +52,8 @@ impl Provider {
         make_token_response(account)
     }
 
-    pub async fn log_in(&self, ctx: Rc<Context>, request: LogInRequest) -> Result<TokensResponse> {
-        let account = match self.metadata.account.get_by_email(&request.email).await? {
+    pub async fn log_in(&self, _ctx: Context, request: LogInRequest) -> Result<TokensResponse> {
+        let account = match self.metadata.accounts.get_by_email(&request.email).await? {
             Some(account) => account,
             None => unimplemented!(),
         };

@@ -157,7 +157,7 @@ impl LogicalPlan {
                     .iter()
                     .map(|f| f.to_owned().to_df_expr(self.schema()))
                     .collect::<Result<_>>()?,
-                limit: limit.clone(),
+                limit: *limit,
             }),
             LogicalPlan::Filter { predicate, input } => Ok(DFLogicalPlan::Filter {
                 predicate: predicate.clone().to_df_expr(self.schema())?,
