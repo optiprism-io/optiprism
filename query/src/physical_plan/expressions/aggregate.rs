@@ -35,6 +35,11 @@ use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
 
+#[derive(Debug, Clone)]
+pub enum CustomAggregationFunction {
+    SortedDistinct(DataType),
+}
+
 // enum storage for accumulator for fast static dispatching and easy translating between threads
 #[derive(Debug, Clone)]
 enum PartitionedAccumulatorEnum {

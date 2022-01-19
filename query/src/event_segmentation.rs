@@ -10,8 +10,10 @@ use datafusion::scalar::ScalarValue;
 
 use std::ops::Sub;
 use std::sync::Arc;
+use arrow::datatypes::DataType;
 use store::dictionary::DictionaryProvider;
 use store::schema::{event_fields, SchemaProvider};
+use crate::physical_plan::expressions::aggregate::CustomAggregationFunction;
 
 #[derive(Clone)]
 pub enum TimeUnit {
@@ -614,8 +616,8 @@ fn plan_agg(
                     args: vec![col(event_fields::EVENT_NAME)],
                     distinct: false,
                 },
-                Query::CountUniqueGroups | Query::DailyActiveGroups => Expr::AggregateFunction {
-                    fun: AggregateFunction::Count,
+                Query::CountUniqueGroups | Query::DailyActiveGroups => Expr::CustomAggregationFunction {
+                    fun: CustomAggregationFunction::SortedDistinct(DataType::UInt64), // TODO FIXME data type is hard-coded!
                     args: vec![col(es.group.as_ref())],
                     distinct: true,
                 },
