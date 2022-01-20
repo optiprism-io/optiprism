@@ -189,8 +189,8 @@ pub struct NamedQuery {
 impl NamedQuery {
     pub fn new(agg: Query, name: Option<String>) -> Self {
         NamedQuery {
-            name: name.clone(),
-            agg: agg.clone(),
+            name,
+            agg,
         }
     }
 }
@@ -373,8 +373,8 @@ fn named_property_expression(
             Ok(expr)
         }
         // for isNull and isNotNull we don't need values at all
-        Operation::IsNull => Ok(is_null(prop_col.clone())),
-        Operation::IsNotNull => Ok(is_not_null(prop_col.clone())),
+        Operation::IsNull => Ok(is_null(prop_col)),
+        Operation::IsNotNull => Ok(is_not_null(prop_col)),
     }
 }
 
@@ -427,7 +427,7 @@ fn event_filters_expression(
         .collect::<Result<Vec<Expr>>>()?;
 
     if filters_exprs.len() == 1 {
-        return Ok(filter_exprs[0].clone());
+        Ok(filter_exprs[0].clone())
     } else {
         let mut expr = and(filters_exprs[0].clone(), filters_exprs[1].clone());
         for fexpr in filter_exprs.iter().skip(2) {
@@ -534,7 +534,7 @@ fn plan_filter(
             EventRef::Regular(event_name) => {
                 expr = and(
                     expr.clone(),
-                    event_filters_expression(schema.clone(), &event_name, filters)?,
+                    event_filters_expression(schema.clone(), event_name, filters)?,
                 );
             }
             EventRef::Custom(_) => unimplemented!(),
@@ -544,7 +544,7 @@ fn plan_filter(
     //global filter
     Ok(LogicalPlan::Filter {
         predicate: expr,
-        input: input.clone(),
+        input,
     })
 }
 
@@ -567,14 +567,14 @@ fn breakdown_expr(
             PropertyRef::User(prop_name) => {
                 let prop = schema.get_user_property_by_name(prop_name)?;
                 let col_name = prop.db_col_name();
-                return Ok(Expr::Alias(Box::new(col(&col_name)), prop.name));
+                Ok(Expr::Alias(Box::new(col(&col_name)), prop.name))
             }
             PropertyRef::UserCustom(_) => unimplemented!(),
             PropertyRef::Event(prop_name) => {
                 let prop =
                     schema.get_event_property_by_name(event.event.name().as_ref(), prop_name)?;
                 let col_name = prop.db_col_name();
-                return Ok(Expr::Alias(Box::new(col(&col_name)), prop.name));
+                Ok(Expr::Alias(Box::new(col(&col_name)), prop.name))
             }
             PropertyRef::EventCustom(_) => unimplemented!(),
         },
@@ -675,7 +675,7 @@ fn plan_agg(
     let aggr_schema = DFSchema::new(exprlist_to_fields(all_expr, input.schema())?)?;
 
     let expr = LogicalPlan::Aggregate {
-        input: input.clone(),
+        input,
         group_expr,
         aggr_expr,
         schema: Arc::new(aggr_schema),
@@ -692,7 +692,7 @@ pub fn create_logical_plan(
     dict_provider: Arc<dyn DictionaryProvider>,
     event: &Event,
 ) -> Result<LogicalPlan> {
-    let filter = plan_filter(input.clone(), es, schema.clone(), dict_provider, event)?;
+    let filter = plan_filter(input, es, schema.clone(), dict_provider, event)?;
     let agg = plan_agg(Arc::new(filter), es, schema.clone(), event)?;
     Ok(agg)
 }
@@ -810,7 +810,7 @@ mod tests {
                 source,
                 projection,
                 projected_schema,
-                filters: filters.iter().map(|e| Expr::from_df_expr(e)).collect(),
+                filters: filters.iter().map(Expr::from_df_expr).collect(),
                 limit,
             },
             _ => unreachable!(),
@@ -977,8 +977,8 @@ mod tests {
             .with_timezone(&Utc);
         let es = EventSegmentation {
             time: QueryTime::Between {
-                from: to.clone().sub(Duration::days(10)),
-                to: to.clone(),
+                from: to.sub(Duration::days(10)),
+                to,
             },
             group: event_fields::USER_ID.to_string(),
             interval_unit: TimeUnit::Day,
@@ -1109,8 +1109,8 @@ mod tests {
             .with_timezone(&Utc);
         let es = EventSegmentation {
             time: QueryTime::Between {
-                from: to.clone().sub(Duration::days(10)),
-                to: to.clone(),
+                from: to.sub(Duration::days(10)),
+                to,
             },
             group: event_fields::USER_ID.to_string(),
             interval_unit: TimeUnit::Day,

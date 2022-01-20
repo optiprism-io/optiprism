@@ -152,14 +152,10 @@ impl Provider {
         }
 
         Ok(
-            match self
+            self
                 .store
                 .put_checked(KV_NAMESPACE, account.id.to_le_bytes(), serialize(&account)?)
-                .await?
-            {
-                None => None,
-                Some(_) => Some(account),
-            },
+                .await?.map(|_| account),
         )
     }
 
