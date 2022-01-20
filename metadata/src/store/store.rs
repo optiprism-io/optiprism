@@ -7,6 +7,48 @@ use std::{
     path::Path,
 };
 
+#[derive(Clone)]
+pub enum Key<'a> {
+    // {namespace}/data/{project_id}/{event_id}
+    Data(&'a str, u64, u64),
+    // {namespace}/idx/{project_id}/{idx_name}/{key}
+    Index(&'a str, u64, &'a str, &'a str),
+    // {namespace}/id_seq/{project_id}
+    IdSequence(&'a str, u64),
+}
+
+impl<'a> Key<'a> {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        match self {
+            Key::Data(ns, project_id, event_id) => [
+                ns.as_bytes(),
+                b"/data/",
+                project_id.to_le_bytes().as_ref(),
+                b"/",
+                event_id.to_le_bytes().as_ref(),
+            ]
+                .concat(),
+            Key::Index(ns, project_id, idx_name, key) => [
+                ns.as_bytes(),
+                b"/idx/",
+                project_id.to_le_bytes().as_ref(),
+                b"/",
+                idx_name.as_bytes(),
+                b"/",
+                key.as_bytes(),
+            ]
+                .concat(),
+            Key::IdSequence(ns, project_id) => {
+                [
+                    ns.as_bytes(),
+                    b"/id_seq/",
+                    project_id.to_le_bytes().as_ref(),
+                ].concat()
+            }
+        }
+    }
+}
+
 type KVBytes = (Box<[u8]>, Box<[u8]>);
 
 pub struct Store {

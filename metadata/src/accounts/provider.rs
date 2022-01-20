@@ -1,22 +1,75 @@
-use crate::store::store;
+use crate::store::{index, store};
 use crate::store::store::Store;
 use crate::Result;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
-use types::account::{Account, CreateRequest, ListRequest, UpdateRequest};
+use types::account::{Account, CreateAccountRequest, ListRequest, UpdateRequest};
 
-const KV_NAMESPACE: store::Namespace = store::Namespace::Accounts;
+const NAMESPACE: &str = "accounts";
+const IDX_EMAIL: &str = "email";
+
+#[derive(Clone)]
+pub enum Key<'a> {
+    // {namespace}/data/{account_id}
+    Data(&'a str, u64),
+    // {namespace}/idx//{idx_name}/{idx_value}
+    Index(&'a str, &'a str, &'a str),
+    // {namespace}/id_seq
+    IdSequence(&'a str),
+}
+
+impl Key<'a> {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        match self {
+            Key::Data(ns, account_id) => [
+                ns.as_bytes(),
+                b"/data/",
+                account_id.to_le_bytes().as_ref(),
+            ]
+                .concat(),
+            Key::Index(ns, idx_name, key) => [
+                ns.as_bytes(),
+                b"/idx/",
+                idx_name.as_bytes(),
+                b"/",
+                key,
+            ]
+                .concat(),
+            Key::IdSequence(ns) => {
+                [
+                    ns.as_bytes(),
+                    b"/id_seq",
+                ].concat()
+            }
+        }
+    }
+}
 
 pub struct Provider {
     store: Arc<Store>,
+    idx: index::hash_map::HashMap,
+}
+
+fn indexes(account: &Account) -> Vec<Option<(Vec<u8>, Vec<u8>)>> {
+    vec![Some((
+        Key::Index(NAMESPACE, IDX_EMAIL, account.email.as_str()).as_bytes(),
+        account.id.to_le_bytes().to_vec(),
+    ))]
 }
 
 impl Provider {
     pub fn new(kv: Arc<Store>) -> Self {
-        Provider { store: kv.clone() }
+        Provider {
+            store: kv.clone(),
+            idx: idx: index::hash_map::HashMap::new(kv),
+        }
     }
-    pub async fn create(&self, request: CreateRequest) -> Result<Account> {
+
+    pub async fn create_account(&self, request: CreateAccountRequest) -> Result<Account> {
+        self.idx
+            .check_insert_constraints(indexes(&event).as_ref())
+            .await?;
         let account = Account {
             id: self.store.next_seq(KV_NAMESPACE).await?,
             created_at: Utc::now(),

@@ -10,8 +10,57 @@ pub enum Status {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Event {
     pub id: u64,
-    pub created_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
+    pub created_by: u64,
+    pub updated_by: Option<u64>,
+    pub project_id: u64,
+    pub tags: Vec<String>,
+    pub name: String,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub status: Status,
+    pub properties: Option<Vec<u64>>,
+    pub custom_properties: Option<Vec<u64>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct CreateEventRequest {
+    pub created_by: u64,
+    pub updated_by: u64,
+    pub project_id: u64,
+    pub tags: Vec<String>,
+    pub name: String,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub status: Status,
+    pub properties: Option<Vec<u64>>,
+    pub custom_properties: Option<Vec<u64>>,
+}
+
+impl CreateEventRequest {
+    pub fn into_event(self, id: u64, created_at: DateTime<Utc>) -> Event {
+        Event {
+            id,
+            created_at,
+            updated_at: None,
+            created_by: self.created_by,
+            updated_by: None,
+            project_id: self.project_id,
+            tags: self.tags,
+            name: self.name,
+            display_name: self.display_name,
+            description: self.description,
+            status: self.status,
+            properties: self.properties,
+            custom_properties: self.custom_properties,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct UpdateEventRequest {
+    pub id: u64,
     pub created_by: u64,
     pub update_by: u64,
     pub project_id: u64,
@@ -22,4 +71,24 @@ pub struct Event {
     pub status: Status,
     pub properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
+}
+
+impl UpdateEventRequest {
+    pub fn into_event(self, prev: Event, updated_at: DateTime<Utc>, updated_by: Option<u64>) -> Event {
+        Event {
+            id: self.id,
+            created_at: prev.created_at,
+            updated_at: Some(updated_at),
+            created_by: self.created_by,
+            updated_by,
+            project_id: self.project_id,
+            tags: self.tags,
+            name: self.name,
+            display_name: self.display_name,
+            description: self.description,
+            status: self.status,
+            properties: self.properties,
+            custom_properties: self.custom_properties,
+        }
+    }
 }

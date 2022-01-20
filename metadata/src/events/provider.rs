@@ -1,59 +1,42 @@
 use crate::error::Error;
-use crate::store::store::Store;
+use crate::store::store::{Key, Store};
 use crate::Result;
 
 use crate::store::index;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
-use types::event::Event;
+use types::event::{CreateEventRequest, Event, UpdateEventRequest};
 
-#[derive(Clone)]
-enum Key {
-    // /events/data/{project_id}/{event_id}
-    Data(u64, u64),
-    // /events/idx/{project_id}/{idx_name}/{idx_value}
-    Index(u64, String, Vec<u8>),
-    // /events/id_seq
-    IdSequence,
-}
 
-impl Key {
-    fn as_bytes(&self) -> Vec<u8> {
-        match self {
-            Key::Data(project_id, event_id) => [
-                b"/events/data/",
-                project_id.to_le_bytes().as_ref(),
-                b"/",
-                event_id.to_le_bytes().as_ref(),
-            ]
-            .concat(),
-            Key::Index(project_id, idx_name, key) => [
-                b"/events/idx/",
-                project_id.to_le_bytes().as_ref(),
-                b"/",
-                idx_name.as_bytes(),
-                b"/",
-                key,
-            ]
-            .concat(),
-            Key::IdSequence => "/events/id_seq/".as_bytes().to_vec(),
-        }
+const NAMESPACE: &str = "events";
+const IDX_NAME: &str = "name";
+const IDX_DISPLAY_NAME: &str = "display_name";
+
+fn index_keys(project_id: u64, name: &str, display_name: &Option<String>) -> Vec<Option<Vec<u8>>> {
+    if let Some(display_name) = display_name {
+        vec![
+            Some(
+                Key::Index(NAMESPACE, project_id, IDX_DISPLAY_NAME, display_name).as_bytes(),
+            ),
+            None,
+        ]
+    } else {
+        vec![
+            Some(
+                Key::Index(NAMESPACE, project_id, IDX_NAME, name).as_bytes(),
+            ),
+            None,
+        ]
     }
 }
 
-fn indexes(event: &Event) -> Vec<Option<(Vec<u8>, Vec<u8>)>> {
+/*fn indexes(event: &Event) -> Vec<Option<(Vec<u8>, Vec<u8>)>> {
     vec![Some((
-        [
-            b"/events/idx/",
-            event.project_id.to_le_bytes().as_slice(),
-            b"/name/",
-            event.name.as_bytes(),
-        ]
-        .concat(),
+        Key::Index(NAMESPACE, event.project_id, IDX_NAME, event.name.as_str()).as_bytes(),
         event.id.to_le_bytes().to_vec(),
     ))]
-}
+}*/
 
 pub struct Provider {
     store: Arc<Store>,
@@ -68,49 +51,60 @@ impl Provider {
         }
     }
 
-    pub async fn create_event(&mut self, event: Event) -> Result<Event> {
+    pub async fn create_event(&mut self, req: CreateEventRequest) -> Result<Event> {
+        let idx_keys = index_keys(req.project_id, req.name.as_str(), &req.display_name);
         self.idx
-            .check_insert_constraints(indexes(&event).as_ref())
+            .check_insert_constraints(idx_keys.as_ref())
             .await?;
 
-        let mut event = event.clone();
-        event.created_at = Some(Utc::now());
-        event.id = self.store.next_seq(Key::IdSequence.as_bytes()).await?;
+        let created_at = Utc::now();
+        let id = self.store.next_seq(Key::IdSequence(NAMESPACE, req.project_id).as_bytes()).await?;
+
+        let event = req.into_event(id, created_at);
         self.store
             .put(
-                Key::Data(event.project_id, event.id).as_bytes(),
+                Key::Data(NAMESPACE, event.project_id, event.id).as_bytes(),
                 serialize(&event)?,
             )
             .await?;
 
-        self.idx.insert(indexes(&event).as_ref()).await?;
+        self.idx.insert(idx_keys.as_ref(), event.id.to_le_bytes()).await?;
         Ok(event)
     }
 
-    pub async fn update_event(&mut self, event: Event) -> Result<Event> {
-        let prev_event = self.get_event_by_id(event.project_id, event.id).await?;
+    pub async fn update_event(&mut self, req: UpdateEventRequest) -> Result<Event> {
+        let prev_event = self.get_event_by_id(req.project_id, req.id).await?;
+        let idx_keys = index_keys(req.project_id, req.name.as_str(), &req.display_name);
+        let idx_prev_keys = index_keys(prev_event.project_id, prev_event.name.as_str(), &prev_event.display_name);
         self.idx
-            .check_update_constraints(indexes(&event).as_ref(), indexes(&prev_event).as_ref())
+            .check_update_constraints(
+                idx_keys.as_ref(),
+                idx_prev_keys.as_ref(),
+            )
             .await?;
 
-        let mut event = event.clone();
-        event.updated_at = Some(Utc::now());
+        let updated_at = Utc::now(); // TODO add updated_by
+        let event = req.into_event(prev_event, updated_at, None);
 
         self.store
             .put(
-                Key::Data(event.project_id, event.id).as_bytes(),
+                Key::Data(NAMESPACE, event.project_id, event.id).as_bytes(),
                 serialize(&event)?,
             )
             .await?;
 
         self.idx
-            .update(indexes(&event).as_ref(), indexes(&prev_event).as_ref())
+            .update(
+                idx_keys.as_ref(),
+                idx_prev_keys.as_ref(),
+                event.id.to_le_bytes(),
+            )
             .await?;
         Ok(event)
     }
 
     pub async fn get_event_by_id(&self, project_id: u64, id: u64) -> Result<Event> {
-        match self.store.get(Key::Data(project_id, id).as_bytes()).await? {
+        match self.store.get(Key::Data(NAMESPACE, project_id, id).as_bytes()).await? {
             None => Err(Error::EventDoesNotExist),
             Some(value) => Ok(deserialize(&value)?),
         }
@@ -119,7 +113,7 @@ impl Provider {
     pub async fn get_event_by_name(&self, project_id: u64, name: &str) -> Result<Event> {
         let id = self
             .idx
-            .get(Key::Index(project_id, "name".to_string(), name.as_bytes().to_vec()).as_bytes())
+            .get(Key::Index(NAMESPACE, project_id, IDX_NAME, name).as_bytes())
             .await?;
         self.get_event_by_id(project_id, u64::from_le_bytes(id.try_into()?))
             .await
@@ -128,10 +122,10 @@ impl Provider {
     pub async fn delete_event(&mut self, project_id: u64, id: u64) -> Result<Event> {
         let event = self.get_event_by_id(project_id, id).await?;
         self.store
-            .delete(Key::Data(project_id, id).as_bytes())
+            .delete(Key::Data(NAMESPACE, project_id, id).as_bytes())
             .await?;
 
-        self.idx.delete(indexes(&event).as_ref()).await?;
+        self.idx.delete(index_keys(event.project_id, event.name.as_str(), &event.display_name).as_ref()).await?;
         Ok(event)
     }
 

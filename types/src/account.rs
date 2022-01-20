@@ -22,7 +22,7 @@ pub struct Account {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct CreateRequest {
+pub struct CreateAccountRequest {
     pub admin: bool,
     pub salt: String,
     pub password: String,
