@@ -10,7 +10,7 @@ use axum::{extract::Extension, routing::post, Json, Router};
 use std::sync::Arc;
 
 async fn sign_up(
-    ctx: Context,
+    ctx: Context,н
     Extension(provider): Extension<Arc<Provider>>,
     Json(request): Json<SignUpRequest>,
 ) -> Result<Json<TokensResponse>> {

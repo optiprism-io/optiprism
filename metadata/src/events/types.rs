@@ -27,7 +27,6 @@ pub struct Event {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CreateEventRequest {
     pub created_by: u64,
-    pub updated_by: u64,
     pub project_id: u64,
     pub tags: Vec<String>,
     pub name: String,
@@ -62,7 +61,7 @@ impl CreateEventRequest {
 pub struct UpdateEventRequest {
     pub id: u64,
     pub created_by: u64,
-    pub update_by: u64,
+    pub updated_by: u64,
     pub project_id: u64,
     pub tags: Vec<String>,
     pub name: String,

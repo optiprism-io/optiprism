@@ -6,7 +6,8 @@ use crate::store::index;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
-use types::event::{CreateEventRequest, Event, UpdateEventRequest};
+use crate::events::Event;
+use crate::events::types::{CreateEventRequest, UpdateEventRequest};
 
 
 const NAMESPACE: &str = "events";
@@ -16,27 +17,16 @@ const IDX_DISPLAY_NAME: &str = "display_name";
 fn index_keys(project_id: u64, name: &str, display_name: &Option<String>) -> Vec<Option<Vec<u8>>> {
     if let Some(display_name) = display_name {
         vec![
-            Some(
-                Key::Index(NAMESPACE, project_id, IDX_DISPLAY_NAME, display_name).as_bytes(),
-            ),
+            Some(Key::Index(NAMESPACE, project_id, IDX_DISPLAY_NAME, display_name).as_bytes()),
             None,
         ]
     } else {
         vec![
-            Some(
-                Key::Index(NAMESPACE, project_id, IDX_NAME, name).as_bytes(),
-            ),
+            Some(Key::Index(NAMESPACE, project_id, IDX_NAME, name).as_bytes()),
             None,
         ]
     }
 }
-
-/*fn indexes(event: &Event) -> Vec<Option<(Vec<u8>, Vec<u8>)>> {
-    vec![Some((
-        Key::Index(NAMESPACE, event.project_id, IDX_NAME, event.name.as_str()).as_bytes(),
-        event.id.to_le_bytes().to_vec(),
-    ))]
-}*/
 
 pub struct Provider {
     store: Arc<Store>,
@@ -72,6 +62,34 @@ impl Provider {
         Ok(event)
     }
 
+    pub async fn get_event_by_id(&self, project_id: u64, id: u64) -> Result<Event> {
+        match self.store.get(Key::Data(NAMESPACE, project_id, id).as_bytes()).await? {
+            None => Err(Error::EventDoesNotExist),
+            Some(value) => Ok(deserialize(&value)?),
+        }
+    }
+
+    pub async fn get_event_by_name(&self, project_id: u64, name: &str) -> Result<Event> {
+        let id = self
+            .idx
+            .get(Key::Index(NAMESPACE, project_id, IDX_NAME, name).as_bytes())
+            .await?;
+        self.get_event_by_id(project_id, u64::from_le_bytes(id.try_into()?))
+            .await
+    }
+
+    pub async fn list_events(&self) -> Result<Vec<Event>> {
+        let list = self
+            .store
+            .list_prefix(b"/events/ent") // TODO doesn't work
+            .await?
+            .iter()
+            .map(|v| deserialize(v.1.as_ref()))
+            .collect::<bincode::Result<_>>()?;
+
+        Ok(list)
+    }
+
     pub async fn update_event(&mut self, req: UpdateEventRequest) -> Result<Event> {
         let prev_event = self.get_event_by_id(req.project_id, req.id).await?;
         let idx_keys = index_keys(req.project_id, req.name.as_str(), &req.display_name);
@@ -103,22 +121,6 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn get_event_by_id(&self, project_id: u64, id: u64) -> Result<Event> {
-        match self.store.get(Key::Data(NAMESPACE, project_id, id).as_bytes()).await? {
-            None => Err(Error::EventDoesNotExist),
-            Some(value) => Ok(deserialize(&value)?),
-        }
-    }
-
-    pub async fn get_event_by_name(&self, project_id: u64, name: &str) -> Result<Event> {
-        let id = self
-            .idx
-            .get(Key::Index(NAMESPACE, project_id, IDX_NAME, name).as_bytes())
-            .await?;
-        self.get_event_by_id(project_id, u64::from_le_bytes(id.try_into()?))
-            .await
-    }
-
     pub async fn delete_event(&mut self, project_id: u64, id: u64) -> Result<Event> {
         let event = self.get_event_by_id(project_id, id).await?;
         self.store
@@ -127,17 +129,5 @@ impl Provider {
 
         self.idx.delete(index_keys(event.project_id, event.name.as_str(), &event.display_name).as_ref()).await?;
         Ok(event)
-    }
-
-    pub async fn list_events(&self) -> Result<Vec<Event>> {
-        let list = self
-            .store
-            .list_prefix(b"/events/ent") // TODO doesn't work
-            .await?
-            .iter()
-            .map(|v| deserialize(v.1.as_ref()))
-            .collect::<bincode::Result<_>>()?;
-
-        Ok(list)
     }
 }

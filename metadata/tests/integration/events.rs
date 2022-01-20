@@ -4,8 +4,9 @@ use metadata::Metadata;
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use types::event::{CreateEventRequest, Event, Status, UpdateEventRequest};
 use uuid::Uuid;
+use metadata::events::{Status, UpdateEventRequest};
+use metadata::events::types::CreateEventRequest;
 
 #[tokio::test]
 async fn test_events() -> Result<()> {
@@ -16,7 +17,6 @@ async fn test_events() -> Result<()> {
     let mut md = Metadata::try_new(store.clone())?;
     let create_event_req = CreateEventRequest {
         created_by: 0,
-        updated_by: 0,
         project_id: 1,
         tags: vec![],
         name: "".to_string(),
@@ -30,7 +30,7 @@ async fn test_events() -> Result<()> {
     let update_event_req = UpdateEventRequest {
         id: 1,
         created_by: 0,
-        update_by: 0,
+        updated_by: 0,
         project_id: 1,
         tags: vec![],
         name: "".to_string(),

@@ -7,24 +7,25 @@ use crate::{context::Context, error::Result};
 use chrono::Utc;
 use common::rbac::{Role, Scope};
 use metadata::{
-    accounts::types::{Account as MetadataAccount, CreateRequest as CreateAccountRequest},
+    accounts::types::{Account as MetadataAccount, CreateAccountRequest},
     Metadata,
 };
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::Serialize;
 use sha3::{Digest, Sha3_256, Sha3_512};
 use std::{collections::HashMap, ops::Add, sync::Arc};
+use std::sync::Mutex;
 
 pub struct Provider {
-    metadata: Arc<Metadata>,
+    metadata: Arc<Mutex<Metadata>>,
 }
 
 impl Provider {
-    pub fn new(metadata: Arc<Metadata>) -> Self {
-        Self { metadata }
+    pub fn new(metadata: Arc<Mutex<Metadata>>) -> Self {
+        Self { metadata: metadata.clone() }
     }
 
-    pub async fn sign_up(&self, _ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
+    pub async fn sign_up(&mut self, _ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
         // let org = self
         //     .organization_provider
         //     .create(organization::CreateRequest {
@@ -33,10 +34,12 @@ impl Provider {
         let organization_id = 1u64; // TODO: add organizaion
         let mut roles = HashMap::new();
         roles.insert(Scope::Organization, Role::Owner);
+
         let account = self
-            .metadata
+            .metadata.lock().unwrap()
             .accounts
-            .create(CreateAccountRequest {
+            .create_account(CreateAccountRequest {
+                created_by: 0,
                 admin: false,
                 salt: "".to_string(),       // TODO: make salt
                 password: request.password, // TODO: make pass hash
@@ -52,11 +55,9 @@ impl Provider {
         make_token_response(account)
     }
 
-    pub async fn log_in(&self, _ctx: Context, request: LogInRequest) -> Result<TokensResponse> {
-        let account = match self.metadata.accounts.get_by_email(&request.email).await? {
-            Some(account) => account,
-            None => unimplemented!(),
-        };
+    pub async fn log_in(&mut self, _ctx: Context, request: LogInRequest) -> Result<TokensResponse> {
+        let account = self.metadata.lock().unwrap().accounts.get_account_by_email(&request.email).await?;
+
         if !is_valid_password(&request.password, &account.salt, &account.password) {
             unimplemented!();
         }
