@@ -12,7 +12,7 @@ impl Metadata {
     pub fn try_new(store: Arc<Store>) -> Result<Self> {
         Ok(Metadata {
             events: events::Provider::new(store.clone()),
-            accounts: accounts::Provider::new(store.clone()),
+            accounts: accounts::Provider::new(store),
         })
     }
 }

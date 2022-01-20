@@ -164,8 +164,8 @@ impl Store {
         let iter = self.db.prefix_iterator(prefix.as_ref());
         Ok(iter
             .map(|v| {
-                println!("{}", std::str::from_utf8(&v.0.clone()).unwrap());
-                (v.0.clone(), v.1.clone())
+                println!("{}", std::str::from_utf8(&v.0).unwrap());
+                (v.0.clone(), v.1)
             })
             .collect())
     }

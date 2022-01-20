@@ -22,7 +22,7 @@ pub struct Provider {
 impl Provider {
     pub fn new(metadata: Arc<Metadata>) -> Self {
         Self {
-            metadata: metadata.clone(),
+            metadata,
         }
     }
 
