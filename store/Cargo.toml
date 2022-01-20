@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 arrow = "5.2.0"
 chrono = { version = "0.4.19", features = ["serde"] }
+datafusion = "6.0.0"
