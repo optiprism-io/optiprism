@@ -1,20 +1,19 @@
-use crate::store::index;
+use crate::accounts::types::CreateAccountRequest;
+use crate::accounts::{Account, ListAccountsRequest, UpdateAccountRequest};
+use crate::error::Error;
+use crate::store::index::hash_map::HashMap;
 use crate::store::store::Store;
 use crate::Result;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
+use futures::lock::Mutex;
 use std::sync::Arc;
-use crate::accounts::{Account, ListAccountsRequest, UpdateAccountRequest};
-use crate::accounts::types::CreateAccountRequest;
-use crate::error::Error;
 
 const NAMESPACE: &str = "accounts";
 const IDX_EMAIL: &str = "email";
 
 fn index_keys(email: &str) -> Vec<Option<Vec<u8>>> {
-    vec![
-        Some(Key::Index(IDX_EMAIL, email).as_bytes()),
-    ]
+    vec![Some(Key::Index(IDX_EMAIL, email).as_bytes())]
 }
 
 #[derive(Clone)]
@@ -35,7 +34,7 @@ impl<'a> Key<'a> {
                 b"/data/",
                 account_id.to_le_bytes().as_ref(),
             ]
-                .concat(),
+            .concat(),
             Key::Index(idx_name, key) => [
                 NAMESPACE.as_bytes(),
                 b"/idx/",
@@ -43,35 +42,30 @@ impl<'a> Key<'a> {
                 b"/",
                 key.as_bytes(),
             ]
-                .concat(),
-            Key::IdSequence => {
-                [
-                    NAMESPACE.as_bytes(),
-                    b"/id_seq",
-                ].concat()
-            }
+            .concat(),
+            Key::IdSequence => [NAMESPACE.as_bytes(), b"/id_seq"].concat(),
         }
     }
 }
 
 pub struct Provider {
     store: Arc<Store>,
-    idx: index::hash_map::HashMap,
+    idx: Mutex<HashMap>,
 }
 
 impl Provider {
     pub fn new(kv: Arc<Store>) -> Self {
         Provider {
             store: kv.clone(),
-            idx: index::hash_map::HashMap::new(kv),
+            idx: Mutex::new(HashMap::new(kv)),
         }
     }
 
-    pub async fn create_account(&mut self, req: CreateAccountRequest) -> Result<Account> {
+    pub async fn create_account(&self, req: CreateAccountRequest) -> Result<Account> {
         let idx_keys = index_keys(req.email.as_str());
-        self.idx
-            .check_insert_constraints(idx_keys.as_ref())
-            .await?;
+        let mut idx = self.idx.lock().await;
+
+        idx.check_insert_constraints(idx_keys.as_ref()).await?;
 
         let created_at = Utc::now();
         let id = self.store.next_seq(Key::IdSequence.as_bytes()).await?;
@@ -79,13 +73,11 @@ impl Provider {
         let account = req.into_account(id, created_at);
 
         self.store
-            .put(
-                Key::Data(account.id).as_bytes(),
-                serialize(&account)?,
-            )
+            .put(Key::Data(account.id).as_bytes(), serialize(&account)?)
             .await?;
 
-        self.idx.insert(idx_keys.as_ref(), account.id.to_le_bytes()).await?;
+        idx.insert(idx_keys.as_ref(), account.id.to_le_bytes())
+            .await?;
         Ok(account)
     }
 
@@ -97,10 +89,9 @@ impl Provider {
     }
 
     pub async fn get_account_by_email(&self, email: &str) -> Result<Account> {
-        let id = self
-            .idx
-            .get(Key::Index(IDX_EMAIL, email).as_bytes())
-            .await?;
+        let idx = self.idx.lock().await;
+
+        let id = idx.get(Key::Index(IDX_EMAIL, email).as_bytes()).await?;
         self.get_account_by_id(u64::from_le_bytes(id.try_into()?))
             .await
     }
@@ -118,46 +109,42 @@ impl Provider {
         unimplemented!()
     }
 
-    pub async fn update_account(&mut self, req: UpdateAccountRequest) -> Result<Account> {
+    pub async fn update_account(&self, req: UpdateAccountRequest) -> Result<Account> {
         let prev_account = self.get_account_by_id(req.id).await?;
         let idx_keys = index_keys(req.email.as_str());
         let idx_prev_keys = index_keys(prev_account.email.as_str());
 
-        self.idx
-            .check_update_constraints(
-                idx_keys.as_ref(),
-                idx_prev_keys.as_ref(),
-            )
+        let mut idx = self.idx.lock().await;
+
+        idx.check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await?;
 
         let updated_at = Utc::now(); // TODO add updated_by
         let account = req.into_account(prev_account, updated_at, None);
 
         self.store
-            .put(
-                Key::Data(account.id).as_bytes(),
-                serialize(&account)?,
-            )
+            .put(Key::Data(account.id).as_bytes(), serialize(&account)?)
             .await?;
 
-        self.idx
-            .update(
-                idx_keys.as_ref(),
-                idx_prev_keys.as_ref(),
-                account.id.to_le_bytes(),
-            )
-            .await?;
+        idx.update(
+            idx_keys.as_ref(),
+            idx_prev_keys.as_ref(),
+            account.id.to_le_bytes(),
+        )
+        .await?;
 
         Ok(account)
     }
 
-    pub async fn delete_account(&mut self, id: u64) -> Result<Account> {
+    pub async fn delete_account(&self, id: u64) -> Result<Account> {
         let account = self.get_account_by_id(id).await?;
-        self.store
-            .delete(Key::Data(id).as_bytes())
-            .await?;
+        self.store.delete(Key::Data(id).as_bytes()).await?;
 
-        self.idx.delete(index_keys(account.email.as_str()).as_ref()).await?;
+        self.idx
+            .lock()
+            .await
+            .delete(index_keys(account.email.as_str()).as_ref())
+            .await?;
         Ok(account)
     }
 }

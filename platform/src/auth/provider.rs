@@ -14,18 +14,19 @@ use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::Serialize;
 use sha3::{Digest, Sha3_256, Sha3_512};
 use std::{collections::HashMap, ops::Add, sync::Arc};
-use std::sync::Mutex;
 
 pub struct Provider {
-    metadata: Arc<Mutex<Metadata>>,
+    metadata: Arc<Metadata>,
 }
 
 impl Provider {
-    pub fn new(metadata: Arc<Mutex<Metadata>>) -> Self {
-        Self { metadata: metadata.clone() }
+    pub fn new(metadata: Arc<Metadata>) -> Self {
+        Self {
+            metadata: metadata.clone(),
+        }
     }
 
-    pub async fn sign_up(&mut self, _ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
+    pub async fn sign_up(&self, _ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
         // let org = self
         //     .organization_provider
         //     .create(organization::CreateRequest {
@@ -36,7 +37,7 @@ impl Provider {
         roles.insert(Scope::Organization, Role::Owner);
 
         let account = self
-            .metadata.lock().unwrap()
+            .metadata
             .accounts
             .create_account(CreateAccountRequest {
                 created_by: 0,
@@ -55,8 +56,12 @@ impl Provider {
         make_token_response(account)
     }
 
-    pub async fn log_in(&mut self, _ctx: Context, request: LogInRequest) -> Result<TokensResponse> {
-        let account = self.metadata.lock().unwrap().accounts.get_account_by_email(&request.email).await?;
+    pub async fn log_in(&self, _ctx: Context, request: LogInRequest) -> Result<TokensResponse> {
+        let account = self
+            .metadata
+            .accounts
+            .get_account_by_email(&request.email)
+            .await?;
 
         if !is_valid_password(&request.password, &account.salt, &account.password) {
             unimplemented!();

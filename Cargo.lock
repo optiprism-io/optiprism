@@ -1239,6 +1239,7 @@ dependencies = [
  "bincode",
  "chrono",
  "common",
+ "futures",
  "rocksdb",
  "serde",
  "serde_json",
