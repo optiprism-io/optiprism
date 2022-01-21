@@ -24,7 +24,7 @@ impl Provider {
         Self { metadata, accounts }
     }
 
-    pub async fn sign_up(&self, ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
+    pub async fn sign_up(&self, _ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
         let organization = self
             .metadata
             .organizations
@@ -37,7 +37,7 @@ impl Provider {
         let account = self
             .accounts
             .create(
-                ctx,
+                Context::with_permission(organization.id, Permission::AccountCreate),
                 CreateAccountRequest {
                     admin: false,
                     password: request.password,
