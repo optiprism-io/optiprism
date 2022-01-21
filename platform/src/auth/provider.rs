@@ -7,7 +7,7 @@ use crate::{context::Context, error::Result};
 use chrono::Utc;
 use common::rbac::{Role, Scope};
 use metadata::{
-    accounts::types::{Account as MetadataAccount, CreateRequest as CreateAccountRequest},
+    accounts::types::{Account as MetadataAccount, CreateAccountRequest},
     Metadata,
 };
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -21,7 +21,9 @@ pub struct Provider {
 
 impl Provider {
     pub fn new(metadata: Arc<Metadata>) -> Self {
-        Self { metadata }
+        Self {
+            metadata,
+        }
     }
 
     pub async fn sign_up(&self, _ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
@@ -33,10 +35,12 @@ impl Provider {
         let organization_id = 1u64; // TODO: add organizaion
         let mut roles = HashMap::new();
         roles.insert(Scope::Organization, Role::Owner);
+
         let account = self
             .metadata
             .accounts
-            .create(CreateAccountRequest {
+            .create_account(CreateAccountRequest {
+                created_by: 0,
                 admin: false,
                 salt: "".to_string(),       // TODO: make salt
                 password: request.password, // TODO: make pass hash
@@ -53,10 +57,12 @@ impl Provider {
     }
 
     pub async fn log_in(&self, _ctx: Context, request: LogInRequest) -> Result<TokensResponse> {
-        let account = match self.metadata.accounts.get_by_email(&request.email).await? {
-            Some(account) => account,
-            None => unimplemented!(),
-        };
+        let account = self
+            .metadata
+            .accounts
+            .get_account_by_email(&request.email)
+            .await?;
+
         if !is_valid_password(&request.password, &account.salt, &account.password) {
             unimplemented!();
         }

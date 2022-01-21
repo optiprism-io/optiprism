@@ -1,107 +1,133 @@
-use super::Event;
-use crate::{
-    error::Error,
-    store::store::{Namespace, Store},
-    Result,
-};
+use crate::error::Error;
+use crate::store::store::{Key, Store};
+use crate::Result;
+
+use crate::store::index;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
-use std::collections::HashMap;
 use std::sync::Arc;
+use crate::events::Event;
+use crate::events::types::{CreateEventRequest, UpdateEventRequest};
 
-const KV_NAMESPACE: Namespace = Namespace::Events;
+
+const NAMESPACE: &str = "events";
+const IDX_NAME: &str = "name";
+const IDX_DISPLAY_NAME: &str = "display_name";
+
+fn index_keys(project_id: u64, name: &str, display_name: &Option<String>) -> Vec<Option<Vec<u8>>> {
+    if let Some(display_name) = display_name {
+        vec![
+            Some(Key::Index(NAMESPACE, project_id, IDX_DISPLAY_NAME, display_name).as_bytes()),
+            None,
+        ]
+    } else {
+        vec![
+            Some(Key::Index(NAMESPACE, project_id, IDX_NAME, name).as_bytes()),
+            None,
+        ]
+    }
+}
 
 pub struct Provider {
     store: Arc<Store>,
-    name_idx: HashMap<String, u64>,
+    idx: index::hash_map::HashMap,
 }
 
 impl Provider {
-    pub fn try_new(kv: Arc<Store>) -> Result<Self> {
-        let prov = Provider {
-            store: kv,
-            name_idx: HashMap::new(),
-        };
-        prov.init()?;
-        Ok(prov)
-    }
-
-    fn init(&self) -> Result<()> {
-        Ok(())
-    }
-
-    fn update_idx(&mut self, event: &Event, prev_event: Option<&Event>) {
-        if let Some(e) = prev_event {
-            if e.name != event.name {
-                self.name_idx.remove(&e.name);
-            }
+    pub fn new(kv: Arc<Store>) -> Self {
+        Provider {
+            store: kv.clone(),
+            idx: index::hash_map::HashMap::new(kv),
         }
-        self.name_idx.insert(event.name.clone(), event.id);
     }
 
-    pub async fn create_event(&mut self, event: Event) -> Result<Event> {
-        // name is unique among all events
-        match self.name_idx.get(&event.name) {
-            Some(_) => return Err(Error::EventWithSameNameAlreadyExist),
-            None => {}
-        }
-
-        let mut event = event.clone();
-        event.created_at = Some(Utc::now());
-        event.id = self.store.next_seq(KV_NAMESPACE).await?;
-        self.store
-            .put(KV_NAMESPACE, event.id.to_le_bytes(), serialize(&event)?)
+    pub async fn create_event(&mut self, req: CreateEventRequest) -> Result<Event> {
+        let idx_keys = index_keys(req.project_id, req.name.as_str(), &req.display_name);
+        self.idx
+            .check_insert_constraints(idx_keys.as_ref())
             .await?;
-        self.update_idx(&event, None);
 
+        let created_at = Utc::now();
+        let id = self.store.next_seq(Key::IdSequence(NAMESPACE, req.project_id).as_bytes()).await?;
+
+        let event = req.into_event(id, created_at);
+        self.store
+            .put(
+                Key::Data(NAMESPACE, event.project_id, event.id).as_bytes(),
+                serialize(&event)?,
+            )
+            .await?;
+
+        self.idx.insert(idx_keys.as_ref(), event.id.to_le_bytes()).await?;
         Ok(event)
     }
 
-    pub async fn update_event(&mut self, event: Event) -> Result<Event> {
-        let prev_event = self.get_event_by_id(event.id).await?;
-
-        let mut event = event.clone();
-        event.updated_at = Some(Utc::now());
-
-        self.store
-            .put(KV_NAMESPACE, event.id.to_le_bytes(), serialize(&event)?)
-            .await?;
-
-        self.update_idx(&event, Some(&prev_event));
-        Ok(event)
-    }
-
-    pub async fn get_event_by_id(&self, id: u64) -> Result<Event> {
-        match self.store.get(KV_NAMESPACE, id.to_le_bytes()).await? {
+    pub async fn get_event_by_id(&self, project_id: u64, id: u64) -> Result<Event> {
+        match self.store.get(Key::Data(NAMESPACE, project_id, id).as_bytes()).await? {
             None => Err(Error::EventDoesNotExist),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
 
-    pub async fn get_event_by_name(&self, name: &str) -> Result<Event> {
-        match self.name_idx.get(name) {
-            None => Err(Error::EventDoesNotExist),
-            Some(id) => self.get_event_by_id(*id).await,
-        }
-    }
-
-    pub async fn delete_event(&mut self, id: u64) -> Result<Event> {
-        let event = self.get_event_by_id(id).await?;
-        self.store.delete(KV_NAMESPACE, id.to_le_bytes()).await?;
-
-        self.name_idx.remove(&event.name);
-        Ok(event)
+    pub async fn get_event_by_name(&self, project_id: u64, name: &str) -> Result<Event> {
+        let id = self
+            .idx
+            .get(Key::Index(NAMESPACE, project_id, IDX_NAME, name).as_bytes())
+            .await?;
+        self.get_event_by_id(project_id, u64::from_le_bytes(id.try_into()?))
+            .await
     }
 
     pub async fn list_events(&self) -> Result<Vec<Event>> {
         let list = self
             .store
-            .list(KV_NAMESPACE)
+            .list_prefix(b"/events/ent") // TODO doesn't work
             .await?
             .iter()
             .map(|v| deserialize(v.1.as_ref()))
             .collect::<bincode::Result<_>>()?;
 
         Ok(list)
+    }
+
+    pub async fn update_event(&mut self, req: UpdateEventRequest) -> Result<Event> {
+        let prev_event = self.get_event_by_id(req.project_id, req.id).await?;
+        let idx_keys = index_keys(req.project_id, req.name.as_str(), &req.display_name);
+        let idx_prev_keys = index_keys(prev_event.project_id, prev_event.name.as_str(), &prev_event.display_name);
+        self.idx
+            .check_update_constraints(
+                idx_keys.as_ref(),
+                idx_prev_keys.as_ref(),
+            )
+            .await?;
+
+        let updated_at = Utc::now(); // TODO add updated_by
+        let event = req.into_event(prev_event, updated_at, None);
+
+        self.store
+            .put(
+                Key::Data(NAMESPACE, event.project_id, event.id).as_bytes(),
+                serialize(&event)?,
+            )
+            .await?;
+
+        self.idx
+            .update(
+                idx_keys.as_ref(),
+                idx_prev_keys.as_ref(),
+                event.id.to_le_bytes(),
+            )
+            .await?;
+        Ok(event)
+    }
+
+    pub async fn delete_event(&mut self, project_id: u64, id: u64) -> Result<Event> {
+        let event = self.get_event_by_id(project_id, id).await?;
+        self.store
+            .delete(Key::Data(NAMESPACE, project_id, id).as_bytes())
+            .await?;
+
+        self.idx.delete(index_keys(event.project_id, event.name.as_str(), &event.display_name).as_ref()).await?;
+        Ok(event)
     }
 }

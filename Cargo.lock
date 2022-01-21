@@ -1235,9 +1235,11 @@ name = "metadata"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrow 5.5.0",
  "bincode",
  "chrono",
  "common",
+ "futures",
  "rocksdb",
  "serde",
  "serde_json",

@@ -1,51 +1,51 @@
 use crate::Result;
-use rocksdb::{BoundColumnFamily, ColumnFamilyDescriptor, IteratorMode, Options, WriteBatch, DB};
+use rocksdb::{
+    ColumnFamilyDescriptor, Options,
+    SliceTransform, WriteBatch, DB,
+};
 use std::{
     path::Path,
-    sync::{Arc, RwLock},
 };
 
 #[derive(Clone)]
-pub enum Namespace {
-    Sequences = 0,
-    // namespace for non-entities
-    General = 1,
-    Events = 2,
-    CustomEvents = 3,
-    EventProperties = 4,
-    EventCustomProperties = 5,
-    Accounts = 6,
+pub enum Key<'a> {
+    // {namespace}/data/{project_id}/{event_id}
+    Data(&'a str, u64, u64),
+    // {namespace}/idx/{project_id}/{idx_name}/{key}
+    Index(&'a str, u64, &'a str, &'a str),
+    // {namespace}/id_seq/{project_id}
+    IdSequence(&'a str, u64),
 }
 
-impl Namespace {
-    fn to_bytes(&self) -> [u8; 1] {
-        [self.clone() as u8]
-    }
-}
-
-static CF_NAME_SEQUENCES: &str = "sequences";
-static CF_NAME_GENERAL: &str = "general";
-static CF_NAME_EVENTS: &str = "events";
-static CF_CUSTOM_EVENTS: &str = "custom_events";
-static CF_EVENT_PROPERTIES: &str = "event_properties";
-static CF_EVENT_CUSTOM_PROPERTIES: &str = "event_custom_properties";
-static CF_ACCOUNTS: &str = "accounts";
-
-fn cf_descriptor(t: Namespace) -> ColumnFamilyDescriptor {
-    match t {
-        Namespace::Sequences => ColumnFamilyDescriptor::new(CF_NAME_SEQUENCES, Options::default()),
-        Namespace::General => ColumnFamilyDescriptor::new(CF_NAME_GENERAL, Options::default()),
-        Namespace::Events => ColumnFamilyDescriptor::new(CF_NAME_EVENTS, Options::default()),
-        Namespace::CustomEvents => {
-            ColumnFamilyDescriptor::new(CF_CUSTOM_EVENTS, Options::default())
+impl<'a> Key<'a> {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        match self {
+            Key::Data(ns, project_id, event_id) => [
+                ns.as_bytes(),
+                b"/data/",
+                project_id.to_le_bytes().as_ref(),
+                b"/",
+                event_id.to_le_bytes().as_ref(),
+            ]
+                .concat(),
+            Key::Index(ns, project_id, idx_name, key) => [
+                ns.as_bytes(),
+                b"/idx/",
+                project_id.to_le_bytes().as_ref(),
+                b"/",
+                idx_name.as_bytes(),
+                b"/",
+                key.as_bytes(),
+            ]
+                .concat(),
+            Key::IdSequence(ns, project_id) => {
+                [
+                    ns.as_bytes(),
+                    b"/id_seq/",
+                    project_id.to_le_bytes().as_ref(),
+                ].concat()
+            }
         }
-        Namespace::EventProperties => {
-            ColumnFamilyDescriptor::new(CF_EVENT_PROPERTIES, Options::default())
-        }
-        Namespace::EventCustomProperties => {
-            ColumnFamilyDescriptor::new(CF_EVENT_CUSTOM_PROPERTIES, Options::default())
-        }
-        Namespace::Accounts => ColumnFamilyDescriptor::new(CF_ACCOUNTS, Options::default()),
     }
 }
 
@@ -53,149 +53,144 @@ type KVBytes = (Box<[u8]>, Box<[u8]>);
 
 pub struct Store {
     db: DB,
-    ns_guard: Vec<RwLock<()>>,
+}
+
+enum ColumnFamily {
+    General,
+}
+
+fn cf_descriptor(cf: ColumnFamily, opts: Options) -> ColumnFamilyDescriptor {
+    match cf {
+        ColumnFamily::General => ColumnFamilyDescriptor::new("general", opts),
+    }
+}
+
+fn first_three(k: &[u8]) -> &[u8] {
+    println!("cc {}", std::str::from_utf8(&k[..15]).unwrap());
+    &k[..15]
 }
 
 impl Store {
     pub fn new<P: AsRef<Path>>(path: P) -> Store {
-        let mut options = Options::default();
-        options.create_if_missing(true);
-        options.create_missing_column_families(true);
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
 
-        let cf_descriptors = vec![
-            cf_descriptor(Namespace::Sequences),
-            cf_descriptor(Namespace::General),
-            cf_descriptor(Namespace::Events),
-            cf_descriptor(Namespace::CustomEvents),
-            cf_descriptor(Namespace::EventProperties),
-            cf_descriptor(Namespace::EventCustomProperties),
-            cf_descriptor(Namespace::Accounts),
-        ];
+        // TODO manage how to properly work with prefixes
+        let prefix_extractor = SliceTransform::create("first_three", first_three, None);
+        opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(10));
+        opts.create_missing_column_families(true);
+        opts.set_prefix_extractor(prefix_extractor);
 
-        let cfd_len = cf_descriptors.len();
+        let cf_descriptors = vec![cf_descriptor(ColumnFamily::General, opts.clone())];
 
-        let db = DB::open_cf_descriptors(&options, path, cf_descriptors).unwrap();
-        Store {
-            db,
-            ns_guard: (0..cfd_len).into_iter().map(|_| RwLock::new(())).collect(),
-        }
+        let db = DB::open_cf_descriptors(&opts, path, cf_descriptors).unwrap();
+        Store { db }
     }
 
-    fn cf_handle(&self, t: Namespace) -> Arc<BoundColumnFamily> {
-        match t {
-            Namespace::Sequences => self.db.cf_handle(CF_NAME_SEQUENCES).unwrap(),
-            Namespace::General => self.db.cf_handle(CF_NAME_GENERAL).unwrap(),
-            Namespace::Events => self.db.cf_handle(CF_NAME_EVENTS).unwrap(),
-            Namespace::CustomEvents => self.db.cf_handle(CF_CUSTOM_EVENTS).unwrap(),
-            Namespace::EventProperties => self.db.cf_handle(CF_EVENT_PROPERTIES).unwrap(),
-            Namespace::EventCustomProperties => {
-                self.db.cf_handle(CF_EVENT_CUSTOM_PROPERTIES).unwrap()
-            }
-            Namespace::Accounts => self.db.cf_handle(CF_ACCOUNTS).unwrap(),
-        }
-    }
-
-    pub async fn put<K, V>(&self, ns: Namespace, key: K, value: V) -> Result<()>
-    where
-        K: AsRef<[u8]>,
-        V: AsRef<[u8]>,
+    pub async fn put<K, V>(&self, key: K, value: V) -> Result<()>
+        where
+            K: AsRef<[u8]>,
+            V: AsRef<[u8]>,
     {
-        Ok(self.db.put_cf(&self.cf_handle(ns), key, value)?)
+        Ok(self.db.put(key, value)?)
     }
 
-    pub async fn put_checked<K, V>(
-        &self,
-        ns: Namespace,
-        key: K,
-        value: V,
-    ) -> Result<Option<Vec<u8>>>
-    where
-        K: AsRef<[u8]> + Clone,
-        V: AsRef<[u8]>,
+    pub async fn put_checked<K, V>(&self, key: K, value: V) -> Result<Option<Vec<u8>>>
+        where
+            K: AsRef<[u8]> + Clone,
+            V: AsRef<[u8]>,
     {
-        let _guard = self.ns_guard[ns.clone() as usize].write();
-
-        match self.db.get_cf(&self.cf_handle(ns.clone()), key.clone())? {
+        match self.db.get(key.as_ref())? {
             None => Ok(None),
             Some(v) => {
-                self.db.put_cf(&self.cf_handle(ns), key, value)?;
+                self.db.put(key, value)?;
                 Ok(Some(v))
             }
         }
     }
 
-    pub async fn multi_put(&self, t: Namespace, kv: Vec<KVBytes>) -> Result<()> {
-        let cf = self.cf_handle(t);
+    pub async fn multi_put(&self, kv: Vec<KVBytes>) -> Result<()> {
         let mut batch = WriteBatch::default();
         for (k, v) in kv.iter() {
-            batch.put_cf(&cf, k, v);
+            batch.put(k, v);
         }
         Ok(self.db.write(batch)?)
     }
 
-    pub async fn get<K>(&self, t: Namespace, key: K) -> Result<Option<Vec<u8>>>
-    where
-        K: AsRef<[u8]>,
+    pub async fn get<K>(&self, key: K) -> Result<Option<Vec<u8>>>
+        where
+            K: AsRef<[u8]>,
     {
-        Ok(self.db.get_cf(&self.cf_handle(t), key)?)
+        Ok(self.db.get(key)?)
     }
 
-    pub async fn multi_get(&self, ns: Namespace, keys: Vec<&[u8]>) -> Result<Vec<Option<Vec<u8>>>> {
-        let cf = self.cf_handle(ns);
+    pub async fn multi_get<K: AsRef<[u8]>>(&self, keys: Vec<&K>) -> Result<Vec<Option<Vec<u8>>>> {
         Ok(keys
             .iter()
-            .map(|key| self.db.get_cf(&cf, key))
+            .map(|key| self.db.get(key))
             .collect::<std::result::Result<_, _>>()?)
     }
 
-    pub async fn delete<K>(&self, ns: Namespace, key: K) -> Result<()>
-    where
-        K: AsRef<[u8]> + Clone,
+    pub async fn delete<K>(&self, key: K) -> Result<()>
+        where
+            K: AsRef<[u8]> + Clone,
     {
-        Ok(self.db.delete_cf(&self.cf_handle(ns), key)?)
+        Ok(self.db.delete(key)?)
     }
 
-    pub async fn delete_checked<K>(&self, ns: Namespace, key: K) -> Result<Option<Vec<u8>>>
-    where
-        K: AsRef<[u8]> + Clone,
+    pub async fn delete_checked<K>(&self, key: K) -> Result<Option<Vec<u8>>>
+        where
+            K: AsRef<[u8]> + Clone,
     {
-        let _guard = self.ns_guard[ns.clone() as usize].write();
-
-        match self.db.get_cf(&self.cf_handle(ns.clone()), key.clone())? {
+        match self.db.get(key.as_ref())? {
             None => Ok(None),
             Some(v) => {
-                self.db.delete_cf(&self.cf_handle(ns), key)?;
+                self.db.delete(key)?;
                 Ok(Some(v))
             }
         }
     }
 
-    pub async fn multi_delete(&self, ns: Namespace, keys: Vec<&[u8]>) -> Result<()> {
-        let cf = self.cf_handle(ns);
+    pub async fn multi_delete<K: AsRef<[u8]>>(&self, keys: Vec<&K>) -> Result<()> {
         let mut batch = WriteBatch::default();
         for key in keys.iter() {
-            batch.delete_cf(&cf, key);
+            batch.delete(key);
         }
         Ok(self.db.write(batch)?)
     }
 
-    pub async fn list(&self, ns: Namespace) -> Result<Vec<KVBytes>> {
-        let iter = self
-            .db
-            .iterator_cf(&self.cf_handle(ns), IteratorMode::Start);
-        Ok(iter.map(|v| (v.0.clone(), v.1)).collect())
+    pub async fn list_prefix<K: AsRef<[u8]>>(&self, prefix: K) -> Result<Vec<KVBytes>> {
+        println!("pp {}", std::str::from_utf8(prefix.as_ref()).unwrap());
+        let iter = self.db.prefix_iterator(prefix.as_ref());
+        Ok(iter
+            .map(|v| {
+                println!("{}", std::str::from_utf8(&v.0).unwrap());
+                (v.0.clone(), v.1)
+            })
+            .collect())
     }
 
-    pub async fn next_seq(&self, ns: Namespace) -> Result<u64> {
-        let _guard = self.ns_guard[ns.clone() as usize].write();
-        let cf = self.cf_handle(Namespace::Sequences);
-        let key = ns.to_bytes();
-        let id = self.db.get_cf(&cf, key)?;
+    pub async fn next_seq<K: AsRef<[u8]>>(&self, key: K) -> Result<u64> {
+        let id = self.db.get(key.as_ref())?;
         let result: u64 = match id {
             Some(v) => u64::from_le_bytes(v.try_into()?) + 1,
             None => 1,
         };
-        self.db.put_cf(&cf, key, result.to_le_bytes())?;
+        self.db.put(key, result.to_le_bytes())?;
         Ok(result)
+    }
+}
+
+// https://github.com/paritytech/parity-common/blob/d8c63201624d39525198ce71fc550dd09a267271/kvdb/src/lib.rs#L155-L170
+pub fn end_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
+    let mut end_range = prefix.to_vec();
+    while let Some(0xff) = end_range.last() {
+        end_range.pop();
+    }
+    if let Some(byte) = end_range.last_mut() {
+        *byte += 1;
+        Some(end_range)
+    } else {
+        None
     }
 }

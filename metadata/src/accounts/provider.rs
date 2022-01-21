@@ -1,56 +1,103 @@
-use super::{Account, CreateRequest, ListRequest, UpdateRequest};
-use crate::{store::store, store::store::Store, Result};
+use crate::accounts::types::CreateAccountRequest;
+use crate::accounts::{Account, ListAccountsRequest, UpdateAccountRequest};
+use crate::error::Error;
+use crate::store::index::hash_map::HashMap;
+use crate::store::store::Store;
+use crate::Result;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
+use futures::lock::Mutex;
 use std::sync::Arc;
 
-const KV_NAMESPACE: store::Namespace = store::Namespace::Accounts;
+const NAMESPACE: &str = "accounts";
+const IDX_EMAIL: &str = "email";
+
+fn index_keys(email: &str) -> Vec<Option<Vec<u8>>> {
+    vec![Some(Key::Index(IDX_EMAIL, email).as_bytes())]
+}
+
+#[derive(Clone)]
+pub enum Key<'a> {
+    // accounts/data/{account_id}
+    Data(u64),
+    // accounts/idx/{idx_name}/{idx_value}
+    Index(&'a str, &'a str),
+    // accounts/id_seq
+    IdSequence,
+}
+
+impl<'a> Key<'a> {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        match self {
+            Key::Data(account_id) => [
+                NAMESPACE.as_bytes(),
+                b"/data/",
+                account_id.to_le_bytes().as_ref(),
+            ]
+            .concat(),
+            Key::Index(idx_name, key) => [
+                NAMESPACE.as_bytes(),
+                b"/idx/",
+                idx_name.as_bytes(),
+                b"/",
+                key.as_bytes(),
+            ]
+            .concat(),
+            Key::IdSequence => [NAMESPACE.as_bytes(), b"/id_seq"].concat(),
+        }
+    }
+}
 
 pub struct Provider {
     store: Arc<Store>,
+    idx: Mutex<HashMap>,
 }
 
 impl Provider {
     pub fn new(kv: Arc<Store>) -> Self {
-        Provider { store: kv }
+        Provider {
+            store: kv.clone(),
+            idx: Mutex::new(HashMap::new(kv)),
+        }
     }
-    pub async fn create(&self, request: CreateRequest) -> Result<Account> {
-        let account = Account {
-            id: self.store.next_seq(KV_NAMESPACE).await?,
-            created_at: Utc::now(),
-            updated_at: None,
-            admin: request.admin,
-            salt: request.salt,
-            password: request.password,
-            organization_id: request.organization_id,
-            email: request.email,
-            roles: request.roles,
-            permissions: request.permissions,
-            first_name: request.first_name,
-            middle_name: request.middle_name,
-            last_name: request.last_name,
-        };
+
+    pub async fn create_account(&self, req: CreateAccountRequest) -> Result<Account> {
+        let idx_keys = index_keys(req.email.as_str());
+        let mut idx = self.idx.lock().await;
+
+        idx.check_insert_constraints(idx_keys.as_ref()).await?;
+
+        let created_at = Utc::now();
+        let id = self.store.next_seq(Key::IdSequence.as_bytes()).await?;
+
+        let account = req.into_account(id, created_at);
+
         self.store
-            .put(KV_NAMESPACE, account.id.to_le_bytes(), serialize(&account)?)
+            .put(Key::Data(account.id).as_bytes(), serialize(&account)?)
+            .await?;
+
+        idx.insert(idx_keys.as_ref(), account.id.to_le_bytes())
             .await?;
         Ok(account)
     }
 
-    pub async fn get_by_id(&self, id: u64) -> Result<Option<Account>> {
-        Ok(
-            match self.store.get(KV_NAMESPACE, id.to_le_bytes()).await? {
-                None => None,
-                Some(value) => Some(deserialize(&value)?),
-            },
-        )
+    pub async fn get_account_by_id(&self, id: u64) -> Result<Account> {
+        match self.store.get(Key::Data(id).as_bytes()).await? {
+            None => Err(Error::AccountDoesNotExist),
+            Some(value) => Ok(deserialize(&value)?),
+        }
     }
 
-    pub async fn get_by_email(&self, _email: &str) -> Result<Option<Account>> {
-        unimplemented!()
+    pub async fn get_account_by_email(&self, email: &str) -> Result<Account> {
+        let idx = self.idx.lock().await;
+
+        let id = idx.get(Key::Index(IDX_EMAIL, email).as_bytes()).await?;
+        self.get_account_by_id(u64::from_le_bytes(id.try_into()?))
+            .await
     }
 
-    pub async fn list(&self, _request: ListRequest) -> Result<Vec<Account>> {
-        // TODO: apply limit/offset
+    pub async fn list_accounts(&self, _request: ListAccountsRequest) -> Result<Vec<Account>> {
+        /*// TODO: apply limit/offset
         let list = self
             .store
             .list(KV_NAMESPACE)
@@ -58,62 +105,46 @@ impl Provider {
             .iter()
             .map(|v| deserialize(v.1.as_ref()))
             .collect::<bincode::Result<_>>()?;
-        Ok(list)
+        Ok(list)*/
+        unimplemented!()
     }
 
-    pub async fn update(&self, request: UpdateRequest) -> Result<Option<Account>> {
-        // TODO: lock
-        let mut account = match self.get_by_id(request.id).await? {
-            Some(account) => account,
-            None => unimplemented!(),
-        };
-        let mut updated = false;
-        if let Some(value) = &request.first_name {
-            updated = true;
-            account.first_name = if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            };
-        }
-        if let Some(value) = &request.middle_name {
-            updated = true;
-            account.middle_name = if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            };
-        }
-        if let Some(value) = &request.last_name {
-            updated = true;
-            account.last_name = if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            };
-        }
-        if updated {
-            account.updated_at = Some(Utc::now());
-        }
+    pub async fn update_account(&self, req: UpdateAccountRequest) -> Result<Account> {
+        let prev_account = self.get_account_by_id(req.id).await?;
+        let idx_keys = index_keys(req.email.as_str());
+        let idx_prev_keys = index_keys(prev_account.email.as_str());
 
-        Ok(
-            self
-                .store
-                .put_checked(KV_NAMESPACE, account.id.to_le_bytes(), serialize(&account)?)
-                .await?.map(|_| account),
+        let mut idx = self.idx.lock().await;
+
+        idx.check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
+            .await?;
+
+        let updated_at = Utc::now(); // TODO add updated_by
+        let account = req.into_account(prev_account, updated_at, None);
+
+        self.store
+            .put(Key::Data(account.id).as_bytes(), serialize(&account)?)
+            .await?;
+
+        idx.update(
+            idx_keys.as_ref(),
+            idx_prev_keys.as_ref(),
+            account.id.to_le_bytes(),
         )
+        .await?;
+
+        Ok(account)
     }
 
-    pub async fn delete(&self, id: u64) -> Result<Option<Account>> {
-        Ok(
-            match self
-                .store
-                .delete_checked(KV_NAMESPACE, id.to_le_bytes())
-                .await?
-            {
-                None => None,
-                Some(v) => Some(deserialize(&v)?),
-            },
-        )
+    pub async fn delete_account(&self, id: u64) -> Result<Account> {
+        let account = self.get_account_by_id(id).await?;
+        self.store.delete(Key::Data(id).as_bytes()).await?;
+
+        self.idx
+            .lock()
+            .await
+            .delete(index_keys(account.email.as_str()).as_ref())
+            .await?;
+        Ok(account)
     }
 }

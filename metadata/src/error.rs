@@ -13,6 +13,13 @@ pub enum Error {
     RocksDbError(rocksdb::Error),
     EventWithSameNameAlreadyExist,
     EventDoesNotExist,
+    EventPropertyWithSameNameAlreadyExist,
+    EventPropertyWithSameDisplayNameAlreadyExist,
+    EventPropertyDoesNotExist,
+    EventPropertyColumnShouldBeEmpty,
+    AccountDoesNotExist,
+    IndexKeyExist,    // TODO make parametrized errors
+    IndexKeyNotFound, // TODO make parametrized errors
 }
 
 impl std::error::Error for Error {}
