@@ -1,28 +1,32 @@
 use crate::error::Error;
-use crate::store::store::{Key, Store};
+use crate::store::store::{make_data_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
 
 use crate::store::index;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
-use crate::events::Event;
-use crate::events::types::{CreateEventRequest, UpdateEventRequest};
+use crate::events::{Event, Status};
+use crate::events::types::{CreateEventRequest, IndexValues, UpdateEventRequest};
 
 
-const NAMESPACE: &str = "events";
-const IDX_NAME: &str = "name";
-const IDX_DISPLAY_NAME: &str = "display_name";
+const NAMESPACE: &[u8] = b"events";
+const IDX_NAME: &[u8] = b"name";
+const IDX_DISPLAY_NAME: &[u8] = b"display_name";
 
-fn index_keys(project_id: u64, name: &str, display_name: &Option<String>) -> Vec<Option<Vec<u8>>> {
-    if let Some(display_name) = display_name {
+
+fn index_keys(values: Box<&dyn IndexValues>) -> Vec<Option<Vec<u8>>> {
+    if let Status::Disabled = values.status() {
+        return vec![None, None];
+    }
+    if let Some(display_name) = values.display_name() {
         vec![
-            Some(Key::Index(NAMESPACE, project_id, IDX_DISPLAY_NAME, display_name).as_bytes()),
-            None,
+            Some(make_index_key(NAMESPACE, values.project_id(), IDX_NAME, values.name()).to_vec()),
+            Some(make_index_key(NAMESPACE, values.project_id(), IDX_DISPLAY_NAME, display_name).to_vec()),
         ]
     } else {
         vec![
-            Some(Key::Index(NAMESPACE, project_id, IDX_NAME, name).as_bytes()),
+            Some(make_index_key(NAMESPACE, values.project_id(), IDX_NAME, values.name()).to_vec()),
             None,
         ]
     }
@@ -41,19 +45,19 @@ impl Provider {
         }
     }
 
-    pub async fn create_event(&mut self, req: CreateEventRequest) -> Result<Event> {
-        let idx_keys = index_keys(req.project_id, req.name.as_str(), &req.display_name);
+    pub async fn create(&mut self, req: CreateEventRequest) -> Result<Event> {
+        let idx_keys = index_keys(Box::new(&req));
         self.idx
             .check_insert_constraints(idx_keys.as_ref())
             .await?;
 
         let created_at = Utc::now();
-        let id = self.store.next_seq(Key::IdSequence(NAMESPACE, req.project_id).as_bytes()).await?;
+        let id = self.store.next_seq(make_id_seq_key(NAMESPACE, req.project_id)).await?;
 
         let event = req.into_event(id, created_at);
         self.store
             .put(
-                Key::Data(NAMESPACE, event.project_id, event.id).as_bytes(),
+                make_data_key(NAMESPACE, event.project_id, event.id),
                 serialize(&event)?,
             )
             .await?;
@@ -62,23 +66,23 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn get_event_by_id(&self, project_id: u64, id: u64) -> Result<Event> {
-        match self.store.get(Key::Data(NAMESPACE, project_id, id).as_bytes()).await? {
+    pub async fn get_by_id(&self, project_id: u64, id: u64) -> Result<Event> {
+        match self.store.get(make_data_key(NAMESPACE, project_id, id)).await? {
             None => Err(Error::EventDoesNotExist),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
 
-    pub async fn get_event_by_name(&self, project_id: u64, name: &str) -> Result<Event> {
+    pub async fn get_by_name(&self, project_id: u64, name: &str) -> Result<Event> {
         let id = self
             .idx
-            .get(Key::Index(NAMESPACE, project_id, IDX_NAME, name).as_bytes())
+            .get(make_index_key(NAMESPACE, project_id, IDX_NAME, name))
             .await?;
-        self.get_event_by_id(project_id, u64::from_le_bytes(id.try_into()?))
+        self.get_by_id(project_id, u64::from_le_bytes(id.try_into()?))
             .await
     }
 
-    pub async fn list_events(&self) -> Result<Vec<Event>> {
+    pub async fn list(&self) -> Result<Vec<Event>> {
         let list = self
             .store
             .list_prefix(b"/events/ent") // TODO doesn't work
@@ -90,10 +94,10 @@ impl Provider {
         Ok(list)
     }
 
-    pub async fn update_event(&mut self, req: UpdateEventRequest) -> Result<Event> {
-        let prev_event = self.get_event_by_id(req.project_id, req.id).await?;
-        let idx_keys = index_keys(req.project_id, req.name.as_str(), &req.display_name);
-        let idx_prev_keys = index_keys(prev_event.project_id, prev_event.name.as_str(), &prev_event.display_name);
+    pub async fn update(&mut self, req: UpdateEventRequest) -> Result<Event> {
+        let idx_keys = index_keys(Box::new(&req));
+        let prev_event = self.get_by_id(req.project_id, req.id).await?;
+        let idx_prev_keys = index_keys(Box::new(&prev_event));
         self.idx
             .check_update_constraints(
                 idx_keys.as_ref(),
@@ -106,7 +110,7 @@ impl Provider {
 
         self.store
             .put(
-                Key::Data(NAMESPACE, event.project_id, event.id).as_bytes(),
+                make_data_key(NAMESPACE, event.project_id, event.id),
                 serialize(&event)?,
             )
             .await?;
@@ -121,13 +125,13 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn delete_event(&mut self, project_id: u64, id: u64) -> Result<Event> {
-        let event = self.get_event_by_id(project_id, id).await?;
+    pub async fn delete(&mut self, project_id: u64, id: u64) -> Result<Event> {
+        let event = self.get_by_id(project_id, id).await?;
         self.store
-            .delete(Key::Data(NAMESPACE, project_id, id).as_bytes())
+            .delete(make_data_key(NAMESPACE, project_id, id))
             .await?;
 
-        self.idx.delete(index_keys(event.project_id, event.name.as_str(), &event.display_name).as_ref()).await?;
+        self.idx.delete(index_keys(Box::new(&event)).as_ref()).await?;
         Ok(event)
     }
 }
