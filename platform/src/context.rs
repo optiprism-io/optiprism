@@ -1,10 +1,13 @@
-use crate::{auth, error::Error};
+use crate::Error;
 use axum::{
     async_trait,
     extract::{FromRequest, RequestParts, TypedHeader},
     headers::{authorization::Bearer, Authorization},
 };
-use common::rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS};
+use common::{
+    auth::parse_access_token,
+    rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS},
+};
 use std::collections::HashMap;
 
 #[derive(Default)]
@@ -94,7 +97,7 @@ where
             TypedHeader::<Authorization<Bearer>>::from_request(request).await
         {
             if let Some(token) = bearer.token().strip_prefix("Bearer ") {
-                if let Ok(claims) = auth::parse_access_token(token) {
+                if let Ok(claims) = parse_access_token(token) {
                     ctx.organization_id = claims.organization_id;
                     ctx.account_id = claims.account_id;
                     ctx.roles = claims.roles;

@@ -1,6 +1,6 @@
 use axum::{Router, Server};
 use metadata::{Metadata, Store};
-use platform::auth::Provider as AuthProvider;
+use platform::{accounts::Provider as AccountProvider, auth::Provider as AuthProvider};
 use std::{env::set_var, net::SocketAddr, sync::Arc};
 use tower_http::add_extension::AddExtensionLayer;
 
@@ -16,10 +16,12 @@ async fn main() {
 
     let store = Arc::new(Store::new(".db"));
     let metadata = Arc::new(Metadata::try_new(store).unwrap());
-    let auth_provider = AuthProvider::new(metadata);
+    let account_provider = Arc::new(AccountProvider::new(metadata.clone()));
+    let auth_provider = Arc::new(AuthProvider::new(metadata, account_provider.clone()));
 
     let app = platform::http::configure(Router::new())
-        .layer(AddExtensionLayer::new(Arc::new(auth_provider)));
+        .layer(AddExtensionLayer::new(account_provider))
+        .layer(AddExtensionLayer::new(auth_provider));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     Server::bind(&addr)

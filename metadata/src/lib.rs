@@ -5,6 +5,6 @@ pub mod metadata;
 pub mod organizations;
 pub mod store;
 
-use error::Result;
+pub use error::{Error, Result};
 pub use metadata::Metadata;
 pub use store::store::Store;
