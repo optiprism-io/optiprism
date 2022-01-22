@@ -5,7 +5,7 @@ use std::env::temp_dir;
 use std::sync::Arc;
 
 use uuid::Uuid;
-use metadata::events::{Status, UpdateEventRequest};
+use metadata::events::{Scope, Status, UpdateEventRequest};
 use metadata::events::types::CreateEventRequest;
 
 #[tokio::test]
@@ -23,6 +23,7 @@ async fn test_events() -> Result<()> {
         display_name: None,
         description: None,
         status: Status::Enabled,
+        scope: Scope::System,
         properties: None,
         global_properties: None,
         custom_properties: None,
@@ -38,6 +39,7 @@ async fn test_events() -> Result<()> {
         display_name: None,
         description: None,
         status: Status::Enabled,
+        scope: Scope::System,
         properties: None,
         global_properties: None,
         custom_properties: None,
@@ -58,12 +60,12 @@ async fn test_events() -> Result<()> {
     create_event2.name = "event2".to_string();
     let res = md.events.create(create_event2.clone()).await?;
     assert_eq!(res.id, 2);
-    md.events.attach_global_property(1, 1, 1).await?;
-    assert!(md.events.attach_global_property(1, 1, 1).await.is_err());
-    md.events.attach_global_property(1, 1, 2).await?;
-    assert!(md.events.detach_global_property(1, 1, 3).await.is_err());
-    md.events.detach_global_property(1, 1, 1).await?;
-    md.events.attach_global_property(1, 1, 1).await?;
+    md.events.attach_property(1, 1, 1).await?;
+    assert!(md.events.attach_property(1, 1, 1).await.is_err());
+    md.events.attach_property(1, 1, 2).await?;
+    assert!(md.events.detach_property(1, 1, 3).await.is_err());
+    md.events.detach_property(1, 1, 1).await?;
+    md.events.attach_property(1, 1, 1).await?;
 
     // check existence by id
     assert_eq!(md.events.get_by_id(1, 1).await?.id, 1);
@@ -77,10 +79,13 @@ async fn test_events() -> Result<()> {
     update_event1.name = "event2".to_string();
     assert!(md.events.update(update_event1.clone()).await.is_err());
     update_event1.name = "event1_new".to_string();
+    update_event1.description = Some("desc".to_string());
     assert_eq!(md.events.update(update_event1.clone()).await?.id, 1);
 
     assert!(md.events.get_by_name(1, "event1").await.is_err());
-    assert_eq!(md.events.get_by_name(1, "event1_new").await?.id, 1);
+    let res = md.events.get_by_name(1, "event1_new").await?;
+    assert_eq!(res.id, 1);
+    assert_eq!(res.description, update_event1.description);
 
     update_event1.display_name = Some("e".to_string());
     assert_eq!(md.events.update(update_event1.clone()).await?.display_name, Some("e".to_string()));

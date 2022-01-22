@@ -27,7 +27,7 @@ fn index_keys(values: Box<&dyn IndexValues>) -> Vec<Option<Vec<u8>>> {
                     IDX_DISPLAY_NAME,
                     display_name,
                 )
-                .to_vec(),
+                    .to_vec(),
             ),
         ]
     } else {
@@ -62,15 +62,16 @@ impl Provider {
             .await?;
 
         let event = req.into_event(id, created_at);
+        let data = serialize(&event)?;
         self.store
             .put(
                 make_data_key(NAMESPACE, event.project_id, event.id),
-                serialize(&event)?,
+                &data,
             )
             .await?;
 
         self.idx
-            .insert(idx_keys.as_ref(), event.id.to_le_bytes())
+            .insert(idx_keys.as_ref(), &data)
             .await?;
         Ok(event)
     }
@@ -87,12 +88,12 @@ impl Provider {
     }
 
     pub async fn get_by_name(&self, project_id: u64, name: &str) -> Result<Event> {
-        let id = self
+        let data = self
             .idx
             .get(make_index_key(NAMESPACE, project_id, IDX_NAME, name))
             .await?;
-        self.get_by_id(project_id, u64::from_le_bytes(id.try_into()?))
-            .await
+
+        Ok(deserialize(&data)?)
     }
 
     pub async fn list(&self) -> Result<Vec<Event>> {
@@ -117,11 +118,11 @@ impl Provider {
 
         let updated_at = Utc::now(); // TODO add updated_by
         let event = req.into_event(prev_event, updated_at, None);
-
+        let data = serialize(&event)?;
         self.store
             .put(
                 make_data_key(NAMESPACE, event.project_id, event.id),
-                serialize(&event)?,
+                &data,
             )
             .await?;
 
@@ -129,20 +130,20 @@ impl Provider {
             .update(
                 idx_keys.as_ref(),
                 idx_prev_keys.as_ref(),
-                event.id.to_le_bytes(),
+                &data,
             )
             .await?;
         Ok(event)
     }
 
-    pub async fn attach_global_property(
+    pub async fn attach_property(
         &mut self,
         project_id: u64,
         event_id: u64,
         prop_id: u64,
     ) -> Result<()> {
         let mut event = self.get_by_id(project_id, event_id).await?;
-        event.global_properties = match event.global_properties {
+        event.properties = match event.properties {
             None => Some(vec![prop_id]),
             Some(props) => match props.iter().find(|x| prop_id == **x) {
                 None => Some([props, vec![prop_id]].concat()),
@@ -159,14 +160,14 @@ impl Provider {
         Ok(())
     }
 
-    pub async fn detach_global_property(
+    pub async fn detach_property(
         &mut self,
         project_id: u64,
         event_id: u64,
         prop_id: u64,
     ) -> Result<()> {
         let mut event = self.get_by_id(project_id, event_id).await?;
-        event.global_properties = match event.global_properties {
+        event.properties = match event.properties {
             None => return Err(Error::EventDoesntHaveGlobalProperty),
             Some(props) => match props.iter().find(|x| prop_id == **x) {
                 None => return Err(Error::EventDoesntHaveGlobalProperty),

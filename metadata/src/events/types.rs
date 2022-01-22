@@ -15,6 +15,12 @@ pub enum Status {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum Scope {
+    System,
+    User,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Event {
     pub id: u64,
     pub created_at: DateTime<Utc>,
@@ -27,8 +33,8 @@ pub struct Event {
     pub display_name: Option<String>,
     pub description: Option<String>,
     pub status: Status,
+    pub scope: Scope,
     pub properties: Option<Vec<u64>>,
-    pub global_properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
 }
 
@@ -59,6 +65,7 @@ pub struct CreateEventRequest {
     pub display_name: Option<String>,
     pub description: Option<String>,
     pub status: Status,
+    pub scope: Scope,
     pub properties: Option<Vec<u64>>,
     pub global_properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
@@ -96,8 +103,8 @@ impl CreateEventRequest {
             display_name: self.display_name,
             description: self.description,
             status: self.status,
+            scope: self.scope,
             properties: self.properties,
-            global_properties: self.global_properties,
             custom_properties: self.custom_properties,
         }
     }
@@ -114,6 +121,7 @@ pub struct UpdateEventRequest {
     pub display_name: Option<String>,
     pub description: Option<String>,
     pub status: Status,
+    pub scope: Scope,
     pub properties: Option<Vec<u64>>,
     pub global_properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
@@ -151,8 +159,8 @@ impl UpdateEventRequest {
             display_name: self.display_name,
             description: self.description,
             status: self.status,
+            scope: self.scope,
             properties: self.properties,
-            global_properties: self.global_properties,
             custom_properties: self.custom_properties,
         }
     }
