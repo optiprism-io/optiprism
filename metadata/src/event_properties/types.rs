@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 pub trait IndexValues {
     fn status(&self) -> Status;
     fn project_id(&self) -> u64;
-    fn scope(&self) -> Scope;
     fn name(&self) -> &str;
     fn display_name(&self) -> &Option<String>;
 }
@@ -18,8 +17,8 @@ pub enum Status {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Scope {
-    Event(u64),
-    Global,
+    System,
+    User,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -30,7 +29,6 @@ pub struct EventProperty {
     pub created_by: u64,
     pub updated_by: Option<u64>,
     pub project_id: u64,
-    pub scope: Scope,
     pub tags: Vec<String>,
     pub name: String,
     pub description: String,
@@ -38,6 +36,7 @@ pub struct EventProperty {
     pub typ: DataType,
     pub col_id: u64,
     pub status: Status,
+    pub scope: Scope,
     pub nullable: bool,
     // this also defines whether property is required or not
     pub is_array: bool,
@@ -54,10 +53,6 @@ impl IndexValues for EventProperty {
         self.project_id
     }
 
-    fn scope(&self) -> Scope {
-        self.scope.clone()
-    }
-
     fn name(&self) -> &str {
         &self.name
     }
@@ -71,13 +66,13 @@ impl IndexValues for EventProperty {
 pub struct CreateEventPropertyRequest {
     pub created_by: u64,
     pub project_id: u64,
-    pub scope: Scope,
     pub tags: Vec<String>,
     pub name: String,
     pub description: String,
     pub display_name: Option<String>,
     pub typ: DataType,
     pub status: Status,
+    pub scope: Scope,
     pub nullable: bool,
     // this also defines whether property is required or not
     pub is_array: bool,
@@ -92,10 +87,6 @@ impl IndexValues for CreateEventPropertyRequest {
 
     fn project_id(&self) -> u64 {
         self.project_id
-    }
-
-    fn scope(&self) -> Scope {
-        self.scope.clone()
     }
 
     fn name(&self) -> &str {
@@ -116,7 +107,6 @@ impl CreateEventPropertyRequest {
             created_by: self.created_by,
             updated_by: None,
             project_id: self.project_id,
-            scope: self.scope,
             tags: self.tags,
             name: self.name,
             description: self.description,
@@ -124,6 +114,7 @@ impl CreateEventPropertyRequest {
             typ: self.typ,
             col_id,
             status: self.status,
+            scope: self.scope,
             nullable: self.nullable,
             is_array: self.is_array,
             is_dictionary: self.is_dictionary,
@@ -160,11 +151,7 @@ impl IndexValues for UpdateEventPropertyRequest {
     fn project_id(&self) -> u64 {
         self.project_id
     }
-
-    fn scope(&self) -> Scope {
-        self.scope.clone()
-    }
-
+    
     fn name(&self) -> &str {
         &self.name
     }
@@ -183,7 +170,6 @@ impl UpdateEventPropertyRequest {
             created_by: self.created_by,
             updated_by,
             project_id: self.project_id,
-            scope: self.scope,
             tags: self.tags,
             name: self.name,
             description: self.description,
@@ -191,6 +177,7 @@ impl UpdateEventPropertyRequest {
             typ: self.typ,
             col_id: prev.col_id,
             status: self.status,
+            scope: self.scope,
             nullable: self.nullable,
             is_array: self.is_array,
             is_dictionary: self.is_dictionary,
