@@ -17,4 +17,3 @@ tokio = { version = "1.15.0", features = ["rt-multi-thread", "macros"] }
 anyhow = "1.0.52"
 arrow = "5.2.0"
 futures = "0.3.19"
-bstr = "0.2"

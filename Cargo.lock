@@ -1237,7 +1237,6 @@ dependencies = [
  "anyhow",
  "arrow 5.5.0",
  "bincode",
- "bstr",
  "chrono",
  "common",
  "futures",
