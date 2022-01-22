@@ -18,6 +18,7 @@ pub enum Error {
     EventPropertyDoesNotExist,
     EventPropertyColumnShouldBeEmpty,
     OrganizationDoesNotExist,
+    ProjectDoesNotExist,
     AccountDoesNotExist,
     IndexKeyExist,    // TODO make parametrized errors
     IndexKeyNotFound, // TODO make parametrized errors

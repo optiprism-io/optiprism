@@ -1,11 +1,6 @@
 use crate::Result;
-use rocksdb::{
-    ColumnFamilyDescriptor, Options,
-    SliceTransform, WriteBatch, DB,
-};
-use std::{
-    path::Path,
-};
+use rocksdb::{ColumnFamilyDescriptor, Options, SliceTransform, WriteBatch, DB};
+use std::path::Path;
 
 #[derive(Clone)]
 pub enum Key<'a> {
@@ -27,7 +22,7 @@ impl<'a> Key<'a> {
                 b"/",
                 event_id.to_le_bytes().as_ref(),
             ]
-                .concat(),
+            .concat(),
             Key::Index(ns, project_id, idx_name, key) => [
                 ns.as_bytes(),
                 b"/idx/",
@@ -37,14 +32,13 @@ impl<'a> Key<'a> {
                 b"/",
                 key.as_bytes(),
             ]
-                .concat(),
-            Key::IdSequence(ns, project_id) => {
-                [
-                    ns.as_bytes(),
-                    b"/id_seq/",
-                    project_id.to_le_bytes().as_ref(),
-                ].concat()
-            }
+            .concat(),
+            Key::IdSequence(ns, project_id) => [
+                ns.as_bytes(),
+                b"/id_seq/",
+                project_id.to_le_bytes().as_ref(),
+            ]
+            .concat(),
         }
     }
 }
@@ -88,17 +82,17 @@ impl Store {
     }
 
     pub async fn put<K, V>(&self, key: K, value: V) -> Result<()>
-        where
-            K: AsRef<[u8]>,
-            V: AsRef<[u8]>,
+    where
+        K: AsRef<[u8]>,
+        V: AsRef<[u8]>,
     {
         Ok(self.db.put(key, value)?)
     }
 
     pub async fn put_checked<K, V>(&self, key: K, value: V) -> Result<Option<Vec<u8>>>
-        where
-            K: AsRef<[u8]> + Clone,
-            V: AsRef<[u8]>,
+    where
+        K: AsRef<[u8]> + Clone,
+        V: AsRef<[u8]>,
     {
         match self.db.get(key.as_ref())? {
             None => Ok(None),
@@ -118,8 +112,8 @@ impl Store {
     }
 
     pub async fn get<K>(&self, key: K) -> Result<Option<Vec<u8>>>
-        where
-            K: AsRef<[u8]>,
+    where
+        K: AsRef<[u8]>,
     {
         Ok(self.db.get(key)?)
     }
@@ -132,15 +126,15 @@ impl Store {
     }
 
     pub async fn delete<K>(&self, key: K) -> Result<()>
-        where
-            K: AsRef<[u8]> + Clone,
+    where
+        K: AsRef<[u8]> + Clone,
     {
         Ok(self.db.delete(key)?)
     }
 
     pub async fn delete_checked<K>(&self, key: K) -> Result<Option<Vec<u8>>>
-        where
-            K: AsRef<[u8]> + Clone,
+    where
+        K: AsRef<[u8]> + Clone,
     {
         match self.db.get(key.as_ref())? {
             None => Ok(None),
@@ -160,12 +154,15 @@ impl Store {
     }
 
     pub async fn list_prefix<K: AsRef<[u8]>>(&self, prefix: K) -> Result<Vec<KVBytes>> {
-        println!("pp {}", std::str::from_utf8(prefix.as_ref()).unwrap());
-        let iter = self.db.prefix_iterator(prefix.as_ref());
+        let prefix = prefix.as_ref();
+        let iter = self.db.prefix_iterator(prefix);
         Ok(iter
-            .map(|v| {
-                println!("{}", std::str::from_utf8(&v.0).unwrap());
-                (v.0.clone(), v.1)
+            .filter_map(|v| {
+                if v.0.len() > prefix.len() && v.0[..prefix.len()].eq(prefix) {
+                    Some((v.0.clone(), v.1))
+                } else {
+                    None
+                }
             })
             .collect())
     }

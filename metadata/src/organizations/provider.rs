@@ -3,14 +3,13 @@ use crate::{error::Error, Result, Store};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::{cmp::Ordering, sync::Arc};
 
-const SEQUENCE_KEY: &[u8] = b"organizations/id_seq";
-const DATA_PREFIX: &[u8] = b"organizations/data/";
+const SEQUENCE_KEY: &str = "organizations/id_seq";
+const DATA_PREFIX: &str = "organizations/data/";
 
 fn data_key(id: u64) -> Vec<u8> {
-    // organizations/data/{id}
-    [DATA_PREFIX, id.to_le_bytes().as_ref()].concat()
+    format!("{DATA_PREFIX}{id}").into()
 }
 
 pub struct Provider {
@@ -46,8 +45,30 @@ impl Provider {
         }
     }
 
-    pub async fn list(&self, _request: ListRequest) -> Result<Vec<Organization>> {
-        unimplemented!()
+    pub async fn list(&self, request: ListRequest) -> Result<Vec<Organization>> {
+        let mut list = self
+            .store
+            .list_prefix(DATA_PREFIX)
+            .await?
+            .iter()
+            .map(|v| deserialize(v.1.as_ref()))
+            .collect::<bincode::Result<Vec<Organization>>>()?;
+        list.sort_by(|a, b| {
+            if a.id == b.id {
+                Ordering::Equal
+            } else if a.id > b.id {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            }
+        });
+        // if let Some(offset) = request.offset {
+        //     list = list[(offset as usize)..];
+        // }
+        // if let Some(limit) = request.limit {
+        //     list = list[..(limit as usize)];
+        // }
+        Ok(list)
     }
 
     pub async fn update(&self, request: UpdateRequest) -> Result<Organization> {

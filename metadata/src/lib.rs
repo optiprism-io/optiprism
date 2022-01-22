@@ -3,6 +3,7 @@ pub mod error;
 pub mod events;
 pub mod metadata;
 pub mod organizations;
+pub mod projects;
 pub mod store;
 
 pub use error::{Error, Result};
