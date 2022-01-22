@@ -28,6 +28,7 @@ pub struct Event {
     pub description: Option<String>,
     pub status: Status,
     pub properties: Option<Vec<u64>>,
+    pub global_properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
 }
 
@@ -59,6 +60,7 @@ pub struct CreateEventRequest {
     pub description: Option<String>,
     pub status: Status,
     pub properties: Option<Vec<u64>>,
+    pub global_properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
 }
 
@@ -95,6 +97,7 @@ impl CreateEventRequest {
             description: self.description,
             status: self.status,
             properties: self.properties,
+            global_properties: self.global_properties,
             custom_properties: self.custom_properties,
         }
     }
@@ -112,6 +115,7 @@ pub struct UpdateEventRequest {
     pub description: Option<String>,
     pub status: Status,
     pub properties: Option<Vec<u64>>,
+    pub global_properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
 }
 
@@ -148,6 +152,7 @@ impl UpdateEventRequest {
             description: self.description,
             status: self.status,
             properties: self.properties,
+            global_properties: self.global_properties,
             custom_properties: self.custom_properties,
         }
     }

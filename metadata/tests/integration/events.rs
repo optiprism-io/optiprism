@@ -24,6 +24,7 @@ async fn test_events() -> Result<()> {
         description: None,
         status: Status::Enabled,
         properties: None,
+        global_properties: None,
         custom_properties: None,
     };
 
@@ -38,6 +39,7 @@ async fn test_events() -> Result<()> {
         description: None,
         status: Status::Enabled,
         properties: None,
+        global_properties: None,
         custom_properties: None,
     };
 
@@ -56,6 +58,13 @@ async fn test_events() -> Result<()> {
     create_event2.name = "event2".to_string();
     let res = md.events.create(create_event2.clone()).await?;
     assert_eq!(res.id, 2);
+    md.events.attach_global_property(1, 1, 1).await?;
+    assert!(md.events.attach_global_property(1, 1, 1).await.is_err());
+    md.events.attach_global_property(1, 1, 2).await?;
+    assert!(md.events.detach_global_property(1, 1, 3).await.is_err());
+    md.events.detach_global_property(1, 1, 1).await?;
+    md.events.attach_global_property(1, 1, 1).await?;
+
     // check existence by id
     assert_eq!(md.events.get_by_id(1, 1).await?.id, 1);
     assert_eq!(md.events.get_by_id(1, 2).await?.id, 2);

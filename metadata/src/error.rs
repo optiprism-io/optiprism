@@ -13,6 +13,8 @@ pub enum Error {
     RocksDbError(rocksdb::Error),
     EventWithSameNameAlreadyExist,
     EventDoesNotExist,
+    EventAlreadyHasGlobalProperty,
+    EventDoesntHaveGlobalProperty,
     EventPropertyWithSameNameAlreadyExist,
     EventPropertyWithSameDisplayNameAlreadyExist,
     EventPropertyDoesNotExist,
