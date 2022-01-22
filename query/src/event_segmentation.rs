@@ -789,7 +789,7 @@ mod tests {
         )?;
 
         let _prov = MemTable::try_new(schema.clone(), vec![vec![batch]])?;
-        let path = "/Users/ravlio/work/rust/exprtree/tests/events.csv";
+        let path = "../tests/events.csv";
 
         let schema = events_schema();
         let options = CsvReadOptions::new().schema(&schema);

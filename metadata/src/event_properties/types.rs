@@ -1,3 +1,4 @@
+use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +22,7 @@ pub enum Scope {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Event {
+pub struct EventProperty {
     pub id: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
@@ -30,15 +31,20 @@ pub struct Event {
     pub project_id: u64,
     pub tags: Vec<String>,
     pub name: String,
+    pub description: String,
     pub display_name: Option<String>,
-    pub description: Option<String>,
+    pub typ: DataType,
+    pub col_id: u64,
     pub status: Status,
     pub scope: Scope,
-    pub properties: Option<Vec<u64>>,
-    pub custom_properties: Option<Vec<u64>>,
+    pub nullable: bool,
+    // this also defines whether property is required or not
+    pub is_array: bool,
+    pub is_dictionary: bool,
+    pub dictionary_type: Option<DataType>,
 }
 
-impl IndexValues for Event {
+impl IndexValues for EventProperty {
     fn status(&self) -> Status {
         self.status.clone()
     }
@@ -57,21 +63,24 @@ impl IndexValues for Event {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct CreateEventRequest {
+pub struct CreateEventPropertyRequest {
     pub created_by: u64,
     pub project_id: u64,
     pub tags: Vec<String>,
     pub name: String,
+    pub description: String,
     pub display_name: Option<String>,
-    pub description: Option<String>,
+    pub typ: DataType,
     pub status: Status,
     pub scope: Scope,
-    pub properties: Option<Vec<u64>>,
-    pub global_properties: Option<Vec<u64>>,
-    pub custom_properties: Option<Vec<u64>>,
+    pub nullable: bool,
+    // this also defines whether property is required or not
+    pub is_array: bool,
+    pub is_dictionary: bool,
+    pub dictionary_type: Option<DataType>,
 }
 
-impl IndexValues for CreateEventRequest {
+impl IndexValues for CreateEventPropertyRequest {
     fn status(&self) -> Status {
         self.status.clone()
     }
@@ -89,9 +98,9 @@ impl IndexValues for CreateEventRequest {
     }
 }
 
-impl CreateEventRequest {
-    pub fn into_event(self, id: u64, created_at: DateTime<Utc>) -> Event {
-        Event {
+impl CreateEventPropertyRequest {
+    pub fn into_event_property(self, id: u64, col_id: u64, created_at: DateTime<Utc>) -> EventProperty {
+        EventProperty {
             id,
             created_at,
             updated_at: None,
@@ -100,34 +109,41 @@ impl CreateEventRequest {
             project_id: self.project_id,
             tags: self.tags,
             name: self.name,
-            display_name: self.display_name,
             description: self.description,
+            display_name: self.display_name,
+            typ: self.typ,
+            col_id,
             status: self.status,
             scope: self.scope,
-            properties: self.properties,
-            custom_properties: self.custom_properties,
+            nullable: self.nullable,
+            is_array: self.is_array,
+            is_dictionary: self.is_dictionary,
+            dictionary_type: self.dictionary_type,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct UpdateEventRequest {
+pub struct UpdateEventPropertyRequest {
     pub id: u64,
     pub created_by: u64,
-    pub updated_by: u64,
+    pub updated_by: Option<u64>,
     pub project_id: u64,
+    pub scope: Scope,
     pub tags: Vec<String>,
     pub name: String,
+    pub description: String,
     pub display_name: Option<String>,
-    pub description: Option<String>,
+    pub typ: DataType,
     pub status: Status,
-    pub scope: Scope,
-    pub properties: Option<Vec<u64>>,
-    pub global_properties: Option<Vec<u64>>,
-    pub custom_properties: Option<Vec<u64>>,
+    pub nullable: bool,
+    // this also defines whether property is required or not
+    pub is_array: bool,
+    pub is_dictionary: bool,
+    pub dictionary_type: Option<DataType>,
 }
 
-impl IndexValues for UpdateEventRequest {
+impl IndexValues for UpdateEventPropertyRequest {
     fn status(&self) -> Status {
         self.status.clone()
     }
@@ -135,7 +151,7 @@ impl IndexValues for UpdateEventRequest {
     fn project_id(&self) -> u64 {
         self.project_id
     }
-
+    
     fn name(&self) -> &str {
         &self.name
     }
@@ -145,9 +161,9 @@ impl IndexValues for UpdateEventRequest {
     }
 }
 
-impl UpdateEventRequest {
-    pub fn into_event(self, prev: Event, updated_at: DateTime<Utc>, updated_by: Option<u64>) -> Event {
-        Event {
+impl UpdateEventPropertyRequest {
+    pub fn into_event_property(self, prev: EventProperty, updated_at: DateTime<Utc>, updated_by: Option<u64>) -> EventProperty {
+        EventProperty {
             id: self.id,
             created_at: prev.created_at,
             updated_at: Some(updated_at),
@@ -156,12 +172,16 @@ impl UpdateEventRequest {
             project_id: self.project_id,
             tags: self.tags,
             name: self.name,
-            display_name: self.display_name,
             description: self.description,
+            display_name: self.display_name,
+            typ: self.typ,
+            col_id: prev.col_id,
             status: self.status,
             scope: self.scope,
-            properties: self.properties,
-            custom_properties: self.custom_properties,
+            nullable: self.nullable,
+            is_array: self.is_array,
+            is_dictionary: self.is_dictionary,
+            dictionary_type: self.dictionary_type,
         }
     }
 }

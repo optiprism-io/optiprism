@@ -2,45 +2,32 @@ use crate::Result;
 use rocksdb::{ColumnFamilyDescriptor, Options, SliceTransform, WriteBatch, DB};
 use std::path::Path;
 
-#[derive(Clone)]
-pub enum Key<'a> {
-    // {namespace}/data/{project_id}/{event_id}
-    Data(&'a str, u64, u64),
-    // {namespace}/idx/{project_id}/{idx_name}/{key}
-    Index(&'a str, u64, &'a str, &'a str),
-    // {namespace}/id_seq/{project_id}
-    IdSequence(&'a str, u64),
+pub fn make_data_key(ns: &[u8], project_id: u64, id: u64) -> Vec<u8> {
+    [
+        ns,
+        b"/data/",
+        project_id.to_le_bytes().as_ref(),
+        b"/",
+        id.to_le_bytes().as_ref(),
+    ]
+    .concat()
 }
 
-impl<'a> Key<'a> {
-    pub fn as_bytes(&self) -> Vec<u8> {
-        match self {
-            Key::Data(ns, project_id, event_id) => [
-                ns.as_bytes(),
-                b"/data/",
-                project_id.to_le_bytes().as_ref(),
-                b"/",
-                event_id.to_le_bytes().as_ref(),
-            ]
-            .concat(),
-            Key::Index(ns, project_id, idx_name, key) => [
-                ns.as_bytes(),
-                b"/idx/",
-                project_id.to_le_bytes().as_ref(),
-                b"/",
-                idx_name.as_bytes(),
-                b"/",
-                key.as_bytes(),
-            ]
-            .concat(),
-            Key::IdSequence(ns, project_id) => [
-                ns.as_bytes(),
-                b"/id_seq/",
-                project_id.to_le_bytes().as_ref(),
-            ]
-            .concat(),
-        }
-    }
+pub fn make_index_key(ns: &[u8], project_id: u64, idx_name: &[u8], key: &str) -> Vec<u8> {
+    [
+        ns,
+        b"/idx/",
+        project_id.to_le_bytes().as_ref(),
+        b"/",
+        idx_name,
+        b"/",
+        key.as_bytes(),
+    ]
+    .concat()
+}
+
+pub fn make_id_seq_key(ns: &[u8], project_id: u64) -> Vec<u8> {
+    [ns, b"/seq/", project_id.to_le_bytes().as_ref(), b"/id"].concat()
 }
 
 type KVBytes = (Box<[u8]>, Box<[u8]>);
