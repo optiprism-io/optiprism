@@ -2,8 +2,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use jsonwebtoken::errors::Error as JWTError;
-use metadata::error::Error as MetadataError;
+use common::Error as CommonError;
+use metadata::Error as MetadataError;
 use std::{
     fmt::{self, Display, Formatter},
     result,
@@ -26,8 +26,8 @@ impl InternalError {
 #[derive(Debug)]
 pub enum Error {
     Internal(InternalError),
+    CommonError(CommonError),
     MetadataError(MetadataError),
-    JWTError(JWTError),
 }
 
 impl Display for Error {
@@ -42,15 +42,15 @@ impl From<InternalError> for Error {
     }
 }
 
-impl From<MetadataError> for Error {
-    fn from(err: MetadataError) -> Self {
-        Self::MetadataError(err)
+impl From<CommonError> for Error {
+    fn from(err: CommonError) -> Self {
+        Self::CommonError(err)
     }
 }
 
-impl From<JWTError> for Error {
-    fn from(err: JWTError) -> Self {
-        Self::JWTError(err)
+impl From<MetadataError> for Error {
+    fn from(err: MetadataError) -> Self {
+        Self::MetadataError(err)
     }
 }
 

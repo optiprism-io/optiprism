@@ -3,8 +3,7 @@ use crate::{
         provider::Provider,
         types::{LogInRequest, SignUpRequest, TokensResponse},
     },
-    context::Context,
-    error::Result,
+    Context, Result,
 };
 use axum::{extract::Extension, routing::post, Json, Router};
 use std::sync::Arc;

@@ -22,8 +22,8 @@ pub struct Account {
     // TODO: add fields
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
-pub struct CreateAccountRequest {
+#[derive(Serialize, Deserialize)]
+pub struct CreateRequest {
     pub created_by: u64,
     pub admin: bool,
     pub salt: String,
@@ -37,7 +37,7 @@ pub struct CreateAccountRequest {
     pub last_name: Option<String>,
 }
 
-impl CreateAccountRequest {
+impl CreateRequest {
     pub fn into_account(self, id: u64, created_at: DateTime<Utc>) -> Account {
         Account {
             id,
@@ -58,8 +58,8 @@ impl CreateAccountRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
-pub struct UpdateAccountRequest {
+#[derive(Serialize, Deserialize)]
+pub struct UpdateRequest {
     pub id: u64,
     pub admin: bool,
     pub salt: String,
@@ -73,7 +73,7 @@ pub struct UpdateAccountRequest {
     pub last_name: Option<String>,
 }
 
-impl UpdateAccountRequest {
+impl UpdateRequest {
     pub fn into_account(
         self,
         prev: Account,
@@ -100,7 +100,7 @@ impl UpdateAccountRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ListAccountsRequest {
+pub struct ListRequest {
     pub limit: u64,
     pub offset: u64,
     // TODO: add fields

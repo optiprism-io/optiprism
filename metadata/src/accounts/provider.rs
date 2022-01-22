@@ -1,9 +1,7 @@
-use crate::accounts::types::CreateAccountRequest;
-use crate::accounts::{Account, ListAccountsRequest, UpdateAccountRequest};
-use crate::error::Error;
+use super::{Account, CreateRequest, ListRequest, UpdateRequest};
 use crate::store::index::hash_map::HashMap;
 use crate::store::store::Store;
-use crate::Result;
+use crate::{Error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use futures::lock::Mutex;
@@ -61,7 +59,7 @@ impl Provider {
         }
     }
 
-    pub async fn create_account(&self, req: CreateAccountRequest) -> Result<Account> {
+    pub async fn create(&self, req: CreateRequest) -> Result<Account> {
         let idx_keys = index_keys(req.email.as_str());
         let mut idx = self.idx.lock().await;
 
@@ -81,22 +79,21 @@ impl Provider {
         Ok(account)
     }
 
-    pub async fn get_account_by_id(&self, id: u64) -> Result<Account> {
+    pub async fn get_by_id(&self, id: u64) -> Result<Account> {
         match self.store.get(Key::Data(id).as_bytes()).await? {
             None => Err(Error::AccountDoesNotExist),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
 
-    pub async fn get_account_by_email(&self, email: &str) -> Result<Account> {
+    pub async fn get_by_email(&self, email: &str) -> Result<Account> {
         let idx = self.idx.lock().await;
 
         let id = idx.get(Key::Index(IDX_EMAIL, email).as_bytes()).await?;
-        self.get_account_by_id(u64::from_le_bytes(id.try_into()?))
-            .await
+        self.get_by_id(u64::from_le_bytes(id.try_into()?)).await
     }
 
-    pub async fn list_accounts(&self, _request: ListAccountsRequest) -> Result<Vec<Account>> {
+    pub async fn list_accounts(&self, _request: ListRequest) -> Result<Vec<Account>> {
         /*// TODO: apply limit/offset
         let list = self
             .store
@@ -109,8 +106,8 @@ impl Provider {
         unimplemented!()
     }
 
-    pub async fn update_account(&self, req: UpdateAccountRequest) -> Result<Account> {
-        let prev_account = self.get_account_by_id(req.id).await?;
+    pub async fn update(&self, req: UpdateRequest) -> Result<Account> {
+        let prev_account = self.get_by_id(req.id).await?;
         let idx_keys = index_keys(req.email.as_str());
         let idx_prev_keys = index_keys(prev_account.email.as_str());
 
@@ -136,8 +133,8 @@ impl Provider {
         Ok(account)
     }
 
-    pub async fn delete_account(&self, id: u64) -> Result<Account> {
-        let account = self.get_account_by_id(id).await?;
+    pub async fn delete(&self, id: u64) -> Result<Account> {
+        let account = self.get_by_id(id).await?;
         self.store.delete(Key::Data(id).as_bytes()).await?;
 
         self.idx
