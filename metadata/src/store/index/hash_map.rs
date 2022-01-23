@@ -12,10 +12,7 @@ impl HashMap {
         HashMap { store }
     }
 
-    pub async fn check_insert_constraints(
-        &mut self,
-        keys: &Vec<Option<Vec<u8>>>,
-    ) -> Result<()> {
+    pub async fn check_insert_constraints(&mut self, keys: &Vec<Option<Vec<u8>>>) -> Result<()> {
         for key in keys.iter() {
             if let Some(key) = key {
                 if let Some(_) = self.store.get(key).await? {
@@ -26,7 +23,11 @@ impl HashMap {
         Ok(())
     }
 
-    pub async fn insert<V: AsRef<[u8]>>(&mut self, keys: &Vec<Option<Vec<u8>>>, value: V) -> Result<()> {
+    pub async fn insert<V: AsRef<[u8]>>(
+        &mut self,
+        keys: &Vec<Option<Vec<u8>>>,
+        value: V,
+    ) -> Result<()> {
         for key in keys.iter() {
             if let Some(key) = key {
                 self.store.put(key, value.as_ref()).await?;
@@ -83,8 +84,8 @@ impl HashMap {
     }
 
     pub async fn get<K>(&self, key: K) -> Result<Vec<u8>>
-        where
-            K: AsRef<[u8]>,
+    where
+        K: AsRef<[u8]>,
     {
         match self.store.get(key).await? {
             None => Err(Error::IndexKeyNotFound),

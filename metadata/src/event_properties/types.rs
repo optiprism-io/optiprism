@@ -99,7 +99,12 @@ impl IndexValues for CreateEventPropertyRequest {
 }
 
 impl CreateEventPropertyRequest {
-    pub fn into_event_property(self, id: u64, col_id: u64, created_at: DateTime<Utc>) -> EventProperty {
+    pub fn into_event_property(
+        self,
+        id: u64,
+        col_id: u64,
+        created_at: DateTime<Utc>,
+    ) -> EventProperty {
         EventProperty {
             id,
             created_at,
@@ -151,7 +156,7 @@ impl IndexValues for UpdateEventPropertyRequest {
     fn project_id(&self) -> u64 {
         self.project_id
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -162,7 +167,12 @@ impl IndexValues for UpdateEventPropertyRequest {
 }
 
 impl UpdateEventPropertyRequest {
-    pub fn into_event_property(self, prev: EventProperty, updated_at: DateTime<Utc>, updated_by: Option<u64>) -> EventProperty {
+    pub fn into_event_property(
+        self,
+        prev: EventProperty,
+        updated_at: DateTime<Utc>,
+        updated_by: Option<u64>,
+    ) -> EventProperty {
         EventProperty {
             id: self.id,
             created_at: prev.created_at,

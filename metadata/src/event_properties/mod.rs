@@ -2,4 +2,6 @@ pub mod provider;
 mod types;
 
 pub use provider::Provider;
-pub use types::{Status, Scope, EventProperty, CreateEventPropertyRequest, UpdateEventPropertyRequest};
+pub use types::{
+    CreateEventPropertyRequest, EventProperty, Scope, Status, UpdateEventPropertyRequest,
+};

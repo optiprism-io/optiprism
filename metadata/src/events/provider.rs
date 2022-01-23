@@ -27,7 +27,7 @@ fn index_keys(values: Box<&dyn IndexValues>) -> Vec<Option<Vec<u8>>> {
                     IDX_DISPLAY_NAME,
                     display_name,
                 )
-                    .to_vec(),
+                .to_vec(),
             ),
         ]
     } else {
@@ -64,15 +64,10 @@ impl Provider {
         let event = req.into_event(id, created_at);
         let data = serialize(&event)?;
         self.store
-            .put(
-                make_data_key(NAMESPACE, event.project_id, event.id),
-                &data,
-            )
+            .put(make_data_key(NAMESPACE, event.project_id, event.id), &data)
             .await?;
 
-        self.idx
-            .insert(idx_keys.as_ref(), &data)
-            .await?;
+        self.idx.insert(idx_keys.as_ref(), &data).await?;
         Ok(event)
     }
 
@@ -120,18 +115,11 @@ impl Provider {
         let event = req.into_event(prev_event, updated_at, None);
         let data = serialize(&event)?;
         self.store
-            .put(
-                make_data_key(NAMESPACE, event.project_id, event.id),
-                &data,
-            )
+            .put(make_data_key(NAMESPACE, event.project_id, event.id), &data)
             .await?;
 
         self.idx
-            .update(
-                idx_keys.as_ref(),
-                idx_prev_keys.as_ref(),
-                &data,
-            )
+            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
             .await?;
         Ok(event)
     }

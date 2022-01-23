@@ -4,9 +4,9 @@ use metadata::Metadata;
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use uuid::Uuid;
-use metadata::events::{Scope, Status, UpdateEventRequest};
 use metadata::events::types::CreateEventRequest;
+use metadata::events::{Scope, Status, UpdateEventRequest};
+use uuid::Uuid;
 
 #[tokio::test]
 async fn test_events() -> Result<()> {
@@ -88,15 +88,24 @@ async fn test_events() -> Result<()> {
     assert_eq!(res.description, update_event1.description);
 
     update_event1.display_name = Some("e".to_string());
-    assert_eq!(md.events.update(update_event1.clone()).await?.display_name, Some("e".to_string()));
+    assert_eq!(
+        md.events.update(update_event1.clone()).await?.display_name,
+        Some("e".to_string())
+    );
 
     let mut update_event2 = update_event_req.clone();
     update_event2.id = 2;
     update_event2.display_name = Some("e".to_string());
     assert!(md.events.update(update_event2.clone()).await.is_err());
     update_event1.display_name = Some("ee".to_string());
-    assert_eq!(md.events.update(update_event1.clone()).await?.display_name, Some("ee".to_string()));
-    assert_eq!(md.events.update(update_event2.clone()).await?.display_name, Some("e".to_string()));
+    assert_eq!(
+        md.events.update(update_event1.clone()).await?.display_name,
+        Some("ee".to_string())
+    );
+    assert_eq!(
+        md.events.update(update_event2.clone()).await?.display_name,
+        Some("e".to_string())
+    );
     // TODO fix
     // assert_eq!(md.events.list_events().await?[0].id, 1);
     // assert_eq!(md.events.list_events().await?[1].id, 2);
