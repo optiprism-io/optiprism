@@ -1,3 +1,4 @@
+use std::any::Any;
 use crate::error::Error;
 use crate::store::store::{make_data_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
@@ -8,6 +9,12 @@ use crate::store::index;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
+use datafusion::datasource::{TableProvider, TableType};
+use datafusion::datasource::datasource::TableProviderFilterPushDown;
+use datafusion::logical_plan::Expr;
+use datafusion::physical_plan::ExecutionPlan;
+use crate::events::memory::RocksDBTable;
 
 const NAMESPACE: &[u8] = b"events";
 const IDX_NAME: &[u8] = b"name";
@@ -194,5 +201,49 @@ impl Provider {
             .delete(index_keys(Box::new(&event)).as_ref())
             .await?;
         Ok(event)
+    }
+}
+
+impl TableProvider for Provider {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> SchemaRef {
+        let fields = vec![
+            Field::new("id", DataType::UInt64, false),
+            Field::new("created_at", DataType::Timestamp(TimeUnit::Second, None), false),
+            Field::new("updated_at", DataType::Timestamp(TimeUnit::Second, None), true),
+            Field::new("created_by", DataType::UInt64, false),
+            Field::new("updated_by", DataType::UInt64, true),
+            Field::new("project_id", DataType::UInt64, false),
+            Field::new("tags", DataType::List(Box::new(Field::new("tag", DataType::Utf8, false))), true),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("display_name", DataType::Utf8, true),
+            Field::new("description", DataType::Utf8, true),
+            Field::new("status", DataType::Utf8, false),
+            Field::new("scope", DataType::Utf8, false),
+            Field::new("properties", DataType::List(Box::new(Field::new("property_id", DataType::UInt64, false))), true),
+            Field::new("custom_properties", DataType::List(Box::new(Field::new("property_id", DataType::UInt64, false))), true),
+        ];
+
+        Arc::new(Schema::new(fields))
+    }
+
+    fn table_type(&self) -> TableType {
+        TableType::Base
+    }
+
+    async fn scan(&self,
+                  projection: &Option<Vec<usize>>,
+                  _batch_size: usize,
+                  _filters: &[Expr],
+                  limit: Option<usize>,
+    ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
+        self.store.list_prefix()
+    }
+
+    fn supports_filter_pushdown(&self, _filter: &Expr) -> datafusion::error::Result<TableProviderFilterPushDown> {
+        Ok(TableProviderFilterPushDown::Unsupported)
     }
 }

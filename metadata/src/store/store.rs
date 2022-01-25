@@ -143,6 +143,10 @@ impl Store {
     pub async fn list_prefix<K: AsRef<[u8]>>(&self, prefix: K) -> Result<Vec<KVBytes>> {
         let prefix = prefix.as_ref();
         let iter = self.db.prefix_iterator(prefix);
+        let b = self.db.iterator();
+        for sb in b{
+
+        }
         Ok(iter
             .filter_map(|v| {
                 if v.0.len() > prefix.len() && v.0[..prefix.len()].eq(prefix) {

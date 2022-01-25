@@ -5,6 +5,7 @@ use datafusion::scalar::ScalarValue;
 use std::fmt::Debug;
 
 pub mod expressions;
+pub mod rocks_db;
 
 // PartitionedAccumulator extends Accumulator trait with reset
 pub trait PartitionedAccumulator: Debug {

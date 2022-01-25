@@ -24,6 +24,10 @@ impl Error {
     pub fn into_datafusion_plan_error(self) -> DataFusionError {
         DataFusionError::Plan(self.to_string())
     }
+
+    pub fn into_arrow_external_error(self) -> ArrowError {
+        ArrowError::from_external_error(Box::new(self))
+    }
 }
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {

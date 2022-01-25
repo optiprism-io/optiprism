@@ -57,38 +57,9 @@ checksum = "a4c527152e37cf757a3f78aae5a06fbeefdb07ccc535c980a3208ee3060dd544"
 
 [[package]]
 name = "arrayvec"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
-
-[[package]]
-name = "arrayvec"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
-
-[[package]]
-name = "arrow"
-version = "5.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2678e86fcfd8084e23310a1ded1d4b355663d78b5e79561b014c3a66cc211231"
-dependencies = [
- "bitflags",
- "chrono",
- "csv",
- "flatbuffers",
- "hex",
- "indexmap",
- "lazy_static",
- "lexical-core 0.7.6",
- "multiversion",
- "num",
- "rand",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
-]
 
 [[package]]
 name = "arrow"
@@ -104,7 +75,7 @@ dependencies = [
  "hex",
  "indexmap",
  "lazy_static",
- "lexical-core 0.8.2",
+ "lexical-core",
  "multiversion",
  "num",
  "rand",
@@ -263,7 +234,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "526c210b4520e416420759af363083471656e819a75e831b8d2c9d5a584f2413"
 dependencies = [
  "arrayref",
- "arrayvec 0.7.2",
+ "arrayvec",
  "cc",
  "cfg-if",
  "constant_time_eq",
@@ -436,8 +407,10 @@ dependencies = [
 name = "common"
 version = "0.1.0"
 dependencies = [
+ "arrow",
  "async-trait",
  "chrono",
+ "datafusion",
  "hex",
  "jsonwebtoken",
  "lazy_static",
@@ -598,7 +571,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79e4a8a1f1ee057b2c27a01f050b9dffe56e8d43605d0201234b353a3cc1eb2f"
 dependencies = [
  "ahash",
- "arrow 6.3.0",
+ "arrow",
  "async-trait",
  "blake2",
  "blake3",
@@ -1056,19 +1029,6 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "lexical-core"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6607c62aa161d23d17a9072cc5da0be67cdfc89d3afb1e8d9c842bebc2525ffe"
-dependencies = [
- "arrayvec 0.5.2",
- "bitflags",
- "cfg-if",
- "ryu",
- "static_assertions",
-]
-
-[[package]]
-name = "lexical-core"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a3926d8f156019890be4abe5fd3785e0cff1001e06f59c597641fd513a5a284"
@@ -1240,10 +1200,11 @@ name = "metadata"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arrow 5.5.0",
+ "arrow",
  "bincode",
  "chrono",
  "common",
+ "datafusion",
  "futures",
  "rocksdb",
  "serde",
@@ -1533,7 +1494,7 @@ version = "6.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "479de475fbb7abf51e39cde69da3cc902d13a6fcb9259993f98688325e6a1ee7"
 dependencies = [
- "arrow 6.3.0",
+ "arrow",
  "base64 0.13.0",
  "brotli",
  "byteorder",
@@ -1709,11 +1670,17 @@ dependencies = [
 name = "query"
 version = "0.1.0"
 dependencies = [
- "arrow 6.3.0",
+ "arrow",
+ "bincode",
  "chrono",
  "datafusion",
+ "futures",
+ "metadata",
  "mockall",
  "platform",
+ "rocksdb",
+ "serde",
+ "serde_json",
  "store",
  "tokio",
 ]
@@ -2060,7 +2027,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "store"
 version = "0.1.0"
 dependencies = [
- "arrow 5.5.0",
+ "arrow",
  "chrono",
  "datafusion",
 ]
