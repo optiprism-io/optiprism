@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::sync::Arc;
 use arrow::datatypes::DataType;
@@ -47,6 +48,7 @@ impl From<SortedDistinct> for AggregateUDF {
 #[derive(Debug, Default)]
 struct SortedDistinctAccumulator {
     current: Option<ScalarValue>,
+    ordering: Option<Ordering>,
     distinct: u64,
 }
 
@@ -55,12 +57,46 @@ impl SortedDistinctAccumulator {
         Self::default()
     }
 
-    fn offer(&mut self, value: &ScalarValue) {
-        if self.current.is_none() || !value.eq(self.current.as_ref().unwrap()) {
+    fn offer(&mut self, value: &ScalarValue) -> datafusion::error::Result<()> {
+        if value.is_null() {
+            return Ok(());
+        }
+
+        if self.current.is_none() {
             self.current = Some(value.clone());
             self.distinct += 1;
-            // TODO return Err if data happens to be unsorted (detect asc/desc ordering on the fly)
+            return Ok(());
         }
+
+        let ordering = value.partial_cmp(self.current.as_ref().unwrap());
+        if ordering.is_none() {
+            let message = format!("SortedDistinctAccumulator: cannot compare '{}' to '{}'.",
+                                  value, self.current.as_ref().unwrap());
+            return Err(datafusion::error::DataFusionError::Internal(message));
+        }
+        let ordering = ordering.unwrap();
+
+        if self.ordering.is_none() && ordering != Ordering::Equal {
+            self.distinct += 1;
+            self.current = Some(value.clone());
+            self.ordering = Some(ordering);
+            return Ok(());
+        }
+
+        if ordering == Ordering::Equal {
+            return Ok(());
+        } else {
+            self.distinct += 1;
+            self.current = Some(value.clone());
+        }
+
+        if &ordering != self.ordering.as_ref().unwrap() {
+            let message = format!("SortedDistinctAccumulator: ordering violation detected '{:?}' after '{:?}'.",
+                                  ordering, self.ordering.as_ref().unwrap());
+            return Err(datafusion::error::DataFusionError::Internal(message));
+        }
+
+        Ok(())
     }
 }
 
@@ -71,7 +107,7 @@ impl Accumulator for SortedDistinctAccumulator {
 
     fn update(&mut self, values: &[ScalarValue]) -> datafusion::error::Result<()> {
         for value in values {
-            self.offer(value);
+            self.offer(value)?;
         }
         Ok(())
     }
@@ -91,4 +127,47 @@ impl Accumulator for SortedDistinctAccumulator {
     fn evaluate(&self) -> datafusion::error::Result<ScalarValue> {
         Ok(ScalarValue::UInt64(Some(self.distinct)))
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+    use datafusion::error::DataFusionError;
+    use super::*;
+
+    fn check_distinct(sequence: &[i64], expected: usize) -> datafusion::error::Result<()> {
+        let mut acc = SortedDistinctAccumulator::new();
+        for val in sequence {
+            acc.offer(&ScalarValue::Int64(Some(*val)))?;
+        }
+        let state = acc.state()?[0].clone();
+        assert_eq!(state, ScalarValue::UInt64(Some(expected as u64)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_ordered_unique() {
+        let sequence = vec![1, 2, 3, 5, 7, 11, 13, 17, 19];
+        check_distinct(&sequence, sequence.len()).unwrap();
+    }
+
+    #[test]
+    fn test_ordered_duplicates() {
+        let sequence = vec![1, 2, 2, 3, 3, 3, 5, 5, 5, 5, 7, 7, 7, 11, 13, 17, 19];
+        let expected = sequence.iter().cloned().collect::<HashSet<_>>().len();
+        check_distinct(&sequence, expected).unwrap();
+    }
+
+    #[test]
+    fn test_unordered() {
+        let sequence = vec![1, 2, 3, 5, 7, 11, 13, 17, 19, 1];
+        let result = check_distinct(&sequence, sequence.len());
+
+        let expected = "SortedDistinctAccumulator: ordering violation detected 'Less' after 'Greater'.";
+        match result {
+            Err(DataFusionError::Internal(actual)) => assert_eq!(actual, expected),
+            e => panic!("Unexpected result: {:?}", e)
+        }
+    }
+
 }

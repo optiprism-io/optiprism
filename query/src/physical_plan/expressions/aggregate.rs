@@ -37,7 +37,7 @@ use datafusion::scalar::ScalarValue;
 
 #[derive(Debug, Clone)]
 pub enum CustomAggregationFunction {
-    SortedDistinct(DataType),
+    OrderedDistinct(DataType),
 }
 
 // enum storage for accumulator for fast static dispatching and easy translating between threads

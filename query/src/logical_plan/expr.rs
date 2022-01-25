@@ -202,7 +202,7 @@ impl Expr {
                 ..
             } => {
                 match fun {
-                    CustomAggregationFunction::SortedDistinct(data_type) => {
+                    CustomAggregationFunction::OrderedDistinct(data_type) => {
                         let sorted_distinct = SortedDistinct::new(
                             "count".to_string(), data_type.clone());
                         let udf = sorted_distinct.into();
@@ -320,7 +320,7 @@ impl Expr {
                 ..
             } => {
                 match fun {
-                    CustomAggregationFunction::SortedDistinct(data_type) => Ok(data_type.clone()),
+                    CustomAggregationFunction::OrderedDistinct(data_type) => Ok(data_type.clone()),
                 }
             }
             Expr::AggregatePartitionedFunction {

@@ -616,10 +616,14 @@ fn plan_agg(
                     args: vec![col(event_fields::EVENT_NAME)],
                     distinct: false,
                 },
-                Query::CountUniqueGroups | Query::DailyActiveGroups => Expr::CustomAggregationFunction {
-                    fun: CustomAggregationFunction::SortedDistinct(DataType::UInt64), // TODO FIXME data type is hard-coded!
-                    args: vec![col(es.group.as_ref())],
-                    distinct: true,
+                Query::CountUniqueGroups | Query::DailyActiveGroups => {
+                    // Data type needs to be known in advance
+                    let data_type = DataType::UInt64;
+                    Expr::CustomAggregationFunction {
+                        fun: CustomAggregationFunction::OrderedDistinct(data_type),
+                        args: vec![col(es.group.as_ref())],
+                        distinct: true,
+                    }
                 },
                 Query::WeeklyActiveGroups => unimplemented!(),
                 Query::MonthlyActiveGroups => unimplemented!(),
