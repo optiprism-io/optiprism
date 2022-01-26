@@ -37,7 +37,7 @@ impl Provider {
         let account = self
             .accounts
             .create(
-                Context::with_permission(organization.id, Permission::AccountCreate),
+                Context::with_permission(organization.id, Permission::CreateAccount),
                 CreateAccountRequest {
                     admin: false,
                     password: request.password,

@@ -1,4 +1,5 @@
 use crate::Error;
+use crate::Result;
 use axum::{
     async_trait,
     extract::{FromRequest, RequestParts, TypedHeader},
@@ -9,10 +10,12 @@ use common::{
     rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS},
 };
 use std::collections::HashMap;
+use common::rbac::{Action, Resource};
 
 #[derive(Default)]
 pub struct Context {
     pub organization_id: u64,
+    pub project_id: u64,
     pub account_id: u64,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
@@ -26,6 +29,33 @@ impl Context {
         permissions.insert(Scope::Organization, vec![permission]);
         ctx.permissions = Some(permissions);
         ctx
+    }
+
+    pub fn check_action_permission(&self, permission: Permission) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn maybe_check_project_permission(&self, project_id: Option<u64>) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn check_project_permission(&self, project_id: u64) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn check_organization_permission(&self, organization_id: u64) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn check_resource_permission(&self, id: u64, owner_id: u64, resource: Resource, action: Action) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn get_project_id(&self, other_project_id: Option<u64>) -> u64 {
+        match other_project_id {
+            None => self.project_id,
+            Some(project_id) => project_id
+        }
     }
 
     pub fn is_permitted(
@@ -86,15 +116,15 @@ fn check_permissions(permissions: &[Permission], permission: &Permission) -> boo
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
-where
-    B: Send,
+    where
+        B: Send,
 {
     type Rejection = Error;
 
-    async fn from_request(request: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+    async fn from_request(request: &mut RequestParts<B>) -> std::Result<Self, Self::Rejection> {
         let mut ctx = Context::default();
         if let Ok(TypedHeader(Authorization(bearer))) =
-            TypedHeader::<Authorization<Bearer>>::from_request(request).await
+        TypedHeader::<Authorization<Bearer>>::from_request(request).await
         {
             if let Some(token) = bearer.token().strip_prefix("Bearer ") {
                 if let Ok(claims) = parse_access_token(token) {

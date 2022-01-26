@@ -20,7 +20,7 @@ impl Provider {
     }
 
     pub async fn create(&self, ctx: Context, request: CreateRequest) -> Result<Account> {
-        if !ctx.is_permitted(request.organization_id, 0, Permission::AccountCreate) {
+        if !ctx.is_permitted(request.organization_id, 0, Permission::CreateAccount) {
             unimplemented!()
         }
         let salt = make_salt();
