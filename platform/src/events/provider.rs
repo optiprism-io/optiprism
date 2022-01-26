@@ -17,8 +17,6 @@ pub struct Provider {
     metadata: Arc<Metadata>,
 }
 
-fn overwrite_project(project_id: u64) -> u64 {}
-
 impl Provider {
     pub fn new(metadata: Arc<Metadata>) -> Self {
         Self { metadata }
