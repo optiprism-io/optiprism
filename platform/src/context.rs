@@ -31,7 +31,7 @@ impl Context {
         ctx
     }
 
-    pub pub fn check_permission(
+    pub fn check_permission(
         &self,
         organization_id: u64,
         project_id: u64,

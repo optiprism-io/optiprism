@@ -79,7 +79,7 @@ impl Provider {
 
     pub async fn get_by_id(&self, id: u64) -> Result<Account> {
         match self.store.get(Key::Data(id).as_bytes()).await? {
-            None => Err(Error::AccountDoesNotExist),
+            None => Err(Error::KeyNotFound),
             Some(value) => Ok(deserialize(&value)?),
         }
     }

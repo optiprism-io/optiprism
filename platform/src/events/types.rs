@@ -6,6 +6,7 @@ use metadata::events::{Scope, Status};
 #[derive(Deserialize)]
 pub struct CreateRequest {
     pub created_by: u64,
+    pub project_id: u64,
     pub tags: Vec<String>,
     pub name: String,
     pub display_name: Option<String>,
@@ -19,8 +20,10 @@ pub struct CreateRequest {
 
 #[derive(Deserialize)]
 pub struct UpdateRequest {
+    pub id: u64,
     pub created_by: u64,
     pub updated_by: u64,
+    pub project_id: u64,
     pub tags: Vec<String>,
     pub name: String,
     pub display_name: Option<String>,

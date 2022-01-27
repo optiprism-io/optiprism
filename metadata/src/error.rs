@@ -2,6 +2,7 @@ use std::{
     fmt::{self, Display, Formatter},
     result,
 };
+use std::sync::PoisonError;
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -11,19 +12,9 @@ pub enum Error {
     Plan(String),
     BincodeError(bincode::Error),
     RocksDbError(rocksdb::Error),
-    EventWithSameNameAlreadyExist,
-    EventDoesNotExist,
-    EventAlreadyHasGlobalProperty,
-    EventDoesntHaveGlobalProperty,
-    EventPropertyWithSameNameAlreadyExist,
-    EventPropertyWithSameDisplayNameAlreadyExist,
-    EventPropertyDoesNotExist,
-    EventPropertyColumnShouldBeEmpty,
-    OrganizationDoesNotExist,
-    ProjectDoesNotExist,
-    AccountDoesNotExist,
-    IndexKeyExist,    // TODO make parametrized errors
-    IndexKeyNotFound, // TODO make parametrized errors
+    KeyAlreadyExist,
+    KeyNotFound,
+    ConstraintViolation,
 }
 
 impl std::error::Error for Error {}

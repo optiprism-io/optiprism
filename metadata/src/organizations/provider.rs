@@ -40,7 +40,7 @@ impl Provider {
 
     pub async fn get_by_id(&self, id: u64) -> Result<Organization> {
         match self.store.get(&data_key(id)).await? {
-            None => Err(Error::OrganizationDoesNotExist),
+            None => Err(Error::KeyNotFound),
             Some(value) => Ok(deserialize(&value)?),
         }
     }

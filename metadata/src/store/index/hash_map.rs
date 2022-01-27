@@ -16,7 +16,7 @@ impl HashMap {
         for key in keys.iter() {
             if let Some(key) = key {
                 if let Some(_) = self.store.get(key).await? {
-                    return Err(Error::IndexKeyExist);
+                    return Err(Error::ConstraintViolation);
                 }
             }
         }
@@ -45,7 +45,7 @@ impl HashMap {
             if let Some(key_v) = key {
                 if key != prev_key {
                     if let Some(_) = self.store.get(key_v).await? {
-                        return Err(Error::IndexKeyExist);
+                        return Err(Error::ConstraintViolation);
                     }
                 }
             }
@@ -88,7 +88,7 @@ impl HashMap {
         K: AsRef<[u8]>,
     {
         match self.store.get(key).await? {
-            None => Err(Error::IndexKeyNotFound),
+            None => Err(Error::KeyNotFound),
             Some(v) => Ok(v),
         }
     }

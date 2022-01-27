@@ -51,7 +51,7 @@ impl Provider {
 
     pub async fn get_by_id(&self, organization_id: u64, id: u64) -> Result<Project> {
         match self.store.get(&data_key(organization_id, id)).await? {
-            None => Err(Error::ProjectDoesNotExist),
+            None => Err(Error::KeyNotFound),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
