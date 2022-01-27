@@ -30,7 +30,7 @@ impl From<SortedDistinct> for AggregateUDF {
     fn from(sorted_distinct: SortedDistinct) -> Self {
         let data_type = Arc::new(sorted_distinct.data_type.clone());
         let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(data_type.clone()));
-        let accumulator: AccumulatorFunctionImplementation = Arc::new(|| Ok(Box::new(SortedDistinctAccumulator::new())));
+        let accumulator: AccumulatorFunctionImplementation = Arc::new(|| Ok(Box::new(SortedDistinctCountAccumulator::new())));
         let state_type: StateTypeFunction = Arc::new(|_| Ok(Arc::new(vec![DataType::UInt64])));
         AggregateUDF::new(
             &sorted_distinct.name,
@@ -46,13 +46,13 @@ impl From<SortedDistinct> for AggregateUDF {
 }
 
 #[derive(Debug, Default)]
-struct SortedDistinctAccumulator {
+struct SortedDistinctCountAccumulator {
     current: Option<ScalarValue>,
     ordering: Option<Ordering>,
     distinct: u64,
 }
 
-impl SortedDistinctAccumulator {
+impl SortedDistinctCountAccumulator {
     fn new() -> Self {
         Self::default()
     }
@@ -100,7 +100,7 @@ impl SortedDistinctAccumulator {
     }
 }
 
-impl Accumulator for SortedDistinctAccumulator {
+impl Accumulator for SortedDistinctCountAccumulator {
     fn state(&self) -> datafusion::error::Result<Vec<ScalarValue>> {
         Ok(vec![ScalarValue::UInt64(Some(self.distinct))])
     }
@@ -136,7 +136,7 @@ mod tests {
     use super::*;
 
     fn check_distinct(sequence: &[i64], expected: usize) -> datafusion::error::Result<()> {
-        let mut acc = SortedDistinctAccumulator::new();
+        let mut acc = SortedDistinctCountAccumulator::new();
         for val in sequence {
             acc.offer(&ScalarValue::Int64(Some(*val)))?;
         }
