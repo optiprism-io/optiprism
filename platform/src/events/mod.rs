@@ -1,4 +1,5 @@
 mod provider;
 mod types;
 
-pub use types::{CreateRequest};
+pub use provider::Provider;
+pub use types::{CreateRequest, UpdateRequest};

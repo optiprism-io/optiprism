@@ -1,4 +1,5 @@
 mod auth;
+mod events;
 
 use axum::Router;
 

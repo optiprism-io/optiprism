@@ -141,7 +141,7 @@ impl Provider {
         project_id: u64,
         event_id: u64,
         prop_id: u64,
-    ) -> Result<()> {
+    ) -> Result<Event> {
         let mut event = self.get_by_id(project_id, event_id).await?;
         event.properties = match event.properties {
             None => Some(vec![prop_id]),
@@ -157,7 +157,7 @@ impl Provider {
                 serialize(&event)?,
             )
             .await?;
-        Ok(())
+        Ok(event)
     }
 
     pub async fn detach_property(
@@ -165,7 +165,7 @@ impl Provider {
         project_id: u64,
         event_id: u64,
         prop_id: u64,
-    ) -> Result<()> {
+    ) -> Result<Event> {
         let mut event = self.get_by_id(project_id, event_id).await?;
         event.properties = match event.properties {
             None => return Err(Error::EventDoesntHaveGlobalProperty),
@@ -181,7 +181,7 @@ impl Provider {
                 serialize(&event)?,
             )
             .await?;
-        Ok(())
+        Ok(event)
     }
 
     pub async fn delete(&mut self, project_id: u64, id: u64) -> Result<Event> {

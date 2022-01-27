@@ -31,24 +31,18 @@ impl Context {
         ctx
     }
 
-    pub fn check_action_permission(&self, permission: Permission) -> Result<()> {
-        Ok(())
+    pub pub fn check_permission(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        permission: Permission,
+    ) -> Result<()> {
+        unimplemented!()
     }
 
-    pub fn maybe_check_project_permission(&self, project_id: Option<u64>) -> Result<()> {
-        Ok(())
-    }
 
-    pub fn check_project_permission(&self, project_id: u64) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn check_organization_permission(&self, organization_id: u64) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn check_resource_permission(&self, id: u64, owner_id: u64, resource: Resource, action: Action) -> Result<()> {
-        Ok(())
+    pub fn check_ownership(&self, owner_id: u64) -> Result<()> {
+        unimplemented!()
     }
 
     pub fn get_project_id(&self, other_project_id: Option<u64>) -> u64 {
