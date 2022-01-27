@@ -205,7 +205,7 @@ impl Expr {
                     CustomAggregationFunction::OrderedDistinct(data_type) => {
                         let sorted_distinct = SortedDistinct::new(
                             "count".to_string(), data_type.clone());
-                        let udf = sorted_distinct.into();
+                        let udf = sorted_distinct.try_into()?;
                         let args = args.iter()
                             .map(|arg| arg.to_df_expr(input_schema))
                             .collect::<Result<_>>()?;
