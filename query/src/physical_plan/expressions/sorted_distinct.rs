@@ -1,9 +1,10 @@
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::sync::Arc;
-use arrow::array::ArrayRef;
-use arrow::datatypes::DataType;
+use arrow::array::{ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, DictionaryArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, LargeBinaryArray, LargeStringArray, ListArray, PrimitiveArray, StringArray, StructArray, TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+use arrow::datatypes::{ArrowPrimitiveType, DataType, Int64Type, Int8Type, TimeUnit};
 use datafusion::error::{DataFusionError, Result};
+use datafusion::parquet::arrow::converter::Utf8ArrayConverter;
 use datafusion::physical_plan::{Accumulator, AggregateExpr, PhysicalExpr};
 use datafusion::physical_plan::aggregates::{AccumulatorFunctionImplementation, StateTypeFunction};
 use datafusion::physical_plan::functions::{ReturnTypeFunction, Signature, TypeSignature, Volatility};
@@ -70,6 +71,90 @@ impl SortedDistinctCountAccumulator {
     }
 }
 
+fn distinct_iter_count<T, I>(it: I) -> u64
+    where
+        I: Iterator<Item=Option<T>>,
+        T: Clone + Eq
+{
+    let mut current: Option<T> = None;
+    let mut count: u64 = 0;
+    for item in it {
+        if item.is_none() {
+            continue;
+        }
+        let item = item.as_ref().unwrap();
+        if current.is_none() || !current.as_ref().unwrap().eq(&item) {
+            count += 1;
+            current = Some(item.clone());
+        }
+    }
+    count
+}
+
+fn distinct_array_count<A, T>(array: &ArrayRef, data_type: &DataType) -> Result<u64>
+    where
+        A: 'static,
+        T: Clone + Eq,
+        for<'a> &'a A: IntoIterator<Item = Option<T>>,
+{
+    if let Some(arr) = array.as_any().downcast_ref::<A>() {
+        let it = arr.into_iter();
+        Ok(distinct_iter_count(it))
+    } else {
+        let message = format!("Failed to downcast array of type '{}' to type item type '{}",
+            array.data_type(), data_type);
+        Err(DataFusionError::Internal(message))
+    }
+}
+
+fn distinct_count(array: &ArrayRef) -> Result<u64> {
+    let dt = array.data_type();
+    match dt {
+        DataType::Boolean => distinct_array_count::<BooleanArray, _>(array, dt),
+        // TODO FIXME Float{32, 64} are not Eq
+        // DataType::Float64 => distinct_array_count::<Float64Array, _>(array, dt),
+        // DataType::Float32 => distinct_array_count::<Float32Array, _>(array, dt),
+        DataType::UInt64 => distinct_array_count::<UInt64Array, _>(array, dt),
+        DataType::UInt32 => distinct_array_count::<UInt32Array, _>(array, dt),
+        DataType::UInt16 => distinct_array_count::<UInt16Array, _>(array, dt),
+        DataType::UInt8 => distinct_array_count::<UInt8Array, _>(array, dt),
+        DataType::Int64 => distinct_array_count::<Int64Array, _>(array, dt),
+        DataType::Int32 => distinct_array_count::<Int32Array, _>(array, dt),
+        DataType::Int16 => distinct_array_count::<Int16Array, _>(array, dt),
+        DataType::Int8 => distinct_array_count::<Int8Array, _>(array, dt),
+        // TODO FIXME implementation of `IntoIterator` is not general enough
+        // DataType::Binary => distinct_array_count::<BinaryArray, _>(array, dt),
+        // DataType::LargeBinary => distinct_array_count::<LargeBinaryArray, _>(array, dt),
+        // DataType::Utf8 => distinct_array_count::<StringArray, _>(array, dt),
+        // DataType::LargeUtf8 => distinct_array_count::<LargeStringArray, _>(array, dt),
+        // TODO FIXME ListArray is not an iterator
+        // DataType::List(_) => distinct_array_count::<ListArray, _>(array, dt),
+        DataType::Date32 => distinct_array_count::<Date32Array, _>(array, dt),
+        DataType::Date64 => distinct_array_count::<Date64Array, _>(array, dt),
+        DataType::Timestamp(TimeUnit::Second, _) => distinct_array_count::<TimestampSecondArray, _>(array, dt),
+        DataType::Timestamp(TimeUnit::Millisecond, _) => distinct_array_count::<TimestampMillisecondArray, _>(array, dt),
+        DataType::Timestamp(TimeUnit::Microsecond, _) => distinct_array_count::<TimestampMicrosecondArray, _>(array, dt),
+        DataType::Timestamp(TimeUnit::Nanosecond, _) => distinct_array_count::<TimestampNanosecondArray, _>(array, dt),
+        DataType::Dictionary(index_type, _) => {
+            let index_type = *index_type.clone();
+            match index_type {
+                // TODO FIXME DictionaryArray is not an iterator
+                //DataType::Int8 => distinct_array_count::<DictionaryArray<Int8Type>, _>(array, dt),
+                other => {
+                    let message = format!("Cannot compute ordered distinct count over array of dictionary[{:?}]", other);
+                    Err(DataFusionError::NotImplemented(message))
+                }
+            }
+        },
+        // TODO FIXME StructArray is not an iterator
+        //DataType::Struct(_) => distinct_array_count::<StructArray, _>(array, dt),
+        other => {
+            let message = format!("Cannot compute ordered distinct count over array of type \"{:?}\"", other);
+            Err(DataFusionError::NotImplemented(message))
+        }
+    }
+}
+
 impl Accumulator for SortedDistinctCountAccumulator {
     fn state(&self) -> Result<Vec<ScalarValue>> {
         Ok(vec![ScalarValue::UInt64(Some(self.count))])
@@ -80,6 +165,13 @@ impl Accumulator for SortedDistinctCountAccumulator {
         if !self.current.eq(value) {
             self.current = value.clone();
             self.count += 1;
+        }
+        Ok(())
+    }
+
+    fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
+        for array in values {
+            self.count += distinct_count(array)?;
         }
         Ok(())
     }
