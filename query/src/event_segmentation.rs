@@ -13,7 +13,7 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use store::dictionary::DictionaryProvider;
 use store::schema::{event_fields, SchemaProvider};
-use crate::physical_plan::expressions::aggregate::CustomAggregationFunction;
+use crate::physical_plan::expressions::aggregate::AggregationFunction;
 
 #[derive(Clone)]
 pub enum TimeUnit {
@@ -166,16 +166,16 @@ pub enum Query {
     WeeklyActiveGroups,
     MonthlyActiveGroups,
     CountPerGroup {
-        aggregate: CustomAggregationFunction,
+        aggregate: AggregationFunction,
     },
     AggregatePropertyPerGroup {
         property: PropertyRef,
-        aggregate_per_group: CustomAggregationFunction,
-        aggregate: CustomAggregationFunction,
+        aggregate_per_group: AggregationFunction,
+        aggregate: AggregationFunction,
     },
     AggregateProperty {
         property: PropertyRef,
-        aggregate: CustomAggregationFunction,
+        aggregate: AggregationFunction,
     },
     QueryFormula {
         formula: String,
@@ -612,12 +612,12 @@ fn plan_agg(
         .map(|(id, query)| {
             let q = match &query.agg {
                 Query::CountEvents => Expr::AggregateFunction {
-                    fun: CustomAggregationFunction::Count,
+                    fun: AggregationFunction::Count,
                     args: vec![col(event_fields::EVENT_NAME)],
                     distinct: false,
                 },
                 Query::CountUniqueGroups | Query::DailyActiveGroups => Expr::AggregateFunction {
-                    fun: CustomAggregationFunction::OrderedDistinct,
+                    fun: AggregationFunction::OrderedDistinct,
                     args: vec![col(es.group.as_ref())],
                     distinct: true,
                 },
@@ -731,7 +731,7 @@ mod tests {
     use std::sync::Arc;
     use store::dictionary::MockDictionary;
     use store::schema::{event_fields, DBCol, EventPropertyStatus, MockSchema};
-    use crate::physical_plan::expressions::aggregate::CustomAggregationFunction;
+    use crate::physical_plan::expressions::aggregate::AggregationFunction;
 
     fn users_provider() -> Result<MemTable> {
         let schema = Arc::new(Schema::new(vec![
@@ -1030,30 +1030,30 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::CountPerGroup {
-                            aggregate: CustomAggregationFunction::Avg,
+                            aggregate: AggregationFunction::Avg,
                         },
                         Some("count_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: CustomAggregationFunction::Avg,
-                            aggregate: CustomAggregationFunction::Avg,
+                            aggregate_per_group: AggregationFunction::Avg,
+                            aggregate: AggregationFunction::Avg,
                         },
                         Some("avg_revenue_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: CustomAggregationFunction::Min,
-                            aggregate: CustomAggregationFunction::Avg,
+                            aggregate_per_group: AggregationFunction::Min,
+                            aggregate: AggregationFunction::Avg,
                         },
                         Some("min_revenue_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregateProperty {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate: CustomAggregationFunction::Sum,
+                            aggregate: AggregationFunction::Sum,
                         },
                         Some("sum_revenue".to_string()),
                     ),
@@ -1132,22 +1132,22 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::CountPerGroup {
-                            aggregate: CustomAggregationFunction::Avg,
+                            aggregate: AggregationFunction::Avg,
                         },
                         Some("count_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: CustomAggregationFunction::Sum,
-                            aggregate: CustomAggregationFunction::Avg,
+                            aggregate_per_group: AggregationFunction::Sum,
+                            aggregate: AggregationFunction::Avg,
                         },
                         Some("avg_revenue_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregateProperty {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate: CustomAggregationFunction::Sum,
+                            aggregate: AggregationFunction::Sum,
                         },
                         Some("sum_revenue".to_string()),
                     ),

@@ -37,7 +37,7 @@ use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
 
 #[derive(Debug, Clone)]
-pub enum CustomAggregationFunction {
+pub enum AggregationFunction {
     Count,
     Sum,
     Min,
@@ -47,33 +47,33 @@ pub enum CustomAggregationFunction {
     OrderedDistinct,
 }
 
-impl fmt::Display for CustomAggregationFunction {
+impl fmt::Display for AggregationFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", format!("{:?}", self).to_uppercase())
     }
 }
 
 
-impl TryFrom<CustomAggregationFunction> for AggregateFunction {
+impl TryFrom<AggregationFunction> for AggregateFunction {
     type Error = Error;
 
-    fn try_from(value: CustomAggregationFunction) -> std::result::Result<Self, Self::Error> {
-        <Self as TryFrom<&CustomAggregationFunction>>::try_from(&value)
+    fn try_from(value: AggregationFunction) -> std::result::Result<Self, Self::Error> {
+        <Self as TryFrom<&AggregationFunction>>::try_from(&value)
     }
 }
 
-impl TryFrom<&CustomAggregationFunction> for AggregateFunction {
+impl TryFrom<&AggregationFunction> for AggregateFunction {
     type Error = Error;
 
-    fn try_from(value: &CustomAggregationFunction) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &AggregationFunction) -> std::result::Result<Self, Self::Error> {
         match value {
-            CustomAggregationFunction::Count => Ok(AggregateFunction::Count),
-            CustomAggregationFunction::Sum => Ok(AggregateFunction::Sum),
-            CustomAggregationFunction::Min => Ok(AggregateFunction::Min),
-            CustomAggregationFunction::Max => Ok(AggregateFunction::Max),
-            CustomAggregationFunction::Avg => Ok(AggregateFunction::Avg),
-            CustomAggregationFunction::ApproxDistinct => Ok(AggregateFunction::ApproxDistinct),
-            CustomAggregationFunction::OrderedDistinct => {
+            AggregationFunction::Count => Ok(AggregateFunction::Count),
+            AggregationFunction::Sum => Ok(AggregateFunction::Sum),
+            AggregationFunction::Min => Ok(AggregateFunction::Min),
+            AggregationFunction::Max => Ok(AggregateFunction::Max),
+            AggregationFunction::Avg => Ok(AggregateFunction::Avg),
+            AggregationFunction::ApproxDistinct => Ok(AggregateFunction::ApproxDistinct),
+            AggregationFunction::OrderedDistinct => {
                 let message = "OrderedDistinct as AggregateFunction".to_string();
                 Err(Error::DataFusionError(DataFusionError::NotImplemented(message)))
             }
@@ -81,15 +81,15 @@ impl TryFrom<&CustomAggregationFunction> for AggregateFunction {
     }
 }
 
-impl From<AggregateFunction> for CustomAggregationFunction {
+impl From<AggregateFunction> for AggregationFunction {
     fn from(af: AggregateFunction) -> Self {
         match af {
-            AggregateFunction::Count => CustomAggregationFunction::Count,
-            AggregateFunction::Sum => CustomAggregationFunction::Sum,
-            AggregateFunction::Min => CustomAggregationFunction::Min,
-            AggregateFunction::Max => CustomAggregationFunction::Max,
-            AggregateFunction::Avg => CustomAggregationFunction::Avg,
-            AggregateFunction::ApproxDistinct => CustomAggregationFunction::ApproxDistinct
+            AggregateFunction::Count => AggregationFunction::Count,
+            AggregateFunction::Sum => AggregationFunction::Sum,
+            AggregateFunction::Min => AggregationFunction::Min,
+            AggregateFunction::Max => AggregationFunction::Max,
+            AggregateFunction::Avg => AggregationFunction::Avg,
+            AggregateFunction::ApproxDistinct => AggregationFunction::ApproxDistinct
         }
     }
 }
