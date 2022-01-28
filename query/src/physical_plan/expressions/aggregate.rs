@@ -31,13 +31,13 @@ use arrow::array::ArrayRef;
 use arrow::datatypes::DataType;
 use datafusion::error::{DataFusionError, Result as DFResult};
 
-use datafusion::physical_plan::aggregates::AggregateFunction;
+use datafusion::physical_plan::aggregates::{AggregateFunction as DFAggregateFunction};
 
 use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
 
 #[derive(Debug, Clone)]
-pub enum AggregationFunction {
+pub enum AggregateFunction {
     Count,
     Sum,
     Min,
@@ -47,33 +47,33 @@ pub enum AggregationFunction {
     OrderedDistinct,
 }
 
-impl fmt::Display for AggregationFunction {
+impl fmt::Display for AggregateFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", format!("{:?}", self).to_uppercase())
     }
 }
 
 
-impl TryFrom<AggregationFunction> for AggregateFunction {
+impl TryFrom<AggregateFunction> for DFAggregateFunction {
     type Error = Error;
 
-    fn try_from(value: AggregationFunction) -> std::result::Result<Self, Self::Error> {
-        <Self as TryFrom<&AggregationFunction>>::try_from(&value)
+    fn try_from(value: AggregateFunction) -> std::result::Result<Self, Self::Error> {
+        <Self as TryFrom<&AggregateFunction>>::try_from(&value)
     }
 }
 
-impl TryFrom<&AggregationFunction> for AggregateFunction {
+impl TryFrom<&AggregateFunction> for DFAggregateFunction {
     type Error = Error;
 
-    fn try_from(value: &AggregationFunction) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &AggregateFunction) -> std::result::Result<Self, Self::Error> {
         match value {
-            AggregationFunction::Count => Ok(AggregateFunction::Count),
-            AggregationFunction::Sum => Ok(AggregateFunction::Sum),
-            AggregationFunction::Min => Ok(AggregateFunction::Min),
-            AggregationFunction::Max => Ok(AggregateFunction::Max),
-            AggregationFunction::Avg => Ok(AggregateFunction::Avg),
-            AggregationFunction::ApproxDistinct => Ok(AggregateFunction::ApproxDistinct),
-            AggregationFunction::OrderedDistinct => {
+            AggregateFunction::Count => Ok(DFAggregateFunction::Count),
+            AggregateFunction::Sum => Ok(DFAggregateFunction::Sum),
+            AggregateFunction::Min => Ok(DFAggregateFunction::Min),
+            AggregateFunction::Max => Ok(DFAggregateFunction::Max),
+            AggregateFunction::Avg => Ok(DFAggregateFunction::Avg),
+            AggregateFunction::ApproxDistinct => Ok(DFAggregateFunction::ApproxDistinct),
+            AggregateFunction::OrderedDistinct => {
                 let message = "OrderedDistinct as AggregateFunction".to_string();
                 Err(Error::DataFusionError(DataFusionError::NotImplemented(message)))
             }
@@ -81,15 +81,15 @@ impl TryFrom<&AggregationFunction> for AggregateFunction {
     }
 }
 
-impl From<AggregateFunction> for AggregationFunction {
-    fn from(af: AggregateFunction) -> Self {
+impl From<DFAggregateFunction> for AggregateFunction {
+    fn from(af: DFAggregateFunction) -> Self {
         match af {
-            AggregateFunction::Count => AggregationFunction::Count,
-            AggregateFunction::Sum => AggregationFunction::Sum,
-            AggregateFunction::Min => AggregationFunction::Min,
-            AggregateFunction::Max => AggregationFunction::Max,
-            AggregateFunction::Avg => AggregationFunction::Avg,
-            AggregateFunction::ApproxDistinct => AggregationFunction::ApproxDistinct
+            DFAggregateFunction::Count => AggregateFunction::Count,
+            DFAggregateFunction::Sum => AggregateFunction::Sum,
+            DFAggregateFunction::Min => AggregateFunction::Min,
+            DFAggregateFunction::Max => AggregateFunction::Max,
+            DFAggregateFunction::Avg => AggregateFunction::Avg,
+            DFAggregateFunction::ApproxDistinct => AggregateFunction::ApproxDistinct
         }
     }
 }
@@ -147,16 +147,16 @@ impl PartitionedAccumulator for PartitionedAccumulatorEnum {
 pub struct PartitionedAggregate {
     partition_type: DataType,
     data_type: DataType,
-    agg: AggregateFunction,
-    outer_agg: AggregateFunction,
+    agg: DFAggregateFunction,
+    outer_agg: DFAggregateFunction,
 }
 
 impl PartitionedAggregate {
     pub fn try_new(
         partition_type: DataType,
         data_type: DataType,
-        agg: AggregateFunction,
-        outer_agg: AggregateFunction,
+        agg: DFAggregateFunction,
+        outer_agg: DFAggregateFunction,
     ) -> Result<Self> {
         Ok(Self {
             partition_type,
@@ -187,26 +187,26 @@ pub struct PartitionedAggregateAccumulator {
 }
 
 fn new_accumulator(
-    agg: &AggregateFunction,
+    agg: &DFAggregateFunction,
     data_type: &DataType,
 ) -> Result<PartitionedAccumulatorEnum> {
     Ok(match agg {
-        AggregateFunction::Sum => {
+        DFAggregateFunction::Sum => {
             PartitionedAccumulatorEnum::Sum(SumAccumulator::try_new(data_type)?)
         }
-        AggregateFunction::Avg => {
+        DFAggregateFunction::Avg => {
             PartitionedAccumulatorEnum::Avg(AvgAccumulator::try_new(data_type)?)
         }
-        AggregateFunction::Count => PartitionedAccumulatorEnum::Count(CountAccumulator::new()),
+        DFAggregateFunction::Count => PartitionedAccumulatorEnum::Count(CountAccumulator::new()),
         _ => unimplemented!(),
     })
 }
 
-pub fn state_types(data_type: DataType, agg: &AggregateFunction) -> Result<Vec<DataType>> {
+pub fn state_types(data_type: DataType, agg: &DFAggregateFunction) -> Result<Vec<DataType>> {
     Ok(match agg {
-        AggregateFunction::Count => vec![DataType::UInt64],
-        AggregateFunction::Sum => vec![data_type],
-        AggregateFunction::Avg => vec![DataType::UInt64, data_type],
+        DFAggregateFunction::Count => vec![DataType::UInt64],
+        DFAggregateFunction::Sum => vec![data_type],
+        DFAggregateFunction::Avg => vec![DataType::UInt64, data_type],
         _ => unimplemented!(),
     })
 }
@@ -216,8 +216,8 @@ impl PartitionedAggregateAccumulator {
     pub fn try_new(
         partition_type: &DataType,
         data_type: &DataType,
-        agg: &AggregateFunction,
-        outer_agg: &AggregateFunction,
+        agg: &DFAggregateFunction,
+        outer_agg: &DFAggregateFunction,
     ) -> Result<Self> {
         Ok(Self {
             last_partition_value: ScalarValue::try_from(partition_type)?,

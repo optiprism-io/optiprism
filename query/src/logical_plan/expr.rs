@@ -17,7 +17,7 @@ use datafusion::scalar::ScalarValue;
 use std::fmt;
 
 use std::sync::Arc;
-use crate::physical_plan::expressions::aggregate::AggregationFunction;
+use crate::physical_plan::expressions::aggregate::AggregateFunction;
 use crate::physical_plan::expressions::sorted_distinct::SortedDistinct;
 
 #[derive(Clone)]
@@ -39,7 +39,7 @@ pub enum Expr {
     /// Represents the call of an aggregate built-in function with arguments.
     AggregateFunction {
         /// Name of the function
-        fun: AggregationFunction,
+        fun: AggregateFunction,
         /// List of expressions to feed to the functions as arguments
         args: Vec<Expr>,
         /// Whether this is a DISTINCT aggregation or not
@@ -191,7 +191,7 @@ impl Expr {
                 distinct,
             } => {
                 match fun {
-                    AggregationFunction::OrderedDistinct => {
+                    AggregateFunction::OrderedDistinct => {
                         let name = "count".to_string();
                         let data_type = args[0].get_type(input_schema)?;
                         let sorted_distinct = SortedDistinct::new(name, data_type);
@@ -294,7 +294,7 @@ impl Expr {
             Expr::Literal(l) => Ok(l.get_datatype()),
             Expr::AggregateFunction { fun, args, .. } => {
                 match fun {
-                    AggregationFunction::OrderedDistinct => {
+                    AggregateFunction::OrderedDistinct => {
                         Ok(DataType::UInt64)
                     },
                     _ => {
