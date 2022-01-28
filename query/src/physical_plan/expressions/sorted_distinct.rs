@@ -77,10 +77,7 @@ impl Accumulator for SortedDistinctCountAccumulator {
 
     fn update(&mut self, values: &[ScalarValue]) -> Result<()> {
         let value = &values[0];
-        if value.is_null() {
-            return Ok(());
-        }
-        if self.current.is_null() || !self.current.eq(value) {
+        if !self.current.eq(value) {
             self.current = value.clone();
             self.count += 1;
         }
