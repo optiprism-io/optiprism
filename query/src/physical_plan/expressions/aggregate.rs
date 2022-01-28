@@ -44,7 +44,7 @@ pub enum AggregateFunction {
     Max,
     Avg,
     ApproxDistinct,
-    OrderedDistinct,
+    OrderedDistinctCount,
 }
 
 impl fmt::Display for AggregateFunction {
@@ -73,7 +73,7 @@ impl TryFrom<&AggregateFunction> for DFAggregateFunction {
             AggregateFunction::Max => Ok(DFAggregateFunction::Max),
             AggregateFunction::Avg => Ok(DFAggregateFunction::Avg),
             AggregateFunction::ApproxDistinct => Ok(DFAggregateFunction::ApproxDistinct),
-            AggregateFunction::OrderedDistinct => {
+            AggregateFunction::OrderedDistinctCount => {
                 let message = "OrderedDistinct as AggregateFunction".to_string();
                 Err(Error::DataFusionError(DataFusionError::NotImplemented(message)))
             }

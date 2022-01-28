@@ -617,7 +617,7 @@ fn plan_agg(
                     distinct: false,
                 },
                 Query::CountUniqueGroups | Query::DailyActiveGroups => Expr::AggregateFunction {
-                    fun: AggregateFunction::OrderedDistinct,
+                    fun: AggregateFunction::OrderedDistinctCount,
                     args: vec![col(es.group.as_ref())],
                     distinct: true,
                 },

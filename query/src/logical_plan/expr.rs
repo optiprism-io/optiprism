@@ -191,7 +191,7 @@ impl Expr {
                 distinct,
             } => {
                 match fun {
-                    AggregateFunction::OrderedDistinct => {
+                    AggregateFunction::OrderedDistinctCount => {
                         let name = "count".to_string();
                         let data_type = args[0].get_type(input_schema)?;
                         let sorted_distinct = SortedDistinct::new(name, data_type);
@@ -294,7 +294,7 @@ impl Expr {
             Expr::Literal(l) => Ok(l.get_datatype()),
             Expr::AggregateFunction { fun, args, .. } => {
                 match fun {
-                    AggregateFunction::OrderedDistinct => {
+                    AggregateFunction::OrderedDistinctCount => {
                         Ok(DataType::UInt64)
                     },
                     _ => {
