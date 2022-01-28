@@ -166,16 +166,16 @@ pub enum Query {
     WeeklyActiveGroups,
     MonthlyActiveGroups,
     CountPerGroup {
-        aggregate: AggregateFunction,
+        aggregate: CustomAggregationFunction,
     },
     AggregatePropertyPerGroup {
         property: PropertyRef,
-        aggregate_per_group: AggregateFunction,
-        aggregate: AggregateFunction,
+        aggregate_per_group: CustomAggregationFunction,
+        aggregate: CustomAggregationFunction,
     },
     AggregateProperty {
         property: PropertyRef,
-        aggregate: AggregateFunction,
+        aggregate: CustomAggregationFunction,
     },
     QueryFormula {
         formula: String,
@@ -612,25 +612,21 @@ fn plan_agg(
         .map(|(id, query)| {
             let q = match &query.agg {
                 Query::CountEvents => Expr::AggregateFunction {
-                    fun: AggregateFunction::Count,
+                    fun: CustomAggregationFunction::Count,
                     args: vec![col(event_fields::EVENT_NAME)],
                     distinct: false,
                 },
-                Query::CountUniqueGroups | Query::DailyActiveGroups => {
-                    // Data type needs to be known in advance
-                    let data_type = DataType::UInt64;
-                    Expr::CustomAggregationFunction {
-                        fun: CustomAggregationFunction::OrderedDistinct(data_type),
-                        args: vec![col(es.group.as_ref())],
-                        distinct: true,
-                    }
+                Query::CountUniqueGroups | Query::DailyActiveGroups => Expr::AggregateFunction {
+                    fun: CustomAggregationFunction::OrderedDistinct,
+                    args: vec![col(es.group.as_ref())],
+                    distinct: true,
                 },
                 Query::WeeklyActiveGroups => unimplemented!(),
                 Query::MonthlyActiveGroups => unimplemented!(),
                 Query::CountPerGroup { aggregate } => Expr::AggregatePartitionedFunction {
                     partition_by: Box::new(col(es.group.as_ref())),
                     fun: AggregateFunction::Count,
-                    outer_fun: aggregate.clone(),
+                    outer_fun: aggregate.clone().try_into()?,
                     args: vec![col(event_fields::USER_ID)],
                     distinct: false,
                 },
@@ -640,8 +636,8 @@ fn plan_agg(
                     aggregate,
                 } => Expr::AggregatePartitionedFunction {
                     partition_by: Box::new(col(es.group.as_ref())),
-                    fun: aggregate_per_group.clone(),
-                    outer_fun: aggregate.clone(),
+                    fun: aggregate_per_group.clone().try_into()?,
+                    outer_fun: aggregate.clone().try_into()?,
                     args: vec![col(property_db_col_name(
                         schema.clone(),
                         event.event.name().as_ref(),
@@ -735,6 +731,7 @@ mod tests {
     use std::sync::Arc;
     use store::dictionary::MockDictionary;
     use store::schema::{event_fields, DBCol, EventPropertyStatus, MockSchema};
+    use crate::physical_plan::expressions::aggregate::CustomAggregationFunction;
 
     fn users_provider() -> Result<MemTable> {
         let schema = Arc::new(Schema::new(vec![
@@ -1033,30 +1030,30 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::CountPerGroup {
-                            aggregate: aggregates::AggregateFunction::Avg,
+                            aggregate: CustomAggregationFunction::Avg,
                         },
                         Some("count_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: aggregates::AggregateFunction::Avg,
-                            aggregate: aggregates::AggregateFunction::Avg,
+                            aggregate_per_group: CustomAggregationFunction::Avg,
+                            aggregate: CustomAggregationFunction::Avg,
                         },
                         Some("avg_revenue_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: aggregates::AggregateFunction::Min,
-                            aggregate: aggregates::AggregateFunction::Avg,
+                            aggregate_per_group: CustomAggregationFunction::Min,
+                            aggregate: CustomAggregationFunction::Avg,
                         },
                         Some("min_revenue_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregateProperty {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate: aggregates::AggregateFunction::Sum,
+                            aggregate: CustomAggregationFunction::Sum,
                         },
                         Some("sum_revenue".to_string()),
                     ),
@@ -1135,22 +1132,22 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::CountPerGroup {
-                            aggregate: aggregates::AggregateFunction::Avg,
+                            aggregate: CustomAggregationFunction::Avg,
                         },
                         Some("count_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: aggregates::AggregateFunction::Sum,
-                            aggregate: aggregates::AggregateFunction::Avg,
+                            aggregate_per_group: CustomAggregationFunction::Sum,
+                            aggregate: CustomAggregationFunction::Avg,
                         },
                         Some("avg_revenue_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregateProperty {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate: aggregates::AggregateFunction::Sum,
+                            aggregate: CustomAggregationFunction::Sum,
                         },
                         Some("sum_revenue".to_string()),
                     ),

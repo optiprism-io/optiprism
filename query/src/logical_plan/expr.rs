@@ -17,8 +17,8 @@ use datafusion::scalar::ScalarValue;
 use std::fmt;
 
 use std::sync::Arc;
-use crate::physical_plan::expressions::sorted_distinct::SortedDistinct;
 use crate::physical_plan::expressions::aggregate::CustomAggregationFunction;
+use crate::physical_plan::expressions::sorted_distinct::SortedDistinct;
 
 #[derive(Clone)]
 pub enum Expr {
@@ -39,15 +39,10 @@ pub enum Expr {
     /// Represents the call of an aggregate built-in function with arguments.
     AggregateFunction {
         /// Name of the function
-        fun: aggregates::AggregateFunction,
+        fun: CustomAggregationFunction,
         /// List of expressions to feed to the functions as arguments
         args: Vec<Expr>,
         /// Whether this is a DISTINCT aggregation or not
-        distinct: bool,
-    },
-    CustomAggregationFunction {
-        fun: CustomAggregationFunction,
-        args: Vec<Expr>,
         distinct: bool,
     },
     // Represents the call of an partitioned aggregate built-in function with arguments.
@@ -133,11 +128,6 @@ fn create_name(e: &Expr, input_schema: &DFSchema) -> Result<String> {
             args,
             ..
         } => create_function_name(&fun.to_string(), *distinct, args, input_schema),
-        Expr::CustomAggregationFunction {
-            fun,
-            args,
-            distinct,
-        } => create_function_name(&format!("{:?}", fun), *distinct, args, input_schema),
         Expr::AggregatePartitionedFunction {
             partition_by,
             fun,
@@ -172,7 +162,7 @@ impl Expr {
                 args,
                 distinct,
             } => Expr::AggregateFunction {
-                fun: fun.clone(),
+                fun: fun.clone().into(),
                 args: args.iter().map(Expr::from_df_expr).collect(),
                 distinct: *distinct,
             },
@@ -195,16 +185,16 @@ impl Expr {
                 Ok(DFExpr::IsNotNull(Box::new(expr.to_df_expr(input_schema)?)))
             }
             Expr::IsNull(expr) => Ok(DFExpr::IsNull(Box::new(expr.to_df_expr(input_schema)?))),
-
-            Expr::CustomAggregationFunction {
+            Expr::AggregateFunction {
                 fun,
                 args,
-                ..
+                distinct,
             } => {
                 match fun {
-                    CustomAggregationFunction::OrderedDistinct(data_type) => {
-                        let sorted_distinct = SortedDistinct::new(
-                            "count".to_string(), data_type.clone());
+                    CustomAggregationFunction::OrderedDistinct => {
+                        let name = "count".to_string();
+                        let data_type = args[0].get_type(input_schema)?;
+                        let sorted_distinct = SortedDistinct::new(name, data_type);
                         let udf = sorted_distinct.try_into()?;
                         let args = args.iter()
                             .map(|arg| arg.to_df_expr(input_schema))
@@ -214,22 +204,16 @@ impl Expr {
                             args,
                         })
                     },
-                    _ => Err(Error::Internal(format!("Unknown custom aggregation function: {:?}", fun)))
+                    _ => Ok(DFExpr::AggregateFunction {
+                           fun: fun.clone().try_into()?,
+                           args: args
+                               .iter()
+                               .map(|e| e.to_df_expr(input_schema))
+                               .collect::<Result<_>>()?,
+                           distinct: *distinct,
+                       })
                 }
-            }
-
-            Expr::AggregateFunction {
-                fun,
-                args,
-                distinct,
-            } => Ok(DFExpr::AggregateFunction {
-                fun: fun.clone(),
-                args: args
-                    .iter()
-                    .map(|e| e.to_df_expr(input_schema))
-                    .collect::<Result<_>>()?,
-                distinct: *distinct,
-            }),
+            },
             Expr::AggregatePartitionedFunction {
                 partition_by,
                 fun,
@@ -309,18 +293,17 @@ impl Expr {
             Expr::Column(c) => Ok(schema.field_from_column(c)?.data_type().clone()),
             Expr::Literal(l) => Ok(l.get_datatype()),
             Expr::AggregateFunction { fun, args, .. } => {
-                let data_types = args
-                    .iter()
-                    .map(|e| e.get_type(schema))
-                    .collect::<Result<Vec<_>>>()?;
-                Ok(aggregates::return_type(fun, &data_types)?)
-            }
-            Expr::CustomAggregationFunction {
-                fun,
-                ..
-            } => {
                 match fun {
-                    CustomAggregationFunction::OrderedDistinct(data_type) => Ok(data_type.clone()),
+                    CustomAggregationFunction::OrderedDistinct => {
+                        Ok(DataType::UInt64)
+                    },
+                    _ => {
+                        let data_types = args
+                            .iter()
+                            .map(|e| e.get_type(schema))
+                            .collect::<Result<Vec<_>>>()?;
+                        Ok(aggregates::return_type(&fun.try_into()?, &data_types)?)
+                    }
                 }
             }
             Expr::AggregatePartitionedFunction {
@@ -359,7 +342,6 @@ impl Expr {
             Expr::Column(c) => Ok(input_schema.field_from_column(c)?.is_nullable()),
             Expr::Literal(value) => Ok(value.is_null()),
             Expr::AggregateFunction { .. } => Ok(true),
-            Expr::CustomAggregationFunction { .. } => Ok(true),
             Expr::AggregatePartitionedFunction { .. } => Ok(true),
             Expr::IsNull(_) => Ok(false),
             Expr::IsNotNull(_) => Ok(false),
@@ -447,7 +429,6 @@ impl fmt::Debug for Expr {
                 ref args,
                 ..
             } => fmt_function(f, &fun.to_string(), *distinct, args),
-            Expr::CustomAggregationFunction { .. } => write!(f, "TODO"),
             Expr::AggregatePartitionedFunction {
                 partition_by,
                 fun,

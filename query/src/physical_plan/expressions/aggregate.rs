@@ -19,6 +19,7 @@
 
 use std::cmp::Ordering;
 use std::convert::TryFrom;
+use std::fmt;
 
 use crate::error::{Error, Result};
 use crate::physical_plan::expressions::average::AvgAccumulator;
@@ -28,7 +29,7 @@ use crate::physical_plan::PartitionedAccumulator;
 
 use arrow::array::ArrayRef;
 use arrow::datatypes::DataType;
-use datafusion::error::Result as DFResult;
+use datafusion::error::{DataFusionError, Result as DFResult};
 
 use datafusion::physical_plan::aggregates::AggregateFunction;
 
@@ -37,7 +38,60 @@ use datafusion::scalar::ScalarValue;
 
 #[derive(Debug, Clone)]
 pub enum CustomAggregationFunction {
-    OrderedDistinct(DataType),
+    Count,
+    Sum,
+    Min,
+    Max,
+    Avg,
+    ApproxDistinct,
+    OrderedDistinct,
+}
+
+impl fmt::Display for CustomAggregationFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", format!("{:?}", self).to_uppercase())
+    }
+}
+
+
+impl TryFrom<CustomAggregationFunction> for AggregateFunction {
+    type Error = Error;
+
+    fn try_from(value: CustomAggregationFunction) -> std::result::Result<Self, Self::Error> {
+        <Self as TryFrom<&CustomAggregationFunction>>::try_from(&value)
+    }
+}
+
+impl TryFrom<&CustomAggregationFunction> for AggregateFunction {
+    type Error = Error;
+
+    fn try_from(value: &CustomAggregationFunction) -> std::result::Result<Self, Self::Error> {
+        match value {
+            CustomAggregationFunction::Count => Ok(AggregateFunction::Count),
+            CustomAggregationFunction::Sum => Ok(AggregateFunction::Sum),
+            CustomAggregationFunction::Min => Ok(AggregateFunction::Min),
+            CustomAggregationFunction::Max => Ok(AggregateFunction::Max),
+            CustomAggregationFunction::Avg => Ok(AggregateFunction::Avg),
+            CustomAggregationFunction::ApproxDistinct => Ok(AggregateFunction::ApproxDistinct),
+            CustomAggregationFunction::OrderedDistinct => {
+                let message = "OrderedDistinct as AggregateFunction".to_string();
+                Err(Error::DataFusionError(DataFusionError::NotImplemented(message)))
+            }
+        }
+    }
+}
+
+impl From<AggregateFunction> for CustomAggregationFunction {
+    fn from(af: AggregateFunction) -> Self {
+        match af {
+            AggregateFunction::Count => CustomAggregationFunction::Count,
+            AggregateFunction::Sum => CustomAggregationFunction::Sum,
+            AggregateFunction::Min => CustomAggregationFunction::Min,
+            AggregateFunction::Max => CustomAggregationFunction::Max,
+            AggregateFunction::Avg => CustomAggregationFunction::Avg,
+            AggregateFunction::ApproxDistinct => CustomAggregationFunction::ApproxDistinct
+        }
+    }
 }
 
 // enum storage for accumulator for fast static dispatching and easy translating between threads
