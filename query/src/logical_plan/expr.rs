@@ -51,9 +51,9 @@ pub enum Expr {
     AggregatePartitionedFunction {
         partition_by: Box<Expr>,
         /// Name of the aggregate function per a partition
-        fun: aggregates::AggregateFunction,
+        fun: AggregateFunction,
         /// Name of the final (outer) function, the result of function
-        outer_fun: aggregates::AggregateFunction,
+        outer_fun: AggregateFunction,
         /// List of expressions to feed to the functions as arguments
         args: Vec<Expr>,
         /// Whether this is a DISTINCT aggregation or not
@@ -227,10 +227,10 @@ impl Expr {
                     .map(|x| x.get_type(input_schema))
                     .collect::<Result<Vec<DataType>>>()?;
                 // determine return type
-                let rtype = return_type(outer_fun, &data_types)?;
+                let rtype = return_type(&outer_fun.try_into()?, &data_types)?;
 
                 // determine state types
-                let state_types: Vec<DataType> = state_types(rtype.clone(), outer_fun)?;
+                let state_types: Vec<DataType> = state_types(rtype.clone(), &outer_fun.try_into()?)?;
 
                 // make partitioned aggregate factory
                 let pagg = PartitionedAggregate::try_new(
@@ -313,7 +313,7 @@ impl Expr {
                     .iter()
                     .map(|e| e.get_type(schema))
                     .collect::<Result<Vec<_>>>()?;
-                Ok(aggregates::return_type(outer_fun, &data_types)?)
+                Ok(aggregates::return_type(&outer_fun.try_into()?, &data_types)?)
             }
             Expr::IsNull(_) => Ok(DataType::Boolean),
             Expr::IsNotNull(_) => Ok(DataType::Boolean),

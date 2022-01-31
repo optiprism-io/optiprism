@@ -625,8 +625,8 @@ fn plan_agg(
                 Query::MonthlyActiveGroups => unimplemented!(),
                 Query::CountPerGroup { aggregate } => Expr::AggregatePartitionedFunction {
                     partition_by: Box::new(col(es.group.as_ref())),
-                    fun: DFAggregateFunction::Count,
-                    outer_fun: aggregate.clone().try_into()?,
+                    fun: AggregateFunction::Count,
+                    outer_fun: aggregate.clone(),
                     args: vec![col(event_fields::USER_ID)],
                     distinct: false,
                 },
@@ -636,8 +636,8 @@ fn plan_agg(
                     aggregate,
                 } => Expr::AggregatePartitionedFunction {
                     partition_by: Box::new(col(es.group.as_ref())),
-                    fun: aggregate_per_group.clone().try_into()?,
-                    outer_fun: aggregate.clone().try_into()?,
+                    fun: aggregate_per_group.clone(),
+                    outer_fun: aggregate.clone(),
                     args: vec![col(property_db_col_name(
                         schema.clone(),
                         event.event.name().as_ref(),

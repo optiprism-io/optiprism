@@ -147,16 +147,16 @@ impl PartitionedAccumulator for PartitionedAccumulatorEnum {
 pub struct PartitionedAggregate {
     partition_type: DataType,
     data_type: DataType,
-    agg: DFAggregateFunction,
-    outer_agg: DFAggregateFunction,
+    agg: AggregateFunction,
+    outer_agg: AggregateFunction,
 }
 
 impl PartitionedAggregate {
     pub fn try_new(
         partition_type: DataType,
         data_type: DataType,
-        agg: DFAggregateFunction,
-        outer_agg: DFAggregateFunction,
+        agg: AggregateFunction,
+        outer_agg: AggregateFunction,
     ) -> Result<Self> {
         Ok(Self {
             partition_type,
@@ -187,17 +187,17 @@ pub struct PartitionedAggregateAccumulator {
 }
 
 fn new_accumulator(
-    agg: &DFAggregateFunction,
+    agg: &AggregateFunction,
     data_type: &DataType,
 ) -> Result<PartitionedAccumulatorEnum> {
     Ok(match agg {
-        DFAggregateFunction::Sum => {
+        AggregateFunction::Sum => {
             PartitionedAccumulatorEnum::Sum(SumAccumulator::try_new(data_type)?)
         }
-        DFAggregateFunction::Avg => {
+        AggregateFunction::Avg => {
             PartitionedAccumulatorEnum::Avg(AvgAccumulator::try_new(data_type)?)
         }
-        DFAggregateFunction::Count => PartitionedAccumulatorEnum::Count(CountAccumulator::new()),
+        AggregateFunction::Count => PartitionedAccumulatorEnum::Count(CountAccumulator::new()),
         _ => unimplemented!(),
     })
 }
@@ -216,8 +216,8 @@ impl PartitionedAggregateAccumulator {
     pub fn try_new(
         partition_type: &DataType,
         data_type: &DataType,
-        agg: &DFAggregateFunction,
-        outer_agg: &DFAggregateFunction,
+        agg: &AggregateFunction,
+        outer_agg: &AggregateFunction,
     ) -> Result<Self> {
         Ok(Self {
             last_partition_value: ScalarValue::try_from(partition_type)?,
