@@ -150,9 +150,7 @@ impl Accumulator for SortedDistinctCountAccumulator {
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
-        for array in values {
-            self.count += distinct_count(array)?;
-        }
+        self.count += distinct_count(&values[0])?;
         Ok(())
     }
 
