@@ -16,6 +16,7 @@ async fn sign_up(
     Ok(Json(provider.sign_up(ctx, request).await?))
 }
 
+#[axum_debug::debug_handler]
 async fn log_in(
     ctx: Context,
     Extension(provider): Extension<Arc<Provider>>,

@@ -47,3 +47,31 @@ env FNP_ - future name prefix
 /cmd/
 	main.rs - запускалка ноды. Запускалка одна и конфиг один общий для простоты. Просто какие-то компоненты можно не запускать опционально
 ```
+
+
+
+
+```
+POST /projects
+GET /projects
+GET /projects/:id
+PATCH /projects/:id
+
+POST /projects/:project_id/events
+GET /projects/:project_id/events
+GET /projects/:project_id/events/:id
+PATCH /projects/:project_id/events/:id
+```
+
+```
+/orgs/idx
+/orgs/data/{org_id}
+/orgs/idx/name/{org_name}
+
+/orgs/{org_id}/projects/idx
+/orgs/{org_id}/projects/data/{project_id}
+
+/orgs/{org_id}/projects/{project_id}/events/idx
+/orgs/{org_id}/projects/{project_id}/events/data/{event_id}
+/orgs/{org_id}/projects/{project_id}/events/idx/name/{event_name}
+```
