@@ -120,6 +120,7 @@ impl SortedDistinctCountAccumulator {
 }
 
 // Decimal cannot be represented as a ScalarValue due to missing impl From<i128> for ScalarValue
+// TODO FIXME Decimal support gets introduced into ScalarValue in https://github.com/apache/arrow-datafusion/pull/1394
 fn distinct_count_array_decimal(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) -> Result<()> {
     let array = array.as_any().downcast_ref::<DecimalArray>().unwrap();
     for index in 0..array.len() {
