@@ -9,7 +9,7 @@ const SEQUENCE_KEY: &str = "organizations/id_seq";
 const DATA_PREFIX: &str = "organizations/data/";
 
 fn data_key(id: u64) -> Vec<u8> {
-    format!("{}{}", DATA_PREFIX, id).into()
+    format!("{DATA_PREFIX}{id}").into()
 }
 
 pub struct Provider {
