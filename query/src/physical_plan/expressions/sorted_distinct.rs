@@ -53,65 +53,15 @@ impl TryFrom<SortedDistinct> for AggregateUDF {
     }
 }
 
-#[derive(Clone, Debug)]
-enum Value {
-    Decimal(Option<i128>),
-    Scalar(ScalarValue),
-}
-
-struct Decimal(i128);
-
-impl From<i128> for Decimal {
-    fn from(decimal: i128) -> Self {
-        Decimal(decimal)
-    }
-}
-
-impl From<Decimal> for Value {
-    fn from(decimal: Decimal) -> Self {
-        Self::Decimal(Some(decimal.0))
-    }
-}
-
-impl<T> From<T> for Value
-    where
-        T: Into<ScalarValue>
-{
-    fn from(scalar: T) -> Self {
-        Self::Scalar(scalar.into())
-    }
-}
-
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Value::Scalar(this), Value::Scalar(that)) => this.eq(that),
-            (Value::Decimal(this), Value::Decimal(that)) => {
-                match (this, that) {
-                    (Some(a), Some(b)) => a.eq(b),
-                    (None, None) => true,
-                    _ => false
-                }
-            },
-            _ => false
-        }
-    }
-}
-
-impl Eq for Value {}
-
 #[derive(Debug)]
 struct SortedDistinctCountAccumulator {
-    current: Value,
+    current: ScalarValue,
     count: u64,
 }
 
 impl SortedDistinctCountAccumulator {
     fn try_new(data_type: &DataType) -> Result<Self> {
-        let current = match ScalarValue::try_from(data_type) {
-            Ok(scalar) => Value::Scalar(scalar),
-            Err(_) => Value::Decimal(None)
-        };
+        let current = ScalarValue::try_from(data_type)?;
         Ok(Self {
             current,
             count: 0,
@@ -119,25 +69,11 @@ impl SortedDistinctCountAccumulator {
     }
 }
 
-// Decimal cannot be represented as a ScalarValue due to missing impl From<i128> for ScalarValue
-// TODO FIXME Decimal support gets introduced into ScalarValue in https://github.com/apache/arrow-datafusion/pull/1394
-fn distinct_count_array_decimal(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) -> Result<()> {
-    let array = array.as_any().downcast_ref::<DecimalArray>().unwrap();
-    for index in 0..array.len() {
-        let value: Value = Decimal(array.value(index)).into();
-        if !value.eq(&state.current) {
-            state.current = value;
-            state.count += 1;
-        }
-    }
-    Ok(())
-}
-
 macro_rules! distinct_count_array {
     ($ARRAYREF:expr, $ARRAYTYPE:ident, $STATE:expr) => {{
         let array = $ARRAYREF.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
         for index in 0..array.len() {
-            let value: Value = array.value(index).into();
+            let value: ScalarValue = array.value(index).into();
             if !value.eq(&$STATE.current) {
                 $STATE.current = value;
                 $STATE.count += 1;
@@ -151,7 +87,7 @@ macro_rules! distinct_count_array_limited {
     ($ARRAYREF:expr, $ARRAYTYPE:ident, $STATE:expr, $LIMIT:expr) => {{
         let array = $ARRAYREF.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
         for index in 0..array.len() {
-            let value: Value = array.value(index).into();
+            let value: ScalarValue = array.value(index).into();
             if !value.eq(&$STATE.current) {
                 $STATE.current = value;
                 $STATE.count += 1;
@@ -178,8 +114,12 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
         DataType::Int8 => distinct_count_array_limited!(array, Int8Array, state, 256),
         DataType::Date32 => distinct_count_array!(array, Date32Array, state),
         DataType::Date64 => distinct_count_array!(array, Date64Array, state),
-        DataType::Decimal(_, _) => distinct_count_array_decimal(array, state),
         DataType::Timestamp(TimeUnit::Second, _) => distinct_count_array!(array, TimestampSecondArray, state),
+
+        // "the trait `From<i128>` is not implemented for `datafusion::scalar::ScalarValue`"
+        // TODO Enable once https://github.com/apache/arrow-datafusion/pull/1394 is released
+        // DataType::Decimal(_, _) => distinct_count_array!(array, DecimalArray, state),
+
         other => {
             let message = format!("Ordered distinct count over array of type \"{:?}\" is not supported", other);
             Err(DataFusionError::NotImplemented(message))
