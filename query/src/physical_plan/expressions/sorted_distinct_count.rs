@@ -70,13 +70,13 @@ impl SortedDistinctCountAccumulator {
 }
 
 macro_rules! distinct_count_array {
-    ($ARRAYREF:expr, $ARRAYTYPE:ident, $STATE:expr) => {{
-        let array = $ARRAYREF.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
-        for index in 0..array.len() {
-            let value: ScalarValue = array.value(index).into();
-            if !value.eq(&$STATE.current) {
-                $STATE.current = value;
-                $STATE.count += 1;
+    ($array:expr, $ARRAYTYPE:ident, $state:expr) => {{
+        let array_size = $array.len();
+        let typed_array = $array.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
+        for index in 0..array_size {
+            if !$state.current.eq_array($array, index) {
+                $state.current = typed_array.value(index).into();
+                $state.count += 1;
             }
         }
         Ok(())
@@ -84,14 +84,14 @@ macro_rules! distinct_count_array {
 }
 
 macro_rules! distinct_count_array_limited {
-    ($ARRAYREF:expr, $ARRAYTYPE:ident, $STATE:expr, $LIMIT:expr) => {{
-        let array = $ARRAYREF.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
-        for index in 0..array.len() {
-            let value: ScalarValue = array.value(index).into();
-            if !value.eq(&$STATE.current) {
-                $STATE.current = value;
-                $STATE.count += 1;
-                if $STATE.count >= $LIMIT {
+    ($array:expr, $ARRAYTYPE:ident, $state:expr, $limit:expr) => {{
+        let array_size = $array.len();
+        let typed_array = $array.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
+        for index in 0..array_size {
+            if !$state.current.eq_array($array, index) {
+                $state.current = typed_array.value(index).into();
+                $state.count += 1;
+                if $state.count >= $limit {
                     return Ok(());
                 }
             }
