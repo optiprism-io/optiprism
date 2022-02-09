@@ -18,7 +18,7 @@ use std::fmt;
 
 use std::sync::Arc;
 use crate::physical_plan::expressions::aggregate::AggregateFunction;
-use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinct;
+use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
 
 #[derive(Clone)]
 pub enum Expr {
@@ -194,7 +194,7 @@ impl Expr {
                     AggregateFunction::OrderedDistinctCount => {
                         let name = "count".to_string();
                         let data_type = args[0].get_type(input_schema)?;
-                        let sorted_distinct = SortedDistinct::new(name, data_type);
+                        let sorted_distinct = SortedDistinctCount::new(name, data_type);
                         let udf = sorted_distinct.try_into()?;
                         let args = args.iter()
                             .map(|arg| arg.to_df_expr(input_schema))

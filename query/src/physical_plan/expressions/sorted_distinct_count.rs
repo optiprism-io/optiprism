@@ -10,12 +10,12 @@ use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::scalar::ScalarValue;
 
 #[derive(Debug)]
-pub struct SortedDistinct {
+pub struct SortedDistinctCount {
     name: String,
     data_type: DataType,
 }
 
-impl SortedDistinct {
+impl SortedDistinctCount {
     pub fn new(
         name: String,
         data_type: DataType,
@@ -27,10 +27,10 @@ impl SortedDistinct {
     }
 }
 
-impl TryFrom<SortedDistinct> for AggregateUDF {
+impl TryFrom<SortedDistinctCount> for AggregateUDF {
     type Error = DataFusionError;
 
-    fn try_from(sorted_distinct: SortedDistinct) -> std::result::Result<Self, Self::Error> {
+    fn try_from(sorted_distinct: SortedDistinctCount) -> std::result::Result<Self, Self::Error> {
         let data_type = sorted_distinct.data_type.clone();
         let data_type_arc = Arc::new(data_type.clone());
         let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(data_type_arc.clone()));
