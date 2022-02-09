@@ -18,7 +18,7 @@ use std::fmt;
 
 use std::sync::Arc;
 use crate::physical_plan::expressions::aggregate::AggregateFunction;
-use crate::physical_plan::expressions::sorted_distinct::SortedDistinct;
+use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinct;
 
 #[derive(Clone)]
 pub enum Expr {
