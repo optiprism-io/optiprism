@@ -54,18 +54,22 @@ impl TryFrom<SortedDistinctCount> for AggregateUDF {
 }
 
 #[derive(Debug)]
-struct SortedDistinctCountAccumulator {
+pub struct SortedDistinctCountAccumulator {
     current: ScalarValue,
     count: u64,
 }
 
 impl SortedDistinctCountAccumulator {
-    fn try_new(data_type: &DataType) -> Result<Self> {
+    pub fn try_new(data_type: &DataType) -> Result<Self> {
         let current = ScalarValue::try_from(data_type)?;
         Ok(Self {
             current,
             count: 0,
         })
+    }
+
+    pub fn count(&self) -> u64 {
+        self.count
     }
 }
 
