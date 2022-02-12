@@ -1,0 +1,52 @@
+:root {
+    --pf-global--spacer--md: 0.7rem;
+    --pf-global--FontSize--md: 0.9rem;
+    --pf-c-page__main-section--PaddingTop: 1rem;
+    --pf-global--gutter: 0.7rem;
+
+    --op-base-color: #3d4a58;
+    --op-base-color-text: #5c6f7f;
+    --op-base-light: #bdcbd5;
+    --op-base-background: #fafafa;
+
+    --pf-global--main-color--100: #1e83c0;
+    --pf-global--main-color--200: #0f5683;
+    --pf-global--main-color--light-100: #60b0e2;
+    --pf-global--main-color--dark-100: #007dca;
+
+    --pf-global--base-light-color--100: #d0d5d9;
+    --pf-global--base-light-color--200: #99a1a9;
+    --pf-global--base-light-color--light-100: #495664;
+    --pf-global--base-light-color--dark-100: #475261;
+}
+
+.min-w-100 {
+    min-width: 100px;
+}
+
+.min-w-50 {
+    min-width: 50px;
+}
+
+.v-popper {
+    &__popper {
+        &.ui-hint {
+            .v-popper__inner {
+                position: relative;
+                max-width: 18.75rem;
+                background-color: var(--pf-global--BackgroundColor--dark-100);
+                box-shadow: var(--pf-global--BoxShadow--md);
+                padding: var(--pf-global--spacer--sm);
+                font-size: var(--pf-global--FontSize--sm);
+                color: var(--pf-c-tooltip__content--Color);
+                text-align: center;
+                word-break: break-word;
+                color: var(--pf-global--Color--light-100);
+                border-radius: 0;
+            }
+            .v-popper__arrow-inner {
+                color: var(--pf-global--BackgroundColor--dark-100);
+            }
+        }
+    }
+}
