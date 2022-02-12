@@ -1,0 +1,1534 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: OptiPrism
+  termsOfService: http://optiprism.io/terms/
+  contact:
+    email: api@optiprism.io
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/ravlio/optiprism/1.0.0
+  - description: OptiPrism API server
+    url: /
+tags:
+  - name: event
+    description: Event
+  - name: property
+    description: Property
+paths:
+  /schema/events:
+    get:
+      summary: Events list
+      responses:
+        '200':
+          $ref: '#/components/responses/ListEvents'
+  /schema/custom-events:
+    get:
+      summary: Custom events list
+      responses:
+        '200':
+          $ref: '#/components/responses/ListCustomEvents'
+  /schema/event-properties:
+    get:
+      summary: Event properties list
+      responses:
+        '200':
+          $ref: '#/components/responses/ListEventProperties'
+  /schema/event-custom-properties:
+    get:
+      summary: Event custom properties list
+      responses:
+        '200':
+          $ref: '#/components/responses/ListEventCustomProperties'
+  /schema/user-properties:
+    get:
+      summary: User properties list
+      responses:
+        '200':
+          $ref: '#/components/responses/ListUserProperties'
+  /schema/user-custom-properties:
+    get:
+      summary: User custom properties list
+      responses:
+        '200':
+          $ref: '#/components/responses/ListUserCustomProperties'
+  /data/property-values:
+    get:
+      summary: List property values
+      description: >
+        for event property you should incude event_name and event_type
+        <br/><br/>
+        examples:
+        <br/>
+        /data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Name&property_type=regular
+        /data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Total%20Revenue&property_type=custom
+        /data/property-values?event_name=Custom&event_type=custom&property_name=SomeProp&property_type=regular
+        /data/property-values?property_name=Country&property_type=regular
+        /data/property-values?property_name=Full%Name&property_type=custom
+      parameters:
+        - name: event_name
+          in: query
+          description: Event Name. Required if property has event type
+          required: false
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          description: Event Type. Required if property has event type
+          required: false
+          schema:
+            $ref: '#/components/schemas/EventType'
+        - name: property_name
+          in: query
+          description: Property Name
+          required: false
+          schema:
+            type: string
+        - name: property_type
+          in: query
+          description: Property Name
+          required: false
+          schema:
+            $ref: '#/components/schemas/PropertyType'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListPropertyValues'
+
+  /queries/event-segmentation:
+    post:
+      summary: Event segmentation query
+      responses:
+        '200':
+          $ref: '#/components/responses/EventSegmentation'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventSegmentation'
+
+externalDocs:
+  description: Find out more about OptiPrism api
+  url: http://dev.optiprism.io/api
+components:
+  responses:
+    ListPropertyValues:
+      description: list property values
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              values:
+                oneOf:
+                  - type: array
+                    items:
+                      type: string
+                  - type: array
+                    items:
+                      type: number
+    ListEvents:
+      description: event list
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              events:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+    ListCustomEvents:
+      description: custom event list
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              customEvents:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CustomEvent'
+    ListEventProperties:
+      description: event properties list
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              eventProperties:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventProperty'
+    ListEventCustomProperties:
+      description: event custom properties list
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              eventCustomProperties:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventCustomProperty'
+    ListUserProperties:
+      description: user properties list
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              userProperties:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserProperty'
+    ListUserCustomProperties:
+      description: event properties list
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              userCustomProperties:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventProperty'
+    EventSegmentation:
+      description: event segmentation query response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              dimensionHeaders:
+                type: array
+                items:
+                  type: string
+              metricHeaders:
+                type: array
+                items:
+                  type: string
+              dimensions:
+                type: array
+                items:
+                  type: array
+                  items:
+                    type: string
+              singles:
+                type: array
+                items:
+                  type: integer
+              series:
+                type: array
+                items:
+                  type: array
+                  items:
+                    type: integer
+              compare:
+                type: object
+                properties:
+                  dimensions:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: string
+                  singles:
+                    type: array
+                    items:
+                      type: integer
+                  series:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: integer
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+          format: int64
+        updatedBy:
+          type: integer
+          format: int64
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+        teams:
+          type: array
+          items:
+            type: integer
+        projects:
+          type: array
+          items:
+            type: object
+            properties:
+              projectId:
+                type: integer
+                format: int64
+              role:
+                type: string
+        status:
+          type: string
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+          format: int64
+        updatedBy:
+          type: integer
+          format: int64
+        name:
+          type: string
+        sessionTimeoutSeconds:
+          type: integer
+        teams:
+          type: array
+          items:
+            type: integer
+        users:
+          type: array
+          items:
+            type: integer
+
+    Organization:
+      type: object
+      properties:
+        teams:
+          type: array
+          items:
+            type: integer
+        users:
+          type: array
+          items:
+            type: integer
+
+    Event:
+      type: object
+      required: [ "id","createdAt","createdBy","projectId","isSystem","name","status" ]
+      description: Event describes user event. User event is an action which user (client) might do on a product site/app. For instance, user might do a signup and it might be a "Sign up" event. Event Also has a properties.
+        <br/><br/>
+        Name must be unique among project events, including custom ones. E.g. you can't have multiple "Sign up" events.
+        <br/><br/>
+        Normally events are created and updated by admin in a project scope, but there are also system events, which can't be deleted or modified.
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: event unique id
+        createdAt:
+          type: string
+          format: date-time
+          description: create date
+        updatedAt:
+          type: string
+          format: date-time
+          description: update (once updated)
+        createdBy:
+          type: integer
+          format: int64
+          description: id of creator User
+        updatedBy:
+          type: integer
+          format: int64
+          description: id of updater User
+        projectId:
+          type: integer
+          format: int64
+          description: project id
+        isSystyem:
+          type: boolean
+          description: the event is a system-wide, shown in any project and can't be modified by a regular user
+        tags:
+          type: array
+          items:
+            type: string
+            description: event tags
+        name:
+          type: string
+          description: event name. Must be unique among all project events (including custom). The name field is used while events ingesting.
+        displayName:
+          type: string
+          description: event name to display. If empty then name property is used.
+        description:
+          type: string
+          description: description
+        status:
+          type: string
+          enum:
+            - enabled
+            - disabled
+          description: event status
+        properties:
+          type: array
+          items:
+            type: integer
+            format: i64
+          description: array of id of attached to event properties
+        custom_properties:
+          type: array
+          items:
+            type: integer
+            format: i64
+          description: array of id of attached to event custom properties
+
+    CustomEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+          format: int64
+        updatedBy:
+          type: integer
+          format: int64
+        projectId:
+          type: integer
+          format: int64
+        isSystem:
+          type: boolean
+        status:
+          type: string
+          enum:
+            - enabled
+            - disabled
+        name:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    EventProperty:
+      type: object
+      required: [ "id","createdAt","createdBy","projectId","isSystem","isGlobal","name","status","isRequired","nullable","isArray","isDictionary" ]
+      description: event property defines entity with name and type which can be attached to one or multiple events. For example, event "Buy product" may contains next properties like  "Product name" and "Price."
+        <br/><br/>
+        Property must have an unique name. If property is global, that it must be unique among all global properties in project, including custom ones. If property is a non-global and belongs to event, then the name must be uniqueue amount all event properties, including custom ones.
+        <br/><br/>
+        Property must have a type. For example, "Product name" may have String type and "Price." may have Numeric type.
+        <br/><br/>
+        If you have multiple events with same property ("Buy product", "View product") you can make property global (isGlobal=true) and use it in multiple events.
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: property unique id
+        createdAt:
+          type: string
+          format: date-time
+          description: create date
+        updatedAt:
+          type: string
+          format: date-time
+          description: update (once updated)
+        createdBy:
+          type: integer
+          format: int64
+          description: id of creator User
+        updatedBy:
+          type: integer
+          format: int64
+          description: id of updater User
+        projectId:
+          type: integer
+          format: int64
+          description: project id
+        events:
+          type: array
+          items:
+            type: integer
+            format: i64
+          description: list of id of events which use this property
+        isSystem:
+          type: boolean
+          description: the property is a system-wide, shown in any project and can't be modified by a regular user
+        isGlobal:
+          type: boolean
+          description: global property can be used by multiple events. Local property is coupled with only one event exclusively
+        tags:
+          type: array
+          items:
+            type: string
+        name:
+          type: string
+          description: property name. Must be unique among all event properties if property is not global. Or must be unique among all global properties if property is global. The name field is used while events ingesting.
+        displayName:
+          type: string
+          description: property name to display. If empty then name is used.
+        description:
+          type: string
+          description: description
+        status:
+          type: string
+          enum:
+            - enabled
+            - disabled
+          description: property status
+        type:
+          allOf:
+            - type: object
+              description: data type of property. if property is "Product name", that it whould be String, if "Revenue", that it might be numeric.
+            - $ref: '#/components/schemas/DataType'
+        db_col:
+          type: object
+          oneOf:
+            - type: object
+              description: column type. Might be named and auto.
+            - $ref: '#/components/schemas/DBColNamed'
+            - $ref: '#/components/schemas/DBColOrder'
+        isRequired:
+          type: boolean
+          description: required property is required to be defined during ingestion
+        nullable:
+          type: boolean
+          description: nullable property might contains null value
+        isArray:
+          type: boolean
+          description: array property might contents multiple values
+        isDictionary:
+          type: boolean
+          description: dictionary can efficiently packs strings provided that cardinality will be relatively log (16bits is a reasonable maximum)
+        dictionaryType:
+          allOf:
+            - type: object
+              description: type of integer to pack. Between 8bits and 16bits
+            - $ref: '#/components/schemas/DataType'
+
+    EventCustomProperty:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+          format: int64
+        updatedBy:
+          type: integer
+          format: int64
+        projectId:
+          type: integer
+          format: int64
+        events:
+          type: array
+          items:
+            type: integer
+            format: i64
+        isSystem:
+          type: boolean
+        status:
+          type: string
+          enum:
+            - enabled
+            - disabled
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          $ref: '#/components/schemas/DataType'
+        nullable:
+          type: boolean
+        isArray:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+
+    UserProperty:
+      type: object
+      description: user property defines a single property for a user entity. There is a bunch of already predefined, like "Country","Device", "First name","List name", etc. Like "Age".
+        <br/><br/>
+        Property must have an unique name among all user properties in project.
+        <br/><br/>
+        Property must have a type. For example, "Product name" may have String type and "Price." may have Numeric type.
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: property unique id
+        createdAt:
+          type: string
+          format: date-time
+          description: create date
+        updatedAt:
+          type: string
+          format: date-time
+          description: update (once updated)
+        createdBy:
+          type: integer
+          format: int64
+          description: id of creator User
+        updatedBy:
+          type: integer
+          format: int64
+          description: id of updater User
+        projectId:
+          type: integer
+          format: int64
+          description: project id
+        isSystem:
+          type: boolean
+          description: the property is a system-wide, shown in any project and can't be modified by a regular user
+        tags:
+          type: array
+          items:
+            type: string
+        name:
+          type: string
+          description: property name. Must be unique among all user properties
+        displayName:
+          type: string
+          description: property name to display. If empty then name is used.
+        description:
+          type: string
+          description: description
+        status:
+          type: string
+          enum:
+            - enabled
+            - disabled
+          description: property status
+        type:
+          allOf:
+            - type: object
+              description: data type of property. if property is "Country", that it whould be String, if "Age", that it might be numeric
+            - $ref: '#/components/schemas/DataType'
+        db_col:
+          type: object
+          oneOf:
+            - type: object
+              description: column type. Might be named and auto
+            - $ref: '#/components/schemas/DBColNamed'
+            - $ref: '#/components/schemas/DBColOrder'
+        nullable:
+          type: boolean
+          description: nullable property might contains null value
+        isArray:
+          type: boolean
+          description: array property might contents multiple values
+        isDictionary:
+          type: boolean
+          description: dictionary can efficiently packs strings provided that cardinality will be relatively log (16bits is a reasonable maximum)
+        dictionaryType:
+          allOf:
+            - type: object
+              description: type of integer to pack. Between 8bits and 16bits
+            - $ref: '#/components/schemas/DataType'
+
+    UserCustomProperty:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+          format: int64
+        updatedBy:
+          type: integer
+          format: int64
+        projectId:
+          type: integer
+          format: int64
+        isSystem:
+          type: boolean
+        status:
+          type: string
+          enum:
+            - enabled
+            - disabled
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          $ref: '#/components/schemas/DataType'
+        nullable:
+          type: boolean
+        isArray:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+
+    DBColNamed:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - named
+        name:
+          type: string
+
+    DBColOrder:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - order
+        order:
+          type: number
+
+    AnalysisLinear:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - linear
+
+    AnalysisRollingAverage:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - rollingAverage
+        window:
+          type: integer
+
+    AnalysisRollingWindow:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - rollingWindow
+        window:
+          type: integer
+
+    AnalysisCumulative:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - cumulative
+
+    EventSegmentation:
+      type: object
+      description: event segmentation report type main payload
+      required: [ "time","group","intervalUnit","chartType","analysis","events" ]
+      example: >
+        {
+          "time": {
+            "type": "between",
+            "from": "2017-07-21T17:32:28Z",
+            "to": "2017-08-21T17:32:28Z"
+          },
+          "group": "user",
+          "intervalUnit": "day",
+          "chartType": "line",
+          "analysis": {
+            "type": "linear"
+          },
+          "compare": {
+            "offset": 1,
+            "unit": "week"
+          },
+          "events": [
+            {
+              "eventName": "Buy Product",
+              "eventType": "regular",
+              "filters": [
+                {
+                  "filterType": "property",
+                  "propertyName": "Device",
+                  "propertyType": "user",
+                  "operation": "exists"
+                },
+                {
+                  "filterType": "property",
+                  "propertyName": "Product Name",
+                  "propertyType": "event",
+                  "operation": "=",
+                  "value": [
+                    "tv"
+                  ]
+                }
+              ],
+              "breakdowns": [
+                {
+                  "breakdownType": "property",
+                  "propertyName": "Device",
+                  "propertyType": "User"
+                }
+              ],
+              "queries": [
+                {
+                  "queryType": "simple",
+                  "query": "countGroups"
+                },
+                {
+                  "queryType": "countPerGroup",
+                  "aggregate": "avg"
+                },
+                {
+                  "queryType": "aggregateProperty",
+                  "propertyName": "revenue",
+                  "propertyType": "event",
+                  "aggregate": "sum"
+                },
+                {
+                  "queryType": "aggregatePropertyPerGroup",
+                  "propertyName": "revenue",
+                  "propertyType": "event",
+                  "aggregate_per_group": "sum",
+                  "aggregate": "avg"
+                },
+                {
+                  "queryType": "formula",
+                  "formula": "(A+B)/C"
+                }
+              ]
+            }
+          ],
+          "breakdowns": [
+            {
+              "breakdownType": "property",
+              "propertyName": "Country",
+              "propertyType": "user"
+            },
+            {
+              "breakdownType": "property",
+              "propertyName": "Product Name",
+              "propertyType": "event"
+            }
+          ],
+          "filters": [
+            {
+              "filterType": "property",
+              "propertyName": "Region",
+              "propertyType": "user",
+              "operation": "exists"
+            }
+          ]
+        }
+      properties:
+        time:
+          type: object
+          description: select time
+          oneOf:
+            - $ref: '#/components/schemas/TimeBetween'
+            - $ref: '#/components/schemas/TimeFrom'
+            - $ref: '#/components/schemas/TimeLast'
+        group:
+          type: string
+          description: group that is used in aggregations by group. For instance, group by user or group by organizartion.
+          example: user
+        intervalUnit:
+          $ref: '#/components/schemas/TimeUnit'
+          description: the interval unit, by which the grouping will go
+          example: day
+        chartType:
+          $ref: '#/components/schemas/ChartType'
+          description: chart type
+        analysis:
+          type: object
+          description: analysis type
+          oneOf:
+            - $ref: '#/components/schemas/AnalysisLinear'
+            - $ref: '#/components/schemas/AnalysisRollingAverage'
+            - $ref: '#/components/schemas/AnalysisRollingWindow'
+            - $ref: '#/components/schemas/AnalysisCumulative'
+        compare:
+          type: object
+          required: [ "offset","unit" ]
+          description: optional comparison with previous period
+          example: 1 day - compare with past day
+          properties:
+            offset:
+              type: integer
+              description: offset in past in timeUnit
+              example: 1
+            unit:
+              $ref: '#/components/schemas/TimeUnit'
+              description: time unit
+        events:
+          type: array
+          description: array of events to query
+          items:
+            $ref: '#/components/schemas/EventSegmentationEvent'
+        filters:
+          type: array
+          description: array of common filters (which applies to all events)
+          items:
+            type: object
+            oneOf:
+              - $ref: '#/components/schemas/FilterByProperty'
+              - $ref: '#/components/schemas/FilterByCohort'
+        breakdowns:
+          type: array
+          description: array of common breakdowns (which applies to all events)
+          items:
+            $ref: '#/components/schemas/BreakdownByProperty'
+        segments:
+          description: array of segments
+          type: array
+          items:
+            $ref: '#/components/schemas/EventSegmentationSegment'
+
+    EventSegmentationEvent:
+      description: event object
+      required: [ "eventName","eventType","queries" ]
+      allOf:
+        - $ref: '#/components/schemas/EventRef'
+        - type: object
+          properties:
+            filters:
+              type: array
+              description: array of event filters
+              items:
+                type: object
+                oneOf:
+                  - $ref: '#/components/schemas/FilterByProperty'
+            breakdowns:
+              type: array
+              items:
+                type: object
+                description: array of event breakdowns
+                oneOf:
+                  - $ref: '#/components/schemas/BreakdownByProperty'
+            queries:
+              type: array
+              description: array of event queries
+              items:
+                $ref: '#/components/schemas/EventQuery'
+
+    FilterByCohort:
+      type: object
+      properties:
+        filteType:
+          type: string
+          enum:
+            - cohort
+        cohortId:
+          type: integer
+          format: int64
+
+    FilterByProperty:
+      type: object
+      description: filter by property. Use this in event filters or in common filters. If you use it in event then event will be inherited, if you use filter as a common, then property should be commnon for all events.
+      required: [ "filterType","propertyName","propertyType","operation" ]
+      allOf:
+        - type: object
+          properties:
+            filterType:
+              type: string
+              enum:
+                - property
+        - $ref: '#/components/schemas/PropertyRef'
+        - type: object
+          properties:
+            operation:
+              $ref: '#/components/schemas/Operation'
+            value:
+              description: one or several property values. May be not set if operation is "empty" or "exist"
+              type: array
+              items:
+                $ref: '#/components/schemas/Value'
+
+    EventQuery:
+      type: object
+      description: event  query
+      required: [ "query" ]
+      properties:
+        name:
+          type: string
+        query:
+          type: object
+          oneOf:
+            - $ref: '#/components/schemas/QuerySimple'
+            - $ref: '#/components/schemas/QueryCountPerGroup'
+            - $ref: '#/components/schemas/QueryAggregatePropertyPerGroup'
+            - $ref: '#/components/schemas/QueryAggregateProperty'
+            - $ref: '#/components/schemas/QueryFormula'
+
+    BreakdownByProperty:
+      type: object
+      description: breakdown by property.
+      required: [ "breakdownType","propertyName","propertyType" ]
+      allOf:
+        - type: object
+          properties:
+            breakdownType:
+              type: string
+              enum:
+                - property
+        - $ref: '#/components/schemas/PropertyRef'
+
+
+    EventSegmentationSegment:
+      type: object
+      description: segment
+      required: [ "conditions" ]
+      properties:
+        name:
+          type: string
+          description: name of segment
+          example: iphone users
+        conditions:
+          type: array
+          description: array of conditions
+          items:
+            $ref: '#/components/schemas/SegmentCondition'
+
+    SegmentCondition:
+      type: object
+      oneOf:
+        - $ref: '#/components/schemas/SegmentConditionHasPropertyValue'
+        - $ref: '#/components/schemas/SegmentConditionHadPropertyValue'
+        - $ref: '#/components/schemas/SegmentConditionDidEvent'
+        - $ref: '#/components/schemas/SegmentConditionFunnel'
+        - $ref: '#/components/schemas/SegmentConditionReteined'
+
+    TimeBetween:
+      type: object
+      description: time range between fixed values
+      required: [ "type","from","to" ]
+      example: >
+        {
+          "time": {
+            "type": "between",
+            "from": "2017-07-21T17:32:28Z",
+            "to": "2017-08-21T17:32:28Z"
+          }
+        }
+      properties:
+        type:
+          type: string
+          enum:
+            - between
+        from:
+          type: string
+          format: date-time
+          description: start date
+          example: 2017-07-21T17:32:28Z
+        to:
+          type: string
+          format: date-time
+          description: end date
+          example: 2017-08-21T17:32:28Z
+
+    TimeFrom:
+      type: object
+      description: time range between fixed value and current time
+      required: [ "type","from" ]
+      example: >
+        {
+          "time": {
+            "type": "from",
+            "from": "2017-07-21T17:32:28Z"
+          }
+        }
+      properties:
+        type:
+          type: string
+          enum:
+            - from
+        from:
+          type: string
+          format: date-time
+          description: start date
+          example: 2017-0-21T17:32:28Z
+
+    TimeLast:
+      type: object
+      description: take last N days/weeks
+      required: [ "type","n","unit" ]
+      example: >
+        {
+          "time": {
+            "type": "last",
+            "n": 10,
+            "unit":"day"
+          }
+        }
+      properties:
+        type:
+          type: string
+          enum:
+            - last
+        n:
+          type: integer
+          description: N days/weeks
+        unit:
+          $ref: '#/components/schemas/TimeUnit'
+
+    TimeAfterFirstUse:
+      type: object
+      description: time spent after the first use of event. Use in segmentation
+      required: [ "type","within","unit" ]
+      example: >
+        within 2 days after first use - select event which was triggered wihtin 2 daya of it's first use by user
+        
+        {
+          "time": {
+            "type": "afterFirstUse",
+            "within": 10,
+            "unit":"day"
+          }
+        }
+      properties:
+        type:
+          type: string
+          enum:
+            - afterFirstUse
+        within:
+          type: integer
+        unit:
+          $ref: '#/components/schemas/TimeUnit'
+
+    TimeWindowEach:
+      type: object
+      description: >
+        window operation for segmentation. Tells that event should be triggered each timeunit (each day, for instance)
+        
+        {
+          "time": {
+            "type": "each",
+            "unit":"day"
+          }
+        }
+      required: [ "type","unit" ]
+      properties:
+        type:
+          type: string
+          enum:
+            - windowEach
+        unit:
+          $ref: '#/components/schemas/TimeUnit'
+
+    TimeUnit:
+      type: string
+      description: time unit
+      enum:
+        - "second"
+        - "minute"
+        - "hour"
+        - "day"
+        - "week"
+        - "month"
+        - "year"
+
+    ChartType:
+      type: string
+      description: chart type
+      enum:
+        - "line"
+        - "bar"
+
+    SegmentConditionHasPropertyValue:
+      type: object
+      description: check whether the user currently has a property with a value
+      required: [ "conditionType","propertyName","operation" ]
+      properties:
+        conditionType:
+          type: string
+          enum:
+            - hasPropertyValue
+        propertyName:
+          type: string
+          description: property name. Because property here is a user only, we don't need propertyType
+        operation:
+          $ref: '#/components/schemas/Operation'
+          description: operation
+        values:
+          type: array
+          description: one or more values. Doesn't need if operation is "empty" or "exist"
+          items:
+            $ref: '#/components/schemas/Value'
+
+    SegmentConditionHadPropertyValue:
+      type: object
+      description: check whether the user had a property with a value
+      required: [ "conditionType","propertyName","operation","time" ]
+      properties:
+        conditionType:
+          type: string
+          enum:
+            - hadPropertyValue
+        propertyName:
+          type: string
+          description: property name. Because property here is a user only, we don't need propertyType
+        operation:
+          $ref: '#/components/schemas/Operation'
+          description: operation
+        values:
+          type: array
+          description: one or more values. Doesn't need if operation is "empty" or "exist"
+          items:
+            $ref: '#/components/schemas/Value'
+        time:
+          type: object
+          description: time frame
+          oneOf:
+            - $ref: '#/components/schemas/TimeBetween'
+            - $ref: '#/components/schemas/TimeLast'
+            - $ref: '#/components/schemas/TimeWindowEach'
+
+    DidEventCount:
+      type: object
+      description: find all users who made event X times
+      example: filter who made at least 1 purchase each day
+      required: [ "type","operation","time" ]
+      properties:
+        type:
+          type: string
+          enum:
+            - didEventCount
+        operation:
+          $ref: '#/components/schemas/Operation'
+        value:
+          type: integer
+          description: one or more values. Doesn't need if operation is "empty" or "exist"
+        time:
+          type: object
+          description: time frame
+          oneOf:
+            - $ref: '#/components/schemas/TimeBetween'
+            - $ref: '#/components/schemas/TimeLast'
+            - $ref: '#/components/schemas/TimeAfterFirstUse'
+            - $ref: '#/components/schemas/TimeWindowEach'
+
+    DidEventRelativeCount:
+      type: object
+      description: find all users who made left event X time more/less than right event.
+      example: find users who viewed product more than bought product in last 30 days
+      required: [ "type","operation","rightEvent","time" ]
+      properties:
+        type:
+          type: string
+          enum:
+            - didEventRelativeCount
+        operation:
+          $ref: '#/components/schemas/Operation'
+        rightEvent:
+          $ref: '#/components/schemas/EventRef'
+        time:
+          type: object
+          oneOf:
+            - $ref: '#/components/schemas/TimeBetween'
+            - $ref: '#/components/schemas/TimeLast'
+            - $ref: '#/components/schemas/TimeAfterFirstUse'
+            - $ref: '#/components/schemas/TimeWindowEach'
+
+    DidEventAggregateProperty:
+      type: object
+      description: aggregate property and compare to value
+      example: find who made sum(revenue) >$1000 in last 30 days
+      required: [ "type","propertyName","propertyType","aggregate","operation","time" ]
+      allOf:
+        - type: object
+          properties:
+            type:
+              type: string
+              enum:
+                - aggregateProperty
+        - $ref: '#/components/schemas/PropertyRef'
+        - type: object
+          properties:
+            aggregate:
+              $ref: '#/components/schemas/QueryAggregateProperty'
+            operation:
+              $ref: '#/components/schemas/Operation'
+            value:
+              type: integer
+              description: one or more values. Doesn't need if operation is "empty" or "exist"
+            time:
+              type: object
+              description: time frame
+              oneOf:
+                - $ref: '#/components/schemas/TimeBetween'
+                - $ref: '#/components/schemas/TimeLast'
+                - $ref: '#/components/schemas/TimeAfterFirstUse'
+                - $ref: '#/components/schemas/TimeWindowEach'
+
+    DidEventHistoricalCount:
+      type: object
+      description: find users with Nth event occurance
+      example: find who made an event 3rd time in last month
+      required: [ "type","propertyName","propertyType","operation","time" ]
+      properties:
+        type:
+          type: string
+          enum:
+            - historicalCount
+        operation:
+          $ref: '#/components/schemas/Operation'
+        value:
+          type: integer
+        time:
+          type: object
+          oneOf:
+            - $ref: '#/components/schemas/TimeBetween'
+            - $ref: '#/components/schemas/TimeLast'
+            - $ref: '#/components/schemas/TimeAfterFirstUse'
+            - $ref: '#/components/schemas/TimeWindowEach'
+
+    SegmentConditionDidEvent:
+      description: did event condition
+      allOf:
+        - type: object
+          properties:
+            conditionType:
+              type: string
+              enum:
+                - didEvent
+        - $ref: '#/components/schemas/EventRef'
+        - type: object
+          properties:
+            filters:
+              type: array
+              items:
+                $ref: '#/components/schemas/FilterByProperty'
+            aggregate:
+              type: object
+              oneOf:
+                - $ref: '#/components/schemas/DidEventCount'
+                - $ref: '#/components/schemas/DidEventRelativeCount'
+                - $ref: '#/components/schemas/DidEventAggregateProperty'
+                - $ref: '#/components/schemas/DidEventHistoricalCount'
+
+    SegmentConditionFunnel:
+      type: object
+      properties:
+        conditionType:
+          type: string
+          enum:
+            - funnel
+        last:
+          type: integer
+        bucket:
+          $ref: '#/components/schemas/TimeUnit'
+
+    SegmentConditionReteined:
+      type: object
+
+    QuerySimple:
+      type: object
+      description: simple query without any additional agruments
+      required: [ "queryType","query" ]
+      properties:
+        queryType:
+          type: string
+          enum:
+            - simple
+        query:
+          type: string
+          enum:
+            - countEvents
+            - countUniqueGroups
+            - weeklyActiveGroups
+            - monthlyActiveGroups
+
+    QueryCountPerGroup:
+      type: object
+      description: event count aggregate by group
+      example: avegate event count per user
+      required: [ "queryType","aggregate" ]
+      properties:
+        queryType:
+          type: string
+          enum:
+            - countPerGroup
+        aggregate:
+          $ref: '#/components/schemas/QueryAggregate'
+
+    QueryAggregatePropertyPerGroup:
+      description: aggregate of property per by group
+      example: sum of revenue property per user, then calculate average
+      required: [ "queryType","aggregate","propertyName","propertyType","aggregatePerGroup" ]
+      type: object
+      allOf:
+        - type: object
+          properties:
+            queryType:
+              type: string
+              enum:
+                - aggregatePropertyPerGroup
+        - $ref: '#/components/schemas/PropertyRef'
+        - type: object
+          properties:
+            aggregate:
+              $ref: '#/components/schemas/QueryAggregate'
+            aggregatePerGroup:
+              $ref: '#/components/schemas/QueryAggregate'
+
+    QueryAggregateProperty:
+      description: aggregate of property per by group
+      example: sum of revenue property per user, then calculate average
+      required: [ "queryType","aggregate","propertyName","propertyType" ]
+      type: object
+      allOf:
+        - type: object
+          properties:
+            queryType:
+              type: string
+              enum:
+                - aggregateProperty
+        - $ref: '#/components/schemas/PropertyRef'
+        - type: object
+          properties:
+            aggregate:
+              $ref: '#/components/schemas/QueryAggregate'
+
+    QueryFormula:
+      description: apply formula
+      type: object
+      properties:
+        queryType:
+          type: string
+          enum:
+            - formula
+        formula:
+          type: string
+    QueryAggregate:
+      type: string
+      enum:
+        - sum
+        - avg
+        - median
+        - min
+        - max
+        - distinctCount
+        - 25thPercentile
+        - 75thPercentile
+        - 90thPercentile
+        - 99thPercentile
+
+    Value:
+      type: object
+      description: value
+      oneOf:
+        - type: string
+        - type: number
+        - type: boolean
+
+    Operation:
+      description: operation
+      type: string
+      enum:
+        - "="
+        - "neq"
+        - "gt"
+        - "gte"
+        - "lt"
+        - "lte"
+        - "true"
+        - "false"
+        - "exists"
+        - "empty"
+        - "arr_all"
+        - "arr_any"
+        - "arr_none"
+        - "regex"
+
+    PropertyRef:
+      type: object
+      description: reference to property by its name and type
+      properties:
+        propertyName:
+          type: string
+        propertyType:
+          $ref: '#/components/schemas/PropertyType'
+
+    EventRef:
+      type: object
+      description: reference to event by its name and type
+      properties:
+        eventName:
+          type: string
+        eventType:
+          $ref: '#/components/schemas/EventType'
+
+    EventType:
+      type: string
+      description: possible event type
+      enum:
+        - regular
+        - custom
+
+    PropertyType:
+      type: string
+      description: possible property type
+      enum:
+        - event
+        - eventCustom
+        - user
+        - userCustom
+
+    DataType:
+      type: string
+      description: data type
+      enum:
+        - string
+        - float64
+        - int8
+        - int16
+        - int32
+        - int64
+        - uint8
+        - uint16
+        - uint32
+        - uint64
+        - boolean
