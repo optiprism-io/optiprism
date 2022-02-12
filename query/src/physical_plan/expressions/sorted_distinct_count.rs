@@ -71,6 +71,12 @@ impl SortedDistinctCountAccumulator {
     pub fn count(&self) -> u64 {
         self.count
     }
+
+    pub fn reset(&mut self) {
+        let zero = ScalarValue::try_from(&self.current.get_datatype()).unwrap();
+        self.current = zero;
+        self.count = 0;
+    }
 }
 
 macro_rules! distinct_count_array {
@@ -137,9 +143,9 @@ impl Accumulator for SortedDistinctCountAccumulator {
     }
 
     fn update(&mut self, values: &[ScalarValue]) -> Result<()> {
-        let value = values[0].clone().into();
-        if !self.current.eq(&value) {
-            self.current = value;
+        let value = &values[0];
+        if !self.current.eq(value) {
+            self.current = value.clone();
             self.count += 1;
         }
         Ok(())

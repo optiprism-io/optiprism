@@ -192,7 +192,7 @@ impl Expr {
             } => {
                 match fun {
                     AggregateFunction::OrderedDistinctCount => {
-                        let name = "count".to_string();
+                        let name = "ordered_distinct_count".to_string();
                         let data_type = args[0].get_type(input_schema)?;
                         let sorted_distinct = SortedDistinctCount::new(name, data_type);
                         let udf = sorted_distinct.try_into()?;
