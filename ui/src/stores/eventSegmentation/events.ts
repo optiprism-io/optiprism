@@ -62,7 +62,7 @@ export type Events = {
     compareOffset: number,
     chartType: ChartType | string,
 
-    eventSegmentation: any // TODO
+    eventSegmentation: any // TODO integrations backend
     eventSegmentationLoading: boolean
 };
 
@@ -216,6 +216,8 @@ export const useEventsStore = defineStore("events", {
             ];
         },
         propsForEventSegmentationResult(): EventSegmentation {
+            const lexiconStore = useLexiconStore();
+
             let time = {
                 from: new Date(this.period.from),
                 to: new Date(this.period.to),
@@ -256,6 +258,23 @@ export const useEventsStore = defineStore("events", {
                 group: this.group,
                 intervalUnit: this.controlsGroupBy,
                 chartType: this.chartType,
+                events: this.events.map(item => {
+                    const eventLexicon = lexiconStore.findEvent(item.ref)
+
+                    const event = {
+                        eventName: eventLexicon.name,
+                        eventType: item.ref.type,
+                        queries: item.queries.map(query => {
+                            const queryLexicon = lexiconStore.findQuery(query.queryRef)
+
+                            return {
+                                queryType: queryLexicon ? queryLexicon.type : '',
+                            }
+                        }),
+                    }
+
+                    return event;
+                }), // TODO format data for request
             };
 
             if (this.compareTo) {
@@ -266,6 +285,10 @@ export const useEventsStore = defineStore("events", {
             }
 
             return props;
+        },
+        isNoData(): boolean {
+            return !this.eventSegmentationLoading &&
+                (!this.eventSegmentation || (this.eventSegmentation && Array.isArray(this.eventSegmentation.series) && !this.eventSegmentation.series.length))
         },
     },
     actions: {
@@ -301,17 +324,17 @@ export const useEventsStore = defineStore("events", {
         },
         addEventByRef(ref: EventRef): void {
             switch (ref.type) {
-                case EventType.Regular:
+                case 'regular':
                     this.addEvent(ref.id);
                     break;
-                case EventType.Custom:
+                case 'custom':
                     this.addCustomEvent(ref.id);
                     break;
             }
         },
         addEvent(id: number): void {
             this.events.push(<Event>{
-                ref: <EventRef>{ type: EventType.Regular, id: id },
+                ref: <EventRef>{ type: 'regular', id: id },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,
@@ -319,7 +342,7 @@ export const useEventsStore = defineStore("events", {
         },
         addCustomEvent(id: number): void {
             this.events.push(<Event>{
-                ref: <EventRef>{ type: EventType.Custom, id: id },
+                ref: <EventRef>{ type: 'custom', id: id },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,
@@ -355,7 +378,7 @@ export const useEventsStore = defineStore("events", {
             try {
                 const res = await schemaService.propertiesValues({
                     event_name: lexiconStore.eventName(eventRef),
-                    event_type: EventType[eventRef.type],
+                    event_type: eventRef.type,
                     property_name: lexiconStore.propertyName(propRef),
                     property_type: PropertyType[propRef.type]
                 });

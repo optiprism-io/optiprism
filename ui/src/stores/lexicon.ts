@@ -118,13 +118,23 @@ export const useLexiconStore = defineStore("lexicon", {
                 throw new Error(`undefined custom event id: {$id}`);
             };
         },
-        eventName(state: Lexicon) {
+        eventName() {
             return (ref: EventRef): string => {
                 switch (ref.type) {
-                    case EventType.Regular:
+                    case 'regular':
                         return this.findEventById(ref.id).name;
-                    case EventType.Custom:
+                    case 'custom':
                         return this.findCustomEventById(ref.id).name;
+                }
+            };
+        },
+        findEvent() {
+            return (ref: EventRef) => {
+                switch (ref.type) {
+                    case 'regular':
+                        return this.findEventById(ref.id);
+                    case 'custom':
+                        return this.findCustomEventById(ref.id);
                 }
             };
         },

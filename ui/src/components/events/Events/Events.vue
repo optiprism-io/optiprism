@@ -44,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { EventQueryRef, EventRef, PropertyRef } from "@/types/events";
 import { OperationId, Value } from "@/types";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
@@ -56,6 +56,10 @@ const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
 
 const events = computed(() => eventsStore.events);
+
+const updateEventSegmentationResult = (): void => {
+    eventsStore.fetchEventSegmentationResult()
+}
 
 const addEvent = (ref: EventRef) => {
     eventsStore.addEventByRef(ref);
@@ -116,4 +120,11 @@ const removeQuery = (eventIdx: number, queryIdx: number): void => {
 const changeQuery = (eventIdx: number, queryIdx: number, ref: EventQueryRef) => {
     eventsStore.changeQuery(eventIdx, queryIdx, ref);
 };
+
+watch(
+    eventsStore.events,
+    () => {
+        updateEventSegmentationResult()
+    }
+)
 </script>

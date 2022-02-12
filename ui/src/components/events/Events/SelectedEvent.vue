@@ -217,9 +217,9 @@ const removeBreakdown = (breakdownIdx: number): void => {
 
 const eventName = (ref: EventRef): string => {
     switch (ref.type) {
-        case EventType.Regular:
+        case 'regular':
             return lexiconStore.findEventById(ref.id).displayName;
-        case EventType.Custom:
+        case 'custom':
             return lexiconStore.findCustomEventById(ref.id).name;
     }
     throw new Error("unhandled");

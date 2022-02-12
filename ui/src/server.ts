@@ -2,8 +2,9 @@ import { createServer } from "miragejs";
 import { DataType } from "@/types";
 import { EventStatus, UserProperty, UserCustomProperty } from "@/types/events";
 import splineChartMocks from "@/mocks/splineChart.json";
-import eventSegmentationsMocks from "@/mocks/eventSegmentations.json";
 
+import eventSegmentationsMocks from "@/mocks/eventSegmentations/eventSegmentations.json";
+import eventMocks from "@/mocks/eventSegmentations/events.json";
 
 export default function ({ environment = "development" } = {}) {
     return createServer({
@@ -12,98 +13,7 @@ export default function ({ environment = "development" } = {}) {
             this.timing = 200;
 
             this.get("/schema/events", () => {
-                return [
-                    {
-                        id: 1,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 0,
-                        tags: ["Onboarding"],
-                        name: "sign_up",
-                        displayName: "Sign Up",
-                        description: "When user signs up",
-                        status: EventStatus.Enabled
-                    },
-                    {
-                        id: 2,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 0,
-                        tags: ["General"],
-                        name: "search",
-                        displayName: "Search",
-                        description: "",
-                        status: EventStatus.Enabled,
-                        properties: [1]
-                    },
-                    {
-                        id: 3,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 0,
-                        tags: ["General"],
-                        name: "view_product",
-                        displayName: "View Product",
-                        description: "View product",
-                        status: EventStatus.Enabled,
-                        properties: [2, 3, 4]
-                    },
-                    {
-                        id: 4,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 0,
-                        tags: ["Revenue"],
-                        name: "add_product_to_cart",
-                        displayName: "Add Product to Cart",
-                        description: "Add Product to Cart",
-                        status: EventStatus.Enabled,
-                        properties: [5, 6, 7]
-                    },
-                    {
-                        id: 5,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 0,
-                        tags: ["Revenue"],
-                        name: "purchase_product",
-                        displayName: "Purchase Product",
-                        description: "When product was purchased",
-                        status: EventStatus.Enabled,
-                        properties: [8, 9, 10, 11, 12]
-                    },
-                    {
-                        id: 6,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 0,
-                        tags: [],
-                        name: "purchase_product_other_1",
-                        displayName: "Purchase Product Other 1",
-                        description: "Other Test description 1",
-                        status: EventStatus.Enabled,
-                        properties: [8, 9, 10, 11, 12]
-                    },
-                    {
-                        id: 7,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 0,
-                        tags: [],
-                        name: "purchase_product_other_2",
-                        displayName: "Purchase Product Other 2",
-                        description: "Other Test description 2",
-                        status: EventStatus.Enabled,
-                        properties: [8, 9, 10, 11, 12]
-                    }
-                ];
+                return eventMocks
             });
 
             this.get("/schema/custom-events", () => {
@@ -424,8 +334,14 @@ export default function ({ environment = "development" } = {}) {
                 return splineChartMocks;
             });
 
-            this.post("/queries/event-segmentation", (): any => {
-                return eventSegmentationsMocks;
+            this.post("/queries/event-segmentation", (schema, request) => {
+                if (JSON.parse(request.requestBody).events.length) {
+                    return eventSegmentationsMocks;
+                } else {
+                    return {
+                        series: []
+                    };
+                }
             });
         }
     });

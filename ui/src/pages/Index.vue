@@ -68,7 +68,6 @@ onBeforeMount(async () => {
     await lexiconStore.getUserProperties();
 
     await eventsStore.initPeriod();
-    await eventsStore.fetchEventSegmentationResult();
 });
 
 onUnmounted(() => {

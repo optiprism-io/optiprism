@@ -50,7 +50,7 @@ const checkDisable = (propRef: PropertyRef): boolean => {
 const getEventProperties = (eventRef: EventRef) => {
     const properties: Group<Item<PropertyRef, null>[]>[] = [];
 
-    if (eventRef.type == EventType.Regular) {
+    if (eventRef.type === 'regular') {
         const eventProperties = lexiconStore.findEventProperties(eventRef.id);
 
         if (eventProperties.length) {
