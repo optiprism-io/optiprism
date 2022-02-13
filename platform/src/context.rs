@@ -11,7 +11,9 @@ use common::{
     rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS},
 };
 use std::collections::HashMap;
+use axum::http::StatusCode;
 use common::rbac::{Action, Resource};
+use crate::error::InternalError;
 
 #[derive(Default)]
 pub struct Context {
@@ -38,7 +40,7 @@ impl Context {
         permission: Permission,
     ) -> Result<()> {
         if organization_id != self.organization_id {
-            return Err(Error::Forbidden);
+            return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));
         }
         if let Some(roles) = &self.roles {
             for (scope, role) in roles {
@@ -75,7 +77,7 @@ impl Context {
             }
         }
 
-        return Err(Error::Forbidden);
+        return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));
     }
 }
 

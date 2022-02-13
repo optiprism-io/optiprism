@@ -3,7 +3,7 @@ use crate::store::store::{make_data_key, make_id_seq_key, make_index_key, Store}
 use crate::Result;
 
 use crate::events::types::{CreateEventRequest, UpdateEventRequest};
-use crate::events::{Event, Status};
+use crate::events::{Event, Scope, Status};
 use crate::store::index;
 use bincode::{deserialize, serialize};
 use chrono::Utc;

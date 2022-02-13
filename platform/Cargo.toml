@@ -17,6 +17,8 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
+uuid = { version = "0.8.2", features = ["serde", "v4"] }
+reqwest = { version = "0.11", features = ["json"] }
 common = { path = "../common" }
 metadata = { path = "../metadata" }
 axum = { version = "0.4.3", features = ["headers"] }
