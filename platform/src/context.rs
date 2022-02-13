@@ -5,6 +5,7 @@ use axum::{
     extract::{FromRequest, RequestParts, TypedHeader},
     headers::{authorization::Bearer, Authorization},
 };
+
 use common::{
     auth::parse_access_token,
     rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS},
@@ -15,7 +16,6 @@ use common::rbac::{Action, Resource};
 #[derive(Default)]
 pub struct Context {
     pub organization_id: u64,
-    pub project_id: u64,
     pub account_id: u64,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
@@ -37,29 +37,8 @@ impl Context {
         project_id: u64,
         permission: Permission,
     ) -> Result<()> {
-        unimplemented!()
-    }
-
-
-    pub fn check_ownership(&self, owner_id: u64) -> Result<()> {
-        unimplemented!()
-    }
-
-    pub fn get_project_id(&self, other_project_id: Option<u64>) -> u64 {
-        match other_project_id {
-            None => self.project_id,
-            Some(project_id) => project_id
-        }
-    }
-
-    pub fn is_permitted(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        permission: Permission,
-    ) -> bool {
         if organization_id != self.organization_id {
-            return false;
+            return Err(Error::Forbidden);
         }
         if let Some(roles) = &self.roles {
             for (scope, role) in roles {
@@ -69,15 +48,15 @@ impl Context {
                     }
                 }
                 match role {
-                    Role::Owner => return true,
+                    Role::Owner => return Ok(()),
                     Role::Manager => {
                         if check_permissions(&MANAGER_PERMISSIONS, &permission) {
-                            return true;
+                            return Ok(());
                         }
                     }
                     Role::Reader => {
                         if check_permissions(&READER_PERMISSIONS, &permission) {
-                            return true;
+                            return Ok(());
                         }
                     }
                 }
@@ -91,11 +70,12 @@ impl Context {
                     }
                 }
                 if check_permissions(permissions, &permission) {
-                    return true;
+                    return Ok(());
                 }
             }
         }
-        false
+
+        return Err(Error::Forbidden);
     }
 }
 
@@ -115,7 +95,7 @@ impl<B> FromRequest<B> for Context
 {
     type Rejection = Error;
 
-    async fn from_request(request: &mut RequestParts<B>) -> std::Result<Self, Self::Rejection> {
+    async fn from_request(request: &mut RequestParts<B>) -> core::result::Result<Self, Self::Rejection> {
         let mut ctx = Context::default();
         if let Ok(TypedHeader(Authorization(bearer))) =
         TypedHeader::<Authorization<Bearer>>::from_request(request).await

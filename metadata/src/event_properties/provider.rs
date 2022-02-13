@@ -1,8 +1,7 @@
 use crate::error::Error;
-use crate::store::store::{make_data_key, make_id_seq_key, make_index_key, Store};
+use crate::store::store::{make_col_id_seq_key, make_data_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
 
-use crate::column::make_col_id_seq_key;
 use crate::event_properties::types::{
     CreateEventPropertyRequest, EventProperty, Status, UpdateEventPropertyRequest,
 };
@@ -67,7 +66,7 @@ impl Provider {
         let created_at = Utc::now();
         let col_id = self
             .store
-            .next_seq(make_col_id_seq_key(req.project_id))
+            .next_seq(make_col_id_seq_key(organization_id, req.project_id))
             .await?;
 
         let prop = EventProperty {

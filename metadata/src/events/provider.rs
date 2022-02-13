@@ -7,7 +7,9 @@ use crate::events::{Event, Status};
 use crate::store::index;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
+use async_mutex::Mutex;
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::store::index::hash_map::HashMap;
 
 const NAMESPACE: &[u8] = b"events";
@@ -55,7 +57,7 @@ impl Provider {
 
     pub async fn create(&self, organization_id: u64, req: CreateEventRequest) -> Result<Event> {
         let idx_keys = index_keys(organization_id, req.project_id, &req.status, &req.name, &req.display_name);
-        let mut idx = self.idx.lock().map_err(|e| Error::Internal(e.to_string()))?;
+        let mut idx = self.idx.lock().await;
         idx.check_insert_constraints(idx_keys.as_ref()).await?;
 
         let created_at = Utc::now();
@@ -106,7 +108,7 @@ impl Provider {
     }
 
     pub async fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Event> {
-        let idx = self.idx.lock().map_err(|e| Error::Internal(e.to_string()))?;
+        let idx = self.idx.lock().await;
 
         let data = idx
             .get(make_index_key(organization_id, project_id, NAMESPACE, IDX_NAME, name))
@@ -115,7 +117,7 @@ impl Provider {
         Ok(deserialize(&data)?)
     }
 
-    pub async fn list(&self, organization_id: u64, project_id: u64) -> Result<Vec<Event>> {
+    pub async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
         let list = self
             .store
             .list_prefix(b"/events/ent") // TODO doesn't work
@@ -124,14 +126,17 @@ impl Provider {
             .map(|v| deserialize(v.1.as_ref()))
             .collect::<bincode::Result<_>>()?;
 
-        Ok(list)
+        Ok(ListResponse {
+            data: list,
+            meta: ResponseMetadata { next: None },
+        })
     }
 
     pub async fn update(&self, organization_id: u64, req: UpdateEventRequest) -> Result<Event> {
         let idx_keys = index_keys(organization_id, req.project_id, &req.status, &req.name, &req.display_name);
         let prev_event = self.get_by_id(organization_id, req.project_id, req.id).await?;
         let idx_prev_keys = index_keys(organization_id, prev_event.project_id, &prev_event.status, &prev_event.name, &prev_event.display_name);
-        let mut idx = self.idx.lock().map_err(|e| Error::Internal(e.to_string()))?;
+        let mut idx = self.idx.lock().await;
         idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await?;
@@ -227,7 +232,7 @@ impl Provider {
             .delete(make_data_key(organization_id, project_id, NAMESPACE, id))
             .await?;
 
-        let mut idx = self.idx.lock().map_err(|e| Error::Internal(e.to_string()))?;
+        let mut idx = self.idx.lock().await;
         idx.delete(index_keys(organization_id, event.project_id, &event.status, &event.name, &event.display_name).as_ref())
             .await?;
 

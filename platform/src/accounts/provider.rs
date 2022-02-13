@@ -20,9 +20,8 @@ impl Provider {
     }
 
     pub async fn create(&self, ctx: Context, request: CreateRequest) -> Result<Account> {
-        if !ctx.is_permitted(request.organization_id, 0, Permission::CreateAccount) {
-            unimplemented!()
-        }
+        ctx.check_permission(request.organization_id, 0, Permission::CreateAccount)?;
+
         let salt = make_salt();
         let password = make_password_hash(&request.password, &salt);
         let account = self

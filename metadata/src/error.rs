@@ -12,7 +12,7 @@ pub enum Error {
     Plan(String),
     BincodeError(bincode::Error),
     RocksDbError(rocksdb::Error),
-    KeyAlreadyExist,
+    KeyAlreadyExists,
     KeyNotFound,
     ConstraintViolation,
 }

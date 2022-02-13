@@ -2,8 +2,8 @@
 name = "platform"
 version = "0.1.0"
 authors = [
-	"Maxim Bogdanov <maxim.bogdanov@coins.ph>",
-	"Aleksei Lin <aleksei@incsw.in>",
+    "Maxim Bogdanov <maxim.bogdanov@coins.ph>",
+    "Aleksei Lin <aleksei@incsw.in>",
 ]
 edition = "2021"
 

@@ -6,7 +6,6 @@ pub mod organizations;
 pub mod projects;
 pub mod store;
 pub mod event_properties;
-mod column;
 
 pub use error::{Error, Result};
 pub use metadata::Metadata;

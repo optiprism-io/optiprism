@@ -28,6 +28,8 @@ pub enum Error {
     Internal(InternalError),
     CommonError(CommonError),
     MetadataError(MetadataError),
+    Forbidden,
+    BadRequest,
 }
 
 impl Display for Error {
@@ -61,6 +63,6 @@ impl IntoResponse for Error {
         } else {
             (StatusCode::INTERNAL_SERVER_ERROR, format!("{}", self))
         }
-        .into_response()
+            .into_response()
     }
 }
