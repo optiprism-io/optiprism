@@ -57,6 +57,7 @@ impl TryFrom<SortedDistinctCount> for AggregateUDF {
 pub struct SortedDistinctCountAccumulator {
     current: ScalarValue,
     count: u64,
+    full: bool,
 }
 
 impl SortedDistinctCountAccumulator {
@@ -65,6 +66,7 @@ impl SortedDistinctCountAccumulator {
         Ok(Self {
             current,
             count: 0,
+            full: false,
         })
     }
 
@@ -76,6 +78,7 @@ impl SortedDistinctCountAccumulator {
         let zero = ScalarValue::try_from(&self.current.get_datatype()).unwrap();
         self.current = zero;
         self.count = 0;
+        self.full = false;
     }
 }
 
@@ -95,6 +98,13 @@ macro_rules! distinct_count_array {
 
 macro_rules! distinct_count_array_limited {
     ($array:expr, $ARRAYTYPE:ident, $state:expr, $limit:expr) => {{
+        if $state.full {
+            return Ok(());
+        }
+        if $state.count >= $limit {
+            $state.full = true;
+            return Ok(());
+        }
         let array_size = $array.len();
         let typed_array = $array.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
         for index in 0..array_size {
@@ -102,6 +112,7 @@ macro_rules! distinct_count_array_limited {
                 $state.current = typed_array.value(index).into();
                 $state.count += 1;
                 if $state.count >= $limit {
+                    $state.full = true;
                     return Ok(());
                 }
             }
@@ -111,6 +122,9 @@ macro_rules! distinct_count_array_limited {
 }
 
 fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) -> Result<()> {
+    if state.full {
+        return Ok(());
+    }
     match array.data_type() {
         DataType::Boolean => distinct_count_array_limited!(array, BooleanArray, state, 2),
         DataType::Utf8 => distinct_count_array!(array, StringArray, state),
