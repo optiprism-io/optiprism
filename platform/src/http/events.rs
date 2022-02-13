@@ -90,9 +90,9 @@ async fn detach_property(
 
 pub fn configure(router: Router) -> Router {
     router
-        // .route("/v1/projects/:project_id/events", routing::post(create).get(list))
+        .route("/v1/projects/:project_id/events", routing::post(create).get(list))
         .route("/v1/projects/:project_id/events/:event_id", routing::get(get_by_id))
-    // .route("/v1/projects/:project_id/events/name/:event_name", routing::get(get_by_name))
-    // .route("/v1/projects/:project_id/events/:event_id/properties/:property_id/attach", routing::put(attach_property))
-    // .route("/v1/projects/:project_id/events/:event_id/properties/:property_id/detach", routing::put(detach_property))
+        .route("/v1/projects/:project_id/events/name/:event_name", routing::get(get_by_name))
+        .route("/v1/projects/:project_id/events/:event_id/properties/:property_id/attach", routing::put(attach_property))
+        .route("/v1/projects/:project_id/events/:event_id/properties/:property_id/detach", routing::put(detach_property))
 }
