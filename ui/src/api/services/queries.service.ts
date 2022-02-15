@@ -1,6 +1,27 @@
 import { post } from '../apiClient'
 import { TimeUnit } from '@/types'
 
+type Breakdown = {
+    breakdownType: string
+    propertyName: string
+    propertyType: string
+}
+
+type Filter = {
+    filterType: string
+    propertyName: string
+    propertyType: string
+    operation: string
+}
+
+type Query = {
+    queryType: string
+    propertyName?: string
+    propertyType?: string
+    aggregate_per_group?: string
+    aggregate?: string
+}
+
 type EventQuery = {
     eventName: string
     eventType: string
@@ -11,18 +32,8 @@ type EventQuery = {
         operation?: string
         value?: string[]
     }[]
-    breakdowns?: {
-        breakdownType: string
-        propertyName: string
-        propertyType: string
-    }[]
-    queries: {
-        queryType: string
-        propertyName?: string
-        propertyType?: string
-        aggregate_per_group?: string
-        aggregate?: string
-    }[],
+    breakdowns?: Breakdown[]
+    queries: Query[],
 }
 
 export type EventSegmentation = {
@@ -40,10 +51,8 @@ export type EventSegmentation = {
     },
 
     events: EventQuery[],
-
-    // TODO integrations
-    breakdowns?: [],
-    filters?: [],
+    breakdowns?: Breakdown[],
+    filters?: Filter[],
 }
 
 const schemaEventSegmentation = {

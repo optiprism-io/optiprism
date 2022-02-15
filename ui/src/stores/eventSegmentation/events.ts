@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import {
     EventRef,
-    EventType,
     PropertyRef,
     PropertyType,
     EventQueryRef,
@@ -15,6 +14,7 @@ import { getLastNDaysRange } from "@/helpers/calendarHelper";
 import { TimeUnit } from "@/types";
 import {Column, Row} from "@/components/uikit/UiTable/UiTable";
 
+const COLUMN_WIDTH = 170;
 export type ChartType = 'line' | 'pie' | 'column';
 
 type ColumnMap = {
@@ -108,22 +108,23 @@ export const useEventsStore = defineStore("events", {
         eventSegmentationLoading: false,
     }),
     getters: {
+        hasSelectedEvents(): boolean {
+            return Array.isArray(this.events) && Boolean(this.events.length)
+        },
         hasDataEvent(): boolean {
             return this.eventSegmentation && Array.isArray(this.eventSegmentation.series) && this.eventSegmentation.series.length;
         },
         tableColumns(): ColumnMap {
             if (this.hasDataEvent) {
                 return {
-                    ...this.eventSegmentation.dimensionHeaders.reduce((acc: any, key: string) => {
+                    ...this.eventSegmentation.dimensionHeaders.reduce((acc: any, key: string, i: number) => {
                         acc[key] = {
+                            pinned: true,
                             value: key,
                             title: key,
-                        }
-
-                        if (key === 'Event Name') {
-                            acc[key].pinned = true;
-                            acc[key].lastPinned = true;
-                            acc[key].truncate = true;
+                            truncate: true,
+                            lastPinned: this.eventSegmentation.dimensionHeaders.length - 1 === i,
+                            left: i * COLUMN_WIDTH,
                         }
 
                         return acc
@@ -144,13 +145,16 @@ export const useEventsStore = defineStore("events", {
         tableData(): Row[] {
             if (this.hasDataEvent) {
                 return this.eventSegmentation.series.map((values: number[], indexSeries: number) => {
+                    const items = this.eventSegmentation.dimensions[indexSeries];
+
                     return [
-                        ...this.eventSegmentation.dimensions[indexSeries].map((dimension: string, i: number) => {
+                        ...items.map((dimension: string, i: number) => {
                             return {
                                 value: dimension,
                                 title: dimension,
-                                pinned: i === 0,
-                                lastPinned: i === 0,
+                                pinned: true,
+                                lastPinned: i === items.length - 1,
+                                left: i * COLUMN_WIDTH,
                             };
                         }),
                         ...values.map((value: number | undefined) => {
@@ -175,7 +179,7 @@ export const useEventsStore = defineStore("events", {
                         acc.push({
                             date: new Date(this.eventSegmentation.metricHeaders[indexValue]),
                             value,
-                            category: this.eventSegmentation.dimensions[indexSeries].join(', '),
+                            category: this.eventSegmentation.dimensions[indexSeries].filter((item: string) => item !== '-').join(', '),
                         });
                     });
                     return acc;
@@ -188,7 +192,7 @@ export const useEventsStore = defineStore("events", {
             if (this.hasDataEvent) {
                 return this.eventSegmentation.singles.map((item: number, index: number) => {
                     return {
-                        type: this.eventSegmentation.dimensions[index].join(', '),
+                        type: this.eventSegmentation.dimensions[index].filter((item: string) => item !== '-').join(', '),
                         value: item,
                     };
                 });
@@ -274,7 +278,7 @@ export const useEventsStore = defineStore("events", {
                     }
 
                     return event;
-                }), // TODO format data for request
+                }),
             };
 
             if (this.compareTo) {

@@ -326,7 +326,9 @@ const onSelectChartType = (payload: string): void => {
 }
 
 const updateEventSegmentationData = async () => {
-    await eventsStore.fetchEventSegmentationResult()
+    if (eventsStore.hasSelectedEvents) {
+        await eventsStore.fetchEventSegmentationResult()
+    }
 }
 </script>
 
