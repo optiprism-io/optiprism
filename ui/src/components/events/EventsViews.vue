@@ -45,7 +45,7 @@
                     <div class="pf-c-toolbar__item">
                         <UiSelect
                             :items="compareToItems"
-                            :text-button="textSelectCompairTo"
+                            :text-button="textSelectCompareTo"
                             :selections="[eventsStore.compareTo]"
                             :clearable="true"
                             :full-text="true"
@@ -80,7 +80,7 @@
                     />
                 </div>
                 <div class="pf-c-card__title pf-u-text-align-center pf-u-font-size-lg pf-u-color-400">
-                    Select an Event to get started.
+                    {{ $t('events.select_to_start') }}
                 </div>
             </div>
             <component
@@ -212,7 +212,7 @@ const compareToItems = computed(() => {
     })
 })
 
-const textSelectCompairTo = computed(() => {
+const textSelectCompareTo = computed(() => {
     return eventsStore.compareTo ? `Compare to previous ${eventsStore.compareTo}` : 'Compare to Past'
 })
 

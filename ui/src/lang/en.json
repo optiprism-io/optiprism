@@ -1,0 +1,10 @@
+{
+  "common": {
+    "apply": "Apply",
+    "cancel": "Cancel"
+  },
+
+  "events": {
+    "select_to_start": "Select an Event to get started"
+  }
+}
