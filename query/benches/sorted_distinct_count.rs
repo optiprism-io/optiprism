@@ -2,7 +2,8 @@ use std::sync::Arc;
 use arrow::array::{ArrayRef, Int64Array};
 use arrow::datatypes::DataType;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput, BenchmarkId};
-use datafusion::physical_plan::Accumulator;
+use datafusion::physical_plan::{Accumulator, AggregateExpr};
+use datafusion::physical_plan::distinct_expressions::DistinctCount;
 use query::physical_plan::expressions::sorted_distinct_count::SortedDistinctCountAccumulator;
 use rand::Rng;
 
@@ -42,5 +43,29 @@ pub fn sorted_distinct_count_bench(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, sorted_distinct_count_bench);
+pub fn distinct_count_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("distinct_count");
+
+    let arrays = [10, 20, 40, 100, 200, 400, 1000].into_iter()
+        .map(|size| new_random_array(size, size / 2))
+        .collect::<Vec<_>>();
+
+    for array in arrays {
+        let size = array.len() as u64;
+        group.throughput(Throughput::Elements(size));
+        let id = BenchmarkId::from_parameter(size);
+        group.bench_with_input(id, &array, |b, array| {
+            let dc = DistinctCount::new(vec![], vec![], "distinct count".to_string(), DataType::Int64);
+            let mut acc = dc.create_accumulator().unwrap();
+            b.iter(move || {
+                acc.update_batch(&[array.clone()]).unwrap();
+            });
+        });
+    }
+
+    group.finish();
+}
+
+
+criterion_group!(benches, sorted_distinct_count_bench, distinct_count_bench);
 criterion_main!(benches);
