@@ -1,8 +1,4 @@
-pub mod cloud;
+pub mod destinations;
 pub mod events;
-// pub mod grpc;
-pub mod http;
-pub mod local;
 pub mod processing;
-
-// pub use error::{Error, Result};
+pub mod sources;

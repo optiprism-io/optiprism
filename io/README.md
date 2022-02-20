@@ -1,3 +1,26 @@
+```mermaid
+flowchart TB
+	site --> http
+	app --> grpc
+	subgraph Sources
+		http[HTTP]
+		grpc[gRPC]
+	end
+	subgraph Processing
+		direction TB
+		geo[GeoIP] --> device
+		device[Device] --> udfs
+		udfs[UDFs]
+	end
+	Sources --> Processing
+	subgraph Destinations
+		local[Local Storage]
+		cloud[Cloud]
+	end
+	Processing --> Destinations
+	local --> storage[(Storage)]
+```
+
 ```json
 {
 	"user_id": "qwe123", // required
