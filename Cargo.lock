@@ -698,6 +698,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "geoip2"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ac8ee149c442b29d2e59e535a78c5ec4b3eb19bd7a9d3f7688612c14b1228c4"
+dependencies = [
+ "geoip2-codegen",
+]
+
+[[package]]
+name = "geoip2-codegen"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d80975cf6dfa609014037194ea8e6a6f0e55039b17503fed0c10156f1e3e904"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -868,6 +888,7 @@ dependencies = [
  "axum-debug",
  "chrono",
  "common",
+ "geoip2",
  "metadata",
  "serde",
  "serde_json",

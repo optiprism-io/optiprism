@@ -1,4 +1,4 @@
-use crate::{events::Request, processing::Provider};
+use crate::{events::Request, processing::Provider, Result};
 use axum::{
     extract::{Extension, Path},
     routing::post,
@@ -11,8 +11,9 @@ async fn ingest(
     Extension(provider): Extension<Arc<Provider>>,
     Path(id): Path<String>,
     Json(request): Json<Request>,
-) -> Result<Json<Response>> {
-    Ok(Json(provider.ingest(id, request).await?))
+) -> Result<()> {
+    provider.ingest(id, request).await;
+    Ok(())
 }
 
 pub fn configure(router: Router) -> Router {
