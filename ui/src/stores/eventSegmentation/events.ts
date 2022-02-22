@@ -4,6 +4,8 @@ import {
     PropertyRef,
     PropertyType,
     EventQueryRef,
+    EVENT_TYPE_REGULAR,
+    EVENT_TYPE_CUSTOM
 } from "@/types/events";
 import { OperationId, Value, Group } from "@/types";
 import schemaService from "@/api/services/schema.service";
@@ -328,17 +330,17 @@ export const useEventsStore = defineStore("events", {
         },
         addEventByRef(ref: EventRef): void {
             switch (ref.type) {
-                case 'regular':
+                case EVENT_TYPE_REGULAR:
                     this.addEvent(ref.id);
                     break;
-                case 'custom':
+                case EVENT_TYPE_CUSTOM:
                     this.addCustomEvent(ref.id);
                     break;
             }
         },
         addEvent(id: number): void {
             this.events.push(<Event>{
-                ref: <EventRef>{ type: 'regular', id: id },
+                ref: <EventRef>{ type: EVENT_TYPE_REGULAR, id: id },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,
@@ -346,7 +348,7 @@ export const useEventsStore = defineStore("events", {
         },
         addCustomEvent(id: number): void {
             this.events.push(<Event>{
-                ref: <EventRef>{ type: 'custom', id: id },
+                ref: <EventRef>{ type: EVENT_TYPE_CUSTOM, id: id },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,

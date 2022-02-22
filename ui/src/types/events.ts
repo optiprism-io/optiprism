@@ -1,6 +1,9 @@
 import { DataType } from '@/types';
 import { AggregateId } from '@/types/aggregate';
 
+export const EVENT_TYPE_REGULAR = 'regular'
+export const EVENT_TYPE_CUSTOM = 'custom'
+
 export type EventType = 'regular' | 'custom'
 
 export enum PropertyType {
@@ -26,11 +29,11 @@ export type EventRef = {
 };
 
 export function eventRef(e: Event): EventRef {
-    return <EventRef>{ type: 'regular', id: e.id };
+    return <EventRef>{ type: EVENT_TYPE_REGULAR, id: e.id };
 }
 
 export function customEventRef(e: CustomEvent): EventRef {
-    return <EventRef>{ type: 'custom', id: e.id };
+    return <EventRef>{ type: EVENT_TYPE_CUSTOM, id: e.id };
 }
 
 export function eventPropertyRef(e: EventProperty): PropertyRef {
