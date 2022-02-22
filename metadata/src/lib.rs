@@ -9,5 +9,5 @@ pub mod event_properties;
 mod column;
 
 pub use error::{Error, Result};
-pub use metadata::Metadata;
+pub use crate::metadata::Metadata;
 pub use store::store::Store;
