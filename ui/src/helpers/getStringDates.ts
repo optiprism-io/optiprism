@@ -1,19 +1,3 @@
-// export function getMultipleString(dates, names) {
-//     const stringDates = dates.map((item) => {
-//         return getStringDate(item, names);
-//     });
-//
-//     return stringDates.join('; ');
-// }
-
-// export function getRangeString(from, to, names) {
-//     return `${getStringDate(from, names)} - ${getStringDate(to, names)}`;
-// }
-
-// export function getMonthRangeString(from, to, names) {
-//     return `${getStringDate(from, names, false)} - ${getStringDate(to, names, false)}`;
-// }
-
 export function getStringDate(item: string | number, names: string[], includeDate = true) {
     if (isNaN(new Date(item).getTime())) {
         return item;

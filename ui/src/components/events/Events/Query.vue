@@ -132,6 +132,7 @@ import { useEventsStore, Events } from "@/stores/eventSegmentation/events";
 import { EventRef, EventQueryRef, EventsQuery, PropertyRef } from "@/types/events";
 import { AggregateRef } from "@/types/aggregate";
 import { Item } from "@/components/Select/SelectTypes";
+import UiInput from "@/components/uikit/UiInput.vue";
 import Select from "@/components/Select/Select.vue";
 import PropertySelect from "@/components/events/PropertySelect.vue";
 import UiButton from "@/components/uikit/UiButton.vue";

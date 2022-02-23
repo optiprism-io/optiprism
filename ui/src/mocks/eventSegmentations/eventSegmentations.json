@@ -1,7 +1,8 @@
 {
     "dimensionHeaders": [
         "Event Name",
-        "Country"
+        "Country",
+        "Age"
     ],
     "metricHeaders": [
         "2021.10.10",
@@ -20,21 +21,30 @@
     "dimensions": [
         [
             "Buy Product",
-            "Spain"
+            "Spain",
+            "-"
         ],
         [
             "Buy Product",
-            "United Kingdom"
+            "United Kingdom",
+            "-"
         ],
         [
             "View Product",
-            "Spain"
+            "Spain",
+            "-"
+        ],
+        [
+            "Search",
+            "-",
+            "Young"
         ]
     ],
     "singles": [
         2123,
         232,
-        3323
+        3323,
+        523
     ],
     "series": [
         [
@@ -78,6 +88,20 @@
             4000,
             15603,
             12
+        ],
+        [
+            123,
+            326,
+            32,
+            402,
+            223,
+            373,
+            290,
+            12,
+            100,
+            800,
+            103,
+            2
         ]
     ],
     "compare": {

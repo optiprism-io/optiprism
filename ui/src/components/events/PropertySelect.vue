@@ -22,7 +22,9 @@ import {
     PropertyRef,
     PropertyType,
     UserCustomProperty,
-    UserProperty
+    UserProperty,
+    EVENT_TYPE_CUSTOM,
+    EVENT_TYPE_REGULAR
 } from "@/types/events";
 import Select from "@/components/Select/Select.vue";
 import { Group, Item } from "@/components/Select/SelectTypes";
@@ -50,7 +52,7 @@ const checkDisable = (propRef: PropertyRef): boolean => {
 const getEventProperties = (eventRef: EventRef) => {
     const properties: Group<Item<PropertyRef, null>[]>[] = [];
 
-    if (eventRef.type == EventType.Regular) {
+    if (eventRef.type === EVENT_TYPE_REGULAR) {
         const eventProperties = lexiconStore.findEventProperties(eventRef.id);
 
         if (eventProperties.length) {

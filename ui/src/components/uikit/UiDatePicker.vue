@@ -33,6 +33,7 @@
                 :offset="props.offsetMonth"
                 :from-select-only="fromSelectOnly"
                 :disable-apply="warning"
+                :button-text="$t('common.apply')"
                 @on-change="onChange"
                 @on-apply="($event: any) => {hide(); apply($event)}"
             />

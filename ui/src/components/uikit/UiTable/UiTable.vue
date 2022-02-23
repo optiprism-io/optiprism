@@ -7,37 +7,17 @@
         >
             <thead>
                 <tr role="row">
-                    <th
+                    <UiTableHeadCell
                         v-for="column in columns"
                         :key="column.value"
-                        :class="{
-                            'pf-c-table__sort': column.sorted,
-                            'pf-c-table__sticky-column': column.pinned,
-                            'pf-m-truncate': column.truncate,
-                            'pf-m-border-right': column.lastPinned,
-                        }"
-                        role="columnheader"
-                        aria-sort="none"
-                        :data-label="column.title"
-                        scope="col"
-                        :style="`--pf-c-table--cell--MinWidth: ${column.minWidth || '120px'};`"
-                    >
-                        <button
-                            v-if="column.sorted"
-                            class="pf-c-table__button"
-                        >
-                            <div class="pf-c-table__button-content">
-                                <span class="pf-c-table__text">{{ column.title }}</span>
-                                <span class="pf-c-table__sort-indicator">
-                                    <i class="fas fa-arrows-alt-v" />
-                                </span>
-                            </div>
-                        </button>
-                        <span
-                            v-else
-                            class="pf-c-table__text"
-                        >{{ column.title }}</span>
-                    </th>
+                        :value="column.value"
+                        :title="column.title"
+                        :sorted="column.sorted"
+                        :pinned="column.pinned"
+                        :truncate="column.truncate"
+                        :left="column.left"
+                        :last-pinned="column.lastPinned"
+                    />
                 </tr>
             </thead>
             <tbody role="rowgroup">
@@ -46,20 +26,14 @@
                     :key="i"
                     role="row"
                 >
-                    <th
+                    <UiTableCell
                         v-for="cell in row"
                         :key="cell.value"
-                        :class="{
-                            'pf-c-table__sticky-column': cell.pinned,
-                            'pf-m-truncate': cell.truncate,
-                            'pf-m-border-right': cell.lastPinned,
-                        }"
-                        role="columnheader"
-                        :data-label="cell.title"
-                        scope="col"
-                    >
-                        {{ cell.title }}
-                    </th>
+                        :last-pinned="cell.lastPinned"
+                        :left="cell.left"
+                        :pinned="cell.pinned"
+                        :title="cell.title"
+                    />
                 </tr>
             </tbody>
         </table>
@@ -67,19 +41,40 @@
 </template>
 
 <script lang="ts" setup>
-import { Row, Column } from "@/components/uikit/UiTable/UiTable"
+import { computed } from 'vue'
+import { Row, Column } from '@/components/uikit/UiTable/UiTable'
+import UiTableHeadCell from '@/components/uikit/UiTable/UiTableHeadCell.vue'
+import UiTableCell from '@/components/uikit/UiTable/UiTableCell.vue'
 
 type Props = {
     items?: Row[];
-    columns: Column[]
+    columns: Column[],
+    stickyColumnMinWidth?: number
+    stickyColumnWidth?: number
 }
 
-defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    stickyColumnMinWidth: 170,
+    stickyColumnWidth: 170,
+    items: () => [],
+})
+
+const stickyColumnMinWidth = computed(() => `${props.stickyColumnMinWidth}px`)
+const stickyColumnWidth = computed(() => `${props.stickyColumnWidth}px`)
 </script>
 
 <style lang="scss" scoped>
-.pf-c-table tr > * {
-    --pf-c-table--cell--MaxWidth: auto;
-    --pf-c-table--cell--Width: auto;
+.pf-c-table {
+    tr > * {
+        --pf-c-table--cell--MinWidth: 140px;
+        --pf-c-table--cell--MaxWidth: auto;
+        --pf-c-table--cell--Width: auto;
+    }
+
+    &__sticky-column {
+        --pf-c-table--cell--MinWidth: v-bind(stickyColumnWidth) !important;
+        --pf-c-table--cell--MaxWidth: v-bind(stickyColumnWidth) !important;
+        --pf-c-table__sticky-column--MinWidth: v-bind(stickyColumnMinWidth);
+    }
 }
 </style>

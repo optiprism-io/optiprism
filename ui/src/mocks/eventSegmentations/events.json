@@ -1,0 +1,130 @@
+[
+    {
+        "id": 1,
+        "createdAt": "Sun Feb 13 2022 01:20:09 GMT+0300",
+        "createdBy": 0,
+        "updatedBy": 0,
+        "projectId": 0,
+        "tags": [
+            "Onboarding"
+        ],
+        "name": "sign_up",
+        "displayName": "Sign Up",
+        "description": "When user signs up",
+        "status": "enabled"
+    },
+    {
+        "id": 2,
+        "createdAt": "Sun Feb 13 2022 01:20:09 GMT+0300",
+        "createdBy": 0,
+        "updatedBy": 0,
+        "projectId": 0,
+        "tags": [
+            "General"
+        ],
+        "name": "search",
+        "displayName": "Search",
+        "description": "",
+        "status": "enabled",
+        "properties": [
+            1
+        ]
+    },
+    {
+        "id": 3,
+        "createdAt": "Sun Feb 13 2022 01:20:09 GMT+0300",
+        "createdBy": 0,
+        "updatedBy": 0,
+        "projectId": 0,
+        "tags": [
+            "General"
+        ],
+        "name": "view_product",
+        "displayName": "View Product",
+        "description": "View product",
+        "status": "enabled",
+        "properties": [
+            2,
+            3,
+            4
+        ]
+    },
+    {
+        "id": 4,
+        "createdAt": "Sun Feb 13 2022 01:20:09 GMT+0300",
+        "createdBy": 0,
+        "updatedBy": 0,
+        "projectId": 0,
+        "tags": [
+            "Revenue"
+        ],
+        "name": "add_product_to_cart",
+        "displayName": "Add Product to Cart",
+        "description": "Add Product to Cart",
+        "status": "enabled",
+        "properties": [
+            5,
+            6,
+            7
+        ]
+    },
+    {
+        "id": 5,
+        "createdAt": "Sun Feb 13 2022 01:20:09 GMT+0300",
+        "createdBy": 0,
+        "updatedBy": 0,
+        "projectId": 0,
+        "tags": [
+            "Revenue"
+        ],
+        "name": "purchase_product",
+        "displayName": "Purchase Product",
+        "description": "When product was purchased",
+        "status": "enabled",
+        "properties": [
+            8,
+            9,
+            10,
+            11,
+            12
+        ]
+    },
+    {
+        "id": 6,
+        "createdAt": "Sun Feb 13 2022 01:20:09 GMT+0300",
+        "createdBy": 0,
+        "updatedBy": 0,
+        "projectId": 0,
+        "tags": [],
+        "name": "purchase_product_other_1",
+        "displayName": "Purchase Product Other 1",
+        "description": "Other Test description 1",
+        "status": "enabled",
+        "properties": [
+            8,
+            9,
+            10,
+            11,
+            12
+        ]
+    },
+    {
+        "id": 7,
+        "createdAt": "Sun Feb 13 2022 01:20:09 GMT+0300",
+        "createdBy": 0,
+        "updatedBy": 0,
+        "projectId": 0,
+        "tags": [],
+        "name": "purchase_product_other_2",
+        "displayName": "Purchase Product Other 2",
+        "description": "Other Test description 2",
+        "status": "enabled",
+        "properties": [
+            8,
+            9,
+            10,
+            11,
+            12
+        ]
+    }
+]

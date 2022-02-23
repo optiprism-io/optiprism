@@ -7,6 +7,9 @@ export type Column = {
     truncate?: boolean
     lastPinned?: boolean
     minWidth?: boolean
+    maxWidth?: number | string
+    width?: number | string
+    left?: number
 }
 
 export type Cell = {
@@ -15,6 +18,7 @@ export type Cell = {
     pinned?: boolean
     truncate?: boolean
     lastPinned?: boolean
+    left?: number
 }
 
 export type Row = Cell[];

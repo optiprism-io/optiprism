@@ -16,6 +16,8 @@ import {
     EventQueryRef,
     EventsQuery,
     EventProperty,
+    EVENT_TYPE_CUSTOM,
+    EVENT_TYPE_REGULAR,
 } from "@/types/events";
 import { Cohort } from "@/types";
 import { aggregates } from "@/types/aggregate"
@@ -118,13 +120,23 @@ export const useLexiconStore = defineStore("lexicon", {
                 throw new Error(`undefined custom event id: {$id}`);
             };
         },
-        eventName(state: Lexicon) {
+        eventName() {
             return (ref: EventRef): string => {
                 switch (ref.type) {
-                    case EventType.Regular:
+                    case EVENT_TYPE_REGULAR:
                         return this.findEventById(ref.id).name;
-                    case EventType.Custom:
+                    case EVENT_TYPE_CUSTOM:
                         return this.findCustomEventById(ref.id).name;
+                }
+            };
+        },
+        findEvent() {
+            return (ref: EventRef) => {
+                switch (ref.type) {
+                    case EVENT_TYPE_REGULAR:
+                        return this.findEventById(ref.id);
+                    case EVENT_TYPE_CUSTOM:
+                        return this.findCustomEventById(ref.id);
                 }
             };
         },

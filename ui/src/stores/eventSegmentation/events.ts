@@ -1,10 +1,11 @@
 import { defineStore } from "pinia";
 import {
     EventRef,
-    EventType,
     PropertyRef,
     PropertyType,
     EventQueryRef,
+    EVENT_TYPE_REGULAR,
+    EVENT_TYPE_CUSTOM
 } from "@/types/events";
 import { OperationId, Value, Group } from "@/types";
 import schemaService from "@/api/services/schema.service";
@@ -15,6 +16,7 @@ import { getLastNDaysRange } from "@/helpers/calendarHelper";
 import { TimeUnit } from "@/types";
 import {Column, Row} from "@/components/uikit/UiTable/UiTable";
 
+const COLUMN_WIDTH = 170;
 export type ChartType = 'line' | 'pie' | 'column';
 
 type ColumnMap = {
@@ -62,7 +64,7 @@ export type Events = {
     compareOffset: number,
     chartType: ChartType | string,
 
-    eventSegmentation: any // TODO
+    eventSegmentation: any // TODO integrations backend
     eventSegmentationLoading: boolean
 };
 
@@ -108,22 +110,23 @@ export const useEventsStore = defineStore("events", {
         eventSegmentationLoading: false,
     }),
     getters: {
+        hasSelectedEvents(): boolean {
+            return Array.isArray(this.events) && Boolean(this.events.length)
+        },
         hasDataEvent(): boolean {
             return this.eventSegmentation && Array.isArray(this.eventSegmentation.series) && this.eventSegmentation.series.length;
         },
         tableColumns(): ColumnMap {
             if (this.hasDataEvent) {
                 return {
-                    ...this.eventSegmentation.dimensionHeaders.reduce((acc: any, key: string) => {
+                    ...this.eventSegmentation.dimensionHeaders.reduce((acc: any, key: string, i: number) => {
                         acc[key] = {
+                            pinned: true,
                             value: key,
                             title: key,
-                        }
-
-                        if (key === 'Event Name') {
-                            acc[key].pinned = true;
-                            acc[key].lastPinned = true;
-                            acc[key].truncate = true;
+                            truncate: true,
+                            lastPinned: this.eventSegmentation.dimensionHeaders.length - 1 === i,
+                            left: i * COLUMN_WIDTH,
                         }
 
                         return acc
@@ -144,13 +147,16 @@ export const useEventsStore = defineStore("events", {
         tableData(): Row[] {
             if (this.hasDataEvent) {
                 return this.eventSegmentation.series.map((values: number[], indexSeries: number) => {
+                    const items = this.eventSegmentation.dimensions[indexSeries];
+
                     return [
-                        ...this.eventSegmentation.dimensions[indexSeries].map((dimension: string, i: number) => {
+                        ...items.map((dimension: string, i: number) => {
                             return {
                                 value: dimension,
                                 title: dimension,
-                                pinned: i === 0,
-                                lastPinned: i === 0,
+                                pinned: true,
+                                lastPinned: i === items.length - 1,
+                                left: i * COLUMN_WIDTH,
                             };
                         }),
                         ...values.map((value: number | undefined) => {
@@ -175,7 +181,7 @@ export const useEventsStore = defineStore("events", {
                         acc.push({
                             date: new Date(this.eventSegmentation.metricHeaders[indexValue]),
                             value,
-                            category: this.eventSegmentation.dimensions[indexSeries].join(', '),
+                            category: this.eventSegmentation.dimensions[indexSeries].filter((item: string) => item !== '-').join(', '),
                         });
                     });
                     return acc;
@@ -188,7 +194,7 @@ export const useEventsStore = defineStore("events", {
             if (this.hasDataEvent) {
                 return this.eventSegmentation.singles.map((item: number, index: number) => {
                     return {
-                        type: this.eventSegmentation.dimensions[index].join(', '),
+                        type: this.eventSegmentation.dimensions[index].filter((item: string) => item !== '-').join(', '),
                         value: item,
                     };
                 });
@@ -216,6 +222,8 @@ export const useEventsStore = defineStore("events", {
             ];
         },
         propsForEventSegmentationResult(): EventSegmentation {
+            const lexiconStore = useLexiconStore();
+
             let time = {
                 from: new Date(this.period.from),
                 to: new Date(this.period.to),
@@ -256,6 +264,23 @@ export const useEventsStore = defineStore("events", {
                 group: this.group,
                 intervalUnit: this.controlsGroupBy,
                 chartType: this.chartType,
+                events: this.events.map(item => {
+                    const eventLexicon = lexiconStore.findEvent(item.ref)
+
+                    const event = {
+                        eventName: eventLexicon.name,
+                        eventType: item.ref.type,
+                        queries: item.queries.map(query => {
+                            const queryLexicon = lexiconStore.findQuery(query.queryRef)
+
+                            return {
+                                queryType: queryLexicon ? queryLexicon.type : '',
+                            }
+                        }),
+                    }
+
+                    return event;
+                }),
             };
 
             if (this.compareTo) {
@@ -266,6 +291,10 @@ export const useEventsStore = defineStore("events", {
             }
 
             return props;
+        },
+        isNoData(): boolean {
+            return !this.eventSegmentationLoading &&
+                (!this.eventSegmentation || (this.eventSegmentation && Array.isArray(this.eventSegmentation.series) && !this.eventSegmentation.series.length))
         },
     },
     actions: {
@@ -301,17 +330,17 @@ export const useEventsStore = defineStore("events", {
         },
         addEventByRef(ref: EventRef): void {
             switch (ref.type) {
-                case EventType.Regular:
+                case EVENT_TYPE_REGULAR:
                     this.addEvent(ref.id);
                     break;
-                case EventType.Custom:
+                case EVENT_TYPE_CUSTOM:
                     this.addCustomEvent(ref.id);
                     break;
             }
         },
         addEvent(id: number): void {
             this.events.push(<Event>{
-                ref: <EventRef>{ type: EventType.Regular, id: id },
+                ref: <EventRef>{ type: EVENT_TYPE_REGULAR, id: id },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,
@@ -319,7 +348,7 @@ export const useEventsStore = defineStore("events", {
         },
         addCustomEvent(id: number): void {
             this.events.push(<Event>{
-                ref: <EventRef>{ type: EventType.Custom, id: id },
+                ref: <EventRef>{ type: EVENT_TYPE_CUSTOM, id: id },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,
@@ -355,7 +384,7 @@ export const useEventsStore = defineStore("events", {
             try {
                 const res = await schemaService.propertiesValues({
                     event_name: lexiconStore.eventName(eventRef),
-                    event_type: EventType[eventRef.type],
+                    event_type: eventRef.type,
                     property_name: lexiconStore.propertyName(propRef),
                     property_type: PropertyType[propRef.type]
                 });

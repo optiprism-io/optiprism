@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
-import mergeObjects from "@/helpers/mergeObjects";
+import merge from 'lodash/merge';
 import UiSpinner from "../uikit/UiSpinner.vue";
 
 const props = withDefaults(
@@ -44,7 +44,7 @@ const deleteReactivity = (data: any) => {
 
 const updateOptions = () => {
     const lineChartContainer: any = chart.value;
-    const options = mergeObjects(props.defaultOptions, deleteReactivity(props.options));
+    const options = merge(deleteReactivity(props.defaultOptions), deleteReactivity(props.options));
 
     if (chartLib.value) {
         chartLib.value.update(options);

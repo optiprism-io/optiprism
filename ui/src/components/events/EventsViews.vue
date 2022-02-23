@@ -45,7 +45,7 @@
                     <div class="pf-c-toolbar__item">
                         <UiSelect
                             :items="compareToItems"
-                            :text-button="textSelectCompairTo"
+                            :text-button="textSelectCompareTo"
                             :selections="[eventsStore.compareTo]"
                             :clearable="true"
                             :full-text="true"
@@ -69,36 +69,34 @@
             </div>
         </div>
         <div class="pf-c-scroll-inner-wrapper pf-u-p-md">
-            <component
-                :is="chartEventsOptions.component"
-                v-if="chartEventsOptions"
-                :options="chartEventsOptions"
-                :type="eventsStore.chartType"
-                :loading="eventsStore.eventSegmentationLoading"
-            />
             <div
-                v-else
+                v-if="eventsStore.isNoData"
                 class="content-info"
             >
                 <div class="pf-u-display-flex content-info__icons pf-u-color-400">
                     <UiIcon
                         class="content-info__icon"
-                        :icon="'fas fa-chart-pie'"
-                    />
-                    <UiIcon
-                        class="content-info__icon"
-                        :icon="'fas fa-chart-line'"
+                        :icon="'fas fa-search'"
                     />
                 </div>
                 <div class="pf-c-card__title pf-u-text-align-center pf-u-font-size-lg pf-u-color-400">
-                    Select at least one events by clicking
-                    <b>+ add event</b>
+                    {{ $t('events.select_to_start') }}
                 </div>
             </div>
+            <component
+                :is="chartEventsOptions.component"
+                v-else
+                :options="chartEventsOptions"
+                :type="eventsStore.chartType"
+                :loading="eventsStore.eventSegmentationLoading"
+            />
         </div>
     </div>
 
-    <div class="pf-c-card">
+    <div
+        v-if="!eventsStore.isNoData"
+        class="pf-c-card"
+    >
         <div class="pf-c-toolbar">
             <div class="pf-c-toolbar__content">
                 <div class="pf-u-font-size-lg">
@@ -214,7 +212,7 @@ const compareToItems = computed(() => {
     })
 })
 
-const textSelectCompairTo = computed(() => {
+const textSelectCompareTo = computed(() => {
     return eventsStore.compareTo ? `Compare to previous ${eventsStore.compareTo}` : 'Compare to Past'
 })
 
@@ -328,7 +326,9 @@ const onSelectChartType = (payload: string): void => {
 }
 
 const updateEventSegmentationData = async () => {
-    await eventsStore.fetchEventSegmentationResult()
+    if (eventsStore.hasSelectedEvents) {
+        await eventsStore.fetchEventSegmentationResult()
+    }
 }
 </script>
 
@@ -342,7 +342,7 @@ const updateEventSegmentationData = async () => {
 
     &__icons {
         margin-bottom: 25px;
-        font-size: 68px;
+        font-size: 38px;
     }
 
     &__icon {
