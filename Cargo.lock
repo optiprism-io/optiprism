@@ -1570,9 +1570,11 @@ version = "0.1.0"
 dependencies = [
  "arrow 6.3.0",
  "chrono",
+ "criterion",
  "datafusion",
  "mockall",
  "platform",
+ "rand",
  "store",
  "tokio",
 ]

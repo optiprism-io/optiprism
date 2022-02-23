@@ -19,6 +19,7 @@
 
 use std::cmp::Ordering;
 use std::convert::TryFrom;
+use std::fmt;
 
 use crate::error::{Error, Result};
 use crate::physical_plan::expressions::average::AvgAccumulator;
@@ -28,12 +29,70 @@ use crate::physical_plan::PartitionedAccumulator;
 
 use arrow::array::ArrayRef;
 use arrow::datatypes::DataType;
-use datafusion::error::Result as DFResult;
+use datafusion::error::{DataFusionError, Result as DFResult};
 
-use datafusion::physical_plan::aggregates::AggregateFunction;
+use datafusion::physical_plan::aggregates::{AggregateFunction as DFAggregateFunction};
 
 use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
+
+#[derive(Debug, Clone)]
+pub enum AggregateFunction {
+    Count,
+    Sum,
+    Min,
+    Max,
+    Avg,
+    ApproxDistinct,
+    OrderedDistinctCount,
+}
+
+impl fmt::Display for AggregateFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", format!("{:?}", self).to_uppercase())
+    }
+}
+
+
+impl TryFrom<AggregateFunction> for DFAggregateFunction {
+    type Error = Error;
+
+    fn try_from(value: AggregateFunction) -> std::result::Result<Self, Self::Error> {
+        <Self as TryFrom<&AggregateFunction>>::try_from(&value)
+    }
+}
+
+impl TryFrom<&AggregateFunction> for DFAggregateFunction {
+    type Error = Error;
+
+    fn try_from(value: &AggregateFunction) -> std::result::Result<Self, Self::Error> {
+        match value {
+            AggregateFunction::Count => Ok(DFAggregateFunction::Count),
+            AggregateFunction::Sum => Ok(DFAggregateFunction::Sum),
+            AggregateFunction::Min => Ok(DFAggregateFunction::Min),
+            AggregateFunction::Max => Ok(DFAggregateFunction::Max),
+            AggregateFunction::Avg => Ok(DFAggregateFunction::Avg),
+            AggregateFunction::ApproxDistinct => Ok(DFAggregateFunction::ApproxDistinct),
+            AggregateFunction::OrderedDistinctCount => {
+                let message = "OrderedDistinct as AggregateFunction".to_string();
+                Err(Error::DataFusionError(DataFusionError::NotImplemented(message)))
+            }
+        }
+    }
+}
+
+impl From<DFAggregateFunction> for AggregateFunction {
+    fn from(af: DFAggregateFunction) -> Self {
+        match af {
+            DFAggregateFunction::Count => AggregateFunction::Count,
+            DFAggregateFunction::Sum => AggregateFunction::Sum,
+            DFAggregateFunction::Min => AggregateFunction::Min,
+            DFAggregateFunction::Max => AggregateFunction::Max,
+            DFAggregateFunction::Avg => AggregateFunction::Avg,
+            DFAggregateFunction::ApproxDistinct => AggregateFunction::ApproxDistinct
+        }
+    }
+}
 
 // enum storage for accumulator for fast static dispatching and easy translating between threads
 #[derive(Debug, Clone)]
@@ -143,11 +202,11 @@ fn new_accumulator(
     })
 }
 
-pub fn state_types(data_type: DataType, agg: &AggregateFunction) -> Result<Vec<DataType>> {
+pub fn state_types(data_type: DataType, agg: &DFAggregateFunction) -> Result<Vec<DataType>> {
     Ok(match agg {
-        AggregateFunction::Count => vec![DataType::UInt64],
-        AggregateFunction::Sum => vec![data_type],
-        AggregateFunction::Avg => vec![DataType::UInt64, data_type],
+        DFAggregateFunction::Count => vec![DataType::UInt64],
+        DFAggregateFunction::Sum => vec![data_type],
+        DFAggregateFunction::Avg => vec![DataType::UInt64, data_type],
         _ => unimplemented!(),
     })
 }
