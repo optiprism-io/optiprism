@@ -146,7 +146,12 @@ impl IndexValues for UpdateEventRequest {
 }
 
 impl UpdateEventRequest {
-    pub fn into_event(self, prev: Event, updated_at: DateTime<Utc>, updated_by: Option<u64>) -> Event {
+    pub fn into_event(
+        self,
+        prev: Event,
+        updated_at: DateTime<Utc>,
+        updated_by: Option<u64>,
+    ) -> Event {
         Event {
             id: self.id,
             created_at: prev.created_at,

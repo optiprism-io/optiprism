@@ -1,10 +1,11 @@
 use super::Provider;
-use crate::{types::EventWithContext, Result};
+use crate::Result;
 use axum::{
     extract::{Extension, Path},
     routing::post,
     Json, Router,
 };
+use metadata::events_queue::EventWithContext;
 use std::sync::Arc;
 
 #[axum_debug::debug_handler]

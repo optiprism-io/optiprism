@@ -1,5 +1,5 @@
-use crate::{types::EventWithContext, Result};
-use metadata::Metadata;
+use crate::Result;
+use metadata::{events_queue::EventWithContext, Metadata};
 use std::sync::Arc;
 
 pub struct Provider {
@@ -11,8 +11,8 @@ impl Provider {
         Self { metadata }
     }
 
-    pub async fn ingest(&self, event: EventWithContext) -> Result<()> {
-        self.metadata.events_queue.push(event).await?;
+    pub async fn ingest(&self, source: EventWithContext) -> Result<()> {
+        self.metadata.events_queue.push(source).await?;
         Ok(())
     }
 }

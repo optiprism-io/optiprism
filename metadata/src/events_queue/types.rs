@@ -3,6 +3,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
+pub struct EventWithContext {
+    pub user_id: String,
+    pub project_id: u64,
+    pub created_at: Option<DateTime<Utc>>,
+    pub context: Option<Context>,
+    pub event: Event,
+}
+
+#[derive(Serialize, Deserialize)]
 pub enum PropertyValue {
     String(String),
     Float64(f64),
@@ -11,12 +20,8 @@ pub enum PropertyValue {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct EventWithContext {
-    pub user_id: String,
-    pub project_id: u64,
-    pub created_at: Option<DateTime<Utc>>,
-    pub context: Option<Context>,
-    pub event: String,
+pub struct Event {
+    pub name: String,
     pub properties: Option<HashMap<String, PropertyValue>>,
 }
 

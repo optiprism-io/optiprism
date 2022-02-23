@@ -56,12 +56,14 @@ flowchart TB
 		},
 		"ip": "101.10.8.21"
 	},
-	"event": "Buy Product", // required
-	"properties": { // optional, HashMap<String, PropertyValue>
-		"Product Name": "Samsung TV", // arbitrary property name and value
-		"Product Size": 60,
-		"HDR": true,
-		"Price": 899
+	"event": {
+		"name": "Buy Product", // required
+		"properties": { // optional, HashMap<String, PropertyValue>
+			"Product Name": "Samsung TV", // arbitrary property name and value
+			"Product Size": 60,
+			"HDR": true,
+			"Price": 899
+		}
 	}
 }
 ```
