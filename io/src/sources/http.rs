@@ -1,4 +1,5 @@
-use crate::{events::Request, processing::Provider, Result};
+use super::Provider;
+use crate::{types::EventWithContext, Result};
 use axum::{
     extract::{Extension, Path},
     routing::post,
@@ -9,11 +10,11 @@ use std::sync::Arc;
 #[axum_debug::debug_handler]
 async fn ingest(
     Extension(provider): Extension<Arc<Provider>>,
-    Path(id): Path<String>,
-    Json(request): Json<Request>,
+    Path(id): Path<u64>,
+    Json(mut source): Json<EventWithContext>,
 ) -> Result<()> {
-    provider.ingest(id, request).await;
-    Ok(())
+    source.project_id = id;
+    Ok(provider.ingest(source).await?)
 }
 
 pub fn configure(router: Router) -> Router {

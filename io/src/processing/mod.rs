@@ -1,11 +1,6 @@
-pub mod geo;
 pub mod device;
+pub mod geo;
+pub mod provider;
 pub mod udfs;
 
-use crate::events::Request;
-
-pub struct Provider {}
-
-impl Provider {
-    pub async fn ingest(&self, id: String, request: Request) {}
-}
+pub use provider::Provider;
