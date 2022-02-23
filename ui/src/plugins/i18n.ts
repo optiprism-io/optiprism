@@ -1,5 +1,7 @@
 import { App as Application } from "vue";
 
+export type $T = (key: string) => string
+
 const validateKey = (key: string) => {
     if (typeof key !== 'string') {
         return `$t: only the string is supported, key - ${JSON.stringify(key)}`
@@ -90,5 +92,7 @@ export default {
         };
 
         app.config.globalProperties.$t = getTranslate
+
+        app.provide('i18n', {$t: getTranslate});
     },
 };

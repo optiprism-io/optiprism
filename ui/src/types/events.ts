@@ -251,3 +251,10 @@ export const eventsQueries: EventsQuery[] = [
         hasValue: true,
     },
 ]
+
+export interface Condition {
+    action?: {
+        name?: string,
+        id: string
+    },
+}

@@ -3,7 +3,7 @@
         Event Segmentation
     </h1>
     <div class="pf-l-grid pf-m-gutter">
-        <div class="pf-l-grid__item pf-m-12-col-on-md pf-m-6-col-on-2xl">
+        <div class="pf-l-grid__item pf-m-12-col pf-m-6-col-on-lg">
             <div class="pf-c-card pf-m-compact pf-u-h-100">
                 <div class="pf-c-card__title">
                     <p>Events</p>
@@ -13,17 +13,16 @@
                 </div>
             </div>
         </div>
-        <!-- TODO Segments implement later -->
-        <!-- <div class="pf-l-grid__item pf-m-12-col-on-md pf-m-6-col-on-2xl">
+        <div class="pf-l-grid__item pf-m-12-col pf-m-6-col-on-lg">
             <div class="pf-c-card pf-m-compact pf-u-h-100">
                 <div class="pf-c-card__title">
-                    <p>Segments</p>
+                    <p>{{ $t('events.segments.label') }}</p>
                 </div>
                 <div class="pf-c-card__body">
-                    <Breakdowns />
+                    <Segments />
                 </div>
             </div>
-        </div> -->
+        </div>
         <div class="pf-l-grid__item pf-m-12-col pf-m-6-col-on-lg">
             <div class="pf-c-card pf-m-compact pf-u-h-100">
                 <div class="pf-c-card__title">
@@ -55,6 +54,7 @@ import { onBeforeMount, onUnmounted } from "vue";
 import Events from "@/components/events/Events/Events.vue";
 import Breakdowns from "@/components/events/Breakdowns.vue";
 import Filters from "@/components/events/Filters.vue";
+import Segments from "@/components/events/Segments/Segments.vue";
 import EventsViews from "@/components/events/EventsViews.vue";
 import { useLexiconStore } from "@/stores/lexicon";
 import { useEventsStore } from "@/stores/eventSegmentation/events";

@@ -4,6 +4,7 @@ import {
     PropertyRef,
     PropertyType,
     EventQueryRef,
+    Condition,
     EVENT_TYPE_REGULAR,
     EVENT_TYPE_CUSTOM
 } from "@/types/events";
@@ -48,8 +49,14 @@ export type Event = {
     queries: EventQuery[];
 };
 
+interface Segment {
+    name: string
+    conditions?: Condition[]
+}
+
 export type Events = {
-    events: Event[];
+    events: Event[]
+    segments: Segment[]
     group: Group;
 
     controlsGroupBy: string;
@@ -78,7 +85,7 @@ const initialQuery = <EventQuery[]>[
     }
 ]
 
-const compudeEventProperties = (type: PropertyType, items: any): PropertyRef[] => {
+const computedEventProperties = (type: PropertyType, items: any): PropertyRef[] => {
     return items.map((item: any) => {
         return {
             type: type,
@@ -90,6 +97,7 @@ const compudeEventProperties = (type: PropertyType, items: any): PropertyRef[] =
 export const useEventsStore = defineStore("events", {
     state: (): Events => ({
         events: [],
+        segments: [],
         group: Group.User,
 
         controlsGroupBy: 'day',
@@ -211,14 +219,14 @@ export const useEventsStore = defineStore("events", {
 
             this.events.forEach(item => {
                 const eventRef = item.ref;
-                items.push(...compudeEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.id)));
-                items.push(...compudeEventProperties(PropertyType.EventCustom, lexiconStore.findEventCustomProperties(eventRef.id)));
+                items.push(...computedEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.id)));
+                items.push(...computedEventProperties(PropertyType.EventCustom, lexiconStore.findEventCustomProperties(eventRef.id)));
             });
 
             return [
                 ...new Set(items),
-                ...compudeEventProperties(PropertyType.User, lexiconStore.userProperties),
-                ...compudeEventProperties(PropertyType.UserCustom, lexiconStore.userCustomProperties),
+                ...computedEventProperties(PropertyType.User, lexiconStore.userProperties),
+                ...computedEventProperties(PropertyType.UserCustom, lexiconStore.userCustomProperties),
             ];
         },
         propsForEventSegmentationResult(): EventSegmentation {
@@ -298,6 +306,50 @@ export const useEventsStore = defineStore("events", {
         },
     },
     actions: {
+        changeActionCondition(idx: number, idxSegment: number, ref: {id: string, name: string}) {
+            const segment = this.segments[idxSegment]
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[idx]
+                if (condition) {
+                    condition.action = ref
+                }
+            }
+        },
+        removeCondition(idx: number, idxSegment: number) {
+            const segment = this.segments[idxSegment]
+
+            if (segment && segment.conditions) {
+                segment.conditions.splice(idx, 1);
+
+                if (!segment.conditions.length) {
+                    delete segment.conditions
+                }
+            }
+        },
+        addConditionSegment(idx: number) {
+            const segment = this.segments[idx];
+
+            if (segment.conditions) {
+                const length = segment.conditions.length - 1;
+                if (segment.conditions[length] && segment.conditions[length].action) {
+                    segment.conditions.push({})
+                }
+            } else {
+                segment.conditions = [{}]
+            }
+        },
+        renameSegment(name: string, idx: number) {
+            const segment = this.segments[idx];
+            if (segment) {
+                segment.name = name
+            }
+        },
+        deleteSegment(idx: number) {
+            this.segments.splice(idx, 1);
+        },
+        addSegment() {
+            this.segments.push({name: `Segment ${this.segments.length + 1}`})
+        },
         initPeriod(): void {
             const lastNDateRange = getLastNDaysRange(20);
             this.period = {

@@ -5,6 +5,21 @@
   },
 
   "events": {
-    "select_to_start": "Select an Event to get started"
+    "select_to_start": "Select an Event to get started",
+    "segments": {
+      "label": "Segments",
+      "add": "Add segment",
+      "remove": "Remove segment",
+      "add_condition": "Add condition",
+      "select_condition": "Select condition",
+      "remove_condition": "Remove condition"
+    },
+    "condition": {
+      "hasPropertyValue": "Has property value",
+      "hadPropertyValue": "Had property value",
+      "didEvent": "Did event",
+      "funnel": "Funnel",
+      "retained": "Retained"
+    }
   }
 }
