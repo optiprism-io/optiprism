@@ -254,7 +254,8 @@ export const eventsQueries: EventsQuery[] = [
 
 export interface Condition {
     action?: {
-        name?: string,
+        name?: string
         id: string
-    },
+    }
+    propRef?: PropertyRef
 }

@@ -27,8 +27,6 @@ import { useEventsStore, Events } from "@/stores/eventSegmentation/events";
 type Lexicon = {
     cohorts: Cohort[];
 
-    conditions: string[]
-
     events: Event[];
     customEvents: CustomEvent[];
     eventsLoading: boolean;
@@ -57,14 +55,6 @@ export const useLexiconStore = defineStore("lexicon", {
                 id: 3,
                 name: "Profitable users"
             }
-        ],
-
-        conditions: [
-            'hasPropertyValue',
-            'hadPropertyValue',
-            'didEvent',
-            'funnel',
-            'retained',
         ],
 
         eventsLoading: false,
@@ -208,7 +198,6 @@ export const useLexiconStore = defineStore("lexicon", {
                     case PropertyType.UserCustom:
                         return this.findUserCustomPropertyById(ref.id);
                 }
-                throw new Error("unhandled");
             };
         },
         propertyName() {

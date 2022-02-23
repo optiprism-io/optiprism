@@ -44,18 +44,22 @@
                 :key="i"
                 :index="i"
                 :condition="condition"
+                :update-open="updateOpenCondition"
                 @on-remove="onRemoveCondition"
                 @change-action="changeActionCondition"
+                @change-property="changePropertyCondition"
             />
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import AlphabetIdentifier from '@/components/AlphabetIdentifier.vue'
 import UiEditableText from '@/components/uikit/UiEditableText.vue'
 import Condition from '@/components/events/Segments/Condition.vue'
 import { Condition as ConditionType } from '@/types/events'
+import { PropertyRef } from '@/types/events'
 
 interface Props {
     index: number
@@ -71,13 +75,24 @@ const emit = defineEmits<{
     (e: 'add-condition', idx: number): void
     (e: 'on-remove-condition', idx: number, idxSegment: number): void
     (e: 'change-action-condition', idx: number, idxSegment: number, ref: { id: string, name: string }): void
+    (e: 'change-property-condition', idx: number, idxSegment: number, ref: PropertyRef): void
 }>()
+
+const updateOpenCondition = ref(false)
 
 const onRemove = (): void => emit('on-remove', props.index)
 const onRename = (name: string): void => emit('on-rename', name, props.index)
-const addCondition = (): void => emit('add-condition', props.index)
+const addCondition = (): void => {
+    updateOpenCondition.value = true
+    emit('add-condition', props.index)
+
+    setTimeout(() => {
+        updateOpenCondition.value = false
+    })
+}
 const onRemoveCondition = (idx: number): void => emit('on-remove-condition', idx, props.index)
 const changeActionCondition = (idx: number, ref: { id: string, name: string }): void => emit('change-action-condition', idx, props.index, ref)
+const changePropertyCondition = (idx: number, ref: PropertyRef) => emit('change-property-condition', idx, props.index, ref)
 </script>
 
 <style scoped lang="scss">

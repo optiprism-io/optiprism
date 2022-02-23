@@ -6,7 +6,9 @@
 
   "events": {
     "select_to_start": "Select an Event to get started",
+    "select_property": "Select property",
     "segments": {
+      "segment": "Segment",
       "label": "Segments",
       "add": "Add segment",
       "remove": "Remove segment",

@@ -4,7 +4,6 @@ import {
     PropertyRef,
     PropertyType,
     EventQueryRef,
-    Condition,
     EVENT_TYPE_REGULAR,
     EVENT_TYPE_CUSTOM
 } from "@/types/events";
@@ -49,14 +48,8 @@ export type Event = {
     queries: EventQuery[];
 };
 
-interface Segment {
-    name: string
-    conditions?: Condition[]
-}
-
 export type Events = {
     events: Event[]
-    segments: Segment[]
     group: Group;
 
     controlsGroupBy: string;
@@ -97,7 +90,6 @@ const computedEventProperties = (type: PropertyType, items: any): PropertyRef[] 
 export const useEventsStore = defineStore("events", {
     state: (): Events => ({
         events: [],
-        segments: [],
         group: Group.User,
 
         controlsGroupBy: 'day',
@@ -306,50 +298,6 @@ export const useEventsStore = defineStore("events", {
         },
     },
     actions: {
-        changeActionCondition(idx: number, idxSegment: number, ref: {id: string, name: string}) {
-            const segment = this.segments[idxSegment]
-            if (segment && segment.conditions) {
-                const condition = segment.conditions[idx]
-                if (condition) {
-                    condition.action = ref
-                }
-            }
-        },
-        removeCondition(idx: number, idxSegment: number) {
-            const segment = this.segments[idxSegment]
-
-            if (segment && segment.conditions) {
-                segment.conditions.splice(idx, 1);
-
-                if (!segment.conditions.length) {
-                    delete segment.conditions
-                }
-            }
-        },
-        addConditionSegment(idx: number) {
-            const segment = this.segments[idx];
-
-            if (segment.conditions) {
-                const length = segment.conditions.length - 1;
-                if (segment.conditions[length] && segment.conditions[length].action) {
-                    segment.conditions.push({})
-                }
-            } else {
-                segment.conditions = [{}]
-            }
-        },
-        renameSegment(name: string, idx: number) {
-            const segment = this.segments[idx];
-            if (segment) {
-                segment.name = name
-            }
-        },
-        deleteSegment(idx: number) {
-            this.segments.splice(idx, 1);
-        },
-        addSegment() {
-            this.segments.push({name: `Segment ${this.segments.length + 1}`})
-        },
         initPeriod(): void {
             const lastNDateRange = getLastNDaysRange(20);
             this.period = {
