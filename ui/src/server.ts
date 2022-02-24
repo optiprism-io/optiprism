@@ -326,15 +326,21 @@ export default function ({ environment = "development" } = {}) {
                 ];
             });
 
-            this.get("/data/property-values", (): string[] => {
-                return ["Furniture", "Doors", "Lamp", "Tables", "Shelves"];
+            this.get("/data/property-values", (_, request): string[] => {
+                const propertyName = request.queryParams.property_name
+
+                if (propertyName === 'Country') {
+                    return ["Spain", "USA", "United Kingdom", "Poland"]
+                } else {
+                    return ["Furniture", "Doors", "Lamp", "Tables", "Shelves"]
+                }
             });
 
             this.get("/chart", (): any[] => {
                 return splineChartMocks;
             });
 
-            this.post("/queries/event-segmentation", (schema, request) => {
+            this.post("/queries/event-segmentation", (_, request) => {
                 if (JSON.parse(request.requestBody).events.length) {
                     return eventSegmentationsMocks;
                 } else {

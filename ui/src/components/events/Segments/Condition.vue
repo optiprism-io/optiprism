@@ -20,9 +20,11 @@
                     </UiButton>
                 </Select>
             </div>
-            <div class="pf-c-action-list__item">
+            <div
+                v-if="isShowSelectProp"
+                class="pf-c-action-list__item"
+            >
                 <PropertySelect
-                    v-if="isShowSelectProp"
                     @select="changeProperty"
                 >
                     <UiButton
@@ -36,6 +38,60 @@
                         {{ displayNameProp }}
                     </UiButton>
                 </PropertySelect>
+            </div>
+            <div
+                v-if="props.condition.propRef && props.condition.opId"
+                class="pf-c-action-list__item"
+            >
+                <OperationSelect
+                    :property-ref="props.condition.propRef"
+                    :selected="props.condition.opId"
+                    @select="changeOperation"
+                >
+                    <UiButton class="pf-m-main pf-m-secondary">
+                        {{ operationById?.get(props.condition.opId)?.name }}
+                    </UiButton>
+                </OperationSelect>
+            </div>
+            <div
+                v-if="props.condition.propRef && props.condition.values"
+                class="pf-c-action-list__item"
+            >
+                <ValueSelect
+                    :property-ref="props.condition.propRef"
+                    :selected="props.condition.values"
+                    :items="conditionValuesItems"
+                    @add="addValue"
+                    @deselect="removeValue"
+                >
+                    <template v-if="props.condition.values.length > 0">
+                        <div class="pf-c-action-list">
+                            <div
+                                v-for="(value, i) in props.condition.values"
+                                :key="i"
+                                class="pf-c-action-list__item"
+                            >
+                                <UiButton class="pf-m-main pf-m-secondary">
+                                    {{ value }}
+                                    <span class="pf-c-button__icon pf-m-end">
+                                        <UiIcon
+                                            icon="fas fa-times"
+                                            @click.stop="removeValue(value)"
+                                        />
+                                    </span>
+                                </UiButton>
+                            </div>
+                        </div>
+                    </template>
+                    <template v-else>
+                        <UiButton
+                            class="pf-m-main"
+                            :before-icon="'fas fa-plus-circle'"
+                        >
+                            {{ $t('events.select_value') }}
+                        </UiButton>
+                    </template>
+                </ValueSelect>
             </div>
             <div
                 class="pf-c-action-list__item condition__control"
@@ -54,17 +110,21 @@
 
 <script lang="ts" setup>
 import { inject, computed } from 'vue'
-import { PropertyRef } from '@/types/events'
-import { Condition as ConditionType } from '@/types/events'
+import { operationById, OperationId, Value } from '@/types'
+import { PropertyRef, Condition as ConditionType } from '@/types/events'
 import Select from '@/components/Select/Select.vue'
 import UiButton from '@/components/uikit/UiButton.vue'
 import PropertySelect from '@/components/events/PropertySelect.vue'
+import OperationSelect from '@/components/events/OperationSelect.vue'
+import ValueSelect from "@/components/events/ValueSelect.vue";
 import { conditions } from '@/configs/events/conditions'
 import { useLexiconStore } from '@/stores/lexicon'
+
 const i18n = inject<any>('i18n')
 
 interface Props {
     index: number
+    indexParent: number
     condition: ConditionType
     updateOpen?: boolean
 }
@@ -74,8 +134,6 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
     (e: 'on-remove', idx: number): void
-    (e: 'change-action', idx: number, ref: { id: string, name: string }): void
-    (e: 'change-property', idx: number, propRef: PropertyRef): void
 }>()
 
 const conditionItems = inject<[]>('conditionItems')
@@ -97,9 +155,39 @@ const isShowSelectProp = computed(() => {
     }
 })
 
-const changeConditionAction = (payload: { id: string, name: string }) => emit('change-action', props.index, payload)
+const conditionValuesItems = computed(() => {
+    if (props.condition.valuesList) {
+        return props.condition.valuesList.map((item: string, i) => {
+            return { item, name: item }
+        })
+    } else {
+        return []
+    }
+})
+
 const onRemove = () => emit('on-remove', props.index)
-const changeProperty = (propRef: PropertyRef) => emit('change-property', props.index, propRef)
+
+
+const changePropertyCondition = inject<(idx: number, indexParent: number, propRef: PropertyRef) => void>('changePropertyCondition')
+const changeOperationCondition = inject<(idx: number, indexParent: number, opId: OperationId) => void>('changeOperationCondition')
+const changeActionCondition = inject<(idx: number, indexParent: number, ref: { id: string, name: string }) => void>('changeActionCondition')
+const addValueCondition = inject<(idx: number, indexParent: number, value: Value) => void>('addValueCondition')
+const removeValueCondition = inject<(idx: number, indexParent: number, value: Value) => void>('removeValueCondition')
+
+const changeConditionAction = (payload: { id: string, name: string }) =>
+    changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
+
+const changeProperty = (propRef: PropertyRef) =>
+    changePropertyCondition && changePropertyCondition(props.index, props.indexParent, propRef)
+
+const changeOperation = (opId: OperationId) =>
+    changeOperationCondition && changeOperationCondition(props.index, props.indexParent, opId)
+
+const addValue = (value: Value) =>
+    addValueCondition && addValueCondition(props.index, props.indexParent, value)
+
+const removeValue = (value: Value) =>
+    removeValueCondition && removeValueCondition(props.index, props.indexParent, value)
 </script>
 
 <style lang="scss" scoped>

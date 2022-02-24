@@ -1,4 +1,4 @@
-import { DataType } from '@/types';
+import { DataType, OperationId, Value } from '@/types'
 import { AggregateId } from '@/types/aggregate';
 
 export const EVENT_TYPE_REGULAR = 'regular'
@@ -258,4 +258,7 @@ export interface Condition {
         id: string
     }
     propRef?: PropertyRef
+    opId?: OperationId
+    values?: Value[]
+    valuesList?: string[]
 }

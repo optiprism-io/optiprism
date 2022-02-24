@@ -1,10 +1,10 @@
 import { get } from "../apiClient";
 
 type PropertiesValues = {
-    event_name: string;
-    event_type: string;
+    event_name?: string;
+    event_type?: string;
     property_name: string;
-    property_type: string;
+    property_type?: string;
 };
 
 const schemaService = {

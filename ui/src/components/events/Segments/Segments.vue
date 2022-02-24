@@ -10,8 +10,6 @@
             @on-rename="onRenameSegment"
             @add-condition="addCondition"
             @on-remove-condition="onRemoveCondition"
-            @change-action-condition="changeActionCondition"
-            @change-property-condition="changePropertyCondition"
         />
         <div class="pf-l-flex">
             <UiButton
@@ -28,6 +26,7 @@
 
 <script lang="ts" setup>
 import { computed, inject, provide } from 'vue'
+import { OperationId, Value } from '@/types'
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
 import Segment from '@/components/events/Segments/Segment.vue'
 import { conditions } from '@/configs/events/conditions'
@@ -49,7 +48,6 @@ const conditionItems = computed(() => {
         }
     })
 })
-provide('conditionItems', conditionItems.value)
 
 const addSegment = () => segmentsStore.addSegment(`${i18n.$t(`events.segments.segment`)} ${segmentsStore.segments.length + 1}`)
 const deleteSegment = (idx: number) => segmentsStore.deleteSegment(idx)
@@ -58,4 +56,14 @@ const addCondition = (idx: number) => segmentsStore.addConditionSegment(idx)
 const onRemoveCondition = (idx: number, idxSegment: number) => segmentsStore.removeCondition(idx, idxSegment)
 const changeActionCondition = (idx: number, idxSegment: number, ref: { id: string, name: string }) => segmentsStore.changeActionCondition(idx, idxSegment, ref)
 const changePropertyCondition = (idx: number, idxSegment: number, ref: PropertyRef) => segmentsStore.changePropertyCondition(idx, idxSegment, ref)
+const changeOperationCondition = (idx: number, idxSegment: number, opId: OperationId) => segmentsStore.changeOperationCondition(idx, idxSegment, opId)
+const addValueCondition = (idx: number, idxSegment: number, value: Value) => segmentsStore.addValueCondition(idx, idxSegment, value)
+const removeValueCondition = (idx: number, idxSegment: number, value: Value) => segmentsStore.removeValueCondition(idx, idxSegment, value)
+
+provide('conditionItems', conditionItems.value)
+provide('changeOperationCondition', changeOperationCondition)
+provide('changePropertyCondition', changePropertyCondition)
+provide('changeActionCondition', changeActionCondition)
+provide('addValueCondition', addValueCondition)
+provide('removeValueCondition', removeValueCondition)
 </script>

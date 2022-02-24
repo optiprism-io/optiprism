@@ -3,6 +3,9 @@ import {
     Condition,
     PropertyRef,
 } from "@/types/events";
+import { OperationId, Value } from "@/types";
+import schemaService from "@/api/services/schema.service";
+import { useLexiconStore } from "@/stores/lexicon";
 
 interface Segment {
     name: string
@@ -19,13 +22,64 @@ export const useSegmentsStore = defineStore("segments", {
     }),
     getters: {},
     actions: {
-        changePropertyCondition(idx: number, idxSegment: number, ref: PropertyRef) {
+        removeValueCondition(idx: number, idxSegment: number, value: Value): void {
+            const segment = this.segments[idxSegment]
+
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[idx]
+                if (condition && condition.values) {
+                    condition.values = condition.values.filter(v => v !== value)
+                }
+            }
+        },
+        addValueCondition(idx: number, idxSegment: number, value: Value): void {
+            const segment = this.segments[idxSegment]
+
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[idx]
+                if (condition && condition.values) {
+                    condition.values.push(value)
+                } else {
+                    condition.values = [value]
+                }
+            }
+        },
+        changeOperationCondition(idx: number, idxSegment: number, opId: OperationId): void {
             const segment = this.segments[idxSegment]
 
             if (segment && segment.conditions) {
                 const condition = segment.conditions[idx]
                 if (condition) {
+                    condition.opId = opId
+                    condition.values = []
+                }
+            }
+        },
+        async changePropertyCondition(idx: number, idxSegment: number, ref: PropertyRef) {
+            const segment = this.segments[idxSegment]
+
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[idx]
+
+                if (condition) {
+                    const lexiconStore = useLexiconStore()
+
+                    try {
+                        const res = await schemaService.propertiesValues({
+                            // TODO integration with backand
+                            // check condition type
+                            property_name: lexiconStore.propertyName(ref),
+                        })
+
+                        if (res) {
+                            condition.valuesList = res
+                        }
+                    } catch (error) {
+                        throw new Error('error getEventsValues')
+                    }
                     condition.propRef = ref
+                    condition.opId = OperationId.Eq
+                    condition.values = []
                 }
             }
         },
