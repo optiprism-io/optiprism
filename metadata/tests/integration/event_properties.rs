@@ -56,7 +56,9 @@ async fn test_properties() -> Result<()> {
     assert!(md.event_properties.update(1, update_prop_req.clone()).await.is_err());
     let mut create_prop1 = create_prop_req.clone();
     create_prop1.name = "prop1".to_string();
-    let res = md.event_properties.create(1, create_prop1.clone()).await?.id;
+    let res = md.event_properties.get_or_create(1, create_prop1.clone()).await?.id;
+    assert_eq!(res, 1);
+    let res = md.event_properties.get_or_create(1, create_prop1.clone()).await?.id;
     assert_eq!(res, 1);
     let mut create_prop2 = create_prop_req.clone();
     create_prop2.name = "prop2".to_string();
