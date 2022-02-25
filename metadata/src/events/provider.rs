@@ -1,16 +1,16 @@
-use crate::error::Error;
-use crate::store::store::{make_data_key, make_id_seq_key, make_index_key, Store};
-use crate::Result;
+use std::sync::Arc;
 
-use crate::events::types::{CreateEventRequest, UpdateEventRequest};
-use crate::events::{Event, Scope, Status};
-use crate::store::index;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
-use std::sync::{Arc};
-use async_mutex::Mutex;
-use crate::metadata::{ListResponse, ResponseMetadata};
+use tokio::sync::Mutex;
+
+use crate::error::Error;
+use crate::events::{Event, Status};
+use crate::events::types::{CreateEventRequest, UpdateEventRequest};
+use crate::metadata::{list, ListResponse};
+use crate::Result;
 use crate::store::index::hash_map::HashMap;
+use crate::store::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 
 const NAMESPACE: &[u8] = b"events";
 const IDX_NAME: &[u8] = b"name";
@@ -57,7 +57,7 @@ impl Provider {
 
     pub async fn create(&self, organization_id: u64, req: CreateEventRequest) -> Result<Event> {
         let idx_keys = index_keys(organization_id, req.project_id, &req.status, &req.name, &req.display_name);
-        let mut idx = self.idx.lock().await;
+        let idx = self.idx.lock().await;
         idx.check_insert_constraints(idx_keys.as_ref()).await?;
 
         let created_at = Utc::now();
@@ -85,7 +85,7 @@ impl Provider {
         let data = serialize(&event)?;
         self.store
             .put(
-                make_data_key(organization_id, event.project_id, NAMESPACE, event.id),
+                make_data_value_key(organization_id, event.project_id, NAMESPACE, event.id),
                 &data,
             )
             .await?;
@@ -99,7 +99,7 @@ impl Provider {
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         match self
             .store
-            .get(make_data_key(organization_id, project_id, NAMESPACE, id))
+            .get(make_data_value_key(organization_id, project_id, NAMESPACE, id))
             .await?
         {
             None => Err(Error::KeyNotFound),
@@ -118,25 +118,14 @@ impl Provider {
     }
 
     pub async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
-        let list = self
-            .store
-            .list_prefix(b"/events/ent") // TODO doesn't work
-            .await?
-            .iter()
-            .map(|v| deserialize(v.1.as_ref()))
-            .collect::<bincode::Result<_>>()?;
-
-        Ok(ListResponse {
-            data: list,
-            meta: ResponseMetadata { next: None },
-        })
+        list(self.store.clone(), organization_id, project_id, NAMESPACE).await
     }
 
     pub async fn update(&self, organization_id: u64, req: UpdateEventRequest) -> Result<Event> {
         let idx_keys = index_keys(organization_id, req.project_id, &req.status, &req.name, &req.display_name);
         let prev_event = self.get_by_id(organization_id, req.project_id, req.id).await?;
         let idx_prev_keys = index_keys(organization_id, prev_event.project_id, &prev_event.status, &prev_event.name, &prev_event.display_name);
-        let mut idx = self.idx.lock().await;
+        let idx = self.idx.lock().await;
         idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await?;
@@ -161,7 +150,7 @@ impl Provider {
         let data = serialize(&event)?;
         self.store
             .put(
-                make_data_key(organization_id, event.project_id, NAMESPACE, event.id),
+                make_data_value_key(organization_id, event.project_id, NAMESPACE, event.id),
                 &data,
             )
             .await?;
@@ -194,7 +183,7 @@ impl Provider {
 
         self.store
             .put(
-                make_data_key(organization_id, event.project_id, NAMESPACE, event.id),
+                make_data_value_key(organization_id, event.project_id, NAMESPACE, event.id),
                 serialize(&event)?,
             )
             .await?;
@@ -219,7 +208,7 @@ impl Provider {
 
         self.store
             .put(
-                make_data_key(organization_id, event.project_id, NAMESPACE, event.id),
+                make_data_value_key(organization_id, event.project_id, NAMESPACE, event.id),
                 serialize(&event)?,
             )
             .await?;
@@ -229,10 +218,10 @@ impl Provider {
     pub async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let event = self.get_by_id(organization_id, project_id, id).await?;
         self.store
-            .delete(make_data_key(organization_id, project_id, NAMESPACE, id))
+            .delete(make_data_value_key(organization_id, project_id, NAMESPACE, id))
             .await?;
 
-        let mut idx = self.idx.lock().await;
+        let idx = self.idx.lock().await;
         idx.delete(index_keys(organization_id, event.project_id, &event.status, &event.name, &event.display_name).as_ref())
             .await?;
 

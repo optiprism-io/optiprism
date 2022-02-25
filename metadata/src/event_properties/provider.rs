@@ -1,11 +1,10 @@
 use crate::error::Error;
-use crate::store::store::{make_col_id_seq_key, make_data_key, make_id_seq_key, make_index_key, Store};
+use crate::store::store::{make_col_id_seq_key, make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
 
 use crate::event_properties::types::{
     CreateEventPropertyRequest, EventProperty, Status, UpdateEventPropertyRequest,
 };
-use crate::store::index;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::{Arc, Mutex};
@@ -56,7 +55,7 @@ impl Provider {
 
     pub async fn create(&self, organization_id: u64, req: CreateEventPropertyRequest) -> Result<EventProperty> {
         let idx_keys = index_keys(organization_id, req.project_id, &req.status, &req.name, &req.display_name);
-        let mut idx = self.idx.lock().map_err(|e| Error::Internal(e.to_string()))?;
+        let idx = self.idx.lock().map_err(|e| Error::Internal(e.to_string()))?;
         idx.check_insert_constraints(idx_keys.as_ref()).await?;
 
         let id = self
@@ -92,7 +91,7 @@ impl Provider {
 
         let data = serialize(&prop)?;
         self.store
-            .put(make_data_key(organization_id, prop.project_id, NAMESPACE, prop.id), &data).await?;
+            .put(make_data_value_key(organization_id, prop.project_id, NAMESPACE, prop.id), &data).await?;
 
         idx.insert(idx_keys.as_ref(), &data).await?;
         Ok(prop)
@@ -101,7 +100,7 @@ impl Provider {
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<EventProperty> {
         match self
             .store
-            .get(make_data_key(organization_id, project_id, NAMESPACE, id))
+            .get(make_data_value_key(organization_id, project_id, NAMESPACE, id))
             .await?
         {
             None => Err(Error::KeyNotFound),
@@ -118,7 +117,7 @@ impl Provider {
         Ok(deserialize(&data)?)
     }
 
-    pub async fn list(&self, organization_id: u64, project_id: u64) -> Result<Vec<EventProperty>> {
+    pub async fn list(&self, _: u64, _: u64) -> Result<Vec<EventProperty>> {
         let list = self
             .store
             .list_prefix(b"/event_properties/ent") // TODO doesn't work
@@ -134,12 +133,12 @@ impl Provider {
         let idx_keys = index_keys(organization_id, req.project_id, &req.status, &req.name, &req.display_name);
         let prev_prop = self.get_by_id(organization_id, req.project_id, req.id).await?;
         let idx_prev_keys = index_keys(organization_id, prev_prop.project_id, &prev_prop.status, &prev_prop.name, &prev_prop.display_name);
-        let mut idx = self.idx.lock().map_err(|e| Error::Internal(e.to_string()))?;
+        let idx = self.idx.lock().map_err(|e| Error::Internal(e.to_string()))?;
         idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await?;
 
-        let updated_at = Utc::now(); // TODO add updated_by
+        let updated_at = Utc::now();
         let prop = EventProperty {
             id: req.id,
             created_at: prev_prop.created_at,
@@ -163,7 +162,7 @@ impl Provider {
         let data = serialize(&prop)?;
 
         self.store
-            .put(make_data_key(organization_id, prop.project_id, NAMESPACE, prop.id), &data)
+            .put(make_data_value_key(organization_id, prop.project_id, NAMESPACE, prop.id), &data)
             .await?;
 
         idx
@@ -175,10 +174,10 @@ impl Provider {
     pub async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<EventProperty> {
         let prop = self.get_by_id(organization_id, project_id, id).await?;
         self.store
-            .delete(make_data_key(organization_id, project_id, NAMESPACE, id))
+            .delete(make_data_value_key(organization_id, project_id, NAMESPACE, id))
             .await?;
 
-        let mut idx = self.idx.lock().map_err(|e| Error::Internal(e.to_string()))?;
+        let idx = self.idx.lock().map_err(|e| Error::Internal(e.to_string()))?;
         idx
             .delete(index_keys(organization_id, prop.project_id, &prop.status, &prop.name, &prop.display_name).as_ref())
             .await?;

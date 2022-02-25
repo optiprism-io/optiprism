@@ -1,16 +1,9 @@
 use super::CreateRequest;
 use crate::events::types::UpdateRequest;
 use crate::{Context, Result};
-use common::rbac::{Action, Resource};
-use common::{
-    auth::{make_password_hash, make_salt},
-    rbac::Permission,
-};
-use metadata::events::{CreateEventRequest, Event, Scope, Status, UpdateEventRequest};
-use metadata::{
-    accounts::{Account, CreateRequest as CreateAccountRequest},
-    Metadata,
-};
+use common::rbac::Permission;
+use metadata::events::{CreateEventRequest, Event, UpdateEventRequest};
+use metadata::Metadata;
 use std::sync::Arc;
 use metadata::metadata::ListResponse;
 
@@ -36,7 +29,7 @@ impl Provider {
             .create(
                 ctx.organization_id,
                 CreateEventRequest {
-                    created_by: request.created_by,
+                    created_by: ctx.account_id,
                     project_id: request.project_id,
                     tags: request.tags,
                     name: request.name,
@@ -45,7 +38,6 @@ impl Provider {
                     status: request.status,
                     scope: request.scope,
                     properties: request.properties,
-                    global_properties: request.global_properties,
                     custom_properties: request.custom_properties,
                 },
             )
@@ -83,7 +75,7 @@ impl Provider {
                 ctx.organization_id,
                 UpdateEventRequest {
                     id: req.id,
-                    updated_by: req.updated_by,
+                    updated_by: ctx.account_id,
                     project_id: req.project_id,
                     tags: req.tags,
                     name: req.name,
@@ -92,7 +84,6 @@ impl Provider {
                     status: req.status,
                     scope: req.scope,
                     properties: req.properties,
-                    global_properties: req.global_properties,
                     custom_properties: req.custom_properties,
                 },
             )

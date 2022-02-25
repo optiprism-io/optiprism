@@ -26,6 +26,7 @@ impl InternalError {
 #[derive(Debug)]
 pub enum Error {
     Internal(InternalError),
+    SerdeError(serde_json::Error),
     CommonError(CommonError),
     MetadataError(MetadataError),
 }
@@ -51,6 +52,12 @@ impl From<CommonError> for Error {
 impl From<MetadataError> for Error {
     fn from(err: MetadataError) -> Self {
         Self::MetadataError(err)
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
+        Self::SerdeError(err)
     }
 }
 

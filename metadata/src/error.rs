@@ -2,7 +2,6 @@ use std::{
     fmt::{self, Display, Formatter},
     result,
 };
-use std::sync::PoisonError;
 
 pub type Result<T> = result::Result<T, Error>;
 

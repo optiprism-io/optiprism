@@ -2,7 +2,7 @@ use crate::Result;
 use rocksdb::{ColumnFamilyDescriptor, Options, SliceTransform, WriteBatch, DB};
 use std::path::Path;
 
-fn make_org_proj_key(organization_id: u64, project_id: u64) -> Vec<u8> {
+pub fn make_org_proj_key(organization_id: u64, project_id: u64) -> Vec<u8> {
     [
         b"organizations/",
         organization_id.to_le_bytes().as_ref(),
@@ -12,7 +12,7 @@ fn make_org_proj_key(organization_id: u64, project_id: u64) -> Vec<u8> {
     ].concat()
 }
 
-fn make_main_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
+pub fn make_main_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
     [
         make_org_proj_key(organization_id, project_id).as_slice(),
         ns,
@@ -20,10 +20,17 @@ fn make_main_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
     ].concat()
 }
 
-pub fn make_data_key(organization_id: u64, project_id: u64, ns: &[u8], id: u64) -> Vec<u8> {
+pub fn make_data_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
     [
         make_main_key(organization_id, project_id, ns).as_slice(),
-        b"data/",
+        b"data/"
+    ]
+        .concat()
+}
+
+pub fn make_data_value_key(organization_id: u64, project_id: u64, ns: &[u8], id: u64) -> Vec<u8> {
+    [
+        make_data_key(organization_id, project_id, ns).as_slice(),
         id.to_le_bytes().as_ref(),
     ]
         .concat()

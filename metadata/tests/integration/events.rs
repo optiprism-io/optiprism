@@ -18,14 +18,13 @@ async fn test_events() -> Result<()> {
     let create_event_req = CreateEventRequest {
         created_by: 0,
         project_id: 1,
-        tags: vec![],
+        tags: Some(vec![]),
         name: "".to_string(),
         display_name: None,
         description: None,
         status: Status::Enabled,
         scope: Scope::System,
         properties: None,
-        global_properties: None,
         custom_properties: None,
     };
 
@@ -33,14 +32,13 @@ async fn test_events() -> Result<()> {
         id: 1,
         updated_by: 0,
         project_id: 1,
-        tags: vec![],
+        tags: Some(vec![]),
         name: "".to_string(),
         display_name: None,
         description: None,
         status: Status::Enabled,
         scope: Scope::System,
         properties: None,
-        global_properties: None,
         custom_properties: None,
     };
 
@@ -96,9 +94,8 @@ async fn test_events() -> Result<()> {
     update_event1.display_name = Some("ee".to_string());
     assert_eq!(md.events.update(1, update_event1.clone()).await?.display_name, Some("ee".to_string()));
     assert_eq!(md.events.update(1, update_event2.clone()).await?.display_name, Some("e".to_string()));
-    // TODO fix
-    // assert_eq!(md.events.list_events().await?[0].id, 1);
-    // assert_eq!(md.events.list_events().await?[1].id, 2);
+
+    assert_eq!(md.events.list(1,1).await?.data[0].id, 1);
 
     // delete events
     assert_eq!(md.events.delete(1, 1, 1).await?.id, 1);

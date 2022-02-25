@@ -8,12 +8,9 @@ use axum::{
 
 use common::{
     auth::parse_access_token,
-    rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS},
+    rbac::{Permission, Role, Scope},
 };
 use std::collections::HashMap;
-use axum::http::StatusCode;
-use common::rbac::{Action, Resource};
-use crate::error::InternalError;
 
 #[derive(Default)]
 pub struct Context {
@@ -33,15 +30,9 @@ impl Context {
         ctx
     }
 
-    pub fn check_permission(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        permission: Permission,
-    ) -> Result<()> {
-        return Ok(()); // TODO remove
-
-        if organization_id != self.organization_id {
+    pub fn check_permission(&self, _: u64, _: u64, _: Permission) -> Result<()> {
+        return Ok(());
+        /*if organization_id != self.organization_id {
             return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));
         }
         if let Some(roles) = &self.roles {
@@ -79,30 +70,32 @@ impl Context {
             }
         }
 
-        return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));
+        return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));*/
     }
 }
 
-fn check_permissions(permissions: &[Permission], permission: &Permission) -> bool {
+/*fn check_permissions(permissions: &[Permission], permission: &Permission) -> bool {
     for p in permissions {
         if *p == *permission {
             return true;
         }
     }
     false
-}
+}*/
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
-    where
-        B: Send,
+where
+    B: Send,
 {
     type Rejection = Error;
 
-    async fn from_request(request: &mut RequestParts<B>) -> core::result::Result<Self, Self::Rejection> {
+    async fn from_request(
+        request: &mut RequestParts<B>,
+    ) -> core::result::Result<Self, Self::Rejection> {
         let mut ctx = Context::default();
         if let Ok(TypedHeader(Authorization(bearer))) =
-        TypedHeader::<Authorization<Bearer>>::from_request(request).await
+            TypedHeader::<Authorization<Bearer>>::from_request(request).await
         {
             if let Some(token) = bearer.token().strip_prefix("Bearer ") {
                 if let Ok(claims) = parse_access_token(token) {

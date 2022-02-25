@@ -1,36 +1,29 @@
-use common::rbac::{Permission, Role};
-use serde::Deserialize;
-use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
 use metadata::events::{Scope, Status};
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct CreateRequest {
-    pub created_by: u64,
     pub project_id: u64,
-    pub tags: Vec<String>,
+    pub tags: Option<Vec<String>>,
     pub name: String,
     pub display_name: Option<String>,
     pub description: Option<String>,
     pub status: Status,
     pub scope: Scope,
     pub properties: Option<Vec<u64>>,
-    pub global_properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct UpdateRequest {
     pub id: u64,
-    pub created_by: u64,
-    pub updated_by: u64,
     pub project_id: u64,
-    pub tags: Vec<String>,
+    pub tags: Option<Vec<String>>,
     pub name: String,
     pub display_name: Option<String>,
     pub description: Option<String>,
     pub status: Status,
     pub scope: Scope,
     pub properties: Option<Vec<u64>>,
-    pub global_properties: Option<Vec<u64>>,
     pub custom_properties: Option<Vec<u64>>,
 }

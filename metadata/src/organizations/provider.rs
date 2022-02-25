@@ -45,7 +45,7 @@ impl Provider {
         }
     }
 
-    pub async fn list(&self, request: ListRequest) -> Result<Vec<Organization>> {
+    pub async fn list(&self, _: ListRequest) -> Result<Vec<Organization>> {
         let mut list = self
             .store
             .list_prefix(DATA_PREFIX)
