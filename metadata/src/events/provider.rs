@@ -1,8 +1,9 @@
 use std::sync::Arc;
+use arrow::compute::or;
 
 use bincode::{deserialize, serialize};
 use chrono::Utc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::error::Error;
 use crate::events::{Event};
@@ -37,21 +38,23 @@ fn index_keys(organization_id: u64, project_id: u64, name: &str, display_name: &
 
 pub struct Provider {
     store: Arc<Store>,
-    idx: Mutex<HashMap>,
+    idx: HashMap,
+    guard: RwLock<()>,
 }
 
 impl Provider {
     pub fn new(kv: Arc<Store>) -> Self {
         Provider {
             store: kv.clone(),
-            idx: Mutex::new(HashMap::new(kv)),
+            idx: HashMap::new(kv),
+            guard: RwLock::new(()),
         }
     }
 
     pub async fn create(&self, organization_id: u64, req: CreateEventRequest) -> Result<Event> {
+        let _guard = self.guard.write().await;
         let idx_keys = index_keys(organization_id, req.project_id, &req.name, &req.display_name);
-        let idx = self.idx.lock().await;
-        idx.check_insert_constraints(idx_keys.as_ref()).await?;
+        self.idx.check_insert_constraints(idx_keys.as_ref()).await?;
 
         let created_at = Utc::now();
         let id = self
@@ -83,13 +86,18 @@ impl Provider {
             )
             .await?;
 
-        idx
+        self.idx
             .insert(idx_keys.as_ref(), &data)
             .await?;
         Ok(event)
     }
 
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
+        let _guard = self.guard.read().await;
+        self._get_by_id(organization_id, project_id, id).await
+    }
+
+    pub async fn _get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         match self
             .store
             .get(make_data_value_key(organization_id, project_id, NAMESPACE, id))
@@ -101,9 +109,8 @@ impl Provider {
     }
 
     pub async fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Event> {
-        let idx = self.idx.lock().await;
-
-        let data = idx
+        let _guard = self.guard.read().await;
+        let data = self.idx
             .get(make_index_key(organization_id, project_id, NAMESPACE, IDX_NAME, name))
             .await?;
 
@@ -115,11 +122,11 @@ impl Provider {
     }
 
     pub async fn update(&self, organization_id: u64, req: UpdateEventRequest) -> Result<Event> {
+        let _guard = self.guard.write().await;
         let idx_keys = index_keys(organization_id, req.project_id, &req.name, &req.display_name);
-        let prev_event = self.get_by_id(organization_id, req.project_id, req.id).await?;
+        let prev_event = self._get_by_id(organization_id, req.project_id, req.id).await?;
         let idx_prev_keys = index_keys(organization_id, prev_event.project_id, &prev_event.name, &prev_event.display_name);
-        let idx = self.idx.lock().await;
-        idx
+        self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await?;
 
@@ -148,7 +155,7 @@ impl Provider {
             )
             .await?;
 
-        idx
+        self.idx
             .update(
                 idx_keys.as_ref(),
                 idx_prev_keys.as_ref(),
@@ -165,7 +172,8 @@ impl Provider {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        let mut event = self.get_by_id(organization_id, project_id, event_id).await?;
+        let _guard = self.guard.write().await;
+        let mut event = self._get_by_id(organization_id, project_id, event_id).await?;
         event.properties = match event.properties {
             None => Some(vec![prop_id]),
             Some(props) => match props.iter().find(|x| prop_id == **x) {
@@ -190,7 +198,8 @@ impl Provider {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        let mut event = self.get_by_id(organization_id, project_id, event_id).await?;
+        let _guard = self.guard.write().await;
+        let mut event = self._get_by_id(organization_id, project_id, event_id).await?;
         event.properties = match event.properties {
             None => return Err(Error::ConstraintViolation),
             Some(props) => match props.iter().find(|x| prop_id == **x) {
@@ -209,13 +218,13 @@ impl Provider {
     }
 
     pub async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
-        let event = self.get_by_id(organization_id, project_id, id).await?;
+        let _guard = self.guard.write().await;
+        let event = self._get_by_id(organization_id, project_id, id).await?;
         self.store
             .delete(make_data_value_key(organization_id, project_id, NAMESPACE, id))
             .await?;
 
-        let idx = self.idx.lock().await;
-        idx.delete(index_keys(organization_id, event.project_id, &event.name, &event.display_name).as_ref())
+        self.idx.delete(index_keys(organization_id, event.project_id, &event.name, &event.display_name).as_ref())
             .await?;
 
         Ok(event)
