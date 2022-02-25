@@ -14,7 +14,7 @@ async fn test_events() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let store = Arc::new(Store::new(path));
-    let mut md = Metadata::try_new(store.clone())?;
+    let md = Metadata::try_new(store.clone())?;
     let create_event_req = CreateEventRequest {
         created_by: 0,
         project_id: 1,

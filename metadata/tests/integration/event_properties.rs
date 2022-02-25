@@ -13,7 +13,7 @@ async fn test_properties() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let store = Arc::new(Store::new(path));
-    let mut md = Metadata::try_new(store.clone())?;
+    let md = Metadata::try_new(store.clone())?;
     let create_prop_req = CreateEventPropertyRequest {
         created_by: 0,
         project_id: 1,
