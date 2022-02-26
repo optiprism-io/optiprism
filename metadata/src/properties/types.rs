@@ -15,7 +15,7 @@ pub enum Scope {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct EventProperty {
+pub struct Property {
     pub id: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,

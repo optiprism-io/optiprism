@@ -3,6 +3,7 @@ use crate::store::store::Store;
 use crate::Result;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct HashMap {
     store: Arc<Store>,
 }

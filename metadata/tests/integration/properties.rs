@@ -1,8 +1,6 @@
 use arrow::datatypes::DataType;
 use metadata::error::Result;
-use metadata::event_properties::{
-    CreateEventPropertyRequest, Scope, Status, UpdateEventPropertyRequest,
-};
+use metadata::properties::{CreateEventPropertyRequest, Scope, Status, UpdateEventPropertyRequest};
 use metadata::store::store::Store;
 use metadata::Metadata;
 use std::env::temp_dir;

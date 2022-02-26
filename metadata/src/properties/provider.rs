@@ -1,23 +1,36 @@
 use crate::error::Error;
+use crate::metadata::{list, ListResponse};
+use crate::properties::types::{CreateEventPropertyRequest, Property, UpdateEventPropertyRequest};
+use crate::store::index::hash_map::HashMap;
 use crate::store::store::{
     make_col_id_seq_key, make_data_value_key, make_id_seq_key, make_index_key, Store,
 };
 use crate::Result;
-use crate::event_properties::types::{
-    CreateEventPropertyRequest, EventProperty, UpdateEventPropertyRequest,
-};
-use crate::metadata::{list, ListResponse};
-use crate::store::index::hash_map::HashMap;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-const NAMESPACE: &[u8] = b"event_properties";
-const IDX_NAME: &[u8] = b"event_name";
+#[derive(Clone)]
+pub enum Namespace {
+    Event,
+    User,
+}
+
+const IDX_NAME: &[u8] = b"name";
 const IDX_DISPLAY_NAME: &[u8] = b"display_name";
 
+impl Namespace {
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            Namespace::Event => "event_properties".as_bytes(),
+            Namespace::User => "user_properties".as_bytes(),
+        }
+    }
+}
+
 fn index_keys(
+    ns: Namespace,
     organization_id: u64,
     project_id: u64,
     name: &str,
@@ -25,13 +38,13 @@ fn index_keys(
 ) -> Vec<Option<Vec<u8>>> {
     let mut idx: Vec<Option<Vec<u8>>> = vec![];
     idx.push(Some(
-        make_index_key(organization_id, project_id, NAMESPACE, IDX_NAME, name).to_vec(),
+        make_index_key(organization_id, project_id, ns.as_bytes(), IDX_NAME, name).to_vec(),
     ));
     idx.push(display_name.as_ref().map(|display_name| {
         make_index_key(
             organization_id,
             project_id,
-            NAMESPACE,
+            ns.as_bytes(),
             IDX_DISPLAY_NAME,
             display_name,
         )
@@ -45,14 +58,16 @@ pub struct Provider {
     store: Arc<Store>,
     idx: HashMap,
     guard: RwLock<()>,
+    ns: Namespace,
 }
 
 impl Provider {
-    pub fn new(kv: Arc<Store>) -> Self {
+    pub fn new(kv: Arc<Store>, ns: Namespace) -> Self {
         Provider {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
+            ns,
         }
     }
 
@@ -60,7 +75,7 @@ impl Provider {
         &self,
         organization_id: u64,
         req: CreateEventPropertyRequest,
-    ) -> Result<EventProperty> {
+    ) -> Result<Property> {
         let _guard = self.guard.write().await;
         self._create(organization_id, req).await
     }
@@ -69,8 +84,9 @@ impl Provider {
         &self,
         organization_id: u64,
         req: CreateEventPropertyRequest,
-    ) -> Result<EventProperty> {
+    ) -> Result<Property> {
         let idx_keys = index_keys(
+            self.ns.clone(),
             organization_id,
             req.project_id,
             &req.name,
@@ -80,7 +96,11 @@ impl Provider {
 
         let id = self
             .store
-            .next_seq(make_id_seq_key(organization_id, req.project_id, NAMESPACE))
+            .next_seq(make_id_seq_key(
+                organization_id,
+                req.project_id,
+                self.ns.as_bytes(),
+            ))
             .await?;
         let created_at = Utc::now();
         let col_id = self
@@ -88,7 +108,7 @@ impl Provider {
             .next_seq(make_col_id_seq_key(organization_id, req.project_id))
             .await?;
 
-        let prop = EventProperty {
+        let prop = Property {
             id,
             created_at,
             updated_at: None,
@@ -112,7 +132,12 @@ impl Provider {
         let data = serialize(&prop)?;
         self.store
             .put(
-                make_data_value_key(organization_id, prop.project_id, NAMESPACE, prop.id),
+                make_data_value_key(
+                    organization_id,
+                    prop.project_id,
+                    self.ns.as_bytes(),
+                    prop.id,
+                ),
                 &data,
             )
             .await?;
@@ -125,7 +150,7 @@ impl Provider {
         &self,
         organization_id: u64,
         req: CreateEventPropertyRequest,
-    ) -> Result<EventProperty> {
+    ) -> Result<Property> {
         let _guard = self.guard.write().await;
         match self
             ._get_by_name(organization_id, req.project_id, req.name.as_str())
@@ -144,13 +169,13 @@ impl Provider {
         organization_id: u64,
         project_id: u64,
         id: u64,
-    ) -> Result<EventProperty> {
+    ) -> Result<Property> {
         match self
             .store
             .get(make_data_value_key(
                 organization_id,
                 project_id,
-                NAMESPACE,
+                self.ns.as_bytes(),
                 id,
             ))
             .await?
@@ -165,7 +190,7 @@ impl Provider {
         organization_id: u64,
         project_id: u64,
         name: &str,
-    ) -> Result<EventProperty> {
+    ) -> Result<Property> {
         let _guard = self.guard.read().await;
         self._get_by_name(organization_id, project_id, name).await
     }
@@ -175,13 +200,13 @@ impl Provider {
         organization_id: u64,
         project_id: u64,
         name: &str,
-    ) -> Result<EventProperty> {
+    ) -> Result<Property> {
         let data = self
             .idx
             .get(make_index_key(
                 organization_id,
                 project_id,
-                NAMESPACE,
+                self.ns.as_bytes(),
                 IDX_NAME,
                 name,
             ))
@@ -194,17 +219,24 @@ impl Provider {
         &self,
         organization_id: u64,
         project_id: u64,
-    ) -> Result<ListResponse<EventProperty>> {
-        list(self.store.clone(), organization_id, project_id, NAMESPACE).await
+    ) -> Result<ListResponse<Property>> {
+        list(
+            self.store.clone(),
+            organization_id,
+            project_id,
+            self.ns.as_bytes(),
+        )
+        .await
     }
 
     pub async fn update(
         &self,
         organization_id: u64,
         req: UpdateEventPropertyRequest,
-    ) -> Result<EventProperty> {
+    ) -> Result<Property> {
         let _guard = self.guard.write().await;
         let idx_keys = index_keys(
+            self.ns.clone(),
             organization_id,
             req.project_id,
             &req.name,
@@ -214,6 +246,7 @@ impl Provider {
             .get_by_id(organization_id, req.project_id, req.id)
             .await?;
         let idx_prev_keys = index_keys(
+            self.ns.clone(),
             organization_id,
             prev_prop.project_id,
             &prev_prop.name,
@@ -224,7 +257,7 @@ impl Provider {
             .await?;
 
         let updated_at = Utc::now();
-        let prop = EventProperty {
+        let prop = Property {
             id: req.id,
             created_at: prev_prop.created_at,
             updated_at: Some(updated_at),
@@ -248,7 +281,12 @@ impl Provider {
 
         self.store
             .put(
-                make_data_value_key(organization_id, prop.project_id, NAMESPACE, prop.id),
+                make_data_value_key(
+                    organization_id,
+                    prop.project_id,
+                    self.ns.as_bytes(),
+                    prop.id,
+                ),
                 &data,
             )
             .await?;
@@ -259,19 +297,14 @@ impl Provider {
         Ok(prop)
     }
 
-    pub async fn delete(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<EventProperty> {
+    pub async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let _guard = self.guard.write().await;
         let prop = self.get_by_id(organization_id, project_id, id).await?;
         self.store
             .delete(make_data_value_key(
                 organization_id,
                 project_id,
-                NAMESPACE,
+                self.ns.as_bytes(),
                 id,
             ))
             .await?;
@@ -279,6 +312,7 @@ impl Provider {
         self.idx
             .delete(
                 index_keys(
+                    self.ns.clone(),
                     organization_id,
                     prop.project_id,
                     &prop.name,

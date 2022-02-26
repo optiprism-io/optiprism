@@ -1,2 +1,2 @@
-mod event_properties;
 mod events;
+mod properties;

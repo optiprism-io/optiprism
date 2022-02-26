@@ -8,7 +8,7 @@ use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-const NAMESPACE: &[u8] = b"event_properties";
+const NAMESPACE: &[u8] = b"accounts";
 const IDX_EMAIL: &[u8] = b"email";
 
 pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {

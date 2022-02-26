@@ -2,12 +2,13 @@ use arrow::datatypes::DataType;
 use axum::http::HeaderValue;
 use axum::{AddExtensionLayer, Router, Server};
 use chrono::Utc;
-use metadata::event_properties::{CreateEventPropertyRequest, EventProperty, Scope, Status};
 use metadata::metadata::ListResponse;
+use metadata::properties::provider::Namespace;
+use metadata::properties::{CreateEventPropertyRequest, Property, Scope, Status};
 use metadata::{Metadata, Store};
 use platform::error::Result;
-use platform::event_properties::Provider;
-use platform::http::event_properties;
+use platform::http::properties;
+use platform::properties::Provider;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, StatusCode};
 use std::env::temp_dir;
@@ -16,7 +17,7 @@ use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
-fn assert(l: &EventProperty, r: &EventProperty) {
+fn assert(l: &Property, r: &Property) {
     assert_eq!(l.id, r.id);
     assert_eq!(l.project_id, r.project_id);
     assert_eq!(l.tags, r.tags);
@@ -38,14 +39,16 @@ async fn test_event_properties() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let store = Arc::new(Store::new(path));
-    let metadata = Arc::new(Metadata::try_new(store).unwrap());
-
-    let md = metadata.clone();
+    let md = Arc::new(Metadata::try_new(store).unwrap());
+    let md2 = md.clone();
     tokio::spawn(async move {
-        let provider = Arc::new(Provider::new(md));
+        let provider = Arc::new(Provider::new(
+            md2.event_properties.clone(),
+            Namespace::Event,
+        ));
 
-        let app =
-            event_properties::configure(Router::new()).layer(AddExtensionLayer::new(provider));
+        let app = properties::configure(Router::new(), Namespace::Event)
+            .layer(AddExtensionLayer::new(provider));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
         Server::bind(&addr)
@@ -56,7 +59,7 @@ async fn test_event_properties() -> Result<()> {
 
     sleep(Duration::from_millis(100)).await;
 
-    let prop1 = EventProperty {
+    let prop1 = Property {
         id: 1,
         created_at: Utc::now(),
         updated_at: None,
@@ -139,7 +142,7 @@ async fn test_event_properties() -> Result<()> {
             dictionary_type: prop1.dictionary_type.clone(),
         };
 
-        let resp = metadata.event_properties.create(0, req).await?;
+        let resp = md.event_properties.create(0, req).await?;
         assert_eq!(resp.id, 1);
     }
 
@@ -153,7 +156,7 @@ async fn test_event_properties() -> Result<()> {
             .unwrap();
         let status = resp.status();
         assert_eq!(status, StatusCode::OK);
-        let p: EventProperty = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+        let p: Property = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert(&p, &prop1)
     }
     // list events should return list with one event
@@ -165,7 +168,7 @@ async fn test_event_properties() -> Result<()> {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let resp: ListResponse<EventProperty> =
+        let resp: ListResponse<Property> =
             serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert_eq!(resp.data.len(), 1);
         assert(&resp.data[0], &prop1);

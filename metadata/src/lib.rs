@@ -1,10 +1,10 @@
 pub mod accounts;
 pub mod error;
-pub mod event_properties;
 pub mod events;
 pub mod metadata;
 pub mod organizations;
 pub mod projects;
+pub mod properties;
 pub mod store;
 
 pub use error::{Error, Result};

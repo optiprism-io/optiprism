@@ -27,6 +27,11 @@ pub enum Permission {
     GetEventPropertyByName,
     ListEventProperties,
     DeleteEventProperty,
+
+    GetUserPropertyById,
+    GetUserPropertyByName,
+    ListUserProperties,
+    DeleteUserProperty,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]

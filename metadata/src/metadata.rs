@@ -1,5 +1,6 @@
+use crate::properties::provider::Namespace;
 use crate::store::store::make_data_key;
-use crate::{accounts, event_properties, events, organizations, projects, Result, Store};
+use crate::{accounts, events, organizations, projects, properties, Result, Store};
 use bincode::deserialize;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -48,7 +49,8 @@ where
 
 pub struct Metadata {
     pub events: events::Provider,
-    pub event_properties: event_properties::Provider,
+    pub event_properties: Arc<properties::Provider>,
+    pub user_properties: properties::Provider,
     pub organizations: organizations::Provider,
     pub projects: projects::Provider,
     pub accounts: accounts::Provider,
@@ -58,7 +60,8 @@ impl Metadata {
     pub fn try_new(store: Arc<Store>) -> Result<Self> {
         Ok(Metadata {
             events: events::Provider::new(store.clone()),
-            event_properties: event_properties::Provider::new(store.clone()),
+            event_properties: Arc::new(properties::Provider::new(store.clone(), Namespace::Event)),
+            user_properties: properties::Provider::new(store.clone(), Namespace::User),
             organizations: organizations::Provider::new(store.clone()),
             projects: projects::Provider::new(store.clone()),
             accounts: accounts::Provider::new(store),
