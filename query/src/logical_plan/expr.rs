@@ -242,8 +242,7 @@ impl Expr {
 
                 // factory closure
                 let acc_fn: AccumulatorFunctionImplementation = Arc::new(move || {
-                    pagg
-                        .create_accumulator()
+                    pagg.create_accumulator()
                         .map_err(Error::into_datafusion_plan_error)
                 });
                 let return_type_fn: ReturnTypeFunction =

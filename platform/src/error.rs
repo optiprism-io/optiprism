@@ -18,7 +18,7 @@ pub struct InternalError {
 }
 
 impl InternalError {
-    const fn new(code: &'static str, status_code: StatusCode) -> Self {
+    pub fn new(code: &'static str, status_code: StatusCode) -> Self {
         Self { code, status_code }
     }
 }
@@ -26,6 +26,7 @@ impl InternalError {
 #[derive(Debug)]
 pub enum Error {
     Internal(InternalError),
+    SerdeError(serde_json::Error),
     CommonError(CommonError),
     MetadataError(MetadataError),
 }
@@ -54,12 +55,27 @@ impl From<MetadataError> for Error {
     }
 }
 
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
+        Self::SerdeError(err)
+    }
+}
+
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        if let Error::Internal(err) = self {
-            (err.status_code, err.code.to_string())
-        } else {
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("{}", self))
+        match self {
+            Error::Internal(err) => (err.status_code, err.code.to_string()),
+            Error::MetadataError(err) => match err {
+                metadata::Error::KeyNotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
+                _ => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal server error".to_string(),
+                ),
+            },
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal server error".to_string(),
+            ),
         }
         .into_response()
     }

@@ -13,14 +13,14 @@ async fn test_organizations() -> Result<()> {
     let store = Arc::new(Store::new(path));
     let metadata = Metadata::try_new(store.clone())?;
 
-    let organization1 = metadata
+    let _ = metadata
         .organizations
         .create(CreateRequest {
             name: "organization1".into(),
         })
         .await
         .unwrap();
-    let organization2 = metadata
+    let _ = metadata
         .organizations
         .create(CreateRequest {
             name: "organization2".into(),

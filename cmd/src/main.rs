@@ -15,8 +15,9 @@ async fn main() {
     }
 
     let store = Arc::new(Store::new(".db"));
-    let metadata = Arc::new(Metadata::try_new(store).unwrap());
-    let account_provider = Arc::new(AccountProvider::new(metadata.clone()));
+    let account_provider = Arc::new(AccountProvider::new(
+        metadata::accounts::Provider::new(store.clone()).clone(),
+    ));
     let auth_provider = Arc::new(AuthProvider::new(metadata, account_provider.clone()));
 
     let app = platform::http::configure(Router::new())

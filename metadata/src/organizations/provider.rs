@@ -40,12 +40,12 @@ impl Provider {
 
     pub async fn get_by_id(&self, id: u64) -> Result<Organization> {
         match self.store.get(&data_key(id)).await? {
-            None => Err(Error::OrganizationDoesNotExist),
+            None => Err(Error::KeyNotFound),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
 
-    pub async fn list(&self, request: ListRequest) -> Result<Vec<Organization>> {
+    pub async fn list(&self, _: ListRequest) -> Result<Vec<Organization>> {
         let mut list = self
             .store
             .list_prefix(DATA_PREFIX)

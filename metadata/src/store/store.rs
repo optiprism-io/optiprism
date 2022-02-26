@@ -2,23 +2,52 @@ use crate::Result;
 use rocksdb::{ColumnFamilyDescriptor, Options, SliceTransform, WriteBatch, DB};
 use std::path::Path;
 
-pub fn make_data_key(ns: &[u8], project_id: u64, id: u64) -> Vec<u8> {
+pub fn make_org_proj_key(organization_id: u64, project_id: u64) -> Vec<u8> {
     [
-        ns,
-        b"/data/",
+        b"organizations/",
+        organization_id.to_le_bytes().as_ref(),
+        b"projects/",
         project_id.to_le_bytes().as_ref(),
         b"/",
+    ]
+    .concat()
+}
+
+pub fn make_main_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
+    [
+        make_org_proj_key(organization_id, project_id).as_slice(),
+        ns,
+        b"/",
+    ]
+    .concat()
+}
+
+pub fn make_data_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
+    [
+        make_main_key(organization_id, project_id, ns).as_slice(),
+        b"data/",
+    ]
+    .concat()
+}
+
+pub fn make_data_value_key(organization_id: u64, project_id: u64, ns: &[u8], id: u64) -> Vec<u8> {
+    [
+        make_data_key(organization_id, project_id, ns).as_slice(),
         id.to_le_bytes().as_ref(),
     ]
     .concat()
 }
 
-pub fn make_index_key(ns: &[u8], project_id: u64, idx_name: &[u8], key: &str) -> Vec<u8> {
+pub fn make_index_key(
+    organization_id: u64,
+    project_id: u64,
+    ns: &[u8],
+    idx_name: &[u8],
+    key: &str,
+) -> Vec<u8> {
     [
-        ns,
-        b"/idx/",
-        project_id.to_le_bytes().as_ref(),
-        b"/",
+        make_main_key(organization_id, project_id, ns).as_slice(),
+        b"idx/",
         idx_name,
         b"/",
         key.as_bytes(),
@@ -26,8 +55,20 @@ pub fn make_index_key(ns: &[u8], project_id: u64, idx_name: &[u8], key: &str) ->
     .concat()
 }
 
-pub fn make_id_seq_key(ns: &[u8], project_id: u64) -> Vec<u8> {
-    [ns, b"/seq/", project_id.to_le_bytes().as_ref(), b"/id"].concat()
+pub fn make_id_seq_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
+    [
+        make_main_key(organization_id, project_id, ns).as_slice(),
+        b"id_seq",
+    ]
+    .concat()
+}
+
+pub fn make_col_id_seq_key(organization_id: u64, project_id: u64) -> Vec<u8> {
+    [
+        make_org_proj_key(organization_id, project_id).as_slice(),
+        b"/columns/id_seq",
+    ]
+    .concat()
 }
 
 type KVBytes = (Box<[u8]>, Box<[u8]>);

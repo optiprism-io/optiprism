@@ -11,19 +11,9 @@ pub enum Error {
     Plan(String),
     BincodeError(bincode::Error),
     RocksDbError(rocksdb::Error),
-    EventWithSameNameAlreadyExist,
-    EventDoesNotExist,
-    EventAlreadyHasGlobalProperty,
-    EventDoesntHaveGlobalProperty,
-    EventPropertyWithSameNameAlreadyExist,
-    EventPropertyWithSameDisplayNameAlreadyExist,
-    EventPropertyDoesNotExist,
-    EventPropertyColumnShouldBeEmpty,
-    OrganizationDoesNotExist,
-    ProjectDoesNotExist,
-    AccountDoesNotExist,
-    IndexKeyExist,    // TODO make parametrized errors
-    IndexKeyNotFound, // TODO make parametrized errors
+    KeyAlreadyExists,
+    KeyNotFound,
+    ConstraintViolation,
 }
 
 impl std::error::Error for Error {}

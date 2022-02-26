@@ -4,30 +4,27 @@ use common::{
     auth::{make_password_hash, make_salt},
     rbac::Permission,
 };
-use metadata::{
-    accounts::{Account, CreateRequest as CreateAccountRequest},
-    Metadata,
+use metadata::accounts::{
+    Account, CreateRequest as CreateAccountRequest, Provider as AccountProvider,
 };
 use std::sync::Arc;
 
 pub struct Provider {
-    metadata: Arc<Metadata>,
+    prov: Arc<AccountProvider>,
 }
 
 impl Provider {
-    pub fn new(metadata: Arc<Metadata>) -> Self {
-        Self { metadata }
+    pub fn new(prov: Arc<AccountProvider>) -> Self {
+        Self { prov }
     }
 
     pub async fn create(&self, ctx: Context, request: CreateRequest) -> Result<Account> {
-        if !ctx.is_permitted(request.organization_id, 0, Permission::AccountCreate) {
-            unimplemented!()
-        }
+        ctx.check_permission(request.organization_id, 0, Permission::CreateAccount)?;
+
         let salt = make_salt();
         let password = make_password_hash(&request.password, &salt);
         let account = self
-            .metadata
-            .accounts
+            .prov
             .create(CreateAccountRequest {
                 created_by: ctx.account_id,
                 admin: request.admin,

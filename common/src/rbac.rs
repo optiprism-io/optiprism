@@ -8,11 +8,30 @@ pub enum Scope {
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum Permission {
-    AccountCreate,
-    AccountGetById,
-    AccountList,
-    AccountUpdate,
-    AccountDelete,
+    CreateAccount,
+    GetAccountById,
+    UpdateAccount,
+    DeleteAccount,
+    ListAccounts,
+
+    CreateEvent,
+    GetEventById,
+    GetEventByName,
+    UpdateEvent,
+    DeleteEvent,
+    ListEvents,
+    AttachPropertyToEvent,
+    DetachPropertyFromEvent,
+
+    GetEventPropertyById,
+    GetEventPropertyByName,
+    ListEventProperties,
+    DeleteEventProperty,
+
+    GetUserPropertyById,
+    GetUserPropertyByName,
+    ListUserProperties,
+    DeleteUserProperty,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -22,13 +41,28 @@ pub enum Role {
     Reader,
 }
 
+pub enum Resource {
+    Account,
+    Project,
+    Organization,
+    Event,
+    EventProperty,
+}
+
+pub enum Action {
+    Read,
+    Modify,
+    Write,
+    Delete,
+}
+
 pub const MANAGER_PERMISSIONS: [Permission; 5] = [
-    Permission::AccountCreate,
-    Permission::AccountGetById,
-    Permission::AccountList,
-    Permission::AccountUpdate,
-    Permission::AccountDelete,
+    Permission::CreateAccount,
+    Permission::GetAccountById,
+    Permission::ListAccounts,
+    Permission::UpdateAccount,
+    Permission::DeleteAccount,
 ];
 
 pub const READER_PERMISSIONS: [Permission; 2] =
-    [Permission::AccountGetById, Permission::AccountList];
+    [Permission::GetAccountById, Permission::ListAccounts];

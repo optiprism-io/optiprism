@@ -190,10 +190,7 @@ pub struct NamedQuery {
 
 impl NamedQuery {
     pub fn new(agg: Query, name: Option<String>) -> Self {
-        NamedQuery {
-            name,
-            agg,
-        }
+        NamedQuery { name, agg }
     }
 }
 

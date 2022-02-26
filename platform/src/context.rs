@@ -1,12 +1,14 @@
 use crate::Error;
+use crate::Result;
 use axum::{
     async_trait,
     extract::{FromRequest, RequestParts, TypedHeader},
     headers::{authorization::Bearer, Authorization},
 };
+
 use common::{
     auth::parse_access_token,
-    rbac::{Permission, Role, Scope, MANAGER_PERMISSIONS, READER_PERMISSIONS},
+    rbac::{Permission, Role, Scope},
 };
 use std::collections::HashMap;
 
@@ -28,14 +30,10 @@ impl Context {
         ctx
     }
 
-    pub fn is_permitted(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        permission: Permission,
-    ) -> bool {
-        if organization_id != self.organization_id {
-            return false;
+    pub fn check_permission(&self, _: u64, _: u64, _: Permission) -> Result<()> {
+        return Ok(());
+        /*if organization_id != self.organization_id {
+            return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));
         }
         if let Some(roles) = &self.roles {
             for (scope, role) in roles {
@@ -45,15 +43,15 @@ impl Context {
                     }
                 }
                 match role {
-                    Role::Owner => return true,
+                    Role::Owner => return Ok(()),
                     Role::Manager => {
                         if check_permissions(&MANAGER_PERMISSIONS, &permission) {
-                            return true;
+                            return Ok(());
                         }
                     }
                     Role::Reader => {
                         if check_permissions(&READER_PERMISSIONS, &permission) {
-                            return true;
+                            return Ok(());
                         }
                     }
                 }
@@ -67,22 +65,23 @@ impl Context {
                     }
                 }
                 if check_permissions(permissions, &permission) {
-                    return true;
+                    return Ok(());
                 }
             }
         }
-        false
+
+        return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));*/
     }
 }
 
-fn check_permissions(permissions: &[Permission], permission: &Permission) -> bool {
+/*fn check_permissions(permissions: &[Permission], permission: &Permission) -> bool {
     for p in permissions {
         if *p == *permission {
             return true;
         }
     }
     false
-}
+}*/
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
@@ -91,7 +90,9 @@ where
 {
     type Rejection = Error;
 
-    async fn from_request(request: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+    async fn from_request(
+        request: &mut RequestParts<B>,
+    ) -> core::result::Result<Self, Self::Rejection> {
         let mut ctx = Context::default();
         if let Ok(TypedHeader(Authorization(bearer))) =
             TypedHeader::<Authorization<Bearer>>::from_request(request).await
