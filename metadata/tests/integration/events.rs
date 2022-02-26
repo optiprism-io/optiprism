@@ -51,7 +51,9 @@ async fn test_events() -> Result<()> {
     // create two events
     let mut create_event1 = create_event_req.clone();
     create_event1.name = "event1".to_string();
-    let res = md.events.create(1, create_event1.clone()).await?;
+    let res = md.events.get_or_create(1, create_event1.clone()).await?;
+    assert_eq!(res.id, 1);
+    let res = md.events.get_or_create(1, create_event1.clone()).await?;
     assert_eq!(res.id, 1);
     let mut create_event2 = create_event_req.clone();
     create_event2.name = "event2".to_string();

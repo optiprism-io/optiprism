@@ -53,6 +53,10 @@ impl Provider {
 
     pub async fn create(&self, organization_id: u64, req: CreateEventRequest) -> Result<Event> {
         let _guard = self.guard.write().await;
+        self._create(organization_id, req).await
+    }
+
+    pub async fn _create(&self, organization_id: u64, req: CreateEventRequest) -> Result<Event> {
         let idx_keys = index_keys(organization_id, req.project_id, &req.name, &req.display_name);
         self.idx.check_insert_constraints(idx_keys.as_ref()).await?;
 
@@ -92,6 +96,16 @@ impl Provider {
         Ok(event)
     }
 
+    pub async fn get_or_create(&self, organization_id: u64, req: CreateEventRequest) -> Result<Event> {
+        let _guard = self.guard.write().await;
+        match self._get_by_name(organization_id, req.project_id, req.name.as_str()).await {
+            Ok(event) => return Ok(event),
+            Err(Error::KeyNotFound) => {}
+            Err(err) => return Err(err)
+        }
+
+        self._create(organization_id, req).await
+    }
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let _guard = self.guard.read().await;
         self._get_by_id(organization_id, project_id, id).await
@@ -110,6 +124,10 @@ impl Provider {
 
     pub async fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Event> {
         let _guard = self.guard.read().await;
+        self._get_by_name(organization_id, project_id, name).await
+    }
+
+    pub async fn _get_by_name(&self, organization_id: u64, project_id: u64, name: &str) -> Result<Event> {
         let data = self.idx
             .get(make_index_key(organization_id, project_id, NAMESPACE, IDX_NAME, name))
             .await?;
