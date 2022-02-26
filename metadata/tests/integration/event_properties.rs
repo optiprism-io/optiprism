@@ -93,10 +93,8 @@ async fn test_properties() -> Result<()> {
     update_event1.display_name = Some("ee".to_string());
     assert_eq!(md.event_properties.update(1, update_event1.clone()).await?.display_name, Some("ee".to_string()));
     assert_eq!(md.event_properties.update(1, update_event2.clone()).await?.display_name, Some("e".to_string()));
-    // TODO fix
-    // assert_eq!(md.event_properties.list().await?[0].id, 1);
-    // assert_eq!(md.event_properties.list().await?[1].id, 2);
 
+    assert_eq!(md.event_properties.list(1,1).await?.data[0].id, 1);
 
     // delete props
     assert_eq!(md.event_properties.delete(1, 1, 1).await?.id, 1);
