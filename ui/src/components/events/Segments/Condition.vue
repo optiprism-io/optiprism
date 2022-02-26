@@ -94,6 +94,29 @@
                 </ValueSelect>
             </div>
             <div
+                v-if="isShowSelectDate"
+                class="pf-c-action-list__item"
+            >
+                <UiDatePicker
+                    :value="calendarValue"
+                    :last-count="lastCount"
+                    :active-tab-controls="props.condition?.period?.type"
+                    @on-apply="onApplyPeriod"
+                >
+                    <template #action>
+                        <UiButton
+                            class="pf-m-main"
+                            :before-icon="'fas fa-calendar-alt'"
+                            :class="{
+                                'pf-m-secondary': isSelectedCalendar,
+                            }"
+                        >
+                            {{ calendarValueString }}
+                        </UiButton>
+                    </template>
+                </UiDatePicker>
+            </div>
+            <div
                 class="pf-c-action-list__item condition__control"
                 @click="onRemove"
             >
@@ -116,9 +139,11 @@ import Select from '@/components/Select/Select.vue'
 import UiButton from '@/components/uikit/UiButton.vue'
 import PropertySelect from '@/components/events/PropertySelect.vue'
 import OperationSelect from '@/components/events/OperationSelect.vue'
-import ValueSelect from "@/components/events/ValueSelect.vue";
+import ValueSelect from '@/components/events/ValueSelect.vue'
 import { conditions } from '@/configs/events/conditions'
 import { useLexiconStore } from '@/stores/lexicon'
+import { getStringDateByFormat } from '@/helpers/getStringDates'
+import UiDatePicker, { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
 
 const i18n = inject<any>('i18n')
 
@@ -138,6 +163,41 @@ const emit = defineEmits<{
 
 const conditionItems = inject<[]>('conditionItems')
 
+
+const lastCount = computed(() => {
+    return props.condition?.period?.last;
+})
+
+const calendarValue = computed(() => {
+    return {
+        from: props.condition?.period?.from || '',
+        to: props.condition?.period?.to || '',
+        multiple: false,
+        dates: [],
+    }
+})
+
+const isSelectedCalendar = computed(() => {
+    return props.condition.period && props.condition.period.from && props.condition.period.to
+})
+
+const calendarValueString = computed(() => {
+    if (props.condition.period && props.condition.period.from && props.condition.period.to) {
+        switch(props.condition.period.type) {
+            case 'last':
+                return `${i18n.$t('common.calendar.last')} ${props.condition.period.last} ${props.condition.period.last === 1 ? i18n.$t('common.calendar.day') : i18n.$t('common.calendar.days')}`
+            case 'since':
+                return `${i18n.$t('common.calendar.since')} ${getStringDateByFormat(props.condition.period.from, '%d %b, %Y')}`
+            case 'between':
+                return `${getStringDateByFormat(props.condition.period.from, '%d %b, %Y')} - ${getStringDateByFormat(props.condition.period.to, '%d %b, %Y')}`
+            default:
+                return i18n.$t('common.select_period')
+        }
+    } else {
+        return i18n.$t('common.select_period')
+    }
+})
+
 const isSelectedAction = computed(() => Boolean(props.condition.action))
 const displayNameAction = computed(() => props.condition?.action?.name || i18n.$t(`events.segments.select_condition`))
 
@@ -153,6 +213,12 @@ const isShowSelectProp = computed(() => {
     } else {
         return false
     }
+})
+
+const isShowSelectDate = computed(() => {
+    const id = props.condition?.action?.id;
+
+    return id === 'hadPropertyValue' && props.condition.action && props.condition.propRef && props.condition.values && props.condition.values.length
 })
 
 const conditionValuesItems = computed(() => {
@@ -173,7 +239,7 @@ const changeOperationCondition = inject<(idx: number, indexParent: number, opId:
 const changeActionCondition = inject<(idx: number, indexParent: number, ref: { id: string, name: string }) => void>('changeActionCondition')
 const addValueCondition = inject<(idx: number, indexParent: number, value: Value) => void>('addValueCondition')
 const removeValueCondition = inject<(idx: number, indexParent: number, value: Value) => void>('removeValueCondition')
-
+const changePeriodCondition = inject<(idx: number, indexParent: number, payload: ApplyPayload) => void>('changePeriodCondition')
 const changeConditionAction = (payload: { id: string, name: string }) =>
     changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
 
@@ -188,6 +254,9 @@ const addValue = (value: Value) =>
 
 const removeValue = (value: Value) =>
     removeValueCondition && removeValueCondition(props.index, props.indexParent, value)
+
+const onApplyPeriod = (payload: ApplyPayload) =>
+    changePeriodCondition && changePeriodCondition(props.index, props.indexParent, payload)
 </script>
 
 <style lang="scss" scoped>

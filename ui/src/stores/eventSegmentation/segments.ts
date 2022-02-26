@@ -6,6 +6,7 @@ import {
 import { OperationId, Value } from "@/types";
 import schemaService from "@/api/services/schema.service";
 import { useLexiconStore } from "@/stores/lexicon";
+import { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
 
 interface Segment {
     name: string
@@ -22,6 +23,22 @@ export const useSegmentsStore = defineStore("segments", {
     }),
     getters: {},
     actions: {
+        changePeriodCondition(idx: number, idxSegment: number, payload: ApplyPayload): void {
+            const segment = this.segments[idxSegment]
+
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[idx]
+
+                if (condition && condition.period) {
+                    condition.period = {
+                        from: payload.value.from || '',
+                        to: payload.value.to || '',
+                        last: payload.last,
+                        type: payload.type,
+                    }
+                }
+            }
+        },
         removeValueCondition(idx: number, idxSegment: number, value: Value): void {
             const segment = this.segments[idxSegment]
 
@@ -52,6 +69,7 @@ export const useSegmentsStore = defineStore("segments", {
                 if (condition) {
                     condition.opId = opId
                     condition.values = []
+                    condition.period = {}
                 }
             }
         },
@@ -80,6 +98,7 @@ export const useSegmentsStore = defineStore("segments", {
                     condition.propRef = ref
                     condition.opId = OperationId.Eq
                     condition.values = []
+                    condition.period = {}
                 }
             }
         },
@@ -91,6 +110,7 @@ export const useSegmentsStore = defineStore("segments", {
                 if (condition) {
                     delete condition.propRef
                     condition.action = ref
+                    condition.period = {}
                 }
             }
         },

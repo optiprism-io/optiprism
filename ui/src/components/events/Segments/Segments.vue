@@ -31,6 +31,7 @@ import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
 import Segment from '@/components/events/Segments/Segment.vue'
 import { conditions } from '@/configs/events/conditions'
 import { PropertyRef } from '@/types/events'
+import { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
 const i18n = inject<any>('i18n')
 
 const segmentsStore = useSegmentsStore()
@@ -59,6 +60,7 @@ const changePropertyCondition = (idx: number, idxSegment: number, ref: PropertyR
 const changeOperationCondition = (idx: number, idxSegment: number, opId: OperationId) => segmentsStore.changeOperationCondition(idx, idxSegment, opId)
 const addValueCondition = (idx: number, idxSegment: number, value: Value) => segmentsStore.addValueCondition(idx, idxSegment, value)
 const removeValueCondition = (idx: number, idxSegment: number, value: Value) => segmentsStore.removeValueCondition(idx, idxSegment, value)
+const changePeriodCondition = (idx: number, idxSegment: number, payload: ApplyPayload) => segmentsStore.changePeriodCondition(idx, idxSegment, payload)
 
 provide('conditionItems', conditionItems.value)
 provide('changeOperationCondition', changeOperationCondition)
@@ -66,4 +68,5 @@ provide('changePropertyCondition', changePropertyCondition)
 provide('changeActionCondition', changeActionCondition)
 provide('addValueCondition', addValueCondition)
 provide('removeValueCondition', removeValueCondition)
+provide('changePeriodCondition', changePeriodCondition)
 </script>

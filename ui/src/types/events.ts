@@ -261,4 +261,10 @@ export interface Condition {
     opId?: OperationId
     values?: Value[]
     valuesList?: string[]
+    period?: {
+        from?: string,
+        to?: string,
+        last?: number,
+        type?: string,
+    },
 }

@@ -1,7 +1,14 @@
 {
   "common": {
     "apply": "Apply",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "select_period": "Select period",
+    "calendar": {
+      "last": "Last",
+      "since": "Since",
+      "day": "day",
+      "days": "days"
+    }
   },
 
   "events": {
