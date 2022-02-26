@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod event_properties;
 pub mod events;
 
 use axum::Router;

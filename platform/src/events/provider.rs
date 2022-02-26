@@ -3,9 +3,9 @@ use crate::events::types::UpdateRequest;
 use crate::{Context, Result};
 use common::rbac::Permission;
 use metadata::events::{CreateEventRequest, Event, UpdateEventRequest};
+use metadata::metadata::ListResponse;
 use metadata::Metadata;
 use std::sync::Arc;
-use metadata::metadata::ListResponse;
 
 pub struct Provider {
     metadata: Arc<Metadata>,
@@ -48,7 +48,11 @@ impl Provider {
 
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Event> {
         ctx.check_permission(ctx.organization_id, project_id, Permission::GetEventById)?;
-        Ok(self.metadata.events.get_by_id(ctx.organization_id, project_id, id).await?)
+        Ok(self
+            .metadata
+            .events
+            .get_by_id(ctx.organization_id, project_id, id)
+            .await?)
     }
 
     pub async fn get_by_name(&self, ctx: Context, project_id: u64, name: &str) -> Result<Event> {
@@ -63,7 +67,11 @@ impl Provider {
 
     pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Event>> {
         ctx.check_permission(ctx.organization_id, project_id, Permission::ListEvents)?;
-        Ok(self.metadata.events.list(ctx.organization_id, project_id).await?)
+        Ok(self
+            .metadata
+            .events
+            .list(ctx.organization_id, project_id)
+            .await?)
     }
 
     pub async fn update(&self, ctx: Context, req: UpdateRequest) -> Result<Event> {
@@ -99,7 +107,11 @@ impl Provider {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        ctx.check_permission(ctx.organization_id, project_id, Permission::AttachPropertyToEvent)?;
+        ctx.check_permission(
+            ctx.organization_id,
+            project_id,
+            Permission::AttachPropertyToEvent,
+        )?;
         Ok(self
             .metadata
             .events
@@ -114,7 +126,11 @@ impl Provider {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        ctx.check_permission(ctx.organization_id, project_id, Permission::DetachPropertyFromEvent)?;
+        ctx.check_permission(
+            ctx.organization_id,
+            project_id,
+            Permission::DetachPropertyFromEvent,
+        )?;
         Ok(self
             .metadata
             .events

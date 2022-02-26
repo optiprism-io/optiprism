@@ -9,7 +9,8 @@ pub fn make_org_proj_key(organization_id: u64, project_id: u64) -> Vec<u8> {
         b"projects/",
         project_id.to_le_bytes().as_ref(),
         b"/",
-    ].concat()
+    ]
+    .concat()
 }
 
 pub fn make_main_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
@@ -17,15 +18,16 @@ pub fn make_main_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8
         make_org_proj_key(organization_id, project_id).as_slice(),
         ns,
         b"/",
-    ].concat()
+    ]
+    .concat()
 }
 
 pub fn make_data_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
     [
         make_main_key(organization_id, project_id, ns).as_slice(),
-        b"data/"
+        b"data/",
     ]
-        .concat()
+    .concat()
 }
 
 pub fn make_data_value_key(organization_id: u64, project_id: u64, ns: &[u8], id: u64) -> Vec<u8> {
@@ -33,10 +35,16 @@ pub fn make_data_value_key(organization_id: u64, project_id: u64, ns: &[u8], id:
         make_data_key(organization_id, project_id, ns).as_slice(),
         id.to_le_bytes().as_ref(),
     ]
-        .concat()
+    .concat()
 }
 
-pub fn make_index_key(organization_id: u64, project_id: u64, ns: &[u8], idx_name: &[u8], key: &str) -> Vec<u8> {
+pub fn make_index_key(
+    organization_id: u64,
+    project_id: u64,
+    ns: &[u8],
+    idx_name: &[u8],
+    key: &str,
+) -> Vec<u8> {
     [
         make_main_key(organization_id, project_id, ns).as_slice(),
         b"idx/",
@@ -44,7 +52,7 @@ pub fn make_index_key(organization_id: u64, project_id: u64, ns: &[u8], idx_name
         b"/",
         key.as_bytes(),
     ]
-        .concat()
+    .concat()
 }
 
 pub fn make_id_seq_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
@@ -52,7 +60,7 @@ pub fn make_id_seq_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<
         make_main_key(organization_id, project_id, ns).as_slice(),
         b"id_seq",
     ]
-        .concat()
+    .concat()
 }
 
 pub fn make_col_id_seq_key(organization_id: u64, project_id: u64) -> Vec<u8> {
@@ -60,7 +68,7 @@ pub fn make_col_id_seq_key(organization_id: u64, project_id: u64) -> Vec<u8> {
         make_org_proj_key(organization_id, project_id).as_slice(),
         b"/columns/id_seq",
     ]
-        .concat()
+    .concat()
 }
 
 type KVBytes = (Box<[u8]>, Box<[u8]>);
@@ -102,17 +110,17 @@ impl Store {
     }
 
     pub async fn put<K, V>(&self, key: K, value: V) -> Result<()>
-        where
-            K: AsRef<[u8]>,
-            V: AsRef<[u8]>,
+    where
+        K: AsRef<[u8]>,
+        V: AsRef<[u8]>,
     {
         Ok(self.db.put(key, value)?)
     }
 
     pub async fn put_checked<K, V>(&self, key: K, value: V) -> Result<Option<Vec<u8>>>
-        where
-            K: AsRef<[u8]> + Clone,
-            V: AsRef<[u8]>,
+    where
+        K: AsRef<[u8]> + Clone,
+        V: AsRef<[u8]>,
     {
         match self.db.get(key.as_ref())? {
             None => Ok(None),
@@ -132,8 +140,8 @@ impl Store {
     }
 
     pub async fn get<K>(&self, key: K) -> Result<Option<Vec<u8>>>
-        where
-            K: AsRef<[u8]>,
+    where
+        K: AsRef<[u8]>,
     {
         Ok(self.db.get(key)?)
     }
@@ -146,15 +154,15 @@ impl Store {
     }
 
     pub async fn delete<K>(&self, key: K) -> Result<()>
-        where
-            K: AsRef<[u8]> + Clone,
+    where
+        K: AsRef<[u8]> + Clone,
     {
         Ok(self.db.delete(key)?)
     }
 
     pub async fn delete_checked<K>(&self, key: K) -> Result<Option<Vec<u8>>>
-        where
-            K: AsRef<[u8]> + Clone,
+    where
+        K: AsRef<[u8]> + Clone,
     {
         match self.db.get(key.as_ref())? {
             None => Ok(None),

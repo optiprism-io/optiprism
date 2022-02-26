@@ -65,14 +65,18 @@ impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
             Error::Internal(err) => (err.status_code, err.code.to_string()),
-            Error::MetadataError(err) => {
-                match err {
-                    metadata::Error::KeyNotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
-                    _ => (StatusCode::INTERNAL_SERVER_ERROR, "internal server error".to_string())
-                }
-            }
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, "internal server error".to_string())
+            Error::MetadataError(err) => match err {
+                metadata::Error::KeyNotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
+                _ => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal server error".to_string(),
+                ),
+            },
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal server error".to_string(),
+            ),
         }
-            .into_response()
+        .into_response()
     }
 }

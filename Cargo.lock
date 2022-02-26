@@ -1354,7 +1354,7 @@ name = "metadata"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arrow 5.5.0",
+ "arrow 6.3.0",
  "async-mutex",
  "bincode",
  "chrono",
@@ -1794,6 +1794,7 @@ checksum = "58893f751c9b0412871a09abd62ecd2a00298c6c83befa223ef98c52aef40cbe"
 name = "platform"
 version = "0.1.0"
 dependencies = [
+ "arrow 6.3.0",
  "axum",
  "axum-debug",
  "chrono",

@@ -1,50 +1,30 @@
-use super::{Account, CreateRequest, ListRequest, UpdateRequest};
+use super::{Account, CreateRequest, UpdateRequest};
+use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::store::index::hash_map::HashMap;
-use crate::store::store::{Store};
+use crate::store::store::Store;
 use crate::{Error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::metadata::{list, ListResponse, ResponseMetadata};
-
 
 const NAMESPACE: &[u8] = b"event_properties";
 const IDX_EMAIL: &[u8] = b"email";
 
 pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {
-    [
-        ns,
-        b"/id_seq",
-    ]
-        .concat()
+    [ns, b"/id_seq"].concat()
 }
 
 fn make_index_key(ns: &[u8], idx_name: &[u8], key: &str) -> Vec<u8> {
-    [
-        ns,
-        b"/idx/",
-        idx_name,
-        b"/",
-        key.as_bytes(),
-    ]
-        .concat()
+    [ns, b"/idx/", idx_name, b"/", key.as_bytes()].concat()
 }
 
 pub fn make_data_key(ns: &[u8]) -> Vec<u8> {
-    [
-        ns,
-        b"/data/",
-    ]
-        .concat()
+    [ns, b"/data/"].concat()
 }
 
 pub fn make_data_value_key(ns: &[u8], id: u64) -> Vec<u8> {
-    [
-        make_data_key(ns).as_slice(),
-        id.to_le_bytes().as_ref(),
-    ]
-        .concat()
+    [make_data_key(ns).as_slice(), id.to_le_bytes().as_ref()].concat()
 }
 
 fn index_keys(email: &str) -> Vec<Option<Vec<u8>>> {
@@ -80,9 +60,7 @@ impl Provider {
         self.store
             .put(make_data_value_key(NAMESPACE, account.id), &data)
             .await?;
-        self.idx
-            .insert(idx_keys.as_ref(), &data)
-            .await?;
+        self.idx.insert(idx_keys.as_ref(), &data).await?;
         Ok(account)
     }
 
@@ -95,7 +73,8 @@ impl Provider {
 
     pub async fn get_by_email(&self, email: &str) -> Result<Account> {
         let _guard = self.guard.read().await;
-        let data = self.idx
+        let data = self
+            .idx
             .get(make_index_key(NAMESPACE, IDX_EMAIL, email))
             .await?;
 
@@ -105,13 +84,20 @@ impl Provider {
     pub async fn list(&self) -> Result<ListResponse<Account>> {
         let prefix = make_data_key(NAMESPACE);
 
-        let list = self.store.list_prefix("").await?.iter().filter_map(|x| {
-            if x.0.len() < prefix.len() || !prefix.as_slice().cmp(&x.0[..prefix.len()]).is_eq() {
-                return None;
-            }
+        let list = self
+            .store
+            .list_prefix("")
+            .await?
+            .iter()
+            .filter_map(|x| {
+                if x.0.len() < prefix.len() || !prefix.as_slice().cmp(&x.0[..prefix.len()]).is_eq()
+                {
+                    return None;
+                }
 
-            Some(deserialize(x.1.as_ref()))
-        }).collect::<bincode::Result<_>>()?;
+                Some(deserialize(x.1.as_ref()))
+            })
+            .collect::<bincode::Result<_>>()?;
 
         Ok(ListResponse {
             data: list,
@@ -134,11 +120,7 @@ impl Provider {
             .put(make_data_value_key(NAMESPACE, account.id), &data)
             .await?;
         self.idx
-            .update(
-                idx_keys.as_ref(),
-                idx_prev_keys.as_ref(),
-                &data,
-            )
+            .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
             .await?;
         Ok(account)
     }
@@ -146,7 +128,9 @@ impl Provider {
     pub async fn delete(&self, id: u64) -> Result<Account> {
         let _guard = self.guard.write().await;
         let account = self.get_by_id(id).await?;
-        self.store.delete(make_data_value_key(NAMESPACE, id)).await?;
+        self.store
+            .delete(make_data_value_key(NAMESPACE, id))
+            .await?;
         self.idx
             .delete(index_keys(account.email.as_str()).as_ref())
             .await?;

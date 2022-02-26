@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
 use metadata::events::{Scope, Status};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct CreateRequest {
