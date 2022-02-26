@@ -48,23 +48,23 @@ where
 }
 
 pub struct Metadata {
-    pub events: events::Provider,
+    pub events: Arc<events::Provider>,
     pub event_properties: Arc<properties::Provider>,
-    pub user_properties: properties::Provider,
-    pub organizations: organizations::Provider,
-    pub projects: projects::Provider,
-    pub accounts: accounts::Provider,
+    pub user_properties: Arc<properties::Provider>,
+    pub organizations: Arc<organizations::Provider>,
+    pub projects: Arc<projects::Provider>,
+    pub accounts: Arc<accounts::Provider>,
 }
 
 impl Metadata {
     pub fn try_new(store: Arc<Store>) -> Result<Self> {
         Ok(Metadata {
-            events: events::Provider::new(store.clone()),
+            events: Arc::new(events::Provider::new(store.clone())),
             event_properties: Arc::new(properties::Provider::new(store.clone(), Namespace::Event)),
-            user_properties: properties::Provider::new(store.clone(), Namespace::User),
-            organizations: organizations::Provider::new(store.clone()),
-            projects: projects::Provider::new(store.clone()),
-            accounts: accounts::Provider::new(store),
+            user_properties: Arc::new(properties::Provider::new(store.clone(), Namespace::User)),
+            organizations: Arc::new(organizations::Provider::new(store.clone())),
+            projects: Arc::new(projects::Provider::new(store.clone())),
+            accounts: Arc::new(accounts::Provider::new(store)),
         })
     }
 }

@@ -35,8 +35,8 @@ async fn test_events() -> Result<()> {
         let mut path = temp_dir();
         path.push(format!("{}.db", Uuid::new_v4()));
         let store = Arc::new(Store::new(path));
-        let metadata = Arc::new(Metadata::try_new(store).unwrap());
-        let events_provider = Arc::new(EventsProvider::new(metadata.clone()));
+        let metadata = Metadata::try_new(store).unwrap();
+        let events_provider = Arc::new(EventsProvider::new(metadata.events.clone()));
 
         let app = events::configure(Router::new()).layer(AddExtensionLayer::new(events_provider));
 
