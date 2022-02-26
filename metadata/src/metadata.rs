@@ -1,4 +1,3 @@
-use crate::properties::provider::Namespace;
 use crate::store::store::make_data_key;
 use crate::{accounts, events, organizations, projects, properties, Result, Store};
 use bincode::deserialize;
@@ -60,8 +59,8 @@ impl Metadata {
     pub fn try_new(store: Arc<Store>) -> Result<Self> {
         Ok(Metadata {
             events: Arc::new(events::Provider::new(store.clone())),
-            event_properties: Arc::new(properties::Provider::new(store.clone(), Namespace::Event)),
-            user_properties: Arc::new(properties::Provider::new(store.clone(), Namespace::User)),
+            event_properties: Arc::new(properties::Provider::new_event(store.clone())),
+            user_properties: Arc::new(properties::Provider::new_user(store.clone())),
             organizations: Arc::new(organizations::Provider::new(store.clone())),
             projects: Arc::new(projects::Provider::new(store.clone())),
             accounts: Arc::new(accounts::Provider::new(store)),

@@ -1,9 +1,9 @@
 use axum::http::HeaderValue;
 use axum::{AddExtensionLayer, Router, Server};
 use chrono::Utc;
-use metadata::events::{Event, Scope, Status};
+use metadata::events::{Event, Provider, Scope, Status};
 use metadata::metadata::ListResponse;
-use metadata::{Metadata, Store};
+use metadata::Store;
 use platform::error::Result;
 use platform::events::Provider as EventsProvider;
 use platform::events::{CreateRequest, UpdateRequest};
@@ -35,8 +35,8 @@ async fn test_events() -> Result<()> {
         let mut path = temp_dir();
         path.push(format!("{}.db", Uuid::new_v4()));
         let store = Arc::new(Store::new(path));
-        let metadata = Metadata::try_new(store).unwrap();
-        let events_provider = Arc::new(EventsProvider::new(metadata.events.clone()));
+        let prov = Provider::new(store);
+        let events_provider = Arc::new(EventsProvider::new(Arc::new(prov)));
 
         let app = events::configure(Router::new()).layer(AddExtensionLayer::new(events_provider));
 

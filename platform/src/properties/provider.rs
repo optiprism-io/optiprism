@@ -12,11 +12,18 @@ pub struct Provider {
 }
 
 impl Provider {
-    pub fn new(
-        prov: Arc<PropertiesProvider>,
-        ns: metadata::properties::provider::Namespace,
-    ) -> Self {
-        Self { prov, ns }
+    pub fn new_user(prov: Arc<PropertiesProvider>) -> Self {
+        Self {
+            prov,
+            ns: Namespace::User,
+        }
+    }
+
+    pub fn new_event(prov: Arc<PropertiesProvider>) -> Self {
+        Self {
+            prov,
+            ns: Namespace::Event,
+        }
     }
 
     pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Property> {

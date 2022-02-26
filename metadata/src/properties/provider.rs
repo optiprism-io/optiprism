@@ -62,12 +62,21 @@ pub struct Provider {
 }
 
 impl Provider {
-    pub fn new(kv: Arc<Store>, ns: Namespace) -> Self {
+    pub fn new_user(kv: Arc<Store>) -> Self {
         Provider {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
-            ns,
+            ns: Namespace::User,
+        }
+    }
+
+    pub fn new_event(kv: Arc<Store>) -> Self {
+        Provider {
+            store: kv.clone(),
+            idx: HashMap::new(kv),
+            guard: RwLock::new(()),
+            ns: Namespace::Event,
         }
     }
 

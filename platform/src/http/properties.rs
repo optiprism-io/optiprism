@@ -3,7 +3,6 @@ use crate::{Context, Result};
 use axum::extract::Path;
 use axum::{extract::Extension, routing, Json, Router};
 use metadata::metadata::ListResponse;
-use metadata::properties::provider::Namespace;
 use metadata::properties::Property;
 use std::sync::Arc;
 
@@ -41,33 +40,34 @@ async fn delete(
     Ok(Json(provider.delete(ctx, project_id, event_id).await?))
 }
 
-pub fn configure(router: Router, ns: Namespace) -> Router {
-    match ns {
-        Namespace::Event => router
-            .route(
-                "/v1/projects/:project_id/event_properties",
-                routing::get(list),
-            )
-            .route(
-                "/v1/projects/:project_id/event_properties/:prop_id",
-                routing::get(get_by_id).delete(delete),
-            )
-            .route(
-                "/v1/projects/:project_id/event_properties/name/:prop_name",
-                routing::get(get_by_name),
-            ),
-        Namespace::User => router
-            .route(
-                "/v1/projects/:project_id/user_properties",
-                routing::get(list),
-            )
-            .route(
-                "/v1/projects/:project_id/user_properties/:prop_id",
-                routing::get(get_by_id).delete(delete),
-            )
-            .route(
-                "/v1/projects/:project_id/user_properties/name/:prop_name",
-                routing::get(get_by_name),
-            ),
-    }
+pub fn configure_user(router: Router) -> Router {
+    router
+        .route(
+            "/v1/projects/:project_id/user_properties",
+            routing::get(list),
+        )
+        .route(
+            "/v1/projects/:project_id/user_properties/:prop_id",
+            routing::get(get_by_id).delete(delete),
+        )
+        .route(
+            "/v1/projects/:project_id/user_properties/name/:prop_name",
+            routing::get(get_by_name),
+        )
+}
+
+pub fn configure_event(router: Router) -> Router {
+    router
+        .route(
+            "/v1/projects/:project_id/event_properties",
+            routing::get(list),
+        )
+        .route(
+            "/v1/projects/:project_id/event_properties/:prop_id",
+            routing::get(get_by_id).delete(delete),
+        )
+        .route(
+            "/v1/projects/:project_id/event_properties/name/:prop_name",
+            routing::get(get_by_name),
+        )
 }
