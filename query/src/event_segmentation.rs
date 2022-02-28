@@ -699,7 +699,7 @@ pub fn create_logical_plan(
 #[cfg(test)]
 mod tests {
     use crate::error::Result;
-    use crate::event_segmentation::{
+    use crate::q::{
         create_logical_plan, Analysis, Breakdown, ChartType, Event, EventFilter, EventRef,
         EventSegmentation, NamedQuery, Operation, PropertyRef, Query, QueryTime, TimeUnit, Value,
     };
