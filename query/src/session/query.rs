@@ -1,0 +1,8 @@
+
+struct QueryContext {
+
+}
+
+struct Query {
+
+}
