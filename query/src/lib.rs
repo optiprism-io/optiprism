@@ -3,7 +3,7 @@ pub mod event_segmentation;
 pub mod logical_plan;
 pub mod physical_plan;
 mod api;
-mod context;
+pub mod context;
 mod result;
 
 pub use context::Context;
