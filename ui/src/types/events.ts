@@ -63,6 +63,7 @@ export interface CustomEvent {
     name: string;
     description?: string;
     status: EventStatus;
+    displayName?: string;
 }
 
 export interface Event {
@@ -252,6 +253,14 @@ export const eventsQueries: EventsQuery[] = [
     },
 ]
 
+export interface ConditionFilter {
+    propRef?: PropertyRef
+    opId: OperationId
+    values: Value[]
+    valuesList: string[]
+    error?: boolean
+}
+
 export interface Condition {
     action?: {
         name?: string
@@ -262,9 +271,14 @@ export interface Condition {
     values?: Value[]
     valuesList?: string[]
     period?: {
-        from?: string,
-        to?: string,
-        last?: number,
-        type?: string,
+        from?: string
+        to?: string
+        last?: number
+        type?: string
+    }
+    event?: {
+        name: string
+        ref: EventRef
     },
+    filters: ConditionFilter[]
 }

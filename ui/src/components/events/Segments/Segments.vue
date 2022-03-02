@@ -27,6 +27,14 @@
 <script lang="ts" setup>
 import { computed, inject, provide } from 'vue'
 import { OperationId, Value } from '@/types'
+import {
+    ChangeEventCondition,
+    ChangeFilterPropertyCondition,
+    RemoveFilterCondition,
+    ChangeFilterOperation,
+    FilterValueCondition,
+    Ids,
+} from '@/components/events/Segments/ConditionTypes'
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
 import Segment from '@/components/events/Segments/Segment.vue'
 import { conditions } from '@/configs/events/conditions'
@@ -69,4 +77,12 @@ provide('changeActionCondition', changeActionCondition)
 provide('addValueCondition', addValueCondition)
 provide('removeValueCondition', removeValueCondition)
 provide('changePeriodCondition', changePeriodCondition)
+
+provide('addFilterCondition', (payload: Ids) => segmentsStore.addFilterCondition(payload))
+provide('removeFilterCondition', (payload: RemoveFilterCondition) => segmentsStore.removeFilterCondition(payload))
+provide('changeFilterPropertyCondition', (payload: ChangeFilterPropertyCondition) => segmentsStore.changeFilterPropertyCondition(payload))
+provide('changeEventCondition', (payload: ChangeEventCondition) => segmentsStore.changeEventCondition(payload))
+provide('changeFilterOperation', (payload: ChangeFilterOperation) => segmentsStore.changeFilterOperation(payload))
+provide('addFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.addFilterValueCondition(payload))
+provide('removeFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.removeFilterValueCondition(payload))
 </script>

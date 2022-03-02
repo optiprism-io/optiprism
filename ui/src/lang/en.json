@@ -3,6 +3,8 @@
     "apply": "Apply",
     "cancel": "Cancel",
     "select_period": "Select period",
+    "add_filter": "Add Filter",
+    "add_event": "Add Event",
     "calendar": {
       "last": "Last",
       "since": "Since",

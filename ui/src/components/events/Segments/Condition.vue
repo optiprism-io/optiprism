@@ -1,5 +1,5 @@
 <template>
-    <div class="condition pf-l-flex">
+    <div class="condition pf-l-flex pf-m-column">
         <div class="pf-c-action-list">
             <div class="pf-c-action-list__item">
                 <Select
@@ -17,6 +17,28 @@
                         :before-icon="!isSelectedAction ? 'fas fa-plus-circle': ''"
                     >
                         {{ displayNameAction }}
+                    </UiButton>
+                </Select>
+            </div>
+            <div
+                v-if="isShowSelectEvent"
+                class="pf-c-action-list__item"
+            >
+                <Select
+                    grouped
+                    :items="lexiconStore.eventsList"
+                    :width-auto="true"
+                    @select="changeEvent"
+                >
+                    <UiButton
+                        class="pf-m-main"
+                        :class="{
+                            'pf-m-secondary': props.condition.event,
+                        }"
+                        type="button"
+                        :before-icon="!props.condition.event ? 'fas fa-plus-circle' : ''"
+                    >
+                        {{ props.condition?.event?.name || $t('common.add_event') }}
                     </UiButton>
                 </Select>
             </div>
@@ -117,6 +139,18 @@
                 </UiDatePicker>
             </div>
             <div
+                v-if="isHasFilter"
+                class="pf-c-action-list__item condition__control"
+                @click="addFilter"
+            >
+                <VTooltip popper-class="ui-hint">
+                    <UiIcon icon="fas fa-filter" />
+                    <template #popper>
+                        {{ $t('common.add_filter') }}
+                    </template>
+                </VTooltip>
+            </div>
+            <div
                 class="pf-c-action-list__item condition__control"
                 @click="onRemove"
             >
@@ -128,18 +162,42 @@
                 </VTooltip>
             </div>
         </div>
+        <div class="pf-l-flex pf-m-column pf-u-pl-2xl">
+            <Filter
+                v-for="(filter, i) in filters"
+                :key="i"
+                :event-ref="condition?.event?.ref"
+                :filter="filter"
+                :index="i"
+                :update-open="updateOpenFilter"
+                @remove-filter="removeFilter"
+                @change-filter-property="changeFilterProperty"
+                @change-filter-operation="onChangeFilterOperation"
+                @add-filter-value="addFilterValue"
+                @remove-filter-value="removeFilterValue"
+            />
+        </div>
     </div>
 </template>
 
 <script lang="ts" setup>
-import { inject, computed } from 'vue'
+import { inject, computed, ref } from 'vue'
 import { operationById, OperationId, Value } from '@/types'
-import { PropertyRef, Condition as ConditionType } from '@/types/events'
+import { PropertyRef, Condition as ConditionType, EventRef } from '@/types/events'
+import {
+    ChangeFilterPropertyCondition,
+    ChangeEventCondition,
+    RemoveFilterCondition,
+    ChangeFilterOperation,
+    FilterValueCondition,
+    Ids,
+} from '@/components/events/Segments/ConditionTypes'
 import Select from '@/components/Select/Select.vue'
 import UiButton from '@/components/uikit/UiButton.vue'
 import PropertySelect from '@/components/events/PropertySelect.vue'
 import OperationSelect from '@/components/events/OperationSelect.vue'
 import ValueSelect from '@/components/events/ValueSelect.vue'
+import Filter from '@/components/events/Filter.vue'
 import { conditions } from '@/configs/events/conditions'
 import { useLexiconStore } from '@/stores/lexicon'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
@@ -163,9 +221,14 @@ const emit = defineEmits<{
 
 const conditionItems = inject<[]>('conditionItems')
 
+const updateOpenFilter = ref(false);
 
 const lastCount = computed(() => {
-    return props.condition?.period?.last;
+    return props.condition?.period?.last
+})
+
+const filters = computed(() => {
+    return props.condition.filters
 })
 
 const calendarValue = computed(() => {
@@ -175,6 +238,14 @@ const calendarValue = computed(() => {
         multiple: false,
         dates: [],
     }
+})
+
+const isShowSelectEvent = computed(() => {
+    return props.condition?.action?.id === 'didEvent'
+})
+
+const isHasFilter = computed(() => {
+    return props.condition?.action?.id === 'didEvent' && props.condition.event
 })
 
 const isSelectedCalendar = computed(() => {
@@ -209,7 +280,7 @@ const isShowSelectProp = computed(() => {
     if (id && conditionItems) {
         const conditionItem = conditions.find(condition => condition.key === id)
 
-        return Boolean(conditionItem?.hasProp)
+        return conditionItem?.hasProp ? (isShowSelectEvent.value ? props.condition.event : true) : false
     } else {
         return false
     }
@@ -233,30 +304,91 @@ const conditionValuesItems = computed(() => {
 
 const onRemove = () => emit('on-remove', props.index)
 
-
 const changePropertyCondition = inject<(idx: number, indexParent: number, propRef: PropertyRef) => void>('changePropertyCondition')
 const changeOperationCondition = inject<(idx: number, indexParent: number, opId: OperationId) => void>('changeOperationCondition')
 const changeActionCondition = inject<(idx: number, indexParent: number, ref: { id: string, name: string }) => void>('changeActionCondition')
 const addValueCondition = inject<(idx: number, indexParent: number, value: Value) => void>('addValueCondition')
 const removeValueCondition = inject<(idx: number, indexParent: number, value: Value) => void>('removeValueCondition')
 const changePeriodCondition = inject<(idx: number, indexParent: number, payload: ApplyPayload) => void>('changePeriodCondition')
-const changeConditionAction = (payload: { id: string, name: string }) =>
-    changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
 
-const changeProperty = (propRef: PropertyRef) =>
-    changePropertyCondition && changePropertyCondition(props.index, props.indexParent, propRef)
+const addFilterCondition = inject<(payload: Ids) => void>('addFilterCondition')
+const removeFilterCondition = inject<(payload: RemoveFilterCondition) => void>('removeFilterCondition')
+const changeFilterPropertyCondition = inject<(payload: ChangeFilterPropertyCondition) => void>('changeFilterPropertyCondition')
+const changeEventCondition = inject<(payload: ChangeEventCondition) => void>('changeEventCondition')
+const changeFilterOperation = inject<(payload: ChangeFilterOperation) => void>('changeFilterOperation')
+const addFilterValueCondition = inject<(payload: FilterValueCondition) => void>('addFilterValueCondition')
+const removeFilterValueCondition = inject<(payload: FilterValueCondition) => void>('removeFilterValueCondition')
 
-const changeOperation = (opId: OperationId) =>
-    changeOperationCondition && changeOperationCondition(props.index, props.indexParent, opId)
+const changeConditionAction = (payload: { id: string, name: string }) => changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
+const changeProperty = (propRef: PropertyRef) => changePropertyCondition && changePropertyCondition(props.index, props.indexParent, propRef)
+const changeOperation = (opId: OperationId) => changeOperationCondition && changeOperationCondition(props.index, props.indexParent, opId)
+const addValue = (value: Value) => addValueCondition && addValueCondition(props.index, props.indexParent, value)
+const removeValue = (value: Value) => removeValueCondition && removeValueCondition(props.index, props.indexParent, value)
+const onApplyPeriod = (payload: ApplyPayload) => changePeriodCondition && changePeriodCondition(props.index, props.indexParent, payload)
 
-const addValue = (value: Value) =>
-    addValueCondition && addValueCondition(props.index, props.indexParent, value)
+const addFilter = () => {
+    addFilterCondition && addFilterCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+    })
+    updateOpenFilter.value = true
 
-const removeValue = (value: Value) =>
-    removeValueCondition && removeValueCondition(props.index, props.indexParent, value)
+    setTimeout(() => {
+        updateOpenFilter.value = false
+    })
+}
 
-const onApplyPeriod = (payload: ApplyPayload) =>
-    changePeriodCondition && changePeriodCondition(props.index, props.indexParent, payload)
+const removeFilter = (idxFilter: number) => {
+    removeFilterCondition && removeFilterCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+        idxFilter
+    })
+}
+
+const changeFilterProperty = (idxFilter: number, propRef: PropertyRef) => {
+    changeFilterPropertyCondition && changeFilterPropertyCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+        idxFilter,
+        propRef
+    })
+}
+
+const changeEvent = (ref: EventRef) => {
+    changeEventCondition && changeEventCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+        ref,
+    })
+}
+
+const onChangeFilterOperation = (id: number, opId: OperationId) => {
+    changeFilterOperation && changeFilterOperation({
+        idx: props.index,
+        idxParent: props.indexParent,
+        idxFilter: id,
+        opId,
+    })
+}
+
+const addFilterValue = (id: number, value: Value) => {
+    addFilterValueCondition && addFilterValueCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+        idxFilter: id,
+        value,
+    })
+}
+
+const removeFilterValue = (id: number, value: Value) => {
+    removeFilterValueCondition && removeFilterValueCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+        idxFilter: id,
+        value,
+    })
+}
 </script>
 
 <style lang="scss" scoped>

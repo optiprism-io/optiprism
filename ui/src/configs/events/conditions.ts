@@ -9,6 +9,7 @@ export const conditions = [
     },
     {
         key: 'didEvent',
+        hasProp: true,
     },
     {
         key: 'funnel',

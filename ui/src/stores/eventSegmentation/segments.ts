@@ -2,11 +2,22 @@ import { defineStore } from "pinia";
 import {
     Condition,
     PropertyRef,
+    ConditionFilter,
+    Event,
+    PropertyType,
 } from "@/types/events";
 import { OperationId, Value } from "@/types";
 import schemaService from "@/api/services/schema.service";
 import { useLexiconStore } from "@/stores/lexicon";
 import { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
+import {
+    ChangeFilterPropertyCondition,
+    ChangeEventCondition,
+    RemoveFilterCondition,
+    ChangeFilterOperation,
+    FilterValueCondition,
+    Ids,
+} from '@/components/events/Segments/ConditionTypes'
 
 interface Segment {
     name: string
@@ -23,6 +34,127 @@ export const useSegmentsStore = defineStore("segments", {
     }),
     getters: {},
     actions: {
+        removeFilterValueCondition(payload: FilterValueCondition) {
+            const segment = this.segments[payload.idxParent]
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+
+                if (condition) {
+                    condition.filters[payload.idxFilter].values =
+                    condition.filters[payload.idxFilter].values.filter(v =>  v !== payload.value)
+                }
+            }
+        },
+        addFilterValueCondition(payload: FilterValueCondition) {
+            const segment = this.segments[payload.idxParent]
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+
+                if (condition) {
+                    condition.filters[payload.idxFilter].values.push(payload.value)
+                }
+            }
+        },
+        changeFilterOperation(payload: ChangeFilterOperation) {
+            const segment = this.segments[payload.idxParent]
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+
+                if (condition) {
+                    condition.filters[payload.idxFilter].opId = payload.opId
+                    condition.filters[payload.idxFilter].values = []
+                }
+            }
+        },
+        changeEventCondition(payload: ChangeEventCondition) {
+            const segment = this.segments[payload.idxParent]
+
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+
+                if (condition) {
+                    const lexiconStore = useLexiconStore()
+                    const event = lexiconStore.findEvent(payload.ref);
+
+                    condition.event = {
+                        name: event?.displayName || event.name,
+                        ref: payload.ref,
+                    }
+                    condition.filters = []
+
+                    delete condition.propRef
+                    delete condition.opId
+                    delete condition.values
+                    delete condition.valuesList
+                    delete condition.period
+                }
+            }
+        },
+        async changeFilterPropertyCondition(payload: ChangeFilterPropertyCondition) {
+            const segment = this.segments[payload.idxParent]
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+
+                if (condition && condition.event) {
+                    const eventRef = condition.event.ref;
+                    let valuesList: string[] = []
+
+                    try {
+                        const lexiconStore = useLexiconStore()
+
+                        const res = await schemaService.propertiesValues({
+                            event_name: lexiconStore.eventName(eventRef),
+                            event_type: eventRef.type,
+                            property_name: lexiconStore.propertyName(payload.propRef),
+                            property_type: PropertyType[payload.propRef.type]
+                        })
+
+                        if (res) {
+                            valuesList = res
+                        }
+                    } catch (error) {
+                        throw new Error('error getEventsValues')
+                    }
+
+                    condition.filters[payload.idxFilter] = {
+                        propRef: payload.propRef,
+                        opId: OperationId.Eq,
+                        values: [],
+                        valuesList: valuesList
+                    }
+                }
+            }
+        },
+        removeFilterCondition(payload: RemoveFilterCondition): void {
+            const segment = this.segments[payload.idxParent]
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+
+                if (condition) {
+                    condition.filters.splice(payload.idxFilter, 1);
+                }
+            }
+        },
+        addFilterCondition(payload: Ids): void {
+            const segment = this.segments[payload.idxParent]
+
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+                const emptyFilter = condition.filters.find((filter): boolean => filter.propRef === undefined)
+
+                if (emptyFilter) {
+                    return
+                }
+
+                if (condition && condition.filters) {
+                    condition.filters.push(<ConditionFilter>{
+                        opId: OperationId.Eq,
+                        values: [],
+                        valuesList: []
+                    })
+                }
+            }
+        },
         changePeriodCondition(idx: number, idxSegment: number, payload: ApplyPayload): void {
             const segment = this.segments[idxSegment]
 
@@ -111,6 +243,7 @@ export const useSegmentsStore = defineStore("segments", {
                     delete condition.propRef
                     condition.action = ref
                     condition.period = {}
+                    condition.filters = []
                 }
             }
         },
@@ -131,10 +264,14 @@ export const useSegmentsStore = defineStore("segments", {
             if (segment.conditions) {
                 const length = segment.conditions.length - 1;
                 if (segment.conditions[length] && segment.conditions[length].action) {
-                    segment.conditions.push({})
+                    segment.conditions.push({
+                        filters: []
+                    })
                 }
             } else {
-                segment.conditions = [{}]
+                segment.conditions = [{
+                    filters: []
+                }]
             }
         },
         renameSegment(name: string, idx: number) {
