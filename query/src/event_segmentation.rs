@@ -298,27 +298,274 @@ pub struct EventSegmentation {
 pub struct LogicalPlanBuilder {
     ctx: Context,
     metadata: Arc<Metadata>,
+    es: EventSegmentation,
 }
 
 impl LogicalPlanBuilder {
-    pub fn new() -> LogicalPlanBuilder {}
+    /// creates logical plan for event segmentation
+    pub async fn build(
+        ctx: Context,
+        metadata: Arc<Metadata>,
+        es: EventSegmentation,
+    ) -> Result<LogicalPlan> {
+        let builder = LogicalPlanBuilder {
+            ctx,
+            metadata,
+            es,
+        };
+    }
 
-    /// constructs database column name from property related to DFSchema
-    fn property_db_col_name(&self, event_name: &str, property: &PropertyRef) -> Result<String> {
+    async fn build_event_logical_plan(&self, input: Arc<LogicalPlan>, event: &Event) -> Result<LogicalPlan> {
+        let filter = self.build_filter_logical_plan(input.clone(), event).await?;
+        let agg = self.build_aggregate_logical_plan(Arc::new(filter), event).await?;
+        Ok(agg)
+    }
+
+    /// builds filter plan
+    async fn build_filter_logical_plan(
+        &self,
+        input: Arc<LogicalPlan>,
+        event: &Event,
+    ) -> Result<LogicalPlan> {
+        // time filter
+        let mut expr = time_expression(&self.es.time);
+
+        // event filter (event name, properties)
+        expr = and(
+            expr,
+            self.event_expression(event).await?,
+        );
+
+        // global event filters
+        if let Some(filters) = &es.filters {
+            match &event.event {
+                EventRef::Regular(event_name) => {
+                    expr = and(
+                        expr.clone(),
+                        self.event_filters_expression(filters).await?,
+                    );
+                }
+                EventRef::Custom(_) => unimplemented!(),
+            }
+        }
+
+        //global filter
+        Ok(LogicalPlan::Filter {
+            predicate: expr,
+            input,
+        })
+    }
+
+    // builds logical plan for aggregate
+    async fn build_aggregate_logical_plan(
+        &self,
+        input: Arc<LogicalPlan>,
+        event: &Event,
+    ) -> Result<LogicalPlan> {
+        let mut group_expr: Vec<Expr> = vec![];
+        // event groups
+        if let Some(breakdowns) = &event.breakdowns {
+            for breakdown in breakdowns.iter() {
+                group_expr.push(self.breakdown_expr(breakdown).await?);
+            }
+        }
+
+        // common groups
+        if let Some(breakdowns) = &self.es.breakdowns {
+            for breakdown in breakdowns.iter() {
+                group_expr.push(self.breakdown_expr(breakdown).await?);
+            }
+        }
+
+        let aggr_expr = event
+            .queries
+            .iter()
+            .enumerate()
+            .map(|(id, query)| {
+                let q = match &query.agg {
+                    Query::CountEvents => Expr::AggregateFunction {
+                        fun: AggregateFunction::Count,
+                        args: vec![col(event_fields::EVENT_NAME)],
+                        distinct: false,
+                    },
+                    Query::CountUniqueGroups | Query::DailyActiveGroups => Expr::AggregateFunction {
+                        fun: AggregateFunction::OrderedDistinctCount,
+                        args: vec![col(self.es.group.as_ref())],
+                        distinct: true,
+                    },
+                    Query::WeeklyActiveGroups => unimplemented!(),
+                    Query::MonthlyActiveGroups => unimplemented!(),
+                    Query::CountPerGroup { aggregate } => Expr::AggregatePartitionedFunction {
+                        partition_by: Box::new(col(self.es.group.as_ref())),
+                        fun: AggregateFunction::Count,
+                        outer_fun: aggregate.clone(),
+                        args: vec![col(event_fields::USER_ID)],
+                        distinct: false,
+                    },
+                    Query::AggregatePropertyPerGroup {
+                        property,
+                        aggregate_per_group,
+                        aggregate,
+                    } => Expr::AggregatePartitionedFunction {
+                        partition_by: Box::new(col(self.es.group.as_ref())),
+                        fun: aggregate_per_group.clone(),
+                        outer_fun: aggregate.clone(),
+                        args: vec![
+                            self.property_col(
+                                property,
+                            ).await?
+                        ],
+                        distinct: false,
+                    },
+                    Query::AggregateProperty {
+                        property,
+                        aggregate,
+                    } => Expr::AggregateFunction {
+                        fun: aggregate.clone(),
+                        args: vec![
+                            self.property_col(
+                                property,
+                            ).await?
+                        ],
+                        distinct: false,
+                    },
+                    Query::QueryFormula { .. } => unimplemented!(),
+                };
+
+                match &query.name {
+                    None => Ok(Expr::Alias(Box::new(q), format!("agg_{}", id))),
+                    Some(name) => Ok(Expr::Alias(Box::new(q), name.clone())),
+                }
+            })
+            .collect::<Result<Vec<Expr>>>()?;
+
+        // todo check for duplicates
+        let all_expr = group_expr.iter().chain(aggr_expr.iter());
+
+        let aggr_schema = DFSchema::new(exprlist_to_fields(all_expr, input.schema())?)?;
+
+        let expr = LogicalPlan::Aggregate {
+            input,
+            group_expr,
+            aggr_expr,
+            schema: Arc::new(aggr_schema),
+        };
+
+        Ok(expr)
+    }
+
+    /// builds expression for event
+    async fn event_expression(
+        &self,
+        event: &Event,
+    ) -> Result<Expr> {
+        // match event type
+        match &event.event {
+            // regular event
+            EventRef::Regular(_) => {
+                let id = self.metadata.dictionaries.get_id_by_key("events", event.event.name().as_ref()).await?;
+                // add event name condition
+                let mut expr = binary_expr(
+                    col(event_fields::EVENT_NAME),
+                    Operator::Eq,
+                    lit(id.to_df_scalar_value()),
+                );
+
+                // apply filters
+                if let Some(filters) = &event.filters {
+                    expr = and(
+                        expr.clone(),
+                        self.event_filters_expression(filters).await?,
+                    )
+                }
+
+                Ok(expr)
+            }
+
+            EventRef::Custom(_event_name) => unimplemented!(),
+        }
+    }
+
+    /// builds event filters expression
+    async fn event_filters_expression(
+        &self,
+        filters: &Vec<EventFilter>,
+    ) -> Result<Expr> {
+        // vector of expression for OR
+        let filter_exprs: Vec<Expr> = vec![];
+
+        // iterate over filters
+        let filters_exprs = filters
+            .iter()
+            .map(|filter| {
+                // match filter type
+                match filter {
+                    EventFilter::Property {
+                        property,
+                        operation,
+                        value,
+                    } => self.property_expression(property, operation, value).await,
+                }
+            })
+            .collect::<Result<Vec<Expr>>>()?;
+
+        if filters_exprs.len() == 1 {
+            Ok(filter_exprs[0].clone())
+        }
+
+        Ok(multi_and(filters_exprs))
+    }
+
+    // builds breakdown expression
+    async fn breakdown_expr(
+        &self,
+        breakdown: &Breakdown,
+    ) -> Result<Expr> {
+        match breakdown {
+            Breakdown::Property(prop_ref) => match prop_ref {
+                PropertyRef::User(prop_name) | PropertyRef::Event(prop_name) => {
+                    let prop_col = self.property_col(&prop_ref).await?;
+                    Ok(Expr::Alias(Box::new(prop_col), prop_name.clone()))
+                }
+                PropertyRef::UserCustom(_) => unimplemented!(),
+                PropertyRef::EventCustom(_) => unimplemented!(),
+            },
+        }
+    }
+
+    /// builds name [property] [op] [value] expression
+    pub async fn property_expression(
+        &self,
+        property: &PropertyRef,
+        operation: &Operation,
+        value: &Option<Vec<ScalarValue>>,
+    ) -> Result<Expr> {
         match property {
-            // user property
-            PropertyRef::User(prop_name) => {
-                let prop = schema.get_user_property_by_name(prop_name)?;
-                Ok(prop.db_col_name())
+            PropertyRef::User(_) | PropertyRef::Event(_) => {
+                let prop_col = self.property_col(&property).await?;
+                named_property_expression(prop_col, operation, value)
             }
             PropertyRef::UserCustom(_) => unimplemented!(),
-            // event property
-            PropertyRef::Event(prop_name) => {
-                let prop = schema.get_event_property_by_name(event_name, prop_name)?;
-                Ok(prop.db_col_name())
-            }
             PropertyRef::EventCustom(_) => unimplemented!(),
         }
+    }
+
+    pub async fn property_col(
+        &self,
+        property: &PropertyRef,
+    ) -> Result<Expr> {
+        Ok(match property {
+            PropertyRef::User(prop_name) => {
+                let prop = self.metadata.user_properties.get_by_name(ctx.organization_id, ctx.project_id, prop_name).await?;
+                col(prop.col_id.to_string().as_str())
+            }
+            PropertyRef::UserCustom(_prop_name) => unimplemented!(),
+            PropertyRef::Event(prop_name) => {
+                let prop = self.metadata.event_properties.get_by_name(ctx.organization_id, ctx.project_id, prop_name).await?;
+                col(prop.col_id.to_string().as_str())
+            }
+            PropertyRef::EventCustom(_) => unimplemented!(),
+        })
     }
 }
 
@@ -344,48 +591,8 @@ fn multi_and(exprs: Vec<Expr>) -> Expr {
     expr
 }
 
-/// constructs database column name from property related to DFSchema
-fn property_db_col_name(
-    metadata: Arc<Metadata>,
-    event_name: &str,
-    property: &PropertyRef,
-) -> Result<String> {
-    match property {
-        // user property
-        PropertyRef::User(prop_name) => {
-            let prop = schema.get_user_property_by_name(prop_name)?;
-            Ok(prop.db_col_name())
-        }
-        PropertyRef::UserCustom(_) => unimplemented!(),
-        // event property
-        PropertyRef::Event(prop_name) => {
-            let prop = schema.get_event_property_by_name(event_name, prop_name)?;
-            Ok(prop.db_col_name())
-        }
-        PropertyRef::EventCustom(_) => unimplemented!(),
-    }
-}
 
-pub async fn property_col(
-    ctx: &Context,
-    metadata: Arc<Metadata>,
-    property: &PropertyRef,
-) -> Result<Expr> {
-    Ok(match property {
-        PropertyRef::User(prop_name) => {
-            let prop = metadata.user_properties.get_by_name(ctx.organization_id, ctx.project_id, prop_name).await?;
-            col(prop.col_id.to_string().as_str())
-        }
-        PropertyRef::UserCustom(_prop_name) => unimplemented!(),
-        PropertyRef::Event(prop_name) => {
-            let prop = metadata.event_properties.get_by_name(ctx.organization_id, ctx.project_id, prop_name).await?;
-            col(prop.col_id.to_string().as_str())
-        }
-        PropertyRef::EventCustom(_) => unimplemented!(),
-    })
-}
-
-/// builds "[property] [op] [values]" binary expression with already known property column name
+/// builds "[property] [op] [values]" binary expression with already known property column
 fn named_property_expression(
     prop_col: Expr,
     operation: &Operation,
@@ -416,98 +623,6 @@ fn named_property_expression(
         // for isNull and isNotNull we don't need values at all
         Operation::IsNull => Ok(is_null(prop_col)),
         Operation::IsNotNull => Ok(is_not_null(prop_col)),
-    }
-}
-
-/// builds name [property] [op] [value] expression
-pub async fn property_expression(
-    ctx: &Context,
-    metadata: Arc<Metadata>,
-    property: &PropertyRef,
-    operation: &Operation,
-    value: &Option<Vec<ScalarValue>>,
-) -> Result<Expr> {
-    match property {
-        PropertyRef::User(_) | PropertyRef::Event(_) => {
-            let prop_col = property_col(ctx, metadata.clone(), &property).await?;
-            named_property_expression(prop_col, operation, value)
-        }
-        PropertyRef::UserCustom(_prop_name) => unimplemented!(),
-        PropertyRef::EventCustom(_) => unimplemented!(),
-    }
-}
-
-/// builds event filters expression
-fn event_filters_expression(
-    ctx: &Context,
-    metadata: Arc<Metadata>,
-    filters: &Vec<EventFilter>,
-) -> Result<Expr> {
-    // vector of expression for OR
-    let filter_exprs: Vec<Expr> = vec![];
-
-    // iterate over filters
-    let filters_exprs = filters
-        .iter()
-        .map(|filter| {
-            // match filter type
-            match filter {
-                EventFilter::Property {
-                    property,
-                    operation,
-                    value,
-                } => property_expression(ctx, metadata.clone(), property, operation, value),
-            }
-        })
-        .collect::<Result<Vec<Expr>>>()?;
-
-    if filters_exprs.len() == 1 {
-        Ok(filter_exprs[0].clone())
-    }
-
-    Ok(multi_and(filters_exprs))
-}
-
-/// builds expression for regular event
-fn regular_event_expression(
-    ctx: &Context,
-    metadata: Arc<Metadata>,
-    event_name: &str,
-    event: &Event,
-) -> Result<Expr> {
-    let id = metadata.dictionaries.get_id_by_key("events", event_name).await?;
-    // add event name condition
-    let mut expr = binary_expr(
-        col(event_fields::EVENT_NAME),
-        Operator::Eq,
-        lit(id.to_df_scalar_value()),
-    );
-
-    // apply filters
-    if let Some(filters) = &event.filters {
-        expr = and(
-            expr.clone(),
-            event_filters_expression(ctx, metadata.clone(), filters)?,
-        )
-    }
-
-    Ok(expr)
-}
-
-/// builds expression for event
-fn event_expression(
-    ctx: &Context,
-    metadata: Arc<Metadata>,
-    event: &Event,
-) -> Result<Expr> {
-    // match event type
-    match &event.event {
-        // regular event
-        EventRef::Regular(event_name) => {
-            regular_event_expression(ctx, metadata, event_name, event)
-        }
-
-        EventRef::Custom(_event_name) => unimplemented!(),
     }
 }
 
@@ -542,180 +657,12 @@ fn time_expression(time: &QueryTime) -> Expr {
     }
 }
 
-/// builds filter plan
-fn plan_filter(
-    ctx: &Context,
-    input: Arc<LogicalPlan>,
-    es: &EventSegmentation,
-    metadata: Arc<Metadata>,
-    event: &Event,
-) -> Result<LogicalPlan> {
-    // time filter
-    let mut expr = time_expression(&es.time);
-
-    // event filter (event name, properties)
-    expr = and(
-        expr,
-        event_expression(ctx, metadata.clone(), event)?,
-    );
-
-    // global event filters
-    if let Some(filters) = &es.filters {
-        match &event.event {
-            EventRef::Regular(event_name) => {
-                expr = and(
-                    expr.clone(),
-                    event_filters_expression(ctx, metadata.clone(), filters)?,
-                );
-            }
-            EventRef::Custom(_) => unimplemented!(),
-        }
-    }
-
-    //global filter
-    Ok(LogicalPlan::Filter {
-        predicate: expr,
-        input,
-    })
-}
-
 /// Create field meta-data from an expression, to use in a result set schema
 pub fn exprlist_to_fields<'a>(
     expr: impl IntoIterator<Item=&'a Expr>,
     input_schema: &DFSchema,
 ) -> Result<Vec<DFField>> {
     expr.into_iter().map(|e| e.to_field(input_schema)).collect()
-}
-
-// builds breakdown expression
-fn breakdown_expr(
-    metadata: Arc<Metadata>,
-    breakdown: &Breakdown,
-) -> Result<Expr> {
-    match breakdown {
-        Breakdown::Property(prop_ref) => match prop_ref {
-            PropertyRef::User(prop_name) | PropertyRef::Event(prop_name) => {
-                let prop_col = property_col(ctx, metadata.clone(), &prop_ref);
-                Ok(Expr::Alias(Box::new(prop_col), prop_name.clone()))
-            }
-            PropertyRef::UserCustom(_) => unimplemented!(),
-            PropertyRef::EventCustom(_) => unimplemented!(),
-        },
-    }
-}
-
-// builds logical plan for aggregate
-fn plan_agg(
-    input: Arc<LogicalPlan>,
-    es: &EventSegmentation,
-    metadata: Arc<Metadata>,
-    event: &Event,
-) -> Result<LogicalPlan> {
-    let mut group_expr: Vec<Expr> = vec![];
-    // event groups
-    if let Some(breakdowns) = &event.breakdowns {
-        for breakdown in breakdowns.iter() {
-            group_expr.push(breakdown_expr(metadata.clone(), event, breakdown)?);
-        }
-    }
-
-    // common groups
-    if let Some(breakdowns) = &es.breakdowns {
-        for breakdown in breakdowns.iter() {
-            group_expr.push(breakdown_expr(metadata.clone(), event, breakdown)?);
-        }
-    }
-
-    let aggr_expr = event
-        .queries
-        .iter()
-        .enumerate()
-        .map(|(id, query)| {
-            let q = match &query.agg {
-                Query::CountEvents => Expr::AggregateFunction {
-                    fun: AggregateFunction::Count,
-                    args: vec![col(event_fields::EVENT_NAME)],
-                    distinct: false,
-                },
-                Query::CountUniqueGroups | Query::DailyActiveGroups => Expr::AggregateFunction {
-                    fun: AggregateFunction::OrderedDistinctCount,
-                    args: vec![col(es.group.as_ref())],
-                    distinct: true,
-                },
-                Query::WeeklyActiveGroups => unimplemented!(),
-                Query::MonthlyActiveGroups => unimplemented!(),
-                Query::CountPerGroup { aggregate } => Expr::AggregatePartitionedFunction {
-                    partition_by: Box::new(col(es.group.as_ref())),
-                    fun: AggregateFunction::Count,
-                    outer_fun: aggregate.clone(),
-                    args: vec![col(event_fields::USER_ID)],
-                    distinct: false,
-                },
-                Query::AggregatePropertyPerGroup {
-                    property,
-                    aggregate_per_group,
-                    aggregate,
-                } => Expr::AggregatePartitionedFunction {
-                    partition_by: Box::new(col(es.group.as_ref())),
-                    fun: aggregate_per_group.clone(),
-                    outer_fun: aggregate.clone(),
-                    args: vec![col(property_db_col_name(
-                        schema.clone(),
-                        event.event.name().as_ref(),
-                        property,
-                    )?
-                        .as_ref())],
-                    distinct: false,
-                },
-                Query::AggregateProperty {
-                    property,
-                    aggregate,
-                } => Expr::AggregateFunction {
-                    fun: aggregate.clone(),
-                    args: vec![col(property_db_col_name(
-                        schema.clone(),
-                        event.event.name().as_ref(),
-                        property,
-                    )?
-                        .as_ref())],
-                    distinct: false,
-                },
-                Query::QueryFormula { .. } => unimplemented!(),
-            };
-
-            match &query.name {
-                None => Ok(Expr::Alias(Box::new(q), format!("agg_{}", id))),
-                Some(name) => Ok(Expr::Alias(Box::new(q), name.clone())),
-            }
-        })
-        .collect::<Result<Vec<Expr>>>()?;
-
-    // todo check for duplicates
-    let all_expr = group_expr.iter().chain(aggr_expr.iter());
-
-    let aggr_schema = DFSchema::new(exprlist_to_fields(all_expr, input.schema())?)?;
-
-    let expr = LogicalPlan::Aggregate {
-        input,
-        group_expr,
-        aggr_expr,
-        schema: Arc::new(aggr_schema),
-    };
-
-    Ok(expr)
-}
-
-/// creates logical plan for event segmentation
-pub fn create_logical_plan(
-    ctx: &Context,
-    input: Arc<LogicalPlan>,
-    es: &EventSegmentation,
-    metadata: Arc<Metadata>,
-    event: &Event,
-) -> Result<LogicalPlan> {
-    let filter = plan_filter(ctx, input, es, metadata.clone(), event)?;
-    let agg = plan_agg(Arc::new(filter), es, metadata.clone(), event)?;
-    Ok(agg)
 }
 
 #[cfg(test)]
