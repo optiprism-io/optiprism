@@ -331,7 +331,7 @@ const onApplyPeriod = (payload: ApplyPayload) => {
     changePeriodCondition && changePeriodCondition({
         idx: props.index,
         idxParent: props.indexParent,
-        value: payload,
+        value: payload
     })
 }
 
