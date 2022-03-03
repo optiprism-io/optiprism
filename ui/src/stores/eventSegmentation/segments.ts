@@ -9,7 +9,6 @@ import {
 import { OperationId, Value } from "@/types";
 import schemaService from "@/api/services/schema.service";
 import { useLexiconStore } from "@/stores/lexicon";
-import { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
 import {
     ChangeFilterPropertyCondition,
     ChangeEventCondition,
@@ -17,6 +16,7 @@ import {
     ChangeFilterOperation,
     FilterValueCondition,
     Ids,
+    PeriodConditionPayload,
 } from '@/components/events/Segments/ConditionTypes'
 
 interface Segment {
@@ -155,18 +155,18 @@ export const useSegmentsStore = defineStore("segments", {
                 }
             }
         },
-        changePeriodCondition(idx: number, idxSegment: number, payload: ApplyPayload): void {
-            const segment = this.segments[idxSegment]
+        changePeriodCondition(payload: PeriodConditionPayload): void {
+            const segment = this.segments[payload.idxParent]
 
             if (segment && segment.conditions) {
-                const condition = segment.conditions[idx]
+                const condition = segment.conditions[payload.idx]
 
                 if (condition && condition.period) {
                     condition.period = {
-                        from: payload.value.from || '',
-                        to: payload.value.to || '',
-                        last: payload.last,
-                        type: payload.type,
+                        from: payload.value.value.from || '',
+                        to: payload.value.value.to || '',
+                        last: payload.value.last,
+                        type: payload.value.type,
                     }
                 }
             }

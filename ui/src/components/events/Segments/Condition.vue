@@ -191,6 +191,7 @@ import {
     ChangeFilterOperation,
     FilterValueCondition,
     Ids,
+    PeriodConditionPayload,
 } from '@/components/events/Segments/ConditionTypes'
 import Select from '@/components/Select/Select.vue'
 import UiButton from '@/components/uikit/UiButton.vue'
@@ -270,10 +271,13 @@ const calendarValueString = computed(() => {
 })
 
 const isSelectedAction = computed(() => Boolean(props.condition.action))
+
 const displayNameAction = computed(() => props.condition?.action?.name || i18n.$t(`events.segments.select_condition`))
 
 const isSelectedProp = computed(() =>  Boolean(props.condition.propRef))
+
 const displayNameProp = computed(() => props.condition.propRef ? lexiconStore.propertyName(props.condition.propRef) : i18n.$t(`events.select_property`))
+
 const isShowSelectProp = computed(() => {
     const id = props.condition?.action?.id
 
@@ -287,9 +291,7 @@ const isShowSelectProp = computed(() => {
 })
 
 const isShowSelectDate = computed(() => {
-    const id = props.condition?.action?.id;
-
-    return id === 'hadPropertyValue' && props.condition.action && props.condition.propRef && props.condition.values && props.condition.values.length
+    return props.condition.action && props.condition.propRef && props.condition.values && props.condition.values.length
 })
 
 const conditionValuesItems = computed(() => {
@@ -309,7 +311,6 @@ const changeOperationCondition = inject<(idx: number, indexParent: number, opId:
 const changeActionCondition = inject<(idx: number, indexParent: number, ref: { id: string, name: string }) => void>('changeActionCondition')
 const addValueCondition = inject<(idx: number, indexParent: number, value: Value) => void>('addValueCondition')
 const removeValueCondition = inject<(idx: number, indexParent: number, value: Value) => void>('removeValueCondition')
-const changePeriodCondition = inject<(idx: number, indexParent: number, payload: ApplyPayload) => void>('changePeriodCondition')
 
 const addFilterCondition = inject<(payload: Ids) => void>('addFilterCondition')
 const removeFilterCondition = inject<(payload: RemoveFilterCondition) => void>('removeFilterCondition')
@@ -318,13 +319,21 @@ const changeEventCondition = inject<(payload: ChangeEventCondition) => void>('ch
 const changeFilterOperation = inject<(payload: ChangeFilterOperation) => void>('changeFilterOperation')
 const addFilterValueCondition = inject<(payload: FilterValueCondition) => void>('addFilterValueCondition')
 const removeFilterValueCondition = inject<(payload: FilterValueCondition) => void>('removeFilterValueCondition')
+const changePeriodCondition = inject<(payload: PeriodConditionPayload) => void>('changePeriodCondition')
 
 const changeConditionAction = (payload: { id: string, name: string }) => changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
 const changeProperty = (propRef: PropertyRef) => changePropertyCondition && changePropertyCondition(props.index, props.indexParent, propRef)
 const changeOperation = (opId: OperationId) => changeOperationCondition && changeOperationCondition(props.index, props.indexParent, opId)
 const addValue = (value: Value) => addValueCondition && addValueCondition(props.index, props.indexParent, value)
 const removeValue = (value: Value) => removeValueCondition && removeValueCondition(props.index, props.indexParent, value)
-const onApplyPeriod = (payload: ApplyPayload) => changePeriodCondition && changePeriodCondition(props.index, props.indexParent, payload)
+
+const onApplyPeriod = (payload: ApplyPayload) => {
+    changePeriodCondition && changePeriodCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+        value: payload,
+    })
+}
 
 const addFilter = () => {
     addFilterCondition && addFilterCondition({

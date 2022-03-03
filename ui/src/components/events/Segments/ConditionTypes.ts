@@ -1,5 +1,6 @@
 import { PropertyRef, EventRef } from '@/types/events'
 import { OperationId, Value } from '@/types'
+import { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
 
 export type Ids = {
     idx: number
@@ -26,4 +27,8 @@ export interface ChangeFilterOperation extends FilterIds {
 
 export interface FilterValueCondition extends FilterIds {
     value: Value
+}
+
+export interface PeriodConditionPayload extends Ids {
+    value: ApplyPayload
 }

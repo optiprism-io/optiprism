@@ -25,7 +25,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, inject, provide } from 'vue'
+import { computed, inject, provide, watch } from 'vue'
 import { OperationId, Value } from '@/types'
 import {
     ChangeEventCondition,
@@ -34,15 +34,17 @@ import {
     ChangeFilterOperation,
     FilterValueCondition,
     Ids,
+    PeriodConditionPayload,
 } from '@/components/events/Segments/ConditionTypes'
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
 import Segment from '@/components/events/Segments/Segment.vue'
 import { conditions } from '@/configs/events/conditions'
 import { PropertyRef } from '@/types/events'
-import { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
+import { useEventsStore } from '@/stores/eventSegmentation/events'
 const i18n = inject<any>('i18n')
 
 const segmentsStore = useSegmentsStore()
+const eventsStore = useEventsStore()
 
 const conditionItems = computed(() => {
     return conditions.map(item => {
@@ -68,7 +70,6 @@ const changePropertyCondition = (idx: number, idxSegment: number, ref: PropertyR
 const changeOperationCondition = (idx: number, idxSegment: number, opId: OperationId) => segmentsStore.changeOperationCondition(idx, idxSegment, opId)
 const addValueCondition = (idx: number, idxSegment: number, value: Value) => segmentsStore.addValueCondition(idx, idxSegment, value)
 const removeValueCondition = (idx: number, idxSegment: number, value: Value) => segmentsStore.removeValueCondition(idx, idxSegment, value)
-const changePeriodCondition = (idx: number, idxSegment: number, payload: ApplyPayload) => segmentsStore.changePeriodCondition(idx, idxSegment, payload)
 
 provide('conditionItems', conditionItems.value)
 provide('changeOperationCondition', changeOperationCondition)
@@ -76,8 +77,8 @@ provide('changePropertyCondition', changePropertyCondition)
 provide('changeActionCondition', changeActionCondition)
 provide('addValueCondition', addValueCondition)
 provide('removeValueCondition', removeValueCondition)
-provide('changePeriodCondition', changePeriodCondition)
 
+provide('changePeriodCondition',  (payload: PeriodConditionPayload) => segmentsStore.changePeriodCondition(payload))
 provide('addFilterCondition', (payload: Ids) => segmentsStore.addFilterCondition(payload))
 provide('removeFilterCondition', (payload: RemoveFilterCondition) => segmentsStore.removeFilterCondition(payload))
 provide('changeFilterPropertyCondition', (payload: ChangeFilterPropertyCondition) => segmentsStore.changeFilterPropertyCondition(payload))
@@ -85,4 +86,11 @@ provide('changeEventCondition', (payload: ChangeEventCondition) => segmentsStore
 provide('changeFilterOperation', (payload: ChangeFilterOperation) => segmentsStore.changeFilterOperation(payload))
 provide('addFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.addFilterValueCondition(payload))
 provide('removeFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.removeFilterValueCondition(payload))
+
+watch(
+    segmentsStore.segments,
+    () => {
+        eventsStore.fetchEventSegmentationResult()
+    }
+)
 </script>
