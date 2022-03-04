@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::metadata::{list, ListResponse};
-use crate::properties::types::{CreateEventPropertyRequest, Property, UpdateEventPropertyRequest};
+use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
 use crate::store::store::{
     make_col_id_seq_key, make_data_value_key, make_id_seq_key, make_index_key, Store,
@@ -83,7 +83,7 @@ impl Provider {
     pub async fn create(
         &self,
         organization_id: u64,
-        req: CreateEventPropertyRequest,
+        req: CreatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
         self._create(organization_id, req).await
@@ -92,7 +92,7 @@ impl Provider {
     pub async fn _create(
         &self,
         organization_id: u64,
-        req: CreateEventPropertyRequest,
+        req: CreatePropertyRequest,
     ) -> Result<Property> {
         let idx_keys = index_keys(
             self.ns.clone(),
@@ -158,7 +158,7 @@ impl Provider {
     pub async fn get_or_create(
         &self,
         organization_id: u64,
-        req: CreateEventPropertyRequest,
+        req: CreatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
         match self
@@ -241,7 +241,7 @@ impl Provider {
     pub async fn update(
         &self,
         organization_id: u64,
-        req: UpdateEventPropertyRequest,
+        req: UpdatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
         let idx_keys = index_keys(

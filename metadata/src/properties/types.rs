@@ -38,7 +38,7 @@ pub struct Property {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct CreateEventPropertyRequest {
+pub struct CreatePropertyRequest {
     pub created_by: u64,
     pub project_id: u64,
     pub tags: Option<Vec<String>>,
@@ -56,7 +56,7 @@ pub struct CreateEventPropertyRequest {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct UpdateEventPropertyRequest {
+pub struct UpdatePropertyRequest {
     pub id: u64,
     pub created_by: u64,
     pub updated_by: Option<u64>,

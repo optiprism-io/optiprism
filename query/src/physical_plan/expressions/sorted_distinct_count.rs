@@ -4,10 +4,10 @@ use arrow::array::{Array, ArrayRef, BooleanArray, Date32Array, Date64Array, Deci
 use arrow::datatypes::{DataType, TimeUnit};
 use datafusion::error::{DataFusionError, Result};
 use datafusion::physical_plan::Accumulator;
-use datafusion::physical_plan::aggregates::{AccumulatorFunctionImplementation, StateTypeFunction};
 use datafusion::physical_plan::functions::{ReturnTypeFunction, Signature, TypeSignature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::scalar::ScalarValue;
+use datafusion_expr::{AccumulatorFunctionImplementation, StateTypeFunction};
 
 #[derive(Debug)]
 pub struct SortedDistinctCount {
@@ -202,7 +202,7 @@ mod tests {
         let mut acc = SortedDistinctCountAccumulator::try_new(&DataType::Int64)?;
         for seq in sequences {
             let array = Int64Array::from(seq.to_owned());
-            let array_ref= Arc::new(array);
+            let array_ref = Arc::new(array);
             acc.update_batch(&[array_ref])?;
         }
         let state = acc.state()?[0].clone();
