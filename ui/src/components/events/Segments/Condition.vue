@@ -216,10 +216,6 @@ interface Props {
 const lexiconStore = useLexiconStore()
 const props = defineProps<Props>()
 
-const emit = defineEmits<{
-    (e: 'on-remove', idx: number): void
-}>()
-
 const conditionItems = inject<[]>('conditionItems')
 
 const updateOpenFilter = ref(false);
@@ -304,8 +300,6 @@ const conditionValuesItems = computed(() => {
     }
 })
 
-const onRemove = () => emit('on-remove', props.index)
-
 const changePropertyCondition = inject<(idx: number, indexParent: number, propRef: PropertyRef) => void>('changePropertyCondition')
 const changeOperationCondition = inject<(idx: number, indexParent: number, opId: OperationId) => void>('changeOperationCondition')
 const changeActionCondition = inject<(idx: number, indexParent: number, ref: { id: string, name: string }) => void>('changeActionCondition')
@@ -320,12 +314,20 @@ const changeFilterOperation = inject<(payload: ChangeFilterOperation) => void>('
 const addFilterValueCondition = inject<(payload: FilterValueCondition) => void>('addFilterValueCondition')
 const removeFilterValueCondition = inject<(payload: FilterValueCondition) => void>('removeFilterValueCondition')
 const changePeriodCondition = inject<(payload: PeriodConditionPayload) => void>('changePeriodCondition')
+const onRemoveCondition = inject<(payload: Ids) => void>('onRemoveCondition')
 
 const changeConditionAction = (payload: { id: string, name: string }) => changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
 const changeProperty = (propRef: PropertyRef) => changePropertyCondition && changePropertyCondition(props.index, props.indexParent, propRef)
 const changeOperation = (opId: OperationId) => changeOperationCondition && changeOperationCondition(props.index, props.indexParent, opId)
 const addValue = (value: Value) => addValueCondition && addValueCondition(props.index, props.indexParent, value)
 const removeValue = (value: Value) => removeValueCondition && removeValueCondition(props.index, props.indexParent, value)
+
+const onRemove = () => {
+    onRemoveCondition && onRemoveCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+    })
+}
 
 const onApplyPeriod = (payload: ApplyPayload) => {
     changePeriodCondition && changePeriodCondition({

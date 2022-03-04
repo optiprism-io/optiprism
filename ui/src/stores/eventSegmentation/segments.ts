@@ -247,11 +247,11 @@ export const useSegmentsStore = defineStore("segments", {
                 }
             }
         },
-        removeCondition(idx: number, idxSegment: number) {
-            const segment = this.segments[idxSegment]
+        removeCondition(payload: Ids) {
+            const segment = this.segments[payload.idxParent]
 
             if (segment && segment.conditions) {
-                segment.conditions.splice(idx, 1);
+                segment.conditions.splice(payload.idx, 1);
 
                 if (!segment.conditions.length) {
                     delete segment.conditions

@@ -46,7 +46,6 @@
                 :condition="condition"
                 :update-open="updateOpenCondition"
                 :index-parent="props.index"
-                @on-remove="onRemoveCondition"
             />
         </div>
     </div>
@@ -71,12 +70,10 @@ const emit = defineEmits<{
     (e: 'on-remove', inx: number): void
     (e: 'on-rename', name: string, idx: number): void
     (e: 'add-condition', idx: number): void
-    (e: 'on-remove-condition', idx: number, idxSegment: number): void
 }>()
 
 const updateOpenCondition = ref(false)
 
-const onRemove = (): void => emit('on-remove', props.index)
 const onRename = (name: string): void => emit('on-rename', name, props.index)
 const addCondition = (): void => {
     updateOpenCondition.value = true
@@ -86,7 +83,7 @@ const addCondition = (): void => {
         updateOpenCondition.value = false
     })
 }
-const onRemoveCondition = (idx: number): void => emit('on-remove-condition', idx, props.index)
+const onRemove = (): void => emit('on-remove', props.index)
 </script>
 
 <style scoped lang="scss">

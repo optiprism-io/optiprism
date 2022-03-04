@@ -9,7 +9,6 @@
             @on-remove="deleteSegment"
             @on-rename="onRenameSegment"
             @add-condition="addCondition"
-            @on-remove-condition="onRemoveCondition"
         />
         <div class="pf-l-flex">
             <UiButton
@@ -64,7 +63,6 @@ const addSegment = () => segmentsStore.addSegment(`${i18n.$t(`events.segments.se
 const deleteSegment = (idx: number) => segmentsStore.deleteSegment(idx)
 const onRenameSegment = (name: string, idx: number) => segmentsStore.renameSegment(name, idx)
 const addCondition = (idx: number) => segmentsStore.addConditionSegment(idx)
-const onRemoveCondition = (idx: number, idxSegment: number) => segmentsStore.removeCondition(idx, idxSegment)
 const changeActionCondition = (idx: number, idxSegment: number, ref: { id: string, name: string }) => segmentsStore.changeActionCondition(idx, idxSegment, ref)
 const changePropertyCondition = (idx: number, idxSegment: number, ref: PropertyRef) => segmentsStore.changePropertyCondition(idx, idxSegment, ref)
 const changeOperationCondition = (idx: number, idxSegment: number, opId: OperationId) => segmentsStore.changeOperationCondition(idx, idxSegment, opId)
@@ -78,6 +76,7 @@ provide('changeActionCondition', changeActionCondition)
 provide('addValueCondition', addValueCondition)
 provide('removeValueCondition', removeValueCondition)
 
+provide('onRemoveCondition', (payload: Ids) => segmentsStore.removeCondition(payload))
 provide('changePeriodCondition',  (payload: PeriodConditionPayload) => segmentsStore.changePeriodCondition(payload))
 provide('addFilterCondition', (payload: Ids) => segmentsStore.addFilterCondition(payload))
 provide('removeFilterCondition', (payload: RemoveFilterCondition) => segmentsStore.removeFilterCondition(payload))
