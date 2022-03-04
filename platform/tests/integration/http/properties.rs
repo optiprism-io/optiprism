@@ -4,7 +4,7 @@ use axum::{AddExtensionLayer, Router, Server};
 use chrono::Utc;
 use metadata::metadata::ListResponse;
 use metadata::properties::Provider;
-use metadata::properties::{CreateEventPropertyRequest, Property, Scope, Status};
+use metadata::properties::{CreatePropertyRequest, Property, Scope, Status};
 use metadata::Store;
 use platform::error::Result;
 use platform::http::properties;
@@ -122,7 +122,7 @@ async fn test_event_properties() -> Result<()> {
 
     // create request should create event prop
     {
-        let req = CreateEventPropertyRequest {
+        let req = CreatePropertyRequest {
             created_by: prop1.created_by.clone(),
             project_id: prop1.project_id.clone(),
             tags: prop1.tags.clone(),

@@ -7,8 +7,9 @@ use datafusion::logical_plan::{
 };
 use datafusion::physical_plan::aggregates;
 use datafusion::physical_plan::aggregates::{
-    return_type, AccumulatorFunctionImplementation, StateTypeFunction,
+    return_type,
 };
+use datafusion_expr::{AccumulatorFunctionImplementation, StateTypeFunction};
 use datafusion::physical_plan::expressions::binary_operator_data_type;
 use datafusion::physical_plan::functions::{ReturnTypeFunction, Signature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
@@ -203,17 +204,17 @@ impl Expr {
                             fun: Arc::new(udf),
                             args,
                         })
-                    },
+                    }
                     _ => Ok(DFExpr::AggregateFunction {
-                           fun: fun.clone().try_into()?,
-                           args: args
-                               .iter()
-                               .map(|e| e.to_df_expr(input_schema))
-                               .collect::<Result<_>>()?,
-                           distinct: *distinct,
-                       })
+                        fun: fun.clone().try_into()?,
+                        args: args
+                            .iter()
+                            .map(|e| e.to_df_expr(input_schema))
+                            .collect::<Result<_>>()?,
+                        distinct: *distinct,
+                    })
                 }
-            },
+            }
             Expr::AggregatePartitionedFunction {
                 partition_by,
                 fun,
@@ -295,7 +296,7 @@ impl Expr {
                 match fun {
                     AggregateFunction::OrderedDistinctCount => {
                         Ok(DataType::UInt64)
-                    },
+                    }
                     _ => {
                         let data_types = args
                             .iter()
@@ -493,7 +494,7 @@ pub fn lit<T: Literal>(n: T) -> Expr {
 }
 
 pub fn lit_timestamp(ts: i64) -> Expr {
-    lit(ScalarValue::TimestampMicrosecond(Some(ts)))
+    lit(ScalarValue::TimestampMicrosecond(Some(ts), None))
 }
 
 pub fn is_null(col: Expr) -> Expr {

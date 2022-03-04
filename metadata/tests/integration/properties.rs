@@ -1,7 +1,7 @@
 use arrow::datatypes::DataType;
 use metadata::error::Result;
 use metadata::properties::{
-    CreateEventPropertyRequest, Provider, Scope, Status, UpdateEventPropertyRequest,
+    CreatePropertyRequest, Provider, Scope, Status, UpdatePropertyRequest,
 };
 use metadata::store::store::Store;
 use std::env::temp_dir;
@@ -15,7 +15,7 @@ async fn test_properties() -> Result<()> {
 
     let store = Arc::new(Store::new(path));
     let event_properties = Provider::new_event(store.clone());
-    let create_prop_req = CreateEventPropertyRequest {
+    let create_prop_req = CreatePropertyRequest {
         created_by: 0,
         project_id: 1,
         scope: Scope::User,
@@ -31,7 +31,7 @@ async fn test_properties() -> Result<()> {
         dictionary_type: None,
     };
 
-    let update_prop_req = UpdateEventPropertyRequest {
+    let update_prop_req = UpdatePropertyRequest {
         id: 1,
         created_by: 0,
         updated_by: None,

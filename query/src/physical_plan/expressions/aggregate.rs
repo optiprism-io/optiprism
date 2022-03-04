@@ -290,14 +290,6 @@ impl Accumulator for PartitionedAggregateAccumulator {
         Ok(())
     }
 
-    /// this function receives states from other accumulators (Vec<ScalarValue>)
-    /// and updates the accumulator.
-    fn merge(&mut self, states: &[ScalarValue]) -> DFResult<()> {
-        self.outer_acc
-            .merge(states)
-            .map_err(Error::into_datafusion_execution_error)
-    }
-
     fn merge_batch(&mut self, states: &[ArrayRef]) -> DFResult<()> {
         self.outer_acc
             .merge_batch(states)
@@ -308,5 +300,9 @@ impl Accumulator for PartitionedAggregateAccumulator {
         self.outer_acc
             .evaluate()
             .map_err(Error::into_datafusion_execution_error)
+    }
+
+    fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
+        todo!()
     }
 }
