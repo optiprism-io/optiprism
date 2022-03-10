@@ -62,6 +62,28 @@
                 </PropertySelect>
             </div>
             <div
+                v-if="allowSelectAggregate"
+                class="pf-c-action-list__item"
+            >
+                <Select
+                    :items="conditionAggregateItems"
+                    :width-auto="true"
+                    :is-open-mount="updateOpen"
+                    :update-open="!isSelectedAggregate ? updateOpen : false"
+                    @select="changeConditionAggregate"
+                >
+                    <UiButton
+                        class="pf-m-main"
+                        :class="{
+                            'pf-m-secondary': isSelectedAggregate,
+                        }"
+                        :before-icon="!isSelectedAggregate ? 'fas fa-plus-circle': ''"
+                    >
+                        {{ displayNameAggregate }}
+                    </UiButton>
+                </Select>
+            </div>
+            <div
                 v-if="props.condition.propRef && props.condition.opId"
                 class="pf-c-action-list__item"
             >
@@ -162,7 +184,10 @@
                 </VTooltip>
             </div>
         </div>
-        <div class="pf-l-flex pf-m-column pf-u-pl-2xl">
+        <div
+            v-if="filters.length"
+            class="pf-l-flex pf-m-column pf-u-pl-2xl"
+        >
             <Filter
                 v-for="(filter, i) in filters"
                 :key="i"
@@ -199,7 +224,7 @@ import PropertySelect from '@/components/events/PropertySelect.vue'
 import OperationSelect from '@/components/events/OperationSelect.vue'
 import ValueSelect from '@/components/events/ValueSelect.vue'
 import Filter from '@/components/events/Filter.vue'
-import { conditions } from '@/configs/events/conditions'
+import { conditions } from '@/configs/events/segmentCondition'
 import { useLexiconStore } from '@/stores/lexicon'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
 import UiDatePicker, { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
@@ -217,7 +242,7 @@ const lexiconStore = useLexiconStore()
 const props = defineProps<Props>()
 
 const conditionItems = inject<[]>('conditionItems')
-
+const conditionAggregateItems = inject<[]>('conditionAggregateItems')
 const updateOpenFilter = ref(false);
 
 const lastCount = computed(() => {
@@ -266,7 +291,25 @@ const calendarValueString = computed(() => {
     }
 })
 
+const conditionConfig = computed(() => {
+    const id = props.condition?.action?.id
+
+    if (id && conditionItems) {
+        const conditionItem = conditions.find(condition => condition.key === id)
+
+        return conditionItem || null
+    } else {
+        return null
+    }
+})
+
 const isSelectedAction = computed(() => Boolean(props.condition.action))
+
+const allowSelectAggregate = computed(() => conditionConfig.value && conditionConfig.value.hasSelectAggregate &&  Boolean(props.condition.event))
+
+const isSelectedAggregate = computed(() => Boolean(props.condition.aggregate))
+
+const displayNameAggregate = computed(() => props.condition?.aggregate?.name || i18n.$t(`common.select_aggregate`))
 
 const displayNameAction = computed(() => props.condition?.action?.name || i18n.$t(`events.segments.select_condition`))
 
@@ -287,7 +330,7 @@ const isShowSelectProp = computed(() => {
 })
 
 const isShowSelectDate = computed(() => {
-    return props.condition.action && props.condition.propRef && props.condition.values && props.condition.values.length
+    return conditionConfig.value && conditionConfig.value.hasSelectPeriod && props.condition.propRef && props.condition.values && props.condition.values.length
 })
 
 const conditionValuesItems = computed(() => {
@@ -317,6 +360,10 @@ const changePeriodCondition = inject<(payload: PeriodConditionPayload) => void>(
 const onRemoveCondition = inject<(payload: Ids) => void>('onRemoveCondition')
 
 const changeConditionAction = (payload: { id: string, name: string }) => changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
+const changeConditionAggregate = (payload: { id: string, name: string }) => {
+    // TODO
+    console.log(payload);
+}
 const changeProperty = (propRef: PropertyRef) => changePropertyCondition && changePropertyCondition(props.index, props.indexParent, propRef)
 const changeOperation = (opId: OperationId) => changeOperationCondition && changeOperationCondition(props.index, props.indexParent, opId)
 const addValue = (value: Value) => addValueCondition && addValueCondition(props.index, props.indexParent, value)

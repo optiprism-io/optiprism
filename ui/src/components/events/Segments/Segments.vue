@@ -37,13 +37,28 @@ import {
 } from '@/components/events/Segments/ConditionTypes'
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
 import Segment from '@/components/events/Segments/Segment.vue'
-import { conditions } from '@/configs/events/conditions'
+import { conditions } from '@/configs/events/segmentCondition'
+import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
 import { PropertyRef } from '@/types/events'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 const i18n = inject<any>('i18n')
 
 const segmentsStore = useSegmentsStore()
 const eventsStore = useEventsStore()
+
+const conditionAggregateItems = computed(() => {
+    return aggregates.map(item => {
+        const name = i18n.$t(`events.aggregates.${item.key}`)
+
+        return {
+            item: {
+                id: item.key,
+                name,
+            },
+            name,
+        }
+    })
+})
 
 const conditionItems = computed(() => {
     return conditions.map(item => {
@@ -70,6 +85,7 @@ const addValueCondition = (idx: number, idxSegment: number, value: Value) => seg
 const removeValueCondition = (idx: number, idxSegment: number, value: Value) => segmentsStore.removeValueCondition(idx, idxSegment, value)
 
 provide('conditionItems', conditionItems.value)
+provide('conditionAggregateItems', conditionAggregateItems.value)
 provide('changeOperationCondition', changeOperationCondition)
 provide('changePropertyCondition', changePropertyCondition)
 provide('changeActionCondition', changeActionCondition)

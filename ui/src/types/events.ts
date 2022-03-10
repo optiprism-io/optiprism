@@ -279,6 +279,10 @@ export interface Condition {
     event?: {
         name: string
         ref: EventRef
-    },
+    }
     filters: ConditionFilter[]
+    aggregate?: {
+        name?: string
+        id: string
+    }
 }

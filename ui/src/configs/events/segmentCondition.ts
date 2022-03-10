@@ -6,15 +6,17 @@ export const conditions = [
     {
         key: 'hadPropertyValue',
         hasProp: true,
+        hasSelectPeriod: true
     },
     {
         key: 'didEvent',
-        hasProp: true,
+        hasSelectAggregate: true
     },
-    {
-        key: 'funnel',
-    },
-    {
-        key: 'retained',
-    }
+    // TODO next
+    // {
+    //     key: 'funnel',
+    // },
+    // {
+    //     key: 'retained',
+    // }
 ]
