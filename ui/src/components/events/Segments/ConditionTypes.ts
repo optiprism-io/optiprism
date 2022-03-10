@@ -32,3 +32,10 @@ export interface FilterValueCondition extends FilterIds {
 export interface PeriodConditionPayload extends Ids {
     value: ApplyPayload
 }
+
+export interface PayloadChangeAgregateCondition extends Ids {
+    value: {
+        id: string
+        name: string
+    }
+}

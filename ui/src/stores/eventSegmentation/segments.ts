@@ -17,6 +17,7 @@ import {
     FilterValueCondition,
     Ids,
     PeriodConditionPayload,
+    PayloadChangeAgregateCondition,
 } from '@/components/events/Segments/ConditionTypes'
 
 interface Segment {
@@ -34,6 +35,20 @@ export const useSegmentsStore = defineStore("segments", {
     }),
     getters: {},
     actions: {
+        changeAgregateCondition(payload: PayloadChangeAgregateCondition) {
+            const segment = this.segments[payload.idxParent]
+
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+                if (condition) {
+                    delete condition.propRef
+                    condition.aggregate = payload.value
+                    condition.period = {}
+                    condition.filters = []
+                    condition.values = []
+                }
+            }
+        },
         removeFilterValueCondition(payload: FilterValueCondition) {
             const segment = this.segments[payload.idxParent]
             if (segment && segment.conditions) {
@@ -87,6 +102,7 @@ export const useSegmentsStore = defineStore("segments", {
                     delete condition.values
                     delete condition.valuesList
                     delete condition.period
+                    delete condition.aggregate
                 }
             }
         },

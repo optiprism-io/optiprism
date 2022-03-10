@@ -217,6 +217,7 @@ import {
     FilterValueCondition,
     Ids,
     PeriodConditionPayload,
+    PayloadChangeAgregateCondition,
 } from '@/components/events/Segments/ConditionTypes'
 import Select from '@/components/Select/Select.vue'
 import UiButton from '@/components/uikit/UiButton.vue'
@@ -343,6 +344,8 @@ const conditionValuesItems = computed(() => {
     }
 })
 
+const allIds = computed(() => ({idx: props.index, idxParent: props.indexParent}))
+
 const changePropertyCondition = inject<(idx: number, indexParent: number, propRef: PropertyRef) => void>('changePropertyCondition')
 const changeOperationCondition = inject<(idx: number, indexParent: number, opId: OperationId) => void>('changeOperationCondition')
 const changeActionCondition = inject<(idx: number, indexParent: number, ref: { id: string, name: string }) => void>('changeActionCondition')
@@ -358,16 +361,20 @@ const addFilterValueCondition = inject<(payload: FilterValueCondition) => void>(
 const removeFilterValueCondition = inject<(payload: FilterValueCondition) => void>('removeFilterValueCondition')
 const changePeriodCondition = inject<(payload: PeriodConditionPayload) => void>('changePeriodCondition')
 const onRemoveCondition = inject<(payload: Ids) => void>('onRemoveCondition')
+const changeAgregateCondition = inject<(payload: PayloadChangeAgregateCondition) => void>('changeAgregateCondition')
 
 const changeConditionAction = (payload: { id: string, name: string }) => changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
-const changeConditionAggregate = (payload: { id: string, name: string }) => {
-    // TODO
-    console.log(payload);
-}
 const changeProperty = (propRef: PropertyRef) => changePropertyCondition && changePropertyCondition(props.index, props.indexParent, propRef)
 const changeOperation = (opId: OperationId) => changeOperationCondition && changeOperationCondition(props.index, props.indexParent, opId)
 const addValue = (value: Value) => addValueCondition && addValueCondition(props.index, props.indexParent, value)
 const removeValue = (value: Value) => removeValueCondition && removeValueCondition(props.index, props.indexParent, value)
+
+const changeConditionAggregate = (payload: { id: string, name: string }) => {
+    changeAgregateCondition && changeAgregateCondition({
+        ...allIds.value,
+        value: payload,
+    })
+}
 
 const onRemove = () => {
     onRemoveCondition && onRemoveCondition({

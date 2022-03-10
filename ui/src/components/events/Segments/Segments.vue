@@ -34,6 +34,7 @@ import {
     FilterValueCondition,
     Ids,
     PeriodConditionPayload,
+    PayloadChangeAgregateCondition,
 } from '@/components/events/Segments/ConditionTypes'
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
 import Segment from '@/components/events/Segments/Segment.vue'
@@ -92,6 +93,7 @@ provide('changeActionCondition', changeActionCondition)
 provide('addValueCondition', addValueCondition)
 provide('removeValueCondition', removeValueCondition)
 
+provide('changeAgregateCondition', (payload: PayloadChangeAgregateCondition) => segmentsStore.changeAgregateCondition(payload))
 provide('onRemoveCondition', (payload: Ids) => segmentsStore.removeCondition(payload))
 provide('changePeriodCondition',  (payload: PeriodConditionPayload) => segmentsStore.changePeriodCondition(payload))
 provide('addFilterCondition', (payload: Ids) => segmentsStore.addFilterCondition(payload))
