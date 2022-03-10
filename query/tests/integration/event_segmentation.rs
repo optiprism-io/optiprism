@@ -35,7 +35,7 @@ mod tests {
     use metadata::properties::CreatePropertyRequest;
     use query::Context;
     use query::event_segmentation::{LogicalPlanBuilder, Analysis, Breakdown, ChartType, Event, event_fields, EventFilter, EventRef, EventSegmentation, NamedQuery, Operation, PropertyRef, Query, QueryTime, TimeUnit};
-    use query::physical_plan::expressions::aggregate::AggregateFunction;
+    use query::physical_plan::expressions::aggregate::PartitionedAggregateFunction;
     use store::dictionary::MockDictionary;
     use store::schema::{event_fields, DBCol, EventPropertyStatus, MockSchema};
     use crate::physical_plan::expressions::aggregate::AggregateFunction;
@@ -73,7 +73,7 @@ mod tests {
                 DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
                 false,
             ),
-            Field::new(event_fields::EVENT_NAME, DFDataType::UInt16, false),
+            Field::new(event_fields::EVENT, DFDataType::UInt16, false),
             Field::new("country", DFDataType::Utf8, true),
             Field::new("device", DFDataType::Utf8, true),
             Field::new("0_float64", DFDataType::Float64, true),
@@ -290,30 +290,30 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::CountPerGroup {
-                            aggregate: AggregateFunction::Avg,
+                            aggregate: PartitionedAggregateFunction::Avg,
                         },
                         Some("count_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: AggregateFunction::Avg,
-                            aggregate: AggregateFunction::Avg,
+                            aggregate_per_group: PartitionedAggregateFunction::Avg,
+                            aggregate: PartitionedAggregateFunction::Avg,
                         },
                         Some("avg_revenue_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: AggregateFunction::Min,
-                            aggregate: AggregateFunction::Avg,
+                            aggregate_per_group: PartitionedAggregateFunction::Min,
+                            aggregate: PartitionedAggregateFunction::Avg,
                         },
                         Some("min_revenue_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregateProperty {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate: AggregateFunction::Sum,
+                            aggregate: PartitionedAggregateFunction::Sum,
                         },
                         Some("sum_revenue".to_string()),
                     ),
@@ -395,22 +395,22 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::CountPerGroup {
-                            aggregate: AggregateFunction::Avg,
+                            aggregate: PartitionedAggregateFunction::Avg,
                         },
                         Some("count_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: AggregateFunction::Sum,
-                            aggregate: AggregateFunction::Avg,
+                            aggregate_per_group: PartitionedAggregateFunction::Sum,
+                            aggregate: PartitionedAggregateFunction::Avg,
                         },
                         Some("avg_revenue_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregateProperty {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate: AggregateFunction::Sum,
+                            aggregate: PartitionedAggregateFunction::Sum,
                         },
                         Some("sum_revenue".to_string()),
                     ),

@@ -1,9 +1,11 @@
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use datafusion::arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
+use metadata::error::Error as MetadataError;
 use std::fmt::{Display, Formatter};
 use std::{fmt, result};
 use store::error::StoreError;
-
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
@@ -12,6 +14,7 @@ pub enum Error {
     DataFusionError(DataFusionError),
     ArrowError(ArrowError),
     StoreError(StoreError),
+    MetadataError(MetadataError),
 }
 
 impl Error {
@@ -46,5 +49,23 @@ impl From<ArrowError> for Error {
 impl From<StoreError> for Error {
     fn from(err: StoreError) -> Self {
         Self::StoreError(err)
+    }
+}
+
+impl From<MetadataError> for Error {
+    fn from(err: MetadataError) -> Self {
+        Self::MetadataError(err)
+    }
+}
+
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
+        match self {
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal server error".to_string(),
+            ),
+        }
+        .into_response()
     }
 }

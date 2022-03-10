@@ -86,8 +86,8 @@ impl Context {
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
-    where
-        B: Send,
+where
+    B: Send,
 {
     type Rejection = Error;
 
@@ -96,7 +96,7 @@ impl<B> FromRequest<B> for Context
     ) -> core::result::Result<Self, Self::Rejection> {
         let mut ctx = Context::default();
         if let Ok(TypedHeader(Authorization(bearer))) =
-        TypedHeader::<Authorization<Bearer>>::from_request(request).await
+            TypedHeader::<Authorization<Bearer>>::from_request(request).await
         {
             if let Some(token) = bearer.token().strip_prefix("Bearer ") {
                 if let Ok(claims) = parse_access_token(token) {

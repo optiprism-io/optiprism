@@ -1,8 +1,6 @@
 use arrow::datatypes::DataType;
 use metadata::error::Result;
-use metadata::properties::{
-    CreatePropertyRequest, Provider, Scope, Status, UpdatePropertyRequest,
-};
+use metadata::properties::{CreatePropertyRequest, Provider, Scope, Status, UpdatePropertyRequest};
 use metadata::store::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;

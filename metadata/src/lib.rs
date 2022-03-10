@@ -7,6 +7,6 @@ pub mod projects;
 pub mod properties;
 pub mod store;
 
-pub use error::{Error, Result};
 pub use crate::metadata::Metadata;
+pub use error::{Error, Result};
 pub use store::store::Store;
