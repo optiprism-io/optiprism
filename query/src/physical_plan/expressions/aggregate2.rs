@@ -20,6 +20,7 @@
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::fmt;
+use std::fmt::Debug;
 
 use crate::error::{Error, Result};
 use crate::physical_plan::expressions::average::AvgAccumulator;
@@ -27,14 +28,17 @@ use crate::physical_plan::expressions::count::CountAccumulator;
 use crate::physical_plan::expressions::sum::SumAccumulator;
 use crate::physical_plan::PartitionedAccumulator;
 
-use arrow::array::ArrayRef;
+use arrow::array::{Array, ArrayRef, DecimalArray, Int8Builder};
 use arrow::datatypes::DataType;
 use datafusion::error::{DataFusionError, Result as DFResult};
 
 use datafusion::physical_plan::aggregates::AggregateFunction as DFAggregateFunction;
 
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
+use datafusion_expr::AggregateFunction;
+use datafusion_expr::ColumnarValue::Scalar;
 
 #[derive(Debug, Clone)]
 pub enum PartitionedAggregateFunction {
@@ -50,48 +54,6 @@ pub enum PartitionedAggregateFunction {
 impl fmt::Display for PartitionedAggregateFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", format!("{:?}", self).to_uppercase())
-    }
-}
-
-impl TryFrom<PartitionedAggregateFunction> for DFAggregateFunction {
-    type Error = Error;
-
-    fn try_from(value: PartitionedAggregateFunction) -> std::result::Result<Self, Self::Error> {
-        <Self as TryFrom<&PartitionedAggregateFunction>>::try_from(&value)
-    }
-}
-
-impl TryFrom<&PartitionedAggregateFunction> for DFAggregateFunction {
-    type Error = Error;
-
-    fn try_from(value: &PartitionedAggregateFunction) -> std::result::Result<Self, Self::Error> {
-        match value {
-            PartitionedAggregateFunction::Count => Ok(DFAggregateFunction::Count),
-            PartitionedAggregateFunction::Sum => Ok(DFAggregateFunction::Sum),
-            PartitionedAggregateFunction::Min => Ok(DFAggregateFunction::Min),
-            PartitionedAggregateFunction::Max => Ok(DFAggregateFunction::Max),
-            PartitionedAggregateFunction::Avg => Ok(DFAggregateFunction::Avg),
-            PartitionedAggregateFunction::ApproxDistinct => Ok(DFAggregateFunction::ApproxDistinct),
-            PartitionedAggregateFunction::OrderedDistinctCount => {
-                let message = "OrderedDistinct as AggregateFunction".to_string();
-                Err(Error::DataFusionError(DataFusionError::NotImplemented(
-                    message,
-                )))
-            }
-        }
-    }
-}
-
-impl From<DFAggregateFunction> for PartitionedAggregateFunction {
-    fn from(af: DFAggregateFunction) -> Self {
-        match af {
-            DFAggregateFunction::Count => PartitionedAggregateFunction::Count,
-            DFAggregateFunction::Sum => PartitionedAggregateFunction::Sum,
-            DFAggregateFunction::Min => PartitionedAggregateFunction::Min,
-            DFAggregateFunction::Max => PartitionedAggregateFunction::Max,
-            DFAggregateFunction::Avg => PartitionedAggregateFunction::Avg,
-            DFAggregateFunction::ApproxDistinct => PartitionedAggregateFunction::ApproxDistinct,
-        }
     }
 }
 
@@ -149,7 +111,7 @@ pub struct PartitionedAggregate {
     partition_type: DataType,
     data_type: DataType,
     agg: PartitionedAggregateFunction,
-    outer_agg: PartitionedAggregateFunction,
+    outer_agg: AggregateFunction,
 }
 
 impl PartitionedAggregate {
@@ -157,7 +119,7 @@ impl PartitionedAggregate {
         partition_type: DataType,
         data_type: DataType,
         agg: PartitionedAggregateFunction,
-        outer_agg: PartitionedAggregateFunction,
+        outer_agg: AggregateFunction,
     ) -> Result<Self> {
         Ok(Self {
             partition_type,
@@ -257,61 +219,15 @@ impl Accumulator for PartitionedAggregateAccumulator {
             .map_err(Error::into_datafusion_execution_error)
     }
 
-    /*/// this function receives one entry per argument of this accumulator.
-        /// DataFusion calls this function on every row, and expects this function to update the accumulator's state.
-        /// TODO: leverage update_batch
-        fn update(&mut self, values: &[ScalarValue]) -> DFResult<()> {
-            if self.first_row {
-                self.last_partition_value = values[0].clone();
-                self.first_row = false
-            }
-
-            match self.last_partition_value.partial_cmp(&values[0]) {
-                None => unreachable!(),
-                Some(ord) => match ord {
-                    Ordering::Less | Ordering::Greater => {
-                        let res = self
-                            .acc
-                            .evaluate()
-                            .map_err(Error::into_datafusion_execution_error)?;
-                        self.outer_acc
-                            .update(&[res])
-                            .map_err(Error::into_datafusion_execution_error)?;
-                        self.acc
-                            .reset()
-                            .map_err(Error::into_datafusion_execution_error)?;
-                        self.last_partition_value = values[0].clone();
-                    }
-
-                    _ => {}
-                },
-            };
-
-            self.acc
-                .update(&values[1..])
-                .map_err(Error::into_datafusion_execution_error)?;
-            Ok(())
-        }
-    */
-    fn merge_batch(&mut self, states: &[ArrayRef]) -> DFResult<()> {
-        self.outer_acc
-            .merge_batch(states)
-            .map_err(Error::into_datafusion_execution_error)
-    }
-
-    fn evaluate(&self) -> DFResult<ScalarValue> {
-        self.outer_acc
-            .evaluate()
-            .map_err(Error::into_datafusion_execution_error)
-    }
-
-    fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
-        // todo сделать переиспользуемый arrow-буффер, чтобы кидать его в acc, а результат acc - в outer_acc
-        /*if self.first_row {
+    /// this function receives one entry per argument of this accumulator.
+    /// DataFusion calls this function on every row, and expects this function to update the accumulator's state.
+    /// TODO: leverage update_batch
+    /*fn update(&mut self, values: &[ScalarValue]) -> DFResult<()> {
+        if self.first_row {
             self.last_partition_value = values[0].clone();
             self.first_row = false
-        }*/
-        /*
+        }
+
         match self.last_partition_value.partial_cmp(&values[0]) {
             None => unreachable!(),
             Some(ord) => match ord {
@@ -335,7 +251,84 @@ impl Accumulator for PartitionedAggregateAccumulator {
 
         self.acc
             .update(&values[1..])
-            .map_err(Error::into_datafusion_execution_error)?;*/
+            .map_err(Error::into_datafusion_execution_error)?;
+        Ok(())
+    }*/
+
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> DFResult<()> {
+        self.outer_acc
+            .merge_batch(states)
+            .map_err(Error::into_datafusion_execution_error)
+    }
+
+    fn evaluate(&self) -> DFResult<ScalarValue> {
+        self.outer_acc
+            .evaluate()
+            .map_err(Error::into_datafusion_execution_error)
+    }
+
+    fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
+        let mut partition_marks: Vec<bool> = Vec::with_capacity(values[0].len());
+        match values[0].data_type() {
+            DataType::Decimal(a, b) => {
+                let keys_arr = values[0].as_any().downcast_ref::<DecimalArray>()?;
+                if self.first_row {
+                    self.last_partition_value = keys_arr[0].clone();
+                    self.first_row = false
+                }
+
+                for (idx, key) in keys_arr.iter().skip(1).enumerate() {
+                    let right = ScalarValue::Decimal128(key, DECIMAL_PRECISION, DECIMAL_SCALE);
+                    match self.last_partition_value.partial_cmp(&right) {
+                        None => unreachable!(),
+                        Some(ord) => match ord {
+                            Ordering::Less | Ordering::Greater => {
+                                keys_arr[idx] = true;
+                            }
+                            Ordering::Equal => {
+                                keys_arr[idx] = false;
+                            }
+                        },
+                    }
+                }
+            }
+            DataType::Utf8 => {}
+            DataType::Boolean => {}
+            DataType::Timestamp(t, tz) => {}
+            _ => unimplemented!(),
+        }
+
+        match values[1].data_type() {}
+        // todo сделать переиспользуемый arrow-буффер, чтобы кидать его в acc, а результат acc - в outer_acc
+        if self.first_row {
+            self.last_partition_value = values[0].clone();
+            self.first_row = false
+        }
+
+        match self.last_partition_value.partial_cmp(&values[0]) {
+            None => unreachable!(),
+            Some(ord) => match ord {
+                Ordering::Less | Ordering::Greater => {
+                    let res = self
+                        .acc
+                        .evaluate()
+                        .map_err(Error::into_datafusion_execution_error)?;
+                    self.outer_acc
+                        .update(&[res])
+                        .map_err(Error::into_datafusion_execution_error)?;
+                    self.acc
+                        .reset()
+                        .map_err(Error::into_datafusion_execution_error)?;
+                    self.last_partition_value = values[0].clone();
+                }
+
+                _ => {}
+            },
+        };
+
+        self.acc
+            .update(&values[1..])
+            .map_err(Error::into_datafusion_execution_error)?;
         Ok(())
     }
 }

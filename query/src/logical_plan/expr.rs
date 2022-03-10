@@ -6,20 +6,18 @@ use datafusion::logical_plan::{
     lit as df_lit, Column, DFField, DFSchema, Expr as DFExpr, Literal, Operator,
 };
 use datafusion::physical_plan::aggregates;
-use datafusion::physical_plan::aggregates::{
-    return_type,
-};
-use datafusion_expr::{AccumulatorFunctionImplementation, StateTypeFunction};
+use datafusion::physical_plan::aggregates::return_type;
 use datafusion::physical_plan::expressions::binary_operator_data_type;
 use datafusion::physical_plan::functions::{ReturnTypeFunction, Signature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
+use datafusion_expr::{AccumulatorFunctionImplementation, AggregateFunction, StateTypeFunction};
 
 use datafusion::scalar::ScalarValue;
 use std::fmt;
 
-use std::sync::Arc;
-use crate::physical_plan::expressions::aggregate::AggregateFunction;
+use crate::physical_plan::expressions::aggregate::PartitionedAggregateFunction;
 use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub enum Expr {
@@ -40,7 +38,7 @@ pub enum Expr {
     /// Represents the call of an aggregate built-in function with arguments.
     AggregateFunction {
         /// Name of the function
-        fun: AggregateFunction,
+        fun: PartitionedAggregateFunction,
         /// List of expressions to feed to the functions as arguments
         args: Vec<Expr>,
         /// Whether this is a DISTINCT aggregation or not
@@ -52,9 +50,9 @@ pub enum Expr {
     AggregatePartitionedFunction {
         partition_by: Box<Expr>,
         /// Name of the aggregate function per a partition
-        fun: AggregateFunction,
+        fun: PartitionedAggregateFunction,
         /// Name of the final (outer) function, the result of function
-        outer_fun: AggregateFunction,
+        outer_fun: PartitionedAggregateFunction,
         /// List of expressions to feed to the functions as arguments
         args: Vec<Expr>,
         /// Whether this is a DISTINCT aggregation or not
@@ -190,31 +188,30 @@ impl Expr {
                 fun,
                 args,
                 distinct,
-            } => {
-                match fun {
-                    AggregateFunction::OrderedDistinctCount => {
-                        let name = "ordered_distinct_count".to_string();
-                        let data_type = args[0].get_type(input_schema)?;
-                        let sorted_distinct = SortedDistinctCount::new(name, data_type);
-                        let udf = sorted_distinct.try_into()?;
-                        let args = args.iter()
-                            .map(|arg| arg.to_df_expr(input_schema))
-                            .collect::<Result<_>>()?;
-                        Ok(DFExpr::AggregateUDF {
-                            fun: Arc::new(udf),
-                            args,
-                        })
-                    }
-                    _ => Ok(DFExpr::AggregateFunction {
-                        fun: fun.clone().try_into()?,
-                        args: args
-                            .iter()
-                            .map(|e| e.to_df_expr(input_schema))
-                            .collect::<Result<_>>()?,
-                        distinct: *distinct,
+            } => match fun {
+                PartitionedAggregateFunction::OrderedDistinctCount => {
+                    let name = "ordered_distinct_count".to_string();
+                    let data_type = args[0].get_type(input_schema)?;
+                    let sorted_distinct = SortedDistinctCount::new(name, data_type);
+                    let udf = sorted_distinct.try_into()?;
+                    let args = args
+                        .iter()
+                        .map(|arg| arg.to_df_expr(input_schema))
+                        .collect::<Result<_>>()?;
+                    Ok(DFExpr::AggregateUDF {
+                        fun: Arc::new(udf),
+                        args,
                     })
                 }
-            }
+                _ => Ok(DFExpr::AggregateFunction {
+                    fun: fun.clone().try_into()?,
+                    args: args
+                        .iter()
+                        .map(|e| e.to_df_expr(input_schema))
+                        .collect::<Result<_>>()?,
+                    distinct: *distinct,
+                }),
+            },
             Expr::AggregatePartitionedFunction {
                 partition_by,
                 fun,
@@ -231,7 +228,8 @@ impl Expr {
                 let rtype = return_type(&outer_fun.try_into()?, &data_types)?;
 
                 // determine state types
-                let state_types: Vec<DataType> = state_types(rtype.clone(), &outer_fun.try_into()?)?;
+                let state_types: Vec<DataType> =
+                    state_types(rtype.clone(), &outer_fun.try_into()?)?;
 
                 // make partitioned aggregate factory
                 let pagg = PartitionedAggregate::try_new(
@@ -292,20 +290,16 @@ impl Expr {
             Expr::Alias(expr, _) => expr.get_type(schema),
             Expr::Column(c) => Ok(schema.field_from_column(c)?.data_type().clone()),
             Expr::Literal(l) => Ok(l.get_datatype()),
-            Expr::AggregateFunction { fun, args, .. } => {
-                match fun {
-                    AggregateFunction::OrderedDistinctCount => {
-                        Ok(DataType::UInt64)
-                    }
-                    _ => {
-                        let data_types = args
-                            .iter()
-                            .map(|e| e.get_type(schema))
-                            .collect::<Result<Vec<_>>>()?;
-                        Ok(aggregates::return_type(&fun.try_into()?, &data_types)?)
-                    }
+            Expr::AggregateFunction { fun, args, .. } => match fun {
+                PartitionedAggregateFunction::OrderedDistinctCount => Ok(DataType::UInt64),
+                _ => {
+                    let data_types = args
+                        .iter()
+                        .map(|e| e.get_type(schema))
+                        .collect::<Result<Vec<_>>>()?;
+                    Ok(aggregates::return_type(&fun.try_into()?, &data_types)?)
                 }
-            }
+            },
             Expr::AggregatePartitionedFunction {
                 outer_fun, args, ..
             } => {
@@ -313,7 +307,10 @@ impl Expr {
                     .iter()
                     .map(|e| e.get_type(schema))
                     .collect::<Result<Vec<_>>>()?;
-                Ok(aggregates::return_type(&outer_fun.try_into()?, &data_types)?)
+                Ok(aggregates::return_type(
+                    &outer_fun.try_into()?,
+                    &data_types,
+                )?)
             }
             Expr::IsNull(_) => Ok(DataType::Boolean),
             Expr::IsNotNull(_) => Ok(DataType::Boolean),

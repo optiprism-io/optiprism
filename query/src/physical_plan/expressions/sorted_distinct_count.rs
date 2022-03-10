@@ -1,13 +1,19 @@
-use std::fmt::Debug;
-use std::sync::Arc;
-use arrow::array::{Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+use arrow::array::{
+    Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Int16Array, Int32Array,
+    Int64Array, Int8Array, StringArray, TimestampSecondArray, UInt16Array, UInt32Array,
+    UInt64Array, UInt8Array,
+};
 use arrow::datatypes::{DataType, TimeUnit};
 use datafusion::error::{DataFusionError, Result};
-use datafusion::physical_plan::Accumulator;
-use datafusion::physical_plan::functions::{ReturnTypeFunction, Signature, TypeSignature, Volatility};
+use datafusion::physical_plan::functions::{
+    ReturnTypeFunction, Signature, TypeSignature, Volatility,
+};
 use datafusion::physical_plan::udaf::AggregateUDF;
+use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
 use datafusion_expr::{AccumulatorFunctionImplementation, StateTypeFunction};
+use std::fmt::Debug;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct SortedDistinctCount {
@@ -16,14 +22,8 @@ pub struct SortedDistinctCount {
 }
 
 impl SortedDistinctCount {
-    pub fn new(
-        name: String,
-        data_type: DataType,
-    ) -> Self {
-        Self {
-            name,
-            data_type,
-        }
+    pub fn new(name: String, data_type: DataType) -> Self {
+        Self { name, data_type }
     }
 }
 
@@ -34,18 +34,14 @@ impl TryFrom<SortedDistinctCount> for AggregateUDF {
         let data_type = sorted_distinct.data_type.clone();
         let data_type_arc = Arc::new(data_type.clone());
         let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(data_type_arc.clone()));
-        let accumulator: AccumulatorFunctionImplementation = Arc::new(
-            move || {
-                let acc = SortedDistinctCountAccumulator::try_new(&data_type)?;
-                Ok(Box::new(acc))
-            });
+        let accumulator: AccumulatorFunctionImplementation = Arc::new(move || {
+            let acc = SortedDistinctCountAccumulator::try_new(&data_type)?;
+            Ok(Box::new(acc))
+        });
         let state_type: StateTypeFunction = Arc::new(|_| Ok(Arc::new(vec![DataType::UInt64])));
         Ok(AggregateUDF::new(
             &sorted_distinct.name,
-            &Signature::new(
-                TypeSignature::Any(1),
-                Volatility::Immutable,
-            ),
+            &Signature::new(TypeSignature::Any(1), Volatility::Immutable),
             &return_type,
             &accumulator,
             &state_type,
@@ -138,14 +134,18 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
         DataType::Int8 => distinct_count_array_limited!(array, Int8Array, state, 256),
         DataType::Date32 => distinct_count_array!(array, Date32Array, state),
         DataType::Date64 => distinct_count_array!(array, Date64Array, state),
-        DataType::Timestamp(TimeUnit::Second, _) => distinct_count_array!(array, TimestampSecondArray, state),
+        DataType::Timestamp(TimeUnit::Second, _) => {
+            distinct_count_array!(array, TimestampSecondArray, state)
+        }
 
         // "the trait `From<i128>` is not implemented for `datafusion::scalar::ScalarValue`"
         // TODO Enable once https://github.com/apache/arrow-datafusion/pull/1394 is released
         // DataType::Decimal(_, _) => distinct_count_array!(array, DecimalArray, state),
-
         other => {
-            let message = format!("Ordered distinct count over array of type \"{:?}\" is not supported", other);
+            let message = format!(
+                "Ordered distinct count over array of type \"{:?}\" is not supported",
+                other
+            );
             Err(DataFusionError::NotImplemented(message))
         }
     }
@@ -156,28 +156,31 @@ impl Accumulator for SortedDistinctCountAccumulator {
         Ok(vec![ScalarValue::UInt64(Some(self.count))])
     }
 
-    fn update(&mut self, values: &[ScalarValue]) -> Result<()> {
-        let value = &values[0];
-        if !self.current.eq(value) {
-            self.current = value.clone();
-            self.count += 1;
-        }
-        Ok(())
-    }
+    // fn update(&mut self, values: &[ScalarValue]) -> Result<()> {
+    //     let value = &values[0];
+    //     if !self.current.eq(value) {
+    //         self.current = value.clone();
+    //         self.count += 1;
+    //     }
+    //     Ok(())
+    // }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
         distinct_count(&values[0], self)
     }
 
-    fn merge(&mut self, states: &[ScalarValue]) -> Result<()> {
-        for state in states {
-            if let ScalarValue::UInt64(Some(distinct)) = state {
-                self.count += *distinct;
+    /*    fn merge(&mut self, states: &[ScalarValue]) -> Result<()> {
+            for state in states {
+                if let ScalarValue::UInt64(Some(distinct)) = state {
+                    self.count += *distinct;
+                }
             }
+            Ok(())
         }
-        Ok(())
+    */
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
+        todo!()
     }
-
     fn evaluate(&self) -> Result<ScalarValue> {
         Ok(ScalarValue::UInt64(Some(self.count)))
     }
@@ -185,8 +188,8 @@ impl Accumulator for SortedDistinctCountAccumulator {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
     use super::*;
+    use std::collections::HashSet;
 
     fn check_update(sequence: &[i64], expected: usize) -> datafusion::error::Result<()> {
         let mut acc = SortedDistinctCountAccumulator::try_new(&DataType::Int64)?;
@@ -225,17 +228,27 @@ mod tests {
 
     #[test]
     fn test_batch_ordered_disjoint() {
-        check_batch(&[
-            vec![1, 1, 1, 2, 2, 3, 3, 3],
-            vec![4, 4, 5, 5, 5, 6, 6, 6],
-            vec![7, 7, 7, 8, 8, 9, 9, 9]], 9).unwrap();
+        check_batch(
+            &[
+                vec![1, 1, 1, 2, 2, 3, 3, 3],
+                vec![4, 4, 5, 5, 5, 6, 6, 6],
+                vec![7, 7, 7, 8, 8, 9, 9, 9],
+            ],
+            9,
+        )
+        .unwrap();
     }
 
     #[test]
     fn test_batch_ordered_overlapped() {
-        check_batch(&[
-            vec![1, 1, 2, 2, 3, 3, 4, 4, 4], // value 4 overlaps with next batch
-            vec![4, 4, 4, 5, 5, 5, 6, 7, 7], // value 7 overlaps with next batch
-            vec![7, 7, 7, 8, 8, 8, 9, 9, 9]], 9).unwrap();
+        check_batch(
+            &[
+                vec![1, 1, 2, 2, 3, 3, 4, 4, 4], // value 4 overlaps with next batch
+                vec![4, 4, 4, 5, 5, 5, 6, 7, 7], // value 7 overlaps with next batch
+                vec![7, 7, 7, 8, 8, 8, 9, 9, 9],
+            ],
+            9,
+        )
+        .unwrap();
     }
 }
