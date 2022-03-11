@@ -37,15 +37,17 @@ import {
     PayloadChangeAgregateCondition,
 } from '@/components/events/Segments/ConditionTypes'
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
+import { useEventsStore } from '@/stores/eventSegmentation/events'
+import { useLexiconStore } from '@/stores/lexicon'
 import Segment from '@/components/events/Segments/Segment.vue'
 import { conditions } from '@/configs/events/segmentCondition'
 import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
 import { PropertyRef } from '@/types/events'
-import { useEventsStore } from '@/stores/eventSegmentation/events'
 const i18n = inject<any>('i18n')
 
 const segmentsStore = useSegmentsStore()
 const eventsStore = useEventsStore()
+const lexiconStore = useLexiconStore()
 
 const conditionAggregateItems = computed(() => {
     return aggregates.map(item => {
@@ -57,6 +59,7 @@ const conditionAggregateItems = computed(() => {
                 name,
             },
             name,
+            items: item.hasProperty ? lexiconStore.eventsQueryAggregates : null
         }
     })
 })

@@ -7,8 +7,9 @@ export const aggregates = [
     },
     {
         key: 'aggregateProperty',
+        hasProperty: true,
     },
-    {
-        key: 'historicalCount',
-    }
+    // {
+    //     key: 'historicalCount',
+    // }
 ]

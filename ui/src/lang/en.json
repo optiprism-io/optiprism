@@ -39,6 +39,18 @@
       "relativeCount": "Relative count",
       "aggregateProperty": "Aggregate property",
       "historicalCount": "Historical count"
+    },
+    "aggregateProperty": {
+      "sum": "Sum of property",
+      "avg": "Average of property",
+      "median": "Median of property",
+      "min": "Minimum of property",
+      "max": "Maximum of property",
+      "distinctCount": "Distinct count of property",
+      "25thPercentile": "25th Percentile of property",
+      "75thPercentile": "75th Percentile of property",
+      "90thPercentile": "90th Percentile of property",
+      "99thPercentile": "99th Percentile of property"
     }
   }
 }

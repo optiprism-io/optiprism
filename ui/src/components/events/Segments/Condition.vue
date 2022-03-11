@@ -43,25 +43,6 @@
                 </Select>
             </div>
             <div
-                v-if="isShowSelectProp"
-                class="pf-c-action-list__item"
-            >
-                <PropertySelect
-                    @select="changeProperty"
-                >
-                    <UiButton
-                        class="pf-m-main"
-                        :class="{
-                            'pf-m-secondary': isSelectedProp,
-                        }"
-                        type="button"
-                        :before-icon="!isSelectedProp ? 'fas fa-plus-circle' : ''"
-                    >
-                        {{ displayNameProp }}
-                    </UiButton>
-                </PropertySelect>
-            </div>
-            <div
                 v-if="allowSelectAggregate"
                 class="pf-c-action-list__item"
             >
@@ -82,6 +63,25 @@
                         {{ displayNameAggregate }}
                     </UiButton>
                 </Select>
+            </div>
+            <div
+                v-if="isShowSelectProp"
+                class="pf-c-action-list__item"
+            >
+                <PropertySelect
+                    @select="changeProperty"
+                >
+                    <UiButton
+                        class="pf-m-main"
+                        :class="{
+                            'pf-m-secondary': isSelectedProp,
+                        }"
+                        type="button"
+                        :before-icon="!isSelectedProp ? 'fas fa-plus-circle' : ''"
+                    >
+                        {{ displayNameProp }}
+                    </UiButton>
+                </PropertySelect>
             </div>
             <div
                 v-if="props.condition.propRef && props.condition.opId"
@@ -226,6 +226,7 @@ import OperationSelect from '@/components/events/OperationSelect.vue'
 import ValueSelect from '@/components/events/ValueSelect.vue'
 import Filter from '@/components/events/Filter.vue'
 import { conditions } from '@/configs/events/segmentCondition'
+import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
 import { useLexiconStore } from '@/stores/lexicon'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
 import UiDatePicker, { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
@@ -310,7 +311,23 @@ const allowSelectAggregate = computed(() => conditionConfig.value && conditionCo
 
 const isSelectedAggregate = computed(() => Boolean(props.condition.aggregate))
 
-const displayNameAggregate = computed(() => props.condition?.aggregate?.name || i18n.$t(`common.select_aggregate`))
+const displayNameAggregate = computed(() => {
+    if (props.condition?.aggregate?.name) {
+        return props.condition?.aggregate?.typeAggregate ? i18n.$t(`events.aggregateProperty.${props.condition.aggregate.typeAggregate}`) : props.condition?.aggregate?.name
+    } else {
+        return i18n.$t(`common.select_aggregate`)
+    }
+})
+
+const didEventAggregateSelectedConfig = computed(() => {
+    if (props.condition.aggregate) {
+        const aggregate = aggregates.find(item => item.key === props.condition.aggregate?.id)
+
+        return aggregate || null
+    } else {
+        return null
+    }
+})
 
 const displayNameAction = computed(() => props.condition?.action?.name || i18n.$t(`events.segments.select_condition`))
 
@@ -324,7 +341,15 @@ const isShowSelectProp = computed(() => {
     if (id && conditionItems) {
         const conditionItem = conditions.find(condition => condition.key === id)
 
-        return conditionItem?.hasProp ? (isShowSelectEvent.value ? props.condition.event : true) : false
+        if (conditionItem?.hasProp) {
+            if (conditionItem.hasSelectAggregate) {
+                return props.condition.aggregate && didEventAggregateSelectedConfig.value && didEventAggregateSelectedConfig.value.hasProperty
+            } else {
+                return isShowSelectEvent.value ? props.condition.event : true
+            }
+        } else {
+            return false
+        }
     } else {
         return false
     }

@@ -10,7 +10,9 @@ export const conditions = [
     },
     {
         key: 'didEvent',
-        hasSelectAggregate: true
+        hasProp: true,
+        hasSelectAggregate: true,
+        hasSelectPeriod: true
     },
     // TODO next
     // {

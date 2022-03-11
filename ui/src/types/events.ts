@@ -283,6 +283,7 @@ export interface Condition {
     filters: ConditionFilter[]
     aggregate?: {
         name?: string
-        id: string
+        id: string,
+        typeAggregate?: string
     }
 }
