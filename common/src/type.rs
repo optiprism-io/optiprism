@@ -24,6 +24,7 @@ impl DataType {
     }
 }
 
+#[derive(Clone)]
 pub enum ScalarValue {
     Number(Option<Decimal>),
     String(Option<String>),
@@ -31,6 +32,23 @@ pub enum ScalarValue {
     Timestamp(Option<i64>),
 }
 
+impl Into<DFScalarValue> for ScalarValue {
+    fn into(self) -> DFScalarValue {
+        match self {
+            ScalarValue::Number(v) => match v {
+                None => DFScalarValue::Decimal128(None, 0, 0),
+                Some(v) => DFScalarValue::Decimal128(
+                    Some(v.mantissa()),
+                    DECIMAL_PRECISION,
+                    v.scale() as usize,
+                ),
+            },
+            ScalarValue::String(v) => DFScalarValue::Utf8(v),
+            ScalarValue::Boolean(v) => DFScalarValue::Boolean(v),
+            ScalarValue::Timestamp(v) => DFScalarValue::TimestampSecond(v, None),
+        }
+    }
+}
 impl ScalarValue {
     pub fn to_df(self) -> DFScalarValue {
         match self {

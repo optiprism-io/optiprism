@@ -14,37 +14,6 @@ use datafusion::error::Result as DFResult;
 use datafusion::physical_plan::{expressions, Accumulator};
 use datafusion::scalar::ScalarValue;
 
-// enum storage for accumulator for static dispatching
-#[derive(Debug, Clone)]
-pub enum AccumulatorEnum {
-    Sum(sum::SumAccumulator),
-}
-
-impl Accumulator for AccumulatorEnum {
-    fn state(&self) -> DFResult<Vec<ScalarValue>> {
-        match self {
-            AccumulatorEnum::Sum(acc) => acc.state(),
-        }
-    }
-
-    fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
-        match self {
-            AccumulatorEnum::Sum(acc) => acc.update_batch(values),
-        }
-    }
-    fn merge_batch(&mut self, states: &[ArrayRef]) -> DFResult<()> {
-        match self {
-            AccumulatorEnum::Sum(acc) => acc.merge_batch(states),
-        }
-    }
-
-    fn evaluate(&self) -> DFResult<ScalarValue> {
-        match self {
-            AccumulatorEnum::Sum(acc) => acc.evaluate(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 enum Value {
     Int64(i64),
@@ -106,18 +75,18 @@ impl From<&Value> for f64 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SumAccumulator {
     sum: Value,
     result_buffer: Vec<Value>,
-    acc: AccumulatorEnum,
+    acc: Box<dyn Accumulator>,
 }
 
 const CAP: usize = 1000;
 
 impl SumAccumulator {
     /// new sum accumulator
-    pub fn try_new(data_type: &DataType, acc: AccumulatorEnum) -> Result<Self> {
+    pub fn try_new(data_type: &DataType, acc: Box<dyn Accumulator>) -> Result<Self> {
         let value = match data_type {
             DataType::Int64 => Value::Int64(0),
             _ => unimplemented!(),
@@ -225,7 +194,7 @@ impl SumAccumulator {
 #[cfg(test)]
 mod tests {
     use crate::error::Result;
-    use crate::tt::partitioned_sum::{AccumulatorEnum, SumAccumulator};
+    use crate::tt::partitioned_sum::{SumAccumulator};
     use crate::tt::sum::SumAccumulator as SumAcc;
     use arrow::array::{ArrayRef, Int8Array};
     use arrow::datatypes::DataType;
@@ -234,7 +203,7 @@ mod tests {
 
     #[test]
     fn test() -> Result<()> {
-        let mut sum_acc = AccumulatorEnum::Sum(SumAcc::try_new(&DataType::Int64)?);
+        let mut sum_acc = Box::new(SumAcc::try_new(&DataType::Int64)?);
         let mut acc = SumAccumulator::try_new(&DataType::Int64, sum_acc)?;
         //                                        3                   12                         30
         let spans = vec![

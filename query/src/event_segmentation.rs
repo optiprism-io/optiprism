@@ -8,13 +8,14 @@ use datafusion::logical_plan::{Column, DFField, DFSchema, Operator};
 use datafusion::physical_plan::aggregates::AggregateFunction as DFAggregateFunction;
 use datafusion::scalar::ScalarValue as DFScalarValue;
 
-use crate::physical_plan::expressions::aggregate::PartitionedAggregateFunction;
+use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 use crate::Context;
 use common::ScalarValue;
 use futures::executor;
 use metadata::Metadata;
 use std::ops::Sub;
 use std::sync::Arc;
+use crate::physical_plan::expressions::aggregate::AggregateFunction;
 
 pub mod event_fields {
     pub const EVENT: &str = "event";
@@ -173,16 +174,16 @@ pub enum Query {
     WeeklyActiveGroups,
     MonthlyActiveGroups,
     CountPerGroup {
-        aggregate: PartitionedAggregateFunction,
+        aggregate: AggregateFunction,
     },
     AggregatePropertyPerGroup {
         property: PropertyRef,
         aggregate_per_group: PartitionedAggregateFunction,
-        aggregate: PartitionedAggregateFunction,
+        aggregate: AggregateFunction,
     },
     AggregateProperty {
         property: PropertyRef,
-        aggregate: PartitionedAggregateFunction,
+        aggregate: AggregateFunction,
     },
     QueryFormula {
         formula: String,
@@ -383,13 +384,13 @@ impl LogicalPlanBuilder {
             .map(|(id, query)| {
                 let q = match &query.agg {
                     Query::CountEvents => Expr::AggregateFunction {
-                        fun: PartitionedAggregateFunction::Count,
+                        fun: AggregateFunction::Count,
                         args: vec![col(event_fields::EVENT)],
                         distinct: false,
                     },
                     Query::CountUniqueGroups | Query::DailyActiveGroups => {
                         Expr::AggregateFunction {
-                            fun: PartitionedAggregateFunction::OrderedDistinctCount,
+                            fun: AggregateFunction::SortedDistinctCount,
                             args: vec![col(self.es.group.as_ref())],
                             distinct: true,
                         }
@@ -596,18 +597,18 @@ fn named_property_expression(
             // expressions for OR
             let mut exprs: Vec<Expr> = vec![];
 
-            let values_vac = values.as_ref().unwrap();
+            let values_vec = values.as_ref().unwrap();
             // iterate over all possible values
-            for value in values_vac.iter() {
+            for value in values_vec.into_iter() {
                 exprs.push(binary_expr(
                     prop_col.clone(),
                     operation.clone().into(),
-                    lit(value.to_df()),
+                    lit(value.clone().to_df()),
                 ));
             }
 
             // for only one value we just return first expression
-            if values_vac.len() == 1 {
+            if values_vec.len() == 1 {
                 return Ok(exprs[0].clone());
             }
 
@@ -652,7 +653,7 @@ fn time_expression(time: &QueryTime) -> Expr {
 
 /// Create field meta-data from an expression, to use in a result set schema
 pub fn exprlist_to_fields<'a>(
-    expr: impl IntoIterator<Item = &'a Expr>,
+    expr: impl IntoIterator<Item=&'a Expr>,
     input_schema: &DFSchema,
 ) -> Result<Vec<DFField>> {
     expr.into_iter().map(|e| e.to_field(input_schema)).collect()

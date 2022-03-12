@@ -1,7 +1,6 @@
 pub mod auth;
 pub mod error;
 pub mod rbac;
-mod tt;
 pub mod r#type;
 
 pub use error::{Error, Result};
