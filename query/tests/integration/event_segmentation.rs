@@ -1,4 +1,4 @@
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use std::env::temp_dir;
     use query::error::Result;
@@ -24,14 +24,17 @@ mod tests {
 
     use std::ops::Sub;
     use std::sync::Arc;
+    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::logical_plan::TableScan;
     use rust_decimal::Decimal;
+    use uuid::Uuid;
     use common::{DataType, ScalarValue};
     use metadata::{events, Metadata, properties, Store};
     use metadata::properties::CreatePropertyRequest;
     use query::Context;
     use query::event_segmentation::{LogicalPlanBuilder, Analysis, Breakdown, ChartType, Event, event_fields, EventFilter, EventRef, EventSegmentation, NamedQuery, Operation, PropertyRef, Query, QueryTime, TimeUnit};
-    use query::physical_plan::expressions::partitioned_aggregate::AggregateFunction;
+    use query::physical_plan::expressions::aggregate::AggregateFunction;
+    use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 
     fn users_provider() -> Result<MemTable> {
         let schema = Arc::new(Schema::new(vec![
@@ -97,7 +100,7 @@ mod tests {
         let schema = events_schema();
         let options = CsvReadOptions::new().schema(&schema);
         let df_input =
-            LogicalPlanBuilder::scan_csv(Arc::new(LocalFileSystem {}), path, options, None, 1)
+            datafusion::logical_plan::LogicalPlanBuilder::scan_csv(Arc::new(LocalFileSystem {}), path, options, None, 1)
                 .await?;
 
         Ok(match df_input.build()? {
@@ -106,8 +109,8 @@ mod tests {
                 source: t.source,
                 projection: t.projection,
                 projected_schema: t.projected_schema,
-                filters: t.filters.iter().map(Expr::from_df_expr).collect(),
-                limit,
+                filters: t.filters.iter().map(Expr::from_df_expr).collect::<Result<_>>()?,
+                limit: t.limit,
             },
             _ => unreachable!(),
         })
@@ -290,7 +293,7 @@ mod tests {
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: AggregateFunction::Avg,
+                            aggregate_per_group: PartitionedAggregateFunction::Avg,
                             aggregate: AggregateFunction::Avg,
                         },
                         Some("avg_revenue_per_user".to_string()),
@@ -298,7 +301,7 @@ mod tests {
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: AggregateFunction::Min,
+                            aggregate_per_group: PartitionedAggregateFunction::Min,
                             aggregate: AggregateFunction::Avg,
                         },
                         Some("min_revenue_per_user".to_string()),
@@ -355,7 +358,7 @@ mod tests {
         let planner = DefaultPhysicalPlanner::default();
         let physical_plan = planner.create_physical_plan(&df_plan, &ctx_state).await?;
 
-        let result = collect(physical_plan).await?;
+        let result = collect(physical_plan, Arc::new(RuntimeEnv::new(RuntimeConfig::new()).unwrap())).await?;
 
         print_batches(&result)?;
         Ok(())
@@ -395,7 +398,7 @@ mod tests {
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("revenue".to_string()),
-                            aggregate_per_group: AggregateFunction::Sum,
+                            aggregate_per_group: PartitionedAggregateFunction::Sum,
                             aggregate: AggregateFunction::Avg,
                         },
                         Some("avg_revenue_per_user".to_string()),
@@ -441,10 +444,9 @@ mod tests {
         let planner = DefaultPhysicalPlanner::default();
         let physical_plan = planner.create_physical_plan(&df_plan, &ctx_state).await?;
 
-        let result = collect(physical_plan).await?;
+        let result = collect(physical_plan, Arc::new(RuntimeEnv::new(RuntimeConfig::new())?)).await?;
 
         print_batches(&result)?;
         Ok(())
     }
 }
-*/

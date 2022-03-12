@@ -1886,6 +1886,7 @@ dependencies = [
  "serde_json",
  "store",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
