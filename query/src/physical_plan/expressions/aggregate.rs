@@ -1,341 +1,199 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
-//! Defines physical expressions that can evaluated at runtime during query execution
-
-use std::cmp::Ordering;
-use std::convert::TryFrom;
 use std::fmt;
-
-use crate::error::{Error, Result};
-use crate::physical_plan::expressions::average::AvgAccumulator;
-use crate::physical_plan::expressions::count::CountAccumulator;
-use crate::physical_plan::expressions::sum::SumAccumulator;
-use crate::physical_plan::PartitionedAccumulator;
-
 use arrow::array::ArrayRef;
 use arrow::datatypes::DataType;
-use datafusion::error::{DataFusionError, Result as DFResult};
+use datafusion_expr::Accumulator;
+use crate::error::{Error, Result};
+use crate::physical_plan::expressions::sum::SumAccumulator;
+use datafusion_expr::AggregateFunction as DFAggregateFunction;
+use datafusion::scalar::ScalarValue as DFScalarValue;
+use datafusion::error::Result as DFResult;
 
-use datafusion::physical_plan::aggregates::AggregateFunction as DFAggregateFunction;
-
-use datafusion::physical_plan::Accumulator;
-use datafusion::scalar::ScalarValue;
-
-#[derive(Debug, Clone)]
-pub enum PartitionedAggregateFunction {
+/// Enum of all built-in aggregate functions
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
+pub enum AggregateFunction {
+    /// count
     Count,
+    /// sum
     Sum,
+    /// min
     Min,
+    /// max
     Max,
+    /// avg
     Avg,
+    /// Approximate aggregate function
     ApproxDistinct,
-    OrderedDistinctCount,
+    /// array_agg
+    ArrayAgg,
+    /// Variance (Sample)
+    Variance,
+    /// Variance (Population)
+    VariancePop,
+    /// Standard Deviation (Sample)
+    Stddev,
+    /// Standard Deviation (Population)
+    StddevPop,
+    /// Covariance (Sample)
+    Covariance,
+    /// Covariance (Population)
+    CovariancePop,
+    /// Correlation
+    Correlation,
+    /// Approximate continuous percentile function
+    ApproxPercentileCont,
+    /// ApproxMedian
+    ApproxMedian,
+    // SortedDistinctCount
+    SortedDistinctCount,
 }
 
-impl fmt::Display for PartitionedAggregateFunction {
+// enum storage for accumulator for fast static dispatching and easy translating between threads
+#[derive(Debug, Clone)]
+pub enum AccumulatorEnum {
+    Sum(SumAccumulator),
+}
+
+impl Accumulator for AccumulatorEnum {
+    fn state(&self) -> DFResult<Vec<DFScalarValue>> {
+        match self {
+            AccumulatorEnum::Sum(acc) => acc.state(),
+        }
+    }
+
+    fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
+        match self {
+            AccumulatorEnum::Sum(acc) => acc.update_batch(values),
+        }
+    }
+
+    fn merge_batch(&mut self, states: &[ArrayRef]) -> DFResult<()> {
+        match self {
+            AccumulatorEnum::Sum(acc) => acc.merge_batch(states),
+        }
+    }
+
+    fn evaluate(&self) -> DFResult<DFScalarValue> {
+        match self {
+            AccumulatorEnum::Sum(acc) => acc.evaluate(),
+        }
+    }
+}
+
+impl fmt::Display for AggregateFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", format!("{:?}", self).to_uppercase())
     }
 }
 
-impl TryFrom<PartitionedAggregateFunction> for DFAggregateFunction {
-    type Error = Error;
 
-    fn try_from(value: PartitionedAggregateFunction) -> std::result::Result<Self, Self::Error> {
-        <Self as TryFrom<&PartitionedAggregateFunction>>::try_from(&value)
+impl TryInto<DFAggregateFunction> for AggregateFunction {
+    type Error = crate::Error;
+
+    fn try_into(self) -> std::result::Result<DFAggregateFunction, Self::Error> {
+        Ok(match self {
+            AggregateFunction::Count => DFAggregateFunction::Count,
+            AggregateFunction::Sum => DFAggregateFunction::Sum,
+            AggregateFunction::Min => DFAggregateFunction::Min,
+            AggregateFunction::Max => DFAggregateFunction::Max,
+            AggregateFunction::Avg => DFAggregateFunction::Avg,
+            AggregateFunction::ApproxDistinct => DFAggregateFunction::ApproxDistinct,
+            AggregateFunction::ArrayAgg => DFAggregateFunction::ArrayAgg,
+            AggregateFunction::Variance => DFAggregateFunction::Variance,
+            AggregateFunction::VariancePop => DFAggregateFunction::VariancePop,
+            AggregateFunction::Stddev => DFAggregateFunction::Stddev,
+            AggregateFunction::StddevPop => DFAggregateFunction::StddevPop,
+            AggregateFunction::Covariance => DFAggregateFunction::Covariance,
+            AggregateFunction::CovariancePop => DFAggregateFunction::CovariancePop,
+            AggregateFunction::Correlation => DFAggregateFunction::Correlation,
+            AggregateFunction::ApproxPercentileCont => DFAggregateFunction::ApproxPercentileCont,
+            AggregateFunction::ApproxMedian => DFAggregateFunction::ApproxMedian,
+            AggregateFunction::SortedDistinctCount => unreachable!()
+        })
     }
 }
 
-impl TryFrom<&PartitionedAggregateFunction> for DFAggregateFunction {
-    type Error = Error;
+impl TryInto<DFAggregateFunction> for &AggregateFunction {
+    type Error = crate::Error;
 
-    fn try_from(value: &PartitionedAggregateFunction) -> std::result::Result<Self, Self::Error> {
+    fn try_into(self) -> std::result::Result<DFAggregateFunction, Self::Error> {
+        Ok(match self {
+            AggregateFunction::Count => DFAggregateFunction::Count,
+            AggregateFunction::Sum => DFAggregateFunction::Sum,
+            AggregateFunction::Min => DFAggregateFunction::Min,
+            AggregateFunction::Max => DFAggregateFunction::Max,
+            AggregateFunction::Avg => DFAggregateFunction::Avg,
+            AggregateFunction::ApproxDistinct => DFAggregateFunction::ApproxDistinct,
+            AggregateFunction::ArrayAgg => DFAggregateFunction::ArrayAgg,
+            AggregateFunction::Variance => DFAggregateFunction::Variance,
+            AggregateFunction::VariancePop => DFAggregateFunction::VariancePop,
+            AggregateFunction::Stddev => DFAggregateFunction::Stddev,
+            AggregateFunction::StddevPop => DFAggregateFunction::StddevPop,
+            AggregateFunction::Covariance => DFAggregateFunction::Covariance,
+            AggregateFunction::CovariancePop => DFAggregateFunction::CovariancePop,
+            AggregateFunction::Correlation => DFAggregateFunction::Correlation,
+            AggregateFunction::ApproxPercentileCont => DFAggregateFunction::ApproxPercentileCont,
+            AggregateFunction::ApproxMedian => DFAggregateFunction::ApproxMedian,
+            AggregateFunction::SortedDistinctCount => unreachable!()
+        })
+    }
+}
+
+impl From<DFAggregateFunction> for AggregateFunction {
+    fn from(value: DFAggregateFunction) -> Self {
         match value {
-            PartitionedAggregateFunction::Count => Ok(DFAggregateFunction::Count),
-            PartitionedAggregateFunction::Sum => Ok(DFAggregateFunction::Sum),
-            PartitionedAggregateFunction::Min => Ok(DFAggregateFunction::Min),
-            PartitionedAggregateFunction::Max => Ok(DFAggregateFunction::Max),
-            PartitionedAggregateFunction::Avg => Ok(DFAggregateFunction::Avg),
-            PartitionedAggregateFunction::ApproxDistinct => Ok(DFAggregateFunction::ApproxDistinct),
-            PartitionedAggregateFunction::OrderedDistinctCount => {
-                let message = "OrderedDistinct as AggregateFunction".to_string();
-                Err(Error::DataFusionError(DataFusionError::NotImplemented(
-                    message,
-                )))
-            }
+            DFAggregateFunction::Count => AggregateFunction::Count,
+            DFAggregateFunction::Sum => AggregateFunction::Sum,
+            DFAggregateFunction::Min => AggregateFunction::Min,
+            DFAggregateFunction::Max => AggregateFunction::Max,
+            DFAggregateFunction::Avg => AggregateFunction::Avg,
+            DFAggregateFunction::ApproxDistinct => AggregateFunction::ApproxDistinct,
+            DFAggregateFunction::ArrayAgg => AggregateFunction::ArrayAgg,
+            DFAggregateFunction::Variance => AggregateFunction::Variance,
+            DFAggregateFunction::VariancePop => AggregateFunction::VariancePop,
+            DFAggregateFunction::Stddev => AggregateFunction::Stddev,
+            DFAggregateFunction::StddevPop => AggregateFunction::StddevPop,
+            DFAggregateFunction::Covariance => AggregateFunction::Covariance,
+            DFAggregateFunction::CovariancePop => AggregateFunction::CovariancePop,
+            DFAggregateFunction::Correlation => AggregateFunction::Correlation,
+            DFAggregateFunction::ApproxPercentileCont => AggregateFunction::ApproxPercentileCont,
+            DFAggregateFunction::ApproxMedian => AggregateFunction::ApproxMedian,
         }
     }
 }
 
-impl From<DFAggregateFunction> for PartitionedAggregateFunction {
-    fn from(af: DFAggregateFunction) -> Self {
-        match af {
-            DFAggregateFunction::Count => PartitionedAggregateFunction::Count,
-            DFAggregateFunction::Sum => PartitionedAggregateFunction::Sum,
-            DFAggregateFunction::Min => PartitionedAggregateFunction::Min,
-            DFAggregateFunction::Max => PartitionedAggregateFunction::Max,
-            DFAggregateFunction::Avg => PartitionedAggregateFunction::Avg,
-            DFAggregateFunction::ApproxDistinct => PartitionedAggregateFunction::ApproxDistinct,
-        }
-    }
-}
+impl TryFrom<&DFAggregateFunction> for AggregateFunction {
+    type Error = crate::Error;
 
-// enum storage for accumulator for fast static dispatching and easy translating between threads
-#[derive(Debug, Clone)]
-enum PartitionedAccumulatorEnum {
-    Sum(SumAccumulator),
-    Avg(AvgAccumulator),
-    Count(CountAccumulator),
-}
-
-impl PartitionedAccumulator for PartitionedAccumulatorEnum {
-    fn state(&self) -> Result<Vec<ScalarValue>> {
-        match self {
-            PartitionedAccumulatorEnum::Sum(acc) => acc.state(),
-            PartitionedAccumulatorEnum::Avg(acc) => acc.state(),
-            PartitionedAccumulatorEnum::Count(acc) => acc.state(),
-        }
-    }
-
-    fn update(&mut self, values: &[ScalarValue]) -> Result<()> {
-        match self {
-            PartitionedAccumulatorEnum::Sum(acc) => acc.update(values),
-            PartitionedAccumulatorEnum::Avg(acc) => acc.update(values),
-            PartitionedAccumulatorEnum::Count(acc) => acc.update(values),
-        }
-    }
-    fn merge(&mut self, states: &[ScalarValue]) -> Result<()> {
-        match self {
-            PartitionedAccumulatorEnum::Sum(acc) => acc.merge(states),
-            PartitionedAccumulatorEnum::Avg(acc) => acc.merge(states),
-            PartitionedAccumulatorEnum::Count(acc) => acc.merge(states),
-        }
-    }
-
-    fn evaluate(&self) -> Result<ScalarValue> {
-        match self {
-            PartitionedAccumulatorEnum::Sum(acc) => acc.evaluate(),
-            PartitionedAccumulatorEnum::Avg(acc) => acc.evaluate(),
-            PartitionedAccumulatorEnum::Count(acc) => acc.evaluate(),
-        }
-    }
-
-    fn reset(&mut self) -> Result<()> {
-        match self {
-            PartitionedAccumulatorEnum::Sum(acc) => acc.reset(),
-            PartitionedAccumulatorEnum::Avg(acc) => acc.reset(),
-            PartitionedAccumulatorEnum::Count(acc) => acc.reset(),
-        }
-    }
-}
-
-// partitioned aggregate is used as a accumulator factory from closure
-pub struct PartitionedAggregate {
-    partition_type: DataType,
-    data_type: DataType,
-    agg: PartitionedAggregateFunction,
-    outer_agg: PartitionedAggregateFunction,
-}
-
-impl PartitionedAggregate {
-    pub fn try_new(
-        partition_type: DataType,
-        data_type: DataType,
-        agg: PartitionedAggregateFunction,
-        outer_agg: PartitionedAggregateFunction,
-    ) -> Result<Self> {
-        Ok(Self {
-            partition_type,
-            data_type,
-            agg,
-            outer_agg,
+    fn try_from(value: &DFAggregateFunction) -> std::result::Result<Self, Self::Error> {
+        Ok(match value {
+            DFAggregateFunction::Count => AggregateFunction::Count,
+            DFAggregateFunction::Sum => AggregateFunction::Sum,
+            DFAggregateFunction::Min => AggregateFunction::Min,
+            DFAggregateFunction::Max => AggregateFunction::Max,
+            DFAggregateFunction::Avg => AggregateFunction::Avg,
+            DFAggregateFunction::ApproxDistinct => AggregateFunction::ApproxDistinct,
+            DFAggregateFunction::ArrayAgg => AggregateFunction::ArrayAgg,
+            DFAggregateFunction::Variance => AggregateFunction::Variance,
+            DFAggregateFunction::VariancePop => AggregateFunction::VariancePop,
+            DFAggregateFunction::Stddev => AggregateFunction::Stddev,
+            DFAggregateFunction::StddevPop => AggregateFunction::StddevPop,
+            DFAggregateFunction::Covariance => AggregateFunction::Covariance,
+            DFAggregateFunction::CovariancePop => AggregateFunction::CovariancePop,
+            DFAggregateFunction::Correlation => AggregateFunction::Correlation,
+            DFAggregateFunction::ApproxPercentileCont => AggregateFunction::ApproxPercentileCont,
+            DFAggregateFunction::ApproxMedian => AggregateFunction::ApproxMedian,
         })
     }
-
-    pub fn create_accumulator(&self) -> Result<Box<dyn Accumulator>> {
-        Ok(Box::new(PartitionedAggregateAccumulator::try_new(
-            &self.partition_type,
-            &self.data_type,
-            &self.agg,
-            &self.outer_agg,
-        )?))
-    }
 }
 
-// partitioned aggregate accumulator aggregates incoming partitioned values via acc accumulator and
-// aggregates acc result via outer_acc
-#[derive(Debug, Clone)]
-pub struct PartitionedAggregateAccumulator {
-    last_partition_value: ScalarValue,
-    first_row: bool,
-    acc: PartitionedAccumulatorEnum,
-    outer_acc: PartitionedAccumulatorEnum,
-}
-
-fn new_accumulator(
-    agg: &PartitionedAggregateFunction,
+pub fn new_accumulator(
+    agg: &AggregateFunction,
     data_type: &DataType,
-) -> Result<PartitionedAccumulatorEnum> {
+) -> Result<AccumulatorEnum> {
     Ok(match agg {
-        PartitionedAggregateFunction::Sum => {
-            PartitionedAccumulatorEnum::Sum(SumAccumulator::try_new(data_type)?)
-        }
-        PartitionedAggregateFunction::Avg => {
-            PartitionedAccumulatorEnum::Avg(AvgAccumulator::try_new(data_type)?)
-        }
-        PartitionedAggregateFunction::Count => {
-            PartitionedAccumulatorEnum::Count(CountAccumulator::new())
+        AggregateFunction::Sum => {
+            AccumulatorEnum::Sum(SumAccumulator::try_new(data_type)?)
         }
         _ => unimplemented!(),
     })
-}
-
-pub fn state_types(data_type: DataType, agg: &DFAggregateFunction) -> Result<Vec<DataType>> {
-    Ok(match agg {
-        DFAggregateFunction::Count => vec![DataType::UInt64],
-        DFAggregateFunction::Sum => vec![data_type],
-        DFAggregateFunction::Avg => vec![DataType::UInt64, data_type],
-        _ => unimplemented!(),
-    })
-}
-
-impl PartitionedAggregateAccumulator {
-    /// new sum accumulator
-    pub fn try_new(
-        partition_type: &DataType,
-        data_type: &DataType,
-        agg: &PartitionedAggregateFunction,
-        outer_agg: &PartitionedAggregateFunction,
-    ) -> Result<Self> {
-        Ok(Self {
-            last_partition_value: ScalarValue::try_from(partition_type)?,
-            first_row: true,
-            acc: new_accumulator(agg, data_type)?,
-            outer_acc: new_accumulator(outer_agg, data_type)?,
-        })
-    }
-
-    /// get the last value from acc and put it into outer_acc. This is called from state()
-    fn finalize(&mut self) -> Result<()> {
-        let res = self.acc.evaluate()?;
-        self.outer_acc.update(&[res])
-    }
-
-    /// outer state
-    fn outer_state(&self) -> Result<Vec<ScalarValue>> {
-        self.outer_acc.state()
-    }
-}
-
-impl Accumulator for PartitionedAggregateAccumulator {
-    /// this function finalizes and serializes our state to `ScalarValue`, which DataFusion uses
-    /// to pass this state between execution stages.
-    /// Note that this can be arbitrary data.
-    fn state(&self) -> DFResult<Vec<ScalarValue>> {
-        // we should clone the accumulator because state is immutable and we can't simply mutate it
-        let mut outer_acc = self.clone();
-        outer_acc
-            .finalize()
-            .map_err(Error::into_datafusion_execution_error)?;
-        outer_acc
-            .outer_state()
-            .map_err(Error::into_datafusion_execution_error)
-    }
-
-    /*/// this function receives one entry per argument of this accumulator.
-        /// DataFusion calls this function on every row, and expects this function to update the accumulator's state.
-        /// TODO: leverage update_batch
-        fn update(&mut self, values: &[ScalarValue]) -> DFResult<()> {
-            if self.first_row {
-                self.last_partition_value = values[0].clone();
-                self.first_row = false
-            }
-
-            match self.last_partition_value.partial_cmp(&values[0]) {
-                None => unreachable!(),
-                Some(ord) => match ord {
-                    Ordering::Less | Ordering::Greater => {
-                        let res = self
-                            .acc
-                            .evaluate()
-                            .map_err(Error::into_datafusion_execution_error)?;
-                        self.outer_acc
-                            .update(&[res])
-                            .map_err(Error::into_datafusion_execution_error)?;
-                        self.acc
-                            .reset()
-                            .map_err(Error::into_datafusion_execution_error)?;
-                        self.last_partition_value = values[0].clone();
-                    }
-
-                    _ => {}
-                },
-            };
-
-            self.acc
-                .update(&values[1..])
-                .map_err(Error::into_datafusion_execution_error)?;
-            Ok(())
-        }
-    */
-    fn merge_batch(&mut self, states: &[ArrayRef]) -> DFResult<()> {
-        self.outer_acc
-            .merge_batch(states)
-            .map_err(Error::into_datafusion_execution_error)
-    }
-
-    fn evaluate(&self) -> DFResult<ScalarValue> {
-        self.outer_acc
-            .evaluate()
-            .map_err(Error::into_datafusion_execution_error)
-    }
-
-    fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
-        // todo сделать переиспользуемый arrow-буффер, чтобы кидать его в acc, а результат acc - в outer_acc
-        /*if self.first_row {
-            self.last_partition_value = values[0].clone();
-            self.first_row = false
-        }*/
-        /*
-        match self.last_partition_value.partial_cmp(&values[0]) {
-            None => unreachable!(),
-            Some(ord) => match ord {
-                Ordering::Less | Ordering::Greater => {
-                    let res = self
-                        .acc
-                        .evaluate()
-                        .map_err(Error::into_datafusion_execution_error)?;
-                    self.outer_acc
-                        .update(&[res])
-                        .map_err(Error::into_datafusion_execution_error)?;
-                    self.acc
-                        .reset()
-                        .map_err(Error::into_datafusion_execution_error)?;
-                    self.last_partition_value = values[0].clone();
-                }
-
-                _ => {}
-            },
-        };
-
-        self.acc
-            .update(&values[1..])
-            .map_err(Error::into_datafusion_execution_error)?;*/
-        Ok(())
-    }
 }

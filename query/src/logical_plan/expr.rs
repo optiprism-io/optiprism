@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::physical_plan::expressions::aggregate::{state_types, PartitionedAggregate};
+use crate::physical_plan::expressions::partitioned_aggregate::{state_types, PartitionedAggregate, PartitionedAggregateFunction};
 use datafusion::arrow::datatypes::DataType;
 
 use datafusion::logical_plan::{
@@ -10,14 +10,14 @@ use datafusion::physical_plan::aggregates::return_type;
 use datafusion::physical_plan::expressions::binary_operator_data_type;
 use datafusion::physical_plan::functions::{ReturnTypeFunction, Signature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion_expr::{AccumulatorFunctionImplementation, AggregateFunction, StateTypeFunction};
+use datafusion_expr::{AccumulatorFunctionImplementation, AggregateFunction as DFAggregateFunction, StateTypeFunction};
 
 use datafusion::scalar::ScalarValue;
 use std::fmt;
 
-use crate::physical_plan::expressions::aggregate::PartitionedAggregateFunction;
-use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
+// use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
 use std::sync::Arc;
+use crate::physical_plan::expressions::aggregate::AggregateFunction;
 
 #[derive(Clone)]
 pub enum Expr {
@@ -38,7 +38,7 @@ pub enum Expr {
     /// Represents the call of an aggregate built-in function with arguments.
     AggregateFunction {
         /// Name of the function
-        fun: PartitionedAggregateFunction,
+        fun: AggregateFunction,
         /// List of expressions to feed to the functions as arguments
         args: Vec<Expr>,
         /// Whether this is a DISTINCT aggregation or not
@@ -52,7 +52,7 @@ pub enum Expr {
         /// Name of the aggregate function per a partition
         fun: PartitionedAggregateFunction,
         /// Name of the final (outer) function, the result of function
-        outer_fun: PartitionedAggregateFunction,
+        outer_fun: AggregateFunction,
         /// List of expressions to feed to the functions as arguments
         args: Vec<Expr>,
         /// Whether this is a DISTINCT aggregation or not
@@ -145,30 +145,30 @@ fn create_name(e: &Expr, input_schema: &DFSchema) -> Result<String> {
 }
 
 impl Expr {
-    pub fn from_df_expr(expr: &DFExpr) -> Expr {
-        match expr {
+    pub fn from_df_expr(expr: &DFExpr) -> Result<Expr> {
+        Ok(match expr {
             DFExpr::Column(column) => Expr::Column(column.clone()),
             DFExpr::Literal(v) => Expr::Literal(v.clone()),
             DFExpr::BinaryExpr { left, op, right } => Expr::BinaryExpr {
-                left: Box::new(Expr::from_df_expr(left)),
+                left: Box::new(Expr::from_df_expr(left)?),
                 op: *op,
-                right: Box::new(Expr::from_df_expr(right)),
+                right: Box::new(Expr::from_df_expr(right)?),
             },
-            DFExpr::IsNotNull(expr) => Expr::IsNotNull(Box::new(Expr::from_df_expr(expr))),
-            DFExpr::IsNull(expr) => Expr::IsNull(Box::new(Expr::from_df_expr(expr))),
+            DFExpr::IsNotNull(expr) => Expr::IsNotNull(Box::new(Expr::from_df_expr(expr)?)),
+            DFExpr::IsNull(expr) => Expr::IsNull(Box::new(Expr::from_df_expr(expr)?)),
             DFExpr::AggregateFunction {
                 fun,
                 args,
                 distinct,
             } => Expr::AggregateFunction {
-                fun: fun.clone().into(),
-                args: args.iter().map(Expr::from_df_expr).collect(),
+                fun: fun.try_into()?,
+                args: args.iter().map(Expr::from_df_expr).collect::<Result<_>>()?,
                 distinct: *distinct,
             },
             DFExpr::Wildcard => Expr::Wildcard,
-            DFExpr::Alias(e, v) => Expr::Alias(Box::new(Expr::from_df_expr(e)), v.clone()),
+            DFExpr::Alias(e, v) => Expr::Alias(Box::new(Expr::from_df_expr(e)?), v.clone()),
             _ => unimplemented!(),
-        }
+        })
     }
 
     pub fn to_df_expr(&self, input_schema: &DFSchema) -> Result<DFExpr> {
@@ -189,20 +189,20 @@ impl Expr {
                 args,
                 distinct,
             } => match fun {
-                PartitionedAggregateFunction::OrderedDistinctCount => {
-                    let name = "ordered_distinct_count".to_string();
-                    let data_type = args[0].get_type(input_schema)?;
-                    let sorted_distinct = SortedDistinctCount::new(name, data_type);
-                    let udf = sorted_distinct.try_into()?;
-                    let args = args
-                        .iter()
-                        .map(|arg| arg.to_df_expr(input_schema))
-                        .collect::<Result<_>>()?;
-                    Ok(DFExpr::AggregateUDF {
-                        fun: Arc::new(udf),
-                        args,
-                    })
-                }
+                /*   AggregateFunction::OrderedDistinctCount => {
+                       let name = "ordered_distinct_count".to_string();
+                       let data_type = args[0].get_type(input_schema)?;
+                       let sorted_distinct = SortedDistinctCount::new(name, data_type);
+                       let udf = sorted_distinct.try_into()?;
+                       let args = args
+                           .iter()
+                           .map(|arg| arg.to_df_expr(input_schema))
+                           .collect::<Result<_>>()?;
+                       Ok(DFExpr::AggregateUDF {
+                           fun: Arc::new(udf),
+                           args,
+                       })
+                   }*/
                 _ => Ok(DFExpr::AggregateFunction {
                     fun: fun.clone().try_into()?,
                     args: args
@@ -229,13 +229,14 @@ impl Expr {
 
                 // determine state types
                 let state_types: Vec<DataType> =
-                    state_types(rtype.clone(), &outer_fun.try_into()?)?;
+                    state_types(rtype.clone(), &outer_fun)?;
 
                 // make partitioned aggregate factory
                 let pagg = PartitionedAggregate::try_new(
                     partition_by.get_type(input_schema)?,
                     rtype.clone(),
                     fun.clone(),
+                    rtype.clone(),
                     outer_fun.clone(),
                 )?;
 
@@ -291,7 +292,7 @@ impl Expr {
             Expr::Column(c) => Ok(schema.field_from_column(c)?.data_type().clone()),
             Expr::Literal(l) => Ok(l.get_datatype()),
             Expr::AggregateFunction { fun, args, .. } => match fun {
-                PartitionedAggregateFunction::OrderedDistinctCount => Ok(DataType::UInt64),
+                // AggregateFunction::OrderedDistinctCount => Ok(DataType::UInt64),
                 _ => {
                     let data_types = args
                         .iter()
