@@ -18,6 +18,7 @@ import {
     Ids,
     PeriodConditionPayload,
     PayloadChangeAgregateCondition,
+    PayloadChangeValueItem,
 } from '@/components/events/Segments/ConditionTypes'
 
 interface Segment {
@@ -35,6 +36,17 @@ export const useSegmentsStore = defineStore("segments", {
     }),
     getters: {},
     actions: {
+        inputValue(payload: PayloadChangeValueItem) {
+            const segment = this.segments[payload.idxParent]
+
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+                if (condition) {
+                    condition.valueItem = payload.value
+                    condition.period = {}
+                }
+            }
+        },
         changeAgregateCondition(payload: PayloadChangeAgregateCondition) {
             const segment = this.segments[payload.idxParent]
 
@@ -43,9 +55,11 @@ export const useSegmentsStore = defineStore("segments", {
                 if (condition) {
                     delete condition.propRef
                     condition.aggregate = payload.value
+                    condition.opId = OperationId.Eq
                     condition.period = {}
                     condition.filters = []
                     condition.values = []
+                    condition.valueItem = ''
                 }
             }
         },

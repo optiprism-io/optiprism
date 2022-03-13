@@ -35,6 +35,7 @@ import {
     Ids,
     PeriodConditionPayload,
     PayloadChangeAgregateCondition,
+    PayloadChangeValueItem,
 } from '@/components/events/Segments/ConditionTypes'
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
@@ -106,6 +107,7 @@ provide('changeEventCondition', (payload: ChangeEventCondition) => segmentsStore
 provide('changeFilterOperation', (payload: ChangeFilterOperation) => segmentsStore.changeFilterOperation(payload))
 provide('addFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.addFilterValueCondition(payload))
 provide('removeFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.removeFilterValueCondition(payload))
+provide('inputValueCondition', (payload: PayloadChangeValueItem) => segmentsStore.inputValue(payload))
 
 watch(
     segmentsStore.segments,

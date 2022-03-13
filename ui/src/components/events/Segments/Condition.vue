@@ -20,123 +20,90 @@
                     </UiButton>
                 </Select>
             </div>
-            <div
-                v-if="isShowSelectEvent"
-                class="pf-c-action-list__item"
-            >
-                <Select
-                    grouped
-                    :items="lexiconStore.eventsList"
-                    :width-auto="true"
-                    @select="changeEvent"
+            <ConditionDidEvent
+                v-if="isSelectedDidEvent"
+                :index="props.index"
+                :index-parent="props.indexParent"
+                :condition="props.condition"
+                :update-open="props.updateOpen"
+                @change-property="changeProperty"
+                @change-operation="changeOperation"
+            />
+            <template v-else>
+                <div
+                    v-if="isShowSelectProp"
+                    class="pf-c-action-list__item"
                 >
-                    <UiButton
-                        class="pf-m-main"
-                        :class="{
-                            'pf-m-secondary': props.condition.event,
-                        }"
-                        type="button"
-                        :before-icon="!props.condition.event ? 'fas fa-plus-circle' : ''"
+                    <PropertySelect
+                        @select="changeProperty"
                     >
-                        {{ props.condition?.event?.name || $t('common.add_event') }}
-                    </UiButton>
-                </Select>
-            </div>
-            <div
-                v-if="allowSelectAggregate"
-                class="pf-c-action-list__item"
-            >
-                <Select
-                    :items="conditionAggregateItems"
-                    :width-auto="true"
-                    :is-open-mount="updateOpen"
-                    :update-open="!isSelectedAggregate ? updateOpen : false"
-                    @select="changeConditionAggregate"
-                >
-                    <UiButton
-                        class="pf-m-main"
-                        :class="{
-                            'pf-m-secondary': isSelectedAggregate,
-                        }"
-                        :before-icon="!isSelectedAggregate ? 'fas fa-plus-circle': ''"
-                    >
-                        {{ displayNameAggregate }}
-                    </UiButton>
-                </Select>
-            </div>
-            <div
-                v-if="isShowSelectProp"
-                class="pf-c-action-list__item"
-            >
-                <PropertySelect
-                    @select="changeProperty"
-                >
-                    <UiButton
-                        class="pf-m-main"
-                        :class="{
-                            'pf-m-secondary': isSelectedProp,
-                        }"
-                        type="button"
-                        :before-icon="!isSelectedProp ? 'fas fa-plus-circle' : ''"
-                    >
-                        {{ displayNameProp }}
-                    </UiButton>
-                </PropertySelect>
-            </div>
-            <div
-                v-if="props.condition.propRef && props.condition.opId"
-                class="pf-c-action-list__item"
-            >
-                <OperationSelect
-                    :property-ref="props.condition.propRef"
-                    :selected="props.condition.opId"
-                    @select="changeOperation"
-                >
-                    <UiButton class="pf-m-main pf-m-secondary">
-                        {{ operationById?.get(props.condition.opId)?.name }}
-                    </UiButton>
-                </OperationSelect>
-            </div>
-            <div
-                v-if="props.condition.propRef && props.condition.values"
-                class="pf-c-action-list__item"
-            >
-                <ValueSelect
-                    :property-ref="props.condition.propRef"
-                    :selected="props.condition.values"
-                    :items="conditionValuesItems"
-                    @add="addValue"
-                    @deselect="removeValue"
-                >
-                    <template v-if="props.condition.values.length > 0">
-                        <div class="pf-c-action-list">
-                            <div
-                                v-for="(value, i) in props.condition.values"
-                                :key="i"
-                                class="pf-c-action-list__item"
-                            >
-                                <UiButton class="pf-m-main pf-m-secondary">
-                                    {{ value }}
-                                    <span class="pf-c-button__icon pf-m-end">
-                                        <UiIcon
-                                            icon="fas fa-times"
-                                            @click.stop="removeValue(value)"
-                                        />
-                                    </span>
-                                </UiButton>
-                            </div>
-                        </div>
-                    </template>
-                    <template v-else>
                         <UiButton
                             class="pf-m-main"
-                            :before-icon="'fas fa-plus-circle'"
+                            :class="{
+                                'pf-m-secondary': isSelectedProp,
+                            }"
+                            type="button"
+                            :before-icon="!isSelectedProp ? 'fas fa-plus-circle' : ''"
                         >
-                            {{ $t('events.select_value') }}
+                            {{ displayNameProp }}
                         </UiButton>
-                    </template>
-                </ValueSelect>
-            </div>
+                    </PropertySelect>
+                </div>
+                <div
+                    v-if="props.condition.propRef && props.condition.opId"
+                    class="pf-c-action-list__item"
+                >
+                    <OperationSelect
+                        :property-ref="props.condition.propRef"
+                        :selected="props.condition.opId"
+                        @select="changeOperation"
+                    >
+                        <UiButton class="pf-m-main pf-m-secondary">
+                            {{ operationById?.get(props.condition.opId)?.name }}
+                        </UiButton>
+                    </OperationSelect>
+                </div>
+                <div
+                    v-if="props.condition.propRef && props.condition.values"
+                    class="pf-c-action-list__item"
+                >
+                    <ValueSelect
+                        :property-ref="props.condition.propRef"
+                        :selected="props.condition.values"
+                        :items="conditionValuesItems"
+                        @add="addValue"
+                        @deselect="removeValue"
+                    >
+                        <template v-if="props.condition.values.length > 0">
+                            <div class="pf-c-action-list">
+                                <div
+                                    v-for="(value, i) in props.condition.values"
+                                    :key="i"
+                                    class="pf-c-action-list__item"
+                                >
+                                    <UiButton class="pf-m-main pf-m-secondary">
+                                        {{ value }}
+                                        <span class="pf-c-button__icon pf-m-end">
+                                            <UiIcon
+                                                icon="fas fa-times"
+                                                @click.stop="removeValue(value)"
+                                            />
+                                        </span>
+                                    </UiButton>
+                                </div>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <UiButton
+                                class="pf-m-main"
+                                :before-icon="'fas fa-plus-circle'"
+                            >
+                                {{ $t('events.select_value') }}
+                            </UiButton>
+                        </template>
+                    </ValueSelect>
+                </div>
+            </template>
             <div
                 v-if="isShowSelectDate"
                 class="pf-c-action-list__item"
@@ -211,13 +178,11 @@ import { operationById, OperationId, Value } from '@/types'
 import { PropertyRef, Condition as ConditionType, EventRef } from '@/types/events'
 import {
     ChangeFilterPropertyCondition,
-    ChangeEventCondition,
     RemoveFilterCondition,
     ChangeFilterOperation,
     FilterValueCondition,
     Ids,
     PeriodConditionPayload,
-    PayloadChangeAgregateCondition,
 } from '@/components/events/Segments/ConditionTypes'
 import Select from '@/components/Select/Select.vue'
 import UiButton from '@/components/uikit/UiButton.vue'
@@ -226,10 +191,10 @@ import OperationSelect from '@/components/events/OperationSelect.vue'
 import ValueSelect from '@/components/events/ValueSelect.vue'
 import Filter from '@/components/events/Filter.vue'
 import { conditions } from '@/configs/events/segmentCondition'
-import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
 import { useLexiconStore } from '@/stores/lexicon'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
 import UiDatePicker, { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
+import ConditionDidEvent from './ConditionDidEvent.vue'
 
 const i18n = inject<any>('i18n')
 
@@ -244,7 +209,6 @@ const lexiconStore = useLexiconStore()
 const props = defineProps<Props>()
 
 const conditionItems = inject<[]>('conditionItems')
-const conditionAggregateItems = inject<[]>('conditionAggregateItems')
 const updateOpenFilter = ref(false);
 
 const lastCount = computed(() => {
@@ -264,7 +228,7 @@ const calendarValue = computed(() => {
     }
 })
 
-const isShowSelectEvent = computed(() => {
+const isSelectedDidEvent = computed(() => {
     return props.condition?.action?.id === 'didEvent'
 })
 
@@ -307,28 +271,6 @@ const conditionConfig = computed(() => {
 
 const isSelectedAction = computed(() => Boolean(props.condition.action))
 
-const allowSelectAggregate = computed(() => conditionConfig.value && conditionConfig.value.hasSelectAggregate &&  Boolean(props.condition.event))
-
-const isSelectedAggregate = computed(() => Boolean(props.condition.aggregate))
-
-const displayNameAggregate = computed(() => {
-    if (props.condition?.aggregate?.name) {
-        return props.condition?.aggregate?.typeAggregate ? i18n.$t(`events.aggregateProperty.${props.condition.aggregate.typeAggregate}`) : props.condition?.aggregate?.name
-    } else {
-        return i18n.$t(`common.select_aggregate`)
-    }
-})
-
-const didEventAggregateSelectedConfig = computed(() => {
-    if (props.condition.aggregate) {
-        const aggregate = aggregates.find(item => item.key === props.condition.aggregate?.id)
-
-        return aggregate || null
-    } else {
-        return null
-    }
-})
-
 const displayNameAction = computed(() => props.condition?.action?.name || i18n.$t(`events.segments.select_condition`))
 
 const isSelectedProp = computed(() =>  Boolean(props.condition.propRef))
@@ -341,22 +283,18 @@ const isShowSelectProp = computed(() => {
     if (id && conditionItems) {
         const conditionItem = conditions.find(condition => condition.key === id)
 
-        if (conditionItem?.hasProp) {
-            if (conditionItem.hasSelectAggregate) {
-                return props.condition.aggregate && didEventAggregateSelectedConfig.value && didEventAggregateSelectedConfig.value.hasProperty
-            } else {
-                return isShowSelectEvent.value ? props.condition.event : true
-            }
-        } else {
-            return false
-        }
+        return conditionItem?.hasProp;
     } else {
         return false
     }
 })
 
 const isShowSelectDate = computed(() => {
-    return conditionConfig.value && conditionConfig.value.hasSelectPeriod && props.condition.propRef && props.condition.values && props.condition.values.length
+    if (isSelectedDidEvent.value) {
+        return Boolean(props.condition.valueItem)
+    } else {
+        return conditionConfig.value && conditionConfig.value.hasSelectPeriod && props.condition.propRef && props.condition.values && props.condition.values.length
+    }
 })
 
 const conditionValuesItems = computed(() => {
@@ -369,8 +307,6 @@ const conditionValuesItems = computed(() => {
     }
 })
 
-const allIds = computed(() => ({idx: props.index, idxParent: props.indexParent}))
-
 const changePropertyCondition = inject<(idx: number, indexParent: number, propRef: PropertyRef) => void>('changePropertyCondition')
 const changeOperationCondition = inject<(idx: number, indexParent: number, opId: OperationId) => void>('changeOperationCondition')
 const changeActionCondition = inject<(idx: number, indexParent: number, ref: { id: string, name: string }) => void>('changeActionCondition')
@@ -380,26 +316,16 @@ const removeValueCondition = inject<(idx: number, indexParent: number, value: Va
 const addFilterCondition = inject<(payload: Ids) => void>('addFilterCondition')
 const removeFilterCondition = inject<(payload: RemoveFilterCondition) => void>('removeFilterCondition')
 const changeFilterPropertyCondition = inject<(payload: ChangeFilterPropertyCondition) => void>('changeFilterPropertyCondition')
-const changeEventCondition = inject<(payload: ChangeEventCondition) => void>('changeEventCondition')
 const changeFilterOperation = inject<(payload: ChangeFilterOperation) => void>('changeFilterOperation')
 const addFilterValueCondition = inject<(payload: FilterValueCondition) => void>('addFilterValueCondition')
 const removeFilterValueCondition = inject<(payload: FilterValueCondition) => void>('removeFilterValueCondition')
 const changePeriodCondition = inject<(payload: PeriodConditionPayload) => void>('changePeriodCondition')
 const onRemoveCondition = inject<(payload: Ids) => void>('onRemoveCondition')
-const changeAgregateCondition = inject<(payload: PayloadChangeAgregateCondition) => void>('changeAgregateCondition')
-
 const changeConditionAction = (payload: { id: string, name: string }) => changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
 const changeProperty = (propRef: PropertyRef) => changePropertyCondition && changePropertyCondition(props.index, props.indexParent, propRef)
 const changeOperation = (opId: OperationId) => changeOperationCondition && changeOperationCondition(props.index, props.indexParent, opId)
 const addValue = (value: Value) => addValueCondition && addValueCondition(props.index, props.indexParent, value)
 const removeValue = (value: Value) => removeValueCondition && removeValueCondition(props.index, props.indexParent, value)
-
-const changeConditionAggregate = (payload: { id: string, name: string }) => {
-    changeAgregateCondition && changeAgregateCondition({
-        ...allIds.value,
-        value: payload,
-    })
-}
 
 const onRemove = () => {
     onRemoveCondition && onRemoveCondition({
@@ -442,14 +368,6 @@ const changeFilterProperty = (idxFilter: number, propRef: PropertyRef) => {
         idxParent: props.indexParent,
         idxFilter,
         propRef
-    })
-}
-
-const changeEvent = (ref: EventRef) => {
-    changeEventCondition && changeEventCondition({
-        idx: props.index,
-        idxParent: props.indexParent,
-        ref,
     })
 }
 

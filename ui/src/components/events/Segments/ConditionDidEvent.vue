@@ -1,0 +1,247 @@
+<template>
+    <div class="pf-c-action-list__item">
+        <Select
+            grouped
+            :items="lexiconStore.eventsList"
+            :width-auto="true"
+            @select="changeEvent"
+        >
+            <UiButton
+                class="pf-m-main"
+                :class="{
+                    'pf-m-secondary': props.condition.event,
+                }"
+                type="button"
+                :before-icon="!props.condition.event ? 'fas fa-plus-circle' : ''"
+            >
+                {{ props.condition?.event?.name || $t('common.add_event') }}
+            </UiButton>
+        </Select>
+    </div>
+    <div
+        v-if="allowSelectAggregate"
+        class="pf-c-action-list__item"
+    >
+        <Select
+            :items="conditionAggregateItems"
+            :width-auto="true"
+            :is-open-mount="updateOpen"
+            :update-open="!isSelectedAggregate ? updateOpen : false"
+            @select="changeConditionAggregate"
+        >
+            <UiButton
+                class="pf-m-main"
+                :class="{
+                    'pf-m-secondary': isSelectedAggregate,
+                }"
+                :before-icon="!isSelectedAggregate ? 'fas fa-plus-circle': ''"
+            >
+                {{ displayNameAggregate }}
+            </UiButton>
+        </Select>
+    </div>
+    <div
+        v-if="isShowSelectProp"
+        class="pf-c-action-list__item"
+    >
+        <PropertySelect
+            @select="changeProperty"
+        >
+            <UiButton
+                class="pf-m-main"
+                :class="{
+                    'pf-m-secondary': isSelectedProp,
+                }"
+                type="button"
+                :before-icon="!isSelectedProp ? 'fas fa-plus-circle' : ''"
+            >
+                {{ displayNameProp }}
+            </UiButton>
+        </PropertySelect>
+    </div>
+    <div
+        v-if="isShowSelectOpt && props.condition.opId"
+        class="pf-c-action-list__item"
+    >
+        <OperationSelect
+            :selected="props.condition.opId"
+            :op-items="opItems"
+            @select="changeOperation"
+        >
+            <UiButton class="pf-m-main pf-m-secondary">
+                {{ operationById?.get(props.condition.opId)?.name }}
+            </UiButton>
+        </OperationSelect>
+    </div>
+    <div
+        v-if="isHasValue"
+        class="pf-c-action-list__item"
+    >
+        <UiInput
+            :value="props.condition.valueItem"
+            type="number"
+            :min="0"
+            :placeholder="$t('common.enter_value')"
+            :style="{width: '80px'}"
+            @input="onInputValue"
+        />
+    </div>
+</template>
+
+<script lang="ts" setup>
+import { inject, computed } from 'vue'
+
+import { useLexiconStore } from '@/stores/lexicon'
+
+import { Item } from "@/components/Select/SelectTypes";
+import { findOperations, operationById, OperationId, DataType } from '@/types'
+import { PropertyRef, Condition as ConditionType, EventRef } from '@/types/events'
+import { ChangeEventCondition, PayloadChangeAgregateCondition, PayloadChangeValueItem } from '@/components/events/Segments/ConditionTypes'
+
+import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
+import { conditions } from '@/configs/events/segmentCondition'
+
+import Select from '@/components/Select/Select.vue'
+import PropertySelect from '@/components/events/PropertySelect.vue'
+import OperationSelect from '@/components/events/OperationSelect.vue'
+import UiInput from '@/components/uikit/UiInput.vue'
+
+const lexiconStore = useLexiconStore()
+const i18n = inject<any>('i18n')
+
+interface Props {
+    index: number
+    indexParent: number
+    condition: ConditionType
+    updateOpen?: boolean
+}
+const props = defineProps<Props>()
+
+const emit = defineEmits<{
+    (e: 'change-property', propRef: PropertyRef): void
+    (e: 'change-operation', opId: OperationId): void
+}>()
+
+const conditionItems = inject<[]>('conditionItems')
+const conditionAggregateItems = inject<[]>('conditionAggregateItems')
+
+const allIds = computed(() => ({idx: props.index, idxParent: props.indexParent}))
+
+const conditionConfig = computed(() => {
+    const id = props.condition?.action?.id
+
+    if (id && conditionItems) {
+        const conditionItem = conditions.find(condition => condition.key === id)
+
+        return conditionItem || null
+    } else {
+        return null
+    }
+})
+
+
+/**
+ * Event
+ */
+const changeEventCondition = inject<(payload: ChangeEventCondition) => void>('changeEventCondition')
+
+const changeEvent = (ref: EventRef) => {
+    changeEventCondition && changeEventCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+        ref,
+    })
+}
+
+/**
+ * Agregate
+ */
+const didEventAggregateSelectedConfig = computed(() => {
+    if (props.condition.aggregate) {
+        const aggregate = aggregates.find(item => item.key === props.condition.aggregate?.id)
+
+        return aggregate || null
+    } else {
+        return null
+    }
+})
+
+const allowSelectAggregate = computed(() => conditionConfig.value && conditionConfig.value.hasSelectAggregate &&  Boolean(props.condition.event))
+
+const isSelectedAggregate = computed(() => Boolean(props.condition.aggregate))
+
+const displayNameAggregate = computed(() => {
+    if (props.condition?.aggregate?.name) {
+        return props.condition?.aggregate?.typeAggregate ? i18n.$t(`events.aggregateProperty.${props.condition.aggregate.typeAggregate}`) : props.condition?.aggregate?.name
+    } else {
+        return i18n.$t(`common.select_aggregate`)
+    }
+})
+
+const changeAgregateCondition = inject<(payload: PayloadChangeAgregateCondition) => void>('changeAgregateCondition')
+
+const changeConditionAggregate = (payload: { id: string, name: string }) => {
+    changeAgregateCondition && changeAgregateCondition({
+        ...allIds.value,
+        value: payload,
+    })
+}
+
+
+/**
+ * Property
+ */
+const isShowSelectProp = computed(() => {
+    const id = props.condition?.action?.id
+
+    if (id && conditionItems) {
+
+        return props.condition.aggregate && didEventAggregateSelectedConfig.value && didEventAggregateSelectedConfig.value.hasProperty
+    } else {
+        return false
+    }
+})
+const displayNameProp = computed(() => props.condition.propRef ? lexiconStore.propertyName(props.condition.propRef) : i18n.$t(`events.select_property`))
+const isSelectedProp = computed(() =>  Boolean(props.condition.propRef))
+const changeProperty = (propRef: PropertyRef) => emit('change-property', propRef)
+
+
+/**
+ * Operation
+ */
+const isShowSelectOpt = computed(() => {
+    return isSelectedAggregate ? didEventAggregateSelectedConfig.value?.hasProperty ? Boolean(props.condition.propRef) : true : false
+})
+
+const opItems = computed(() => {
+    let items: Item<OperationId, null>[] = [];
+
+    findOperations(DataType.Float64, false, false).forEach(op =>
+        items.push({
+            item: op.id,
+            name: op.name
+        })
+    )
+
+    return items
+})
+const changeOperation = (opId: OperationId) => emit('change-operation', opId)
+
+
+/**
+ * Value
+ */
+const isHasValue = computed(() => {
+    return isSelectedAggregate.value ? didEventAggregateSelectedConfig.value?.hasProperty ? Boolean(props.condition.propRef) : true : false
+})
+
+const inputValueCondition = inject<(payload: PayloadChangeValueItem) => void>('inputValueCondition')
+const onInputValue = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+
+    inputValueCondition && inputValueCondition({
+        ...allIds.value,
+        value: Number(target.value)
+    })
+}
+</script>

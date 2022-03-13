@@ -39,3 +39,7 @@ export interface PayloadChangeAgregateCondition extends Ids {
         name: string
     }
 }
+
+export interface PayloadChangeValueItem extends Ids {
+    value: string | number
+}

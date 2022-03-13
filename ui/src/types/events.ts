@@ -269,6 +269,7 @@ export interface Condition {
     propRef?: PropertyRef
     opId?: OperationId
     values?: Value[]
+    valueItem?: string | number
     valuesList?: string[]
     period?: {
         from?: string

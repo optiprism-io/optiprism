@@ -143,19 +143,22 @@ export const findOperations = (
 ): Operation[] => {
     const kind = dataTypeKinds.get(type);
     return operations.filter(op => {
-        if (op.typeKinds && !op.typeKinds.find(t => t === kind)) {
-            return false;
+
+        if (!op.typeKinds && !op.flags) {
+            return true
         }
 
-        if (nullable && op.flags && !op.flags.find(f => f === OpFlag.Null)) {
-            return false;
+        if (op.typeKinds && op.typeKinds.find(t => t === kind)) {
+            return true;
         }
 
-        if (isArray && op.flags && !op.flags.find(f => f === OpFlag.Array)) {
-            return false;
+        if (nullable && op.flags && op.flags.find(f => f === OpFlag.Null)) {
+            return true;
         }
 
-        return true;
+        if (isArray && op.flags && op.flags.find(f => f === OpFlag.Array)) {
+            return true;
+        }
     });
 };
 
