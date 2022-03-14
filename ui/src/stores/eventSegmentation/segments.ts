@@ -3,7 +3,6 @@ import {
     Condition,
     PropertyRef,
     ConditionFilter,
-    Event,
     PropertyType,
 } from "@/types/events";
 import { OperationId, Value } from "@/types";
@@ -20,6 +19,8 @@ import {
     PayloadChangeAgregateCondition,
     PayloadChangeValueItem,
 } from '@/components/events/Segments/ConditionTypes'
+import { getYYYYMMDD } from '@/helpers/getStringDates'
+import { getLastNDaysRange } from '@/helpers/calendarHelper'
 
 interface Segment {
     name: string
@@ -43,7 +44,6 @@ export const useSegmentsStore = defineStore("segments", {
                 const condition = segment.conditions[payload.idx]
                 if (condition) {
                     condition.valueItem = payload.value
-                    condition.period = {}
                 }
             }
         },
@@ -55,11 +55,17 @@ export const useSegmentsStore = defineStore("segments", {
                 if (condition) {
                     delete condition.propRef
                     condition.aggregate = payload.value
-                    condition.opId = OperationId.Eq
-                    condition.period = {}
+                    condition.opId = OperationId.Gte
+                    const lastNDateRange = getLastNDaysRange(30);
+                    condition.period = {
+                        from: getYYYYMMDD(lastNDateRange.from),
+                        to: getYYYYMMDD(new Date()),
+                        last: 30,
+                        type: 'last',
+                    }
                     condition.filters = []
                     condition.values = []
-                    condition.valueItem = ''
+                    condition.valueItem = 1
                 }
             }
         },
@@ -110,13 +116,6 @@ export const useSegmentsStore = defineStore("segments", {
                         ref: payload.ref,
                     }
                     condition.filters = []
-
-                    delete condition.propRef
-                    delete condition.opId
-                    delete condition.values
-                    delete condition.valuesList
-                    delete condition.period
-                    delete condition.aggregate
                 }
             }
         },
@@ -231,7 +230,6 @@ export const useSegmentsStore = defineStore("segments", {
                 if (condition) {
                     condition.opId = opId
                     condition.values = []
-                    condition.period = {}
                 }
             }
         },
@@ -260,7 +258,14 @@ export const useSegmentsStore = defineStore("segments", {
                     condition.propRef = ref
                     condition.opId = OperationId.Eq
                     condition.values = []
-                    condition.period = {}
+
+                    const lastNDateRange = getLastNDaysRange(30);
+                    condition.period = {
+                        from: getYYYYMMDD(lastNDateRange.from),
+                        to: getYYYYMMDD(new Date()),
+                        last: 30,
+                        type: 'last',
+                    }
                 }
             }
         },

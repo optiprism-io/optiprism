@@ -75,6 +75,7 @@ const conditionItems = computed(() => {
                 name,
             },
             name,
+            description: i18n.$t(`events.condition.${item.key}_hint`)
         }
     })
 })
@@ -103,7 +104,17 @@ provide('changePeriodCondition',  (payload: PeriodConditionPayload) => segmentsS
 provide('addFilterCondition', (payload: Ids) => segmentsStore.addFilterCondition(payload))
 provide('removeFilterCondition', (payload: RemoveFilterCondition) => segmentsStore.removeFilterCondition(payload))
 provide('changeFilterPropertyCondition', (payload: ChangeFilterPropertyCondition) => segmentsStore.changeFilterPropertyCondition(payload))
-provide('changeEventCondition', (payload: ChangeEventCondition) => segmentsStore.changeEventCondition(payload))
+provide('changeEventCondition', (payload: ChangeEventCondition) => {
+    segmentsStore.changeEventCondition(payload)
+    segmentsStore.changeAgregateCondition({
+        idx: payload.idx,
+        idxParent: payload.idxParent,
+        value: {
+            id: 'count',
+            name: i18n.$t('events.aggregates.count')
+        }
+    })
+})
 provide('changeFilterOperation', (payload: ChangeFilterOperation) => segmentsStore.changeFilterOperation(payload))
 provide('addFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.addFilterValueCondition(payload))
 provide('removeFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.removeFilterValueCondition(payload))

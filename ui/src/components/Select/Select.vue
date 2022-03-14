@@ -183,6 +183,7 @@ const onSearch = (payload: string) => {
 
 const onHide = () => {
     isOpen.value = false;
+    search.value = '';
 };
 
 onBeforeMount(() => {

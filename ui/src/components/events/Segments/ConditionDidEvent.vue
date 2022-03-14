@@ -77,14 +77,23 @@
         v-if="isHasValue"
         class="pf-c-action-list__item"
     >
-        <UiInput
-            :value="props.condition.valueItem"
-            type="number"
-            :min="0"
-            :placeholder="$t('common.enter_value')"
-            :style="{width: '80px'}"
-            @input="onInputValue"
-        />
+        <Select
+            :items="valueList"
+            :width-auto="true"
+            :selected="props.condition.valueItem"
+            @select="onInputValue"
+        >
+            <UiButton
+                class="pf-m-main"
+                :class="{
+                    'pf-m-secondary': props.condition.event,
+                }"
+                type="button"
+                :before-icon="!props.condition.valueItem ? 'fas fa-plus-circle' : ''"
+            >
+                {{ props.condition.valueItem }}
+            </UiButton>
+        </Select>
     </div>
 </template>
 
@@ -104,7 +113,6 @@ import { conditions } from '@/configs/events/segmentCondition'
 import Select from '@/components/Select/Select.vue'
 import PropertySelect from '@/components/events/PropertySelect.vue'
 import OperationSelect from '@/components/events/OperationSelect.vue'
-import UiInput from '@/components/uikit/UiInput.vue'
 
 const lexiconStore = useLexiconStore()
 const i18n = inject<any>('i18n')
@@ -235,13 +243,20 @@ const isHasValue = computed(() => {
     return isSelectedAggregate.value ? didEventAggregateSelectedConfig.value?.hasProperty ? Boolean(props.condition.propRef) : true : false
 })
 
-const inputValueCondition = inject<(payload: PayloadChangeValueItem) => void>('inputValueCondition')
-const onInputValue = (e: Event) => {
-    const target = e.target as HTMLInputElement;
+const valueList = computed(() => {
+    const items = Array.from(Array(101).keys())
+    items.shift()
+    return items.map(item => ({
+        item,
+        name: String(item),
+    }))
+})
 
+const inputValueCondition = inject<(payload: PayloadChangeValueItem) => void>('inputValueCondition')
+const onInputValue = (payload: number) => {
     inputValueCondition && inputValueCondition({
         ...allIds.value,
-        value: Number(target.value)
+        value: payload
     })
 }
 </script>

@@ -33,7 +33,13 @@
       "hadPropertyValue": "Had property value",
       "didEvent": "Did event",
       "funnel": "Funnel",
-      "retained": "Retained"
+      "retained": "Retained",
+
+      "hasPropertyValue_hint": "Has property value description",
+      "hadPropertyValue_hint": "Had property value description",
+      "didEvent_hint": "Did event description",
+      "funnel_hint": "Funnel description",
+      "retained_hint": "Retained description"
     },
     "aggregates": {
       "count": "Count",

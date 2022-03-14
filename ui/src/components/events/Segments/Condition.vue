@@ -175,7 +175,7 @@
 <script lang="ts" setup>
 import { inject, computed, ref } from 'vue'
 import { operationById, OperationId, Value } from '@/types'
-import { PropertyRef, Condition as ConditionType, EventRef } from '@/types/events'
+import { PropertyRef, Condition as ConditionType } from '@/types/events'
 import {
     ChangeFilterPropertyCondition,
     RemoveFilterCondition,
