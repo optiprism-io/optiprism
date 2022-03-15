@@ -281,6 +281,10 @@ export interface Condition {
         name: string
         ref: EventRef
     }
+    compareEvent?: {
+        name: string
+        ref: EventRef
+    }
     filters: ConditionFilter[]
     aggregate?: {
         name?: string

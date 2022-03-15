@@ -341,7 +341,9 @@ export default function ({ environment = "development" } = {}) {
             });
 
             this.post("/queries/event-segmentation", (_, request) => {
-                if (JSON.parse(request.requestBody).events.length) {
+                const body = JSON.parse(request.requestBody);
+
+                if (body.events.length || body.segments) {
                     return eventSegmentationsMocks;
                 } else {
                     return {

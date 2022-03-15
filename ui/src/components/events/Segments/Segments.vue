@@ -104,6 +104,14 @@ provide('changePeriodCondition',  (payload: PeriodConditionPayload) => segmentsS
 provide('addFilterCondition', (payload: Ids) => segmentsStore.addFilterCondition(payload))
 provide('removeFilterCondition', (payload: RemoveFilterCondition) => segmentsStore.removeFilterCondition(payload))
 provide('changeFilterPropertyCondition', (payload: ChangeFilterPropertyCondition) => segmentsStore.changeFilterPropertyCondition(payload))
+provide('changeFilterOperation', (payload: ChangeFilterOperation) => segmentsStore.changeFilterOperation(payload))
+provide('addFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.addFilterValueCondition(payload))
+provide('removeFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.removeFilterValueCondition(payload))
+provide('inputValueCondition', (payload: PayloadChangeValueItem) => segmentsStore.inputValue(payload))
+
+/**
+ * Events condition
+ */
 provide('changeEventCondition', (payload: ChangeEventCondition) => {
     segmentsStore.changeEventCondition(payload)
     segmentsStore.changeAgregateCondition({
@@ -115,10 +123,11 @@ provide('changeEventCondition', (payload: ChangeEventCondition) => {
         }
     })
 })
-provide('changeFilterOperation', (payload: ChangeFilterOperation) => segmentsStore.changeFilterOperation(payload))
-provide('addFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.addFilterValueCondition(payload))
-provide('removeFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.removeFilterValueCondition(payload))
-provide('inputValueCondition', (payload: PayloadChangeValueItem) => segmentsStore.inputValue(payload))
+
+provide('changeCompareEventCondition', (payload: ChangeEventCondition) => {
+    segmentsStore.changeCompareEventCondition(payload)
+})
+
 
 watch(
     segmentsStore.segments,

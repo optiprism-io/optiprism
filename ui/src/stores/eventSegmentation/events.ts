@@ -10,11 +10,13 @@ import {
 import { OperationId, Value, Group } from "@/types";
 import schemaService from "@/api/services/schema.service";
 import queriesService, { EventSegmentation } from "@/api/services/queries.service";
-import { useLexiconStore } from "@/stores/lexicon";
 import { getYYYYMMDD, getStringDateByFormat } from "@/helpers/getStringDates";
 import { getLastNDaysRange } from "@/helpers/calendarHelper";
 import { TimeUnit } from "@/types";
 import {Column, Row} from "@/components/uikit/UiTable/UiTable";
+
+import { useLexiconStore } from "@/stores/lexicon";
+import { useSegmentsStore } from "@/stores/eventSegmentation/segments";
 
 const COLUMN_WIDTH = 170;
 export type ChartType = 'line' | 'pie' | 'column';
@@ -223,6 +225,7 @@ export const useEventsStore = defineStore("events", {
         },
         propsForEventSegmentationResult(): EventSegmentation {
             const lexiconStore = useLexiconStore();
+            const segmentsStore = useSegmentsStore()
 
             let time = {
                 from: new Date(this.period.from),
@@ -281,6 +284,7 @@ export const useEventsStore = defineStore("events", {
 
                     return event;
                 }),
+                segments: segmentsStore.segments.length ? segmentsStore.segments : null,
             };
 
             if (this.compareTo) {

@@ -119,6 +119,23 @@ export const useSegmentsStore = defineStore("segments", {
                 }
             }
         },
+        changeCompareEventCondition(payload: ChangeEventCondition) {
+            const segment = this.segments[payload.idxParent]
+
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+
+                if (condition) {
+                    const lexiconStore = useLexiconStore()
+                    const event = lexiconStore.findEvent(payload.ref);
+
+                    condition.compareEvent = {
+                        name: event?.displayName || event.name,
+                        ref: payload.ref,
+                    }
+                }
+            }
+        },
         async changeFilterPropertyCondition(payload: ChangeFilterPropertyCondition) {
             const segment = this.segments[payload.idxParent]
             if (segment && segment.conditions) {

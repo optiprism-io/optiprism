@@ -74,6 +74,28 @@
         </OperationSelect>
     </div>
     <div
+        v-if="isShowNextEventSelect"
+        class="pf-c-action-list__item"
+    >
+        <Select
+            grouped
+            :items="compareEventItems"
+            :width-auto="true"
+            @select="changeCompareEvent"
+        >
+            <UiButton
+                class="pf-m-main"
+                :class="{
+                    'pf-m-secondary': props.condition.compareEvent,
+                }"
+                type="button"
+                :before-icon="!props.condition.compareEvent ? 'fas fa-plus-circle' : ''"
+            >
+                {{ props.condition?.compareEvent?.name || $t('common.add_event') }}
+            </UiButton>
+        </Select>
+    </div>
+    <div
         v-if="isHasValue"
         class="pf-c-action-list__item"
     >
@@ -152,6 +174,7 @@ const conditionConfig = computed(() => {
  * Event
  */
 const changeEventCondition = inject<(payload: ChangeEventCondition) => void>('changeEventCondition')
+const changeCompareEventCondition = inject<(payload: ChangeEventCondition) => void>('changeCompareEventCondition')
 
 const changeEvent = (ref: EventRef) => {
     changeEventCondition && changeEventCondition({
@@ -160,6 +183,33 @@ const changeEvent = (ref: EventRef) => {
         ref,
     })
 }
+
+const changeCompareEvent = (ref: EventRef) => {
+    changeCompareEventCondition && changeCompareEventCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+        ref,
+    })
+}
+
+const isShowNextEventSelect = computed(() => {
+    return props.condition.aggregate?.id === 'relativeCount'
+})
+
+const compareEventItems = computed(() => {
+    return lexiconStore.eventsList.map(eventGroup => {
+        return {
+            ...eventGroup,
+            items: eventGroup.items.map(event => {
+                return {
+                    ...event,
+                    disabled: props.condition.event?.ref.id === event.item.id,
+                }
+            })
+
+        }
+    })
+})
 
 /**
  * Agregate
@@ -244,7 +294,7 @@ const changeOperation = (opId: OperationId) => emit('change-operation', opId)
  * Value
  */
 const isHasValue = computed(() => {
-    return isSelectedAggregate.value ? didEventAggregateSelectedConfig.value?.hasProperty ? Boolean(props.condition.propRef) : true : false
+    return !isShowNextEventSelect.value && isSelectedAggregate.value ? didEventAggregateSelectedConfig.value?.hasProperty ? Boolean(props.condition.propRef) : true : false
 })
 
 const valueList = computed(() => {
