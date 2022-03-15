@@ -51,7 +51,7 @@
                     @select="changeOperation"
                 >
                     <UiButton class="pf-m-main pf-m-secondary">
-                        {{ operationById?.get(filter.opId)?.name }}
+                        {{ operationButtonText }}
                     </UiButton>
                 </OperationSelect>
             </div>
@@ -154,7 +154,10 @@ const emit = defineEmits<{
     (e: "handleSelectProperty"): void;
 }>();
 
-const isNowSelectedFilterRef = computed(() => !props?.filter?.propRef);
+const operationButtonText = computed(() => {
+    return props.filter.opId ? operationById?.get(props.filter.opId)?.shortName || operationById?.get(props.filter.opId)?.name : '';
+})
+
 const filterItemValues = computed(() =>
     props.filter.valuesList.map((item: string, i) => {
         return { item, name: item };

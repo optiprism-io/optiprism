@@ -59,7 +59,7 @@
                         @select="changeOperation"
                     >
                         <UiButton class="pf-m-main pf-m-secondary">
-                            {{ operationById?.get(props.condition.opId)?.name }}
+                            {{ operationButtonText }}
                         </UiButton>
                     </OperationSelect>
                 </div>
@@ -305,6 +305,10 @@ const conditionValuesItems = computed(() => {
     } else {
         return []
     }
+})
+
+const operationButtonText = computed(() => {
+    return props.condition.opId ? operationById?.get(props.condition.opId)?.shortName || operationById?.get(props.condition.opId)?.name : '';
 })
 
 const changePropertyCondition = inject<(idx: number, indexParent: number, propRef: PropertyRef) => void>('changePropertyCondition')

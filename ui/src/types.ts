@@ -58,6 +58,7 @@ export enum OperationId {
 export interface Operation {
     id: OperationId;
     name: string;
+    shortName?: string;
     typeKinds?: DataTypeKind[];
     flags?: OpFlag[];
 }
@@ -70,36 +71,42 @@ enum OpFlag {
 export const operations: Operation[] = [
     {
         id: OperationId.Eq,
-        name: "Equal (=)"
+        name: "Equal (=)",
+        shortName: '='
     },
     {
         id: OperationId.Neq,
-        name: "Not Equal (!=)"
+        name: "Not Equal (!=)",
+        shortName: '!=',
     },
     {
         id: OperationId.Gt,
         name: "Greater (>)",
-        typeKinds: [DataTypeKind.Number]
+        typeKinds: [DataTypeKind.Number],
+        shortName: '>',
     },
     {
         id: OperationId.Gte,
         name: "Greater or Equal (>=)",
-        typeKinds: [DataTypeKind.Number]
+        typeKinds: [DataTypeKind.Number],
+        shortName: '>=',
     },
     {
         id: OperationId.Lt,
         name: "Less (<)",
-        typeKinds: [DataTypeKind.Number]
+        typeKinds: [DataTypeKind.Number],
+        shortName: '<',
     },
     {
         id: OperationId.Lte,
         name: "Less or Equal (<=)",
-        typeKinds: [DataTypeKind.Number]
+        typeKinds: [DataTypeKind.Number],
+        shortName: '<=',
     },
     {
         id: OperationId.True,
         name: "True",
-        typeKinds: [DataTypeKind.Boolean]
+        typeKinds: [DataTypeKind.Boolean],
     },
     {
         id: OperationId.False,

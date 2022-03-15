@@ -69,7 +69,7 @@
             @select="changeOperation"
         >
             <UiButton class="pf-m-main pf-m-secondary">
-                {{ operationById?.get(props.condition.opId)?.name }}
+                {{ operationButtonText }}
             </UiButton>
         </OperationSelect>
     </div>
@@ -219,6 +219,10 @@ const changeProperty = (propRef: PropertyRef) => emit('change-property', propRef
  */
 const isShowSelectOpt = computed(() => {
     return isSelectedAggregate ? didEventAggregateSelectedConfig.value?.hasProperty ? Boolean(props.condition.propRef) : true : false
+})
+
+const operationButtonText = computed(() => {
+    return props.condition.opId ? operationById?.get(props.condition.opId)?.shortName || operationById?.get(props.condition.opId)?.name : '';
 })
 
 const opItems = computed(() => {
