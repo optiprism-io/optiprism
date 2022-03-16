@@ -44,9 +44,7 @@
         v-if="isShowSelectProp"
         class="pf-c-action-list__item"
     >
-        <PropertySelect
-            @select="changeProperty"
-        >
+        <PropertySelect @select="changeProperty">
             <UiButton
                 class="pf-m-main"
                 :class="{
@@ -268,7 +266,7 @@ const changeProperty = (propRef: PropertyRef) => emit('change-property', propRef
  * Operation
  */
 const isShowSelectOpt = computed(() => {
-    return isSelectedAggregate ? didEventAggregateSelectedConfig.value?.hasProperty ? Boolean(props.condition.propRef) : true : false
+    return isSelectedAggregate.value ? didEventAggregateSelectedConfig.value?.hasProperty ? Boolean(props.condition.propRef) : true : false
 })
 
 const operationButtonText = computed(() => {
