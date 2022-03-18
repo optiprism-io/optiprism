@@ -10,8 +10,17 @@
     "calendar": {
       "last": "Last",
       "since": "Since",
+      "between": "Between",
+      "each": "Each",
       "day": "day",
-      "days": "days"
+      "days": "days",
+      "each_select": {
+        "month": "Month",
+        "week": "Week",
+        "day": "Day",
+        "hour": "Hour",
+        "minute": "Minute"
+      }
     }
   },
 

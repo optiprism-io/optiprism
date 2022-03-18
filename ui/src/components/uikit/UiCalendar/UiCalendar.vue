@@ -468,7 +468,7 @@ watch(() => props.value, (value) => {
     }
 
     &__footer {
-        border-top: var(--pf-c-calendar-month__days--BorderBottomWidth) solid var(--pf-c-calendar-month__days--BorderBottomColor);
+        border-top: 1px solid var(--pf-global--BackgroundColor--200);
     }
 
     .pf-c-calendar-month {

@@ -112,12 +112,14 @@
                     :value="calendarValue"
                     :last-count="lastCount"
                     :active-tab-controls="props.condition?.period?.type"
+                    :show-each="true"
+                    @on-change-each="onChangeEach"
                     @on-apply="onApplyPeriod"
                 >
                     <template #action>
                         <UiButton
                             class="pf-m-main"
-                            :before-icon="'fas fa-calendar-alt'"
+                            :before-icon="props.condition.each ? '' : 'fas fa-calendar-alt'"
                             :class="{
                                 'pf-m-secondary': isSelectedCalendar,
                             }"
@@ -183,16 +185,19 @@ import {
     FilterValueCondition,
     Ids,
     PeriodConditionPayload,
+    PayloadChangeEach,
 } from '@/components/events/Segments/ConditionTypes'
+import { conditions } from '@/configs/events/segmentCondition'
+import { useLexiconStore } from '@/stores/lexicon'
+import { getStringDateByFormat } from '@/helpers/getStringDates'
+import { Each } from '@/components/uikit/UiCalendar/UiCalendarType'
+
 import Select from '@/components/Select/Select.vue'
 import UiButton from '@/components/uikit/UiButton.vue'
 import PropertySelect from '@/components/events/PropertySelect.vue'
 import OperationSelect from '@/components/events/OperationSelect.vue'
 import ValueSelect from '@/components/events/ValueSelect.vue'
 import Filter from '@/components/events/Filter.vue'
-import { conditions } from '@/configs/events/segmentCondition'
-import { useLexiconStore } from '@/stores/lexicon'
-import { getStringDateByFormat } from '@/helpers/getStringDates'
 import UiDatePicker, { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
 import ConditionDidEvent from './ConditionDidEvent.vue'
 
@@ -236,19 +241,25 @@ const isHasFilter = computed(() => {
     return props.condition?.action?.id === 'didEvent' && props.condition.event
 })
 
+
+/**
+ * Calendar Period
+ */
 const isSelectedCalendar = computed(() => {
-    return props.condition.period && props.condition.period.from && props.condition.period.to
+    return props.condition.each || props.condition.period && props.condition.period.from && props.condition.period.to
 })
 
 const calendarValueString = computed(() => {
-    if (props.condition.period && props.condition.period.from && props.condition.period.to) {
+    if (props.condition.period) {
         switch(props.condition.period.type) {
             case 'last':
                 return `${i18n.$t('common.calendar.last')} ${props.condition.period.last} ${props.condition.period.last === 1 ? i18n.$t('common.calendar.day') : i18n.$t('common.calendar.days')}`
             case 'since':
-                return `${i18n.$t('common.calendar.since')} ${getStringDateByFormat(props.condition.period.from, '%d %b, %Y')}`
+                return props.condition.period.from ? `${i18n.$t('common.calendar.since')} ${getStringDateByFormat(props.condition.period.from, '%d %b, %Y')}` : ''
             case 'between':
-                return `${getStringDateByFormat(props.condition.period.from, '%d %b, %Y')} - ${getStringDateByFormat(props.condition.period.to, '%d %b, %Y')}`
+                return props.condition.period.from && props.condition.period.to ? `${getStringDateByFormat(props.condition.period.from, '%d %b, %Y')} - ${getStringDateByFormat(props.condition.period.to, '%d %b, %Y')}` : ''
+            case 'each':
+                return `${i18n.$t('common.calendar.each')} ${i18n.$t(`common.calendar.each_select.${props.condition.each}`).toLowerCase()}`
             default:
                 return i18n.$t('common.select_period')
         }
@@ -325,6 +336,8 @@ const addFilterValueCondition = inject<(payload: FilterValueCondition) => void>(
 const removeFilterValueCondition = inject<(payload: FilterValueCondition) => void>('removeFilterValueCondition')
 const changePeriodCondition = inject<(payload: PeriodConditionPayload) => void>('changePeriodCondition')
 const onRemoveCondition = inject<(payload: Ids) => void>('onRemoveCondition')
+const changeEachCondition = inject<(payload: PayloadChangeEach) => void>('changeEachCondition')
+
 const changeConditionAction = (payload: { id: string, name: string }) => changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
 const changeProperty = (propRef: PropertyRef) => changePropertyCondition && changePropertyCondition(props.index, props.indexParent, propRef)
 const changeOperation = (opId: OperationId) => changeOperationCondition && changeOperationCondition(props.index, props.indexParent, opId)
@@ -399,6 +412,14 @@ const removeFilterValue = (id: number, value: Value) => {
         idxParent: props.indexParent,
         idxFilter: id,
         value,
+    })
+}
+
+const onChangeEach = (payload: Each) => {
+    changeEachCondition && changeEachCondition({
+        idx: props.index,
+        idxParent: props.indexParent,
+        value: payload,
     })
 }
 </script>

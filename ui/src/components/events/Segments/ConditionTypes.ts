@@ -1,6 +1,7 @@
 import { PropertyRef, EventRef } from '@/types/events'
 import { OperationId, Value } from '@/types'
 import { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
+import { Each } from '@/components/uikit/UiCalendar/UiCalendarType'
 
 export type Ids = {
     idx: number
@@ -42,4 +43,8 @@ export interface PayloadChangeAgregateCondition extends Ids {
 
 export interface PayloadChangeValueItem extends Ids {
     value: string | number
+}
+
+export interface PayloadChangeEach extends Ids {
+    value: Each
 }

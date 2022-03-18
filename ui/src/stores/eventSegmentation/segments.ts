@@ -18,6 +18,7 @@ import {
     PeriodConditionPayload,
     PayloadChangeAgregateCondition,
     PayloadChangeValueItem,
+    PayloadChangeEach,
 } from '@/components/events/Segments/ConditionTypes'
 import { getYYYYMMDD } from '@/helpers/getStringDates'
 import { getLastNDaysRange } from '@/helpers/calendarHelper'
@@ -37,6 +38,19 @@ export const useSegmentsStore = defineStore("segments", {
     }),
     getters: {},
     actions: {
+        inputCalendarEach(payload: PayloadChangeEach) {
+            const segment = this.segments[payload.idxParent]
+
+            if (segment && segment.conditions) {
+                const condition = segment.conditions[payload.idx]
+                if (condition) {
+                    condition.each = payload.value
+                    condition.period = {
+                        type: 'each',
+                    }
+                }
+            }
+        },
         inputValue(payload: PayloadChangeValueItem) {
             const segment = this.segments[payload.idxParent]
 
@@ -56,13 +70,10 @@ export const useSegmentsStore = defineStore("segments", {
                     delete condition.propRef
                     condition.aggregate = payload.value
                     condition.opId = OperationId.Gte
-                    const lastNDateRange = getLastNDaysRange(30);
                     condition.period = {
-                        from: getYYYYMMDD(lastNDateRange.from),
-                        to: getYYYYMMDD(new Date()),
-                        last: 30,
-                        type: 'last',
+                        type: 'each',
                     }
+                    condition.each = 'day'
                     condition.filters = []
                     condition.values = []
                     condition.valueItem = 1
@@ -214,6 +225,7 @@ export const useSegmentsStore = defineStore("segments", {
                         last: payload.value.last,
                         type: payload.value.type,
                     }
+                    delete condition.each
                 }
             }
         },
@@ -275,14 +287,10 @@ export const useSegmentsStore = defineStore("segments", {
                     condition.propRef = ref
                     condition.opId = OperationId.Eq
                     condition.values = []
-
-                    const lastNDateRange = getLastNDaysRange(30);
                     condition.period = {
-                        from: getYYYYMMDD(lastNDateRange.from),
-                        to: getYYYYMMDD(new Date()),
-                        last: 30,
-                        type: 'last',
+                        type: 'each',
                     }
+                    condition.each = 'day'
                 }
             }
         },

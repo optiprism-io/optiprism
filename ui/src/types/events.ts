@@ -1,5 +1,6 @@
 import { DataType, OperationId, Value } from '@/types'
-import { AggregateId } from '@/types/aggregate';
+import { AggregateId } from '@/types/aggregate'
+import { Each } from '@/components/uikit/UiCalendar/UiCalendarType'
 
 export const EVENT_TYPE_REGULAR = 'regular'
 export const EVENT_TYPE_CUSTOM = 'custom'
@@ -291,4 +292,5 @@ export interface Condition {
         id: string,
         typeAggregate?: string
     }
+    each?: Each
 }

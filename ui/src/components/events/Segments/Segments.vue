@@ -36,6 +36,7 @@ import {
     PeriodConditionPayload,
     PayloadChangeAgregateCondition,
     PayloadChangeValueItem,
+    PayloadChangeEach,
 } from '@/components/events/Segments/ConditionTypes'
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
@@ -108,6 +109,14 @@ provide('changeFilterOperation', (payload: ChangeFilterOperation) => segmentsSto
 provide('addFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.addFilterValueCondition(payload))
 provide('removeFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.removeFilterValueCondition(payload))
 provide('inputValueCondition', (payload: PayloadChangeValueItem) => segmentsStore.inputValue(payload))
+
+/**
+ * Period Calendar
+ */
+provide('changeEachCondition', (payload: PayloadChangeEach) => {
+    segmentsStore.inputCalendarEach(payload)
+})
+
 
 /**
  * Events condition
