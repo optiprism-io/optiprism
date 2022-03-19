@@ -186,11 +186,12 @@ import {
     Ids,
     PeriodConditionPayload,
     PayloadChangeEach,
-} from '@/components/events/Segments/ConditionTypes'
+} from '@/components/events/Segments/SegmentsType'
 import { conditions } from '@/configs/events/segmentCondition'
 import { useLexiconStore } from '@/stores/lexicon'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
-import { Each } from '@/components/uikit/UiCalendar/UiCalendarType'
+
+import { Each, ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 
 import Select from '@/components/Select/Select.vue'
 import UiButton from '@/components/uikit/UiButton.vue'
@@ -198,7 +199,7 @@ import PropertySelect from '@/components/events/PropertySelect.vue'
 import OperationSelect from '@/components/events/OperationSelect.vue'
 import ValueSelect from '@/components/events/ValueSelect.vue'
 import Filter from '@/components/events/Filter.vue'
-import UiDatePicker, { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
+import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
 import ConditionDidEvent from './ConditionDidEvent.vue'
 
 const i18n = inject<any>('i18n')

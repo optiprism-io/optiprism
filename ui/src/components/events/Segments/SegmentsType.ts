@@ -1,7 +1,6 @@
 import { PropertyRef, EventRef } from '@/types/events'
 import { OperationId, Value } from '@/types'
-import { ApplyPayload } from '@/components/uikit/UiDatePicker.vue'
-import { Each } from '@/components/uikit/UiCalendar/UiCalendarType'
+import { Each, ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 
 export type Ids = {
     idx: number

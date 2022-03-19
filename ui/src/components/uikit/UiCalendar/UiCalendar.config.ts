@@ -1,4 +1,4 @@
-export type Each = 'month' | 'week' | 'day' | 'hour' | 'minute'
+import { Each } from './UiCalendar'
 
 export const eachMap: Each[] = [
     'month',

@@ -37,7 +37,7 @@ import {
     PayloadChangeAgregateCondition,
     PayloadChangeValueItem,
     PayloadChangeEach,
-} from '@/components/events/Segments/ConditionTypes'
+} from '@/components/events/Segments/SegmentsType'
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useLexiconStore } from '@/stores/lexicon'

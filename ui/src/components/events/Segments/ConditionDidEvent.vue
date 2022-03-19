@@ -125,7 +125,7 @@ import { useLexiconStore } from '@/stores/lexicon'
 import { Item } from "@/components/Select/SelectTypes";
 import { findOperations, operationById, OperationId, DataType } from '@/types'
 import { PropertyRef, Condition as ConditionType, EventRef } from '@/types/events'
-import { ChangeEventCondition, PayloadChangeAgregateCondition, PayloadChangeValueItem } from '@/components/events/Segments/ConditionTypes'
+import { ChangeEventCondition, PayloadChangeAgregateCondition, PayloadChangeValueItem } from '@/components/events/Segments/SegmentsType'
 
 import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
 import { conditions } from '@/configs/events/segmentCondition'

@@ -76,33 +76,13 @@
 </template>
 
 <script lang="ts" setup>
-import {computed, ref, onMounted, watch} from "vue";
-import {VirtualisedList} from "vue-virtualised";
-import UiCalendarMonth, {Ranged} from './UiCalendarMonth.vue';
+import { computed, ref, onMounted, watch } from "vue";
+import { VirtualisedList } from "vue-virtualised";
 
-export interface RangeValue {
-    i?: number;
-    id: string;
-    month?: number;
-    year?: number;
-}
+import UiCalendarMonth from './UiCalendarMonth.vue';
 
-export interface CurrentValue {
-    from: null | string,
-    to: null | string,
-    dates: string[],
-    multiple: boolean,
-    type: string,
-    activeDates: string[],
-    date: string | null,
-}
+import { RangeValue, CurrentValue, Value, Ranged } from './UiCalendar'
 
-export interface Value {
-    from: string,
-    to: string,
-    multiple: boolean,
-    dates?: string[],
-}
 
 interface Props {
     dates?: string[];

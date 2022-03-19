@@ -57,10 +57,8 @@ import {
     getOrderedWeekdays,
 } from '@/helpers/calendarHelper';
 
-export interface Ranged {
-    from: string | null;
-    to: string | null;
-}
+import { Ranged } from './UiCalendar'
+
 
 interface CellDate {
     date: number;

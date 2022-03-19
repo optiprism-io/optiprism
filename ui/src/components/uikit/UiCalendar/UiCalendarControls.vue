@@ -1,5 +1,5 @@
 <template>
-    <div class="pf-c-card pf-m-display-lg pf-u-min-width">
+    <div class="pf-m-display-lg pf-u-min-width">
         <div class="pf-c-menu pf-m-plain pf-m-scrollable">
             <ul class="pf-c-menu__list">
                 <li

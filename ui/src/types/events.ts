@@ -1,6 +1,6 @@
 import { DataType, OperationId, Value } from '@/types'
 import { AggregateId } from '@/types/aggregate'
-import { Each } from '@/components/uikit/UiCalendar/UiCalendarType'
+import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
 
 export const EVENT_TYPE_REGULAR = 'regular'
 export const EVENT_TYPE_CUSTOM = 'custom'

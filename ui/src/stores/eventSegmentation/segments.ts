@@ -19,9 +19,7 @@ import {
     PayloadChangeAgregateCondition,
     PayloadChangeValueItem,
     PayloadChangeEach,
-} from '@/components/events/Segments/ConditionTypes'
-import { getYYYYMMDD } from '@/helpers/getStringDates'
-import { getLastNDaysRange } from '@/helpers/calendarHelper'
+} from '@/components/events/Segments/SegmentsType'
 
 interface Segment {
     name: string

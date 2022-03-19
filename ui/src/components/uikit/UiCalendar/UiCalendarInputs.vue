@@ -86,7 +86,8 @@
 <script lang="ts" setup>
 import { computed, inject } from "vue";
 import UiInput from "@/components/uikit/UiInput.vue";
-import { eachMap, Each } from '@/components/uikit/UiCalendar/UiCalendarType'
+import { Each } from './UiCalendar'
+import { eachMap } from './UiCalendar.config'
 
 const i18n = inject<any>('i18n')
 

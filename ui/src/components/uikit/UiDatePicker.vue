@@ -60,15 +60,9 @@ import { getLastNDaysRange, dateDiff, isDate } from "@/helpers/calendarHelper";
 
 import UiCalendarControls from "@/components/uikit/UiCalendar/UiCalendarControls.vue";
 import UiCalendarInputs from './UiCalendar/UiCalendarInputs.vue'
-import UiCalendar, { Value, CurrentValue } from "@/components/uikit/UiCalendar/UiCalendar.vue";
+import UiCalendar from "@/components/uikit/UiCalendar/UiCalendar.vue";
 
-import { Each } from '@/components/uikit/UiCalendar/UiCalendarType'
-
-export interface ApplyPayload {
-    value: CurrentValue,
-    type: string,
-    last: number,
-}
+import { Each, ApplyPayload, CurrentValue, Value } from '@/components/uikit/UiCalendar/UiCalendar'
 
 interface Props {
     showControls?: boolean
@@ -299,6 +293,10 @@ watch(() => props.lastCount, (value) => {
         max-width: 330px;
         min-width: 200px;
         border-left: 1px solid var(--pf-global--BackgroundColor--200);
+    }
+
+    .pf-c-menu.pf-m-plain {
+        box-shadow: none;
     }
 }
 </style>
