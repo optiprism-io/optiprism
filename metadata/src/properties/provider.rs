@@ -48,7 +48,7 @@ fn index_keys(
             IDX_DISPLAY_NAME,
             display_name,
         )
-        .to_vec()
+            .to_vec()
     }));
 
     idx
@@ -166,7 +166,7 @@ impl Provider {
             .await
         {
             Ok(prop) => return Ok(prop),
-            Err(Error::KeyNotFound) => {}
+            Err(Error::KeyNotFound(_)) => {}
             Err(err) => return Err(err),
         }
 
@@ -179,17 +179,19 @@ impl Provider {
         project_id: u64,
         id: u64,
     ) -> Result<Property> {
+        let key = make_data_value_key(
+            organization_id,
+            project_id,
+            self.ns.as_bytes(),
+            id,
+        );
+
         match self
             .store
-            .get(make_data_value_key(
-                organization_id,
-                project_id,
-                self.ns.as_bytes(),
-                id,
-            ))
+            .get(&key)
             .await?
         {
-            None => Err(Error::KeyNotFound),
+            None => Err(Error::KeyNotFound(String::from_utf8(key)?)),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -235,7 +237,7 @@ impl Provider {
             project_id,
             self.ns.as_bytes(),
         )
-        .await
+            .await
     }
 
     pub async fn update(
@@ -327,7 +329,7 @@ impl Provider {
                     &prop.name,
                     &prop.display_name,
                 )
-                .as_ref(),
+                    .as_ref(),
             )
             .await?;
         Ok(prop)

@@ -85,11 +85,11 @@ impl HashMap {
     }
 
     pub async fn get<K>(&self, key: K) -> Result<Vec<u8>>
-    where
-        K: AsRef<[u8]>,
+        where
+            K: AsRef<[u8]>,
     {
-        match self.store.get(key).await? {
-            None => Err(Error::KeyNotFound),
+        match self.store.get(key.as_ref()).await? {
+            None => Err(Error::KeyNotFound(String::from_utf8(key.as_ref().to_vec())?)),
             Some(v) => Ok(v),
         }
     }
