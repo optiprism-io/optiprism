@@ -28,38 +28,13 @@ mod tests {
     use datafusion::logical_plan::TableScan;
     use rust_decimal::Decimal;
     use uuid::Uuid;
-    use common::{DataType, ScalarValue};
+    use common::{DataType, DECIMAL_PRECISION, DECIMAL_SCALE, ScalarValue};
     use metadata::{events, Metadata, properties, Store};
     use metadata::properties::CreatePropertyRequest;
     use query::Context;
     use query::event_segmentation::{LogicalPlanBuilder, Analysis, Breakdown, ChartType, Event, event_fields, EventFilter, EventRef, EventSegmentation, NamedQuery, Operation, PropertyRef, Query, QueryTime, TimeUnit};
     use query::physical_plan::expressions::aggregate::AggregateFunction;
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-
-    fn users_provider() -> Result<MemTable> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new(
-                "created_at",
-                DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
-                false,
-            ),
-            Field::new("b", DFDataType::Int32, false),
-            Field::new("c", DFDataType::Int32, false),
-            Field::new("d", DFDataType::Int32, true),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(TimestampMicrosecondArray::from(vec![1, 2, 3])),
-                Arc::new(Int32Array::from(vec![4, 5, 6])),
-                Arc::new(Int32Array::from(vec![7, 8, 9])),
-                Arc::new(Int32Array::from(vec![None, None, Some(9)])),
-            ],
-        )?;
-
-        Ok(MemTable::try_new(schema, vec![vec![batch]])?)
-    }
 
     fn events_schema() -> Schema {
         Schema::new(vec![
@@ -70,10 +45,10 @@ mod tests {
                 false,
             ),
             Field::new(event_fields::EVENT, DFDataType::UInt16, false),
-            Field::new("country", DFDataType::Utf8, true),
-            Field::new("device", DFDataType::Utf8, true),
-            Field::new("0_float64", DFDataType::Float64, true),
-            Field::new("1_utf8", DFDataType::Utf8, true),
+            Field::new("0_utf8", DFDataType::Utf8, true), // country
+            Field::new("1_utf8", DFDataType::Utf8, true), // device
+            Field::new("0_float64", DFDataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE), true), // revenue
+            Field::new("1_utf8", DFDataType::Utf8, true), //
             Field::new("2_int8", DFDataType::Int8, true),
         ])
     }
@@ -248,12 +223,12 @@ mod tests {
                 EventRef::Regular("Buy Product".to_string()),
                 Some(vec![
                     EventFilter::Property {
-                        property: PropertyRef::Event("revenue".to_string()),
+                        property: PropertyRef::Event("Revenue".to_string()),
                         operation: Operation::IsNull,
                         value: None,
                     },
                     EventFilter::Property {
-                        property: PropertyRef::Event("revenue".to_string()),
+                        property: PropertyRef::Event("Revenue".to_string()),
                         operation: Operation::Eq,
                         value: Some(vec![
                             ScalarValue::Number(Some(Decimal::new(1, 0))),
@@ -262,12 +237,12 @@ mod tests {
                         ]),
                     },
                     EventFilter::Property {
-                        property: PropertyRef::User("country".to_string()),
+                        property: PropertyRef::User("Country".to_string()),
                         operation: Operation::IsNull,
                         value: None,
                     },
                     EventFilter::Property {
-                        property: PropertyRef::User("country".to_string()),
+                        property: PropertyRef::User("Country".to_string()),
                         operation: Operation::Eq,
                         value: Some(vec![
                             ScalarValue::String(Some("Spain".to_string())),
@@ -292,7 +267,7 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
-                            property: PropertyRef::Event("revenue".to_string()),
+                            property: PropertyRef::Event("Revenue".to_string()),
                             aggregate_per_group: PartitionedAggregateFunction::Avg,
                             aggregate: AggregateFunction::Avg,
                         },
@@ -300,7 +275,7 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
-                            property: PropertyRef::Event("revenue".to_string()),
+                            property: PropertyRef::Event("Revenue".to_string()),
                             aggregate_per_group: PartitionedAggregateFunction::Min,
                             aggregate: AggregateFunction::Avg,
                         },
@@ -308,7 +283,7 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::AggregateProperty {
-                            property: PropertyRef::Event("revenue".to_string()),
+                            property: PropertyRef::Event("Revenue".to_string()),
                             aggregate: AggregateFunction::Sum,
                         },
                         Some("sum_revenue".to_string()),
@@ -317,12 +292,12 @@ mod tests {
             )],
             filters: Some(vec![
                 EventFilter::Property {
-                    property: PropertyRef::User("device".to_string()),
+                    property: PropertyRef::User("Device".to_string()),
                     operation: Operation::Eq,
                     value: Some(vec![ScalarValue::String(Some("Iphone".to_string()))]),
                 },
                 EventFilter::Property {
-                    property: PropertyRef::User("is_premium".to_string()),
+                    property: PropertyRef::User("Is Premium".to_string()),
                     operation: Operation::Eq,
                     value: Some(vec![ScalarValue::Number(Some(Decimal::new(1, 0)))]),
                 },
@@ -414,7 +389,7 @@ mod tests {
             )],
             filters: None,
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
-                "country".to_string(),
+                "Country".to_string(),
             ))]),
             segments: None,
         };

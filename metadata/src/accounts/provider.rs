@@ -66,7 +66,7 @@ impl Provider {
 
     pub async fn get_by_id(&self, id: u64) -> Result<Account> {
         match self.store.get(make_data_value_key(NAMESPACE, id)).await? {
-            None => Err(Error::KeyNotFound),
+            None => Err(Error::KeyNotFound(id.to_string())),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
