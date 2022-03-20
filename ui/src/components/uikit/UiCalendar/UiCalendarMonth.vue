@@ -84,7 +84,7 @@ interface Props {
     weekDays: string[];
     monthsNames: string[];
     activeDates?: string[];
-    ranged: Ranged | string[];
+    ranged: Ranged;
     years: Year[];
     showSelectYears: boolean;
     allowFuture: boolean;

@@ -1,12 +1,12 @@
 <template>
     <h1 class="pf-u-font-size-2xl pf-u-mb-md">
-        Event Segmentation
+        {{ $t('events.event_segmentation') }}
     </h1>
     <div class="pf-l-grid pf-m-gutter">
         <div class="pf-l-grid__item pf-m-12-col pf-m-6-col-on-lg">
             <div class="pf-c-card pf-m-compact pf-u-h-100">
                 <div class="pf-c-card__title">
-                    <p>Events</p>
+                    <p>{{ $t('events.events') }}</p>
                 </div>
                 <div class="pf-c-card__body">
                     <Events />
@@ -26,7 +26,7 @@
         <div class="pf-l-grid__item pf-m-12-col pf-m-6-col-on-lg">
             <div class="pf-c-card pf-m-compact pf-u-h-100">
                 <div class="pf-c-card__title">
-                    <p>Filters</p>
+                    <p>{{ $t('events.filters') }}</p>
                 </div>
                 <div class="pf-c-card__body">
                     <Filters />
@@ -36,7 +36,7 @@
         <div class="pf-l-grid__item pf-m-12-col pf-m-6-col-on-lg">
             <div class="pf-c-card pf-m-compact pf-u-h-100">
                 <div class="pf-c-card__title">
-                    <p>Breakdowns</p>
+                    <p>{{ $t('events.breakdowns') }}</p>
                 </div>
                 <div class="pf-c-card__body">
                     <Breakdowns />

@@ -20,11 +20,17 @@
         "day": "Day",
         "hour": "Hour",
         "minute": "Minute"
-      }
+      },
+      "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+      "week_days": ["mo", "tu", "we", "th", "fr", "sa", "su"]
     }
   },
 
   "events": {
+    "filters": "Filters",
+    "breakdowns": "Breakdowns",
+    "events": "Events",
+    "event_segmentation": "Event Segmentation",
     "select_to_start": "Select an Event to get started",
     "select_property": "Select property",
     "select_value": "Select value",

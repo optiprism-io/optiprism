@@ -76,13 +76,14 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, onMounted, watch } from "vue";
+import { computed, ref, onMounted, watch, inject } from "vue";
 import { VirtualisedList } from "vue-virtualised";
-
-import UiCalendarMonth from './UiCalendarMonth.vue';
 
 import { RangeValue, CurrentValue, Value, Ranged } from './UiCalendar'
 
+import UiCalendarMonth from './UiCalendarMonth.vue';
+
+const i18n = inject<any>('i18n')
 
 interface Props {
     dates?: string[];
@@ -104,14 +105,13 @@ interface Props {
     disableFutureDates?: boolean;
     firstDayOfWeek?: number;
     disabledMultiple?: boolean;
-    value: Value | number;
+    value: Value;
     fromSelectOnly?: boolean;
     disableApply?: boolean;
 }
 
-const weekDays = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su'];
-const monthsNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const monthsNamesShort = [];
+const weekDays = new Array(7).fill(0).map((_, i) => i18n.$t(`common.calendar.week_days.${i}`))
+const monthsNames = new Array(12).fill(0).map((_, i) => i18n.$t(`common.calendar.months.${i}`))
 const VIEWPORT_HEIGHT = 300;
 
 const props = withDefaults(defineProps<Props>(), {
