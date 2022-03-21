@@ -30,13 +30,14 @@
                         :warning-text="warningText"
                         :from="betweenValue.from"
                         :to="betweenValue.to"
+                        :each="value.each"
                         @on-select-last-count="onSelectLastCount"
                         @on-change-since="onChangeSince"
                         @on-change-between="onChangeBetween"
                         @on-change-each="onChangeEach"
                     />
                     <UiCalendar
-                        v-if="showcalendar"
+                        v-if="showCalendar"
                         :multiple="true"
                         :value="valueLocal"
                         :count="props.monthLength"
@@ -117,15 +118,16 @@ const firsDateCalendar = computed((): Date => {
     return firsDateCalendar;
 });
 
-const showcalendar = computed(() => activeTab.value !== 'each')
+const showCalendar = computed(() => activeTab.value !== 'each')
 
 const onToggle = () => {
     isOpen.value = !isOpen.value;
 };
 
 const onHide = () => {
-    isOpen.value = false;
-};
+    isOpen.value = false
+    activeTab.value = props.activeTabControls
+}
 
 const onSelectTab = (type: string) => {
     if (type === 'last') {
@@ -283,6 +285,7 @@ watch(() => props.lastCount, (value) => {
 .ui-date-picker {
     &__content {
         display: flex;
+        overflow: hidden;
     }
 
     &__tabs {
@@ -290,8 +293,7 @@ watch(() => props.lastCount, (value) => {
     }
 
     &__action {
-        max-width: 330px;
-        min-width: 200px;
+        width: 280px;
         border-left: 1px solid var(--pf-global--BackgroundColor--200);
     }
 

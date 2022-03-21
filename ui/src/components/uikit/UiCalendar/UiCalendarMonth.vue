@@ -227,7 +227,7 @@ const mouseleaveItem = (date: string) => {
 
     &__side {
         width: 2.6rem;
-        padding-top: .5rem;
+        padding-top: 1rem;
         padding-left: .5rem;
     }
 
@@ -238,4 +238,10 @@ const mouseleaveItem = (date: string) => {
     }
 }
 
+.pf-c-calendar-month {
+    &__date {
+        width: 30px;
+        height: 30px;
+    }
+}
 </style>

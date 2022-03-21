@@ -57,14 +57,13 @@
         >
             <div class="pf-c-menu pf-m-plain pf-m-scrollable">
                 <ul class="pf-c-menu__list">
-                    <!-- :class="{
-                        'pf-c-menu__list-item--selected': item.active,
-                    }" -->
                     <li
                         v-for="item in itemsEach"
                         :key="item.value"
                         class="pf-c-menu__item"
-
+                        :class="{
+                            'pf-c-menu__list-item--selected': item.active,
+                        }"
                         @click="onSelectEach(item.value)"
                     >
                         <div class="pf-c-menu__item-main">
@@ -106,7 +105,8 @@ interface Props {
     warning?: boolean
     from?: string
     to?: string
-    warningText?: string,
+    warningText?: string
+    each?: Each
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -121,10 +121,11 @@ const props = withDefaults(defineProps<Props>(), {
 const textLastCount = computed(() => props.lastCount === 1 ? 'day' : 'days')
 
 const itemsEach = computed(() => {
-    return eachMap.map((key: Each): {value: Each, name: string } => {
+    return eachMap.map((key: Each): {value: Each, name: string, active: boolean } => {
         return {
             value: key,
             name: i18n.$t(`common.calendar.each_select.${ key}`),
+            active: key === props.each,
         }
     })
 })

@@ -65,7 +65,7 @@
                 </div>
             </div>
         </div>
-        <div class="selected-event__rows pf-l-flex pf-m-column pf-u-pl-2xl">
+        <div class="selected-event__rows pf-l-flex pf-m-column pf-u-pl-xl">
             <Filter
                 v-for="(filter, i) in filters"
                 :key="i"

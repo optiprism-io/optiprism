@@ -24,10 +24,11 @@ export interface ApplyPayload {
 }
 
 export interface Value {
-    from: string,
-    to: string,
-    multiple: boolean,
-    dates?: string[],
+    from: string
+    to: string
+    multiple: boolean
+    dates?: string[]
+    each?: Each
 }
 
 export interface Ranged {

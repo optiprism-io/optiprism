@@ -24,7 +24,7 @@
                     </thead>
                 </table>
                 <VirtualisedList
-                    :viewport-height="300"
+                    :viewport-height="220"
                     :get-node-height="getNodeHeight"
                     :tolerance="1"
                     :nodes="calendarList"
@@ -112,7 +112,7 @@ interface Props {
 
 const weekDays = new Array(7).fill(0).map((_, i) => i18n.$t(`common.calendar.week_days.${i}`))
 const monthsNames = new Array(12).fill(0).map((_, i) => i18n.$t(`common.calendar.months.${i}`))
-const VIEWPORT_HEIGHT = 300;
+const VIEWPORT_HEIGHT = 220;
 
 const props = withDefaults(defineProps<Props>(), {
     count: 2,
@@ -151,7 +151,7 @@ const start = ref(-1);
 const currentDates = ref<string[]>([]);
 const hovered = ref('');
 const currentMultiple = ref(false);
-const initialScrollTop = computed(() => props.count * VIEWPORT_HEIGHT + 300);
+const initialScrollTop = computed(() => props.count * VIEWPORT_HEIGHT + VIEWPORT_HEIGHT);
 
 const calendarList = computed(() => {
     switch (props.type) {
@@ -211,7 +211,7 @@ const currentRanged = computed(() => {
     return ranged;
 });
 
-const getNodeHeight = () => 250;
+const getNodeHeight = () => VIEWPORT_HEIGHT;
 
 const setPosition = (offset: number) => {
     const localDate = new Date(date.value);
@@ -459,7 +459,7 @@ watch(() => props.value, (value) => {
         }
 
         &__day {
-            width: 40px;
+            width: 30px;
             text-transform: uppercase;
             font-weight: 300;
             font-size: .8rem;

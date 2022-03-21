@@ -155,7 +155,7 @@
         </div>
         <div
             v-if="filters.length"
-            class="pf-l-flex pf-m-column pf-u-pl-2xl"
+            class="pf-l-flex pf-m-column pf-u-pl-xl"
         >
             <Filter
                 v-for="(filter, i) in filters"
@@ -231,6 +231,7 @@ const calendarValue = computed(() => {
         to: props.condition?.period?.to || '',
         multiple: false,
         dates: [],
+        each: props.condition.each
     }
 })
 

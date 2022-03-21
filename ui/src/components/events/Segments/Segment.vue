@@ -38,7 +38,7 @@
                 </div>
             </div>
         </div>
-        <div class="pf-l-flex pf-m-column pf-u-pl-2xl">
+        <div class="pf-l-flex pf-m-column pf-u-pl-xl">
             <Condition
                 v-for="(condition, i) in props.conditions"
                 :key="i"
