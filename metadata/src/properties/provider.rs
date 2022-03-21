@@ -3,7 +3,7 @@ use crate::metadata::{list, ListResponse};
 use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
 use crate::store::store::{
-    make_col_id_seq_key, make_data_value_key, make_id_seq_key, make_index_key, Store,
+    make_data_value_key, make_id_seq_key, make_index_key, Store,
 };
 use crate::Result;
 use bincode::{deserialize, serialize};
@@ -112,10 +112,6 @@ impl Provider {
             ))
             .await?;
         let created_at = Utc::now();
-        let col_id = self
-            .store
-            .next_seq(make_col_id_seq_key(organization_id, req.project_id))
-            .await?;
 
         let prop = Property {
             id,
@@ -129,7 +125,6 @@ impl Provider {
             description: req.description,
             display_name: req.display_name,
             typ: req.typ,
-            col_id,
             status: req.status,
             scope: req.scope,
             nullable: req.nullable,
@@ -280,7 +275,6 @@ impl Provider {
             description: req.description,
             display_name: req.display_name,
             typ: req.typ,
-            col_id: prev_prop.col_id,
             status: req.status,
             scope: req.scope,
             nullable: req.nullable,

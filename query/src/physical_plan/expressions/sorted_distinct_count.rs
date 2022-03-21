@@ -6,14 +6,15 @@ use arrow::array::{
 use arrow::datatypes::{DataType, TimeUnit};
 use datafusion::error::{DataFusionError, Result};
 use datafusion::physical_plan::functions::{
-    ReturnTypeFunction, Signature, TypeSignature, Volatility,
+    Signature, TypeSignature, Volatility,
 };
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
-use datafusion_expr::{AccumulatorFunctionImplementation, StateTypeFunction};
+use datafusion_expr::{ReturnTypeFunction, AccumulatorFunctionImplementation, StateTypeFunction};
 use std::fmt::Debug;
 use std::sync::Arc;
+use arrow::compute;
 
 #[derive(Debug)]
 pub struct SortedDistinctCount {
@@ -156,30 +157,17 @@ impl Accumulator for SortedDistinctCountAccumulator {
         Ok(vec![ScalarValue::UInt64(Some(self.count))])
     }
 
-    // fn update(&mut self, values: &[ScalarValue]) -> Result<()> {
-    //     let value = &values[0];
-    //     if !self.current.eq(value) {
-    //         self.current = value.clone();
-    //         self.count += 1;
-    //     }
-    //     Ok(())
-    // }
-
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
         distinct_count(&values[0], self)
     }
 
-    /*    fn merge(&mut self, states: &[ScalarValue]) -> Result<()> {
-            for state in states {
-                if let ScalarValue::UInt64(Some(distinct)) = state {
-                    self.count += *distinct;
-                }
-            }
-            Ok(())
-        }
-    */
     fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
-        todo!()
+        let counts = states[0].as_any().downcast_ref::<UInt64Array>().unwrap();
+        let delta = &compute::sum(counts);
+        if let Some(d) = delta {
+            self.count += *d;
+        }
+        Ok(())
     }
     fn evaluate(&self) -> Result<ScalarValue> {
         Ok(ScalarValue::UInt64(Some(self.count)))
@@ -190,16 +178,6 @@ impl Accumulator for SortedDistinctCountAccumulator {
 mod tests {
     use super::*;
     use std::collections::HashSet;
-
-    fn check_update(sequence: &[i64], expected: usize) -> datafusion::error::Result<()> {
-        let mut acc = SortedDistinctCountAccumulator::try_new(&DataType::Int64)?;
-        for val in sequence {
-            acc.update(&[ScalarValue::Int64(Some(*val))])?;
-        }
-        let state = acc.state()?[0].clone();
-        assert_eq!(state, ScalarValue::UInt64(Some(expected as u64)));
-        Ok(())
-    }
 
     fn check_batch(sequences: &[Vec<i64>], expected: usize) -> datafusion::error::Result<()> {
         let mut acc = SortedDistinctCountAccumulator::try_new(&DataType::Int64)?;
@@ -214,19 +192,6 @@ mod tests {
     }
 
     #[test]
-    fn test_update_ordered_unique() {
-        let sequence = vec![1, 2, 3, 5, 7, 11, 13, 17, 19];
-        check_update(&sequence, sequence.len()).unwrap();
-    }
-
-    #[test]
-    fn test_update_ordered_duplicates() {
-        let sequence = vec![1, 2, 2, 3, 3, 3, 5, 5, 5, 5, 7, 7, 7, 11, 13, 17, 19];
-        let expected = sequence.iter().cloned().collect::<HashSet<_>>().len();
-        check_update(&sequence, expected).unwrap();
-    }
-
-    #[test]
     fn test_batch_ordered_disjoint() {
         check_batch(
             &[
@@ -236,7 +201,7 @@ mod tests {
             ],
             9,
         )
-        .unwrap();
+            .unwrap();
     }
 
     #[test]
@@ -249,6 +214,6 @@ mod tests {
             ],
             9,
         )
-        .unwrap();
+            .unwrap();
     }
 }

@@ -5,6 +5,7 @@ use metadata::store::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 use uuid::Uuid;
+use metadata::properties::provider::Namespace;
 
 #[tokio::test]
 async fn test_properties() -> Result<()> {
@@ -64,9 +65,11 @@ async fn test_properties() -> Result<()> {
     assert_eq!(res, 1);
     let res = event_properties
         .get_or_create(1, create_prop1.clone())
-        .await?
-        .id;
-    assert_eq!(res, 1);
+        .await?;
+    assert_eq!(res.id, 1);
+
+    assert_eq!(res.column_name(Namespace::User), "user_1_prop1".to_string());
+
     let mut create_prop2 = create_prop_req.clone();
     create_prop2.name = "prop2".to_string();
     let res = event_properties.create(1, create_prop2.clone()).await?.id;

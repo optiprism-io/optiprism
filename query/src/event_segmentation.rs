@@ -15,6 +15,7 @@ use futures::executor;
 use metadata::Metadata;
 use std::ops::Sub;
 use std::sync::Arc;
+use metadata::properties::provider::Namespace;
 use crate::physical_plan::expressions::aggregate::AggregateFunction;
 
 pub mod event_fields {
@@ -401,7 +402,7 @@ impl LogicalPlanBuilder {
                         partition_by: Box::new(col(self.es.group.as_ref())),
                         fun: PartitionedAggregateFunction::Count,
                         outer_fun: aggregate.clone(),
-                        args: vec![col(event_fields::USER_ID)],
+                        args: vec![col(self.es.group.as_ref())],
                         distinct: false,
                     },
                     Query::AggregatePropertyPerGroup {
@@ -548,7 +549,7 @@ impl LogicalPlanBuilder {
                     .user_properties
                     .get_by_name(self.ctx.organization_id, self.ctx.project_id, prop_name)
                     .await?;
-                col(prop.col_id.to_string().as_str())
+                col(prop.column_name(Namespace::User).as_str())
             }
             PropertyRef::UserCustom(_prop_name) => unimplemented!(),
             PropertyRef::Event(prop_name) => {
@@ -557,7 +558,7 @@ impl LogicalPlanBuilder {
                     .event_properties
                     .get_by_name(self.ctx.organization_id, self.ctx.project_id, prop_name)
                     .await?;
-                col(prop.col_id.to_string().as_str())
+                col(prop.column_name(Namespace::Event).as_str())
             }
             PropertyRef::EventCustom(_) => unimplemented!(),
         })

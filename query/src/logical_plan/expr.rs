@@ -6,18 +6,18 @@ use datafusion::logical_plan::{
     lit as df_lit, Column, DFField, DFSchema, Expr as DFExpr, Literal, Operator,
 };
 use datafusion::physical_plan::aggregates;
-use datafusion::physical_plan::aggregates::return_type;
 use datafusion::physical_plan::expressions::binary_operator_data_type;
-use datafusion::physical_plan::functions::{ReturnTypeFunction, Signature, Volatility};
+use datafusion::physical_plan::functions::{Signature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion_expr::{AccumulatorFunctionImplementation, AggregateFunction as DFAggregateFunction, StateTypeFunction};
-
+use datafusion_expr::{AccumulatorFunctionImplementation, ReturnTypeFunction, AggregateFunction as DFAggregateFunction, StateTypeFunction};
 use datafusion::scalar::ScalarValue;
+
 use std::fmt;
 
 // use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
 use std::sync::Arc;
-use crate::physical_plan::expressions::aggregate::AggregateFunction;
+use crate::physical_plan::expressions::aggregate::{AggregateFunction, return_type};
+use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
 
 #[derive(Clone)]
 pub enum Expr {
@@ -189,20 +189,20 @@ impl Expr {
                 args,
                 distinct,
             } => match fun {
-                /*   AggregateFunction::OrderedDistinctCount => {
-                       let name = "ordered_distinct_count".to_string();
-                       let data_type = args[0].get_type(input_schema)?;
-                       let sorted_distinct = SortedDistinctCount::new(name, data_type);
-                       let udf = sorted_distinct.try_into()?;
-                       let args = args
-                           .iter()
-                           .map(|arg| arg.to_df_expr(input_schema))
-                           .collect::<Result<_>>()?;
-                       Ok(DFExpr::AggregateUDF {
-                           fun: Arc::new(udf),
-                           args,
-                       })
-                   }*/
+                AggregateFunction::SortedDistinctCount => {
+                    let name = "sorted_distinct_count".to_string();
+                    let data_type = args[0].get_type(input_schema)?;
+                    let sorted_distinct = SortedDistinctCount::new(name, data_type);
+                    let udf = sorted_distinct.try_into()?;
+                    let args = args
+                        .iter()
+                        .map(|arg| arg.to_df_expr(input_schema))
+                        .collect::<Result<_>>()?;
+                    Ok(DFExpr::AggregateUDF {
+                        fun: Arc::new(udf),
+                        args,
+                    })
+                }
                 _ => Ok(DFExpr::AggregateFunction {
                     fun: fun.clone().try_into()?,
                     args: args
@@ -225,7 +225,7 @@ impl Expr {
                     .map(|x| x.get_type(input_schema))
                     .collect::<Result<Vec<DataType>>>()?;
                 // determine return type
-                let rtype = return_type(&outer_fun.try_into()?, &data_types)?;
+                let rtype = return_type(&outer_fun, &data_types)?;
 
                 // determine state types
                 let state_types: Vec<DataType> =
@@ -298,7 +298,7 @@ impl Expr {
                         .iter()
                         .map(|e| e.get_type(schema))
                         .collect::<Result<Vec<_>>>()?;
-                    Ok(aggregates::return_type(&fun.try_into()?, &data_types)?)
+                    Ok(return_type(&fun, &data_types)?)
                 }
             },
             Expr::AggregatePartitionedFunction {
@@ -308,8 +308,8 @@ impl Expr {
                     .iter()
                     .map(|e| e.get_type(schema))
                     .collect::<Result<Vec<_>>>()?;
-                Ok(aggregates::return_type(
-                    &outer_fun.try_into()?,
+                Ok(return_type(
+                    &outer_fun,
                     &data_types,
                 )?)
             }

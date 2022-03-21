@@ -21,26 +21,28 @@ use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::Debug;
+use std::sync::Arc;
 use crate::error::{Error, Result};
 
 use arrow::array::{Array, ArrayRef, Int8Array};
 use arrow::datatypes::DataType;
+use dyn_clone::DynClone;
 use datafusion::error::{DataFusionError, Result as DFResult};
 
 
-use datafusion::physical_plan::Accumulator;
+use datafusion::physical_plan::{Accumulator, AggregateExpr};
 use datafusion::physical_plan::aggregates::return_type;
+use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, Min, Sum};
 use datafusion::scalar::ScalarValue;
-use crate::physical_plan::expressions::aggregate::{AccumulatorEnum, AggregateFunction, new_accumulator};
-use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
+use crate::physical_plan::expressions::aggregate::{AggregateFunction};
+use crate::physical_plan::expressions::partitioned_sum::{PartitionedSumAccumulator};
 
 // PartitionedAccumulator extends Accumulator trait with reset
 pub trait PartitionedAccumulator: Debug + Send + Sync {
     fn update_batch(&mut self, spans: &[bool], values: &[ArrayRef]) -> Result<()>;
     fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()>;
-    fn state(&mut self) -> Result<Vec<ScalarValue>>;
+    fn state(&self) -> Result<Vec<ScalarValue>>;
     fn evaluate(&self) -> Result<ScalarValue>;
-    fn clone(&self) -> Self where Self: Sized;
 }
 
 
@@ -65,6 +67,16 @@ pub enum Value {
     Int64(i64),
     UInt64(u64),
     Float64(f64),
+}
+
+impl Value {
+    pub fn get_datatype(&self) -> DataType {
+        match self {
+            Value::Int64(_) => DataType::Int64,
+            Value::UInt64(_) => DataType::UInt64,
+            Value::Float64(_) => DataType::Float64,
+        }
+    }
 }
 
 impl From<Value> for i64 {
@@ -160,59 +172,27 @@ impl PartitionedAggregate {
     }
 }
 
-// enum storage for accumulator for fast static dispatching and easy translating between threads
-#[derive(Debug, Clone)]
-pub enum PartitionedAccumulatorEnum {
-    Sum(PartitionedSumAccumulator),
-}
-
-impl PartitionedAccumulatorEnum {
-    fn state(&mut self) -> Result<Vec<ScalarValue>> {
-        match self {
-            PartitionedAccumulatorEnum::Sum(acc) => acc.state(),
-        }
-    }
-
-
-    fn evaluate(&self) -> Result<ScalarValue> {
-        match self {
-            PartitionedAccumulatorEnum::Sum(acc) => acc.evaluate(),
-        }
-    }
-
-    fn update_batch(&mut self, spans: &[bool], values: &[ArrayRef]) -> Result<()> {
-        match self {
-            PartitionedAccumulatorEnum::Sum(acc) => acc.update_batch(spans, values),
-        }
-    }
-
-    fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
-        match self {
-            PartitionedAccumulatorEnum::Sum(acc) => acc.merge_batch(states),
-        }
-    }
-}
-
 // partitioned aggregate accumulator aggregates incoming partitioned values via acc accumulator and
 // aggregates acc result via outer_acc
 #[derive(Debug)]
 pub struct PartitionedAggregateAccumulator {
     last_partition_value: ScalarValue,
     first_row: bool,
-    acc: PartitionedAccumulatorEnum,
+    acc: Box<dyn PartitionedAccumulator>,
 }
 
 fn new_partitioned_accumulator(
     agg: &PartitionedAggregateFunction,
-    outer_acc: AccumulatorEnum,
-    data_type: &DataType,
-) -> Result<PartitionedAccumulatorEnum> {
-    Ok(match agg {
+    outer_acc: Box<dyn Accumulator>,
+    outer_agg: AggregateFunction,
+    data_type: DataType,
+) -> Result<Box<dyn PartitionedAccumulator>> {
+    Ok(Box::new(match agg {
         PartitionedAggregateFunction::Sum => {
-            PartitionedAccumulatorEnum::Sum(PartitionedSumAccumulator::try_new(data_type, outer_acc)?)
+            PartitionedSumAccumulator::try_new(data_type, outer_acc, outer_agg)?
         }
         _ => unimplemented!(),
-    })
+    }))
 }
 
 pub fn state_types(data_type: DataType, agg: &AggregateFunction) -> Result<Vec<DataType>> {
@@ -233,11 +213,17 @@ impl PartitionedAggregateAccumulator {
         agg_return_type: &DataType,
         outer_agg: &AggregateFunction,
     ) -> Result<Self> {
-        let outer_acc = new_accumulator(outer_agg, agg_return_type)?;
+        let expr = Arc::new(Literal::new(ScalarValue::from(true)));
+        let outer_acc: Box<dyn Accumulator> = Box::new(match outer_agg {
+            AggregateFunction::Avg => Ok(AvgAccumulator::try_new(agg_return_type)?),
+            _ => Err(Error::Internal(format!("{:?} doesn't supported", outer_agg))),
+        }?);
+
+        // let outer_acc = new_accumulator(outer_agg, agg_return_type)?;
         Ok(Self {
             last_partition_value: ScalarValue::try_from(partition_type)?,
             first_row: true,
-            acc: new_partitioned_accumulator(agg, outer_acc, data_type)?,
+            acc: new_partitioned_accumulator(agg, outer_acc, outer_agg.clone(), data_type.clone())?,
         })
     }
 
@@ -255,7 +241,7 @@ impl PartitionedAggregateAccumulator {
 
 impl Accumulator for PartitionedAggregateAccumulator {
     fn state(&self) -> DFResult<Vec<ScalarValue>> {
-        self.acc.clone().state().map_err(Error::into_datafusion_execution_error)
+        self.acc.state().map_err(Error::into_datafusion_execution_error)
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
@@ -295,7 +281,6 @@ impl Accumulator for PartitionedAggregateAccumulator {
             _ => unimplemented!()
         }
 
-        println!("{:?}", &spans);
         self.acc.update_batch(&spans, &values[1..]).map_err(Error::into_datafusion_execution_error);
         Ok(())
     }

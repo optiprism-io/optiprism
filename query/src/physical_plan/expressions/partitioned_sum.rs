@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
+use std::fmt::Debug;
 use std::ops::Add;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use crate::error::{Error, Result};
 use arrow::array::{
@@ -10,30 +11,37 @@ use arrow::array::{
 use arrow::compute;
 use arrow::datatypes::DataType;
 use datafusion::error::Result as DFResult;
-use datafusion::physical_plan::{expressions, Accumulator};
+use datafusion::physical_plan::{expressions, Accumulator, AggregateExpr, PhysicalExpr};
+use datafusion::physical_plan::aggregates::return_type;
+use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, Min, Sum};
 use datafusion::scalar::ScalarValue;
-use crate::physical_plan::expressions::aggregate::AccumulatorEnum;
+use crate::physical_plan::expressions::aggregate::{AggregateFunction};
 use crate::physical_plan::expressions::partitioned_aggregate::{PartitionedAccumulator, PartitionedAggregate, Value};
+use dyn_clone::DynClone;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PartitionedSumAccumulator {
     sum: Value,
+    data_type: DataType,
     result_buffer: Vec<Value>,
-    acc: AccumulatorEnum,
+    outer_acc: Box<dyn Accumulator>,
+    outer_agg: AggregateFunction,
 }
 
 const CAP: usize = 1000;
 
 impl PartitionedSumAccumulator {
-    pub fn try_new(data_type: &DataType, acc: AccumulatorEnum) -> Result<Self> {
+    pub fn try_new(data_type: DataType, outer_acc: Box<dyn Accumulator>, outer_agg: AggregateFunction) -> Result<Self> {
         let value = match data_type {
             DataType::Int64 => Value::Int64(0),
             _ => unimplemented!(),
         };
         Ok(Self {
             sum: value,
+            data_type,
             result_buffer: Vec::with_capacity(CAP),
-            acc,
+            outer_acc,
+            outer_agg,
         })
     }
 }
@@ -82,7 +90,7 @@ macro_rules! flush_buffer {
                 .map(|v| v.into())
                 .collect::<Vec<$type>>(),
         );
-        $self.acc.update_batch(&[Arc::new(arr) as ArrayRef])?;
+        $self.outer_acc.update_batch(&[Arc::new(arr) as ArrayRef])?;
         $self
             .result_buffer
             .resize(0, Value::$vtype($type::default()));
@@ -113,27 +121,38 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
     }
 
     fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
-        Ok(self.acc.merge_batch(states)?)
+        Ok(self.outer_acc.merge_batch(states)?)
     }
 
-    fn state(&mut self) -> Result<Vec<ScalarValue>> {
-        if !self.result_buffer.is_empty() {
+    fn state(&self) -> Result<Vec<ScalarValue>> {
+        /*if !self.result_buffer.is_empty() {
             self.flush_buffer();
-        }
-
-        Ok(self.acc.state()?)
+        }*/
+        Ok(self.outer_acc.state()?)
     }
 
     fn evaluate(&self) -> Result<ScalarValue> {
-        Ok(self.acc.evaluate()?)
-    }
+        if !self.result_buffer.is_empty() {
+            let mut outer_acc: Box<dyn Accumulator> = Box::new(match self.outer_agg {
+                AggregateFunction::Avg => AvgAccumulator::try_new(&self.outer_acc.evaluate()?.get_datatype())?,
+                _ => unimplemented!(),
+            });
 
-    fn clone(&self) -> Self where Self: Sized {
-        Self {
-            sum: self.sum.clone(),
-            result_buffer: self.result_buffer.clone(),
-            acc: self.acc.clone(),
+            let outer_state: Vec<ArrayRef> = self.outer_acc.state()?.iter().map(|v| v.to_array()).collect();
+            outer_acc.merge_batch(&outer_state)?;
+            let mut acc = PartitionedSumAccumulator {
+                sum: self.sum.clone(),
+                data_type: self.data_type.clone(),
+                result_buffer: self.result_buffer.clone(),
+                outer_acc,
+                outer_agg: self.outer_agg.clone(),
+            };
+
+            acc.flush_buffer();
+            return Ok(acc.outer_acc.evaluate()?);
         }
+
+        Ok(self.outer_acc.evaluate()?)
     }
 }
 
@@ -155,15 +174,18 @@ mod tests {
     use arrow::datatypes::DataType;
     use datafusion::scalar::ScalarValue as DFScalarValue;
     use std::sync::Arc;
-    use crate::physical_plan::expressions::aggregate::AccumulatorEnum;
+    use datafusion::physical_plan::AggregateExpr;
+    use datafusion::physical_plan::expressions::{Avg, Literal};
+    use datafusion_common::ScalarValue;
+    use crate::physical_plan::expressions::aggregate::{AggregateFunction};
     use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAccumulator;
     use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
-    use crate::physical_plan::expressions::sum::SumAccumulator;
 
     #[test]
     fn test() -> Result<()> {
-        let mut acc = AccumulatorEnum::Sum(SumAccumulator::try_new(&DataType::Int64)?);
-        let mut sum_acc = PartitionedSumAccumulator::try_new(&DataType::Int64, acc)?;
+        let expr = Avg::new(Arc::new(Literal::new(ScalarValue::from(true))), "avg", DataType::Float64);
+        let outer_acc = expr.create_accumulator()?;
+        let mut sum_acc = PartitionedSumAccumulator::try_new(DataType::Int64, outer_acc, AggregateFunction::Avg)?;
         //                                        3                   12                         30
         let spans = vec![
             false, false, true, false, false, true, false, false, false, true,
@@ -171,7 +193,7 @@ mod tests {
         let arr = Arc::new(Int8Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]));
         sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
         sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
-        assert_eq!(sum_acc.state()?, vec![DFScalarValue::Int64(Some(100))]);
+        assert_eq!(sum_acc.evaluate()?, DFScalarValue::Int64(Some(100)));
         Ok(())
     }
 }

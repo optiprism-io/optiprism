@@ -32,7 +32,7 @@ async fn test_database() -> Result<()> {
     let col = Column {
         name: "c1".to_string(),
         data_type: DataType::Null,
-        is_nullable: false,
+        nullable: false,
     };
 
     // add column, non-existent table
