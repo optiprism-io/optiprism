@@ -1,6 +1,8 @@
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use crate::properties::provider::Namespace;
+use convert_case::{Case, Casing};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Status {
@@ -27,7 +29,6 @@ pub struct Property {
     pub description: Option<String>,
     pub display_name: Option<String>,
     pub typ: DataType,
-    pub col_id: u64,
     pub status: Status,
     pub scope: Scope,
     pub nullable: bool,
@@ -35,6 +36,21 @@ pub struct Property {
     pub is_array: bool,
     pub is_dictionary: bool,
     pub dictionary_type: Option<DataType>,
+}
+
+impl Property {
+    pub fn column_name(&self, ns: Namespace) -> String {
+        let mut name: String = self.name.chars().filter(|c| c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace()).collect();
+        name = name.to_case(Case::Snake);
+        name = name.trim().to_string();
+        let prefix = match ns {
+            Namespace::Event => "event".to_string(),
+            Namespace::User => "user".to_string(),
+        };
+
+        // format!("{}_{}_{}", prefix, self.id.to_string(), name)
+        format!("{}_{}", prefix, name)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

@@ -1,4 +1,4 @@
-use arrow::datatypes::DataType;
+use arrow::datatypes::{DataType, Field, Schema};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -18,5 +18,26 @@ pub struct Table {
 pub struct Column {
     pub name: String,
     pub data_type: DataType,
-    pub is_nullable: bool,
+    pub nullable: bool,
+}
+
+impl Column {
+    pub fn new(name: String, data_type: DataType, is_nullable: bool) -> Column {
+        Column {
+            name,
+            data_type,
+            nullable: is_nullable,
+        }
+    }
+}
+
+impl Table {
+    pub fn arrow_schema(&self) -> Schema {
+        Schema::new(
+            self.columns
+                .iter()
+                .map(|c| Field::new(&c.name, c.data_type.clone(), c.nullable))
+                .collect()
+        )
+    }
 }

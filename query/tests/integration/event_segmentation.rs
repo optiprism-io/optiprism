@@ -29,51 +29,20 @@ mod tests {
     use rust_decimal::Decimal;
     use uuid::Uuid;
     use common::{DataType, DECIMAL_PRECISION, DECIMAL_SCALE, ScalarValue};
-    use metadata::{events, Metadata, properties, Store};
-    use metadata::properties::CreatePropertyRequest;
+    use metadata::{database, events, Metadata, properties, Store};
+    use metadata::database::{Column, Table, TableType};
+    use metadata::properties::{CreatePropertyRequest, Property};
+    use metadata::properties::provider::Namespace;
     use query::Context;
     use query::event_segmentation::{LogicalPlanBuilder, Analysis, Breakdown, ChartType, Event, event_fields, EventFilter, EventRef, EventSegmentation, NamedQuery, Operation, PropertyRef, Query, QueryTime, TimeUnit};
     use query::physical_plan::expressions::aggregate::AggregateFunction;
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 
-    fn events_schema() -> Schema {
-        Schema::new(vec![
-            Field::new(event_fields::USER_ID, DFDataType::UInt64, false),
-            Field::new(
-                event_fields::CREATED_AT,
-                DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
-                false,
-            ),
-            Field::new(event_fields::EVENT, DFDataType::UInt16, false),
-            Field::new("0_utf8", DFDataType::Utf8, true), // country
-            Field::new("1_utf8", DFDataType::Utf8, true), // device
-            Field::new("0_float64", DFDataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE), true), // revenue
-            Field::new("1_utf8", DFDataType::Utf8, true), //
-            Field::new("2_int8", DFDataType::Int8, true),
-        ])
-    }
-
-    async fn events_provider() -> Result<LogicalPlan> {
-        let schema = Arc::new(events_schema());
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(UInt64Array::from(vec![0u64; 0])),
-                Arc::new(TimestampMicrosecondArray::from(vec![0i64; 0])),
-                Arc::new(UInt16Array::from(vec![0u16; 0])),
-                Arc::new(StringArray::from(vec!["".to_string(); 0])),
-                Arc::new(StringArray::from(vec!["".to_string(); 0])),
-                Arc::new(Float64Array::from(vec![0f64; 0])),
-                Arc::new(StringArray::from(vec!["".to_string(); 0])),
-                Arc::new(Int8Array::from(vec![0i8; 0])),
-            ],
-        )?;
-
-        let _prov = MemTable::try_new(schema.clone(), vec![vec![batch]])?;
-        let path = "../tests/events.csv";
-
-        let schema = events_schema();
+    async fn events_provider(db: Arc<database::Provider>, org_id: u64, proj_id: u64) -> Result<LogicalPlan> {
+        let table = db.get_table(TableType::Events(org_id, proj_id)).await?;
+        let schema = table.arrow_schema();
         let options = CsvReadOptions::new().schema(&schema);
+        let path = "../tests/events.csv";
         let df_input =
             datafusion::logical_plan::LogicalPlanBuilder::scan_csv(Arc::new(LocalFileSystem {}), path, options, None, 1)
                 .await?;
@@ -91,69 +60,50 @@ mod tests {
         })
     }
 
-    async fn create_entities(metadata: Arc<Metadata>, org_id: u64, proj_id: u64) -> Result<()> {
-        // create events
-        metadata.events.create(org_id, events::CreateEventRequest {
-            created_by: 0,
-            project_id: proj_id,
-            tags: None,
-            name: "View Product".to_string(),
-            display_name: None,
-            description: None,
-            status: events::Status::Enabled,
-            scope: events::Scope::User,
-            properties: None,
-            custom_properties: None,
-        }).await?;
+    async fn create_property(md: &Arc<Metadata>, ns: Namespace, org_id: u64, proj_id: u64, req: CreatePropertyRequest) -> Result<Property> {
+        let prop = match ns {
+            Namespace::Event => md.event_properties.create(org_id, req).await?,
+            Namespace::User => md.user_properties.create(org_id, req).await?
+        };
 
-        metadata.events.create(org_id, events::CreateEventRequest {
-            created_by: 0,
-            project_id: proj_id,
-            tags: None,
-            name: "Buy Product".to_string(),
-            display_name: None,
-            description: None,
-            status: events::Status::Enabled,
-            scope: events::Scope::User,
-            properties: None,
-            custom_properties: None,
-        }).await?;
+        md.database.add_column(
+            TableType::Events(org_id, proj_id),
+            Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable),
+        ).await?;
 
-        // create event props
-        metadata.event_properties.create(org_id, CreatePropertyRequest {
-            created_by: 0,
-            project_id: proj_id,
-            tags: None,
-            name: "Revenue".to_string(),
-            description: None,
-            display_name: None,
-            typ: DFDataType::Float64,
-            status: properties::Status::Enabled,
-            scope: properties::Scope::User,
-            nullable: false,
-            is_array: false,
-            is_dictionary: false,
-            dictionary_type: None,
-        }).await?;
+        Ok(prop)
+    }
 
-        metadata.event_properties.create(org_id, CreatePropertyRequest {
-            created_by: 0,
-            project_id: proj_id,
-            tags: None,
-            name: "Product Name".to_string(),
-            description: None,
-            display_name: None,
-            typ: DFDataType::Utf8,
-            status: properties::Status::Enabled,
-            scope: properties::Scope::User,
-            nullable: false,
-            is_array: false,
-            is_dictionary: false,
-            dictionary_type: None,
-        }).await?;
+    async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Result<()> {
+        md.database.create_table(Table { typ: TableType::Events(org_id, proj_id), columns: vec![] }).await?;
+
+        md.database.add_column(
+            TableType::Events(org_id, proj_id),
+            Column::new(
+                event_fields::USER_ID.to_string(),
+                DFDataType::UInt64,
+                false,
+            ),
+        ).await?;
+        md.database.add_column(
+            TableType::Events(org_id, proj_id),
+            Column::new(
+                event_fields::CREATED_AT.to_string(),
+                DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
+                false,
+            ),
+        ).await?;
+        md.database.add_column(
+            TableType::Events(org_id, proj_id),
+            Column::new(
+                event_fields::EVENT.to_string(),
+                DFDataType::UInt16,
+                false,
+            ),
+        ).await?;
 
         // create user props
-        metadata.user_properties.create(org_id, CreatePropertyRequest {
+        create_property(&md, Namespace::User, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             project_id: proj_id,
             tags: None,
@@ -169,7 +119,7 @@ mod tests {
             dictionary_type: None,
         }).await?;
 
-        metadata.user_properties.create(org_id, CreatePropertyRequest {
+        create_property(&md, Namespace::User, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             project_id: proj_id,
             tags: None,
@@ -185,7 +135,7 @@ mod tests {
             dictionary_type: None,
         }).await?;
 
-        metadata.user_properties.create(org_id, CreatePropertyRequest {
+        create_property(&md, Namespace::User, org_id, proj_id, CreatePropertyRequest {
             created_by: 0,
             project_id: proj_id,
             tags: None,
@@ -201,8 +151,77 @@ mod tests {
             dictionary_type: None,
         }).await?;
 
+        // create events
+        md.events.create(org_id, events::CreateEventRequest {
+            created_by: 0,
+            project_id: proj_id,
+            tags: None,
+            name: "View Product".to_string(),
+            display_name: None,
+            description: None,
+            status: events::Status::Enabled,
+            scope: events::Scope::User,
+            properties: None,
+            custom_properties: None,
+        }).await?;
+
+        md.events.create(org_id, events::CreateEventRequest {
+            created_by: 0,
+            project_id: proj_id,
+            tags: None,
+            name: "Buy Product".to_string(),
+            display_name: None,
+            description: None,
+            status: events::Status::Enabled,
+            scope: events::Scope::User,
+            properties: None,
+            custom_properties: None,
+        }).await?;
+
+        // create event props
+        create_property(&md, Namespace::Event, org_id, proj_id, CreatePropertyRequest {
+            created_by: 0,
+            project_id: proj_id,
+            tags: None,
+            name: "Product Name".to_string(),
+            description: None,
+            display_name: None,
+            typ: DFDataType::Utf8,
+            status: properties::Status::Enabled,
+            scope: properties::Scope::User,
+            nullable: false,
+            is_array: false,
+            is_dictionary: false,
+            dictionary_type: None,
+        }).await?;
+
+        create_property(&md, Namespace::Event, org_id, proj_id, CreatePropertyRequest {
+            created_by: 0,
+            project_id: proj_id,
+            tags: None,
+            name: "Revenue".to_string(),
+            description: None,
+            display_name: None,
+            typ: DFDataType::Float64,
+            status: properties::Status::Enabled,
+            scope: properties::Scope::User,
+            nullable: false,
+            is_array: false,
+            is_dictionary: false,
+            dictionary_type: None,
+        }).await?;
+
         Ok(())
     }
+
+    fn create_md() -> Result<Arc<Metadata>> {
+        let mut path = temp_dir();
+        path.push(format!("{}.db", Uuid::new_v4()));
+
+        let store = Arc::new(Store::new(path));
+        Ok(Arc::new(Metadata::try_new(store)?))
+    }
+
 
     #[tokio::test]
     async fn test_filters() -> Result<()> {
@@ -303,7 +322,7 @@ mod tests {
                 },
             ]),
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
-                "device".to_string(),
+                "Device".to_string(),
             ))]),
             segments: None,
         };
@@ -313,17 +332,20 @@ mod tests {
 
         let store = Arc::new(Store::new(path));
         let md = Arc::new(Metadata::try_new(store)?);
-        create_entities(md.clone(), 1, 1).await?;
+
+        let org_id = 1;
+        let proj_id = 1;
 
         let ctx = Context {
-            organization_id: 1,
+            organization_id: org_id,
             account_id: 1,
-            project_id: 1,
+            project_id: proj_id,
             roles: None,
             permissions: None,
         };
 
-        let input = Arc::new(events_provider().await?);
+        create_entities(md.clone(), org_id, proj_id).await?;
+        let input = Arc::new(events_provider(md.database.clone(), org_id, proj_id).await?);
 
         let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
         let df_plan = plan.to_df_plan()?;
@@ -338,6 +360,7 @@ mod tests {
         print_batches(&result)?;
         Ok(())
     }
+
 
     #[tokio::test]
     async fn test_query() -> Result<()> {
@@ -372,7 +395,7 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
-                            property: PropertyRef::Event("revenue".to_string()),
+                            property: PropertyRef::Event("Revenue".to_string()),
                             aggregate_per_group: PartitionedAggregateFunction::Sum,
                             aggregate: AggregateFunction::Avg,
                         },
@@ -380,7 +403,7 @@ mod tests {
                     ),
                     NamedQuery::new(
                         Query::AggregateProperty {
-                            property: PropertyRef::Event("revenue".to_string()),
+                            property: PropertyRef::Event("Revenue".to_string()),
                             aggregate: AggregateFunction::Sum,
                         },
                         Some("sum_revenue".to_string()),
@@ -394,22 +417,21 @@ mod tests {
             segments: None,
         };
 
-        let mut path = temp_dir();
-        path.push(format!("{}.db", Uuid::new_v4()));
+        let md = create_md()?;
 
-        let store = Arc::new(Store::new(path));
-        let md = Arc::new(Metadata::try_new(store)?);
-        create_entities(md.clone(), 1, 1).await?;
+        let org_id = 1;
+        let proj_id = 1;
 
         let ctx = Context {
-            organization_id: 1,
+            organization_id: org_id,
             account_id: 1,
-            project_id: 1,
+            project_id: proj_id,
             roles: None,
             permissions: None,
         };
 
-        let input = Arc::new(events_provider().await?);
+        create_entities(md.clone(), org_id, proj_id).await?;
+        let input = Arc::new(events_provider(md.database.clone(), org_id, proj_id).await?);
 
         let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
         let df_plan = plan.to_df_plan()?;

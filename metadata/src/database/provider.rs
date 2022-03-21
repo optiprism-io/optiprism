@@ -44,9 +44,7 @@ impl Provider {
 
     pub async fn get_table(&self, table_type: TableType) -> Result<Table> {
         let tables = self.tables.read().await;
-        let table = tables.iter().find(|t| {
-            t.typ == table_type
-        });
+        let table = tables.iter().find(|t| t.typ == table_type);
 
         match table {
             None => Err(Error::KeyNotFound("table".to_string())),
@@ -56,7 +54,7 @@ impl Provider {
 
     pub async fn add_column(&self, table_type: TableType, col: Column) -> Result<()> {
         let mut tables = self.tables.write().await;
-        let table = tables.iter_mut().find(|t| t.typ == table_type).ok_or_else(||Error::KeyNotFound("table".to_string()))?;
+        let table = tables.iter_mut().find(|t| t.typ == table_type).ok_or_else(|| Error::KeyNotFound("table".to_string()))?;
 
         if table.columns.iter().find(|c| c.name == col.name).is_some() {
             return Err(Error::KeyAlreadyExists);
