@@ -11,7 +11,7 @@ info:
 servers:
   # Added by API Auto Mocking Plugin
   - description: SwaggerHub API Auto Mocking
-    url: https://virtserver.swaggerhub.com/ravlio/optiprism/1.0.0
+    url: https://virtserver.swaggerhub.com/optiprism/optiprism/1.0.0
   - description: OptiPrism API server
     url: /
 tags:
@@ -19,6 +19,9 @@ tags:
     description: Event
   - name: property
     description: Property
+externalDocs:
+  description: Find out more about OptiPrism api
+  url: https://dev.optiprism.io/api
 paths:
   /schema/events:
     get:
@@ -60,7 +63,7 @@ paths:
     get:
       summary: List property values
       description: >
-        for event property you should incude event_name and event_type
+        for event property you should include event_name and event_type
         <br/><br/>
         examples:
         <br/>
@@ -110,9 +113,6 @@ paths:
             schema:
               $ref: '#/components/schemas/EventSegmentation'
 
-externalDocs:
-  description: Find out more about OptiPrism api
-  url: http://dev.optiprism.io/api
 components:
   responses:
     ListPropertyValues:
@@ -404,6 +404,8 @@ components:
           description: array of id of attached to event custom properties
 
     CustomEvent:
+      required: [ "id","createdAt","createdBy","projectId","isSystem","name","status" ]
+      description: Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
       type: object
       properties:
         id:
@@ -439,6 +441,54 @@ components:
           type: array
           items:
             type: string
+        expression:
+          allOf:
+            - type: object
+              description: expression. You can query events with filters and combine multiple events with and/or operations
+            - $ref: '#/components/schemas/CustomEventExpression'
+        properties:
+          type: array
+          items:
+            type: integer
+            format: i64
+          description: array of id of properties contained in expression events
+        custom_properties:
+          type: array
+          items:
+            type: integer
+            format: i64
+          description: array of id of custom properties contained in expression events
+
+    CustomEventExpression:
+      type: object
+      description: find event with option
+      required: [ "type","eventName","eventType","events" ]
+      properties:
+        events:
+          type: array
+          description: match any of events in list
+          items:
+            $ref: '#/components/schemas/CustomEventExpressionEvent'
+
+    CustomEventExpressionEvent:
+      type: object
+      description: event with filters
+      required: [ "type","eventName","eventType","filter" ]
+      properties:
+
+      allOf:
+        - $ref: '#/components/schemas/EventRef'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum:
+                - event
+            filter:
+              allOf:
+                - type: object
+                  description: filter by property
+                - $ref: '#/components/schemas/EventFilterByProperty'
 
     EventProperty:
       type: object
@@ -484,16 +534,13 @@ components:
         isSystem:
           type: boolean
           description: the property is a system-wide, shown in any project and can't be modified by a regular user
-        isGlobal:
-          type: boolean
-          description: global property can be used by multiple events. Local property is coupled with only one event exclusively
         tags:
           type: array
           items:
             type: string
         name:
           type: string
-          description: property name. Must be unique among all event properties if property is not global. Or must be unique among all global properties if property is global. The name field is used while events ingesting.
+          description: property name. Must be unique
         displayName:
           type: string
           description: property name to display. If empty then name is used.
@@ -511,16 +558,6 @@ components:
             - type: object
               description: data type of property. if property is "Product name", that it whould be String, if "Revenue", that it might be numeric.
             - $ref: '#/components/schemas/DataType'
-        db_col:
-          type: object
-          oneOf:
-            - type: object
-              description: column type. Might be named and auto.
-            - $ref: '#/components/schemas/DBColNamed'
-            - $ref: '#/components/schemas/DBColOrder'
-        isRequired:
-          type: boolean
-          description: required property is required to be defined during ingestion
         nullable:
           type: boolean
           description: nullable property might contains null value
@@ -643,13 +680,6 @@ components:
             - type: object
               description: data type of property. if property is "Country", that it whould be String, if "Age", that it might be numeric
             - $ref: '#/components/schemas/DataType'
-        db_col:
-          type: object
-          oneOf:
-            - type: object
-              description: column type. Might be named and auto
-            - $ref: '#/components/schemas/DBColNamed'
-            - $ref: '#/components/schemas/DBColOrder'
         nullable:
           type: boolean
           description: nullable property might contains null value
@@ -707,26 +737,6 @@ components:
           type: array
           items:
             type: string
-
-    DBColNamed:
-      type: object
-      properties:
-        type:
-          type: string
-          enum:
-            - named
-        name:
-          type: string
-
-    DBColOrder:
-      type: object
-      properties:
-        type:
-          type: string
-          enum:
-            - order
-        order:
-          type: number
 
     AnalysisLinear:
       type: object
@@ -810,7 +820,7 @@ components:
                 {
                   "breakdownType": "property",
                   "propertyName": "Device",
-                  "propertyType": "User"
+                  "propertyType": "user"
                 }
               ],
               "queries": [
@@ -876,12 +886,16 @@ components:
           description: group that is used in aggregations by group. For instance, group by user or group by organizartion.
           example: user
         intervalUnit:
-          $ref: '#/components/schemas/TimeUnit'
-          description: the interval unit, by which the grouping will go
+          type: object
+          allOf:
+            - description: the interval unit, by which the grouping will go
+            - $ref: '#/components/schemas/TimeUnit'
           example: day
         chartType:
-          $ref: '#/components/schemas/ChartType'
-          description: chart type
+          type: object
+          allOf:
+            - description: chart type
+            - $ref: '#/components/schemas/ChartType'
         analysis:
           type: object
           description: analysis type
@@ -901,8 +915,10 @@ components:
               description: offset in past in timeUnit
               example: 1
             unit:
-              $ref: '#/components/schemas/TimeUnit'
-              description: time unit
+              type: object
+              allOf:
+                - description: time unit
+                - $ref: '#/components/schemas/TimeUnit'
         events:
           type: array
           description: array of events to query
@@ -914,8 +930,8 @@ components:
           items:
             type: object
             oneOf:
-              - $ref: '#/components/schemas/FilterByProperty'
-              - $ref: '#/components/schemas/FilterByCohort'
+              - $ref: '#/components/schemas/EventFilterByProperty'
+              - $ref: '#/components/schemas/EventFilterByCohort'
         breakdowns:
           type: array
           description: array of common breakdowns (which applies to all events)
@@ -940,7 +956,7 @@ components:
               items:
                 type: object
                 oneOf:
-                  - $ref: '#/components/schemas/FilterByProperty'
+                  - $ref: '#/components/schemas/EventFilterByProperty'
             breakdowns:
               type: array
               items:
@@ -954,7 +970,14 @@ components:
               items:
                 $ref: '#/components/schemas/EventQuery'
 
-    FilterByCohort:
+    EventFilter:
+      type: object
+      description: event filter
+      anyOf:
+        - $ref: '#/components/schemas/EventFilterByCohort'
+        - $ref: '#/components/schemas/EventFilterByProperty'
+
+    EventFilterByCohort:
       type: object
       properties:
         filteType:
@@ -965,7 +988,7 @@ components:
           type: integer
           format: int64
 
-    FilterByProperty:
+    EventFilterByProperty:
       type: object
       description: filter by property. Use this in event filters or in common filters. If you use it in event then event will be inherited, if you use filter as a common, then property should be commnon for all events.
       required: [ "filterType","propertyName","propertyType","operation" ]
@@ -980,7 +1003,7 @@ components:
         - type: object
           properties:
             operation:
-              $ref: '#/components/schemas/Operation'
+              $ref: '#/components/schemas/PropertyFilterOperation'
             value:
               description: one or several property values. May be not set if operation is "empty" or "exist"
               type: array
@@ -989,7 +1012,7 @@ components:
 
     EventQuery:
       type: object
-      description: event  query
+      description: event query
       required: [ "query" ]
       properties:
         name:
@@ -1190,8 +1213,10 @@ components:
           type: string
           description: property name. Because property here is a user only, we don't need propertyType
         operation:
-          $ref: '#/components/schemas/Operation'
-          description: operation
+          type: object
+          allOf:
+            - description: operation
+            - $ref: '#/components/schemas/PropertyFilterOperation'
         values:
           type: array
           description: one or more values. Doesn't need if operation is "empty" or "exist"
@@ -1211,8 +1236,10 @@ components:
           type: string
           description: property name. Because property here is a user only, we don't need propertyType
         operation:
-          $ref: '#/components/schemas/Operation'
-          description: operation
+          type: object
+          allOf:
+            - description: operation
+            - $ref: '#/components/schemas/PropertyFilterOperation'
         values:
           type: array
           description: one or more values. Doesn't need if operation is "empty" or "exist"
@@ -1237,7 +1264,7 @@ components:
           enum:
             - didEventCount
         operation:
-          $ref: '#/components/schemas/Operation'
+          $ref: '#/components/schemas/PropertyFilterOperation'
         value:
           type: integer
           description: one or more values. Doesn't need if operation is "empty" or "exist"
@@ -1261,7 +1288,7 @@ components:
           enum:
             - didEventRelativeCount
         operation:
-          $ref: '#/components/schemas/Operation'
+          $ref: '#/components/schemas/PropertyFilterOperation'
         rightEvent:
           $ref: '#/components/schemas/EventRef'
         time:
@@ -1290,7 +1317,7 @@ components:
             aggregate:
               $ref: '#/components/schemas/QueryAggregateProperty'
             operation:
-              $ref: '#/components/schemas/Operation'
+              $ref: '#/components/schemas/PropertyFilterOperation'
             value:
               type: integer
               description: one or more values. Doesn't need if operation is "empty" or "exist"
@@ -1314,7 +1341,7 @@ components:
           enum:
             - historicalCount
         operation:
-          $ref: '#/components/schemas/Operation'
+          $ref: '#/components/schemas/PropertyFilterOperation'
         value:
           type: integer
         time:
@@ -1340,7 +1367,7 @@ components:
             filters:
               type: array
               items:
-                $ref: '#/components/schemas/FilterByProperty'
+                $ref: '#/components/schemas/EventFilterByProperty'
             aggregate:
               type: object
               oneOf:
@@ -1442,6 +1469,7 @@ components:
             - formula
         formula:
           type: string
+
     QueryAggregate:
       type: string
       enum:
@@ -1464,7 +1492,7 @@ components:
         - type: number
         - type: boolean
 
-    Operation:
+    PropertyFilterOperation:
       description: operation
       type: string
       enum:
