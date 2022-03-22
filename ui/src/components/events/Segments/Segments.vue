@@ -81,7 +81,7 @@ const conditionItems = computed(() => {
     })
 })
 
-const addSegment = () => segmentsStore.addSegment(`${i18n.$t(`events.segments.segment`)} ${segmentsStore.segments.length + 1}`)
+const addSegment = () => segmentsStore.addSegment(`${i18n.$t('events.segments.segment')} ${segmentsStore.segments.length + 1}`)
 const deleteSegment = (idx: number) => segmentsStore.deleteSegment(idx)
 const onRenameSegment = (name: string, idx: number) => segmentsStore.renameSegment(name, idx)
 const addCondition = (idx: number) => segmentsStore.addConditionSegment(idx)
@@ -101,7 +101,6 @@ provide('removeValueCondition', removeValueCondition)
 
 provide('changeAgregateCondition', (payload: PayloadChangeAgregateCondition) => segmentsStore.changeAgregateCondition(payload))
 provide('onRemoveCondition', (payload: Ids) => segmentsStore.removeCondition(payload))
-provide('changePeriodCondition',  (payload: PeriodConditionPayload) => segmentsStore.changePeriodCondition(payload))
 provide('addFilterCondition', (payload: Ids) => segmentsStore.addFilterCondition(payload))
 provide('removeFilterCondition', (payload: RemoveFilterCondition) => segmentsStore.removeFilterCondition(payload))
 provide('changeFilterPropertyCondition', (payload: ChangeFilterPropertyCondition) => segmentsStore.changeFilterPropertyCondition(payload))
@@ -115,6 +114,10 @@ provide('inputValueCondition', (payload: PayloadChangeValueItem) => segmentsStor
  */
 provide('changeEachCondition', (payload: PayloadChangeEach) => {
     segmentsStore.inputCalendarEach(payload)
+})
+
+provide('changePeriodCondition', (payload: PeriodConditionPayload) => {
+    segmentsStore.changePeriodCondition(payload)
 })
 
 

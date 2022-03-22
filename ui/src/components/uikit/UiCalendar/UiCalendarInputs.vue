@@ -83,8 +83,8 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, inject } from "vue";
-import UiInput from "@/components/uikit/UiInput.vue";
+import { computed, inject } from 'vue'
+import UiInput from '@/components/uikit/UiInput.vue'
 import { Each } from './UiCalendar'
 import { eachMap } from './UiCalendar.config'
 
@@ -92,11 +92,11 @@ const i18n = inject<any>('i18n')
 
 
 const emit = defineEmits<{
-    (e: "on-select-last-count", payload: number): void;
-    (e: "on-change-since", payload: string): void;
-    (e: "on-change-between", payload: {type: 'from' | 'to', value: string}): void;
+    (e: 'on-select-last-count', payload: number): void;
+    (e: 'on-change-since', payload: string): void;
+    (e: 'on-change-between', payload: {type: 'from' | 'to', value: string}): void;
     (e: 'on-change-each', payload: Each): void;
-}>();
+}>()
 
 interface Props {
     lastCount?: number
@@ -116,7 +116,8 @@ const props = withDefaults(defineProps<Props>(), {
     warningText: '',
     from: '',
     to: '',
-});
+    each: undefined,
+})
 
 const textLastCount = computed(() => props.lastCount === 1 ? 'day' : 'days')
 
@@ -131,21 +132,21 @@ const itemsEach = computed(() => {
 })
 
 const onSelectLastCount = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    emit('on-select-last-count', Number(target.value));
+    const target = e.target as HTMLInputElement
+    emit('on-select-last-count', Number(target.value))
 }
 
 const onSelectSinceDate = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    emit('on-change-since', target.value);
+    const target = e.target as HTMLInputElement
+    emit('on-change-since', target.value)
 }
 
 const onSelectBetween = (e: Event, type: 'from' | 'to') => {
-    const target = e.target as HTMLInputElement;
+    const target = e.target as HTMLInputElement
     emit('on-change-between', {
         type,
         value: target.value,
-    });
+    })
 }
 
 const onSelectEach = (payload: Each) => emit('on-change-each', payload)
