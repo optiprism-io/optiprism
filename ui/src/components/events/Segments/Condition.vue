@@ -186,7 +186,7 @@ import {
     Ids,
     PeriodConditionPayload,
     PayloadChangeEach,
-} from '@/components/events/Segments/SegmentsType'
+} from '@/components/events/Segments/Segments'
 import { conditions } from '@/configs/events/segmentCondition'
 import { useLexiconStore } from '@/stores/lexicon'
 import { getStringDateByFormat } from '@/helpers/getStringDates'

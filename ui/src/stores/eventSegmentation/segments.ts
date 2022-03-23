@@ -19,7 +19,7 @@ import {
     PayloadChangeAgregateCondition,
     PayloadChangeValueItem,
     PayloadChangeEach,
-} from '@/components/events/Segments/SegmentsType'
+} from '@/components/events/Segments/Segments'
 
 interface Segment {
     name: string
