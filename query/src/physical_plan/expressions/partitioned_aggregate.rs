@@ -20,11 +20,12 @@
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::fmt;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::fmt::{Debug, Formatter};
+use std::marker::PhantomData;
+use std::sync::{Arc, Mutex};
 use crate::error::{Error, Result};
 
-use arrow::array::{Array, ArrayRef, Int8Array};
+use arrow::array::{Array, ArrayRef, Float64Array, Int64Array, Int8Array, UInt64Array};
 use arrow::datatypes::DataType;
 use dyn_clone::DynClone;
 use datafusion::error::{DataFusionError, Result as DFResult};
@@ -45,6 +46,87 @@ pub trait PartitionedAccumulator: Debug + Send + Sync {
     fn evaluate(&self) -> Result<ScalarValue>;
 }
 
+#[derive(Clone, Debug)]
+pub struct Buffer {
+    cap: usize,
+    data_type: DataType,
+    buffer: Vec<Value>,
+    acc: Arc<Mutex<Box<dyn Accumulator>>>,
+}
+
+macro_rules! buffer_to_array_ref {
+    ($self:ident, $type:ident, $vtype:ident, $ARRAYTYPE:ident) => {{
+        Arc::new($ARRAYTYPE::from(
+            $self
+                .buffer
+                .iter()
+                .map(|v| v.into())
+                .collect::<Vec<$type>>(),
+        )) as ArrayRef
+    }};
+}
+
+impl Buffer {
+    pub fn new(cap: usize, data_type: DataType, acc: Box<dyn Accumulator>) -> Self {
+        Self {
+            cap,
+            data_type,
+            buffer: Vec::with_capacity(cap),
+            acc: Arc::new(Mutex::new(acc)),
+        }
+    }
+
+    pub fn push(&mut self, value: Value) -> Result<()> {
+        self.buffer.push(value);
+
+        if self.buffer.len() >= self.cap {
+            self.flush_to_accumulator()?;
+            self.reset();
+        }
+        Ok(())
+    }
+
+    pub fn flush_to_accumulator(&self) -> Result<()> {
+        if self.buffer.is_empty() {
+            return Ok(());
+        }
+
+
+        let arr = match self.data_type {
+            DataType::Int64 => buffer_to_array_ref!(self, i64, Int64, Int64Array),
+            DataType::UInt64 => buffer_to_array_ref!(self, u64, UInt64, UInt64Array),
+            DataType::Float64 => buffer_to_array_ref!(self, f64, Float64, Float64Array),
+            _ => unimplemented!(),
+        };
+
+        let mut acc = self.acc.lock().unwrap();
+        Ok(acc.update_batch(&[arr])?)
+    }
+
+    pub fn reset(&mut self) {
+        self.buffer.resize(0, Value::Null);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
+    }
+
+    pub fn state(&self) -> DFResult<Vec<ScalarValue>> {
+        self.acc.lock().unwrap().state()
+    }
+
+    pub fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
+        self.acc.lock().unwrap().update_batch(values)
+    }
+
+    pub fn merge_batch(&mut self, states: &[ArrayRef]) -> DFResult<()> {
+        self.acc.lock().unwrap().merge_batch(states)
+    }
+
+    pub fn evaluate(&self) -> DFResult<ScalarValue> {
+        self.acc.lock().unwrap().evaluate()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
 pub enum PartitionedAggregateFunction {
@@ -67,6 +149,7 @@ pub enum Value {
     Int64(i64),
     UInt64(u64),
     Float64(f64),
+    Null,
 }
 
 impl Value {
@@ -75,6 +158,7 @@ impl Value {
             Value::Int64(_) => DataType::Int64,
             Value::UInt64(_) => DataType::UInt64,
             Value::Float64(_) => DataType::Float64,
+            _ => unreachable!()
         }
     }
 }
@@ -189,7 +273,7 @@ fn new_partitioned_accumulator(
 ) -> Result<Box<dyn PartitionedAccumulator>> {
     Ok(Box::new(match agg {
         PartitionedAggregateFunction::Sum => {
-            PartitionedSumAccumulator::try_new(data_type, outer_acc, outer_agg)?
+            PartitionedSumAccumulator::try_new(data_type, outer_acc)?
         }
         _ => unimplemented!(),
     }))
@@ -219,7 +303,6 @@ impl PartitionedAggregateAccumulator {
             _ => Err(Error::Internal(format!("{:?} doesn't supported", outer_agg))),
         }?);
 
-        // let outer_acc = new_accumulator(outer_agg, agg_return_type)?;
         Ok(Self {
             last_partition_value: ScalarValue::try_from(partition_type)?,
             first_row: true,
