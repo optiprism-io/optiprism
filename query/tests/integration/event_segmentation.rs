@@ -16,7 +16,6 @@ mod tests {
     use arrow::util::pretty::print_batches;
     use datafusion::datasource::object_store::local::LocalFileSystem;
     use datafusion::datasource::MemTable;
-    use datafusion::execution::context::ExecutionContextState;
     use datafusion::logical_plan::LogicalPlan as DFLogicalPlan;
     use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
     use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
@@ -287,18 +286,10 @@ mod tests {
                     NamedQuery::new(
                         Query::AggregatePropertyPerGroup {
                             property: PropertyRef::Event("Revenue".to_string()),
-                            aggregate_per_group: PartitionedAggregateFunction::Avg,
+                            aggregate_per_group: PartitionedAggregateFunction::Sum,
                             aggregate: AggregateFunction::Avg,
                         },
-                        Some("avg_revenue_per_user".to_string()),
-                    ),
-                    NamedQuery::new(
-                        Query::AggregatePropertyPerGroup {
-                            property: PropertyRef::Event("Revenue".to_string()),
-                            aggregate_per_group: PartitionedAggregateFunction::Min,
-                            aggregate: AggregateFunction::Avg,
-                        },
-                        Some("min_revenue_per_user".to_string()),
+                        Some("avg_total_revenue_per_user".to_string()),
                     ),
                     NamedQuery::new(
                         Query::AggregateProperty {
