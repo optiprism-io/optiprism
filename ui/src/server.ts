@@ -48,7 +48,7 @@ export default function ({ environment = "development" } = {}) {
                         nullable: false,
                         isArray: false,
                         isDictionary: false,
-                        dictionaryType: DataType.UInt16
+                        dictionaryType: DataType.Number
                     },
                     {
                         id: 2,
@@ -62,7 +62,7 @@ export default function ({ environment = "development" } = {}) {
                         nullable: false,
                         isArray: false,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt16
+                        dictionaryType: DataType.Number
                     },
                     {
                         id: 3,
@@ -76,7 +76,7 @@ export default function ({ environment = "development" } = {}) {
                         nullable: false,
                         isArray: false,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt16
+                        dictionaryType: DataType.Number
                     },
                     {
                         id: 4,
@@ -86,7 +86,7 @@ export default function ({ environment = "development" } = {}) {
                         updatedBy: 0,
                         tags: [],
                         name: "Product Price",
-                        type: DataType.Float64,
+                        type: DataType.Number,
                         isArray: false,
                         nullable: false,
                         isDictionary: false
@@ -103,7 +103,7 @@ export default function ({ environment = "development" } = {}) {
                         isArray: false,
                         nullable: false,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt64
+                        dictionaryType: DataType.Number
                     },
                     {
                         id: 6,
@@ -117,7 +117,7 @@ export default function ({ environment = "development" } = {}) {
                         isArray: false,
                         nullable: false,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt16
+                        dictionaryType: DataType.Number
                     },
                     {
                         id: 7,
@@ -127,7 +127,7 @@ export default function ({ environment = "development" } = {}) {
                         updatedBy: 0,
                         tags: [],
                         name: "Product Price",
-                        type: DataType.Float64,
+                        type: DataType.Number,
                         isArray: false,
                         nullable: false,
                         isDictionary: false
@@ -144,7 +144,7 @@ export default function ({ environment = "development" } = {}) {
                         isArray: false,
                         nullable: false,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt64
+                        dictionaryType: DataType.Number
                     },
                     {
                         id: 9,
@@ -158,7 +158,7 @@ export default function ({ environment = "development" } = {}) {
                         isArray: false,
                         nullable: false,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt16
+                        dictionaryType: DataType.Number
                     },
                     {
                         id: 10,
@@ -168,7 +168,7 @@ export default function ({ environment = "development" } = {}) {
                         updatedBy: 0,
                         tags: [],
                         name: "Product Price",
-                        type: DataType.Float64,
+                        type: DataType.Number,
                         isArray: false,
                         nullable: false,
                         isDictionary: false
@@ -181,7 +181,7 @@ export default function ({ environment = "development" } = {}) {
                         updatedBy: 0,
                         tags: [],
                         name: "Discount",
-                        type: DataType.Float64,
+                        type: DataType.Number,
                         isArray: false,
                         nullable: false,
                         isDictionary: false
@@ -194,7 +194,7 @@ export default function ({ environment = "development" } = {}) {
                         updatedBy: 0,
                         tags: [],
                         name: "Revenue",
-                        type: DataType.Float64,
+                        type: DataType.Number,
                         isArray: false,
                         nullable: false,
                         isDictionary: false
@@ -238,7 +238,7 @@ export default function ({ environment = "development" } = {}) {
                         nullable: false,
                         isArray: false,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt64
+                        dictionaryType: DataType.Number
                     },
                     {
                         id: 2,
@@ -253,11 +253,11 @@ export default function ({ environment = "development" } = {}) {
                         description:
                             "Lorem, ipsum dolor sit amet consectetur adipisicing elit. Architecto, temporibus.",
                         status: EventStatus.Enabled,
-                        type: DataType.UInt64,
+                        type: DataType.Number,
                         nullable: false,
                         isArray: false,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt64
+                        dictionaryType: DataType.Number
                     },
                     {
                         id: 3,
@@ -275,7 +275,7 @@ export default function ({ environment = "development" } = {}) {
                         nullable: false,
                         isArray: true,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt64
+                        dictionaryType: DataType.Number
                     },
                     {
                         id: 4,
@@ -293,7 +293,7 @@ export default function ({ environment = "development" } = {}) {
                         nullable: false,
                         isArray: false,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt64
+                        dictionaryType: DataType.Number
                     }
                 ];
             });
@@ -321,7 +321,7 @@ export default function ({ environment = "development" } = {}) {
                         isArray: false,
                         nullable: false,
                         isDictionary: true,
-                        dictionaryType: DataType.UInt64
+                        dictionaryType: DataType.Number
                     }
                 ];
             });

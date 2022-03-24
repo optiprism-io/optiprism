@@ -1,38 +1,10 @@
-export enum DataTypeKind {
-    String,
-    Number,
-    Boolean
-}
-
 export enum DataType {
-    String,
-    Float64,
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    UInt8,
-    UInt16,
-    UInt32,
-    UInt64,
-    Boolean
+    String = 'string',
+    Number = 'number',
+    Boolean = 'boolean',
 }
 
 export type Value = string | number | boolean;
-
-export const dataTypeKinds: Map<DataType, DataTypeKind> = new Map([
-    [DataType.String, DataTypeKind.String],
-    [DataType.Float64, DataTypeKind.Number],
-    [DataType.Int8, DataTypeKind.Number],
-    [DataType.Int16, DataTypeKind.Number],
-    [DataType.Int32, DataTypeKind.Number],
-    [DataType.Int64, DataTypeKind.Number],
-    [DataType.UInt8, DataTypeKind.Number],
-    [DataType.UInt16, DataTypeKind.Number],
-    [DataType.UInt32, DataTypeKind.Number],
-    [DataType.UInt64, DataTypeKind.Number],
-    [DataType.Boolean, DataTypeKind.Boolean]
-]);
 
 export interface Cohort {
     id: number;
@@ -59,7 +31,7 @@ export interface Operation {
     id: OperationId;
     name: string;
     shortName?: string;
-    typeKinds?: DataTypeKind[];
+    typeKinds?: DataType[];
     flags?: OpFlag[];
 }
 
@@ -82,36 +54,36 @@ export const operations: Operation[] = [
     {
         id: OperationId.Gt,
         name: "Greater (>)",
-        typeKinds: [DataTypeKind.Number],
+        typeKinds: [DataType.Number],
         shortName: '>',
     },
     {
         id: OperationId.Gte,
         name: "Greater or Equal (>=)",
-        typeKinds: [DataTypeKind.Number],
+        typeKinds: [DataType.Number],
         shortName: '>=',
     },
     {
         id: OperationId.Lt,
         name: "Less (<)",
-        typeKinds: [DataTypeKind.Number],
+        typeKinds: [DataType.Number],
         shortName: '<',
     },
     {
         id: OperationId.Lte,
         name: "Less or Equal (<=)",
-        typeKinds: [DataTypeKind.Number],
+        typeKinds: [DataType.Number],
         shortName: '<=',
     },
     {
         id: OperationId.True,
         name: "True",
-        typeKinds: [DataTypeKind.Boolean],
+        typeKinds: [DataType.Boolean],
     },
     {
         id: OperationId.False,
         name: "False",
-        typeKinds: [DataTypeKind.Boolean]
+        typeKinds: [DataType.Boolean]
     },
     {
         id: OperationId.Exists,
@@ -136,7 +108,7 @@ export const operations: Operation[] = [
     {
         id: OperationId.Regex,
         name: "Regex",
-        typeKinds: [DataTypeKind.String]
+        typeKinds: [DataType.String]
     }
 ];
 
@@ -148,14 +120,13 @@ export const findOperations = (
     nullable: boolean,
     isArray: boolean
 ): Operation[] => {
-    const kind = dataTypeKinds.get(type);
     return operations.filter(op => {
 
         if (!op.typeKinds && !op.flags) {
             return true
         }
 
-        if (op.typeKinds && op.typeKinds.find(t => t === kind)) {
+        if (op.typeKinds && op.typeKinds.find(t => t === type)) {
             return true;
         }
 
