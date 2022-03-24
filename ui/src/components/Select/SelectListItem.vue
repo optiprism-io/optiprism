@@ -10,7 +10,7 @@
             <VMenu
                 placement="right-start"
                 :triggers="['hover']"
-                :delay="{ hide: 0 }"
+                :delay="{ hide: 200 }"
                 :offset="[0, 0]"
                 class="select-list-item__sub-menu"
             >

@@ -18,12 +18,10 @@ import {
     EventCustomProperty,
     EventProperty,
     EventRef,
-    EventType,
     PropertyRef,
     PropertyType,
     UserCustomProperty,
     UserProperty,
-    EVENT_TYPE_CUSTOM,
     EVENT_TYPE_REGULAR
 } from "@/types/events";
 import Select from "@/components/Select/Select.vue";

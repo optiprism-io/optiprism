@@ -12,31 +12,44 @@
             </div>
         </template>
         <template #popper="{hide}">
-            <UiCalendarControls
-                v-if="props.showControls"
-                :active-tab="activeTab"
-                :since="since"
-                :last-count="lastCountLocal"
-                :warning="warning"
-                :warning-text="warningText"
-                :from="betweenValue.from"
-                :to="betweenValue.to"
-                @on-select-tab="onSelectTab"
-                @on-select-last-count="onSelectLastCount"
-                @on-change-since="onChangeSince"
-                @on-change-between="onChangeBetween"
-            />
-            <UiCalendar
-                :multiple="true"
-                :value="valueLocal"
-                :count="props.monthLength"
-                :offset="props.offsetMonth"
-                :from-select-only="fromSelectOnly"
-                :disable-apply="warning"
-                :button-text="$t('common.apply')"
-                @on-change="onChange"
-                @on-apply="($event: any) => {hide(); apply($event)}"
-            />
+            <div class="ui-date-picker__content">
+                <div class="ui-date-picker__tabs">
+                    <UiCalendarControls
+                        v-if="props.showControls"
+                        :active-tab="activeTab"
+                        :show-each="showEach"
+                        @on-select-tab="onSelectTab"
+                    />
+                </div>
+                <div class="ui-date-picker__action">
+                    <UiCalendarInputs
+                        :active-tab="activeTab"
+                        :since="since"
+                        :last-count="lastCountLocal"
+                        :warning="warning"
+                        :warning-text="warningText"
+                        :from="betweenValue.from"
+                        :to="betweenValue.to"
+                        :each="value.each"
+                        @on-select-last-count="onSelectLastCount"
+                        @on-change-since="onChangeSince"
+                        @on-change-between="onChangeBetween"
+                        @on-change-each="onChangeEach"
+                    />
+                    <UiCalendar
+                        v-if="showCalendar"
+                        :multiple="true"
+                        :value="valueLocal"
+                        :count="props.monthLength"
+                        :offset="props.offsetMonth"
+                        :from-select-only="fromSelectOnly"
+                        :disable-apply="warning"
+                        :button-text="$t('common.apply')"
+                        @on-change="onChange"
+                        @on-apply="($event: any) => {hide(); apply($event)}"
+                    />
+                </div>
+            </div>
         </template>
     </VDropdown>
 </template>
@@ -45,14 +58,12 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { getYYYYMMDD } from "@/helpers/getStringDates";
 import { getLastNDaysRange, dateDiff, isDate } from "@/helpers/calendarHelper";
-import UiCalendarControls from "@/components/uikit/UiCalendar/UiCalendarControls.vue";
-import UiCalendar, { Value, CurrentValue } from "@/components/uikit/UiCalendar/UiCalendar.vue";
 
-export interface ApplyPayload {
-    value: CurrentValue,
-    type: string,
-    last: number,
-}
+import UiCalendarControls from "@/components/uikit/UiCalendar/UiCalendarControls.vue";
+import UiCalendarInputs from './UiCalendar/UiCalendarInputs.vue'
+import UiCalendar from "@/components/uikit/UiCalendar/UiCalendar.vue";
+
+import { Each, ApplyPayload, CurrentValue, Value } from '@/components/uikit/UiCalendar/UiCalendar'
 
 interface Props {
     showControls?: boolean
@@ -61,6 +72,7 @@ interface Props {
     activeTabControls?: string
     offsetMonth?: number
     monthLength?: number
+    showEach?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -74,6 +86,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     (e: "on-select", payload: string): void;
     (e: "on-apply", payload: ApplyPayload): void;
+    (e: 'on-change-each', payload: Each): void;
 }>();
 
 const activeTab = ref('last');
@@ -105,13 +118,16 @@ const firsDateCalendar = computed((): Date => {
     return firsDateCalendar;
 });
 
+const showCalendar = computed(() => activeTab.value !== 'each')
+
 const onToggle = () => {
     isOpen.value = !isOpen.value;
 };
 
 const onHide = () => {
-    isOpen.value = false;
-};
+    isOpen.value = false
+    activeTab.value = props.activeTabControls
+}
 
 const onSelectTab = (type: string) => {
     if (type === 'last') {
@@ -206,6 +222,11 @@ const onChangeBetween = (payload: {type: 'from' | 'to', value: string}) => {
     }
 }
 
+const onChangeEach = (payload: Each) => {
+    isOpen.value = false
+    emit('on-change-each', payload)
+}
+
 const updateValue = () => {
     const value = {...props.value};
 
@@ -262,6 +283,22 @@ watch(() => props.lastCount, (value) => {
 
 <style lang="scss">
 .ui-date-picker {
-    width: 330px;
+    &__content {
+        display: flex;
+        overflow: hidden;
+    }
+
+    &__tabs {
+        width: 200px;
+    }
+
+    &__action {
+        width: 280px;
+        border-left: 1px solid var(--pf-global--BackgroundColor--200);
+    }
+
+    .pf-c-menu.pf-m-plain {
+        box-shadow: none;
+    }
 }
 </style>

@@ -58,6 +58,7 @@ export enum OperationId {
 export interface Operation {
     id: OperationId;
     name: string;
+    shortName?: string;
     typeKinds?: DataTypeKind[];
     flags?: OpFlag[];
 }
@@ -70,36 +71,42 @@ enum OpFlag {
 export const operations: Operation[] = [
     {
         id: OperationId.Eq,
-        name: "Equal (=)"
+        name: "Equal (=)",
+        shortName: '='
     },
     {
         id: OperationId.Neq,
-        name: "Not Equal (!=)"
+        name: "Not Equal (!=)",
+        shortName: '!=',
     },
     {
         id: OperationId.Gt,
         name: "Greater (>)",
-        typeKinds: [DataTypeKind.Number]
+        typeKinds: [DataTypeKind.Number],
+        shortName: '>',
     },
     {
         id: OperationId.Gte,
         name: "Greater or Equal (>=)",
-        typeKinds: [DataTypeKind.Number]
+        typeKinds: [DataTypeKind.Number],
+        shortName: '>=',
     },
     {
         id: OperationId.Lt,
         name: "Less (<)",
-        typeKinds: [DataTypeKind.Number]
+        typeKinds: [DataTypeKind.Number],
+        shortName: '<',
     },
     {
         id: OperationId.Lte,
         name: "Less or Equal (<=)",
-        typeKinds: [DataTypeKind.Number]
+        typeKinds: [DataTypeKind.Number],
+        shortName: '<=',
     },
     {
         id: OperationId.True,
         name: "True",
-        typeKinds: [DataTypeKind.Boolean]
+        typeKinds: [DataTypeKind.Boolean],
     },
     {
         id: OperationId.False,
@@ -143,19 +150,22 @@ export const findOperations = (
 ): Operation[] => {
     const kind = dataTypeKinds.get(type);
     return operations.filter(op => {
-        if (op.typeKinds && !op.typeKinds.find(t => t === kind)) {
-            return false;
+
+        if (!op.typeKinds && !op.flags) {
+            return true
         }
 
-        if (nullable && op.flags && !op.flags.find(f => f === OpFlag.Null)) {
-            return false;
+        if (op.typeKinds && op.typeKinds.find(t => t === kind)) {
+            return true;
         }
 
-        if (isArray && op.flags && !op.flags.find(f => f === OpFlag.Array)) {
-            return false;
+        if (nullable && op.flags && op.flags.find(f => f === OpFlag.Null)) {
+            return true;
         }
 
-        return true;
+        if (isArray && op.flags && op.flags.find(f => f === OpFlag.Array)) {
+            return true;
+        }
     });
 };
 

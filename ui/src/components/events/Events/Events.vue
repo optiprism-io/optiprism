@@ -36,7 +36,7 @@
                     :is-link="true"
                     :before-icon="'fas fa-plus'"
                 >
-                    Add Event
+                    {{ $t('common.add_event') }}
                 </UiButton>
             </Select>
         </div>

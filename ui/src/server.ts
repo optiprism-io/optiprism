@@ -253,7 +253,7 @@ export default function ({ environment = "development" } = {}) {
                         description:
                             "Lorem, ipsum dolor sit amet consectetur adipisicing elit. Architecto, temporibus.",
                         status: EventStatus.Enabled,
-                        type: DataType.String,
+                        type: DataType.UInt64,
                         nullable: false,
                         isArray: false,
                         isDictionary: true,
@@ -273,7 +273,7 @@ export default function ({ environment = "development" } = {}) {
                         status: EventStatus.Enabled,
                         type: DataType.String,
                         nullable: false,
-                        isArray: false,
+                        isArray: true,
                         isDictionary: true,
                         dictionaryType: DataType.UInt64
                     },
@@ -326,16 +326,24 @@ export default function ({ environment = "development" } = {}) {
                 ];
             });
 
-            this.get("/data/property-values", (): string[] => {
-                return ["Furniture", "Doors", "Lamp", "Tables", "Shelves"];
+            this.get("/data/property-values", (_, request): string[] => {
+                const propertyName = request.queryParams.property_name
+
+                if (propertyName === 'Country') {
+                    return ["Spain", "USA", "United Kingdom", "Poland"]
+                } else {
+                    return ["Furniture", "Doors", "Lamp", "Tables", "Shelves"]
+                }
             });
 
             this.get("/chart", (): any[] => {
                 return splineChartMocks;
             });
 
-            this.post("/queries/event-segmentation", (schema, request) => {
-                if (JSON.parse(request.requestBody).events.length) {
+            this.post("/queries/event-segmentation", (_, request) => {
+                const body = JSON.parse(request.requestBody);
+
+                if (body.events.length || body.segments) {
                     return eventSegmentationsMocks;
                 } else {
                     return {

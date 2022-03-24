@@ -10,11 +10,13 @@ import {
 import { OperationId, Value, Group } from "@/types";
 import schemaService from "@/api/services/schema.service";
 import queriesService, { EventSegmentation } from "@/api/services/queries.service";
-import { useLexiconStore } from "@/stores/lexicon";
 import { getYYYYMMDD, getStringDateByFormat } from "@/helpers/getStringDates";
 import { getLastNDaysRange } from "@/helpers/calendarHelper";
 import { TimeUnit } from "@/types";
 import {Column, Row} from "@/components/uikit/UiTable/UiTable";
+
+import { useLexiconStore } from "@/stores/lexicon";
+import { useSegmentsStore } from "@/stores/eventSegmentation/segments";
 
 const COLUMN_WIDTH = 170;
 export type ChartType = 'line' | 'pie' | 'column';
@@ -49,7 +51,7 @@ export type Event = {
 };
 
 export type Events = {
-    events: Event[];
+    events: Event[]
     group: Group;
 
     controlsGroupBy: string;
@@ -78,7 +80,7 @@ const initialQuery = <EventQuery[]>[
     }
 ]
 
-const compudeEventProperties = (type: PropertyType, items: any): PropertyRef[] => {
+const computedEventProperties = (type: PropertyType, items: any): PropertyRef[] => {
     return items.map((item: any) => {
         return {
             type: type,
@@ -211,18 +213,19 @@ export const useEventsStore = defineStore("events", {
 
             this.events.forEach(item => {
                 const eventRef = item.ref;
-                items.push(...compudeEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.id)));
-                items.push(...compudeEventProperties(PropertyType.EventCustom, lexiconStore.findEventCustomProperties(eventRef.id)));
+                items.push(...computedEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.id)));
+                items.push(...computedEventProperties(PropertyType.EventCustom, lexiconStore.findEventCustomProperties(eventRef.id)));
             });
 
             return [
                 ...new Set(items),
-                ...compudeEventProperties(PropertyType.User, lexiconStore.userProperties),
-                ...compudeEventProperties(PropertyType.UserCustom, lexiconStore.userCustomProperties),
+                ...computedEventProperties(PropertyType.User, lexiconStore.userProperties),
+                ...computedEventProperties(PropertyType.UserCustom, lexiconStore.userCustomProperties),
             ];
         },
         propsForEventSegmentationResult(): EventSegmentation {
             const lexiconStore = useLexiconStore();
+            const segmentsStore = useSegmentsStore()
 
             let time = {
                 from: new Date(this.period.from),
@@ -281,6 +284,7 @@ export const useEventsStore = defineStore("events", {
 
                     return event;
                 }),
+                segments: segmentsStore.segments.length ? segmentsStore.segments : null,
             };
 
             if (this.compareTo) {

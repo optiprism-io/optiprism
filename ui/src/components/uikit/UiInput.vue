@@ -1,5 +1,6 @@
 <template>
     <input
+        ref="input"
         class="pf-c-form-control"
         :value="props.modelValue"
         :type="props.type"
@@ -11,6 +12,7 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 const emit = defineEmits(["update:modelValue", "blur"]);
 
 interface Props {
@@ -18,6 +20,7 @@ interface Props {
     type?: string
     placeholder?: string
     min?: number
+    mountFocus?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -25,7 +28,19 @@ const props = withDefaults(defineProps<Props>(), {
     type: "text",
     placeholder: '',
     min: 0,
+    mountFocus: false
 });
+
+const input = ref<HTMLCanvasElement | null>(null)
+
+onMounted(() => {
+    if (props.mountFocus) {
+        const inputElement = input.value
+        if (inputElement) {
+            inputElement.focus()
+        }
+    }
+})
 
 const updateValue = (e: Event) => {
     const target = e.target as HTMLInputElement;

@@ -57,10 +57,8 @@ import {
     getOrderedWeekdays,
 } from '@/helpers/calendarHelper';
 
-export interface Ranged {
-    from: string | null;
-    to: string | null;
-}
+import { Ranged } from './UiCalendar'
+
 
 interface CellDate {
     date: number;
@@ -86,7 +84,7 @@ interface Props {
     weekDays: string[];
     monthsNames: string[];
     activeDates?: string[];
-    ranged: Ranged | string[];
+    ranged: Ranged;
     years: Year[];
     showSelectYears: boolean;
     allowFuture: boolean;
@@ -229,7 +227,7 @@ const mouseleaveItem = (date: string) => {
 
     &__side {
         width: 2.6rem;
-        padding-top: .5rem;
+        padding-top: 1rem;
         padding-left: .5rem;
     }
 
@@ -240,4 +238,10 @@ const mouseleaveItem = (date: string) => {
     }
 }
 
+.pf-c-calendar-month {
+    &__date {
+        width: 30px;
+        height: 30px;
+    }
+}
 </style>

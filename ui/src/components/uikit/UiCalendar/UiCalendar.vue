@@ -24,7 +24,7 @@
                     </thead>
                 </table>
                 <VirtualisedList
-                    :viewport-height="300"
+                    :viewport-height="220"
                     :get-node-height="getNodeHeight"
                     :tolerance="1"
                     :nodes="calendarList"
@@ -76,33 +76,14 @@
 </template>
 
 <script lang="ts" setup>
-import {computed, ref, onMounted, watch} from "vue";
-import {VirtualisedList} from "vue-virtualised";
-import UiCalendarMonth, {Ranged} from './UiCalendarMonth.vue';
+import { computed, ref, onMounted, watch, inject } from "vue";
+import { VirtualisedList } from "vue-virtualised";
 
-export interface RangeValue {
-    i?: number;
-    id: string;
-    month?: number;
-    year?: number;
-}
+import { RangeValue, CurrentValue, Value, Ranged } from './UiCalendar'
 
-export interface CurrentValue {
-    from: null | string,
-    to: null | string,
-    dates: string[],
-    multiple: boolean,
-    type: string,
-    activeDates: string[],
-    date: string | null,
-}
+import UiCalendarMonth from './UiCalendarMonth.vue';
 
-export interface Value {
-    from: string,
-    to: string,
-    multiple: boolean,
-    dates?: string[],
-}
+const i18n = inject<any>('i18n')
 
 interface Props {
     dates?: string[];
@@ -124,15 +105,14 @@ interface Props {
     disableFutureDates?: boolean;
     firstDayOfWeek?: number;
     disabledMultiple?: boolean;
-    value: Value | number;
+    value: Value;
     fromSelectOnly?: boolean;
     disableApply?: boolean;
 }
 
-const weekDays = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su'];
-const monthsNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const monthsNamesShort = [];
-const VIEWPORT_HEIGHT = 300;
+const weekDays = new Array(7).fill(0).map((_, i) => i18n.$t(`common.calendar.week_days.${i}`))
+const monthsNames = new Array(12).fill(0).map((_, i) => i18n.$t(`common.calendar.months.${i}`))
+const VIEWPORT_HEIGHT = 220;
 
 const props = withDefaults(defineProps<Props>(), {
     count: 2,
@@ -171,7 +151,7 @@ const start = ref(-1);
 const currentDates = ref<string[]>([]);
 const hovered = ref('');
 const currentMultiple = ref(false);
-const initialScrollTop = computed(() => props.count * VIEWPORT_HEIGHT + 300);
+const initialScrollTop = computed(() => props.count * VIEWPORT_HEIGHT + VIEWPORT_HEIGHT);
 
 const calendarList = computed(() => {
     switch (props.type) {
@@ -231,7 +211,7 @@ const currentRanged = computed(() => {
     return ranged;
 });
 
-const getNodeHeight = () => 250;
+const getNodeHeight = () => VIEWPORT_HEIGHT;
 
 const setPosition = (offset: number) => {
     const localDate = new Date(date.value);
@@ -468,7 +448,7 @@ watch(() => props.value, (value) => {
     }
 
     &__footer {
-        border-top: var(--pf-c-calendar-month__days--BorderBottomWidth) solid var(--pf-c-calendar-month__days--BorderBottomColor);
+        border-top: 1px solid var(--pf-global--BackgroundColor--200);
     }
 
     .pf-c-calendar-month {
@@ -479,7 +459,7 @@ watch(() => props.value, (value) => {
         }
 
         &__day {
-            width: 40px;
+            width: 30px;
             text-transform: uppercase;
             font-weight: 300;
             font-size: .8rem;

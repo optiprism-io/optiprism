@@ -53,6 +53,8 @@ export type EventSegmentation = {
     events: EventQuery[],
     breakdowns?: Breakdown[],
     filters?: Filter[],
+
+    segments?: any // TODO integration
 }
 
 const schemaEventSegmentation = {

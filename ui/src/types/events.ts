@@ -1,5 +1,6 @@
-import { DataType } from '@/types';
-import { AggregateId } from '@/types/aggregate';
+import { DataType, OperationId, Value } from '@/types'
+import { AggregateId } from '@/types/aggregate'
+import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
 
 export const EVENT_TYPE_REGULAR = 'regular'
 export const EVENT_TYPE_CUSTOM = 'custom'
@@ -63,6 +64,7 @@ export interface CustomEvent {
     name: string;
     description?: string;
     status: EventStatus;
+    displayName?: string;
 }
 
 export interface Event {
@@ -251,3 +253,44 @@ export const eventsQueries: EventsQuery[] = [
         hasValue: true,
     },
 ]
+
+export interface ConditionFilter {
+    propRef?: PropertyRef
+    opId: OperationId
+    values: Value[]
+    valuesList: string[]
+    error?: boolean
+}
+
+export interface Condition {
+    action?: {
+        name?: string
+        id: string
+    }
+    propRef?: PropertyRef
+    opId?: OperationId
+    values?: Value[]
+    valueItem?: string | number
+    valuesList?: string[]
+    period?: {
+        from?: string
+        to?: string
+        last?: number
+        type?: string
+    }
+    event?: {
+        name: string
+        ref: EventRef
+    }
+    compareEvent?: {
+        name: string
+        ref: EventRef
+    }
+    filters: ConditionFilter[]
+    aggregate?: {
+        name?: string
+        id: string,
+        typeAggregate?: string
+    }
+    each?: Each
+}

@@ -1,10 +1,18 @@
 /// <reference types="vite/client" />
 
+import {DefineComponent} from "vue";
+
 declare module "*.vue" {
-    import type { DefineComponent } from "vue";
-    const component: DefineComponent<Record<string, unknown>, Record<string, unknown>, unknown>;
-    export default component;
+    import { defineComponent } from 'vue'
+    const component: ReturnType<typeof defineComponent>
+
+    export default component
 }
 
+declare module '@vue/runtime-core' {
+    interface ComponentCustomProperties {
+        $t: (key: string) => string
+    }
+}
 declare module "v-tooltip";
 declare module "VirtualisedList";

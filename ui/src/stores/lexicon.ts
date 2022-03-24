@@ -198,7 +198,6 @@ export const useLexiconStore = defineStore("lexicon", {
                     case PropertyType.UserCustom:
                         return this.findUserCustomPropertyById(ref.id);
                 }
-                throw new Error("unhandled");
             };
         },
         propertyName() {

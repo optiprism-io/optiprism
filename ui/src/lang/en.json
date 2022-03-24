@@ -1,10 +1,78 @@
 {
   "common": {
     "apply": "Apply",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "select_period": "Select period",
+    "select_aggregate": "Select aggregate",
+    "add_filter": "Add Filter",
+    "add_event": "Add Event",
+    "enter_value": "Enter a value",
+    "calendar": {
+      "last": "Last",
+      "since": "Since",
+      "between": "Between",
+      "each": "Each",
+      "day": "day",
+      "days": "days",
+      "each_select": {
+        "month": "Month",
+        "week": "Week",
+        "day": "Day",
+        "hour": "Hour",
+        "minute": "Minute"
+      },
+      "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+      "week_days": ["mo", "tu", "we", "th", "fr", "sa", "su"]
+    }
   },
 
   "events": {
-    "select_to_start": "Select an Event to get started"
+    "filters": "Filters",
+    "breakdowns": "Breakdowns",
+    "events": "Events",
+    "event_segmentation": "Event Segmentation",
+    "select_to_start": "Select an Event to get started",
+    "select_property": "Select property",
+    "select_value": "Select value",
+    "segments": {
+      "segment": "Segment",
+      "label": "Segments",
+      "add": "Add segment",
+      "remove": "Remove segment",
+      "add_condition": "Add condition",
+      "select_condition": "Select condition",
+      "remove_condition": "Remove condition"
+    },
+    "condition": {
+      "hasPropertyValue": "Has property value",
+      "hadPropertyValue": "Had property value",
+      "didEvent": "Did event",
+      "funnel": "Funnel",
+      "retained": "Retained",
+
+      "hasPropertyValue_hint": "Has property value description",
+      "hadPropertyValue_hint": "Had property value description",
+      "didEvent_hint": "Did event description",
+      "funnel_hint": "Funnel description",
+      "retained_hint": "Retained description"
+    },
+    "aggregates": {
+      "count": "Count",
+      "relativeCount": "Relative count",
+      "aggregateProperty": "Aggregate property",
+      "historicalCount": "Historical count"
+    },
+    "aggregateProperty": {
+      "sum": "Sum of property",
+      "avg": "Average of property",
+      "median": "Median of property",
+      "min": "Minimum of property",
+      "max": "Maximum of property",
+      "distinctCount": "Distinct count of property",
+      "25thPercentile": "25th Percentile of property",
+      "75thPercentile": "75th Percentile of property",
+      "90thPercentile": "90th Percentile of property",
+      "99thPercentile": "99th Percentile of property"
+    }
   }
 }
