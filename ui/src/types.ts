@@ -31,7 +31,7 @@ export interface Operation {
     id: OperationId;
     name: string;
     shortName?: string;
-    typeKinds?: DataType[];
+    dataTypes?: DataType[];
     flags?: OpFlag[];
 }
 
@@ -54,36 +54,36 @@ export const operations: Operation[] = [
     {
         id: OperationId.Gt,
         name: "Greater (>)",
-        typeKinds: [DataType.Number],
+        dataTypes: [DataType.Number],
         shortName: '>',
     },
     {
         id: OperationId.Gte,
         name: "Greater or Equal (>=)",
-        typeKinds: [DataType.Number],
+        dataTypes: [DataType.Number],
         shortName: '>=',
     },
     {
         id: OperationId.Lt,
         name: "Less (<)",
-        typeKinds: [DataType.Number],
+        dataTypes: [DataType.Number],
         shortName: '<',
     },
     {
         id: OperationId.Lte,
         name: "Less or Equal (<=)",
-        typeKinds: [DataType.Number],
+        dataTypes: [DataType.Number],
         shortName: '<=',
     },
     {
         id: OperationId.True,
         name: "True",
-        typeKinds: [DataType.Boolean],
+        dataTypes: [DataType.Boolean],
     },
     {
         id: OperationId.False,
         name: "False",
-        typeKinds: [DataType.Boolean]
+        dataTypes: [DataType.Boolean]
     },
     {
         id: OperationId.Exists,
@@ -108,7 +108,7 @@ export const operations: Operation[] = [
     {
         id: OperationId.Regex,
         name: "Regex",
-        typeKinds: [DataType.String]
+        dataTypes: [DataType.String]
     }
 ];
 
@@ -122,11 +122,11 @@ export const findOperations = (
 ): Operation[] => {
     return operations.filter(op => {
 
-        if (!op.typeKinds && !op.flags) {
+        if (!op.dataTypes && !op.flags) {
             return true
         }
 
-        if (op.typeKinds && op.typeKinds.find(t => t === type)) {
+        if (op.dataTypes && op.dataTypes.find(t => t === type)) {
             return true;
         }
 
