@@ -28,6 +28,7 @@ mod tests {
     use rust_decimal::Decimal;
     use uuid::Uuid;
     use common::{DataType, DECIMAL_PRECISION, DECIMAL_SCALE, ScalarValue};
+    use datafusion::execution::context::ExecutionContextState;
     use metadata::{database, events, Metadata, properties, Store};
     use metadata::database::{Column, Table, TableType};
     use metadata::properties::{CreatePropertyRequest, Property};

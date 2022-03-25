@@ -7,7 +7,7 @@ use datafusion_expr::AggregateFunction as DFAggregateFunction;
 use datafusion::scalar::ScalarValue as DFScalarValue;
 use datafusion::error::Result as DFResult;
 use datafusion::physical_plan::aggregates;
-use datafusion::physical_plan::expressions::{AvgAccumulator, MaxAccumulator, MinAccumulator};
+use datafusion::physical_plan::expressions::{AvgAccumulator};
 
 pub fn return_type(
     fun: &AggregateFunction,
