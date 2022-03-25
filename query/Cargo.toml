@@ -13,7 +13,7 @@ datafusion = { path = "../arrow-datafusion/datafusion" }
 datafusion-expr = { path = "../arrow-datafusion/datafusion-expr" }
 datafusion-common = { path = "../arrow-datafusion/datafusion-common" }
 #datafusion-expr = "7.0.0"
-arrow = { version = "10.0.0", features = ["prettyprint"] }
+arrow = { version = "9.0.0", features = ["prettyprint"] }
 platform = { path = "../platform" }
 store = { path = "../store" }
 mockall = "0.10.1"

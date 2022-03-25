@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use crate::error::{Error, Result};
 
-use arrow::array::{Array, ArrayRef, Float64Array, Int64Array, Int8Array, UInt64Array};
+use arrow::array::{Array, ArrayRef, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
 use arrow::datatypes::DataType;
 use dyn_clone::DynClone;
 use datafusion::error::{DataFusionError, Result as DFResult};
@@ -36,6 +36,7 @@ use datafusion::physical_plan::aggregates::return_type;
 use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, Min, Sum};
 use datafusion::scalar::ScalarValue;
 use crate::physical_plan::expressions::aggregate::{AggregateFunction};
+use crate::physical_plan::expressions::partitioned_count::PartitionedCountAccumulator;
 use crate::physical_plan::expressions::partitioned_sum::{PartitionedSumAccumulator};
 
 // PartitionedAccumulator extends Accumulator trait with reset
@@ -55,10 +56,9 @@ pub struct Buffer {
 }
 
 macro_rules! buffer_to_array_ref {
-    ($self:ident, $type:ident, $vtype:ident, $ARRAYTYPE:ident) => {{
+    ($buffer:ident, $type:ident, $vtype:ident, $ARRAYTYPE:ident) => {{
         Arc::new($ARRAYTYPE::from(
-            $self
-                .buffer
+            $buffer
                 .iter()
                 .map(|v| v.into())
                 .collect::<Vec<$type>>(),
@@ -80,22 +80,36 @@ impl Buffer {
         self.buffer.push(value);
 
         if self.buffer.len() >= self.cap {
-            self.flush_to_accumulator()?;
+            self.flush()?;
             self.reset();
         }
         Ok(())
     }
 
-    pub fn flush_to_accumulator(&self) -> Result<()> {
+    pub fn flush_with_value(&self, value: Value) -> Result<()> {
+        let mut buffer = self.buffer.clone();
+        buffer.push(value);
+        let arr = match self.data_type {
+            DataType::Int64 => buffer_to_array_ref!(buffer, i64, Int64, Int64Array),
+            DataType::UInt64 => buffer_to_array_ref!(buffer, u64, UInt64, UInt64Array),
+            DataType::Float64 => buffer_to_array_ref!(buffer, f64, Float64, Float64Array),
+            _ => unimplemented!(),
+        };
+
+        let mut acc = self.acc.lock().unwrap();
+        Ok(acc.update_batch(&[arr])?)
+    }
+
+    pub fn flush(&self) -> Result<()> {
         if self.buffer.is_empty() {
             return Ok(());
         }
 
-
+        let buf = &self.buffer;
         let arr = match self.data_type {
-            DataType::Int64 => buffer_to_array_ref!(self, i64, Int64, Int64Array),
-            DataType::UInt64 => buffer_to_array_ref!(self, u64, UInt64, UInt64Array),
-            DataType::Float64 => buffer_to_array_ref!(self, f64, Float64, Float64Array),
+            DataType::Int64 => buffer_to_array_ref!(buf, i64, Int64, Int64Array),
+            DataType::UInt64 => buffer_to_array_ref!(buf, u64, UInt64, UInt64Array),
+            DataType::Float64 => buffer_to_array_ref!(buf, f64, Float64, Float64Array),
             _ => unimplemented!(),
         };
 
@@ -132,10 +146,6 @@ impl Buffer {
 pub enum PartitionedAggregateFunction {
     Count,
     Sum,
-    Min,
-    Max,
-    Avg,
-    ApproxDistinct,
 }
 
 impl fmt::Display for PartitionedAggregateFunction {
@@ -217,6 +227,12 @@ impl From<&Value> for f64 {
     }
 }
 
+impl From<u64> for Value {
+    fn from(v: u64) -> Self {
+        Value::UInt64(v)
+    }
+}
+
 const MAX_BUFFER_SIZE: usize = 1000;
 
 // partitioned aggregate is used as a accumulator factory from closure
@@ -271,12 +287,10 @@ fn new_partitioned_accumulator(
     outer_agg: AggregateFunction,
     data_type: DataType,
 ) -> Result<Box<dyn PartitionedAccumulator>> {
-    Ok(Box::new(match agg {
-        PartitionedAggregateFunction::Sum => {
-            PartitionedSumAccumulator::try_new(data_type, outer_acc)?
-        }
-        _ => unimplemented!(),
-    }))
+    Ok(match agg {
+        PartitionedAggregateFunction::Sum => Box::new(PartitionedSumAccumulator::try_new(data_type, outer_acc)?),
+        PartitionedAggregateFunction::Count => Box::new(PartitionedCountAccumulator::try_new(outer_acc)?)
+    })
 }
 
 pub fn state_types(data_type: DataType, agg: &AggregateFunction) -> Result<Vec<DataType>> {
@@ -309,62 +323,61 @@ impl PartitionedAggregateAccumulator {
             acc: new_partitioned_accumulator(agg, outer_acc, outer_agg.clone(), data_type.clone())?,
         })
     }
-
-    /*/// get the last value from acc and put it into outer_acc. This is called from state()
-    fn finalize(&mut self) -> Result<()> {
-        let res = self.acc.evaluate()?;
-        self.outer_acc.update(&[res])
-    }
-
-    /// outer state
-    fn outer_state(&self) -> Result<Vec<ScalarValue>> {
-        self.outer_acc.state()
-    }*/
 }
 
+macro_rules! update_batch {
+    ($self:ident, $values:expr,$type:ident, $scalar_type:ident, $ARRAYTYPE:ident)=> {{
+        let mut spans = Vec::with_capacity($values[0].len());
+
+        let arr = $values[0].as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
+        let mut last_value: Option<$type> = if $self.first_row {
+            $self.first_row = false;
+            match arr.is_null(0) {
+                true => None,
+                false => Some(arr.value(0))
+            }
+        } else {
+            match &$self.last_partition_value {
+                ScalarValue::$scalar_type(v) => *v,
+                _ => unreachable!()
+            }
+        };
+
+        for v in arr.iter() {
+            match last_value.partial_cmp(&v) {
+                None => unreachable!(),
+                Some(ord) => match ord {
+                    Ordering::Less | Ordering::Greater => {
+                        spans.push(true);
+                        last_value = v.clone();
+                    }
+                    Ordering::Equal => spans.push(false),
+                },
+            };
+        }
+
+        $self.last_partition_value = ScalarValue::$scalar_type(last_value);
+
+        $self.acc.update_batch(&spans, &$values[1..]).map_err(Error::into_datafusion_execution_error);
+}}
+}
 impl Accumulator for PartitionedAggregateAccumulator {
     fn state(&self) -> DFResult<Vec<ScalarValue>> {
         self.acc.state().map_err(Error::into_datafusion_execution_error)
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
-        let mut spans = Vec::with_capacity(values[0].len());
-
         match values[0].data_type() {
-            DataType::Int8 => {
-                let arr = values[0].as_any().downcast_ref::<Int8Array>().unwrap();
-                let mut last_value: Option<i8> = if self.first_row {
-                    self.first_row = false;
-                    match arr.is_null(0) {
-                        true => None,
-                        false => Some(arr.value(0))
-                    }
-                } else {
-                    match &self.last_partition_value {
-                        ScalarValue::Int8(v) => *v,
-                        _ => unreachable!()
-                    }
-                };
-
-                for v in arr.iter() {
-                    match last_value.partial_cmp(&v) {
-                        None => unreachable!(),
-                        Some(ord) => match ord {
-                            Ordering::Less | Ordering::Greater => {
-                                spans.push(true);
-                                last_value = v.clone();
-                            }
-                            Ordering::Equal => spans.push(false),
-                        },
-                    };
-                }
-
-                self.last_partition_value = ScalarValue::Int8(last_value);
-            }
+            DataType::Int8 => update_batch!(self,values,i8,Int8,Int8Array),
+            DataType::Int16 => update_batch!(self,values,i16,Int16,Int16Array),
+            DataType::Int32 => update_batch!(self,values,i32,Int32,Int32Array),
+            DataType::Int64 => update_batch!(self,values,i64,Int64,Int64Array),
+            DataType::UInt8 => update_batch!(self,values,u8,UInt8,UInt8Array),
+            DataType::UInt16 => update_batch!(self,values,u16,UInt16,UInt16Array),
+            DataType::UInt32 => update_batch!(self,values,u32,UInt32,UInt32Array),
+            DataType::UInt64 => update_batch!(self,values,u64,UInt64,UInt64Array),
             _ => unimplemented!()
-        }
-
-        self.acc.update_batch(&spans, &values[1..]).map_err(Error::into_datafusion_execution_error);
+        };
         Ok(())
     }
 

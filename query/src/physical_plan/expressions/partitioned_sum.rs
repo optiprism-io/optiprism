@@ -30,7 +30,9 @@ const CAP: usize = 1000;
 impl PartitionedSumAccumulator {
     pub fn try_new(data_type: DataType, outer_acc: Box<dyn Accumulator>) -> Result<Self> {
         let value = match data_type {
-            DataType::Int64 => Value::Int64(0),
+            DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => Value::Int64(0),
+            DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => Value::UInt64(0),
+            DataType::Float16 | DataType::Float32 | DataType::Float64 => Value::Float64(0.0),
             _ => unimplemented!(),
         };
         Ok(Self {
@@ -86,12 +88,12 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
     }
 
     fn state(&self) -> Result<Vec<ScalarValue>> {
-        self.buffer.flush_to_accumulator()?;
+        self.buffer.flush_with_value(self.sum.clone())?;
         Ok(self.buffer.state()?)
     }
 
     fn evaluate(&self) -> Result<ScalarValue> {
-        self.buffer.flush_to_accumulator()?;
+        self.buffer.flush_with_value(self.sum.clone())?;
         Ok(self.buffer.evaluate()?)
     }
 }
@@ -118,13 +120,17 @@ mod tests {
         let spans = vec![
             false, false, true, false, false, true, false, false, false, true,
         ];
-        let arr = Arc::new(Int8Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]));
-        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
-        // sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
+        //                             v        v           v
+        let vals = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let arr = Arc::new(Int8Array::from(vals));
 
-        let list = vec![3, 12, 30];
+        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
+        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
+
+        let list = vec![1 + 2, 3 + 4 + 5, 6 + 7 + 8 + 9, 10 + 1 + 2, 3 + 4 + 5, 6 + 7 + 8 + 9, 10];
         let sum: i32 = Iterator::sum(list.iter());
-        let mean = f64::from(sum) / (list.len() as f64);
+        let mean = sum as f64 / (list.len() as f64);
+
         assert_eq!(sum_acc.evaluate()?, DFScalarValue::Float64(Some(mean)));
         Ok(())
     }
