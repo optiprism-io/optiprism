@@ -2,14 +2,12 @@ use crate::error::{Error, Result};
 use crate::physical_plan::expressions::partitioned_aggregate::{state_types, PartitionedAggregate, PartitionedAggregateFunction};
 use datafusion::arrow::datatypes::DataType;
 
-use datafusion::logical_plan::{
-    lit as df_lit, Column, DFField, DFSchema, Expr as DFExpr, Literal, Operator,
-};
+use datafusion::logical_plan::{lit as df_lit, Column, DFField, DFSchema, Expr as DFExpr, Literal, Operator, ExprSchemable};
 use datafusion::physical_plan::aggregates;
 use datafusion::physical_plan::expressions::binary_operator_data_type;
 use datafusion::physical_plan::functions::{Signature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion_expr::{AccumulatorFunctionImplementation, ReturnTypeFunction, AggregateFunction as DFAggregateFunction, StateTypeFunction};
+use datafusion_expr::{AccumulatorFunctionImplementation, ReturnTypeFunction, AggregateFunction as DFAggregateFunction, StateTypeFunction, BuiltinScalarFunction};
 use datafusion::scalar::ScalarValue;
 
 use std::fmt;
@@ -59,6 +57,13 @@ pub enum Expr {
         distinct: bool,
     },
     Wildcard,
+    /// Represents the call of a built-in scalar function with a set of arguments.
+    ScalarFunction {
+        /// The function
+        fun: BuiltinScalarFunction,
+        /// List of expressions to feed to the functions as arguments
+        args: Vec<Expr>,
+    },
 }
 
 fn create_partitioned_function(
@@ -141,6 +146,9 @@ fn create_name(e: &Expr, input_schema: &DFSchema) -> Result<String> {
             args,
         ),
         Expr::Wildcard => unimplemented!(),
+        Expr::ScalarFunction { fun, args } => {
+            create_function_name(&fun.to_string(), false, args, input_schema)
+        }
     }
 }
 
@@ -167,6 +175,10 @@ impl Expr {
             },
             DFExpr::Wildcard => Expr::Wildcard,
             DFExpr::Alias(e, v) => Expr::Alias(Box::new(Expr::from_df_expr(e)?), v.clone()),
+            DFExpr::ScalarFunction { fun, args } => Expr::ScalarFunction {
+                fun: fun.clone(),
+                args: args.iter().map(Expr::from_df_expr).collect::<Result<_>>()?,
+            },
             _ => unimplemented!(),
         })
     }
@@ -276,6 +288,12 @@ impl Expr {
                 Box::new(e.to_df_expr(input_schema)?),
                 n.clone(),
             )),
+            Expr::ScalarFunction { fun, args } => Ok(
+                DFExpr::ScalarFunction {
+                    fun: fun.clone(),
+                    args: args.iter().map(|arg|arg.to_df_expr(input_schema)).collect::<Result<_>>()?,
+                }
+            )
         }
     }
 
@@ -325,6 +343,7 @@ impl Expr {
                 &right.get_type(schema)?,
             )?),
             Expr::Wildcard => unimplemented!(),
+            Expr::ScalarFunction { .. } => Ok(self.to_df_expr(schema)?.get_type(schema)?),
         }
     }
 
@@ -349,6 +368,7 @@ impl Expr {
                 ..
             } => Ok(left.nullable(input_schema)? || right.nullable(input_schema)?),
             Expr::Wildcard => unimplemented!(),
+            Expr::ScalarFunction { .. } => Ok(self.to_df_expr(input_schema)?.nullable(input_schema)?)
         }
     }
 
@@ -402,13 +422,51 @@ fn fmt_partitioned_function(
     )
 }
 
-fn fmt_function(f: &mut fmt::Formatter, fun: &str, distinct: bool, args: &[Expr]) -> fmt::Result {
-    let args: Vec<String> = args.iter().map(|arg| format!("{:?}", arg)).collect();
+fn fmt_function(
+    f: &mut fmt::Formatter,
+    fun: &str,
+    distinct: bool,
+    args: &[Expr],
+    display: bool,
+) -> fmt::Result {
+    let args: Vec<String> = match display {
+        true => args.iter().map(|arg| format!("{}", arg)).collect(),
+        false => args.iter().map(|arg| format!("{:?}", arg)).collect(),
+    };
+
+    // let args: Vec<String> = args.iter().map(|arg| format!("{:?}", arg)).collect();
     let distinct_str = match distinct {
         true => "DISTINCT ",
         false => "",
     };
     write!(f, "{}({}{})", fun, distinct_str, args.join(", "))
+}
+
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Expr::BinaryExpr {
+                ref left,
+                ref right,
+                ref op,
+            } => write!(f, "{} {} {}", left, op, right),
+            Expr::AggregateFunction {
+                /// Name of the function
+                ref fun,
+                /// List of expressions to feed to the functions as arguments
+                ref args,
+                /// Whether this is a DISTINCT aggregation or not
+                ref distinct,
+            } => fmt_function(f, &fun.to_string(), *distinct, args, true),
+            Expr::ScalarFunction {
+                /// Name of the function
+                ref fun,
+                /// List of expressions to feed to the functions as arguments
+                ref args,
+            } => fmt_function(f, &fun.to_string(), false, args, true),
+            _ => write!(f, "{:?}", self),
+        }
+    }
 }
 
 impl fmt::Debug for Expr {
@@ -426,7 +484,7 @@ impl fmt::Debug for Expr {
                 distinct,
                 ref args,
                 ..
-            } => fmt_function(f, &fun.to_string(), *distinct, args),
+            } => fmt_function(f, &fun.to_string(), *distinct, args, false),
             Expr::AggregatePartitionedFunction {
                 partition_by,
                 fun,
@@ -443,6 +501,9 @@ impl fmt::Debug for Expr {
             ),
             Expr::Wildcard => write!(f, "*"),
             Expr::Alias(expr, alias) => write!(f, "{:?} AS {}", expr, alias),
+            Expr::ScalarFunction { fun, args, .. } => {
+                fmt_function(f, &fun.to_string(), false, args, false)
+            }
         }
     }
 }

@@ -48,7 +48,6 @@ impl Property {
             Namespace::User => "user".to_string(),
         };
 
-        // format!("{}_{}_{}", prefix, self.id.to_string(), name)
         format!("{}_{}", prefix, name)
     }
 }

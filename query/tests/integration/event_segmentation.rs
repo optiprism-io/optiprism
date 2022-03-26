@@ -234,73 +234,88 @@ mod tests {
                 to,
             },
             group: event_fields::USER_ID.to_string(),
-            interval_unit: TimeUnit::Day,
+            interval_unit: TimeUnit::Second,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
-            events: vec![Event::new(
-                EventRef::Regular("Buy Product".to_string()),
-                Some(vec![
-                    EventFilter::Property {
-                        property: PropertyRef::Event("Revenue".to_string()),
-                        operation: Operation::IsNull,
-                        value: None,
-                    },
-                    EventFilter::Property {
-                        property: PropertyRef::Event("Revenue".to_string()),
-                        operation: Operation::Eq,
-                        value: Some(vec![
-                            ScalarValue::Number(Some(Decimal::new(1, 0))),
-                            ScalarValue::Number(Some(Decimal::new(2, 0))),
-                            ScalarValue::Number(Some(Decimal::new(3, 0))),
-                        ]),
-                    },
-                    EventFilter::Property {
-                        property: PropertyRef::User("Country".to_string()),
-                        operation: Operation::IsNull,
-                        value: None,
-                    },
-                    EventFilter::Property {
-                        property: PropertyRef::User("Country".to_string()),
-                        operation: Operation::Eq,
-                        value: Some(vec![
-                            ScalarValue::String(Some("Spain".to_string())),
-                            ScalarValue::String(Some("France".to_string())),
-                        ]),
-                    },
-                ]),
-                Some(vec![Breakdown::Property(PropertyRef::Event(
-                    "Product Name".to_string(),
-                ))]),
-                vec![
-                    NamedQuery::new(Query::CountEvents, Some("count".to_string())),
-                    NamedQuery::new(
-                        Query::CountUniqueGroups,
-                        Some("count_unique_users".to_string()),
+            events: vec![
+                Event::new(
+                    EventRef::Regular("View Product".to_string()),
+                    Some(vec![
+                        EventFilter::Property {
+                            property: PropertyRef::Event("Is Premium".to_string()),
+                            operation: Operation::Eq,
+                            value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                        }]),
+                    Some(vec![
+                        Breakdown::Property(PropertyRef::User("Device".to_string()))],
                     ),
-                    NamedQuery::new(
-                        Query::CountPerGroup {
-                            aggregate: AggregateFunction::Avg,
-                        },
-                        Some("count_per_user".to_string()),
-                    ),
-                    NamedQuery::new(
-                        Query::AggregatePropertyPerGroup {
+                    vec![
+                        NamedQuery::new(Query::CountEvents, Some("count".to_string()))],
+                ),
+                Event::new(
+                    EventRef::Regular("Buy Product".to_string()),
+                    Some(vec![
+                        EventFilter::Property {
                             property: PropertyRef::Event("Revenue".to_string()),
-                            aggregate_per_group: PartitionedAggregateFunction::Sum,
-                            aggregate: AggregateFunction::Avg,
+                            operation: Operation::IsNull,
+                            value: None,
                         },
-                        Some("avg_total_revenue_per_user".to_string()),
-                    ),
-                    NamedQuery::new(
-                        Query::AggregateProperty {
+                        EventFilter::Property {
                             property: PropertyRef::Event("Revenue".to_string()),
-                            aggregate: AggregateFunction::Sum,
+                            operation: Operation::Eq,
+                            value: Some(vec![
+                                ScalarValue::Number(Some(Decimal::new(1, 0))),
+                                ScalarValue::Number(Some(Decimal::new(2, 0))),
+                                ScalarValue::Number(Some(Decimal::new(3, 0))),
+                            ]),
                         },
-                        Some("sum_revenue".to_string()),
-                    ),
-                ],
-            )],
+                        EventFilter::Property {
+                            property: PropertyRef::User("Country".to_string()),
+                            operation: Operation::IsNull,
+                            value: None,
+                        },
+                        EventFilter::Property {
+                            property: PropertyRef::User("Country".to_string()),
+                            operation: Operation::Eq,
+                            value: Some(vec![
+                                ScalarValue::String(Some("Spain".to_string())),
+                                ScalarValue::String(Some("France".to_string())),
+                            ]),
+                        },
+                    ]),
+                    Some(vec![Breakdown::Property(PropertyRef::Event(
+                        "Product Name".to_string(),
+                    ))]),
+                    vec![
+                        NamedQuery::new(Query::CountEvents, Some("count".to_string())),
+                        NamedQuery::new(
+                            Query::CountUniqueGroups,
+                            Some("count_unique_users".to_string()),
+                        ),
+                        NamedQuery::new(
+                            Query::CountPerGroup {
+                                aggregate: AggregateFunction::Avg,
+                            },
+                            Some("count_per_user".to_string()),
+                        ),
+                        NamedQuery::new(
+                            Query::AggregatePropertyPerGroup {
+                                property: PropertyRef::Event("Revenue".to_string()),
+                                aggregate_per_group: PartitionedAggregateFunction::Sum,
+                                aggregate: AggregateFunction::Avg,
+                            },
+                            Some("avg_total_revenue_per_user".to_string()),
+                        ),
+                        NamedQuery::new(
+                            Query::AggregateProperty {
+                                property: PropertyRef::Event("Revenue".to_string()),
+                                aggregate: AggregateFunction::Sum,
+                            },
+                            Some("sum_revenue".to_string()),
+                        ),
+                    ],
+                )],
             filters: Some(vec![
                 EventFilter::Property {
                     property: PropertyRef::User("Device".to_string()),
@@ -365,7 +380,7 @@ mod tests {
                 to,
             },
             group: event_fields::USER_ID.to_string(),
-            interval_unit: TimeUnit::Day,
+            interval_unit: TimeUnit::Second,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,

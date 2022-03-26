@@ -7,20 +7,11 @@ use datafusion::logical_plan::plan::{Aggregate, Filter};
 use datafusion::logical_plan::{DFSchemaRef, LogicalPlan as DFLogicalPlan, TableScan};
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
+use datafusion_expr::BuiltinScalarFunction;
 
 #[derive(Clone)]
 pub enum LogicalPlan {
     Aggregate {
-        /// The incoming logical plan
-        input: Arc<LogicalPlan>,
-        /// Grouping expressions
-        group_expr: Vec<Expr>,
-        /// Aggregate expressions
-        aggr_expr: Vec<Expr>,
-        /// The schema description of the aggregate output
-        schema: DFSchemaRef,
-    },
-    FastAggregate {
         /// The incoming logical plan
         input: Arc<LogicalPlan>,
         /// Grouping expressions
@@ -70,7 +61,6 @@ impl LogicalPlan {
             } => projected_schema,
             LogicalPlan::Filter { input, .. } => input.schema(),
             LogicalPlan::Aggregate { schema, .. } => schema,
-            LogicalPlan::FastAggregate { schema, .. } => schema,
         }
     }
 
@@ -80,7 +70,6 @@ impl LogicalPlan {
         match self {
             LogicalPlan::Filter { input, .. } => vec![input],
             LogicalPlan::Aggregate { input, .. } => vec![input],
-            LogicalPlan::FastAggregate { input, .. } => vec![input],
             // plans without inputs
             LogicalPlan::TableScan { .. } => vec![],
         }
@@ -93,11 +82,6 @@ impl LogicalPlan {
         match self {
             LogicalPlan::Filter { predicate, .. } => vec![predicate.clone()],
             LogicalPlan::Aggregate {
-                group_expr,
-                aggr_expr,
-                ..
-            } => group_expr.iter().chain(aggr_expr.iter()).cloned().collect(),
-            LogicalPlan::FastAggregate {
                 group_expr,
                 aggr_expr,
                 ..

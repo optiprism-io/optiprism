@@ -15,6 +15,8 @@ use futures::executor;
 use metadata::Metadata;
 use std::ops::Sub;
 use std::sync::Arc;
+use axum::response::IntoResponse;
+use datafusion_expr::BuiltinScalarFunction;
 use metadata::properties::provider::Namespace;
 use crate::physical_plan::expressions::aggregate::AggregateFunction;
 
@@ -363,6 +365,22 @@ impl LogicalPlanBuilder {
         event: &Event,
     ) -> Result<LogicalPlan> {
         let mut group_expr: Vec<Expr> = vec![];
+
+        let time_gran = match self.es.interval_unit {
+            TimeUnit::Second => "second",
+            TimeUnit::Minute => "minute",
+            TimeUnit::Hour => "hour",
+            TimeUnit::Day => "day",
+            TimeUnit::Week => "week",
+            TimeUnit::Month => "month",
+            TimeUnit::Year => "year",
+        };
+
+        let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
+        let time_expr = Expr::ScalarFunction { fun: BuiltinScalarFunction::DateTrunc, args: vec![lit(time_gran), ts_col] };
+
+        group_expr.push(Expr::Alias(Box::new(time_expr), "date".to_string()));
+
         // event groups
         if let Some(breakdowns) = &event.breakdowns {
             for breakdown in breakdowns.iter() {
