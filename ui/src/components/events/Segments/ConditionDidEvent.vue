@@ -276,7 +276,7 @@ const operationButtonText = computed(() => {
 const opItems = computed(() => {
     let items: Item<OperationId, null>[] = [];
 
-    findOperations(DataType.Float64, false, false).forEach(op =>
+    findOperations(DataType.Number, false, false).forEach(op =>
         items.push({
             item: op.id,
             name: op.name
