@@ -33,10 +33,10 @@ app.directive('click-outside', {
           binding.value(event, el)
         }
       }
-      document.body.addEventListener('click', el.clickOutsideEvent)
+      document.body.addEventListener('mousedown', el.clickOutsideEvent)
     },
     unmounted(el) {
-      document.body.removeEventListener('click', el.clickOutsideEvent)
+      document.body.removeEventListener('mousedown', el.clickOutsideEvent)
     }
 })
 

@@ -55,6 +55,10 @@ import Header from '@/components/Header.vue'
     &__main-section {
         padding: var(--pf-global--spacer--md);
     }
+
+    &__main {
+        z-index: initial
+    }
 }
 
 .pf-c-menu.pf-m-scrollable {

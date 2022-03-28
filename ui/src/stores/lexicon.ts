@@ -239,7 +239,15 @@ export const useLexiconStore = defineStore("lexicon", {
                 });
 
                 if (items.length) {
-                    eventsList.push({ name: "Custom Events", items });
+                    eventsList.push({
+                        name: 'Custom Events',
+                        items,
+                        action: {
+                            type: 'createCustomEvent',
+                            icon: 'fas fa-plus-circle',
+                            text: 'common.create',
+                        }
+                    });
                 }
             }
 

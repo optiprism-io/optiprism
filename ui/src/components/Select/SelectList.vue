@@ -27,9 +27,26 @@
                                 v-if="index > 0"
                                 class="pf-c-divider"
                             >
-                            <div class="pf-c-menu__group-title">
-                                {{ group.name }}
+                            <div class="pf-c-action-list">
+                                <div class="pf-c-action-list__item">
+                                    <div class="pf-c-menu__group-title">
+                                        {{ group.name }}
+                                    </div>
+                                </div>
+                                <div
+                                    v-if="group.action"
+                                    class="pf-c-action-list__item pf-u-pt-md"
+                                >
+                                    <UiButton
+                                        class="pf-m-link"
+                                        :before-icon="group.action.icon"
+                                        @click="onAction(group.action ? group.action.type : '')"
+                                    >
+                                        {{ $t(group.action.text) }}
+                                    </UiButton>
+                                </div>
                             </div>
+
                             <ul class="pf-c-menu__list">
                                 <SelectListItem
                                     v-for="(item, i) in group.items"
@@ -79,7 +96,6 @@
 </template>
 
 <script setup lang="ts">
-// TODO add generics
 import { computed, ref } from "vue";
 import { Group, Item } from "@/components/Select/SelectTypes";
 import SelectListItem from "@/components/Select/SelectListItem.vue";
@@ -88,6 +104,7 @@ const emit = defineEmits<{
     (e: "select", item: any): void;
     (e: "hover", item: any): void;
     (e: "on-search", value: string): void;
+    (e: 'action', payload: string): void
 }>();
 
 const props = defineProps<{
@@ -126,4 +143,8 @@ const select = (item: any): void => {
 const onSearch = (): void => {
     emit("on-search", search.value);
 };
+
+const onAction = (payload: string) => {
+    emit('action', payload)
+}
 </script>

@@ -46,16 +46,24 @@
         <div class="pf-l-grid__item pf-m-12-col">
             <EventsViews />
         </div>
+
+        <CreateCustomEvent
+            v-if="showCreateCustomEvent"
+            @apply="applyCreateCustomEvent"
+            @cancel="togglePopupCreateCustomEvent(false)"
+        />
     </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, onUnmounted } from "vue";
+import { onBeforeMount, onUnmounted, ref, provide } from "vue";
 import Events from "@/components/events/Events/Events.vue";
 import Breakdowns from "@/components/events/Breakdowns.vue";
 import Filters from "@/components/events/Filters.vue";
 import Segments from "@/components/events/Segments/Segments.vue";
 import EventsViews from "@/components/events/EventsViews.vue";
+import CreateCustomEvent from '@/components/events/CreateCustomEvent.vue'
+
 import { useLexiconStore } from "@/stores/lexicon";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
 
@@ -73,6 +81,25 @@ onBeforeMount(async () => {
 onUnmounted(() => {
     eventsStore.$reset();
 });
+
+
+/**
+ * Create Custom Event
+ */
+const showCreateCustomEvent = ref(false)
+
+const togglePopupCreateCustomEvent = (payload: boolean) => {
+    showCreateCustomEvent.value = payload
+}
+
+const applyCreateCustomEvent = (payload: any) => {
+    showCreateCustomEvent.value = false
+}
+
+provide('createCustomEvent', () => {
+    togglePopupCreateCustomEvent(true)
+})
+/** */
 </script>
 
 <style scoped lang="scss">

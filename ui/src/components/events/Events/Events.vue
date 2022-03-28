@@ -29,6 +29,7 @@
                 grouped
                 :items="lexiconStore.eventsList"
                 :width-auto="true"
+                @action="selectAction"
                 @select="addEvent"
             >
                 <UiButton
@@ -44,13 +45,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, watch, inject } from "vue";
 import { EventQueryRef, EventRef, PropertyRef } from "@/types/events";
 import { OperationId, Value } from "@/types";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
 import { useLexiconStore } from "@/stores/lexicon";
-import Select from "@/components/Select/Select.vue";
-import SelectedEvent from "@/components/events/Events/SelectedEvent.vue";
+
+import Select from '@/components/Select/Select.vue'
+import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
 
 const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
@@ -121,6 +123,15 @@ const changeQuery = (eventIdx: number, queryIdx: number, ref: EventQueryRef) => 
     eventsStore.changeQuery(eventIdx, queryIdx, ref);
 };
 
+
+const createCustomEvent = inject<() => void>('createCustomEvent')
+
+
+const selectAction = (payload: string) => {
+    if  (payload === 'createCustomEvent') {
+        createCustomEvent && createCustomEvent()
+    }
+}
 watch(
     eventsStore.events,
     () => {

@@ -32,6 +32,7 @@
                             @select="($event: any) => {hide(); select($event)}"
                             @hover="hover"
                             @on-search="onSearch"
+                            @action="emit('action', $event)"
                         />
                     </div>
                     <div
@@ -54,7 +55,6 @@
 </template>
 
 <script setup lang="ts">
-// TODO add generics
 import { computed, ref, onBeforeMount, watchEffect } from "vue";
 import SelectList from "@/components/Select/SelectList.vue";
 import UiSpinner from "@/components/uikit/UiSpinner.vue";
@@ -64,6 +64,7 @@ const emit = defineEmits<{
     (e: "select", item: any): void;
     (e: "onSearch", payload: string): void;
     (e: "onHover", item: any): void;
+    (e: 'action', payload: string): void
 }>();
 
 const props = withDefaults(

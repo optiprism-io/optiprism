@@ -1,3 +1,10 @@
+export interface Action {
+    type: string
+    link?: string
+    icon?: string
+    text: string
+}
+
 export interface Item<T, K>{
     item: T;
     name: string;
@@ -7,6 +14,7 @@ export interface Item<T, K>{
 }
 
 export interface Group<T>{
-    name: string;
-    items: T;
+    name: string
+    items: T
+    action?: Action
 }

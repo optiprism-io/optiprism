@@ -27,12 +27,11 @@
                 >
                     <h1
                         class="pf-c-modal-box__title"
-                        id="modal-title"
                     >
                         {{ props.title }}
                     </h1>
                     <div
-                        v-id="props.description"
+                        v-if="props.description"
                         class="pf-c-modal-box__description"
                     >
                         {{ props.description }}
@@ -79,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, inject, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 import getScrollbarWidth from '@/helpers/getScrollbarWidth'
 
@@ -107,7 +106,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-    (e: 'cancel', turget: string): void
+    (e: 'cancel', target: string): void
     (e: 'apply'): void
     (e: 'open'): void
 }>()
@@ -192,7 +191,7 @@ $text-color-title: #171717;
         overflow: auto;
         padding-top: 2rem;
         padding-bottom: 2rem;
-        z-index: 1800;
+        z-index: 18000;
     }
 }
 </style>
