@@ -28,15 +28,15 @@ app.use(router);
 
 app.directive('click-outside', {
     mounted(el, binding, vnode) {
-      el.clickOutsideEvent = function(event: Event) {
-        if (!(el === event.target || el.contains(event.target))) {
-          binding.value(event, el)
+        el.clickOutsideEvent = function(event: Event) {
+            if (!(el === event.target || el.contains(event.target))) {
+                binding.value(event, el)
+            }
         }
-      }
-      document.body.addEventListener('mousedown', el.clickOutsideEvent)
+        document.body.addEventListener('mousedown', el.clickOutsideEvent)
     },
     unmounted(el) {
-      document.body.removeEventListener('mousedown', el.clickOutsideEvent)
+        document.body.removeEventListener('mousedown', el.clickOutsideEvent)
     }
 })
 

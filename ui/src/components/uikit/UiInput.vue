@@ -1,11 +1,13 @@
 <template>
     <input
+        :id="props.name"
         ref="input"
         class="pf-c-form-control"
         :value="props.modelValue"
-        :type="props.type"
         :placeholder="props.placeholder"
         :min="props.min"
+        :required="props.required"
+        :name="props.name"
         @input="updateValue"
         @blur="blur"
     >
@@ -21,14 +23,19 @@ interface Props {
     placeholder?: string
     min?: number
     mountFocus?: boolean
+    required?: boolean
+    name?: string
+    label?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
     modelValue: "",
     type: "text",
-    placeholder: '',
-    min: 0,
-    mountFocus: false
+    mountFocus: false,
+    placeholder: undefined,
+    min: undefined,
+    name: undefined,
+    label: undefined,
 });
 
 const input = ref<HTMLCanvasElement | null>(null)

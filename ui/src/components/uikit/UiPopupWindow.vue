@@ -1,16 +1,21 @@
 <template>
     <div class="ui-popup-window">
         <div
-            class="ui-popup-window__wrapper"
             ref="popupWrapper"
+            class="ui-popup-window__wrapper"
         >
             <div
-                class="pf-c-modal-box"
-                :class="props.size"
+                v-click-outside="onClickOutside"
+                class="pf-c-modal-box ui-popup-window__box"
+                :class="[
+                    props.size,
+                    {
+                        'ui-popup-window__box_full-width': props.fullWidth
+                    }
+                ]"
                 aria-modal="true"
                 aria-labelledby="modal-title"
                 aria-describedby="modal-description"
-                v-click-outside="onClickOutside"
             >
                 <button
                     v-if="closable"
@@ -19,15 +24,16 @@
                     aria-label="Close"
                     @click="cancel('close-btn')"
                 >
-                    <i class="fas fa-times" aria-hidden="true"></i>
+                    <i
+                        class="fas fa-times"
+                        aria-hidden="true"
+                    />
                 </button>
                 <header
                     v-if="props.title"
-                    class="pf-c-modal-box__header"
+                    class="pf-c-modal-box__header pf-u-mb-md"
                 >
-                    <h1
-                        class="pf-c-modal-box__title"
-                    >
+                    <h1 class="pf-c-modal-box__title">
                         {{ props.title }}
                     </h1>
                     <div
@@ -38,7 +44,7 @@
                     </div>
                 </header>
                 <div class="pf-c-modal-box__body">
-                    <slot></slot>
+                    <slot />
                 </div>
                 <footer
                     v-if="props.applyButton || props.cancelButton"
@@ -87,22 +93,27 @@ import UiButton from '@/components/uikit/UiButton.vue'
 interface Props {
     title?: string
     description?: string
-    closable?: boolean
-
     applyButton?: string
     cancelButton?: string
 
+    closable?: boolean
     applyLoading?: boolean
-
     saveBodyOverflow?: boolean
     noRemoveBodyOverflow?: boolean
+    fullWidth?: boolean
 
     size?: 'pf-m-md' | 'pf-m-sm' | 'pf-m-lg' | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
+    title: undefined,
+    description: undefined,
+    applyButton: undefined,
+    cancelButton: undefined,
+
     size: 'pf-m-sm',
     closable: true,
+    fullWidth: true,
 })
 
 const emit = defineEmits<{
@@ -192,6 +203,14 @@ $text-color-title: #171717;
         padding-top: 2rem;
         padding-bottom: 2rem;
         z-index: 18000;
+    }
+
+    &__box {
+        margin: auto;
+
+        &_full-width {
+            max-height: initial;
+        }
     }
 }
 </style>

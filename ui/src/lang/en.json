@@ -28,6 +28,9 @@
   },
 
   "events": {
+    "create_custom": "Create Custom Event",
+    "create_custom_description": "Enter information for create Custom Event.",
+    "custom_event_name": "Custom Event Name",
     "filters": "Filters",
     "breakdowns": "Breakdowns",
     "events": "Events",
