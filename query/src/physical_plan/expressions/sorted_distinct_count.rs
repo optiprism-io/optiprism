@@ -3,18 +3,16 @@ use arrow::array::{
     Int64Array, Int8Array, StringArray, TimestampSecondArray, UInt16Array, UInt32Array,
     UInt64Array, UInt8Array,
 };
+use arrow::compute;
 use arrow::datatypes::{DataType, TimeUnit};
 use datafusion::error::{DataFusionError, Result};
-use datafusion::physical_plan::functions::{
-    Signature, TypeSignature, Volatility,
-};
+use datafusion::physical_plan::functions::{Signature, TypeSignature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
-use datafusion_expr::{ReturnTypeFunction, AccumulatorFunctionImplementation, StateTypeFunction};
+use datafusion_expr::{AccumulatorFunctionImplementation, ReturnTypeFunction, StateTypeFunction};
 use std::fmt::Debug;
 use std::sync::Arc;
-use arrow::compute;
 
 #[derive(Debug)]
 pub struct SortedDistinctCount {
@@ -201,7 +199,7 @@ mod tests {
             ],
             9,
         )
-            .unwrap();
+        .unwrap();
     }
 
     #[test]
@@ -214,6 +212,6 @@ mod tests {
             ],
             9,
         )
-            .unwrap();
+        .unwrap();
     }
 }

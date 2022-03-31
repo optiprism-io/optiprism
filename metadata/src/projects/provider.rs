@@ -16,7 +16,7 @@ fn data_key(organization_id: u64, id: u64) -> Vec<u8> {
         b"/",
         id.to_le_bytes().as_ref(),
     ]
-        .concat()
+    .concat()
 }
 
 pub struct Provider {

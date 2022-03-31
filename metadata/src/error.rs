@@ -1,8 +1,8 @@
+use std::string::FromUtf8Error;
 use std::{
     fmt::{self, Display, Formatter},
     result,
 };
-use std::string::FromUtf8Error;
 
 pub type Result<T> = result::Result<T, Error>;
 

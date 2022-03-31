@@ -4,3 +4,6 @@ use datafusion::scalar::ScalarValue;
 use std::fmt::Debug;
 
 pub mod expressions;
+pub mod merge;
+// pub mod merge;
+// pub mod planner;

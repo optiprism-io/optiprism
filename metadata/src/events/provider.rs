@@ -123,18 +123,9 @@ impl Provider {
     }
 
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
-        let key = make_data_value_key(
-            organization_id,
-            project_id,
-            NAMESPACE,
-            id,
-        );
+        let key = make_data_value_key(organization_id, project_id, NAMESPACE, id);
 
-        match self
-            .store
-            .get(key.clone())
-            .await?
-        {
+        match self.store.get(key.clone()).await? {
             None => Err(Error::KeyNotFound(String::from_utf8(key.clone())?)),
             Some(value) => Ok(deserialize(&value)?),
         }

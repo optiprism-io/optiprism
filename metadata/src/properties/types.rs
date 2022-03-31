@@ -1,8 +1,8 @@
+use crate::properties::provider::Namespace;
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use crate::properties::provider::Namespace;
 use convert_case::{Case, Casing};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Status {
@@ -40,7 +40,11 @@ pub struct Property {
 
 impl Property {
     pub fn column_name(&self, ns: Namespace) -> String {
-        let mut name: String = self.name.chars().filter(|c| c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace()).collect();
+        let mut name: String = self
+            .name
+            .chars()
+            .filter(|c| c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace())
+            .collect();
         name = name.to_case(Case::Snake);
         name = name.trim().to_string();
         let prefix = match ns {

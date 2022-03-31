@@ -6,11 +6,13 @@ use metadata::error::Error as MetadataError;
 use std::fmt::{Display, Formatter};
 use std::{fmt, result};
 use store::error::StoreError;
+
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
     Internal(String),
+    QueryError(String),
     DataFusionError(DataFusionError),
     ArrowError(ArrowError),
     StoreError(StoreError),
@@ -28,6 +30,7 @@ impl Error {
         DataFusionError::Plan(self.to_string())
     }
 }
+
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self)

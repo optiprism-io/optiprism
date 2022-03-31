@@ -37,7 +37,7 @@ impl Table {
             self.columns
                 .iter()
                 .map(|c| Field::new(&c.name, c.data_type.clone(), c.nullable))
-                .collect()
+                .collect(),
         )
     }
 }

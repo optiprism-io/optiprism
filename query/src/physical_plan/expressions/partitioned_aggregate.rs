@@ -17,27 +17,29 @@
 
 //! Defines physical expressions that can evaluated at runtime during query execution
 
+use crate::error::{Error, Result};
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
-use crate::error::{Error, Result};
 
-use arrow::array::{Array, ArrayRef, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+use arrow::array::{
+    Array, ArrayRef, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array,
+    UInt32Array, UInt64Array, UInt8Array,
+};
 use arrow::datatypes::DataType;
-use dyn_clone::DynClone;
 use datafusion::error::{DataFusionError, Result as DFResult};
+use dyn_clone::DynClone;
 
-
-use datafusion::physical_plan::{Accumulator, AggregateExpr};
+use crate::physical_plan::expressions::partitioned_count::PartitionedCountAccumulator;
+use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
 use datafusion::physical_plan::aggregates::return_type;
 use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, Min, Sum};
+use datafusion::physical_plan::{Accumulator, AggregateExpr};
 use datafusion::scalar::ScalarValue;
-use crate::physical_plan::expressions::aggregate::{AggregateFunction};
-use crate::physical_plan::expressions::partitioned_count::PartitionedCountAccumulator;
-use crate::physical_plan::expressions::partitioned_sum::{PartitionedSumAccumulator};
+use datafusion_expr::AggregateFunction;
 
 // PartitionedAccumulator extends Accumulator trait with reset
 pub trait PartitionedAccumulator: Debug + Send + Sync {
@@ -58,10 +60,7 @@ pub struct Buffer {
 macro_rules! buffer_to_array_ref {
     ($buffer:ident, $type:ident, $vtype:ident, $ARRAYTYPE:ident) => {{
         Arc::new($ARRAYTYPE::from(
-            $buffer
-                .iter()
-                .map(|v| v.into())
-                .collect::<Vec<$type>>(),
+            $buffer.iter().map(|v| v.into()).collect::<Vec<$type>>(),
         )) as ArrayRef
     }};
 }
@@ -168,7 +167,7 @@ impl Value {
             Value::Int64(_) => DataType::Int64,
             Value::UInt64(_) => DataType::UInt64,
             Value::Float64(_) => DataType::Float64,
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
@@ -288,17 +287,12 @@ fn new_partitioned_accumulator(
     data_type: DataType,
 ) -> Result<Box<dyn PartitionedAccumulator>> {
     Ok(match agg {
-        PartitionedAggregateFunction::Sum => Box::new(PartitionedSumAccumulator::try_new(data_type, outer_acc)?),
-        PartitionedAggregateFunction::Count => Box::new(PartitionedCountAccumulator::try_new(outer_acc)?)
-    })
-}
-
-pub fn state_types(data_type: DataType, agg: &AggregateFunction) -> Result<Vec<DataType>> {
-    Ok(match agg {
-        AggregateFunction::Count => vec![DataType::UInt64],
-        AggregateFunction::Sum => vec![data_type],
-        AggregateFunction::Avg => vec![DataType::UInt64, data_type],
-        _ => unimplemented!(),
+        PartitionedAggregateFunction::Sum => {
+            Box::new(PartitionedSumAccumulator::try_new(data_type, outer_acc)?)
+        }
+        PartitionedAggregateFunction::Count => {
+            Box::new(PartitionedCountAccumulator::try_new(outer_acc)?)
+        }
     })
 }
 
@@ -314,7 +308,10 @@ impl PartitionedAggregateAccumulator {
         let expr = Arc::new(Literal::new(ScalarValue::from(true)));
         let outer_acc: Box<dyn Accumulator> = Box::new(match outer_agg {
             AggregateFunction::Avg => Ok(AvgAccumulator::try_new(agg_return_type)?),
-            _ => Err(Error::Internal(format!("{:?} doesn't supported", outer_agg))),
+            _ => Err(Error::Internal(format!(
+                "{:?} doesn't supported",
+                outer_agg
+            ))),
         }?);
 
         Ok(Self {
@@ -326,7 +323,7 @@ impl PartitionedAggregateAccumulator {
 }
 
 macro_rules! update_batch {
-    ($self:ident, $values:expr,$type:ident, $scalar_type:ident, $ARRAYTYPE:ident)=> {{
+    ($self:ident, $values:expr,$type:ident, $scalar_type:ident, $ARRAYTYPE:ident) => {{
         let mut spans = Vec::with_capacity($values[0].len());
 
         let arr = $values[0].as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
@@ -334,12 +331,12 @@ macro_rules! update_batch {
             $self.first_row = false;
             match arr.is_null(0) {
                 true => None,
-                false => Some(arr.value(0))
+                false => Some(arr.value(0)),
             }
         } else {
             match &$self.last_partition_value {
                 ScalarValue::$scalar_type(v) => *v,
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         };
 
@@ -358,25 +355,30 @@ macro_rules! update_batch {
 
         $self.last_partition_value = ScalarValue::$scalar_type(last_value);
 
-        $self.acc.update_batch(&spans, &$values[1..]).map_err(Error::into_datafusion_execution_error);
-}}
+        $self
+            .acc
+            .update_batch(&spans, &$values[1..])
+            .map_err(Error::into_datafusion_execution_error);
+    }};
 }
 impl Accumulator for PartitionedAggregateAccumulator {
     fn state(&self) -> DFResult<Vec<ScalarValue>> {
-        self.acc.state().map_err(Error::into_datafusion_execution_error)
+        self.acc
+            .state()
+            .map_err(Error::into_datafusion_execution_error)
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
         match values[0].data_type() {
-            DataType::Int8 => update_batch!(self,values,i8,Int8,Int8Array),
-            DataType::Int16 => update_batch!(self,values,i16,Int16,Int16Array),
-            DataType::Int32 => update_batch!(self,values,i32,Int32,Int32Array),
-            DataType::Int64 => update_batch!(self,values,i64,Int64,Int64Array),
-            DataType::UInt8 => update_batch!(self,values,u8,UInt8,UInt8Array),
-            DataType::UInt16 => update_batch!(self,values,u16,UInt16,UInt16Array),
-            DataType::UInt32 => update_batch!(self,values,u32,UInt32,UInt32Array),
-            DataType::UInt64 => update_batch!(self,values,u64,UInt64,UInt64Array),
-            _ => unimplemented!()
+            DataType::Int8 => update_batch!(self, values, i8, Int8, Int8Array),
+            DataType::Int16 => update_batch!(self, values, i16, Int16, Int16Array),
+            DataType::Int32 => update_batch!(self, values, i32, Int32, Int32Array),
+            DataType::Int64 => update_batch!(self, values, i64, Int64, Int64Array),
+            DataType::UInt8 => update_batch!(self, values, u8, UInt8, UInt8Array),
+            DataType::UInt16 => update_batch!(self, values, u16, UInt16, UInt16Array),
+            DataType::UInt32 => update_batch!(self, values, u32, UInt32, UInt32Array),
+            DataType::UInt64 => update_batch!(self, values, u64, UInt64, UInt64Array),
+            _ => unimplemented!(),
         };
         Ok(())
     }

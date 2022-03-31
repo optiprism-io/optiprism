@@ -77,6 +77,6 @@ impl IntoResponse for Error {
                 "internal server error".to_string(),
             ),
         }
-            .into_response()
+        .into_response()
     }
 }

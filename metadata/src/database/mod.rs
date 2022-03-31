@@ -2,4 +2,4 @@ mod provider;
 mod types;
 
 pub use provider::Provider;
-pub use types::{TableType, Table, Column};
+pub use types::{Column, Table, TableType};

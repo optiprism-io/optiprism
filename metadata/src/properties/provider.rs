@@ -2,9 +2,7 @@ use crate::error::Error;
 use crate::metadata::{list, ListResponse};
 use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
-use crate::store::store::{
-    make_data_value_key, make_id_seq_key, make_index_key, Store,
-};
+use crate::store::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
@@ -48,7 +46,7 @@ fn index_keys(
             IDX_DISPLAY_NAME,
             display_name,
         )
-            .to_vec()
+        .to_vec()
     }));
 
     idx
@@ -174,18 +172,9 @@ impl Provider {
         project_id: u64,
         id: u64,
     ) -> Result<Property> {
-        let key = make_data_value_key(
-            organization_id,
-            project_id,
-            self.ns.as_bytes(),
-            id,
-        );
+        let key = make_data_value_key(organization_id, project_id, self.ns.as_bytes(), id);
 
-        match self
-            .store
-            .get(&key)
-            .await?
-        {
+        match self.store.get(&key).await? {
             None => Err(Error::KeyNotFound(String::from_utf8(key)?)),
             Some(value) => Ok(deserialize(&value)?),
         }
@@ -232,7 +221,7 @@ impl Provider {
             project_id,
             self.ns.as_bytes(),
         )
-            .await
+        .await
     }
 
     pub async fn update(
@@ -323,7 +312,7 @@ impl Provider {
                     &prop.name,
                     &prop.display_name,
                 )
-                    .as_ref(),
+                .as_ref(),
             )
             .await?;
         Ok(prop)

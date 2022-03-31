@@ -22,8 +22,8 @@ pub async fn list<'a, T>(
     project_id: u64,
     ns: &[u8],
 ) -> Result<ListResponse<T>>
-    where
-        T: DeserializeOwned,
+where
+    T: DeserializeOwned,
 {
     let prefix = make_data_key(organization_id, project_id, ns);
 
