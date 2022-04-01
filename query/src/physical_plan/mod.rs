@@ -5,5 +5,6 @@ use std::fmt::Debug;
 
 pub mod expressions;
 pub mod merge;
+pub mod planner;
 // pub mod merge;
 // pub mod planner;

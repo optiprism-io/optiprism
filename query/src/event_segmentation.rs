@@ -18,7 +18,7 @@ use arrow::datatypes::DataType;
 use axum::response::IntoResponse;
 use common::ScalarValue;
 use datafusion::error::Result as DFResult;
-use datafusion::logical_plan::plan::{Aggregate, Filter};
+use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
 use datafusion::logical_plan::ExprSchemable;
 use datafusion_expr::expr_fn::{and, binary_expr, or};
 use datafusion_expr::{
@@ -31,6 +31,7 @@ use metadata::properties::provider::Namespace;
 use metadata::Metadata;
 use std::ops::Sub;
 use std::sync::Arc;
+use crate::logical_plan::merge::MergeNode;
 
 pub enum PropertyScope {
     Event,
@@ -227,21 +228,30 @@ impl LogicalPlanBuilder {
         input: Arc<LogicalPlan>,
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {
-        let event = es.events[0].clone();
+        let len = es.events.len();
         let builder = LogicalPlanBuilder { ctx, metadata, es };
-        Ok(builder
-            .build_event_logical_plan(input.clone(), &event)
-            .await?)
+
+        Ok(match len {
+            1 => builder.build_event_logical_plan(input.clone(), 0).await?,
+            _ => {
+                let inputs = (0..len).into_iter().map(|idx| {
+                    block_on(builder.build_event_logical_plan(input.clone(), idx))
+                }).collect::<Result<Vec<LogicalPlan>>>()?;
+                LogicalPlan::Extension(Extension {
+                    node: Arc::new(MergeNode::try_new(inputs).map_err(|e|e.into_datafusion_plan_error())?)
+                })
+            }
+        })
     }
 
     async fn build_event_logical_plan(
         &self,
         input: Arc<LogicalPlan>,
-        event: &Event,
+        event_id: usize,
     ) -> Result<LogicalPlan> {
-        let filter = self.build_filter_logical_plan(input.clone(), event).await?;
+        let filter = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id]).await?;
         let agg = self
-            .build_aggregate_logical_plan(Arc::new(filter), event)
+            .build_aggregate_logical_plan(Arc::new(filter), &self.es.events[event_id])
             .await?;
         Ok(agg)
     }

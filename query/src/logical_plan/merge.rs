@@ -2,19 +2,26 @@ use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use datafusion::logical_plan::{LogicalPlan, DFSchemaRef, UserDefinedLogicalNode};
+use datafusion_common::DFSchema;
 use datafusion_expr::Expr;
 
+use crate::Result;
+
 pub struct MergeNode {
-    left: Arc<LogicalPlan>,
-    right: Arc<LogicalPlan>,
+    inputs: Vec<LogicalPlan>,
+    schema: DFSchemaRef,
 }
 
 impl MergeNode {
-    pub fn new(left: Arc<LogicalPlan>, right: Arc<LogicalPlan>) -> Self {
-        Self {
-            left,
-            right,
+    pub fn try_new(inputs: Vec<LogicalPlan>) -> Result<Self> {
+        let mut schema = DFSchema::new(vec![])?;
+        for input in inputs.iter() {
+            schema.merge(input.schema());
         }
+        Ok(Self {
+            inputs,
+            schema: Arc::new(schema),
+        })
     }
 }
 
@@ -30,11 +37,11 @@ impl UserDefinedLogicalNode for MergeNode {
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
-        vec![&self.inpu]
+        self.inputs.iter().collect()
     }
 
     fn schema(&self) -> &DFSchemaRef {
-        self.input.schema()
+        &self.schema
     }
 
     fn expressions(&self) -> Vec<Expr> {
@@ -42,13 +49,10 @@ impl UserDefinedLogicalNode for MergeNode {
     }
 
     fn fmt_for_explain(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "Merge: left={:?}, right:{:?}", self.left, self.right)
+        write!(f, "Merge")
     }
 
     fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
-        Arc::new(Self {
-            left: Arc::new(inputs[0].clone()),
-            right: Arc::new(inputs[1].clone()),
-        })
+        Arc::new(MergeNode::try_new(inputs.to_vec()).map_err(|e|e.into_datafusion_plan_error()).unwrap())
     }
 }

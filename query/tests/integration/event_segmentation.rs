@@ -16,7 +16,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
     use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
-    use datafusion::prelude::CsvReadOptions;
+    use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
 
     use common::{DataType, ScalarValue, DECIMAL_PRECISION, DECIMAL_SCALE};
     use datafusion::execution::context::ExecutionContextState;
@@ -38,6 +38,7 @@ mod tests {
     use std::ops::Sub;
     use std::sync::Arc;
     use uuid::Uuid;
+    use query::physical_plan::planner::QueryPlanner;
 
     async fn events_provider(
         db: Arc<database::Provider>,
@@ -55,7 +56,7 @@ mod tests {
             None,
             1,
         )
-        .await?;
+            .await?;
 
         Ok(df_input.build()?)
     }
@@ -135,7 +136,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-        .await?;
+            .await?;
 
         create_property(
             &md,
@@ -158,7 +159,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-        .await?;
+            .await?;
 
         create_property(
             &md,
@@ -181,7 +182,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-        .await?;
+            .await?;
 
         // create events
         md.events
@@ -242,7 +243,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-        .await?;
+            .await?;
 
         create_property(
             &md,
@@ -265,7 +266,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-        .await?;
+            .await?;
 
         Ok(())
     }
@@ -495,19 +496,20 @@ mod tests {
 
         create_entities(md.clone(), org_id, proj_id).await?;
         let input = Arc::new(events_provider(md.database.clone(), org_id, proj_id).await?);
-
         let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
 
-        let mut ctx_state = ExecutionContextState::new();
-        ctx_state.config.target_partitions = 1;
-        let planner = DefaultPhysicalPlanner::default();
-        let physical_plan = planner.create_physical_plan(&plan, &ctx_state).await?;
+        let config =
+            ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {}));
+
+        let ctx = ExecutionContext::with_config(config);
+
+        let physical_plan = ctx.create_physical_plan(&plan).await?;
 
         let result = collect(
             physical_plan,
             Arc::new(RuntimeEnv::new(RuntimeConfig::new())?),
         )
-        .await?;
+            .await?;
 
         print_batches(&result)?;
         Ok(())
