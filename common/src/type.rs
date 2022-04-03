@@ -3,8 +3,8 @@ use arrow::datatypes::TimeUnit::Second;
 use datafusion::scalar::ScalarValue as DFScalarValue;
 use rust_decimal::Decimal;
 
-pub const DECIMAL_PRECISION: usize = 28;
-pub const DECIMAL_SCALE: usize = 28;
+pub const DECIMAL_PRECISION: usize = 19;
+pub const DECIMAL_SCALE: usize = 10;
 
 pub enum DataType {
     Number,

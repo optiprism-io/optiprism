@@ -22,7 +22,6 @@ use datafusion::scalar::ScalarValue;
 #[derive(Debug)]
 pub struct PartitionedCountAccumulator {
     count: u64,
-    unfinished: bool,
     buffer: Buffer,
 }
 
@@ -32,7 +31,6 @@ impl PartitionedCountAccumulator {
     pub fn try_new(outer_acc: Box<dyn Accumulator>) -> Result<Self> {
         Ok(Self {
             count: 0,
-            unfinished: false,
             buffer: Buffer::new(CAP, DataType::UInt64, outer_acc),
         })
     }
@@ -44,10 +42,8 @@ impl PartitionedAccumulator for PartitionedCountAccumulator {
             if *is_span {
                 self.buffer.push(self.count.into());
                 self.count = 0;
-                self.unfinished = false;
             }
             self.count += 1;
-            self.unfinished = true;
         }
 
         Ok(())
@@ -58,22 +54,12 @@ impl PartitionedAccumulator for PartitionedCountAccumulator {
     }
 
     fn state(&self) -> Result<Vec<ScalarValue>> {
-        if self.unfinished {
-            self.buffer.flush_with_value(self.count.into())?;
-        } else {
-            self.buffer.flush()?;
-        }
-
+        self.buffer.flush_with_value(self.count.into())?;
         Ok(self.buffer.state()?)
     }
 
     fn evaluate(&self) -> Result<ScalarValue> {
-        if self.unfinished {
-            self.buffer.flush_with_value(self.count.into())?;
-        } else {
-            self.buffer.flush()?;
-        }
-
+        self.buffer.flush_with_value(self.count.into())?;
         Ok(self.buffer.evaluate()?)
     }
 }

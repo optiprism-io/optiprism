@@ -75,10 +75,11 @@ impl ExecutionPlan for MergeExec {
     }
 
     async fn execute(&self, partition: usize, runtime: Arc<RuntimeEnv>) -> datafusion_common::Result<SendableRecordBatchStream> {
-        let streams = self.inputs.iter().map(|input| {
-            let merge = CoalescePartitionsExec::new(input.clone());
-            block_on(merge.execute(0, runtime.clone())).unwrap()
-        }).collect();
+        let mut streams: Vec<SendableRecordBatchStream> = vec![];
+        for input in self.inputs.iter() {
+            let stream = input.execute(partition, runtime.clone()).await?;
+            streams.push(stream)
+        }
 
         Ok(Box::pin(MergeStream {
             streams,

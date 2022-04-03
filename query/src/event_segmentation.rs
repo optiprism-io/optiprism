@@ -225,20 +225,23 @@ impl LogicalPlanBuilder {
     pub async fn build(
         ctx: Context,
         metadata: Arc<Metadata>,
-        input: Arc<LogicalPlan>,
+        input: LogicalPlan,
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {
         let len = es.events.len();
         let builder = LogicalPlanBuilder { ctx, metadata, es };
 
         Ok(match len {
-            1 => builder.build_event_logical_plan(input.clone(), 0).await?,
+            1 => builder.build_event_logical_plan(Arc::new(input.clone()), 0).await?,
             _ => {
-                let inputs = (0..len).into_iter().map(|idx| {
-                    block_on(builder.build_event_logical_plan(input.clone(), idx))
-                }).collect::<Result<Vec<LogicalPlan>>>()?;
+                let mut inputs: Vec<LogicalPlan> = vec![];
+                for idx in 0..len {
+                    let input = builder.build_event_logical_plan(Arc::new(input.clone()), idx).await?;
+                    inputs.push(input);
+                }
+
                 LogicalPlan::Extension(Extension {
-                    node: Arc::new(MergeNode::try_new(inputs).map_err(|e|e.into_datafusion_plan_error())?)
+                    node: Arc::new(MergeNode::try_new(inputs).map_err(|e| e.into_datafusion_plan_error())?)
                 })
             }
         })
@@ -309,6 +312,7 @@ impl LogicalPlanBuilder {
             args: vec![lit(time_gran), ts_col],
         };
 
+        group_expr.push(Expr::Alias(Box::new(lit(event.event.name())), "event".to_string()));
         group_expr.push(Expr::Alias(Box::new(time_expr), "date".to_string()));
 
         // event groups
@@ -438,9 +442,6 @@ impl LogicalPlanBuilder {
 
     /// builds event filters expression
     async fn event_filters_expression(&self, filters: &Vec<EventFilter>) -> Result<Expr> {
-        // vector of expression for OR
-        let filter_exprs: Vec<Expr> = vec![];
-
         // iterate over filters
         let filters_exprs = filters
             .iter()
@@ -468,7 +469,7 @@ impl LogicalPlanBuilder {
             .collect::<Result<Vec<Expr>>>()?;
 
         if filters_exprs.len() == 1 {
-            return Ok(filter_exprs[0].clone());
+            return Ok(filters_exprs[0].clone());
         }
 
         Ok(multi_and(filters_exprs))
