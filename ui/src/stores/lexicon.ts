@@ -240,6 +240,7 @@ export const useLexiconStore = defineStore("lexicon", {
 
                 if (items.length) {
                     eventsList.push({
+                        type: 'custom',
                         name: 'Custom Events',
                         items,
                         action: {

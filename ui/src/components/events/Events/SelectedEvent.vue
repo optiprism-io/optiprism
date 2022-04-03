@@ -13,6 +13,7 @@
                         :selected="eventRef"
                         :width-auto="true"
                         @select="changeEvent"
+                        @action="emit('action', $event)"
                     >
                         <UiButton class="pf-m-main pf-m-secondary">
                             {{ eventName(eventRef) }}
@@ -20,6 +21,7 @@
                     </Select>
                 </div>
                 <div
+                    v-if="props.showQuery"
                     class="pf-c-action-list__item selected-event__control"
                     @click="addQuery"
                 >
@@ -42,6 +44,7 @@
                     </VTooltip>
                 </div>
                 <div
+                    v-if="props.showBreakdowns"
                     class="pf-c-action-list__item selected-event__control"
                     @click="addBreakdown"
                 >
@@ -80,67 +83,76 @@
                 @remove-filter-value="removeFilterValue"
                 @handle-select-property="handleSelectProperty"
             />
-            <Breakdown
-                v-for="(breakdown, i) in breakdowns"
-                :key="i"
-                :event-ref="eventRef"
-                :breakdown="breakdown"
-                :selected-items="breakdowns"
-                :index="i"
-                :update-open="updateOpenBreakdown"
-                @remove-breakdown="removeBreakdown"
-                @change-breakdown-property="changeBreakdownProperty"
-            />
-            <Query
-                v-for="(query, i) in queries"
-                :key="i"
-                :event-ref="eventRef"
-                :item="query"
-                :index="i"
-                :update-open="updateOpenQuery"
-                :no-delete="query.noDelete"
-                @remove-query="removeQuery"
-                @change-query="changeQuery"
-            />
+            <template v-if="props.showBreakdowns">
+                <Breakdown
+                    v-for="(breakdown, i) in breakdowns"
+                    :key="i"
+                    :event-ref="eventRef"
+                    :breakdown="breakdown"
+                    :selected-items="breakdowns"
+                    :index="i"
+                    :update-open="updateOpenBreakdown"
+                    @remove-breakdown="removeBreakdown"
+                    @change-breakdown-property="changeBreakdownProperty"
+                />
+            </template>
+            <template v-if="props.showQuery">
+                <Query
+                    v-for="(query, i) in queries"
+                    :key="i"
+                    :event-ref="eventRef"
+                    :item="query"
+                    :index="i"
+                    :update-open="updateOpenQuery"
+                    :no-delete="query.noDelete"
+                    @remove-query="removeQuery"
+                    @change-query="changeQuery"
+                />
+            </template>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { EventRef, EventType, PropertyRef, EventQueryRef, EVENT_TYPE_REGULAR, EVENT_TYPE_CUSTOM } from "@/types/events";
+import { ref } from 'vue'
+import { EventRef, PropertyRef, PropertyType, EventQueryRef, EVENT_TYPE_REGULAR, EVENT_TYPE_CUSTOM } from "@/types/events";
 import { OperationId, Value } from "@/types";
 import { useLexiconStore } from "@/stores/lexicon";
-import { EventBreakdown, EventFilter, EventQuery } from "@/stores/eventSegmentation/events";
+import { EventBreakdown, EventFilter, EventQuery, Event, initialQuery } from '@/stores/eventSegmentation/events'
 import Select from "@/components/Select/Select.vue";
 import Filter from "@/components/events/Filter.vue";
 import Breakdown from "@/components/events/Breakdown.vue";
 import Query from "@/components/events/Events/Query.vue";
 import { Group, Item } from "@/components/Select/SelectTypes";
 import AlphabetIdentifier from "@/components/AlphabetIdentifier.vue";
+import schemaService from '@/api/services/schema.service'
 
-const props = withDefaults(
-    defineProps<{
-        eventRef: EventRef;
-        filters: EventFilter[];
-        breakdowns: EventBreakdown[];
-        eventItems: Group<Item<EventRef, null>[]>[];
-        index: number;
-        queries: EventQuery[];
-    }>(), {
-        eventItems: () => []
-    }
-);
+export type SetEventPayload = {
+    event: Event
+    index: number
+}
+
+type Props = {
+    eventRef: EventRef
+    event: Event
+    filters: EventFilter[]
+    breakdowns?: EventBreakdown[]
+    eventItems?: Group<Item<EventRef, null>[]>[]
+    index: number
+    queries?: EventQuery[]
+    showBreakdowns?: boolean
+    showQuery?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    eventItems: () => [],
+    showBreakdowns: true,
+    showQuery: true
+})
 
 const emit = defineEmits<{
     (e: "changeEvent", index: number, ref: EventRef): void;
     (e: "removeEvent", index: number): void;
-    (e: "addFilter", index: number): void;
-    (e: "removeFilter", eventIdx: number, filterIdx: number): void;
-    (e: "changeFilterProperty", eventIdx: number, filterIdx: number, propRef: PropertyRef): void;
-    (e: "changeFilterOperation", eventIdx: number, filterIdx: number, opId: OperationId): void;
-    (e: "addFilterValue", eventIdx: number, filterIdx: number, value: Value): void;
-    (e: "removeFilterValue", eventIdx: number, filterIdx: number, value: Value): void;
     (e: "handleSelectProperty"): void;
     (e: "addBreakdown", index: number): void;
     (e: "changeBreakdownProperty", eventIdx: number, breakdownIdx: number, propRef: PropertyRef): void;
@@ -148,6 +160,9 @@ const emit = defineEmits<{
     (e: "removeQuery", eventIdx: number, queryInx: number): void;
     (e: "addQuery", index: number): void;
     (e: "changeQuery", eventIdx: number, queryIdx: number, queryRef: EventQueryRef): void;
+
+    (e: 'setEvent', payload: SetEventPayload): void
+    (e: 'action', payload: string): void
 }>();
 
 const lexiconStore = useLexiconStore();
@@ -156,45 +171,89 @@ const updateOpenBreakdown = ref(false);
 const updateOpenFilter = ref(false);
 const updateOpenQuery = ref(false)
 
+const setEvent = (payload: Event) => {
+    emit('setEvent', {
+        index: props.index,
+        event: payload
+    })
+}
+
 const handleSelectProperty = (): void => {
     emit("handleSelectProperty");
 };
 
 const changeEvent = (ref: EventRef): void => {
-    emit("changeEvent", props.index, ref);
-};
+    setEvent({
+        ref: ref,
+        filters: [],
+        breakdowns: [],
+        queries: initialQuery,
+    })
+}
 
 const removeEvent = (): void => {
     emit("removeEvent", props.index);
 };
 
 const removeFilter = (filterIdx: number): void => {
-    emit("removeFilter", props.index, filterIdx);
-};
+    props.event.filters.splice(filterIdx, 1)
+}
 
 const addFilter = (): void => {
-    emit("addFilter", props.index);
-    updateOpenFilter.value = true;
+    const emptyFilter = props.event.filters.find((filter): boolean => filter.propRef === undefined)
 
+    if (emptyFilter) {
+        return
+    }
+
+    props.event.filters.push(<EventFilter>{
+        opId: OperationId.Eq,
+        values: [],
+        valuesList: []
+    })
+
+    updateOpenFilter.value = true;
     setTimeout(() => {
         updateOpenFilter.value = false;
     });
 };
 
-const changeFilterProperty = (filterIdx: number, propRef: PropertyRef): void => {
-    emit("changeFilterProperty", props.index, filterIdx, propRef);
-};
+const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => {
+    let valuesList: string[] = []
 
-const changeFilterOperation = (filterIdx: number, opId: OperationId): void => {
-    emit("changeFilterOperation", props.index, filterIdx, opId);
-};
+    try {
+        const res = await schemaService.propertiesValues({
+            event_name: lexiconStore.eventName(props.event.ref),
+            event_type: props.event.ref.type,
+            property_name: lexiconStore.propertyName(propRef),
+            property_type: PropertyType[propRef.type]
+        });
+        if (res) {
+            valuesList = res
+        }
+    } catch (error) {
+        throw new Error('error getEventsValues')
+    }
+
+    props.event.filters[filterIdx] = <EventFilter>{
+        propRef: propRef,
+        opId: OperationId.Eq,
+        values: [],
+        valuesList: valuesList
+    }
+}
+
+const changeFilterOperation = (filterIdx: number, opId: OperationId) => {
+    props.event.filters[filterIdx].opId = opId
+    props.event.filters[filterIdx].values = []
+}
 
 const addFilterValue = (filterIdx: number, value: Value): void => {
-    emit("addFilterValue", props.index, filterIdx, value);
-};
+    props.event.filters[filterIdx].values.push(value)
+}
 
 const removeFilterValue = (filterIdx: number, value: Value): void => {
-    emit("removeFilterValue", props.index, filterIdx, value);
+    props.event.filters[filterIdx].values = props.event.filters[filterIdx].values.filter(v =>  v !== value)
 };
 
 const addBreakdown = async (): Promise<void> => {

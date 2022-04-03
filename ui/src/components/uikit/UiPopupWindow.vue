@@ -56,10 +56,11 @@
                             class="pf-c-action-list__item"
                         >
                             <UiButton
-                                class="pf-m-main pf-m-primary"
+                                class="pf-m-primary"
                                 type="button"
+                                :disabled="props.applyDisabled"
                                 :progress="props.applyLoading"
-                                @click="cancel('cancel-button')"
+                                @click="apply"
                             >
                                 {{ props.applyButton }}
                             </UiButton>
@@ -71,7 +72,7 @@
                             <UiButton
                                 class=""
                                 type="button"
-                                @click="apply"
+                                @click="cancel('cancel-button')"
                             >
                                 {{ props.cancelButton }}
                             </UiButton>
@@ -98,6 +99,7 @@ interface Props {
 
     closable?: boolean
     applyLoading?: boolean
+    applyDisabled?: boolean
     saveBodyOverflow?: boolean
     noRemoveBodyOverflow?: boolean
     fullWidth?: boolean
@@ -109,6 +111,7 @@ const props = withDefaults(defineProps<Props>(), {
     title: undefined,
     description: undefined,
     applyButton: undefined,
+    applyDisabled: false,
     cancelButton: undefined,
 
     size: 'pf-m-sm',
@@ -202,7 +205,7 @@ $text-color-title: #171717;
         overflow: auto;
         padding-top: 2rem;
         padding-bottom: 2rem;
-        z-index: 18000;
+        z-index: 1002;
     }
 
     &__box {
@@ -212,5 +215,9 @@ $text-color-title: #171717;
             max-height: initial;
         }
     }
+}
+
+.popup-floating-popper {
+    z-index: 1003;
 }
 </style>

@@ -48,7 +48,7 @@
         </div>
 
         <CreateCustomEvent
-            v-if="showCreateCustomEvent"
+            v-if="eventsStore.showCreateCustomEvent"
             @apply="applyCreateCustomEvent"
             @cancel="togglePopupCreateCustomEvent(false)"
         />
@@ -83,23 +83,14 @@ onUnmounted(() => {
 });
 
 
-/**
- * Create Custom Event
- */
-const showCreateCustomEvent = ref(false)
 
 const togglePopupCreateCustomEvent = (payload: boolean) => {
-    showCreateCustomEvent.value = payload
+    eventsStore.togglePopupCreateCustomEvent(payload)
 }
 
-const applyCreateCustomEvent = (payload: any) => {
-    showCreateCustomEvent.value = false
+const applyCreateCustomEvent = () => {
+    togglePopupCreateCustomEvent(false)
 }
-
-provide('createCustomEvent', () => {
-    togglePopupCreateCustomEvent(true)
-})
-/** */
 </script>
 
 <style scoped lang="scss">

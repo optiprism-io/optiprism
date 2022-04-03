@@ -14,6 +14,7 @@ export interface Item<T, K>{
 }
 
 export interface Group<T>{
+    type?: string
     name: string
     items: T
     action?: Action

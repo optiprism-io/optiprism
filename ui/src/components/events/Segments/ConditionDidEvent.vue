@@ -5,6 +5,7 @@
             :items="lexiconStore.eventsList"
             :width-auto="true"
             @select="changeEvent"
+            @action="selectAction"
         >
             <UiButton
                 class="pf-m-main"
@@ -173,6 +174,7 @@ const conditionConfig = computed(() => {
  */
 const changeEventCondition = inject<(payload: ChangeEventCondition) => void>('changeEventCondition')
 const changeCompareEventCondition = inject<(payload: ChangeEventCondition) => void>('changeCompareEventCondition')
+const actionEvent = inject<(payload: string) => void>('actionEvent')
 
 const changeEvent = (ref: EventRef) => {
     changeEventCondition && changeEventCondition({
@@ -180,6 +182,10 @@ const changeEvent = (ref: EventRef) => {
         idxParent: props.indexParent,
         ref,
     })
+}
+
+const selectAction = (payload: string) => {
+    actionEvent && actionEvent(payload)
 }
 
 const changeCompareEvent = (ref: EventRef) => {

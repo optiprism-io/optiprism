@@ -8,12 +8,12 @@ import {
     EVENT_TYPE_CUSTOM
 } from "@/types/events";
 import { OperationId, Value, Group } from "@/types";
-import schemaService from "@/api/services/schema.service";
 import queriesService, { EventSegmentation } from "@/api/services/queries.service";
 import { getYYYYMMDD, getStringDateByFormat } from "@/helpers/getStringDates";
 import { getLastNDaysRange } from "@/helpers/calendarHelper";
 import { TimeUnit } from "@/types";
 import {Column, Row} from "@/components/uikit/UiTable/UiTable";
+import { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
 
 import { useLexiconStore } from "@/stores/lexicon";
 import { useSegmentsStore } from "@/stores/eventSegmentation/segments";
@@ -68,9 +68,11 @@ export type Events = {
 
     eventSegmentation: any // TODO integrations backend
     eventSegmentationLoading: boolean
+
+    showCreateCustomEvent: boolean
 };
 
-const initialQuery = <EventQuery[]>[
+export const initialQuery = <EventQuery[]>[
     {
         queryRef: <EventQueryRef>{
             type: "simple",
@@ -110,6 +112,7 @@ export const useEventsStore = defineStore("events", {
             series: [],
         },
         eventSegmentationLoading: false,
+        showCreateCustomEvent: false,
     }),
     getters: {
         hasSelectedEvents(): boolean {
@@ -302,6 +305,12 @@ export const useEventsStore = defineStore("events", {
         },
     },
     actions: {
+        togglePopupCreateCustomEvent(payload: boolean) {
+            this.showCreateCustomEvent = payload
+        },
+        setEvent(payload: SetEventPayload) {
+            this.events[payload.index] = payload.event
+        },
         initPeriod(): void {
             const lastNDateRange = getLastNDaysRange(20);
             this.period = {
@@ -324,14 +333,6 @@ export const useEventsStore = defineStore("events", {
             this.eventSegmentationLoading = false;
         },
 
-        changeEvent(index: number, ref: EventRef): void {
-            this.events[index] = <Event>{
-                ref: ref,
-                filters: [],
-                breakdowns: [],
-                queries: initialQuery,
-            };
-        },
         addEventByRef(ref: EventRef): void {
             switch (ref.type) {
                 case EVENT_TYPE_REGULAR:
@@ -360,62 +361,6 @@ export const useEventsStore = defineStore("events", {
         },
         deleteEvent(idx: number): void {
             this.events.splice(idx, 1);
-        },
-
-        /**
-         * Filters
-         */
-        addFilter(idx: number): void {
-            const emptyFilter = this.events[idx].filters.find((filter): boolean => filter.propRef === undefined);
-
-            if (emptyFilter) {
-                return;
-            }
-            this.events[idx].filters.push(<EventFilter>{
-                opId: OperationId.Eq,
-                values: [],
-                valuesList: []
-            });
-        },
-        removeFilter(eventIdx: number, filterIdx: number): void {
-            this.events[eventIdx].filters.splice(filterIdx, 1);
-        },
-        async changeFilterProperty(eventIdx: number, filterIdx: number, propRef: PropertyRef) {
-            const lexiconStore = useLexiconStore();
-            const eventRef: EventRef = this.events[eventIdx].ref;
-            let valuesList: string[] = [];
-
-            try {
-                const res = await schemaService.propertiesValues({
-                    event_name: lexiconStore.eventName(eventRef),
-                    event_type: eventRef.type,
-                    property_name: lexiconStore.propertyName(propRef),
-                    property_type: PropertyType[propRef.type]
-                });
-                if (res) {
-                    valuesList = res;
-                }
-            } catch (error) {
-                throw new Error("error getEventsValues");
-            }
-
-            this.events[eventIdx].filters[filterIdx] = <EventFilter>{
-                propRef: propRef,
-                opId: OperationId.Eq,
-                values: [],
-                valuesList: valuesList
-            };
-        },
-        changeFilterOperation(eventIdx: number, filterIdx: number, opId: OperationId): void {
-            this.events[eventIdx].filters[filterIdx].opId = opId;
-            this.events[eventIdx].filters[filterIdx].values = [];
-        },
-        addFilterValue(eventIdx: number, filterIdx: number, value: Value): void {
-            this.events[eventIdx].filters[filterIdx].values.push(value);
-        },
-        removeFilterValue(eventIdx: number, filterIdx: number, value: Value): void {
-            this.events[eventIdx].filters[filterIdx].values =
-                this.events[eventIdx].filters[filterIdx].values.filter(v =>  v !== value);
         },
 
         /**

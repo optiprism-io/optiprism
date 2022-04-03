@@ -2,6 +2,7 @@
     <VDropdown
         class="select"
         placement="bottom-start"
+        :popper-class="props.popperClass || ''"
         :shown="isOpen"
         @hide="onHide"
     >
@@ -77,6 +78,7 @@ const props = withDefaults(
         updateOpen?: boolean;
         showSearch?: boolean;
         widthAuto?: boolean;
+        popperClass?: string
     }>(),
     {
         showSearch: true,
@@ -84,6 +86,7 @@ const props = withDefaults(
         selected: false,
         isOpenMount: false,
         updateOpen: false,
+        popperClass: undefined
     }
 );
 

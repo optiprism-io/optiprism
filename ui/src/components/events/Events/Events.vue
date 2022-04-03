@@ -3,20 +3,16 @@
         <SelectedEvent
             v-for="(event, index) in events"
             :key="index"
+            :event="event"
             :event-ref="event.ref"
             :filters="event.filters"
             :index="index"
             :event-items="lexiconStore.eventsList"
             :breakdowns="event.breakdowns"
             :queries="event.queries"
-            @change-event="changeEvent"
+            @action="selectAction"
+            @set-event="setEvent"
             @remove-event="removeEvent"
-            @add-filter="addFilter"
-            @remove-filter="removeFilter"
-            @change-filter-property="changeFilterProperty"
-            @change-filter-operation="changeFilterOperation"
-            @add-filter-value="addFilterValue"
-            @remove-filter-value="removeFilterValue"
             @add-breakdown="addBreakdown"
             @change-breakdown-property="changeBreakdownProperty"
             @remove-breakdown="removeBreakdown"
@@ -47,17 +43,20 @@
 <script setup lang="ts">
 import { computed, watch, inject } from "vue";
 import { EventQueryRef, EventRef, PropertyRef } from "@/types/events";
-import { OperationId, Value } from "@/types";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
 import { useLexiconStore } from "@/stores/lexicon";
 
 import Select from '@/components/Select/Select.vue'
-import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
+import SelectedEvent, { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
 
 const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
 
 const events = computed(() => eventsStore.events);
+
+const setEvent = (payload: SetEventPayload) => {
+    eventsStore.setEvent(payload)
+}
 
 const updateEventSegmentationResult = (): void => {
     eventsStore.fetchEventSegmentationResult()
@@ -67,36 +66,8 @@ const addEvent = (ref: EventRef) => {
     eventsStore.addEventByRef(ref);
 };
 
-const changeEvent = (index: number, ref: EventRef) => {
-    eventsStore.changeEvent(index, ref);
-};
-
 const removeEvent = (idx: number): void => {
     eventsStore.deleteEvent(idx);
-};
-
-const addFilter = (idx: number): void => {
-    eventsStore.addFilter(idx);
-};
-
-const removeFilter = (eventIdx: number, filterIdx: number): void => {
-    eventsStore.removeFilter(eventIdx, filterIdx);
-};
-
-const changeFilterProperty = (eventIdx: number, filterIdx: number, propRef: PropertyRef) => {
-    eventsStore.changeFilterProperty(eventIdx, filterIdx, propRef);
-};
-
-const changeFilterOperation = (eventIdx: number, filterIdx: number, opId: OperationId) => {
-    eventsStore.changeFilterOperation(eventIdx, filterIdx, opId);
-};
-
-const addFilterValue = (eventIdx: number, filterIdx: number, value: Value) => {
-    eventsStore.addFilterValue(eventIdx, filterIdx, value);
-};
-
-const removeFilterValue = (eventIdx: number, filterIdx: number, value: Value) => {
-    eventsStore.removeFilterValue(eventIdx, filterIdx, value);
 };
 
 const addBreakdown = (idx: number): void => {
@@ -123,19 +94,11 @@ const changeQuery = (eventIdx: number, queryIdx: number, ref: EventQueryRef) => 
     eventsStore.changeQuery(eventIdx, queryIdx, ref);
 };
 
-
-const createCustomEvent = inject<() => void>('createCustomEvent')
-
-
 const selectAction = (payload: string) => {
     if  (payload === 'createCustomEvent') {
-        createCustomEvent && createCustomEvent()
+        eventsStore.togglePopupCreateCustomEvent(true)
     }
 }
-watch(
-    eventsStore.events,
-    () => {
-        updateEventSegmentationResult()
-    }
-)
+
+watch(eventsStore.events, updateEventSegmentationResult)
 </script>

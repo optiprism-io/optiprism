@@ -140,6 +140,12 @@ provide('changeCompareEventCondition', (payload: ChangeEventCondition) => {
     segmentsStore.changeCompareEventCondition(payload)
 })
 
+provide('actionEvent', (payload: string) => {
+    if  (payload === 'createCustomEvent') {
+        eventsStore.togglePopupCreateCustomEvent(true)
+    }
+})
+
 
 watch(
     segmentsStore.segments,
