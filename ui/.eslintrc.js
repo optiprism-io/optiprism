@@ -33,6 +33,7 @@ module.exports = {
             "alignAttributesVertically": true,
             "ignores": []
         }],
-        "vue/script-setup-uses-vars": "error"
+        "vue/script-setup-uses-vars": "error",
+        "vue/require-default-prop": "off"
     }
 };

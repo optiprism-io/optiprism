@@ -10,6 +10,7 @@
             :event-items="lexiconStore.eventsList"
             :breakdowns="event.breakdowns"
             :queries="event.queries"
+            :auto-hide="!eventsStore.showCreateCustomEvent"
             @action="selectAction"
             @set-event="setEvent"
             @remove-event="removeEvent"
@@ -25,6 +26,7 @@
                 grouped
                 :items="lexiconStore.eventsList"
                 :width-auto="true"
+                :auto-hide="!eventsStore.showCreateCustomEvent"
                 @action="selectAction"
                 @select="addEvent"
             >
@@ -41,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, inject } from "vue";
+import { computed, watch } from "vue";
 import { EventQueryRef, EventRef, PropertyRef } from "@/types/events";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
 import { useLexiconStore } from "@/stores/lexicon";
@@ -95,7 +97,7 @@ const changeQuery = (eventIdx: number, queryIdx: number, ref: EventQueryRef) => 
 };
 
 const selectAction = (payload: string) => {
-    if  (payload === 'createCustomEvent') {
+    if (payload === 'createCustomEvent') {
         eventsStore.togglePopupCreateCustomEvent(true)
     }
 }

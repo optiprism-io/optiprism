@@ -17,6 +17,7 @@
                     :event-ref="eventRef"
                     :event-refs="eventRefs"
                     :selected="filter.propRef"
+                    :popper-container="props.popperContainer"
                     @select="changeProperty"
                 >
                     <UiButton class="pf-m-main pf-m-secondary">
@@ -28,6 +29,7 @@
                     :is-open-mount="true"
                     :event-ref="eventRef"
                     :update-open="updateOpen"
+                    :popper-container="props.popperContainer"
                     @select="changeProperty"
                 >
                     <UiButton
@@ -48,6 +50,7 @@
                 <OperationSelect
                     :property-ref="filter.propRef"
                     :selected="filter.opId"
+                    :popper-container="props.popperContainer"
                     @select="changeOperation"
                 >
                     <UiButton class="pf-m-main pf-m-secondary">
@@ -64,6 +67,7 @@
                     :property-ref="filter.propRef"
                     :selected="filter.values"
                     :items="filterItemValues"
+                    :popper-container="props.popperContainer"
                     @add="addValue"
                     @deselect="removeValue"
                 >
@@ -143,6 +147,7 @@ const props = defineProps<{
     index: number;
     updateOpen?: boolean;
     showIdentifier?: boolean;
+    popperContainer?: string
 }>();
 
 const emit = defineEmits<{

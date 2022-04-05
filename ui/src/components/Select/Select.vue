@@ -4,6 +4,8 @@
         placement="bottom-start"
         :popper-class="props.popperClass || ''"
         :shown="isOpen"
+        :container="props.popperContainer || 'body'"
+        :auto-hide="props.autoHide"
         @hide="onHide"
     >
         <slot />
@@ -79,6 +81,8 @@ const props = withDefaults(
         showSearch?: boolean;
         widthAuto?: boolean;
         popperClass?: string
+        popperContainer?: string
+        autoHide?: boolean
     }>(),
     {
         showSearch: true,
@@ -86,7 +90,9 @@ const props = withDefaults(
         selected: false,
         isOpenMount: false,
         updateOpen: false,
-        popperClass: undefined
+        popperClass: undefined,
+        autoHide: true,
+        popperContainer: 'body'
     }
 );
 

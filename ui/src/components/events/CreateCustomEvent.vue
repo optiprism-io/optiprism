@@ -5,6 +5,7 @@
         :title="$t('events.create_custom')"
         :description="$t('events.create_custom_description')"
         :apply-disabled="applyDisabled"
+        :apply-loading="loading"
         @apply="apply"
         @cancel="cancel"
     >
@@ -24,24 +25,28 @@
         <div class="pf-u-font-size-md pf-u-font-weight-bold pf-u-mb-md">
             {{ $t('events.events') }}
         </div>
-        <SelectedEvent
-            v-for="(event, index) in events"
-            :key="index"
-            :event="event"
-            :event-ref="event.ref"
-            :filters="event.filters"
-            :index="index"
-            :event-items="eventItems"
-            :show-breakdowns="false"
-            :show-query="false"
-            @set-event="setEvent"
-            @remove-event="removeEvent"
-        />
+        <div class="pf-l-flex pf-m-column">
+            <SelectedEvent
+                v-for="(event, index) in events"
+                :key="index"
+                :event="event"
+                :event-ref="event.ref"
+                :filters="event.filters"
+                :index="index"
+                :event-items="eventItems"
+                :show-breakdowns="false"
+                :show-query="false"
+                :popper-container="'.ui-popup-window__box'"
+                @set-event="setEvent"
+                @remove-event="removeEvent"
+            />
+        </div>
         <Select
             grouped
             :items="eventItems"
             :width-auto="true"
             :popper-class="'popup-floating-popper'"
+            :popper-container="'.ui-popup-window__box'"
             @select="addEvent"
         >
             <UiButton
@@ -57,7 +62,7 @@
 
 <script lang="ts" setup>
 import { ref, computed } from 'vue'
-import { EventRef, EVENT_TYPE_REGULAR } from '@/types/events'
+import { EventRef, EVENT_TYPE_REGULAR, PropertyType } from '@/types/events'
 import { useLexiconStore } from '@/stores/lexicon'
 import { Event } from '@/stores/eventSegmentation/events'
 
@@ -66,6 +71,7 @@ import UiInput from '@/components/uikit/UiInput.vue'
 import UiFormLabel from '@/components//uikit/UiFormLabel.vue'
 import Select from '@/components/Select/Select.vue'
 import SelectedEvent, { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
+import schemaService, { Event as EventScheme, FilterCustomEvent } from '@/api/services/schema.service'
 
 const lexiconStore = useLexiconStore()
 
@@ -74,8 +80,8 @@ const emit = defineEmits<{
     (e: 'apply'): void
 }>()
 
+const loading = ref(false)
 const eventName = ref('')
-
 const events = ref<Event[]>([])
 
 const applyDisabled = computed(() => {
@@ -87,8 +93,8 @@ const eventItems = computed(() => {
 })
 
 const addEvent = (ref: EventRef) => {
-    events.value.push(<Event>{
-        ref: <EventRef>{
+    events.value.push({
+        ref: {
             type: EVENT_TYPE_REGULAR,
             id: ref.id
         },
@@ -106,7 +112,49 @@ const removeEvent = (idx: number): void => {
     events.value.splice(idx, 1)
 }
 
-const apply = () => {
+const apply = async () => {
+    loading.value = true
+    try {
+        await schemaService.createCustomEvents({
+            name: eventName.value,
+            events: events.value.map(item => {
+                const event = lexiconStore.findEventById(item.ref.id)
+
+
+                const eventProps: EventScheme = {
+                    eventName: event.name,
+                    eventType: item.ref.type,
+                    filters: [],
+                }
+
+                if (item.filters.length) {
+                    item.filters.forEach(filter => {
+                        if (filter.propRef) {
+                            const property = lexiconStore.findEventPropertyById(filter.propRef.id)
+
+                            if (eventProps.filters) {
+                                eventProps.filters.push({
+                                    filterType: 'property',
+                                    propertyName: property.name,
+                                    propertyType: PropertyType[filter.propRef.type],
+                                    operation: filter.opId,
+                                    value: filter.values
+                                })
+                            }
+                        }
+                    })
+                }
+
+                return eventProps
+            }),
+        })
+
+        await lexiconStore.getEvents()
+    } catch {
+        throw new Error('create custom events error');
+    }
+
+    loading.value = false
     emit('apply')
 }
 

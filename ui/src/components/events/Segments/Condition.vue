@@ -26,6 +26,7 @@
                 :index-parent="props.indexParent"
                 :condition="props.condition"
                 :update-open="props.updateOpen"
+                :auto-hide-event="props.autoHideEvent"
                 @change-property="changeProperty"
                 @change-operation="changeOperation"
             />
@@ -209,6 +210,7 @@ interface Props {
     indexParent: number
     condition: ConditionType
     updateOpen?: boolean
+    autoHideEvent?: boolean
 }
 
 const lexiconStore = useLexiconStore()

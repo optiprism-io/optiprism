@@ -6,6 +6,7 @@
             :index="index"
             :name="item.name"
             :conditions="item.conditions || []"
+            :auto-hide-event="!eventsStore.showCreateCustomEvent"
             @on-remove="deleteSegment"
             @on-rename="onRenameSegment"
             @add-condition="addCondition"
@@ -141,7 +142,7 @@ provide('changeCompareEventCondition', (payload: ChangeEventCondition) => {
 })
 
 provide('actionEvent', (payload: string) => {
-    if  (payload === 'createCustomEvent') {
+    if (payload === 'createCustomEvent') {
         eventsStore.togglePopupCreateCustomEvent(true)
     }
 })

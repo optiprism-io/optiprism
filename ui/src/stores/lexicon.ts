@@ -227,30 +227,26 @@ export const useLexiconStore = defineStore("lexicon", {
         eventsList(state: Lexicon) {
             const eventsList: Group<Item<EventRef, null>[]>[] = [];
 
-            if (state.customEvents.length) {
-                const items: Item<EventRef, null>[] = [];
+            const items: Item<EventRef, null>[] = [];
 
-                state.customEvents.forEach((e: CustomEvent) => {
-                    items.push({
-                        item: customEventRef(e),
-                        name: e.name,
-                        description: e?.description
-                    });
+            state.customEvents.forEach((e: CustomEvent) => {
+                items.push({
+                    item: customEventRef(e),
+                    name: e.name,
+                    description: e?.description
                 });
+            });
 
-                if (items.length) {
-                    eventsList.push({
-                        type: 'custom',
-                        name: 'Custom Events',
-                        items,
-                        action: {
-                            type: 'createCustomEvent',
-                            icon: 'fas fa-plus-circle',
-                            text: 'common.create',
-                        }
-                    });
+            eventsList.push({
+                type: 'custom',
+                name: 'Custom Events',
+                items,
+                action: {
+                    type: 'createCustomEvent',
+                    icon: 'fas fa-plus-circle',
+                    text: 'common.create',
                 }
-            }
+            })
 
             state.events.forEach((e: Event) => {
                 const item: Item<EventRef, null> = {

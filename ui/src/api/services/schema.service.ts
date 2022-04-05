@@ -1,4 +1,5 @@
-import { get } from "../apiClient";
+import { get, post } from '../apiClient'
+import { Value } from '../../types'
 
 type PropertiesValues = {
     event_name?: string;
@@ -7,30 +8,41 @@ type PropertiesValues = {
     property_type?: string;
 };
 
+export type FilterCustomEvent = {
+    filterType: string
+    propertyName: string
+    propertyType: string
+    operation?: string
+    value?: Value[]
+}
+
+export type Event = {
+    eventName: string
+    eventType: string
+    filters?: FilterCustomEvent[]
+}
+
+type CustomEvents = {
+    // projectId: number, TODO integration
+    name: string,
+    events: Event[]
+}
+
 const schemaService = {
     events: async () => await get("/schema/events", "", null),
+
     customEvents: async () => await get("/schema/custom-events", "", null),
+    createCustomEvents: async(params: CustomEvents) => await post('/schema/custom-events', '', params),
+
     eventProperties: async () => await get("/schema/event-properties", "", null),
     eventCustomProperties: async () => await get("/schema/event-custom-properties", "", null),
+
     userProperties: async () => await get("/schema/user-properties", "", null),
     userCustomProperties: async () => await get("/schema/user-custom-properties", "", null),
 
-    /**
-     * GET propertiesValues
-     * for event property you should incude event_name and event_type
-     *
-     * @param event_name: Event Name. Required if property has event type
-     * @param event_type: Event Type. Required if property has event type
-     * @param property_name: Property Name
-     * @param property_type: Available values : event, eventCustom, user, userCustom
-     */
-    propertiesValues: async (params: PropertiesValues) =>
-        await get("/data/property-values", "", params),
+    propertiesValues: async (params: PropertiesValues) => await get("/data/property-values", "", params),
 
-
-    // TODO event chart
-    getEventChart: async () =>
-        await get("/chart", "", null),
+    getEventChart: async () => await get("/chart", "", null),
 };
 
 export default schemaService;

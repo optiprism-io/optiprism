@@ -12,6 +12,8 @@
                         :items="eventItems"
                         :selected="eventRef"
                         :width-auto="true"
+                        :popper-container="props.popperContainer"
+                        :auto-hide="props.autoHide"
                         @select="changeEvent"
                         @action="emit('action', $event)"
                     >
@@ -76,6 +78,7 @@
                 :filter="filter"
                 :index="i"
                 :update-open="updateOpenFilter"
+                :popper-container="props.popperContainer"
                 @remove-filter="removeFilter"
                 @change-filter-property="changeFilterProperty"
                 @change-filter-operation="changeFilterOperation"
@@ -142,12 +145,15 @@ type Props = {
     queries?: EventQuery[]
     showBreakdowns?: boolean
     showQuery?: boolean
+    popperContainer?: string
+    autoHide?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     eventItems: () => [],
     showBreakdowns: true,
-    showQuery: true
+    showQuery: true,
+    autoHide: true
 })
 
 const emit = defineEmits<{
@@ -192,21 +198,24 @@ const changeEvent = (ref: EventRef): void => {
 }
 
 const removeEvent = (): void => {
-    emit("removeEvent", props.index);
+    emit('removeEvent', props.index)
 };
 
 const removeFilter = (filterIdx: number): void => {
-    props.event.filters.splice(filterIdx, 1)
+    const event = props.event;
+
+    event.filters.splice(filterIdx, 1)
 }
 
 const addFilter = (): void => {
-    const emptyFilter = props.event.filters.find((filter): boolean => filter.propRef === undefined)
+    let event = props.event
+    let emptyFilter = event.filters.find((filter): boolean => filter.propRef === undefined)
 
     if (emptyFilter) {
         return
     }
 
-    props.event.filters.push(<EventFilter>{
+    event.filters.push({
         opId: OperationId.Eq,
         values: [],
         valuesList: []
@@ -219,6 +228,7 @@ const addFilter = (): void => {
 };
 
 const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => {
+    let event = props.event
     let valuesList: string[] = []
 
     try {
@@ -235,7 +245,7 @@ const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => 
         throw new Error('error getEventsValues')
     }
 
-    props.event.filters[filterIdx] = <EventFilter>{
+    event.filters[filterIdx] = {
         propRef: propRef,
         opId: OperationId.Eq,
         values: [],
@@ -244,16 +254,22 @@ const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => 
 }
 
 const changeFilterOperation = (filterIdx: number, opId: OperationId) => {
-    props.event.filters[filterIdx].opId = opId
-    props.event.filters[filterIdx].values = []
+    let event = props.event
+
+    event.filters[filterIdx].opId = opId
+    event.filters[filterIdx].values = []
 }
 
 const addFilterValue = (filterIdx: number, value: Value): void => {
-    props.event.filters[filterIdx].values.push(value)
+    let event = props.event
+
+    event.filters[filterIdx].values.push(value)
 }
 
 const removeFilterValue = (filterIdx: number, value: Value): void => {
-    props.event.filters[filterIdx].values = props.event.filters[filterIdx].values.filter(v =>  v !== value)
+    let event = props.event
+
+    event.filters[filterIdx].values = props.event.filters[filterIdx].values.filter(v =>  v !== value)
 };
 
 const addBreakdown = async (): Promise<void> => {

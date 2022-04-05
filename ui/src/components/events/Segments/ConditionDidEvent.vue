@@ -4,6 +4,7 @@
             grouped
             :items="lexiconStore.eventsList"
             :width-auto="true"
+            :auto-hide="autoHideEvent"
             @select="changeEvent"
             @action="selectAction"
         >
@@ -143,8 +144,11 @@ interface Props {
     indexParent: number
     condition: ConditionType
     updateOpen?: boolean
+    autoHideEvent?: boolean
 }
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    autoHideEvent: true
+})
 
 const emit = defineEmits<{
     (e: 'change-property', propRef: PropertyRef): void

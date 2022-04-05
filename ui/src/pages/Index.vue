@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, onUnmounted, ref, provide } from "vue";
+import { onBeforeMount, onUnmounted } from "vue";
 import Events from "@/components/events/Events/Events.vue";
 import Breakdowns from "@/components/events/Breakdowns.vue";
 import Filters from "@/components/events/Filters.vue";
@@ -81,8 +81,6 @@ onBeforeMount(async () => {
 onUnmounted(() => {
     eventsStore.$reset();
 });
-
-
 
 const togglePopupCreateCustomEvent = (payload: boolean) => {
     eventsStore.togglePopupCreateCustomEvent(payload)

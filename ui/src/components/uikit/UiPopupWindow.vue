@@ -58,7 +58,7 @@
                             <UiButton
                                 class="pf-m-primary"
                                 type="button"
-                                :disabled="props.applyDisabled"
+                                :disabled="props.applyLoading || props.applyDisabled"
                                 :progress="props.applyLoading"
                                 @click="apply"
                             >

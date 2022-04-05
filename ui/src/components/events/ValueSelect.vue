@@ -2,6 +2,7 @@
     <MultiSelect
         :items="items"
         :selected="selected"
+        :popper-container="props.popperContainer"
         @select="add"
         @deselect="remove"
     >
@@ -14,15 +15,17 @@ import { Value } from "@/types";
 import { PropertyRef } from "@/types/events";
 import MultiSelect, { Item } from "@/components/MultiSelect/MultiSelect.vue";
 
-withDefaults(
+const props = withDefaults(
     defineProps<{
         propertyRef: PropertyRef;
         selected?: Value[];
         items?: Item[];
+        popperContainer?: string
     }>(),
     {
         selected: () => [],
-        items: () => []
+        items: () => [],
+        popperContainer: 'body'
     }
 );
 
