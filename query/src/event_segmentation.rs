@@ -32,6 +32,8 @@ use metadata::Metadata;
 use std::ops::Sub;
 use std::sync::Arc;
 use crate::logical_plan::merge::MergeNode;
+use crate::logical_plan::unpivot::UnpivotNode;
+use crate::physical_plan::unpivot::UnpivotExec;
 
 pub enum PropertyScope {
     Event,
@@ -228,14 +230,14 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {
-        let len = es.events.len();
+        let events = es.events.clone();
         let builder = LogicalPlanBuilder { ctx, metadata, es };
 
-        Ok(match len {
+        let input = match events.len() {
             1 => builder.build_event_logical_plan(Arc::new(input.clone()), 0).await?,
             _ => {
                 let mut inputs: Vec<LogicalPlan> = vec![];
-                for idx in 0..len {
+                for idx in 0..events.len() {
                     let input = builder.build_event_logical_plan(Arc::new(input.clone()), idx).await?;
                     inputs.push(input);
                 }
@@ -244,7 +246,17 @@ impl LogicalPlanBuilder {
                     node: Arc::new(MergeNode::try_new(inputs).map_err(|e| e.into_datafusion_plan_error())?)
                 })
             }
-        })
+        };
+
+        let cols = events.iter().flat_map(|e| {
+            e.queries.iter().map(|q| q.clone().name.unwrap())
+        }).collect();
+
+        let input = LogicalPlan::Extension(Extension {
+            node: Arc::new(UnpivotNode::try_new(input, cols, "name".to_string(), "value".to_string())?),
+        });
+
+        Ok(input)
     }
 
     async fn build_event_logical_plan(

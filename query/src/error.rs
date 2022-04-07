@@ -31,6 +31,8 @@ impl Error {
     }
 }
 
+impl std::error::Error for Error {}
+
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self)
@@ -69,6 +71,6 @@ impl IntoResponse for Error {
                 "internal server error".to_string(),
             ),
         }
-        .into_response()
+            .into_response()
     }
 }

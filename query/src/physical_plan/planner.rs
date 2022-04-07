@@ -14,6 +14,8 @@ use datafusion::{
 use crate::logical_plan::merge::MergeNode;
 use crate::physical_plan::merge::MergeExec;
 use axum::{async_trait};
+use crate::logical_plan::unpivot::UnpivotNode;
+use crate::physical_plan::unpivot::UnpivotExec;
 
 pub struct QueryPlanner {}
 
@@ -43,8 +45,16 @@ impl DFExtensionPlanner for ExtensionPlanner {
         _ctx_state: &ExecutionContextState,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
         let any = node.as_any();
-        let plan = if let Some(mux) = any.downcast_ref::<MergeNode>() {
+        let plan = if let Some(_) = any.downcast_ref::<MergeNode>() {
             let exec = MergeExec::try_new(physical_inputs.to_vec()).map_err(|err| DataFusionError::Plan(err.to_string()))?;
+            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
+        } else if let Some(node) = any.downcast_ref::<UnpivotNode>() {
+            let exec = UnpivotExec::try_new(
+                physical_inputs[0].clone(),
+                node.cols.clone(),
+                node.name_col.clone(),
+                node.value_col.clone(),
+            ).map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else {
             None

@@ -20,8 +20,7 @@ use crate::Result;
 use axum::{async_trait};
 use arrow::error::Result as ArrowResult;
 use datafusion_common::Result as DFResult;
-
-struct State {}
+use crate::Error;
 
 pub struct MergeExec {
     inputs: Vec<Arc<dyn ExecutionPlan>>,
@@ -71,7 +70,7 @@ impl ExecutionPlan for MergeExec {
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> { self.inputs.clone() }
 
     fn with_new_children(&self, children: Vec<Arc<dyn ExecutionPlan>>) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(MergeExec::try_new(children).map_err(|err| err.into_datafusion_execution_error())?))
+        Ok(Arc::new(MergeExec::try_new(children).map_err(Error::into_datafusion_execution_error)?))
     }
 
     async fn execute(&self, partition: usize, runtime: Arc<RuntimeEnv>) -> datafusion_common::Result<SendableRecordBatchStream> {
