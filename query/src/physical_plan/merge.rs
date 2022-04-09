@@ -115,7 +115,7 @@ impl Stream for MergeStream {
                 Poll::Ready(Some(Ok(batch))) => {
                     let cols = self.schema.fields().iter().map(|field| {
                         match batch.schema().index_of(field.name().as_str()) {
-                            Ok(col_idx) => Ok(batch.columns()[col_idx].clone()),
+                            Ok(col_idx) => Ok(batch.column(col_idx).clone()),
                             Err(_) => {
                                 let v = ScalarValue::try_from(field.data_type())?;
                                 Ok(v.to_array_of_size(batch.column(0).len()))

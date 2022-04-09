@@ -350,7 +350,7 @@ impl Span {
         let mut row_id = self.start_idx;
         let mut r_len = self.len;
         for batch in self.buffer.iter() {
-            if row_id + r_len > batch.columns()[0].len() {
+            if row_id + r_len > batch.num_rows() {
                 if row_id == 0 {
                     resp.push(batch.clone())
                 } else {
@@ -361,10 +361,10 @@ impl Span {
                         .collect();
                     resp.push(RecordBatch::try_new(self.buffer[0].schema().clone(), cols)?);
                 }
-                r_len -= batch.columns()[0].len() - row_id;
+                r_len -= batch.num_rows() - row_id;
                 row_id = 0;
             } else {
-                if row_id == 0 && r_len == batch.columns()[0].len() {
+                if row_id == 0 && r_len == batch.num_rows() {
                     resp.push(batch.clone())
                 } else {
                     let cols = batch

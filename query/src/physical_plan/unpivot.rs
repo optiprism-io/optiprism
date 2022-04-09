@@ -158,7 +158,7 @@ macro_rules! build_group_arr {
     ($batch_col_idx:expr, $src_arr_ref:expr, $array_type:ident, $unpivot_cols_len:ident,$builder_type:ident) => {{
         // get typed source array
         let src_arr = $src_arr_ref.as_any().downcast_ref::<$array_type>().unwrap();
-        // make result builer. The length of array is the lengs of source array multiplied by number of pivot columns
+        // make result builder. The length of array is the lengs of source array multiplied by number of pivot columns
         let mut result = $builder_type::new($src_arr_ref.len()*$unpivot_cols_len);
 
         // populate the values from source array to result
@@ -207,7 +207,7 @@ macro_rules! build_value_arr {
 }
 
 pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Result<RecordBatch> {
-    let builder_cap = batch.columns()[0].len() * cols.len();
+    let builder_cap = batch.num_rows() * cols.len();
     let unpivot_cols_len = cols.len();
 
     let group_arrs: Vec<ArrayRef> = batch
@@ -274,7 +274,7 @@ pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Resul
 
     let name_arr = {
         let mut builder = StringBuilder::new(builder_cap);
-        for _ in 0..batch.columns()[0].len() {
+        for _ in 0..batch.num_rows() {
             for c in cols.iter() {
                 builder.append_value(c.as_str())?;
             }
@@ -341,10 +341,10 @@ mod tests {
                     ("v2", Arc::new(Float32Array::from(vec![4.3, 6.3])) as ArrayRef),
                 ])?,
                 RecordBatch::try_from_iter(vec![
-                    ("d1", Arc::new(StringArray::from(vec!["a".to_string(), "b".to_string()])) as ArrayRef),
-                    ("d2", Arc::new(Int32Array::from(vec![1, 2])) as ArrayRef),
-                    ("v1", Arc::new(Float64Array::from(vec![2.72, 23.0])) as ArrayRef),
-                    ("v2", Arc::new(Float32Array::from(vec![1.0, 11.0])) as ArrayRef),
+                    ("d1", Arc::new(StringArray::from(vec!["a".to_string(), "b".to_string(), "c".to_string()])) as ArrayRef),
+                    ("d2", Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef),
+                    ("v1", Arc::new(Float64Array::from(vec![2.72, 23.0, 33.3])) as ArrayRef),
+                    ("v2", Arc::new(Float32Array::from(vec![1.0, 11.0, 2.23])) as ArrayRef),
                 ])?,
             ];
 

@@ -7,5 +7,6 @@ pub mod expressions;
 pub mod merge;
 pub mod planner;
 pub mod unpivot;
+mod pivot;
 // pub mod merge;
 // pub mod planner;

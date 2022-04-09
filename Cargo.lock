@@ -2132,6 +2132,7 @@ dependencies = [
 name = "query"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "arrow",
  "axum",
  "axum-debug",
@@ -2142,6 +2143,7 @@ dependencies = [
  "datafusion-common",
  "datafusion-expr",
  "dyn-clone",
+ "fnv",
  "futures",
  "metadata",
  "mockall",

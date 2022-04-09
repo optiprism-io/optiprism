@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+fnv = "1.0.3"
+ahash = { version = "0.7", default-features = false }
 common = { path = "../common" }
 metadata = { path = "../metadata" }
 chrono = "0.4"
