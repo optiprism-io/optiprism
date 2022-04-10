@@ -29,7 +29,7 @@ export interface EventFilter {
     propRef?: PropertyRef;
     opId: OperationId;
     values: Value[];
-    valuesList?: string[];
+    valuesList: string[];
     error?: boolean;
 }
 

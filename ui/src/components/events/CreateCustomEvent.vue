@@ -208,7 +208,7 @@ onBeforeMount(() => {
                             propRef: filter.propRef,
                             opId: filter.operation,
                             values: filter.value,
-                            valuesList: filter.valuesList,
+                            valuesList: filter.valuesList || [],
                         }
                     }) : [],
                     breakdowns: [],
