@@ -147,6 +147,10 @@ provide('actionEvent', (payload: string) => {
     }
 })
 
+provide('editEvent', (payload: number) => {
+    eventsStore.setEditCustomEvent(payload)
+    eventsStore.togglePopupCreateCustomEvent(true)
+})
 
 watch(
     segmentsStore.segments,

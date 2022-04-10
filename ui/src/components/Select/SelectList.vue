@@ -55,8 +55,10 @@
                                     :text="item.name"
                                     :selected="selected"
                                     :is-disabled="item.disabled"
+                                    :editable="item.editable"
                                     @mouseenter="hover(item)"
                                     @click="select"
+                                    @edit="emit('edit', $event)"
                                 />
                             </ul>
                         </section>
@@ -105,6 +107,7 @@ const emit = defineEmits<{
     (e: "hover", item: any): void;
     (e: "on-search", value: string): void;
     (e: 'action', payload: string): void
+    (e: 'edit', payload: number): void
 }>();
 
 const props = defineProps<{

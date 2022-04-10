@@ -1,4 +1,4 @@
-import { post } from '../apiClient'
+import { fetch } from '../apiClient'
 import { TimeUnit } from '@/types'
 
 type Breakdown = {
@@ -59,7 +59,7 @@ export type EventSegmentation = {
 
 const schemaEventSegmentation = {
     eventSegmentation: async (params: EventSegmentation) =>
-        await post('/queries/event-segmentation', '', params),
+        await fetch('/queries/event-segmentation', 'POST', params),
 }
 
 export default schemaEventSegmentation

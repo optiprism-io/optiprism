@@ -11,6 +11,7 @@ export interface Item<T, K>{
     description?: string;
     disabled?: boolean | undefined;
     items?: K | undefined;
+    editable?: boolean
 }
 
 export interface Group<T>{

@@ -8,6 +8,7 @@
     "add_event": "Add Event",
     "enter_value": "Enter a value",
     "create": "Create",
+    "edit": "Edit",
     "calendar": {
       "last": "Last",
       "since": "Since",
@@ -29,6 +30,7 @@
 
   "events": {
     "create_custom": "Create Custom Event",
+    "edit_custom": "Edit Custom Event",
     "create_custom_description": "Enter information for create Custom Event.",
     "custom_event_name": "Custom Event Name",
     "filters": "Filters",

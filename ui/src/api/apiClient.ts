@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { Method } from 'axios'
 
 const client = axios.create({
     baseURL: "/api"
@@ -21,7 +21,7 @@ export const get = async (endpoint = "/", path: string, params: any, settings = 
     return getResponse(response);
 };
 
-export const post = async (endpoint: string, path: string, data: any, file?: any, settings = {}) => {
+export const fetch = async (endpoint: string, method: Method = 'POST', data: any, file?: any, settings = {}) => {
     const formData = new FormData();
     if (file) {
         for (const key in data) {
@@ -29,8 +29,8 @@ export const post = async (endpoint: string, path: string, data: any, file?: any
         }
     }
     const response = await client({
-        method: "POST",
-        url: getUrl(endpoint, path),
+        method,
+        url: endpoint,
         data: file ? formData : data,
         withCredentials: true,
         headers: {

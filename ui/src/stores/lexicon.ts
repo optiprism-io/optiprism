@@ -6,7 +6,6 @@ import {
     Event,
     EventCustomProperty,
     UserProperty,
-    EventType,
     customEventRef,
     eventRef,
     PropertyRef,
@@ -233,7 +232,8 @@ export const useLexiconStore = defineStore("lexicon", {
                 items.push({
                     item: customEventRef(e),
                     name: e.name,
-                    description: e?.description
+                    description: e?.description,
+                    editable: true
                 });
             });
 

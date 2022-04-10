@@ -16,6 +16,7 @@
                         :auto-hide="props.autoHide"
                         @select="changeEvent"
                         @action="emit('action', $event)"
+                        @edit="emit('edit', $event)"
                     >
                         <UiButton class="pf-m-main pf-m-secondary">
                             {{ eventName(eventRef) }}
@@ -169,6 +170,7 @@ const emit = defineEmits<{
 
     (e: 'setEvent', payload: SetEventPayload): void
     (e: 'action', payload: string): void
+    (e: 'edit', payload: number): void
 }>();
 
 const lexiconStore = useLexiconStore();

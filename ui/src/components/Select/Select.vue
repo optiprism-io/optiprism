@@ -36,6 +36,7 @@
                             @hover="hover"
                             @on-search="onSearch"
                             @action="emit('action', $event)"
+                            @edit="emit('edit', $event)"
                         />
                     </div>
                     <div
@@ -68,6 +69,7 @@ const emit = defineEmits<{
     (e: "onSearch", payload: string): void;
     (e: "onHover", item: any): void;
     (e: 'action', payload: string): void
+    (e: 'edit', payload: number): void
 }>();
 
 const props = withDefaults(

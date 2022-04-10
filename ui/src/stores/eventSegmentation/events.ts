@@ -29,7 +29,7 @@ export interface EventFilter {
     propRef?: PropertyRef;
     opId: OperationId;
     values: Value[];
-    valuesList: string[];
+    valuesList?: string[];
     error?: boolean;
 }
 
@@ -70,6 +70,8 @@ export type Events = {
     eventSegmentationLoading: boolean
 
     showCreateCustomEvent: boolean
+
+    editCustomEvent: number | null
 };
 
 export const initialQuery = <EventQuery[]>[
@@ -113,6 +115,8 @@ export const useEventsStore = defineStore("events", {
         },
         eventSegmentationLoading: false,
         showCreateCustomEvent: false,
+
+        editCustomEvent: null,
     }),
     getters: {
         hasSelectedEvents(): boolean {
@@ -305,6 +309,9 @@ export const useEventsStore = defineStore("events", {
         },
     },
     actions: {
+        setEditCustomEvent(payload: number | null) {
+            this.editCustomEvent = payload
+        },
         togglePopupCreateCustomEvent(payload: boolean) {
             this.showCreateCustomEvent = payload
         },

@@ -2,7 +2,7 @@
     <UiPopupWindow
         :apply-button="$t('common.apply')"
         :cancel-button="$t('common.cancel')"
-        :title="$t('events.create_custom')"
+        :title="title"
         :description="$t('events.create_custom_description')"
         :apply-disabled="applyDisabled"
         :apply-loading="loading"
@@ -61,9 +61,10 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeMount, inject } from 'vue'
 import { EventRef, EVENT_TYPE_REGULAR, PropertyType } from '@/types/events'
 import { useLexiconStore } from '@/stores/lexicon'
+import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { Event } from '@/stores/eventSegmentation/events'
 
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
@@ -71,9 +72,12 @@ import UiInput from '@/components/uikit/UiInput.vue'
 import UiFormLabel from '@/components//uikit/UiFormLabel.vue'
 import Select from '@/components/Select/Select.vue'
 import SelectedEvent, { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
-import schemaService, { Event as EventScheme, FilterCustomEvent } from '@/api/services/schema.service'
+import schemaService, { Event as EventScheme, CustomEvents } from '@/api/services/schema.service'
+
+const i18n = inject<any>('i18n')
 
 const lexiconStore = useLexiconStore()
+const eventsStore = useEventsStore()
 
 const emit = defineEmits<{
     (e: 'cancel'): void
@@ -85,7 +89,23 @@ const eventName = ref('')
 const events = ref<Event[]>([])
 
 const applyDisabled = computed(() => {
-    return !events.value.length
+    return !(events.value.length && Boolean(eventName.value))
+})
+
+const isEdit = computed(() => {
+    return eventsStore.editCustomEvent
+})
+
+const editedEvent = computed(() => {
+    if (eventsStore.editCustomEvent) {
+        return lexiconStore.findCustomEventById(eventsStore.editCustomEvent)
+    } else {
+        return null
+    }
+})
+
+const title = computed(() => {
+    return isEdit.value ? i18n.$t('events.edit_custom') : i18n.$t('events.create_custom')
 })
 
 const eventItems = computed(() => {
@@ -115,16 +135,17 @@ const removeEvent = (idx: number): void => {
 const apply = async () => {
     loading.value = true
     try {
-        await schemaService.createCustomEvents({
+
+        const params: CustomEvents = {
             name: eventName.value,
             events: events.value.map(item => {
                 const event = lexiconStore.findEventById(item.ref.id)
-
 
                 const eventProps: EventScheme = {
                     eventName: event.name,
                     eventType: item.ref.type,
                     filters: [],
+                    ref: item.ref,
                 }
 
                 if (item.filters.length) {
@@ -138,7 +159,9 @@ const apply = async () => {
                                     propertyName: property.name,
                                     propertyType: PropertyType[filter.propRef.type],
                                     operation: filter.opId,
-                                    value: filter.values
+                                    value: filter.values,
+                                    propRef: filter.propRef,
+                                    valuesList: filter.valuesList
                                 })
                             }
                         }
@@ -147,10 +170,20 @@ const apply = async () => {
 
                 return eventProps
             }),
-        })
+        }
+
+        if (isEdit.value) {
+            params.id = editedEvent.value?.id
+
+            await schemaService.editCustomEvents(params)
+        } else {
+            await schemaService.createCustomEvents(params)
+        }
+
 
         await lexiconStore.getEvents()
     } catch {
+        loading.value = false
         throw new Error('create custom events error');
     }
 
@@ -161,6 +194,30 @@ const apply = async () => {
 const cancel = (type: string) => {
     emit('cancel')
 }
+
+onBeforeMount(() => {
+    if (editedEvent.value) {
+        eventName.value = editedEvent.value.name
+
+        if (editedEvent.value.events) {
+            events.value = editedEvent.value.events.map(item => {
+                return {
+                    ref: item.ref,
+                    filters: item.filters ? item.filters.map(filter => {
+                        return {
+                            propRef: filter.propRef,
+                            opId: filter.operation,
+                            values: filter.value,
+                            valuesList: filter.valuesList,
+                        }
+                    }) : [],
+                    breakdowns: [],
+                    queries: [],
+                }
+            })
+        }
+    }
+})
 </script>
 
 <style lang="scss">

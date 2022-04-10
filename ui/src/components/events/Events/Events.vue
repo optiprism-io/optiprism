@@ -12,6 +12,7 @@
             :queries="event.queries"
             :auto-hide="!eventsStore.showCreateCustomEvent"
             @action="selectAction"
+            @edit="editEvent"
             @set-event="setEvent"
             @remove-event="removeEvent"
             @add-breakdown="addBreakdown"
@@ -29,6 +30,7 @@
                 :auto-hide="!eventsStore.showCreateCustomEvent"
                 @action="selectAction"
                 @select="addEvent"
+                @edit="editEvent"
             >
                 <UiButton
                     class="pf-m-main"
@@ -100,6 +102,11 @@ const selectAction = (payload: string) => {
     if (payload === 'createCustomEvent') {
         eventsStore.togglePopupCreateCustomEvent(true)
     }
+}
+
+const editEvent = (payload: number) => {
+    eventsStore.setEditCustomEvent(payload)
+    eventsStore.togglePopupCreateCustomEvent(true)
 }
 
 watch(eventsStore.events, updateEventSegmentationResult)
