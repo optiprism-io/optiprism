@@ -200,7 +200,7 @@ onBeforeMount(() => {
         eventName.value = editedEvent.value.name
 
         if (editedEvent.value.events) {
-            events.value = editedEvent.value.events.map(item => {
+            events.value = JSON.parse(JSON.stringify((editedEvent.value.events.map(item => {
                 return {
                     ref: item.ref,
                     filters: item.filters ? item.filters.map(filter => {
@@ -214,7 +214,7 @@ onBeforeMount(() => {
                     breakdowns: [],
                     queries: [],
                 }
-            })
+            }))))
         }
     }
 })

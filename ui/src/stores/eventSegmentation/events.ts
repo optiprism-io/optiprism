@@ -7,11 +7,10 @@ import {
     EVENT_TYPE_REGULAR,
     EVENT_TYPE_CUSTOM
 } from "@/types/events";
-import { OperationId, Value, Group } from "@/types";
+import { OperationId, Value, Group, TimeUnit } from '@/types'
 import queriesService, { EventSegmentation } from "@/api/services/queries.service";
 import { getYYYYMMDD, getStringDateByFormat } from "@/helpers/getStringDates";
 import { getLastNDaysRange } from "@/helpers/calendarHelper";
-import { TimeUnit } from "@/types";
 import {Column, Row} from "@/components/uikit/UiTable/UiTable";
 import { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
 

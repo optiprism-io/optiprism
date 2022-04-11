@@ -1,5 +1,10 @@
 <template>
-    <div class="selected-event pf-l-flex pf-m-column">
+    <div
+        class="selected-event pf-l-flex pf-m-column"
+        :class="{
+            'selected-event_preview': props.forPreview
+        }"
+    >
         <div class="pf-l-flex">
             <AlphabetIdentifier
                 class="pf-l-flex__item"
@@ -148,6 +153,7 @@ type Props = {
     showQuery?: boolean
     popperContainer?: string
     autoHide?: boolean
+    forPreview?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -323,6 +329,13 @@ const changeQuery = (idx: number, ref: EventQueryRef) => {
 
 <style scoped lang="scss">
 .selected-event {
+    &_preview {
+        pointer-events: none;
+        transform: scale(0.6);
+        margin-left: -6rem;
+        margin-right: -7rem;
+    }
+
     &__control {
         padding: 5px;
         opacity: 0;

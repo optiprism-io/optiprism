@@ -40,7 +40,13 @@
                         />
                     </div>
                     <div
-                        v-if="selectedDescription"
+                        v-if="$slots.description"
+                        class="select__description"
+                    >
+                        <slot name="description" />
+                    </div>
+                    <div
+                        v-else-if="selectedDescription"
                         class="select__description"
                     >
                         <div class="pf-c-card__body pf-u-color-200">
@@ -183,7 +189,7 @@ const hover = (item: Item<any, any>): void => {
     if (item) {
         description.value = item?.description || "";
         selectedItemLocal.value = item.item;
-        emit("onHover", item);
+        emit("onHover", item.item);
     }
 };
 
@@ -234,7 +240,7 @@ onBeforeMount(() => {
     }
 
     &__description {
-        width: 260px;
+        min-width: 260px;
         border-left: 1px solid var(--pf-global--BackgroundColor--200);
     }
 

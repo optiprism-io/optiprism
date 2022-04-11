@@ -31,6 +31,7 @@
                 @action="selectAction"
                 @select="addEvent"
                 @edit="editEvent"
+                @on-hover="onHoverEvent"
             >
                 <UiButton
                     class="pf-m-main"
@@ -39,13 +40,29 @@
                 >
                     {{ $t('common.add_event') }}
                 </UiButton>
+                <template
+                    v-if="hoveredCustomEventId"
+                    #description
+                >
+                    <SelectedEvent
+                        v-for="(event, index) in hoveredCustomEventDescription"
+                        :key="index"
+                        :event="event"
+                        :event-ref="event.ref"
+                        :filters="event.filters"
+                        :index="index"
+                        :show-breakdowns="false"
+                        :show-query="false"
+                        :for-preview="true"
+                    />
+                </template>
             </Select>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, watch, ref } from "vue";
 import { EventQueryRef, EventRef, PropertyRef } from "@/types/events";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
 import { useLexiconStore } from "@/stores/lexicon";
@@ -107,6 +124,46 @@ const selectAction = (payload: string) => {
 const editEvent = (payload: number) => {
     eventsStore.setEditCustomEvent(payload)
     eventsStore.togglePopupCreateCustomEvent(true)
+}
+
+const hoveredCustomEventId = ref<number | null>()
+
+const editedEvent = computed(() => {
+    if (hoveredCustomEventId.value) {
+        return lexiconStore.findCustomEventById(hoveredCustomEventId.value)
+    } else {
+        return null
+    }
+})
+
+const hoveredCustomEventDescription = computed(() => {
+    if (editedEvent.value && editedEvent.value.events) {
+        return editedEvent.value.events.map(item => {
+            return {
+                ref: item.ref,
+                filters: item.filters ? item.filters.map(filter => {
+                    return {
+                        propRef: filter.propRef,
+                        opId: filter.operation,
+                        values: filter.value,
+                        valuesList: filter.valuesList || [],
+                    }
+                }) : [],
+                breakdowns: [],
+                queries: [],
+            }
+        })
+    } else {
+        return null
+    }
+})
+
+const onHoverEvent = (payload: EventRef) => {
+    if (payload.type === 'custom') {
+        hoveredCustomEventId.value = payload.id
+    } else {
+        hoveredCustomEventId.value = null
+    }
 }
 
 watch(eventsStore.events, updateEventSegmentationResult)
