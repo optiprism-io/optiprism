@@ -41,7 +41,7 @@
                     </div>
                     <div
                         v-if="$slots.description"
-                        class="select__description"
+                        class="select__description pf-u-pt-lg pf-u-p-sm"
                     >
                         <slot name="description" />
                     </div>
@@ -49,7 +49,7 @@
                         v-else-if="selectedDescription"
                         class="select__description"
                     >
-                        <div class="pf-c-card__body pf-u-color-200">
+                        <div class="pf-c-card__body pf-u-pt-lg pf-u-p-sm pf-u-color-200">
                             <div class="select__description-icon">
                                 <UiIcon icon="fas fa-info-circle" />
                             </div>

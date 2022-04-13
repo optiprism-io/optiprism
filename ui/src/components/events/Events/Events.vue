@@ -66,12 +66,15 @@ import { computed, watch, ref } from "vue";
 import { EventQueryRef, EventRef, PropertyRef } from "@/types/events";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
 import { useLexiconStore } from "@/stores/lexicon";
+import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 
 import Select from '@/components/Select/Select.vue'
 import SelectedEvent, { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
 
 const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
+
+const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()
 
 const events = computed(() => eventsStore.events);
 
@@ -124,46 +127,6 @@ const selectAction = (payload: string) => {
 const editEvent = (payload: number) => {
     eventsStore.setEditCustomEvent(payload)
     eventsStore.togglePopupCreateCustomEvent(true)
-}
-
-const hoveredCustomEventId = ref<number | null>()
-
-const editedEvent = computed(() => {
-    if (hoveredCustomEventId.value) {
-        return lexiconStore.findCustomEventById(hoveredCustomEventId.value)
-    } else {
-        return null
-    }
-})
-
-const hoveredCustomEventDescription = computed(() => {
-    if (editedEvent.value && editedEvent.value.events) {
-        return editedEvent.value.events.map(item => {
-            return {
-                ref: item.ref,
-                filters: item.filters ? item.filters.map(filter => {
-                    return {
-                        propRef: filter.propRef,
-                        opId: filter.operation,
-                        values: filter.value,
-                        valuesList: filter.valuesList || [],
-                    }
-                }) : [],
-                breakdowns: [],
-                queries: [],
-            }
-        })
-    } else {
-        return null
-    }
-})
-
-const onHoverEvent = (payload: EventRef) => {
-    if (payload.type === 'custom') {
-        hoveredCustomEventId.value = payload.id
-    } else {
-        hoveredCustomEventId.value = null
-    }
 }
 
 watch(eventsStore.events, updateEventSegmentationResult)

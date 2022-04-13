@@ -19,6 +19,7 @@
                         :width-auto="true"
                         :popper-container="props.popperContainer"
                         :auto-hide="props.autoHide"
+                        @on-hover="onHoverEvent"
                         @select="changeEvent"
                         @action="emit('action', $event)"
                         @edit="emit('edit', $event)"
@@ -26,6 +27,22 @@
                         <UiButton class="pf-m-main pf-m-secondary">
                             {{ eventName(eventRef) }}
                         </UiButton>
+                        <template
+                            v-if="hoveredCustomEventId"
+                            #description
+                        >
+                            <SelectedEvent
+                                v-for="(event, index) in hoveredCustomEventDescription"
+                                :key="index"
+                                :event="event"
+                                :event-ref="event.ref"
+                                :filters="event.filters"
+                                :index="index"
+                                :show-breakdowns="false"
+                                :show-query="false"
+                                :for-preview="true"
+                            />
+                        </template>
                     </Select>
                 </div>
                 <div
@@ -135,6 +152,7 @@ import Query from "@/components/events/Events/Query.vue";
 import { Group, Item } from "@/components/Select/SelectTypes";
 import AlphabetIdentifier from "@/components/AlphabetIdentifier.vue";
 import schemaService from '@/api/services/schema.service'
+import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 
 export type SetEventPayload = {
     event: Event
@@ -179,6 +197,7 @@ const emit = defineEmits<{
     (e: 'edit', payload: number): void
 }>();
 
+const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()
 const lexiconStore = useLexiconStore();
 
 const updateOpenBreakdown = ref(false);
@@ -331,9 +350,7 @@ const changeQuery = (idx: number, ref: EventQueryRef) => {
 .selected-event {
     &_preview {
         pointer-events: none;
-        transform: scale(0.6);
-        margin-left: -6rem;
-        margin-right: -7rem;
+        zoom: 64%;
     }
 
     &__control {
