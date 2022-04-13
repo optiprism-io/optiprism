@@ -25,12 +25,12 @@
                 #description
             >
                 <SelectedEvent
-                    v-for="(event, index) in hoveredCustomEventDescription"
-                    :key="index"
+                    v-for="(event, i) in hoveredCustomEventDescription"
+                    :key="i"
                     :event="event"
                     :event-ref="event.ref"
                     :filters="event.filters"
-                    :index="index"
+                    :index="i"
                     :show-breakdowns="false"
                     :show-query="false"
                     :for-preview="true"
