@@ -25,21 +25,29 @@ use datafusion_expr::{
     col, lit, AccumulatorFunctionImplementation, AggregateUDF, BuiltinScalarFunction, Expr,
     ReturnTypeFunction, Signature, StateTypeFunction, Volatility,
 };
+use std::io::{self, Write};
 use futures::executor;
 use futures::executor::block_on;
 use metadata::properties::provider::Namespace;
 use metadata::Metadata;
-use std::ops::Sub;
+use std::ops::{Add, Sub};
 use std::sync::Arc;
 use crate::logical_plan::merge::MergeNode;
+use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan::unpivot::UnpivotExec;
+
+const COL_NAME: &str = "name";
+const COL_VALUE: &str = "value";
+const COL_EVENT: &str = "event";
+const COL_DATE: &str = "date";
 
 pub enum PropertyScope {
     Event,
     User,
 }
 
+#[derive(Clone)]
 pub enum SegmentTime {
     Between {
         from: DateTime<Utc>,
@@ -59,11 +67,13 @@ pub enum SegmentTime {
     },
 }
 
+#[derive(Clone)]
 pub enum ChartType {
     Line,
     Bar,
 }
 
+#[derive(Clone)]
 pub enum Analysis {
     Linear,
     RollingAverage { window: usize, unit: TimeUnit },
@@ -71,6 +81,7 @@ pub enum Analysis {
     Cumulative,
 }
 
+#[derive(Clone)]
 pub struct Compare {
     offset: usize,
     unit: TimeUnit,
@@ -196,13 +207,17 @@ impl Event {
     }
 }
 
+#[derive(Clone)]
 pub enum SegmentCondition {}
 
+#[derive(Clone)]
 pub struct Segment {
     name: String,
     conditions: Vec<SegmentCondition>,
 }
 
+
+#[derive(Clone)]
 pub struct EventSegmentation {
     pub time: QueryTime,
     pub group: String,
@@ -218,6 +233,7 @@ pub struct EventSegmentation {
 
 pub struct LogicalPlanBuilder {
     ctx: Context,
+    cur_time: DateTime<Utc>,
     metadata: Arc<Metadata>,
     es: EventSegmentation,
 }
@@ -230,31 +246,74 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {
+        let cur_time = Utc::now();
         let events = es.events.clone();
-        let builder = LogicalPlanBuilder { ctx, metadata, es };
+        let builder = LogicalPlanBuilder { ctx, cur_time, metadata, es:es.clone() };
 
-        let input = match events.len() {
+        // build main query
+        let mut input = match events.len() {
             1 => builder.build_event_logical_plan(Arc::new(input.clone()), 0).await?,
             _ => {
                 let mut inputs: Vec<LogicalPlan> = vec![];
                 for idx in 0..events.len() {
                     let input = builder.build_event_logical_plan(Arc::new(input.clone()), idx).await?;
+
                     inputs.push(input);
                 }
 
+                // merge multiple results into one schema
                 LogicalPlan::Extension(Extension {
                     node: Arc::new(MergeNode::try_new(inputs).map_err(|e| e.into_datafusion_plan_error())?)
                 })
             }
         };
 
-        let cols = events.iter().flat_map(|e| {
-            e.queries.iter().map(|q| q.clone().name.unwrap())
-        }).collect();
+        // unpivot aggregate values into value column
+        input = {
+            let agg_cols = events
+                .iter()
+                .flat_map(|e| {
+                    e.queries
+                        .iter()
+                        .map(|q| q.clone().name.unwrap())
+                })
+                .collect();
 
-        let input = LogicalPlan::Extension(Extension {
-            node: Arc::new(UnpivotNode::try_new(input, cols, "name".to_string(), "value".to_string())?),
-        });
+            LogicalPlan::Extension(Extension {
+                node: Arc::new(UnpivotNode::try_new(
+                    input,
+                    agg_cols,
+                    COL_NAME.to_string(),
+                    COL_VALUE.to_string(),
+                )?),
+            })
+        };
+
+        // pivot date
+        input = {
+            let (mut from, to) = match &es.time {
+                QueryTime::Between { from, to } => (from.clone(), to.clone()),
+                QueryTime::From(from) => (from.clone(), cur_time.clone()),
+                QueryTime::Last { last, unit } => (cur_time.sub(unit.duration(*last)), cur_time.clone())
+            };
+
+            let mut result_cols: Vec<String> = vec![];
+            let dur = es.interval_unit.duration(1);
+
+            while from <= to {
+                result_cols.push(from.naive_utc().to_string());
+                from = from.add(dur.clone());
+            }
+
+            LogicalPlan::Extension(Extension {
+                node: Arc::new(PivotNode::try_new(
+                    input,
+                    Column::from_name(COL_DATE),
+                    Column::from_name(COL_VALUE),
+                    result_cols,
+                )?),
+            })
+        };
 
         Ok(input)
     }
@@ -278,7 +337,7 @@ impl LogicalPlanBuilder {
         event: &Event,
     ) -> Result<LogicalPlan> {
         // time filter
-        let mut expr = time_expression(&self.es.time);
+        let mut expr = time_expression(&self.es.time, &self.cur_time);
 
         // event filter (event name, properties)
         expr = and(expr, self.event_expression(event).await?);
@@ -308,7 +367,7 @@ impl LogicalPlanBuilder {
     ) -> Result<LogicalPlan> {
         let mut group_expr: Vec<Expr> = vec![];
 
-        let time_gran = match self.es.interval_unit {
+        let time_granularity = match self.es.interval_unit {
             TimeUnit::Second => "second",
             TimeUnit::Minute => "minute",
             TimeUnit::Hour => "hour",
@@ -321,11 +380,11 @@ impl LogicalPlanBuilder {
         let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
         let time_expr = Expr::ScalarFunction {
             fun: BuiltinScalarFunction::DateTrunc,
-            args: vec![lit(time_gran), ts_col],
+            args: vec![lit(time_granularity), ts_col],
         };
 
-        group_expr.push(Expr::Alias(Box::new(lit(event.event.name())), "event".to_string()));
-        group_expr.push(Expr::Alias(Box::new(time_expr), "date".to_string()));
+        group_expr.push(Expr::Alias(Box::new(lit(event.event.name())), COL_EVENT.to_string()));
+        group_expr.push(Expr::Alias(Box::new(time_expr), COL_DATE.to_string()));
 
         // event groups
         if let Some(breakdowns) = &event.breakdowns {
@@ -341,7 +400,6 @@ impl LogicalPlanBuilder {
             }
         }
 
-        for (id, query) in event.queries.iter().enumerate() {}
         let aggr_expr = event
             .queries
             .iter()

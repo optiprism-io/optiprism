@@ -1,3 +1,4 @@
+use std::ops::Sub;
 use crate::common::{PropValueOperation, PropertyRef, QueryTime};
 use crate::{event_fields, Context, Error, Result};
 use datafusion::error::Result as DFResult;
@@ -9,6 +10,7 @@ use metadata::properties::provider::Namespace;
 use metadata::Metadata;
 use std::sync::Arc;
 use arrow::datatypes::DataType;
+use chrono::{DateTime, Utc};
 use datafusion::physical_plan::aggregates::return_type;
 use crate::physical_plan::expressions::aggregate::state_types;
 use crate::physical_plan::expressions::partitioned_aggregate::{PartitionedAggregate, PartitionedAggregateFunction};
@@ -42,32 +44,52 @@ pub fn lit_timestamp(ts: i64) -> Expr {
 }
 
 /// builds expression on timestamp
-pub fn time_expression(time: &QueryTime) -> Expr {
+pub fn time_expression(time: &QueryTime, cur_time: &DateTime<Utc>) -> Expr {
     let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
     match time {
         QueryTime::Between { from, to } => {
-            let left = binary_expr(
+            let from = binary_expr(
                 ts_col.clone(),
                 Operator::GtEq,
                 lit_timestamp(from.timestamp_nanos() / 1_000),
             );
 
-            let right = binary_expr(
+            let to = binary_expr(
                 ts_col,
                 Operator::LtEq,
                 lit_timestamp(to.timestamp_nanos() / 1_000),
             );
 
-            and(left, right)
+            and(from, to)
         }
-        QueryTime::From(from) => binary_expr(
-            ts_col,
-            Operator::GtEq,
-            lit_timestamp(from.timestamp_nanos() / 1_000),
-        ),
-        QueryTime::Last { n: last, unit } => {
-            let from = unit.sub(*last);
-            binary_expr(ts_col, Operator::GtEq, lit_timestamp(from.timestamp()))
+        QueryTime::From(from) => {
+            let from = binary_expr(
+                ts_col.clone(),
+                Operator::GtEq,
+                lit_timestamp(from.timestamp_nanos() / 1_000));
+
+            let to = binary_expr(
+                ts_col,
+                Operator::LtEq,
+                lit_timestamp(cur_time.timestamp_nanos() / 1_000),
+            );
+
+            and(from, to)
+        }
+        QueryTime::Last { last, unit } => {
+            let from_time = cur_time.sub(unit.duration(*last));
+            let from = binary_expr(
+                ts_col.clone(),
+                Operator::GtEq,
+                lit_timestamp(from_time.timestamp_nanos() / 1_000));
+
+            let to = binary_expr(
+                ts_col,
+                Operator::LtEq,
+                lit_timestamp(cur_time.timestamp_nanos() / 1_000),
+            );
+
+            and(from, to)
         }
     }
 }

@@ -22,7 +22,7 @@ impl UnpivotNode {
         let value_type = DFDataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let schema = {
-            let mut fields: Vec<DFField> = input.schema().fields().iter().filter_map(|f| {
+            let mut fields:Vec<DFField> = input.schema().fields().iter().filter_map(|f| {
                 match cols.contains(f.name()) {
                     true => None,
                     false => Some(f.clone())

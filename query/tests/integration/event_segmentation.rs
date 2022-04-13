@@ -435,16 +435,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_query() -> Result<()> {
-        let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00")
+        let from = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        let to = DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
         let es = EventSegmentation {
             time: QueryTime::Between {
-                from: to.sub(Duration::days(10)),
+                from,
                 to,
             },
             group: event_fields::USER_ID.to_string(),
-            interval_unit: TimeUnit::Second,
+            interval_unit: TimeUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
@@ -523,7 +526,7 @@ mod tests {
         let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
 
         let config =
-            ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {}));
+            ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {})).with_target_partitions(1);
 
         let ctx = ExecutionContext::with_config(config);
 

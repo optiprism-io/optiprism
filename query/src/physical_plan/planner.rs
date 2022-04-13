@@ -6,7 +6,7 @@ use datafusion::physical_plan::planner::{
 };
 
 use datafusion::logical_plan::{LogicalPlan, UserDefinedLogicalNode};
-use datafusion::physical_plan::{ExecutionPlan, PhysicalPlanner};
+use datafusion::physical_plan::{ExecutionPlan, expressions, PhysicalPlanner};
 use datafusion::{
     error::{DataFusionError, Result},
     physical_plan::displayable,
@@ -14,7 +14,9 @@ use datafusion::{
 use crate::logical_plan::merge::MergeNode;
 use crate::physical_plan::merge::MergeExec;
 use axum::{async_trait};
+use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
+use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::unpivot::UnpivotExec;
 
 pub struct QueryPlanner {}
@@ -54,6 +56,15 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 node.cols.clone(),
                 node.name_col.clone(),
                 node.value_col.clone(),
+            ).map_err(|err| DataFusionError::Plan(err.to_string()))?;
+            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
+        } else if let Some(node) = any.downcast_ref::<PivotNode>() {
+            let schema = node.input.schema();
+            let exec = PivotExec::try_new(
+                physical_inputs[0].clone(),
+                expressions::Column::new(node.name_col.name.as_str(), schema.index_of_column(&node.name_col)?),
+                expressions::Column::new(node.value_col.name.as_str(), schema.index_of_column(&node.value_col)?),
+                node.result_cols.clone(),
             ).map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else {

@@ -10,7 +10,7 @@ pub enum QueryTime {
     },
     From(DateTime<Utc>),
     Last {
-        n: i64,
+        last: i64,
         unit: TimeUnit,
     },
 }
@@ -27,15 +27,15 @@ pub enum TimeUnit {
 }
 
 impl TimeUnit {
-    pub fn sub(&self, n: i64) -> DateTime<Utc> {
+    pub fn duration(&self, n: i64) -> Duration {
         match self {
-            TimeUnit::Second => Utc::now().sub(Duration::seconds(n)),
-            TimeUnit::Minute => Utc::now().sub(Duration::minutes(n)),
-            TimeUnit::Hour => Utc::now().sub(Duration::hours(n)),
-            TimeUnit::Day => Utc::now().sub(Duration::days(n)),
-            TimeUnit::Week => Utc::now().sub(Duration::weeks(n)),
-            TimeUnit::Month => Utc::now().sub(Duration::days(n) * 30),
-            TimeUnit::Year => Utc::now().sub(Duration::days(n) * 365),
+            TimeUnit::Second => Duration::seconds(n),
+            TimeUnit::Minute => Duration::minutes(n),
+            TimeUnit::Hour => Duration::hours(n),
+            TimeUnit::Day => Duration::days(n),
+            TimeUnit::Week => Duration::weeks(n),
+            TimeUnit::Month => Duration::days(n) * 30,
+            TimeUnit::Year => Duration::days(n) * 365,
         }
     }
 }

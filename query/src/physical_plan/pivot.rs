@@ -24,14 +24,17 @@ use axum::{async_trait};
 pub struct PivotExec {
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
+    /// reference to column with names
     name_col: Column,
+    /// reference to column with values
     value_col: Column,
+    /// value type
     value_type: DataType,
     group_cols: Vec<Column>,
     result_cols: Vec<String>,
 }
 
-const BUFFER_LENGTH: usize = 2 ^ 10;
+const BUFFER_LENGTH: usize = 1024;
 
 impl PivotExec {
     pub fn try_new(input: Arc<dyn ExecutionPlan>, name_col: Column, value_col: Column, result_cols: Vec<String>) -> Result<Self> {
@@ -143,9 +146,9 @@ impl RecordBatchStream for PivotStream {
     }
 }
 
+
 impl PivotStream {
     fn pivot_batch(&mut self, batch: &RecordBatch) -> Result<()> {
-        println!("pivot");
         let random_state = RandomState::with_seeds(0, 0, 0, 0);
         let mut batch_hashes = vec![0; batch.num_rows()];
 
@@ -155,14 +158,13 @@ impl PivotStream {
         )?;
 
         let name_arr = c.as_any().downcast_ref::<StringArray>().ok_or_else(|| Error::QueryError("name column cast to string error".to_string()))?;
-        let value_arr = batch.column(self.value_col.index()).as_any().downcast_ref::<Float64Array>().unwrap();
+        let value_arr = batch.column(self.value_col.index());
 
         let group_arrs: Vec<ArrayRef> = self.group_cols.iter().map(|col| batch.column(col.index()).clone()).collect();
         create_hashes(&group_arrs, &random_state, &mut batch_hashes)?;
 
         for (row, hash) in batch_hashes.into_iter().enumerate() {
             let group_idx = *self.group_map.entry(hash).or_insert_with(|| {
-                println!("hash {} {}", hash, self.unique_groups.len());
                 let group_values = group_arrs
                     .iter()
                     .map(|arr| ScalarValue::try_from_array(arr, row).unwrap())
@@ -172,20 +174,18 @@ impl PivotStream {
             });
 
             let group_idx = group_idx as usize;
-
             let col_name = name_arr.value(row);
+
             match self.result_map.get_mut(col_name) {
                 None => return Err(Error::QueryError("unknown name column".to_string())),
                 Some(values) => {
-                    println!("{} {} sd", values.len(), group_idx);
                     if values.len() - 1 < group_idx {
                         values.resize(values.len() + BUFFER_LENGTH, ScalarValue::try_from(&self.value_type)?);
                     }
                     values[group_idx] = if value_arr.is_null(row) {
-                        ScalarValue::Float64(None)
+                        ScalarValue::try_from(value_arr.data_type())?
                     } else {
-                        println!("{} {}", value_arr.len(), group_idx);
-                        ScalarValue::Float64(Some(value_arr.value(row)))
+                        ScalarValue::try_from_array(value_arr, row)?
                     };
                 }
             }
@@ -224,8 +224,8 @@ impl Stream for PivotStream {
                         let unique_groups_len = self.unique_groups.len();
                         let value_type = self.value_type.clone();
                         let scalars = self.result_map.get_mut(col).unwrap();
-                        if scalars.len() > unique_groups_len {
-                            scalars.resize(unique_groups_len, ScalarValue::try_from(&value_type).unwrap())
+                        if scalars.len() != unique_groups_len {
+                            scalars.resize(unique_groups_len, ScalarValue::try_from(&value_type).unwrap());
                         }
 
                         // TODO remove clone
