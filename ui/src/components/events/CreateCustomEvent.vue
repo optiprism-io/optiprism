@@ -44,7 +44,6 @@
         <Select
             grouped
             :items="eventItems"
-            :width-auto="true"
             :popper-class="'popup-floating-popper'"
             :popper-container="'.ui-popup-window__box'"
             @select="addEvent"

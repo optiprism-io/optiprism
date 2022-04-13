@@ -16,7 +16,6 @@
                         grouped
                         :items="eventItems"
                         :selected="eventRef"
-                        :width-auto="true"
                         :popper-container="props.popperContainer"
                         :auto-hide="props.autoHide"
                         @on-hover="onHoverEvent"
@@ -102,6 +101,7 @@
                 :index="i"
                 :update-open="updateOpenFilter"
                 :popper-container="props.popperContainer"
+                :for-preview="props.forPreview"
                 @remove-filter="removeFilter"
                 @change-filter-property="changeFilterProperty"
                 @change-filter-operation="changeFilterOperation"

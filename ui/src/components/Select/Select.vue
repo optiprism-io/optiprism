@@ -218,9 +218,8 @@ onBeforeMount(() => {
     }
 
     &__box {
-        width: 20rem;
-        min-width: 140px;
-        max-width: 22rem;
+        width: 230px;
+        flex: 1;
 
         &_width-auto {
             width: initial;
@@ -240,7 +239,7 @@ onBeforeMount(() => {
     }
 
     &__description {
-        min-width: 260px;
+        min-width: 200px;
         border-left: 1px solid var(--pf-global--BackgroundColor--200);
     }
 
@@ -251,6 +250,7 @@ onBeforeMount(() => {
 
     &__description-text {
         font-size: .9rem;
+        max-width: 200px;
     }
 }
 </style>
