@@ -277,7 +277,7 @@ export default function ({ environment = "development" } = {}) {
                         description: "Country description",
                         status: EventStatus.Enabled,
                         type: DataType.String,
-                        nullable: false,
+                        nullable: true,
                         isArray: true,
                         isDictionary: true,
                         dictionaryType: DataType.Number
