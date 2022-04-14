@@ -208,7 +208,7 @@ const updateOpenFilter = ref(false);
 const updateOpenQuery = ref(false)
 
 const showRows = computed(() => {
-    return props.filters.length && props.showBreakdowns && props.showQuery
+    return props.filters.length || props.showBreakdowns || props.showQuery
 })
 
 const setEvent = (payload: Event) => {
