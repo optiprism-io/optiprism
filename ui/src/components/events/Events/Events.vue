@@ -44,17 +44,19 @@
                     v-if="hoveredCustomEventId"
                     #description
                 >
-                    <SelectedEvent
-                        v-for="(event, index) in hoveredCustomEventDescription"
-                        :key="index"
-                        :event="event"
-                        :event-ref="event.ref"
-                        :filters="event.filters"
-                        :index="index"
-                        :show-breakdowns="false"
-                        :show-query="false"
-                        :for-preview="true"
-                    />
+                    <div class="pf-l-flex pf-m-column">
+                        <SelectedEvent
+                            v-for="(event, index) in hoveredCustomEventDescription"
+                            :key="index"
+                            :event="event"
+                            :event-ref="event.ref"
+                            :filters="event.filters"
+                            :index="index"
+                            :show-breakdowns="false"
+                            :show-query="false"
+                            :for-preview="true"
+                        />
+                    </div>
                 </template>
             </Select>
         </div>
@@ -62,14 +64,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, ref } from "vue";
+import { computed, watch, defineAsyncComponent } from "vue";
 import { EventQueryRef, EventRef, PropertyRef } from "@/types/events";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
 import { useLexiconStore } from "@/stores/lexicon";
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 
 import Select from '@/components/Select/Select.vue'
-import SelectedEvent, { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
+import { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
+const SelectedEvent = defineAsyncComponent(() => import('@/components/events/Events/SelectedEvent.vue'))
 
 const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();

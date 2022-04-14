@@ -92,7 +92,10 @@
                 </div>
             </div>
         </div>
-        <div class="selected-event__rows pf-l-flex pf-m-column pf-u-pl-xl">
+        <div
+            v-if="showRows"
+            class="selected-event__rows pf-l-flex pf-m-column pf-u-pl-xl"
+        >
             <Filter
                 v-for="(filter, i) in filters"
                 :key="i"
@@ -140,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { EventRef, PropertyRef, PropertyType, EventQueryRef, EVENT_TYPE_REGULAR, EVENT_TYPE_CUSTOM } from "@/types/events";
 import { OperationId, Value } from "@/types";
 import { useLexiconStore } from "@/stores/lexicon";
@@ -203,6 +206,10 @@ const lexiconStore = useLexiconStore();
 const updateOpenBreakdown = ref(false);
 const updateOpenFilter = ref(false);
 const updateOpenQuery = ref(false)
+
+const showRows = computed(() => {
+    return props.filters.length && props.showBreakdowns && props.showQuery
+})
 
 const setEvent = (payload: Event) => {
     emit('setEvent', {
