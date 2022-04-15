@@ -23,7 +23,10 @@
                         @action="emit('action', $event)"
                         @edit="emit('edit', $event)"
                     >
-                        <UiButton class="pf-m-main pf-m-secondary">
+                        <UiButton
+                            class="pf-m-main"
+                            :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                        >
                             {{ eventName(eventRef) }}
                         </UiButton>
                         <template
@@ -357,7 +360,6 @@ const changeQuery = (idx: number, ref: EventQueryRef) => {
 .selected-event {
     &_preview {
         pointer-events: none;
-        zoom: 64%;
     }
 
     &__control {

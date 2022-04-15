@@ -20,7 +20,10 @@
                     :popper-container="props.popperContainer"
                     @select="changeProperty"
                 >
-                    <UiButton class="pf-m-main pf-m-secondary">
+                    <UiButton
+                        class="pf-m-main"
+                        :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                    >
                         {{ propertyName(filter.propRef) }}
                     </UiButton>
                 </PropertySelect>
@@ -53,7 +56,10 @@
                     :popper-container="props.popperContainer"
                     @select="changeOperation"
                 >
-                    <UiButton class="pf-m-main pf-m-secondary">
+                    <UiButton
+                        class="pf-m-main"
+                        :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                    >
                         {{ operationButtonText }}
                     </UiButton>
                 </OperationSelect>
@@ -78,7 +84,10 @@
                                 :key="i"
                                 class="pf-c-action-list__item"
                             >
-                                <UiButton class="pf-m-main pf-m-secondary">
+                                <UiButton
+                                    class="pf-m-main"
+                                    :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                                >
                                     {{ value }}
 
                                     <span
