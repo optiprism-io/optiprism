@@ -28,7 +28,7 @@ mod tests {
     use metadata::properties::provider::Namespace;
     use metadata::properties::{CreatePropertyRequest, Property};
     use metadata::{database, events, properties, Metadata, Store};
-    use query::common::{PropValueOperation, PropertyRef, QueryTime, TimeUnit};
+    use query::reports::common::{PropValueOperation, PropertyRef, QueryTime, TimeUnit};
     use query::event_segmentation::{
         Analysis, Breakdown, ChartType, Event, EventFilter, EventRef, EventSegmentation,
         LogicalPlanBuilder, NamedQuery, Query,
@@ -47,7 +47,7 @@ mod tests {
     use datafusion::scalar::ScalarValue as DFScalarValue;
     use query::physical_plan::unpivot::unpivot;
 
-    async fn events_provider(
+    pub async fn events_provider(
         db: Arc<database::Provider>,
         org_id: u64,
         proj_id: u64,

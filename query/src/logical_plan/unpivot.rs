@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use arrow::datatypes::{DataType as DFDataType, Field};
+use arrow::datatypes::{DataType, Field};
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use datafusion::logical_plan::{LogicalPlan, DFSchemaRef, UserDefinedLogicalNode};
 use datafusion_common::{Column, DFField, DFSchema};
@@ -19,7 +19,7 @@ pub struct UnpivotNode {
 
 impl UnpivotNode {
     pub fn try_new(input: LogicalPlan, cols: Vec<String>, name_col: String, value_col: String) -> Result<Self> {
-        let value_type = DFDataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
+        let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let schema = {
             let mut fields:Vec<DFField> = input.schema().fields().iter().filter_map(|f| {
@@ -29,7 +29,7 @@ impl UnpivotNode {
                 }
             }).collect();
 
-            let name_field = DFField::new(None, name_col.as_str(), DFDataType::Utf8, false);
+            let name_field = DFField::new(None, name_col.as_str(), DataType::Utf8, false);
             fields.push(name_field);
             let value_field = DFField::new(None, value_col.as_str(), value_type.clone(), false);
             fields.push(value_field);

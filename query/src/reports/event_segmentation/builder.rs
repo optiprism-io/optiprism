@@ -1,4 +1,4 @@
-use super::error::{Error, Result};
+use crate::error::{Error, Result};
 use chrono::{DateTime, Duration, Utc};
 use datafusion::logical_plan::{
     create_udaf, exprlist_to_fields, Column, DFField, DFSchema, LogicalPlan, Operator,
@@ -6,8 +6,8 @@ use datafusion::logical_plan::{
 use datafusion::physical_plan::aggregates::{return_type, AggregateFunction};
 use datafusion::scalar::ScalarValue as DFScalarValue;
 
-use crate::common::{PropValueOperation, PropertyRef, QueryTime, TimeUnit};
-use crate::logical_plan::expr::{aggregate_partitioned, multi_and, named_property_expression, property_col, property_expression, sorted_distinct_count, time_expression};
+use crate::reports::common::{PropValueOperation, PropertyRef, QueryTime, TimeUnit};
+use crate::logical_plan::expr::{aggregate_partitioned, multi_and, sorted_distinct_count};
 use crate::physical_plan::expressions::aggregate::state_types;
 use crate::physical_plan::expressions::partitioned_aggregate::{
     PartitionedAggregate, PartitionedAggregateFunction,
@@ -25,211 +25,27 @@ use datafusion_expr::{
     col, lit, AccumulatorFunctionImplementation, AggregateUDF, BuiltinScalarFunction, Expr,
     ReturnTypeFunction, Signature, StateTypeFunction, Volatility,
 };
+
+
 use std::io::{self, Write};
+use std::ops::{Add, Sub};
 use futures::executor;
 use futures::executor::block_on;
 use metadata::properties::provider::Namespace;
 use metadata::Metadata;
-use std::ops::{Add, Sub};
 use std::sync::Arc;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan::unpivot::UnpivotExec;
+use serde::{Deserialize, Serialize};
+use crate::reports::event_segmentation::types::{Breakdown, Event, EventFilter, EventSegmentation, Query};
+use crate::reports::expr::{property_col, property_expression, time_expression};
 
 const COL_NAME: &str = "name";
 const COL_VALUE: &str = "value";
 const COL_EVENT: &str = "event";
 const COL_DATE: &str = "date";
-
-pub enum PropertyScope {
-    Event,
-    User,
-}
-
-#[derive(Clone)]
-pub enum SegmentTime {
-    Between {
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    },
-    From(DateTime<Utc>),
-    Last {
-        n: i64,
-        unit: TimeUnit,
-    },
-    AfterFirstUse {
-        within: i64,
-        unit: TimeUnit,
-    },
-    WindowEach {
-        unit: TimeUnit,
-    },
-}
-
-#[derive(Clone)]
-pub enum ChartType {
-    Line,
-    Bar,
-}
-
-#[derive(Clone)]
-pub enum Analysis {
-    Linear,
-    RollingAverage { window: usize, unit: TimeUnit },
-    WindowAverage { window: usize, unit: TimeUnit },
-    Cumulative,
-}
-
-#[derive(Clone)]
-pub struct Compare {
-    offset: usize,
-    unit: TimeUnit,
-}
-
-#[derive(Clone)]
-pub enum QueryAggregate {
-    Min,
-    Max,
-    Sum,
-    Avg,
-    Median,
-    DistinctCount,
-    Percentile25th,
-    Percentile75th,
-    Percentile90th,
-    Percentile99th,
-}
-
-impl QueryAggregate {
-    pub fn aggregate_function(&self) -> AggregateFunction {
-        match self {
-            QueryAggregate::Min => AggregateFunction::Min,
-            QueryAggregate::Max => AggregateFunction::Max,
-            QueryAggregate::Sum => AggregateFunction::Sum,
-            QueryAggregate::Avg => AggregateFunction::Avg,
-            QueryAggregate::Median => unimplemented!(),
-            QueryAggregate::DistinctCount => unimplemented!(),
-            QueryAggregate::Percentile25th => unimplemented!(),
-            QueryAggregate::Percentile75th => unimplemented!(),
-            QueryAggregate::Percentile90th => unimplemented!(),
-            QueryAggregate::Percentile99th => unimplemented!(),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum QueryAggregatePerGroup {
-    Min,
-    Max,
-    Sum,
-    Avg,
-    Median,
-    DistinctCount,
-}
-
-#[derive(Clone)]
-pub enum QueryPerGroup {
-    CountEvents,
-}
-
-#[derive(Clone)]
-pub enum Query {
-    CountEvents,
-    CountUniqueGroups,
-    DailyActiveGroups,
-    WeeklyActiveGroups,
-    MonthlyActiveGroups,
-    CountPerGroup {
-        aggregate: AggregateFunction,
-    },
-    AggregatePropertyPerGroup {
-        property: PropertyRef,
-        aggregate_per_group: PartitionedAggregateFunction,
-        aggregate: AggregateFunction,
-    },
-    AggregateProperty {
-        property: PropertyRef,
-        aggregate: AggregateFunction,
-    },
-    QueryFormula {
-        formula: String,
-    },
-}
-
-#[derive(Clone)]
-pub struct NamedQuery {
-    agg: Query,
-    name: Option<String>,
-}
-
-impl NamedQuery {
-    pub fn new(agg: Query, name: Option<String>) -> Self {
-        NamedQuery { name, agg }
-    }
-}
-
-#[derive(Clone)]
-pub enum EventFilter {
-    Property {
-        property: PropertyRef,
-        operation: PropValueOperation,
-        value: Option<Vec<ScalarValue>>,
-    },
-}
-
-#[derive(Clone)]
-pub enum Breakdown {
-    Property(PropertyRef),
-}
-
-#[derive(Clone)]
-pub struct Event {
-    event: EventRef,
-    filters: Option<Vec<EventFilter>>,
-    breakdowns: Option<Vec<Breakdown>>,
-    queries: Vec<NamedQuery>,
-}
-
-impl Event {
-    pub fn new(
-        event: EventRef,
-        filters: Option<Vec<EventFilter>>,
-        breakdowns: Option<Vec<Breakdown>>,
-        queries: Vec<NamedQuery>,
-    ) -> Self {
-        Event {
-            event,
-            filters,
-            breakdowns,
-            queries,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum SegmentCondition {}
-
-#[derive(Clone)]
-pub struct Segment {
-    name: String,
-    conditions: Vec<SegmentCondition>,
-}
-
-
-#[derive(Clone)]
-pub struct EventSegmentation {
-    pub time: QueryTime,
-    pub group: String,
-    pub interval_unit: TimeUnit,
-    pub chart_type: ChartType,
-    pub analysis: Analysis,
-    pub compare: Option<Compare>,
-    pub events: Vec<Event>,
-    pub filters: Option<Vec<EventFilter>>,
-    pub breakdowns: Option<Vec<Breakdown>>,
-    pub segments: Option<Vec<Segment>>,
-}
 
 pub struct LogicalPlanBuilder {
     ctx: Context,
@@ -248,15 +64,15 @@ impl LogicalPlanBuilder {
     ) -> Result<LogicalPlan> {
         let cur_time = Utc::now();
         let events = es.events.clone();
-        let builder = LogicalPlanBuilder { ctx, cur_time, metadata, es:es.clone() };
+        let builder = LogicalPlanBuilder { ctx, cur_time, metadata, es: es.clone() };
 
         // build main query
         let mut input = match events.len() {
-            1 => builder.build_event_logical_plan(Arc::new(input.clone()), 0).await?,
+            1 => builder.build_event_logical_plan(input.clone(), 0).await?,
             _ => {
                 let mut inputs: Vec<LogicalPlan> = vec![];
                 for idx in 0..events.len() {
-                    let input = builder.build_event_logical_plan(Arc::new(input.clone()), idx).await?;
+                    let input = builder.build_event_logical_plan(input.clone(), idx).await?;
 
                     inputs.push(input);
                 }
@@ -320,12 +136,12 @@ impl LogicalPlanBuilder {
 
     async fn build_event_logical_plan(
         &self,
-        input: Arc<LogicalPlan>,
+        input: LogicalPlan,
         event_id: usize,
     ) -> Result<LogicalPlan> {
         let filter = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id]).await?;
         let agg = self
-            .build_aggregate_logical_plan(Arc::new(filter), &self.es.events[event_id])
+            .build_aggregate_logical_plan(filter, &self.es.events[event_id])
             .await?;
         Ok(agg)
     }
@@ -333,7 +149,7 @@ impl LogicalPlanBuilder {
     /// builds filter plan
     async fn build_filter_logical_plan(
         &self,
-        input: Arc<LogicalPlan>,
+        input: LogicalPlan,
         event: &Event,
     ) -> Result<LogicalPlan> {
         // time filter
@@ -355,14 +171,14 @@ impl LogicalPlanBuilder {
         //global filter
         Ok(LogicalPlan::Filter(Filter {
             predicate: expr,
-            input,
+            input: Arc::new(input),
         }))
     }
 
     // builds logical plan for aggregate
     async fn build_aggregate_logical_plan(
         &self,
-        input: Arc<LogicalPlan>,
+        input: LogicalPlan,
         event: &Event,
     ) -> Result<LogicalPlan> {
         let mut group_expr: Vec<Expr> = vec![];
@@ -420,8 +236,8 @@ impl LogicalPlanBuilder {
                     Query::CountPerGroup { aggregate } => aggregate_partitioned(
                         input.schema(),
                         col(self.es.group.as_ref()),
-                        &PartitionedAggregateFunction::Count,
-                        aggregate,
+                        PartitionedAggregateFunction::Count,
+                        aggregate.into(),
                         vec![col(self.es.group.as_ref())],
                     )?,
                     Query::AggregatePropertyPerGroup {
@@ -431,8 +247,8 @@ impl LogicalPlanBuilder {
                     } => aggregate_partitioned(
                         input.schema(),
                         col(self.es.group.as_ref()),
-                        aggregate_per_group,
-                        aggregate,
+                        aggregate_per_group.into(),
+                        aggregate.into(),
                         vec![executor::block_on(property_col(
                             &self.ctx,
                             &self.metadata,
@@ -443,7 +259,7 @@ impl LogicalPlanBuilder {
                         property,
                         aggregate,
                     } => Expr::AggregateFunction {
-                        fun: aggregate.clone(),
+                        fun: aggregate.into(),
                         args: vec![executor::block_on(property_col(
                             &self.ctx,
                             &self.metadata,
@@ -467,7 +283,7 @@ impl LogicalPlanBuilder {
         let aggr_schema = DFSchema::new(exprlist_to_fields(all_expr, input.schema())?)?;
 
         let expr = LogicalPlan::Aggregate(Aggregate {
-            input,
+            input: Arc::new(input),
             group_expr,
             aggr_expr,
             schema: Arc::new(aggr_schema),
@@ -560,7 +376,21 @@ impl LogicalPlanBuilder {
     }
 }
 
-#[derive(Clone)]
+impl EventSegmentation {
+    pub fn query_names(&self) -> Vec<String> {
+        self.events
+            .iter()
+            .flat_map(|e| {
+                e.queries
+                    .iter()
+                    .map(|q| q.clone().name.unwrap())
+            })
+            .collect()
+    }
+}
+
+
+#[derive(Clone, Serialize, Deserialize)]
 pub enum EventRef {
     Regular(String),
     Custom(String),

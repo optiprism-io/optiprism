@@ -1,10 +1,7 @@
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use arrow::datatypes::{DataType as DFDataType, Field};
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use datafusion::logical_plan::{LogicalPlan, DFSchemaRef, UserDefinedLogicalNode};
-use datafusion::physical_plan::common::collect;
 use datafusion_common::{Column, DFField, DFSchema};
 use datafusion_expr::Expr;
 

@@ -2,6 +2,7 @@ use arrow::datatypes::DataType as ArrowDataType;
 use arrow::datatypes::TimeUnit::Second;
 use datafusion::scalar::ScalarValue as DFScalarValue;
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 
 pub const DECIMAL_PRECISION: usize = 19;
 pub const DECIMAL_SCALE: usize = 10;
@@ -24,7 +25,7 @@ impl DataType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum ScalarValue {
     Number(Option<Decimal>),
     String(Option<String>),
@@ -49,6 +50,7 @@ impl Into<DFScalarValue> for ScalarValue {
         }
     }
 }
+
 impl ScalarValue {
     pub fn to_df(self) -> DFScalarValue {
         match self {

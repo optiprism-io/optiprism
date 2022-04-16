@@ -2,10 +2,10 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use platform::Error as PlatformError;
+use query::Error as QueryError;
 use common::Error as CommonError;
 use metadata::Error as MetadataError;
-use query::Error as QueryError;
-
 use std::{
     fmt::{self, Display, Formatter},
     result,
@@ -28,10 +28,11 @@ impl InternalError {
 #[derive(Debug)]
 pub enum Error {
     Internal(InternalError),
-    SerdeError(serde_json::Error),
+    PlatformError(PlatformError),
+    QueryError(QueryError),
     CommonError(CommonError),
     MetadataError(MetadataError),
-    QueryError(QueryError),
+    ExternalError(String)
 }
 
 impl Display for Error {
@@ -43,6 +44,18 @@ impl Display for Error {
 impl From<InternalError> for Error {
     fn from(err: InternalError) -> Self {
         Self::Internal(err)
+    }
+}
+
+impl From<PlatformError> for Error {
+    fn from(err: PlatformError) -> Self {
+        Self::PlatformError(err)
+    }
+}
+
+impl From<QueryError> for Error {
+    fn from(err: QueryError) -> Self {
+        Self::QueryError(err)
     }
 }
 
@@ -58,17 +71,6 @@ impl From<MetadataError> for Error {
     }
 }
 
-impl From<QueryError> for Error {
-    fn from(err: QueryError) -> Self {
-        Self::QueryError(err)
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Self {
-        Self::SerdeError(err)
-    }
-}
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
@@ -86,6 +88,6 @@ impl IntoResponse for Error {
                 "internal server error".to_string(),
             ),
         }
-        .into_response()
+            .into_response()
     }
 }

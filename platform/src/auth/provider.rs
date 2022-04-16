@@ -1,6 +1,6 @@
 use super::{LogInRequest, SignUpRequest, TokensResponse};
 use crate::{
-    accounts::{CreateRequest as CreateAccountRequest, Provider as AccountProvider},
+    accounts::{Provider as AccountProvider},
     Context, Result,
 };
 use chrono::Utc;
@@ -11,22 +11,22 @@ use common::{
     },
     rbac::{Permission, Role, Scope},
 };
-use metadata::{organizations::CreateRequest as CreateOrganizationRequest, Metadata};
+use metadata::{organizations::CreateRequest as CreateOrganizationRequest, accounts::CreateRequest as CreateAccountRequest, Metadata};
 use std::{collections::HashMap, ops::Add, sync::Arc};
+use common::auth::{make_password_hash, make_salt};
 
 pub struct Provider {
-    metadata: Arc<Metadata>,
-    accounts: Arc<AccountProvider>,
+    md: Arc<Metadata>,
 }
 
 impl Provider {
-    pub fn new(metadata: Arc<Metadata>, accounts: Arc<AccountProvider>) -> Self {
-        Self { metadata, accounts }
+    pub fn new(md: Arc<Metadata>) -> Self {
+        Self { md }
     }
 
-    pub async fn sign_up(&self, _ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
+    pub async fn sign_up(&self, ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
         let organization = self
-            .metadata
+            .md
             .organizations
             .create(CreateOrganizationRequest {
                 name: request.organization_name,
@@ -34,13 +34,18 @@ impl Provider {
             .await?;
         let mut roles = HashMap::new();
         roles.insert(Scope::Organization, Role::Owner);
+
+        let salt = make_salt();
+        let password = make_password_hash(&request.password, &salt);
         let account = self
+            .md
             .accounts
             .create(
-                Context::with_permission(organization.id, Permission::CreateAccount),
                 CreateAccountRequest {
+                    created_by: ctx.account_id,
                     admin: false,
-                    password: request.password,
+                    salt,
+                    password,
                     organization_id: organization.id,
                     email: request.email,
                     roles: Some(roles),
@@ -60,7 +65,7 @@ impl Provider {
     }
 
     pub async fn log_in(&self, _ctx: Context, request: LogInRequest) -> Result<TokensResponse> {
-        let account = self.metadata.accounts.get_by_email(&request.email).await?;
+        let account = self.md.accounts.get_by_email(&request.email).await?;
         if !is_valid_password(&request.password, &account.salt, &account.password) {
             unimplemented!();
         }

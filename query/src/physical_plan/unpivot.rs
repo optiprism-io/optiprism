@@ -3,7 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use arrow::datatypes::{DataType as DFDataType, Field, Schema, SchemaRef};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use arrow::array::{Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray, Int8Array, DecimalBuilder, Float32Builder, Float64Builder, UInt16Builder, UInt32Builder, UInt64Builder, Int16Array, Int32Array, Int64Array, Int16Builder, Int32Builder, Int64Builder, Int8BufferBuilder, Int8Builder, make_builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt8Builder};
@@ -31,7 +31,7 @@ pub struct UnpivotExec {
 
 impl UnpivotExec {
     pub fn try_new(input: Arc<dyn ExecutionPlan>, cols: Vec<String>, name_col: String, value_col: String) -> Result<Self> {
-        let value_type = DFDataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
+        let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let mut uniq_cols = cols.clone();
         uniq_cols.sort();
@@ -52,7 +52,7 @@ impl UnpivotExec {
                 }
             }).collect();
 
-            let name_field = Field::new(name_col.as_str(), DFDataType::Utf8, false);
+            let name_field = Field::new(name_col.as_str(), DataType::Utf8, false);
             fields.push(name_field);
             let value_field = Field::new(value_col.as_str(), value_type.clone(), false);
             fields.push(value_field);
@@ -216,20 +216,20 @@ pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Resul
         .enumerate()
         .filter(|(idx, _)| !cols.contains(batch.schema().field(*idx).name()))
         .map(|(_, arr)| match arr.data_type() {
-            DFDataType::Int8 => build_group_arr!(batch_col_idx, arr, Int8Array, unpivot_cols_len, Int8Builder),
-            DFDataType::Int16 => build_group_arr!(batch_col_idx, arr, Int16Array, unpivot_cols_len, Int16Builder),
-            DFDataType::Int32 => build_group_arr!(batch_col_idx, arr, Int32Array, unpivot_cols_len, Int32Builder),
-            DFDataType::Int64 => build_group_arr!(batch_col_idx, arr, Int64Array, unpivot_cols_len, Int64Builder),
-            DFDataType::UInt8 => build_group_arr!(batch_col_idx, arr, UInt8Array, unpivot_cols_len, UInt8Builder),
-            DFDataType::UInt16 => build_group_arr!(batch_col_idx, arr, UInt16Array, unpivot_cols_len, UInt16Builder),
-            DFDataType::UInt32 => build_group_arr!(batch_col_idx, arr, UInt32Array, unpivot_cols_len, UInt32Builder),
-            DFDataType::UInt64 => build_group_arr!(batch_col_idx, arr, UInt64Array, unpivot_cols_len, UInt64Builder),
-            DFDataType::Boolean => build_group_arr!(batch_col_idx, arr, BooleanArray, unpivot_cols_len, BooleanBuilder),
-            DFDataType::Float32 => build_group_arr!(batch_col_idx, arr, Float32Array, unpivot_cols_len, Float32Builder),
-            DFDataType::Float64 => build_group_arr!(batch_col_idx, arr, Float64Array, unpivot_cols_len, Float64Builder),
-            DFDataType::Utf8 => build_group_arr!(batch_col_idx, arr, StringArray, unpivot_cols_len, StringBuilder),
-            DFDataType::Timestamp(Nanosecond, None) => build_group_arr!(batch_col_idx, arr, TimestampNanosecondArray, unpivot_cols_len, TimestampNanosecondBuilder),
-            DFDataType::Decimal(precision, scale) => {
+            DataType::Int8 => build_group_arr!(batch_col_idx, arr, Int8Array, unpivot_cols_len, Int8Builder),
+            DataType::Int16 => build_group_arr!(batch_col_idx, arr, Int16Array, unpivot_cols_len, Int16Builder),
+            DataType::Int32 => build_group_arr!(batch_col_idx, arr, Int32Array, unpivot_cols_len, Int32Builder),
+            DataType::Int64 => build_group_arr!(batch_col_idx, arr, Int64Array, unpivot_cols_len, Int64Builder),
+            DataType::UInt8 => build_group_arr!(batch_col_idx, arr, UInt8Array, unpivot_cols_len, UInt8Builder),
+            DataType::UInt16 => build_group_arr!(batch_col_idx, arr, UInt16Array, unpivot_cols_len, UInt16Builder),
+            DataType::UInt32 => build_group_arr!(batch_col_idx, arr, UInt32Array, unpivot_cols_len, UInt32Builder),
+            DataType::UInt64 => build_group_arr!(batch_col_idx, arr, UInt64Array, unpivot_cols_len, UInt64Builder),
+            DataType::Boolean => build_group_arr!(batch_col_idx, arr, BooleanArray, unpivot_cols_len, BooleanBuilder),
+            DataType::Float32 => build_group_arr!(batch_col_idx, arr, Float32Array, unpivot_cols_len, Float32Builder),
+            DataType::Float64 => build_group_arr!(batch_col_idx, arr, Float64Array, unpivot_cols_len, Float64Builder),
+            DataType::Utf8 => build_group_arr!(batch_col_idx, arr, StringArray, unpivot_cols_len, StringBuilder),
+            DataType::Timestamp(Nanosecond, None) => build_group_arr!(batch_col_idx, arr, TimestampNanosecondArray, unpivot_cols_len, TimestampNanosecondBuilder),
+            DataType::Decimal(precision, scale) => {
                 // build group array realisation for decimal type
                 let src_arr_typed = arr.as_any().downcast_ref::<DecimalArray>().unwrap();
                 let mut result = DecimalBuilder::new(builder_cap, *precision, *scale);
@@ -253,7 +253,7 @@ pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Resul
 
 
     // define value type
-    let value_type = DFDataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
+    let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
 
     // cast unpivot cols to value type
     let unpivot_arrs: Vec<ArrayRef> = batch
@@ -262,10 +262,10 @@ pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Resul
         .enumerate()
         .filter(|(idx, _)| cols.contains(batch.schema().field(*idx).name()))
         .map(|(_, arr)| match arr.data_type() {
-            DFDataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE) => arr.clone(),
-            DFDataType::UInt64 => {
+            DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE) => arr.clone(),
+            DataType::UInt64 => {
                 // first cast uint to int because Arrow 9.1.0 doesn't support casting from uint to decimal
-                let int_arr = arrow::compute::cast(arr, &DFDataType::Int64).unwrap();
+                let int_arr = arrow::compute::cast(arr, &DataType::Int64).unwrap();
                 arrow::compute::cast(&int_arr, &value_type).unwrap()
             }
             other => arrow::compute::cast(arr, &value_type).unwrap()
@@ -284,11 +284,11 @@ pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Resul
     };
 
     let value_arr: ArrayRef = match value_type {
-        DFDataType::Int8 => build_value_arr!(Int8Array, Int8Builder, builder_cap, unpivot_arrs),
-        DFDataType::Int16 => build_value_arr!(Int16Array, Int16Builder, builder_cap, unpivot_arrs),
-        DFDataType::UInt64 => build_value_arr!(UInt64Array, UInt64Builder, builder_cap, unpivot_arrs),
-        DFDataType::Float64 => build_value_arr!(Float64Array, Float64Builder, builder_cap, unpivot_arrs),
-        DFDataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE) => {
+        DataType::Int8 => build_value_arr!(Int8Array, Int8Builder, builder_cap, unpivot_arrs),
+        DataType::Int16 => build_value_arr!(Int16Array, Int16Builder, builder_cap, unpivot_arrs),
+        DataType::UInt64 => build_value_arr!(UInt64Array, UInt64Builder, builder_cap, unpivot_arrs),
+        DataType::Float64 => build_value_arr!(Float64Array, Float64Builder, builder_cap, unpivot_arrs),
+        DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE) => {
             let arrs: Vec<&DecimalArray> = unpivot_arrs
                 .iter()
                 .map(|x| x.as_any().downcast_ref::<DecimalArray>().unwrap())

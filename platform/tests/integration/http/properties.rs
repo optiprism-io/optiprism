@@ -42,7 +42,7 @@ async fn test_event_properties() -> Result<()> {
     let prov = Arc::new(Provider::new_event(store));
     let events_provider = Arc::new(PropertiesProvider::new_event(prov.clone()));
     tokio::spawn(async {
-        let app = properties::configure_event(Router::new())
+        let app = properties::attach_event_routes(Router::new())
             .layer(AddExtensionLayer::new(events_provider));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
