@@ -13,7 +13,7 @@ servers:
   - description: SwaggerHub API Auto Mocking
     url: https://virtserver.swaggerhub.com/optiprism/optiprism/1.0.0
   - description: OptiPrism API server
-    url: /
+    url: /df
 tags:
   - name: event
     description: Event
@@ -22,19 +22,57 @@ tags:
 externalDocs:
   description: Find out more about OptiPrism api
   url: https://dev.optiprism.io/api
+
 paths:
-  /schema/events:
+  /v1/projects/{project_id}/schema/events:
     get:
       summary: Events list
+      parameters:
+        - name: project_id
+          in: query
+          description: Project ID
+          required: true
+          schema:
+            type: string
       responses:
         '200':
-          $ref: '#/components/responses/ListEvents'
-  /schema/custom-events:
+          description: event list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Event'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+
+  /v1/projects/{project_id}/schema/custom-events:
     get:
       summary: Custom events list
+      parameters:
+        - name: project_id
+          in: query
+          description: Project ID
+          required: true
+          schema:
+            type: string
       responses:
         '200':
-          $ref: '#/components/responses/ListCustomEvents'
+          description: custom event list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CustomEvent'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
     post:
       summary: Create custom event
       requestBody:
@@ -45,33 +83,146 @@ paths:
               $ref: '#/components/schemas/CreateCustomEventRequest'
       responses:
         201:
-          $ref: '#/components/responses/CustomEvent'
+          description: custom event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomEvent'
 
-  /schema/event-properties:
+
+  /v1/projects/{project_id}/schema/event-properties:
     get:
       summary: Event properties list
+      parameters:
+        - name: project_id
+          in: query
+          description: Project ID
+          required: true
+          schema:
+            type: string
       responses:
         '200':
-          $ref: '#/components/responses/ListEventProperties'
-  /schema/event-custom-properties:
+          description: event properties list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EventProperty'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+
+  /v1/projects/{project_id}/schema/event-custom-properties:
     get:
       summary: Event custom properties list
+      parameters:
+        - name: project_id
+          in: query
+          description: Project ID
+          required: true
+          schema:
+            type: string
       responses:
         '200':
-          $ref: '#/components/responses/ListEventCustomProperties'
-  /schema/user-properties:
+          description: event custom properties list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EventCustomProperty'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+
+  /v1/projects/{project_id}/schema/user-properties:
     get:
       summary: User properties list
+      parameters:
+        - name: project_id
+          in: query
+          description: Project ID
+          required: true
+          schema:
+            type: string
       responses:
         '200':
-          $ref: '#/components/responses/ListUserProperties'
-  /schema/user-custom-properties:
+          description: user properties list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserProperty'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+
+  /v1/projects/{project_id}/schema/user-custom-properties:
     get:
       summary: User custom properties list
+      parameters:
+        - name: project_id
+          in: query
+          description: Project ID
+          required: true
+          schema:
+            type: string
       responses:
         '200':
-          $ref: '#/components/responses/ListUserCustomProperties'
-  /data/property-values:
+          description: user custom properties list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserCustomProperty'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+
+  /v1/projects/{project_id}/data/events:
+    post:
+      summary: Events list
+      parameters:
+        - name: project_id
+          in: query
+          description: Project ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventListRequest'
+
+      responses:
+        '200':
+          description: events list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EventRecord'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+
+  /v1/projects/{project_id}/data/property-values:
     get:
       summary: List property values
       description: >
@@ -79,12 +230,18 @@ paths:
         <br/><br/>
         examples:
         <br/>
-        /data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Name&property_type=regular
-        /data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Total%20Revenue&property_type=custom
-        /data/property-values?event_name=Custom&event_type=custom&property_name=SomeProp&property_type=regular
-        /data/property-values?property_name=Country&property_type=regular
-        /data/property-values?property_name=Full%Name&property_type=custom
+        /v1/projects/1/data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Name&property_type=regular
+        /v1/projects/1/data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Total%20Revenue&property_type=custom
+        /v1/projects/1/data/property-values?event_name=Custom&event_type=custom&property_name=SomeProp&property_type=regular
+        /v1/projects/1/data/property-values?property_name=Country&property_type=regular
+        /v1/projects/1/data/property-values?property_name=Full%Name&property_type=custom
       parameters:
+        - name: project_id
+          in: query
+          description: Project ID
+          required: true
+          schema:
+            type: string
         - name: event_name
           in: query
           description: Event Name. Required if property has event type
@@ -111,14 +268,21 @@ paths:
             $ref: '#/components/schemas/PropertyType'
       responses:
         '200':
-          $ref: '#/components/responses/ListPropertyValues'
+          description: list property values
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  values:
+                    oneOf:
+                      - type: array
+                        items:
+                          type: string
+                      - type: array
+                        items:
+                          type: number
 
-  /queries/event-segmentation:
-    post:
-      summary: Event segmentation query
-      responses:
-        '200':
-          $ref: '#/components/responses/EventSegmentation'
       requestBody:
         content:
           application/json:
@@ -126,145 +290,21 @@ paths:
               $ref: '#/components/schemas/EventSegmentation'
 
 components:
-  responses:
-    ListPropertyValues:
-      description: list property values
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              values:
-                oneOf:
-                  - type: array
-                    items:
-                      type: string
-                  - type: array
-                    items:
-                      type: number
-    ListEvents:
-      description: event list
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              events:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Event'
-    CustomEvent:
-      description: custom event
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/CustomEvent'
-    ListCustomEvents:
-      description: custom event list
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              customEvents:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CustomEvent'
-    ListEventProperties:
-      description: event properties list
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              eventProperties:
-                type: array
-                items:
-                  $ref: '#/components/schemas/EventProperty'
-    ListEventCustomProperties:
-      description: event custom properties list
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              eventCustomProperties:
-                type: array
-                items:
-                  $ref: '#/components/schemas/EventCustomProperty'
-    ListUserProperties:
-      description: user properties list
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              userProperties:
-                type: array
-                items:
-                  $ref: '#/components/schemas/UserProperty'
-    ListUserCustomProperties:
-      description: event properties list
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              userCustomProperties:
-                type: array
-                items:
-                  $ref: '#/components/schemas/EventProperty'
-    EventSegmentation:
-      description: event segmentation query response
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              dimensionHeaders:
-                type: array
-                items:
-                  type: string
-              metricHeaders:
-                type: array
-                items:
-                  type: string
-              dimensions:
-                type: array
-                items:
-                  type: array
-                  items:
-                    type: string
-              singles:
-                type: array
-                items:
-                  type: integer
-              series:
-                type: array
-                items:
-                  type: array
-                  items:
-                    type: integer
-              compare:
-                type: object
-                properties:
-                  dimensions:
-                    type: array
-                    items:
-                      type: array
-                      items:
-                        type: string
-                  singles:
-                    type: array
-                    items:
-                      type: integer
-                  series:
-                    type: array
-                    items:
-                      type: array
-                      items:
-                        type: integer
   schemas:
+    ListResponseMetadata:
+      description: list response metadata
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            next:
+              type: string
+            prev:
+              type: string
+            total:
+              type: integer
+
     User:
       type: object
       properties:
@@ -351,6 +391,23 @@ components:
           type: array
           items:
             type: integer
+
+    EventRecord:
+      type: object
+      example: >
+        {
+          "name": "Buy Product",
+          "properties": {
+            "country": "UK",
+            "Product Name": "TV"
+          }
+        }
+      properties:
+        name:
+          type: string
+        properties:
+          type: object
+          description: map of property name and property value pairs
 
     Event:
       type: object
@@ -459,11 +516,10 @@ components:
           type: array
           items:
             type: string
-        expression:
-          allOf:
-            - type: object
-              description: expression. You can query events with filters and combine multiple events with and/or operations
-            - $ref: '#/components/schemas/CustomEventExpression'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomEventEvent'
         properties:
           type: array
           items:
@@ -487,43 +543,24 @@ components:
           format: int64
         name:
           type: string
-        expression:
-          allOf:
-            - type: object
-              description: expression. You can query events with filters and combine multiple events with and/or operations
-            - $ref: '#/components/schemas/CustomEventExpression'
-
-
-    CustomEventExpression:
-      type: object
-      description: expression for custom event matches all the provided events
-      required: [ "type","eventName","eventType","events" ]
-      properties:
         events:
           type: array
-          description: match any of events in list
           items:
-            $ref: '#/components/schemas/CustomEventExpressionEvent'
+            $ref: '#/components/schemas/CustomEventEvent'
 
-    CustomEventExpressionEvent:
+    CustomEventEvent:
       type: object
-      description: event with filters
-      required: [ "type","eventName","eventType","filter" ]
-      properties:
-
+      description: custom event will matches all of the provided events
+      required: [ "eventName","eventType" ]
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
           properties:
-            type:
-              type: string
-              enum:
-                - event
-            filter:
-              allOf:
-                - type: object
-                  description: filter by property
-                - $ref: '#/components/schemas/EventFilterByProperty'
+            filters:
+              type: array
+              description: array of event filters
+              items:
+                $ref: '#/components/schemas/EventFilterByProperty'
 
     EventProperty:
       type: object
@@ -772,6 +809,95 @@ components:
           type: array
           items:
             type: string
+
+    EventListRequest:
+      type: object
+      description: request events sorted by time of creation
+      required: [ "time", "events" ]
+      example: >
+        {
+          "time": {
+            "type": "between",
+            "from": "2017-07-21T17:32:28Z",
+            "to": "2017-08-21T17:32:28Z"
+          },
+          "events": [
+            {
+              "eventName": "Buy Product",
+              "eventType": "regular",
+              "filters": [
+                {
+                  "filterType": "property",
+                  "propertyName": "Device",
+                  "propertyType": "user",
+                  "operation": "exists"
+                },
+                {
+                  "filterType": "property",
+                  "propertyName": "Product Name",
+                  "propertyType": "event",
+                  "operation": "=",
+                  "value": [
+                    "tv"
+                  ]
+                }
+              ]
+            }
+          ],
+          "filters": [
+            {
+              "filterType": "property",
+              "propertyName": "Region",
+              "propertyType": "user",
+              "operation": "exists"
+            }
+          ]
+        }
+      properties:
+        time:
+          type: object
+          description: select time
+          oneOf:
+            - $ref: '#/components/schemas/TimeBetween'
+            - $ref: '#/components/schemas/TimeFrom'
+            - $ref: '#/components/schemas/TimeLast'
+        search:
+          type: object
+          description: search in results
+          properties:
+            term:
+              type: string
+            eventProperties:
+              type: array
+              items:
+                type: string
+            userProperties:
+              type: array
+              items:
+                type: string
+        events:
+          type: array
+          description: array of events to query
+          items:
+            type: object
+            required: [ "eventName","eventType" ]
+            allOf:
+              - $ref: '#/components/schemas/EventRef'
+              - type: object
+                properties:
+                  filters:
+                    type: array
+                    description: array of event filters
+                    items:
+                      $ref: '#/components/schemas/EventFilterByProperty'
+        filters:
+          type: array
+          description: array of common filters (which applies to all events)
+          items:
+            type: object
+            oneOf:
+              - $ref: '#/components/schemas/EventFilterByProperty'
+              - $ref: '#/components/schemas/EventFilterByCohort'
 
     AnalysisLinear:
       type: object
