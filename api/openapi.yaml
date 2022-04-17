@@ -90,9 +90,9 @@ paths:
                 $ref: '#/components/schemas/CustomEvent'
 
 
-  /v1/projects/{project_id}/schema/event-properties:
+  /v1/projects/{project_id}/schema/properties:
     get:
-      summary: Event properties list
+      summary: Properties list
       parameters:
         - name: project_id
           in: query
@@ -100,9 +100,20 @@ paths:
           required: true
           schema:
             type: string
+        - name: type
+          in: query
+          description: Property type
+          required: true
+          schema:
+            type:
+              string
+            enum:
+              - event
+              - user
+
       responses:
         '200':
-          description: event properties list
+          description: properties list
           content:
             application/json:
               schema:
@@ -112,10 +123,10 @@ paths:
                       events:
                         type: array
                         items:
-                          $ref: '#/components/schemas/EventProperty'
+                          $ref: '#/components/schemas/Property'
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
-  /v1/projects/{project_id}/schema/event-custom-properties:
+  /v1/projects/{project_id}/schema/custom-properties:
     get:
       summary: Event custom properties list
       parameters:
@@ -137,57 +148,7 @@ paths:
                       events:
                         type: array
                         items:
-                          $ref: '#/components/schemas/EventCustomProperty'
-                  - $ref: '#/components/schemas/ListResponseMetadata'
-
-  /v1/projects/{project_id}/schema/user-properties:
-    get:
-      summary: User properties list
-      parameters:
-        - name: project_id
-          in: query
-          description: Project ID
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: user properties list
-          content:
-            application/json:
-              schema:
-                type: object
-                allOf:
-                  - properties:
-                      events:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/UserProperty'
-                  - $ref: '#/components/schemas/ListResponseMetadata'
-
-  /v1/projects/{project_id}/schema/user-custom-properties:
-    get:
-      summary: User custom properties list
-      parameters:
-        - name: project_id
-          in: query
-          description: Project ID
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: user custom properties list
-          content:
-            application/json:
-              schema:
-                type: object
-                allOf:
-                  - properties:
-                      events:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/UserCustomProperty'
+                          $ref: '#/components/schemas/CustomProperty'
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
   /v1/projects/{project_id}/data/events:
@@ -562,16 +523,10 @@ components:
               items:
                 $ref: '#/components/schemas/EventFilterByProperty'
 
-    EventProperty:
+    Property:
       type: object
-      required: [ "id","createdAt","createdBy","projectId","isSystem","isGlobal","name","status","isRequired","nullable","isArray","isDictionary" ]
-      description: event property defines entity with name and type which can be attached to one or multiple events. For example, event "Buy product" may contains next properties like  "Product name" and "Price."
-        <br/><br/>
-        Property must have an unique name. If property is global, that it must be unique among all global properties in project, including custom ones. If property is a non-global and belongs to event, then the name must be uniqueue amount all event properties, including custom ones.
-        <br/><br/>
-        Property must have a type. For example, "Product name" may have String type and "Price." may have Numeric type.
-        <br/><br/>
-        If you have multiple events with same property ("Buy product", "View product") you can make property global (isGlobal=true) and use it in multiple events.
+      required: [ "id","createdAt","createdBy","projectId","isSystem","scope","name","status","isRequired","nullable","isArray","isDictionary" ]
+      description: property defines event or user property. For example, event "Buy product" may contains next properties like "Product name" and "Price."
       properties:
         id:
           type: integer
@@ -603,6 +558,11 @@ components:
             type: integer
             format: i64
           description: list of id of events which use this property
+        scope:
+          type: string
+          enum:
+            - event
+            - user
         isSystem:
           type: boolean
           description: the property is a system-wide, shown in any project and can't be modified by a regular user
@@ -625,7 +585,7 @@ components:
             - enabled
             - disabled
           description: property status
-        type:
+        dataType:
           allOf:
             - type: object
               description: data type of property. if property is "Product name", that it whould be String, if "Revenue", that it might be numeric.
@@ -645,7 +605,7 @@ components:
               description: type of integer to pack. Between 8bits and 16bits
             - $ref: '#/components/schemas/DataType'
 
-    EventCustomProperty:
+    CustomProperty:
       type: object
       properties:
         id:
@@ -671,123 +631,6 @@ components:
           items:
             type: integer
             format: i64
-        isSystem:
-          type: boolean
-        status:
-          type: string
-          enum:
-            - enabled
-            - disabled
-        name:
-          type: string
-        description:
-          type: string
-        type:
-          $ref: '#/components/schemas/DataType'
-        nullable:
-          type: boolean
-        isArray:
-          type: boolean
-        tags:
-          type: array
-          items:
-            type: string
-
-    UserProperty:
-      type: object
-      description: user property defines a single property for a user entity. There is a bunch of already predefined, like "Country","Device", "First name","List name", etc. Like "Age".
-        <br/><br/>
-        Property must have an unique name among all user properties in project.
-        <br/><br/>
-        Property must have a type. For example, "Product name" may have String type and "Price." may have Numeric type.
-      properties:
-        id:
-          type: integer
-          format: int64
-          description: property unique id
-        createdAt:
-          type: string
-          format: date-time
-          description: create date
-        updatedAt:
-          type: string
-          format: date-time
-          description: update (once updated)
-        createdBy:
-          type: integer
-          format: int64
-          description: id of creator User
-        updatedBy:
-          type: integer
-          format: int64
-          description: id of updater User
-        projectId:
-          type: integer
-          format: int64
-          description: project id
-        isSystem:
-          type: boolean
-          description: the property is a system-wide, shown in any project and can't be modified by a regular user
-        tags:
-          type: array
-          items:
-            type: string
-        name:
-          type: string
-          description: property name. Must be unique among all user properties
-        displayName:
-          type: string
-          description: property name to display. If empty then name is used.
-        description:
-          type: string
-          description: description
-        status:
-          type: string
-          enum:
-            - enabled
-            - disabled
-          description: property status
-        type:
-          allOf:
-            - type: object
-              description: data type of property. if property is "Country", that it whould be String, if "Age", that it might be numeric
-            - $ref: '#/components/schemas/DataType'
-        nullable:
-          type: boolean
-          description: nullable property might contains null value
-        isArray:
-          type: boolean
-          description: array property might contents multiple values
-        isDictionary:
-          type: boolean
-          description: dictionary can efficiently packs strings provided that cardinality will be relatively log (16bits is a reasonable maximum)
-        dictionaryType:
-          allOf:
-            - type: object
-              description: type of integer to pack. Between 8bits and 16bits
-            - $ref: '#/components/schemas/DataType'
-
-    UserCustomProperty:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        createdBy:
-          type: integer
-          format: int64
-        updatedBy:
-          type: integer
-          format: int64
-        projectId:
-          type: integer
-          format: int64
         isSystem:
           type: boolean
         status:
@@ -1702,13 +1545,21 @@ components:
       description: possible property type
       enum:
         - event
-        - eventCustom
         - user
-        - userCustom
+        - custom
+
     DataType:
       type: string
       description: data type
       enum:
-        - number
         - string
+        - float64
+        - int8
+        - int16
+        - int32
+        - int64
+        - uint8
+        - uint16
+        - uint32
+        - uint64
         - boolean
