@@ -180,7 +180,34 @@ paths:
                       events:
                         type: array
                         items:
-                          $ref: '#/components/schemas/EventRecord'
+                          type: object
+                          example: >
+                            {
+                              "name": "Buy Product",
+                              "properties": {
+                                "country": "UK",
+                                "Product Name": "TV"
+                              },
+                              "matchedCustomEvents": [
+                                {
+                                  "id": 1
+                                }
+                              ]
+                            }
+                          properties:
+                            name:
+                              type: string
+                            properties:
+                              type: object
+                              description: map of property name and property value pairs
+                            matchedCustomEvents:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  id:
+                                    type: integer
+
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
   /v1/projects/{project_id}/data/property-values:
@@ -1553,13 +1580,5 @@ components:
       description: data type
       enum:
         - string
-        - float64
-        - int8
-        - int16
-        - int32
-        - int64
-        - uint8
-        - uint16
-        - uint32
-        - uint64
+        - number
         - boolean
