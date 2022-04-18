@@ -151,7 +151,7 @@ paths:
                           $ref: '#/components/schemas/CustomProperty'
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
-  /v1/projects/{project_id}/data/events:
+  /v1/projects/{project_id}/data/events-stream:
     post:
       summary: Events list
       parameters:
