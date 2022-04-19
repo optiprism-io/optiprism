@@ -29,7 +29,7 @@ paths:
       summary: Events list
       parameters:
         - name: project_id
-          in: query
+          in: path
           description: Project ID
           required: true
           schema:
@@ -54,7 +54,7 @@ paths:
       summary: Custom events list
       parameters:
         - name: project_id
-          in: query
+          in: path
           description: Project ID
           required: true
           schema:
@@ -95,7 +95,7 @@ paths:
       summary: Properties list
       parameters:
         - name: project_id
-          in: query
+          in: path
           description: Project ID
           required: true
           schema:
@@ -131,7 +131,7 @@ paths:
       summary: Event custom properties list
       parameters:
         - name: project_id
-          in: query
+          in: path
           description: Project ID
           required: true
           schema:
@@ -156,7 +156,7 @@ paths:
       summary: Events list
       parameters:
         - name: project_id
-          in: query
+          in: path
           description: Project ID
           required: true
           schema:
@@ -185,9 +185,12 @@ paths:
                             {
                               "name": "Buy Product",
                               "properties": {
-                                "country": "UK",
-                                "Product Name": "TV"
+                                createdAt: "2017-07-21T17:32:28Z",
+                                "Product Name": "TV",
                               },
+                              "userProperties": {
+                                "country": "UK"
+                              },                          
                               "matchedCustomEvents": [
                                 {
                                   "id": 1
@@ -225,7 +228,7 @@ paths:
         /v1/projects/1/data/property-values?property_name=Full%Name&property_type=custom
       parameters:
         - name: project_id
-          in: query
+          in: path
           description: Project ID
           required: true
           schema:
