@@ -63,8 +63,7 @@
 import { ref, computed, onBeforeMount, inject } from 'vue'
 import { EventRef, EVENT_TYPE_REGULAR, PropertyType } from '@/types/events'
 import { useLexiconStore } from '@/stores/lexicon'
-import { useEventsStore } from '@/stores/eventSegmentation/events'
-import { Event } from '@/stores/eventSegmentation/events'
+import { Event, useEventsStore } from '@/stores/eventSegmentation/events'
 
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
 import UiInput from '@/components/uikit/UiInput.vue'
@@ -174,9 +173,9 @@ const apply = async () => {
         if (isEdit.value) {
             params.id = editedEvent.value?.id
 
-            await schemaService.editCustomEvents(params)
+            await schemaService.editCustomEvent(params)
         } else {
-            await schemaService.createCustomEvents(params)
+            await schemaService.createCustomEvent(params)
         }
 
 

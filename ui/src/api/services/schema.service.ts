@@ -37,8 +37,8 @@ const schemaService = {
     events: async () => await get("/schema/events", "", null),
 
     customEvents: async () => await get("/schema/custom-events", "", null),
-    createCustomEvents: async(params: CustomEvents) => await fetch('/schema/custom-events', 'POST', params),
-    editCustomEvents: async(params: CustomEvents) => await fetch('/schema/custom-events', 'PUT', params),
+    createCustomEvent: async(params: CustomEvents) => await fetch('/schema/custom-events', 'POST', params),
+    editCustomEvent: async(params: CustomEvents) => await fetch('/schema/custom-events', 'PUT', params),
 
     eventProperties: async () => await get("/schema/event-properties", "", null),
     eventCustomProperties: async () => await get("/schema/event-custom-properties", "", null),
@@ -46,9 +46,7 @@ const schemaService = {
     userProperties: async () => await get("/schema/user-properties", "", null),
     userCustomProperties: async () => await get("/schema/user-custom-properties", "", null),
 
-    propertiesValues: async (params: PropertiesValues) => await get("/data/property-values", "", params),
-
-    getEventChart: async () => await get("/chart", "", null),
+    propertryValues: async (params: PropertiesValues) => await get("/data/property-values", "", params),
 };
 
 export default schemaService;

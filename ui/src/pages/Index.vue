@@ -48,7 +48,7 @@
         </div>
 
         <CreateCustomEvent
-            v-if="eventsStore.showCreateCustomEvent"
+            v-if="commonStore.showCreateCustomEvent"
             @apply="applyCreateCustomEvent"
             @cancel="togglePopupCreateCustomEvent(false)"
         />
@@ -66,9 +66,11 @@ import CreateCustomEvent from '@/components/events/CreateCustomEvent.vue'
 
 import { useLexiconStore } from "@/stores/lexicon";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
+import { useCommonStore } from '@/stores/common'
 
 const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
+const commonStore = useCommonStore()
 
 onBeforeMount(async () => {
     await lexiconStore.getEvents();
@@ -83,7 +85,7 @@ onUnmounted(() => {
 });
 
 const togglePopupCreateCustomEvent = (payload: boolean) => {
-    eventsStore.togglePopupCreateCustomEvent(payload)
+    commonStore.togglePopupCreateCustomEvent(payload)
 }
 
 const applyCreateCustomEvent = () => {

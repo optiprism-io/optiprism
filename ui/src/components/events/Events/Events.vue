@@ -10,7 +10,7 @@
             :event-items="lexiconStore.eventsList"
             :breakdowns="event.breakdowns"
             :queries="event.queries"
-            :auto-hide="!eventsStore.showCreateCustomEvent"
+            :auto-hide="!commonStore.showCreateCustomEvent"
             @action="selectAction"
             @edit="editEvent"
             @set-event="setEvent"
@@ -27,7 +27,7 @@
                 grouped
                 :items="lexiconStore.eventsList"
                 :width-auto="true"
-                :auto-hide="!eventsStore.showCreateCustomEvent"
+                :auto-hide="!commonStore.showCreateCustomEvent"
                 @action="selectAction"
                 @select="addEvent"
                 @edit="editEvent"
@@ -68,6 +68,7 @@ import { computed, watch, defineAsyncComponent } from "vue";
 import { EventQueryRef, EventRef, PropertyRef } from "@/types/events";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
 import { useLexiconStore } from "@/stores/lexicon";
+import { useCommonStore } from '@/stores/common'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 
 import Select from '@/components/Select/Select.vue'
@@ -76,6 +77,7 @@ const SelectedEvent = defineAsyncComponent(() => import('@/components/events/Eve
 
 const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
+const commonStore = useCommonStore()
 
 const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()
 
@@ -123,13 +125,13 @@ const changeQuery = (eventIdx: number, queryIdx: number, ref: EventQueryRef) => 
 
 const selectAction = (payload: string) => {
     if (payload === 'createCustomEvent') {
-        eventsStore.togglePopupCreateCustomEvent(true)
+        commonStore.togglePopupCreateCustomEvent(true)
     }
 }
 
 const editEvent = (payload: number) => {
     eventsStore.setEditCustomEvent(payload)
-    eventsStore.togglePopupCreateCustomEvent(true)
+    commonStore.togglePopupCreateCustomEvent(true)
 }
 
 watch(eventsStore.events, updateEventSegmentationResult)
