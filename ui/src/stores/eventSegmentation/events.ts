@@ -2,17 +2,16 @@ import { defineStore } from "pinia";
 import {
     EventRef,
     PropertyRef,
-    PropertyType,
     EventQueryRef,
     EVENT_TYPE_REGULAR,
     EVENT_TYPE_CUSTOM
 } from "@/types/events";
-import { OperationId, Value, Group, TimeUnit } from '@/types'
+import { OperationId, Value, Group } from '@/types'
 import queriesService, { EventSegmentation } from "@/api/services/queries.service";
 import { getYYYYMMDD, getStringDateByFormat } from "@/helpers/getStringDates";
 import { getLastNDaysRange } from "@/helpers/calendarHelper";
 import {Column, Row} from "@/components/uikit/UiTable/UiTable";
-import { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
+import { PropertyType, TimeUnit } from '@/api'
 
 import { useLexiconStore } from "@/stores/lexicon";
 import { useSegmentsStore } from "@/stores/eventSegmentation/segments";
@@ -48,6 +47,11 @@ export type Event = {
     breakdowns: EventBreakdown[];
     queries: EventQuery[];
 };
+
+export interface EventPayload {
+    event: Event
+    index: number
+}
 
 export type Events = {
     events: Event[]
@@ -217,13 +221,12 @@ export const useEventsStore = defineStore("events", {
             this.events.forEach(item => {
                 const eventRef = item.ref;
                 items.push(...computedEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.id)));
-                items.push(...computedEventProperties(PropertyType.EventCustom, lexiconStore.findEventCustomProperties(eventRef.id)));
+                items.push(...computedEventProperties(PropertyType.Custom, lexiconStore.findEventCustomProperties(eventRef.id)));
             });
 
             return [
                 ...new Set(items),
                 ...computedEventProperties(PropertyType.User, lexiconStore.userProperties),
-                ...computedEventProperties(PropertyType.UserCustom, lexiconStore.userCustomProperties),
             ];
         },
         propsForEventSegmentationResult(): EventSegmentation {
@@ -308,7 +311,7 @@ export const useEventsStore = defineStore("events", {
         setEditCustomEvent(payload: number | null) {
             this.editCustomEvent = payload
         },
-        setEvent(payload: SetEventPayload) {
+        setEvent(payload: EventPayload) {
             this.events[payload.index] = payload.event
         },
         initPeriod(): void {

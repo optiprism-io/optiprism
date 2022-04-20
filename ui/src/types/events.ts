@@ -1,19 +1,11 @@
-import { DataType, OperationId, Value } from '@/types'
+import { OperationId } from '@/types'
 import { AggregateId } from '@/types/aggregate'
 import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
 import { Event as EventScheme } from '@/api/services/schema.service'
+import { EventType, PropertyType, DataType, Value } from '@/api'
 
 export const EVENT_TYPE_REGULAR = 'regular'
 export const EVENT_TYPE_CUSTOM = 'custom'
-
-export type EventType = 'regular' | 'custom'
-
-export enum PropertyType {
-    Event,
-    EventCustom,
-    User,
-    UserCustom
-}
 
 export type PropertyRef = {
     type: PropertyType;
@@ -43,7 +35,7 @@ export function eventPropertyRef(e: EventProperty): PropertyRef {
 }
 
 export function eventCustomPropertyRef(e: EventCustomProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.EventCustom, id: e.id };
+    return <PropertyRef>{ type: PropertyType.Custom, id: e.id };
 }
 
 export function userPropertyRef(e: UserProperty): PropertyRef {
@@ -51,7 +43,7 @@ export function userPropertyRef(e: UserProperty): PropertyRef {
 }
 
 export function userCustomPropertyRef(e: UserCustomProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.UserCustom, id: e.id };
+    return <PropertyRef>{ type: PropertyType.Custom, id: e.id };
 }
 
 export interface CustomEvent {

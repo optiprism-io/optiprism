@@ -138,12 +138,6 @@ const breakdownName = (): string => {
         ).name;
     }
 
-    if (isBreakdownUserCustomProperty(props.breakdown)) {
-        return lexiconStore.findUserCustomPropertyById(
-            (props.breakdown as BreakdownUserCustomProperty).propertyId
-        ).name;
-    }
-
     if (isBreakdownEventCommonProperty(props.breakdown)) {
         return lexiconStore.findEventPropertyById(
             (props.breakdown as BreakdownEventCommonProperty).propertyId

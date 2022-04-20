@@ -13,10 +13,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { findOperations, OperationId } from "@/types";
-import { PropertyRef, PropertyType } from "@/types/events"
+import { PropertyRef  } from "@/types/events"
 import { Item } from "@/components/Select/SelectTypes";
 import { useLexiconStore } from "@/stores/lexicon";
 import Select from "@/components/Select/Select.vue";
+import { PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();
 
@@ -43,7 +44,7 @@ const items = computed(() => {
                     name: op.name
                 })
             );
-        } else if (props.propertyRef.type === PropertyType.EventCustom) {
+        } else if (props.propertyRef.type === PropertyType.Custom) {
             const prop = lexiconStore.findEventCustomPropertyById(props.propertyRef.id);
             findOperations(prop.type, prop.nullable, prop.isArray).forEach(op =>
                 ret.push({
@@ -53,14 +54,6 @@ const items = computed(() => {
             );
         } else if (props.propertyRef.type === PropertyType.User) {
             const prop = lexiconStore.findUserPropertyById(props.propertyRef.id);
-            findOperations(prop.type, prop.nullable, prop.isArray).forEach(op =>
-                ret.push({
-                    item: op.id,
-                    name: op.name
-                })
-            );
-        } else if (props.propertyRef.type === PropertyType.UserCustom) {
-            const prop = lexiconStore.findUserCustomPropertyById(props.propertyRef.id);
             findOperations(prop.type, prop.nullable, prop.isArray).forEach(op =>
                 ret.push({
                     item: op.id,

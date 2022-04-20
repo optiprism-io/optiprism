@@ -9,7 +9,6 @@ import {
     customEventRef,
     eventRef,
     PropertyRef,
-    PropertyType,
     EventRef,
     eventsQueries,
     EventQueryRef,
@@ -22,6 +21,7 @@ import { Cohort } from "@/types";
 import { aggregates } from "@/types/aggregate"
 import { Group, Item } from "@/components/Select/SelectTypes";
 import { useEventsStore, Events } from "@/stores/eventSegmentation/events";
+import { PropertyType } from '@/api'
 
 type Lexicon = {
     cohorts: Cohort[];
@@ -176,26 +176,15 @@ export const useLexiconStore = defineStore("lexicon", {
                 throw new Error(`undefined user property id: {$id}`);
             };
         },
-        findUserCustomPropertyById(state: Lexicon) {
-            return (id: number): UserCustomProperty => {
-                const e = state.userCustomProperties.find((prop): boolean => prop.id === id);
-                if (e) {
-                    return e;
-                }
-                throw new Error(`undefined user custom property id: {$id}`);
-            };
-        },
         property() {
             return (ref: PropertyRef): EventProperty | EventCustomProperty | UserProperty | UserCustomProperty => {
                 switch (ref.type) {
                     case PropertyType.Event:
                         return this.findEventPropertyById(ref.id);
-                    case PropertyType.EventCustom:
+                    case PropertyType.Custom:
                         return this.findEventCustomPropertyById(ref.id);
                     case PropertyType.User:
                         return this.findUserPropertyById(ref.id);
-                    case PropertyType.UserCustom:
-                        return this.findUserCustomPropertyById(ref.id);
                 }
             };
         },
@@ -204,12 +193,10 @@ export const useLexiconStore = defineStore("lexicon", {
                 switch (ref.type) {
                     case PropertyType.Event:
                         return this.findEventPropertyById(ref.id).name;
-                    case PropertyType.EventCustom:
+                    case PropertyType.Custom:
                         return this.findEventCustomPropertyById(ref.id).name;
                     case PropertyType.User:
                         return this.findUserPropertyById(ref.id).name;
-                    case PropertyType.UserCustom:
-                        return this.findUserCustomPropertyById(ref.id).name;
                 }
                 throw new Error("unhandled");
             };

@@ -70,9 +70,10 @@
 import { EventBreakdown } from "@/stores/eventSegmentation/events";
 import { useLexiconStore } from "@/stores/lexicon";
 import PropertySelect from "@/components/events/PropertySelect.vue";
-import { EventRef, PropertyRef, PropertyType } from "@/types/events";
+import { EventRef, PropertyRef } from "@/types/events";
 import UiButton from "@/components/uikit/UiButton.vue";
 import AlphabetIdentifier from "@/components/AlphabetIdentifier.vue";
+import { PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();
 const props = defineProps<{
@@ -107,12 +108,10 @@ const propertyName = (ref: PropertyRef): string => {
     switch (ref.type) {
         case PropertyType.Event:
             return lexiconStore.findEventPropertyById(ref.id).name;
-        case PropertyType.EventCustom:
+        case PropertyType.Custom:
             return lexiconStore.findEventCustomPropertyById(ref.id).name;
         case PropertyType.User:
             return lexiconStore.findUserPropertyById(ref.id).name;
-        case PropertyType.UserCustom:
-            return lexiconStore.findUserCustomPropertyById(ref.id).name;
     }
     throw new Error("unhandled");
 };

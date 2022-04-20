@@ -1,6 +1,7 @@
 import { get, fetch } from '../apiClient'
 import { Value, OperationId } from '../../types'
 import { EventRef, PropertyRef } from '@/types/events'
+import { CreateCustomEventRequest, PropertyType } from '@/api'
 
 type PropertiesValues = {
     event_name?: string;
@@ -12,7 +13,7 @@ type PropertiesValues = {
 export type FilterCustomEvent = {
     filterType: string
     propertyName: string
-    propertyType: string
+    propertyType: PropertyType,
     operation: OperationId
     value: Value[]
     propRef: PropertyRef
@@ -26,12 +27,10 @@ export type Event = {
     ref: EventRef
 }
 
-export type CustomEvents = {
-    // projectId: number, TODO integration
-    name: string,
-    id?: number,
-    events: Event[]
-}
+export type CustomEvents = Omit<CreateCustomEventRequest, 'events'> & {
+    id?: number // TODO integration
+    events?: Event[]
+};
 
 const schemaService = {
     events: async () => await get("/schema/events", "", null),

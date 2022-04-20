@@ -144,7 +144,7 @@ import { useLexiconStore } from '@/stores/lexicon'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 
 import { Item } from "@/components/Select/SelectTypes";
-import { findOperations, operationById, OperationId, DataType } from '@/types'
+import { findOperations, operationById, OperationId } from '@/types'
 import { PropertyRef, Condition as ConditionType, EventRef } from '@/types/events'
 import { ChangeEventCondition, PayloadChangeAgregateCondition, PayloadChangeValueItem } from '@/components/events/Segments/Segments'
 
@@ -155,6 +155,7 @@ import Select from '@/components/Select/Select.vue'
 import PropertySelect from '@/components/events/PropertySelect.vue'
 import OperationSelect from '@/components/events/OperationSelect.vue'
 import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
+import { DataType } from '@/api'
 
 const lexiconStore = useLexiconStore()
 const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()

@@ -1,5 +1,5 @@
 import { createServer } from 'miragejs'
-import { DataType } from "@/types";
+import { DataType } from '@/api'
 import { EventStatus, UserProperty, UserCustomProperty } from "@/types/events";
 import splineChartMocks from "@/mocks/splineChart.json";
 

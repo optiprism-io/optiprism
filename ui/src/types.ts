@@ -1,31 +1,14 @@
-export enum DataType {
-    String = 'string',
-    Number = 'number',
-    Boolean = 'boolean',
-}
+import { PropertyFilterOperation, Value as ApiValue, DataType } from '@/api'
 
-export type Value = string | number | boolean;
+export type Value = ApiValue
 
 export interface Cohort {
     id: number;
     name: string;
 }
 
-export enum OperationId {
-    Eq = "=",
-    Neq = "neq",
-    Gt = "gt",
-    Gte = "gte",
-    Lt = "lt",
-    Lte = "lte",
-    True = "true",
-    False = "false",
-    Exists = "exists",
-    Empty = "empty",
-    ArrAll = "arr_all",
-    ArrNone = "arr_none",
-    Regex = "regex"
-}
+export const OperationId = PropertyFilterOperation;
+export type OperationId = typeof PropertyFilterOperation[keyof typeof PropertyFilterOperation]
 
 export interface Operation {
     id: OperationId;
@@ -42,7 +25,7 @@ enum OpFlag {
 
 export const operations: Operation[] = [
     {
-        id: OperationId.Eq,
+        id: OperationId.Equal,
         name: "Equal (=)",
         shortName: '='
     },
@@ -101,6 +84,11 @@ export const operations: Operation[] = [
         flags: [OpFlag.Array]
     },
     {
+        id: OperationId.ArrAny,
+        name: "Any in array",
+        flags: [OpFlag.Array]
+    },
+    {
         id: OperationId.ArrNone,
         name: "None in array",
         flags: [OpFlag.Array]
@@ -144,5 +132,3 @@ export enum Group {
     User = "user",
     Country = "country"
 }
-
-export type TimeUnit = 'day' | 'week' | 'month' | 'year'

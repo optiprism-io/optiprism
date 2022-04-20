@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { OperationId, Value } from "@/types";
-import { PropertyRef, PropertyType, EventType, EventRef } from "@/types/events";
+import { PropertyRef, EventRef } from "@/types/events";
 import { useLexiconStore } from "@/stores/lexicon";
 import schemaService from "@/api/services/schema.service";
 
@@ -92,7 +92,7 @@ export const useFiltersStore = defineStore("filters", {
                     event_name: eventRef ? lexiconStore.eventName(eventRef) : "",
                     event_type: eventRef ? eventRef.type : "",
                     property_name: lexiconStore.propertyName(propRef),
-                    property_type: PropertyType[propRef.type]
+                    property_type: propRef.type
                 });
                 if (res) {
                     valuesList = res;
@@ -103,7 +103,7 @@ export const useFiltersStore = defineStore("filters", {
 
             this.filters.push(<Filter>{
                 propRef,
-                opId: OperationId.Eq,
+                opId: OperationId.Equal,
                 values: [],
                 valuesList: valuesList,
             });
@@ -121,7 +121,7 @@ export const useFiltersStore = defineStore("filters", {
                     event_name: eventRef ? lexiconStore.eventName(eventRef) : "",
                     event_type: eventRef ? eventRef.type : "",
                     property_name: lexiconStore.propertyName(propRef),
-                    property_type: PropertyType[propRef.type]
+                    property_type: propRef.type
                 });
                 if (res) {
                     valuesList = res;
@@ -132,7 +132,7 @@ export const useFiltersStore = defineStore("filters", {
 
             this.filters[filterIdx] = <Filter>{
                 propRef,
-                opId: OperationId.Eq,
+                opId: OperationId.Equal,
                 values: [],
                 valuesList: valuesList,
             };

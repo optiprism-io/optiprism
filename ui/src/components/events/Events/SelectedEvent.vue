@@ -147,10 +147,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { EventRef, PropertyRef, PropertyType, EventQueryRef, EVENT_TYPE_REGULAR, EVENT_TYPE_CUSTOM } from "@/types/events";
+import { EventRef, PropertyRef, EventQueryRef, EVENT_TYPE_REGULAR, EVENT_TYPE_CUSTOM } from "@/types/events";
 import { OperationId, Value } from "@/types";
 import { useLexiconStore } from "@/stores/lexicon";
-import { EventBreakdown, EventFilter, EventQuery, Event, initialQuery } from '@/stores/eventSegmentation/events'
+import { EventBreakdown, EventFilter, EventQuery, Event, initialQuery, EventPayload } from '@/stores/eventSegmentation/events'
 import Select from "@/components/Select/Select.vue";
 import Filter from "@/components/events/Filter.vue";
 import Breakdown from "@/components/events/Breakdown.vue";
@@ -159,11 +159,6 @@ import { Group, Item } from "@/components/Select/SelectTypes";
 import AlphabetIdentifier from "@/components/AlphabetIdentifier.vue";
 import schemaService from '@/api/services/schema.service'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
-
-export type SetEventPayload = {
-    event: Event
-    index: number
-}
 
 type Props = {
     eventRef: EventRef
@@ -198,7 +193,7 @@ const emit = defineEmits<{
     (e: "addQuery", index: number): void;
     (e: "changeQuery", eventIdx: number, queryIdx: number, queryRef: EventQueryRef): void;
 
-    (e: 'setEvent', payload: SetEventPayload): void
+    (e: 'setEvent', payload: EventPayload): void
     (e: 'action', payload: string): void
     (e: 'edit', payload: number): void
 }>();
@@ -253,7 +248,7 @@ const addFilter = (): void => {
     }
 
     event.filters.push({
-        opId: OperationId.Eq,
+        opId: OperationId.Equal,
         values: [],
         valuesList: []
     })
@@ -273,7 +268,7 @@ const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => 
             event_name: lexiconStore.eventName(props.event.ref),
             event_type: props.event.ref.type,
             property_name: lexiconStore.propertyName(propRef),
-            property_type: PropertyType[propRef.type]
+            property_type: propRef.type
         });
         if (res) {
             valuesList = res
@@ -284,7 +279,7 @@ const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => 
 
     event.filters[filterIdx] = {
         propRef: propRef,
-        opId: OperationId.Eq,
+        opId: OperationId.Equal,
         values: [],
         valuesList: valuesList
     }

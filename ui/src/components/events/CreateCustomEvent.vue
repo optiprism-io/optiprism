@@ -61,21 +61,23 @@
 
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount, inject } from 'vue'
-import { EventRef, EVENT_TYPE_REGULAR, PropertyType } from '@/types/events'
+import { EventRef, EVENT_TYPE_REGULAR } from '@/types/events'
 import { useLexiconStore } from '@/stores/lexicon'
 import { Event, useEventsStore } from '@/stores/eventSegmentation/events'
+import { useRootStore } from '@/stores/root'
 
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
 import UiInput from '@/components/uikit/UiInput.vue'
 import UiFormLabel from '@/components//uikit/UiFormLabel.vue'
 import Select from '@/components/Select/Select.vue'
-import SelectedEvent, { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
+import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
 import schemaService, { Event as EventScheme, CustomEvents } from '@/api/services/schema.service'
 
 const i18n = inject<any>('i18n')
 
 const lexiconStore = useLexiconStore()
 const eventsStore = useEventsStore()
+const rootStore = useRootStore()
 
 const emit = defineEmits<{
     (e: 'cancel'): void
@@ -122,7 +124,7 @@ const addEvent = (ref: EventRef) => {
     })
 }
 
-const setEvent = (payload: SetEventPayload) => {
+const setEvent = (payload: EventPayload) => {
     events.value[payload.index] = payload.event
 }
 
@@ -133,8 +135,8 @@ const removeEvent = (idx: number): void => {
 const apply = async () => {
     loading.value = true
     try {
-
         const params: CustomEvents = {
+            projectId: rootStore.projectId,
             name: eventName.value,
             events: events.value.map(item => {
                 const event = lexiconStore.findEventById(item.ref.id)
@@ -155,7 +157,7 @@ const apply = async () => {
                                 eventProps.filters.push({
                                     filterType: 'property',
                                     propertyName: property.name,
-                                    propertyType: PropertyType[filter.propRef.type],
+                                    propertyType: filter.propRef.type,
                                     operation: filter.opId,
                                     value: filter.values,
                                     propRef: filter.propRef,

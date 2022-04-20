@@ -18,3 +18,11 @@ Since TypeScript cannot handle type information for `.vue` imports, they are shi
 $ npm run lint
 $ npm run build
 ```
+
+### For generate API client
+
+- [Doc](https://openapi-generator.tech/docs/generators/typescript-axios/)
+
+```
+openapi-generator generate -i api.yaml -g typescript-axios -o ./src/api
+```

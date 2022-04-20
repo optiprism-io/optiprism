@@ -19,7 +19,6 @@ import {
     EventProperty,
     EventRef,
     PropertyRef,
-    PropertyType,
     UserCustomProperty,
     UserProperty,
     EVENT_TYPE_REGULAR
@@ -27,6 +26,7 @@ import {
 import Select from "@/components/Select/Select.vue";
 import { Group, Item } from "@/components/Select/SelectTypes";
 import { useLexiconStore } from "@/stores/lexicon";
+import { PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();
 
@@ -77,7 +77,7 @@ const getEventProperties = (eventRef: EventRef) => {
 
             eventCustomProperties.forEach((prop: EventCustomProperty): void => {
                 const propertyRef: PropertyRef = {
-                    type: PropertyType.EventCustom,
+                    type: PropertyType.Custom,
                     id: prop.id
                 };
 
@@ -116,24 +116,6 @@ const items = computed(() => {
             });
         });
         ret.push({ name: "User Properties", items: items });
-    }
-
-    if (lexiconStore.userCustomProperties.length) {
-        let items: Item<PropertyRef, null>[] = [];
-        lexiconStore.userCustomProperties.forEach((prop: UserCustomProperty): void => {
-            const propertyRef: PropertyRef = {
-                type: PropertyType.UserCustom,
-                id: prop.id
-            };
-
-            items.push({
-                item: propertyRef,
-                name: prop.name,
-                disabled: checkDisable(propertyRef),
-                description: prop?.description
-            });
-        });
-        ret.push({ name: "User Custom Properties", items: items });
     }
 
     if (props.eventRef) {

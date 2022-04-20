@@ -3,7 +3,6 @@ import {
     Condition,
     PropertyRef,
     ConditionFilter,
-    PropertyType,
 } from "@/types/events";
 import { OperationId, Value } from "@/types";
 import schemaService from "@/api/services/schema.service";
@@ -161,7 +160,7 @@ export const useSegmentsStore = defineStore("segments", {
                             event_name: lexiconStore.eventName(eventRef),
                             event_type: eventRef.type,
                             property_name: lexiconStore.propertyName(payload.propRef),
-                            property_type: PropertyType[payload.propRef.type]
+                            property_type: payload.propRef.type
                         })
 
                         if (res) {
@@ -173,7 +172,7 @@ export const useSegmentsStore = defineStore("segments", {
 
                     condition.filters[payload.idxFilter] = {
                         propRef: payload.propRef,
-                        opId: OperationId.Eq,
+                        opId: OperationId.Equal,
                         values: [],
                         valuesList: valuesList
                     }
@@ -203,7 +202,7 @@ export const useSegmentsStore = defineStore("segments", {
 
                 if (condition && condition.filters) {
                     condition.filters.push(<ConditionFilter>{
-                        opId: OperationId.Eq,
+                        opId: OperationId.Equal,
                         values: [],
                         valuesList: []
                     })
@@ -283,7 +282,7 @@ export const useSegmentsStore = defineStore("segments", {
                         throw new Error('error getEventsValues')
                     }
                     condition.propRef = ref
-                    condition.opId = OperationId.Eq
+                    condition.opId = OperationId.Equal
                     condition.values = []
                     condition.period = {
                         type: 'each',
