@@ -63,7 +63,7 @@
 import { ref, computed, onBeforeMount, inject } from 'vue'
 import { EventRef, EVENT_TYPE_REGULAR } from '@/types/events'
 import { useLexiconStore } from '@/stores/lexicon'
-import { Event, useEventsStore } from '@/stores/eventSegmentation/events'
+import { Event, useEventsStore, EventPayload } from '@/stores/eventSegmentation/events'
 import { useRootStore } from '@/stores/root'
 
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
