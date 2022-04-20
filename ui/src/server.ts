@@ -1,4 +1,4 @@
-import { createServer } from "miragejs";
+import { createServer } from 'miragejs'
 import { DataType } from "@/types";
 import { EventStatus, UserProperty, UserCustomProperty } from "@/types/events";
 import splineChartMocks from "@/mocks/splineChart.json";
@@ -8,31 +8,36 @@ import eventMocks from "@/mocks/eventSegmentations/events.json";
 
 export default function ({ environment = "development" } = {}) {
     return createServer({
+        seeds(server) {
+            server.db.loadData({
+                customEvents: [],
+            })
+        },
+
         routes() {
-            this.namespace = "api";
-            this.timing = 200;
+            this.namespace = 'api'
+            this.timing = 300
 
             this.get("/schema/events", () => {
                 return eventMocks
             });
 
-            this.get("/schema/custom-events", () => {
-                return [
-                    {
-                        id: 5,
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 0,
-                        isSystem: true,
-                        status: EventStatus.Enabled,
-                        name: "Custom event",
-                        description: "This is custom event",
-                        tags: ["1"]
-                    }
-                ];
-            });
+            this.get('/schema/custom-events', (schema) => {
+                return schema.db.customEvents
+            })
+
+            this.post('/schema/custom-events', (schema, request) => {
+                const customEvents = JSON.parse(request.requestBody)
+
+                return schema.db.customEvents.insert(customEvents)
+            })
+
+            this.put('/schema/custom-events', (schema, request) => {
+                const customEvent = JSON.parse(request.requestBody)
+                schema.db.customEvents.update(customEvent.id, customEvent)
+
+                return schema.db.customEvents
+            })
 
             this.get("/schema/event-properties", () => {
                 return [
@@ -272,7 +277,7 @@ export default function ({ environment = "development" } = {}) {
                         description: "Country description",
                         status: EventStatus.Enabled,
                         type: DataType.String,
-                        nullable: false,
+                        nullable: true,
                         isArray: true,
                         isDictionary: true,
                         dictionaryType: DataType.Number

@@ -1,6 +1,7 @@
 import { DataType, OperationId, Value } from '@/types'
 import { AggregateId } from '@/types/aggregate'
 import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
+import { Event as EventScheme } from '@/api/services/schema.service'
 
 export const EVENT_TYPE_REGULAR = 'regular'
 export const EVENT_TYPE_CUSTOM = 'custom'
@@ -65,6 +66,7 @@ export interface CustomEvent {
     description?: string;
     status: EventStatus;
     displayName?: string;
+    events?: EventScheme[]
 }
 
 export interface Event {

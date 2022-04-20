@@ -6,6 +6,7 @@
             :index="index"
             :name="item.name"
             :conditions="item.conditions || []"
+            :auto-hide-event="!commonStore.showCreateCustomEvent"
             @on-remove="deleteSegment"
             @on-rename="onRenameSegment"
             @add-condition="addCondition"
@@ -41,6 +42,8 @@ import {
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useLexiconStore } from '@/stores/lexicon'
+import { useCommonStore } from '@/stores/common'
+
 import Segment from '@/components/events/Segments/Segment.vue'
 import { conditions } from '@/configs/events/segmentCondition'
 import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
@@ -50,6 +53,7 @@ const i18n = inject<any>('i18n')
 const segmentsStore = useSegmentsStore()
 const eventsStore = useEventsStore()
 const lexiconStore = useLexiconStore()
+const commonStore = useCommonStore()
 
 const conditionAggregateItems = computed(() => {
     return aggregates.map(item => {
@@ -140,6 +144,16 @@ provide('changeCompareEventCondition', (payload: ChangeEventCondition) => {
     segmentsStore.changeCompareEventCondition(payload)
 })
 
+provide('actionEvent', (payload: string) => {
+    if (payload === 'createCustomEvent') {
+        commonStore.togglePopupCreateCustomEvent(true)
+    }
+})
+
+provide('editEvent', (payload: number) => {
+    eventsStore.setEditCustomEvent(payload)
+    commonStore.togglePopupCreateCustomEvent(true)
+})
 
 watch(
     segmentsStore.segments,

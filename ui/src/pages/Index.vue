@@ -46,6 +46,12 @@
         <div class="pf-l-grid__item pf-m-12-col">
             <EventsViews />
         </div>
+
+        <CreateCustomEvent
+            v-if="commonStore.showCreateCustomEvent"
+            @apply="applyCreateCustomEvent"
+            @cancel="togglePopupCreateCustomEvent(false)"
+        />
     </div>
 </template>
 
@@ -56,11 +62,15 @@ import Breakdowns from "@/components/events/Breakdowns.vue";
 import Filters from "@/components/events/Filters.vue";
 import Segments from "@/components/events/Segments/Segments.vue";
 import EventsViews from "@/components/events/EventsViews.vue";
+import CreateCustomEvent from '@/components/events/CreateCustomEvent.vue'
+
 import { useLexiconStore } from "@/stores/lexicon";
 import { useEventsStore } from "@/stores/eventSegmentation/events";
+import { useCommonStore } from '@/stores/common'
 
 const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
+const commonStore = useCommonStore()
 
 onBeforeMount(async () => {
     await lexiconStore.getEvents();
@@ -73,6 +83,14 @@ onBeforeMount(async () => {
 onUnmounted(() => {
     eventsStore.$reset();
 });
+
+const togglePopupCreateCustomEvent = (payload: boolean) => {
+    commonStore.togglePopupCreateCustomEvent(payload)
+}
+
+const applyCreateCustomEvent = () => {
+    togglePopupCreateCustomEvent(false)
+}
 </script>
 
 <style scoped lang="scss">

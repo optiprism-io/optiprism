@@ -2,14 +2,13 @@
     <VDropdown
         placement="bottom-start"
         class="multi-select"
+        :container="props.popperContainer || 'body'"
     >
         <span class="multi-select__action">
             <slot />
         </span>
         <template #popper>
-            <div
-                class="pf-c-card pf-m-compact pf-u-min-width"
-            >
+            <div class="pf-c-card pf-m-compact pf-u-min-width">
                 <MultiSelectList
                     :items="itemsSelect"
                     :selected="selected"
@@ -23,8 +22,8 @@
 </template>
 
 <script setup lang="ts">
-import MultiSelectList from "@/components/MultiSelect/MultiSelectList.vue";
-import { ref, computed } from "vue";
+import { ref, computed } from 'vue'
+import MultiSelectList from '@/components/MultiSelect/MultiSelectList.vue'
 
 export interface Item {
     item: any;
@@ -40,10 +39,11 @@ const emit = defineEmits<{
 const props = defineProps<{
     items: Item[];
     selected?: any;
+    popperContainer?: string
 }>();
 
 let key = ref(0);
-const searchRef = ref("");
+const searchRef = ref('');
 
 const itemsSelect = computed(() => {
     if (searchRef.value) {

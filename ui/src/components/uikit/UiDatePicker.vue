@@ -126,7 +126,6 @@ const onToggle = () => {
 
 const onHide = () => {
     isOpen.value = false
-    activeTab.value = props.activeTabControls
 }
 
 const onSelectTab = (type: string) => {

@@ -1,12 +1,22 @@
+export interface Action {
+    type: string
+    link?: string
+    icon?: string
+    text: string
+}
+
 export interface Item<T, K>{
     item: T;
     name: string;
     description?: string;
     disabled?: boolean | undefined;
     items?: K | undefined;
+    editable?: boolean
 }
 
 export interface Group<T>{
-    name: string;
-    items: T;
+    type?: string
+    name: string
+    items: T
+    action?: Action
 }

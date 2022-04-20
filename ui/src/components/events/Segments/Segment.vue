@@ -46,6 +46,7 @@
                 :condition="condition"
                 :update-open="updateOpenCondition"
                 :index-parent="props.index"
+                :auto-hide-event="props.autoHideEvent"
             />
         </div>
     </div>
@@ -62,6 +63,7 @@ interface Props {
     index: number
     name: string
     conditions: ConditionType[]
+    autoHideEvent?: boolean
 }
 
 const props = defineProps<Props>()

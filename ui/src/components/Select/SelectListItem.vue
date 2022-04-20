@@ -50,6 +50,20 @@
         >
             <span class="select-list-item__content">
                 <span class="pf-c-menu__item-text">{{ text }}</span>
+                <div
+                    v-if="editable"
+                    class="select-list-item__content-edit"
+                    @click="edit"
+                >
+                    <VTooltip
+                        popper-class="ui-hint"
+                    >
+                        <UiIcon icon="fas fa-edit" />
+                        <template #popper>
+                            {{ $t('common.edit') }}
+                        </template>
+                    </VTooltip>
+                </div>
             </span>
         </div>
     </li>
@@ -65,10 +79,12 @@ const props = defineProps<{
     selected?: any;
     text: string;
     isDisabled?: boolean;
+    editable?: boolean
 }>();
 
 const emit = defineEmits<{
     (e: "click", item: any): void;
+    (e: 'edit', payload: number): void
 }>();
 
 const isSelected = computed(() => {
@@ -84,7 +100,12 @@ const clickList = (payload: any) => {
         ...props.item,
         ...payload,
     })
-};
+}
+
+const edit = (e: Event) => {
+    e.stopPropagation()
+    emit('edit', props.item.id)
+}
 </script>
 
 <style lang="scss">
@@ -122,6 +143,22 @@ const clickList = (payload: any) => {
     &__content {
         display: flex;
         align-items: center;
+        padding-right: 1rem;
+        position: relative;
+
+        &:hover {
+            .select-list-item__content-edit {
+                opacity: 1;
+            }
+        }
+    }
+
+    &__content-edit {
+        position: absolute;
+        top: 50%;
+        right: 2px;
+        transform: translateY(-50%);
+        opacity: 0;
     }
 }
 </style>

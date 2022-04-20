@@ -157,7 +157,7 @@ export const useSegmentsStore = defineStore("segments", {
                     try {
                         const lexiconStore = useLexiconStore()
 
-                        const res = await schemaService.propertiesValues({
+                        const res = await schemaService.propertryValues({
                             event_name: lexiconStore.eventName(eventRef),
                             event_type: eventRef.type,
                             property_name: lexiconStore.propertyName(payload.propRef),
@@ -270,7 +270,7 @@ export const useSegmentsStore = defineStore("segments", {
                     const lexiconStore = useLexiconStore()
 
                     try {
-                        const res = await schemaService.propertiesValues({
+                        const res = await schemaService.propertryValues({
                             // TODO integration with backand
                             // check condition type
                             property_name: lexiconStore.propertyName(ref),

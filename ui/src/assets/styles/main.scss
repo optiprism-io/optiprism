@@ -30,7 +30,11 @@
 
 .v-popper {
     &__popper {
+        z-index: 1001;
+
         &.ui-hint {
+            z-index: 1003;
+
             .v-popper__inner {
                 position: relative;
                 max-width: 18.75rem;

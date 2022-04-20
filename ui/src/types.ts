@@ -36,8 +36,8 @@ export interface Operation {
 }
 
 enum OpFlag {
-    Null,
-    Array
+    Null = 'Null',
+    Array = 'Array'
 }
 
 export const operations: Operation[] = [

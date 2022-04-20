@@ -4,7 +4,11 @@
             grouped
             :items="lexiconStore.eventsList"
             :width-auto="true"
+            :auto-hide="autoHideEvent"
             @select="changeEvent"
+            @action="selectAction"
+            @edit="edit"
+            @on-hover="onHoverEvent"
         >
             <UiButton
                 class="pf-m-main"
@@ -16,6 +20,22 @@
             >
                 {{ props.condition?.event?.name || $t('common.add_event') }}
             </UiButton>
+            <template
+                v-if="hoveredCustomEventId"
+                #description
+            >
+                <SelectedEvent
+                    v-for="(event, i) in hoveredCustomEventDescription"
+                    :key="i"
+                    :event="event"
+                    :event-ref="event.ref"
+                    :filters="event.filters"
+                    :index="i"
+                    :show-breakdowns="false"
+                    :show-query="false"
+                    :for-preview="true"
+                />
+            </template>
         </Select>
     </div>
     <div
@@ -121,6 +141,7 @@
 import { inject, computed } from 'vue'
 
 import { useLexiconStore } from '@/stores/lexicon'
+import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 
 import { Item } from "@/components/Select/SelectTypes";
 import { findOperations, operationById, OperationId, DataType } from '@/types'
@@ -133,8 +154,10 @@ import { conditions } from '@/configs/events/segmentCondition'
 import Select from '@/components/Select/Select.vue'
 import PropertySelect from '@/components/events/PropertySelect.vue'
 import OperationSelect from '@/components/events/OperationSelect.vue'
+import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
 
 const lexiconStore = useLexiconStore()
+const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()
 const i18n = inject<any>('i18n')
 
 interface Props {
@@ -142,8 +165,11 @@ interface Props {
     indexParent: number
     condition: ConditionType
     updateOpen?: boolean
+    autoHideEvent?: boolean
 }
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    autoHideEvent: true
+})
 
 const emit = defineEmits<{
     (e: 'change-property', propRef: PropertyRef): void
@@ -173,6 +199,8 @@ const conditionConfig = computed(() => {
  */
 const changeEventCondition = inject<(payload: ChangeEventCondition) => void>('changeEventCondition')
 const changeCompareEventCondition = inject<(payload: ChangeEventCondition) => void>('changeCompareEventCondition')
+const actionEvent = inject<(payload: string) => void>('actionEvent')
+const editEvent = inject<(payload: number) => void>('editEvent')
 
 const changeEvent = (ref: EventRef) => {
     changeEventCondition && changeEventCondition({
@@ -180,6 +208,14 @@ const changeEvent = (ref: EventRef) => {
         idxParent: props.indexParent,
         ref,
     })
+}
+
+const selectAction = (payload: string) => {
+    actionEvent && actionEvent(payload)
+}
+
+const edit = (payload: number) => {
+    editEvent && editEvent(payload)
 }
 
 const changeCompareEvent = (ref: EventRef) => {

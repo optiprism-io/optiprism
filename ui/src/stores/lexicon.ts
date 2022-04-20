@@ -6,7 +6,6 @@ import {
     Event,
     EventCustomProperty,
     UserProperty,
-    EventType,
     customEventRef,
     eventRef,
     PropertyRef,
@@ -227,21 +226,27 @@ export const useLexiconStore = defineStore("lexicon", {
         eventsList(state: Lexicon) {
             const eventsList: Group<Item<EventRef, null>[]>[] = [];
 
-            if (state.customEvents.length) {
-                const items: Item<EventRef, null>[] = [];
+            const items: Item<EventRef, null>[] = [];
 
-                state.customEvents.forEach((e: CustomEvent) => {
-                    items.push({
-                        item: customEventRef(e),
-                        name: e.name,
-                        description: e?.description
-                    });
+            state.customEvents.forEach((e: CustomEvent) => {
+                items.push({
+                    item: customEventRef(e),
+                    name: e.name,
+                    description: e?.description,
+                    editable: true
                 });
+            });
 
-                if (items.length) {
-                    eventsList.push({ name: "Custom Events", items });
+            eventsList.push({
+                type: 'custom',
+                name: 'Custom Events',
+                items,
+                action: {
+                    type: 'createCustomEvent',
+                    icon: 'fas fa-plus-circle',
+                    text: 'common.create',
                 }
-            }
+            })
 
             state.events.forEach((e: Event) => {
                 const item: Item<EventRef, null> = {

@@ -26,6 +26,7 @@
                 :index-parent="props.indexParent"
                 :condition="props.condition"
                 :update-open="props.updateOpen"
+                :auto-hide-event="props.autoHideEvent"
                 @change-property="changeProperty"
                 @change-operation="changeOperation"
             />
@@ -175,7 +176,7 @@
 </template>
 
 <script lang="ts" setup>
-import { inject, computed, ref } from 'vue'
+import { inject, computed, ref, defineAsyncComponent } from 'vue'
 import { operationById, OperationId, Value } from '@/types'
 import { PropertyRef, Condition as ConditionType } from '@/types/events'
 import {
@@ -200,7 +201,7 @@ import OperationSelect from '@/components/events/OperationSelect.vue'
 import ValueSelect from '@/components/events/ValueSelect.vue'
 import Filter from '@/components/events/Filter.vue'
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
-import ConditionDidEvent from './ConditionDidEvent.vue'
+const ConditionDidEvent = defineAsyncComponent(() => import('./ConditionDidEvent.vue'))
 
 const i18n = inject<any>('i18n')
 
@@ -209,6 +210,7 @@ interface Props {
     indexParent: number
     condition: ConditionType
     updateOpen?: boolean
+    autoHideEvent?: boolean
 }
 
 const lexiconStore = useLexiconStore()

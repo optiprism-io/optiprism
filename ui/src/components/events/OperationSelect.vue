@@ -3,6 +3,7 @@
         :items="items"
         :selected="selectedItem"
         :width-auto="true"
+        :container="props.popperContainer || 'body'"
         @select="select"
     >
         <slot />
@@ -23,6 +24,7 @@ const props = defineProps<{
     propertyRef?: PropertyRef
     opItems?: Item<OperationId, null>[]
     selected?: OperationId
+    popperContainer?: string
 }>();
 
 const emit = defineEmits<{

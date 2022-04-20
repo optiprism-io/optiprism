@@ -17,9 +17,13 @@
                     :event-ref="eventRef"
                     :event-refs="eventRefs"
                     :selected="filter.propRef"
+                    :popper-container="props.popperContainer"
                     @select="changeProperty"
                 >
-                    <UiButton class="pf-m-main pf-m-secondary">
+                    <UiButton
+                        class="pf-m-main"
+                        :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                    >
                         {{ propertyName(filter.propRef) }}
                     </UiButton>
                 </PropertySelect>
@@ -28,6 +32,7 @@
                     :is-open-mount="true"
                     :event-ref="eventRef"
                     :update-open="updateOpen"
+                    :popper-container="props.popperContainer"
                     @select="changeProperty"
                 >
                     <UiButton
@@ -42,15 +47,19 @@
             </div>
 
             <div
-                v-if="filter.propRef"
+                v-if="isShowOperation && filter.propRef"
                 class="pf-c-action-list__item"
             >
                 <OperationSelect
                     :property-ref="filter.propRef"
                     :selected="filter.opId"
+                    :popper-container="props.popperContainer"
                     @select="changeOperation"
                 >
-                    <UiButton class="pf-m-main pf-m-secondary">
+                    <UiButton
+                        class="pf-m-main"
+                        :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                    >
                         {{ operationButtonText }}
                     </UiButton>
                 </OperationSelect>
@@ -64,6 +73,7 @@
                     :property-ref="filter.propRef"
                     :selected="filter.values"
                     :items="filterItemValues"
+                    :popper-container="props.popperContainer"
                     @add="addValue"
                     @deselect="removeValue"
                 >
@@ -74,10 +84,16 @@
                                 :key="i"
                                 class="pf-c-action-list__item"
                             >
-                                <UiButton class="pf-m-main pf-m-secondary">
+                                <UiButton
+                                    class="pf-m-main"
+                                    :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                                >
                                     {{ value }}
 
-                                    <span class="pf-c-button__icon pf-m-end">
+                                    <span
+                                        v-if="!props.forPreview"
+                                        class="pf-c-button__icon pf-m-end"
+                                    >
                                         <UiIcon
                                             icon="fas fa-times"
                                             @click.stop="removeValueButton(value)"
@@ -143,6 +159,8 @@ const props = defineProps<{
     index: number;
     updateOpen?: boolean;
     showIdentifier?: boolean;
+    popperContainer?: string
+    forPreview?: boolean
 }>();
 
 const emit = defineEmits<{
@@ -163,7 +181,14 @@ const filterItemValues = computed(() =>
         return { item, name: item };
     })
 );
-const isShowValues = computed(() => !["exists", "empty"].includes(props.filter.opId));
+
+const isShowOperation = computed(() => {
+    return !(props.forPreview && !props.filter.values.length)
+})
+
+const isShowValues = computed(() => {
+    return !['exists', 'empty'].includes(props.filter.opId) && isShowOperation.value
+})
 
 const removeFilter = (): void => {
     emit("removeFilter", props.index);
