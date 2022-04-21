@@ -27,7 +27,6 @@ fn assert(l: &Property, r: &Property) {
     assert_eq!(l.status, r.status);
     assert_eq!(l.scope, r.scope);
     assert_eq!(l.typ, r.typ);
-    assert_eq!(l.col_id, r.col_id);
     assert_eq!(l.nullable, r.nullable);
     assert_eq!(l.is_array, r.is_dictionary);
     assert_eq!(l.dictionary_type, r.dictionary_type);
@@ -43,7 +42,6 @@ async fn test_event_properties() -> Result<()> {
     let events_provider = Arc::new(PropertiesProvider::new_event(prov.clone()));
     tokio::spawn(async {
         let app = properties::attach_event_routes(Router::new())
-            .layer(AddExtensionLayer::new(events_provider));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
         Server::bind(&addr)
@@ -71,7 +69,6 @@ async fn test_event_properties() -> Result<()> {
         nullable: true,
         is_array: true,
         is_dictionary: true,
-        col_id: 1,
         dictionary_type: Some(DataType::Utf8),
     };
 

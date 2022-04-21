@@ -5,7 +5,7 @@ use datafusion_common::ScalarValue;
 use datafusion_expr::AggregateFunction;
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum SegmentTime {
     Between {
         from: DateTime<Utc>,
@@ -25,13 +25,13 @@ pub enum SegmentTime {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ChartType {
     Line,
     Bar,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Analysis {
     Linear,
     RollingAverage { window: usize, unit: TimeUnit },
@@ -39,13 +39,13 @@ pub enum Analysis {
     Cumulative,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Compare {
     pub offset: usize,
     pub unit: TimeUnit,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum QueryAggregate {
     Min,
     Max,
@@ -76,7 +76,7 @@ impl QueryAggregate {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum QueryAggregatePerGroup {
     Min,
     Max,
@@ -86,12 +86,12 @@ pub enum QueryAggregatePerGroup {
     DistinctCount,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum QueryPerGroup {
     CountEvents,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Query {
     CountEvents,
     CountUniqueGroups,
@@ -115,7 +115,7 @@ pub enum Query {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NamedQuery {
     pub agg: Query,
     pub name: Option<String>,
@@ -127,7 +127,7 @@ impl NamedQuery {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum EventFilter {
     Property {
         property: PropertyRef,
@@ -136,12 +136,12 @@ pub enum EventFilter {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Breakdown {
     Property(PropertyRef),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Event {
     pub event: EventRef,
     pub filters: Option<Vec<EventFilter>>,
@@ -165,17 +165,17 @@ impl Event {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum SegmentCondition {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Segment {
     name: String,
     conditions: Vec<SegmentCondition>,
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EventSegmentation {
     pub time: QueryTime,
     pub group: String,

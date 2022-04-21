@@ -84,6 +84,10 @@ impl IntoResponse for Error {
                     "internal server error".to_string(),
                 ),
             },
+            Error::QueryError(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("query error: {:?}", err),
+            ),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal server error".to_string(),

@@ -89,8 +89,8 @@ impl LogicalPlanBuilder {
                 .iter()
                 .flat_map(|e| {
                     e.queries
-                        .iter()
-                        .map(|q| q.clone().name.unwrap())
+                        .iter().enumerate()
+                        .map(|(idx,q)| idx.to_string())
                 })
                 .collect();
 

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use metadata::{database, Metadata, organizations, projects};
 use query::QueryProvider;
-use crate::{accounts, AccountsProvider, auth, AuthProvider, events, EventsProvider, properties, PropertiesProvider, ReportsProvider};
+use crate::{accounts, AccountsProvider, auth, AuthProvider, events, EventSegmentationProvider, EventsProvider, properties, PropertiesProvider};
 
 pub struct Platform {
     pub events: Arc<EventsProvider>,
@@ -9,7 +9,7 @@ pub struct Platform {
     pub user_properties: Arc<PropertiesProvider>,
     pub accounts: Arc<AccountsProvider>,
     pub auth: Arc<AuthProvider>,
-    pub reports: Arc<ReportsProvider>,
+    pub event_segmentation: Arc<EventSegmentationProvider>,
 }
 
 impl Platform {
@@ -20,7 +20,7 @@ impl Platform {
             user_properties: Arc::new(PropertiesProvider::new_user(md.user_properties.clone())),
             accounts: Arc::new(AccountsProvider::new(md.accounts.clone())),
             auth: Arc::new(AuthProvider::new(md.clone())),
-            reports: Arc::new(ReportsProvider::new(query)),
+            event_segmentation: Arc::new(EventSegmentationProvider::new(query)),
         }
     }
 }

@@ -15,4 +15,4 @@ pub use events::Provider as EventsProvider;
 pub use auth::Provider as AuthProvider;
 pub use accounts::Provider as AccountsProvider;
 pub use properties::Provider as PropertiesProvider;
-pub use event_segmentation::Provider as ReportsProvider;
+pub use event_segmentation::Provider as EventSegmentationProvider;

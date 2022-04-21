@@ -111,7 +111,6 @@ pub fn named_property_expression(
     values: Option<Vec<ScalarValue>>,
 ) -> Result<Expr> {
     match operation {
-        _ => unimplemented!(),
         PropValueOperation::Eq | PropValueOperation::Neq => {
             // expressions for OR
             let mut exprs: Vec<Expr> = vec![];
@@ -142,5 +141,6 @@ pub fn named_property_expression(
         // for isNull and isNotNull we don't need values at all
         PropValueOperation::Empty => Ok(prop_col.is_null()),
         PropValueOperation::Exists => Ok(prop_col.is_not_null()),
+        _ => unimplemented!(),
     }
 }

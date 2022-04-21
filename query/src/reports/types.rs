@@ -3,7 +3,7 @@ use datafusion_expr::Operator;
 use datafusion::physical_plan::aggregates::AggregateFunction as DFAggregateFunction;
 use crate::physical_plan::expressions::partitioned_aggregate;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum QueryTime {
     Between {
         from: DateTime<Utc>,
@@ -16,7 +16,7 @@ pub enum QueryTime {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TimeUnit {
     Second,
     Minute,
@@ -41,7 +41,7 @@ impl TimeUnit {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum PropertyRef {
     User(String),
     Event(String),
@@ -58,7 +58,7 @@ impl PropertyRef {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum EventRef {
     Regular(String),
     Custom(String),
@@ -72,7 +72,7 @@ impl EventRef {
         }
     }
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum PropValueOperation {
     Eq,
     Neq,
