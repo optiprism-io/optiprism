@@ -1,7 +1,6 @@
 use arrow::record_batch::RecordBatch;
 use datafusion_common::ScalarValue;
 use crate::Result;
-use datafusion::error::Result as DFResult;
 
 use serde::{Serialize, Deserialize};
 

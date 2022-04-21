@@ -1,5 +1,5 @@
 use std::ops::Sub;
-use crate::reports::common::{PropValueOperation, PropertyRef, QueryTime};
+use crate::reports::types::{PropValueOperation, PropertyRef, QueryTime};
 use crate::{event_fields, Context, Error, Result};
 use datafusion::error::Result as DFResult;
 use datafusion_common::{Column, DFSchema, ScalarValue};

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use axum::extract::{Extension};
 use axum::{AddExtensionLayer, Json, Router, routing};
 
-use query::reports::event_segmentation::types::EventSegmentation;
+use crate::event_segmentation::types::EventSegmentation;
 use query::reports::results::Series;
 use crate::{Context, ReportsProvider};
 use crate::Result;

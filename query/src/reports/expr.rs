@@ -8,7 +8,7 @@ use metadata::Metadata;
 use metadata::properties::provider::Namespace;
 use crate::{Context, Error, event_fields};
 use crate::logical_plan::expr::{lit_timestamp, multi_or};
-use crate::reports::common::{PropertyRef, PropValueOperation, QueryTime};
+use crate::reports::types::{PropertyRef, PropValueOperation, QueryTime};
 use crate::Result;
 
 /// builds expression on timestamp
@@ -75,8 +75,7 @@ pub async fn property_expression(
             let prop_col = property_col(ctx, md, &property).await?;
             named_property_expression(prop_col, operation, value)
         }
-        PropertyRef::UserCustom(_) => unimplemented!(),
-        PropertyRef::EventCustom(_) => unimplemented!(),
+        PropertyRef::Custom(_) => unimplemented!(),
     }
 }
 
@@ -94,7 +93,6 @@ pub async fn property_col(
                 .await?;
             col(prop.column_name(Namespace::User).as_str())
         }
-        PropertyRef::UserCustom(_prop_name) => unimplemented!(),
         PropertyRef::Event(prop_name) => {
             let prop = md
                 .event_properties
@@ -102,7 +100,7 @@ pub async fn property_col(
                 .await?;
             col(prop.column_name(Namespace::Event).as_str())
         }
-        PropertyRef::EventCustom(_) => unimplemented!(),
+        PropertyRef::Custom(_prop_name) => unimplemented!(),
     })
 }
 
@@ -113,6 +111,7 @@ pub fn named_property_expression(
     values: Option<Vec<ScalarValue>>,
 ) -> Result<Expr> {
     match operation {
+        _ => unimplemented!(),
         PropValueOperation::Eq | PropValueOperation::Neq => {
             // expressions for OR
             let mut exprs: Vec<Expr> = vec![];
@@ -141,7 +140,7 @@ pub fn named_property_expression(
             })
         }
         // for isNull and isNotNull we don't need values at all
-        PropValueOperation::IsNull => Ok(prop_col.is_null()),
-        PropValueOperation::IsNotNull => Ok(prop_col.is_not_null()),
+        PropValueOperation::Empty => Ok(prop_col.is_null()),
+        PropValueOperation::Exists => Ok(prop_col.is_not_null()),
     }
 }

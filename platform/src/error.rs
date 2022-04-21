@@ -28,11 +28,14 @@ impl InternalError {
 #[derive(Debug)]
 pub enum Error {
     Internal(InternalError),
+    BadRequest(String),
     SerdeError(serde_json::Error),
     CommonError(CommonError),
     MetadataError(MetadataError),
     QueryError(QueryError),
 }
+
+impl std::error::Error for Error {}
 
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
@@ -86,6 +89,6 @@ impl IntoResponse for Error {
                 "internal server error".to_string(),
             ),
         }
-        .into_response()
+            .into_response()
     }
 }

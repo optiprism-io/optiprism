@@ -4,9 +4,8 @@ use datafusion::logical_plan::{
     create_udaf, exprlist_to_fields, Column, DFField, DFSchema, LogicalPlan, Operator,
 };
 use datafusion::physical_plan::aggregates::{return_type, AggregateFunction};
-use datafusion::scalar::ScalarValue as DFScalarValue;
 
-use crate::reports::common::{PropValueOperation, PropertyRef, QueryTime, TimeUnit};
+use crate::reports::types::{PropValueOperation, PropertyRef, QueryTime, TimeUnit, EventRef};
 use crate::logical_plan::expr::{aggregate_partitioned, multi_and, sorted_distinct_count};
 use crate::physical_plan::expressions::aggregate::state_types;
 use crate::physical_plan::expressions::partitioned_aggregate::{
@@ -16,7 +15,6 @@ use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCoun
 use crate::{event_fields, Context};
 use arrow::datatypes::DataType;
 use axum::response::IntoResponse;
-use common::ScalarValue;
 use datafusion::error::Result as DFResult;
 use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
 use datafusion::logical_plan::ExprSchemable;
@@ -39,6 +37,7 @@ use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan::unpivot::UnpivotExec;
 use serde::{Deserialize, Serialize};
+use datafusion_common::ScalarValue;
 use crate::reports::event_segmentation::types::{Breakdown, Event, EventFilter, EventSegmentation, Query};
 use crate::reports::expr::{property_col, property_expression, time_expression};
 
@@ -237,7 +236,7 @@ impl LogicalPlanBuilder {
                         input.schema(),
                         col(self.es.group.as_ref()),
                         PartitionedAggregateFunction::Count,
-                        aggregate.into(),
+                        aggregate.clone(),
                         vec![col(self.es.group.as_ref())],
                     )?,
                     Query::AggregatePropertyPerGroup {
@@ -247,8 +246,8 @@ impl LogicalPlanBuilder {
                     } => aggregate_partitioned(
                         input.schema(),
                         col(self.es.group.as_ref()),
-                        aggregate_per_group.into(),
-                        aggregate.into(),
+                        aggregate_per_group.clone(),
+                        aggregate.clone(),
                         vec![executor::block_on(property_col(
                             &self.ctx,
                             &self.metadata,
@@ -259,7 +258,7 @@ impl LogicalPlanBuilder {
                         property,
                         aggregate,
                     } => Expr::AggregateFunction {
-                        fun: aggregate.into(),
+                        fun: aggregate.clone(),
                         args: vec![executor::block_on(property_col(
                             &self.ctx,
                             &self.metadata,
@@ -311,7 +310,7 @@ impl LogicalPlanBuilder {
                 let mut expr = binary_expr(
                     col(event_fields::EVENT),
                     Operator::Eq,
-                    lit(DFScalarValue::from(e.id as u16)),
+                    lit(ScalarValue::from(e.id as u16)),
                 );
 
                 // apply filters
@@ -339,9 +338,9 @@ impl LogicalPlanBuilder {
                         operation,
                         value,
                     } => {
-                        let df_value: Option<Vec<DFScalarValue>> = value
+                        let df_value: Option<Vec<ScalarValue>> = value
                             .as_ref()
-                            .map(|x| x.iter().map(|s| s.clone().to_df()).collect());
+                            .map(|x| x.iter().map(|s| s.clone()).collect());
                         executor::block_on(property_expression(
                             &self.ctx,
                             &self.metadata,
@@ -369,8 +368,7 @@ impl LogicalPlanBuilder {
                     let prop_col = property_col(&self.ctx, &self.metadata, &prop_ref).await?;
                     Ok(Expr::Alias(Box::new(prop_col), prop_name.clone()))
                 }
-                PropertyRef::UserCustom(_) => unimplemented!(),
-                PropertyRef::EventCustom(_) => unimplemented!(),
+                PropertyRef::Custom(_) => unimplemented!(),
             },
         }
     }
@@ -386,21 +384,5 @@ impl EventSegmentation {
                     .map(|q| q.clone().name.unwrap())
             })
             .collect()
-    }
-}
-
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum EventRef {
-    Regular(String),
-    Custom(String),
-}
-
-impl EventRef {
-    pub fn name(&self) -> String {
-        match self {
-            EventRef::Regular(name) => name.clone(),
-            EventRef::Custom(name) => name.clone(),
-        }
     }
 }

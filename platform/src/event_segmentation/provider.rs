@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use query::QueryProvider;
-use query::reports::event_segmentation::types::EventSegmentation;
+use crate::event_segmentation::types::EventSegmentation;
 use query::reports::results::Series;
 use crate::Context;
 use crate::Result;
@@ -15,6 +15,6 @@ impl Provider {
     }
 
     pub async fn event_segmentation(&self, ctx: Context, req: EventSegmentation) -> Result<Series> {
-        Ok(self.query.event_segmentation(ctx.into(),req).await?)
+        Ok(self.query.event_segmentation(ctx.into(),req.try_into()?).await?)
     }
 }
