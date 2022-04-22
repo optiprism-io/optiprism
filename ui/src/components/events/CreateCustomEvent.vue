@@ -64,7 +64,7 @@ import { ref, computed, onBeforeMount, inject } from 'vue'
 import { EventRef, EVENT_TYPE_REGULAR } from '@/types/events'
 import { useLexiconStore } from '@/stores/lexicon'
 import { Event, useEventsStore, EventPayload } from '@/stores/eventSegmentation/events'
-import { useRootStore } from '@/stores/root'
+import { useCommonStore } from '@/stores/common'
 
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
 import UiInput from '@/components/uikit/UiInput.vue'
@@ -77,7 +77,7 @@ const i18n = inject<any>('i18n')
 
 const lexiconStore = useLexiconStore()
 const eventsStore = useEventsStore()
-const rootStore = useRootStore()
+const commonStore = useCommonStore()
 
 const emit = defineEmits<{
     (e: 'cancel'): void
@@ -135,8 +135,8 @@ const removeEvent = (idx: number): void => {
 const apply = async () => {
     loading.value = true
     try {
-        const params: CustomEvents = {
-            projectId: rootStore.projectId,
+        const data: CustomEvents = {
+            projectId: commonStore.projectId,
             name: eventName.value,
             events: events.value.map(item => {
                 const event = lexiconStore.findEventById(item.ref.id)
@@ -173,18 +173,21 @@ const apply = async () => {
         }
 
         if (isEdit.value) {
-            params.id = editedEvent.value?.id
+            const editData = {
+                id: editedEvent.value?.id,
+                ...data,
+            }
 
-            await schemaService.editCustomEvent(params)
+            await schemaService.editCustomEvent(editData)
         } else {
-            await schemaService.createCustomEvent(params)
+            await schemaService.postCustomEvent(String(commonStore.projectId), data)
         }
 
 
         await lexiconStore.getEvents()
-    } catch {
+    } catch(error: unknown) {
         loading.value = false
-        throw new Error('create custom events error');
+        throw Error(JSON.stringify(error))
     }
 
     loading.value = false

@@ -1,5 +1,6 @@
 import { createServer } from 'miragejs'
 import { DataType } from '@/api'
+import { BASE_PATH } from '@/api/base'
 import { EventStatus, UserProperty, UserCustomProperty } from "@/types/events";
 import splineChartMocks from "@/mocks/splineChart.json";
 
@@ -26,7 +27,7 @@ export default function ({ environment = "development" } = {}) {
                 return schema.db.customEvents
             })
 
-            this.post('/schema/custom-events', (schema, request) => {
+            this.post(`${BASE_PATH}/v1/projects/:project_id/schema/custom-events`, (schema, request) => {
                 const customEvents = JSON.parse(request.requestBody)
 
                 return schema.db.customEvents.insert(customEvents)
