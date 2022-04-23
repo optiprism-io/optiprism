@@ -9,7 +9,45 @@ Optimize your product and increase users engagement.
 
 - Analytics
   - [ ] Event segmentation
+    - [ ] Queries
+      - [ ] Total events
+      - [ ] Count unique
+      - [ ] DAU, WAU, MAU
+      - [ ] Count users
+      - [ ] Aggregate property (sum, avg, median, min, max)
+      - [ ] Aggregate property per user
+      - [ ] Formula
+    - [ ] Filters
+    - [ ] Breakdowns
+    - [ ] Segmentation
+    - [ ] Compare periods
+    - [ ] Analysis
+      - [ ] Linear
+      - [ ] Rolling avg
+      - [ ] Logarithmic
+      - [ ] Cumulative
+  - [ ] User segments
+    - [ ] Has property value
+    - [ ] Had property value
+    - [ ] Did event
+      - [ ] Event count
+      - [ ] Relative event count
+      - [ ] Aggregate property (sum, avg, median, min, max)
+    - [ ] Did Funnel
+    - [ ] Retention
   - [ ] Funnels
+    - [ ] Steps
+    - [ ] Trends
+    - [ ] Time to Convert
+    - [ ] Compare periods
+    - [ ] Exclude events
+    - [ ] Any/exact order
+    - [ ] Holing constant
+    - [ ] Filters
+    - [ ] Breakdowns
+    - [ ] Metrics
+      - [ ] convert %/avg time from the start
+      - [ ] convert %/avg time from the previous step
   - [ ] Retention
   - [ ] User Paths
   - [ ] Stickiness
@@ -19,6 +57,18 @@ Optimize your product and increase users engagement.
   - [ ] Prediction
   - [ ] Feature flags
   - [ ] Annotations / Releases
+- Events
+  - [ ] Live event stream
+  - [ ] 
+  - [ ] Event management
+  - [ ] Custom Event management
+  - [ ] Property management
+  - [ ] Custom property management
+- Users
+  - [ ] User explorer
+  - [ ] Cohorts management
+  - [ ] User properties management
+  - [ ] Custom user properties management
 - [ ] Dashboards
 - [ ] Groups
 - [ ] Cohorts
