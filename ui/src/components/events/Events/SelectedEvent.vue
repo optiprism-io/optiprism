@@ -159,6 +159,7 @@ import { Group, Item } from "@/components/Select/SelectTypes";
 import AlphabetIdentifier from "@/components/AlphabetIdentifier.vue";
 import schemaService from '@/api/services/schema.service'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
+import { EventType } from '@/api'
 
 type Props = {
     eventRef: EventRef
@@ -324,9 +325,9 @@ const removeBreakdown = (breakdownIdx: number): void => {
 
 const eventName = (ref: EventRef): string => {
     switch (ref.type) {
-        case EVENT_TYPE_REGULAR:
+        case EventType.Regular:
             return lexiconStore.findEventById(ref.id).displayName;
-        case EVENT_TYPE_CUSTOM:
+        case EventType.Custom:
             return lexiconStore.findCustomEventById(ref.id).name;
     }
     throw new Error("unhandled");

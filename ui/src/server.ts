@@ -23,7 +23,7 @@ export default function ({ environment = "development" } = {}) {
                 return eventMocks
             });
 
-            this.get('/schema/custom-events', (schema) => {
+            this.get(`${BASE_PATH}/v1/projects/:project_id/schema/custom-events`, (schema) => {
                 return schema.db.customEvents
             })
 

@@ -1,15 +1,14 @@
 import { OperationId } from '@/types'
 import { AggregateId } from '@/types/aggregate'
 import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
-import { Event as EventScheme } from '@/api/services/schema.service'
-import { EventType, PropertyType, DataType, Value } from '@/api'
+import { EventType, PropertyType, DataType, Value, CustomEvent } from '@/api'
 
 export const EVENT_TYPE_REGULAR = 'regular'
 export const EVENT_TYPE_CUSTOM = 'custom'
 
 export type PropertyRef = {
     type: PropertyType;
-    id: number;
+    id: number | string
 };
 
 export enum EventStatus {
@@ -19,15 +18,15 @@ export enum EventStatus {
 
 export type EventRef = {
     type: EventType;
-    id: number;
-};
+    id: number | string
+}
 
 export function eventRef(e: Event): EventRef {
-    return <EventRef>{ type: EVENT_TYPE_REGULAR, id: e.id };
+    return <EventRef>{ type: EventType.Regular, id: e.id }
 }
 
 export function customEventRef(e: CustomEvent): EventRef {
-    return <EventRef>{ type: EVENT_TYPE_CUSTOM, id: e.id };
+    return <EventRef>{ type: EventType.Custom, id: e.id };
 }
 
 export function eventPropertyRef(e: EventProperty): PropertyRef {
@@ -44,21 +43,6 @@ export function userPropertyRef(e: UserProperty): PropertyRef {
 
 export function userCustomPropertyRef(e: UserCustomProperty): PropertyRef {
     return <PropertyRef>{ type: PropertyType.Custom, id: e.id };
-}
-
-export interface CustomEvent {
-    id: number;
-    createdAt: Date;
-    updatedAt?: Date;
-    createdBy: number;
-    updatedBy: number;
-    projectId: number;
-    tags: string[];
-    name: string;
-    description?: string;
-    status: EventStatus;
-    displayName?: string;
-    events?: EventScheme[]
 }
 
 export interface Event {

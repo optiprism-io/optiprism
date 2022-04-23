@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import schemaService from "@/api/services/schema.service";
 import {
-    CustomEvent,
     UserCustomProperty,
     Event,
     EventCustomProperty,
@@ -21,13 +20,14 @@ import { Cohort } from "@/types";
 import { aggregates } from "@/types/aggregate"
 import { Group, Item } from "@/components/Select/SelectTypes";
 import { useEventsStore, Events } from "@/stores/eventSegmentation/events";
-import { PropertyType } from '@/api'
+import { PropertyType, CustomEvent } from '@/api'
+import { useCommonStore } from '@/stores/common'
 
 type Lexicon = {
     cohorts: Cohort[];
 
     events: Event[];
-    customEvents: CustomEvent[];
+    customEvents: CustomEvent[]
     eventsLoading: boolean;
 
     eventProperties: EventProperty[];
@@ -70,14 +70,19 @@ export const useLexiconStore = defineStore("lexicon", {
     }),
     actions: {
         async getEvents() {
-            this.eventsLoading = true;
+            const commonStore = useCommonStore()
+            this.eventsLoading = true
+
             try {
-                this.events = await schemaService.events();
-                this.customEvents = await schemaService.customEvents();
+                this.events = await schemaService.events()
+
+                const responseCustomEvents = await schemaService.getCustomEvents(String(commonStore.projectId))
+                this.customEvents = <CustomEvent[]>responseCustomEvents.data
             } catch (error) {
-                throw new Error("error getEvents");
+                throw new Error('error getCustomEvents')
             }
-            this.eventsLoading = false;
+
+            this.eventsLoading = false
         },
         async getEventProperties() {
             this.eventPropertiesLoading = true;
@@ -102,21 +107,21 @@ export const useLexiconStore = defineStore("lexicon", {
     },
     getters: {
         findEventById(state: Lexicon) {
-            return (id: number): Event => {
-                const e = state.events.find((event): boolean => event.id === id);
+            return (id: number | string): Event => {
+                const e = state.events.find((event): boolean => event.id === id || id === event.name)
                 if (e) {
                     return e;
                 }
-                throw new Error(`undefined event id: {$id}`);
+                throw new Error(`undefined event id: ${id}`)
             };
         },
         findCustomEventById(state: Lexicon) {
-            return (id: number): CustomEvent => {
+            return (id: number | string): CustomEvent => {
                 const e = state.customEvents.find((event): boolean => event.id === id);
                 if (e) {
                     return e;
                 }
-                throw new Error(`undefined custom event id: {$id}`);
+                throw new Error(`undefined custom event id: ${id}`)
             };
         },
         eventName() {
@@ -140,40 +145,40 @@ export const useLexiconStore = defineStore("lexicon", {
             };
         },
         findEventProperties(state: Lexicon) {
-            return (eventId: number): EventProperty[] => {
+            return (eventId: number | string): EventProperty[] => {
                 return state.eventProperties.filter((prop): boolean => prop.id === eventId);
             };
         },
         findEventCustomProperties(state: Lexicon) {
-            return (eventId: number): EventCustomProperty[] => {
+            return (eventId: number | string): EventCustomProperty[] => {
                 return state.eventCustomProperties.filter((prop): boolean => prop.id === eventId);
             };
         },
         findEventPropertyById(state: Lexicon) {
-            return (id: number): EventProperty => {
+            return (id: number | string): EventProperty => {
                 const e = state.eventProperties.find((prop): boolean => prop.id === id);
                 if (e) {
                     return e;
                 }
-                throw new Error(`undefined property id: {$id}`);
+                throw new Error(`undefined property id: ${id}`)
             };
         },
         findEventCustomPropertyById(state: Lexicon) {
-            return (id: number): EventCustomProperty => {
+            return (id: number | string): EventCustomProperty => {
                 const e = state.eventCustomProperties.find((prop): boolean => prop.id === id);
                 if (e) {
                     return e;
                 }
-                throw new Error(`undefined custom property id: {$id}`);
+                throw new Error(`undefined custom property id: ${id}`)
             };
         },
         findUserPropertyById(state: Lexicon) {
-            return (id: number): UserProperty => {
+            return (id: number | string): UserProperty => {
                 const e = state.userProperties.find((prop): boolean => prop.id === id);
                 if (e) {
                     return e;
                 }
-                throw new Error(`undefined user property id: {$id}`);
+                throw new Error(`undefined user property id: ${id}`)
             };
         },
         property() {
@@ -198,7 +203,6 @@ export const useLexiconStore = defineStore("lexicon", {
                     case PropertyType.User:
                         return this.findUserPropertyById(ref.id).name;
                 }
-                throw new Error("unhandled");
             };
         },
         findCohortById(state: Lexicon) {
@@ -207,7 +211,7 @@ export const useLexiconStore = defineStore("lexicon", {
                 if (e) {
                     return e;
                 }
-                throw new Error(`undefined cohort id: {$id}`);
+                throw new Error(`undefined cohort id: ${id}`)
             };
         },
         eventsList(state: Lexicon) {

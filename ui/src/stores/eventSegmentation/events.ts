@@ -27,7 +27,7 @@ export interface EventFilter {
     propRef?: PropertyRef;
     opId: OperationId;
     values: Value[];
-    valuesList: string[];
+    valuesList: string[] | []
     error?: boolean;
 }
 
@@ -346,7 +346,7 @@ export const useEventsStore = defineStore("events", {
                     break;
             }
         },
-        addEvent(id: number): void {
+        addEvent(id: number | string): void {
             this.events.push(<Event>{
                 ref: <EventRef>{ type: EVENT_TYPE_REGULAR, id: id },
                 filters: [],
@@ -354,7 +354,7 @@ export const useEventsStore = defineStore("events", {
                 queries: initialQuery,
             });
         },
-        addCustomEvent(id: number): void {
+        addCustomEvent(id: number | string): void {
             this.events.push(<Event>{
                 ref: <EventRef>{ type: EVENT_TYPE_CUSTOM, id: id },
                 filters: [],

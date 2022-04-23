@@ -145,7 +145,6 @@ const apply = async () => {
                     eventName: event.name,
                     eventType: item.ref.type,
                     filters: [],
-                    ref: item.ref,
                 }
 
                 if (item.filters.length) {
@@ -205,13 +204,19 @@ onBeforeMount(() => {
         if (editedEvent.value.events) {
             events.value = JSON.parse(JSON.stringify((editedEvent.value.events.map(item => {
                 return {
-                    ref: item.ref,
+                    ref: {
+                        type: item.eventType,
+                        id: item.eventName
+                    },
                     filters: item.filters ? item.filters.map(filter => {
                         return {
-                            propRef: filter.propRef,
+                            propRef: {
+                                type: filter.propertyType,
+                                id: filter.propertyName
+                            },
                             opId: filter.operation,
                             values: filter.value,
-                            valuesList: filter.valuesList || [],
+                            valuesList: [],
                         }
                     }) : [],
                     breakdowns: [],
