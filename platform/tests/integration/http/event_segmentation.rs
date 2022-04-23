@@ -6,8 +6,8 @@ mod tests {
     use uuid::Uuid;
     use metadata::{Metadata, Store};
     use platform::error::Result;
-    use platform::EventSegmentationProvider;
-    use query::QueryProvider;
+    use platform::{Context, EventSegmentationProvider};
+    use query::{event_fields, QueryProvider};
     use platform::http::event_segmentation;
     use std::{net::SocketAddr};
     use std::time::Duration;
@@ -30,7 +30,6 @@ mod tests {
     use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
     use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
 
-    use common::{DataType, ScalarValue, DECIMAL_PRECISION, DECIMAL_SCALE};
     use datafusion::execution::context::ExecutionContextState;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::logical_plan::{LogicalPlan, TableScan};
@@ -48,9 +47,14 @@ mod tests {
     use reqwest::Client;
     use serde_json::Value;
     use datafusion::physical_plan::coalesce_batches::concat_batches;
-    use datafusion::scalar::ScalarValue as DFScalarValue;
+    use datafusion::scalar::{ScalarValue as DFScalarValue, ScalarValue};
     use platform::event_segmentation::result::Series;
     use platform::event_segmentation::types::{Query, Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, EventType, PropertyType, PropValueOperation, QueryTime, TimeUnit, PartitionedAggregateFunction, AggregateFunction};
+    use query::physical_plan::expressions;
+    use query::reports::event_segmentation::builder::LogicalPlanBuilder;
+    use query::reports::types::EventRef;
+    use query::reports::event_segmentation::types as query_es_types;
+    use query::reports::types as query_types;
 
     async fn create_property(
         md: &Arc<Metadata>,
@@ -283,7 +287,6 @@ mod tests {
 
         sleep(Duration::from_millis(100)).await;
 
-
         let from = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
@@ -372,9 +375,8 @@ mod tests {
 
         let status = resp.status();
         let txt = resp.text().await.unwrap();
-        println!("{}",&txt);
+        println!("{}", &txt);
         assert_eq!(status, StatusCode::OK);
-        let resp: Series = serde_json::from_str(txt.as_str()).unwrap();
 
         Ok(())
     }

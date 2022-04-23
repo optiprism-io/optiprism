@@ -15,7 +15,8 @@ impl Provider {
     }
 
     pub async fn event_segmentation(&self, ctx: Context, req: EventSegmentation) -> Result<Series> {
-        let result = self.query.event_segmentation(ctx.into(),req.try_into()?).await?;
+        let lreq = req.try_into()?;
+        let result = self.query.event_segmentation(ctx.into(),lreq).await?;
         Ok(result.try_into()?)
     }
 }

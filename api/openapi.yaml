@@ -274,11 +274,66 @@ paths:
                         items:
                           type: number
 
+
+  /queries/event-segmentation:
+    post:
+      summary: Event segmentation query
       requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/EventSegmentation'
+      responses:
+        '200':
+          description: event segmentation query response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dimensionHeaders:
+                    type: array
+                    items:
+                      type: string
+                  metricHeaders:
+                    type: array
+                    items:
+                      type: string
+                  dimensions:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: string
+                  singles:
+                    type: array
+                    items:
+                      type: integer
+                  series:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: number
+                  compare:
+                    type: object
+                    properties:
+                      dimensions:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: string
+                      singles:
+                        type: array
+                        items:
+                          type: number
+                      series:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: number
 
 components:
   schemas:
@@ -1530,7 +1585,7 @@ components:
       description: operation
       type: string
       enum:
-        - "="
+        - "eq"
         - "neq"
         - "gt"
         - "gte"

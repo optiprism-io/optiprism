@@ -39,9 +39,9 @@ async fn test_event_properties() -> Result<()> {
 
     let store = Arc::new(Store::new(path));
     let prov = Arc::new(Provider::new_event(store));
-    let events_provider = Arc::new(PropertiesProvider::new_event(prov.clone()));
+    let props_provider = Arc::new(PropertiesProvider::new_event(prov.clone()));
     tokio::spawn(async {
-        let app = properties::attach_event_routes(Router::new())
+        let app = properties::attach_event_routes(Router::new(), props_provider);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
         Server::bind(&addr)
@@ -87,7 +87,6 @@ async fn test_event_properties() -> Result<()> {
             .await
             .unwrap();
 
-        println!("{}", resp.text().await.unwrap());
         /*assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
             resp.text().await.unwrap(),

@@ -196,8 +196,7 @@ mod tests {
     use datafusion_expr::AggregateFunction;
     use crate::event_fields;
     use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-    use crate::reports::types::{AggregateFunction, EventRef, PartitionedAggregateFunction, PropertyRef, PropValueOperation, QueryTime, TimeUnit};
-    use crate::reports::event_segmentation::builder::EventRef;
+    use crate::reports::types::{ EventRef, PropertyRef, PropValueOperation, QueryTime, TimeUnit};
     use crate::reports::event_segmentation::types::{Analysis, Breakdown, ChartType, Compare, Event, EventFilter, EventSegmentation, NamedQuery, Query};
 
     #[test]
@@ -240,17 +239,12 @@ mod tests {
                         EventFilter::Property {
                             property: PropertyRef::Event("p4".to_string()),
                             operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::String(Some("s".to_string()))]),
+                            value: Some(vec![ScalarValue::Utf8(Some("s".to_string()))]),
                         },
                         EventFilter::Property {
                             property: PropertyRef::Event("p5".to_string()),
                             operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::String(None)]),
-                        },
-                        EventFilter::Property {
-                            property: PropertyRef::Event("p6".to_string()),
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::Timestamp(Some(123))]),
+                            value: Some(vec![ScalarValue::Utf8(None)]),
                         },
                     ]),
                     Some(vec![Breakdown::Property(PropertyRef::User(
@@ -299,7 +293,7 @@ mod tests {
             segments: None,
         };
 
-        let j = serde_json::to_string_pretty(&es).unwrap();
-        println!("{}", j);
+        /*let j = serde_json::to_string_pretty(&es).unwrap();
+        println!("{}", j);*/
     }
 }

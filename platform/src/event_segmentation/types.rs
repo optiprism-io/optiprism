@@ -1,3 +1,4 @@
+use std::fmt::format;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -10,6 +11,7 @@ use crate::Result;
 use rust_decimal::Decimal;
 use common::DECIMAL_PRECISION;
 use query::reports::event_segmentation::types::NamedQuery;
+use convert_case::{Case, Casing};
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -511,7 +513,7 @@ impl TryInto<query_es_types::Breakdown> for &Breakdown {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum EventType {
     Regular,
@@ -541,7 +543,13 @@ impl TryInto<query_es_types::Event> for &Event {
             },
             filters: self.filters.as_ref().map(|v| v.iter().map(|v| v.try_into()).collect::<std::result::Result<_, _>>()).transpose()?,
             breakdowns: self.breakdowns.as_ref().map(|v| v.iter().map(|v| v.try_into()).collect::<std::result::Result<_, _>>()).transpose()?,
-            queries: self.queries.iter().map(|v| v.try_into()).collect::<std::result::Result<Vec<query_es_types::Query>, _>>()?.iter().map(|v| NamedQuery::new(v.clone(), None)).collect(),
+            queries: self.queries
+                .iter()
+                .map(|v| v.try_into())
+                .collect::<std::result::Result<Vec<query_es_types::Query>, _>>()?
+                .iter()
+                .enumerate()
+                .map(|(idx, v)| NamedQuery::new(v.clone(), Some(format!("{}_{:?}_{}", self.event_name.to_case(Case::Snake), self.event_type, idx)))).collect(),
         })
     }
 }
@@ -700,7 +708,6 @@ mod tests {
 
         let qes: QueryEventSegmentation = es.clone().try_into()?;
         let j = serde_json::to_string_pretty(&es).unwrap();
-        println!("{}", j);
         Ok(())
     }
 }

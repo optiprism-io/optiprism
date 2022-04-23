@@ -19,20 +19,15 @@ mod tests {
     use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
     use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
 
-    use common::{DataType, ScalarValue, DECIMAL_PRECISION, DECIMAL_SCALE};
     use datafusion::execution::context::ExecutionContextState;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-    use datafusion::logical_plan::{LogicalPlan, TableScan};
+    use datafusion::logical_plan::{LogicalPlan, LogicalPlanBuilder as DFLogicalPlanBuilder, TableScan};
     use datafusion_expr::AggregateFunction;
     use metadata::database::{Column, Table, TableType};
     use metadata::properties::provider::Namespace;
     use metadata::properties::{CreatePropertyRequest, Property};
     use metadata::{database, events, properties, Metadata, Store};
-    use query::reports::types::{PropValueOperation, PropertyRef, QueryTime, TimeUnit};
-    use platform::event_segmentation::event_segmentation::{
-        Analysis, Breakdown, ChartType, Event, EventFilter, EventRef, EventSegmentation,
-        LogicalPlanBuilder, NamedQuery, Query,
-    };
+    use query::reports::types::{PropValueOperation, PropertyRef, QueryTime, TimeUnit, EventRef};
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
     use query::{event_fields, Context, Error};
     use rust_decimal::Decimal;
@@ -45,7 +40,10 @@ mod tests {
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use query::physical_plan::planner::QueryPlanner;
     use datafusion::scalar::ScalarValue as DFScalarValue;
+    use datafusion_common::ScalarValue;
     use query::physical_plan::unpivot::unpivot;
+    use query::reports::event_segmentation::builder::LogicalPlanBuilder;
+    use query::reports::event_segmentation::types::{Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, NamedQuery, Query};
 
     pub async fn events_provider(
         db: Arc<database::Provider>,
@@ -307,7 +305,7 @@ mod tests {
                     Some(vec![EventFilter::Property {
                         property: PropertyRef::User("Is Premium".to_string()),
                         operation: PropValueOperation::Eq,
-                        value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                        value: Some(vec![ScalarValue::Boolean(Some(true)).into()]),
                     }]),
                     Some(vec![Breakdown::Property(PropertyRef::User(
                         "Device".to_string(),
@@ -322,29 +320,29 @@ mod tests {
                     Some(vec![
                         EventFilter::Property {
                             property: PropertyRef::Event("Revenue".to_string()),
-                            operation: PropValueOperation::IsNull,
+                            operation: PropValueOperation::Empty,
                             value: None,
                         },
                         EventFilter::Property {
                             property: PropertyRef::Event("Revenue".to_string()),
                             operation: PropValueOperation::Eq,
                             value: Some(vec![
-                                ScalarValue::Number(Some(Decimal::new(1, 0))),
-                                ScalarValue::Number(Some(Decimal::new(2, 0))),
-                                ScalarValue::Number(Some(Decimal::new(3, 0))),
+                                ScalarValue::Decimal128(Some(1), 1, 0),
+                                ScalarValue::Decimal128(Some(2), 1, 0),
+                                ScalarValue::Decimal128(Some(3), 1, 0),
                             ]),
                         },
                         EventFilter::Property {
                             property: PropertyRef::User("Country".to_string()),
-                            operation: PropValueOperation::IsNull,
+                            operation: PropValueOperation::Empty,
                             value: None,
                         },
                         EventFilter::Property {
                             property: PropertyRef::User("Country".to_string()),
                             operation: PropValueOperation::Eq,
                             value: Some(vec![
-                                ScalarValue::String(Some("Spain".to_string())),
-                                ScalarValue::String(Some("France".to_string())),
+                                ScalarValue::Utf8(Some("Spain".to_string())),
+                                ScalarValue::Utf8(Some("France".to_string())),
                             ]),
                         },
                     ]),
@@ -385,12 +383,12 @@ mod tests {
                 EventFilter::Property {
                     property: PropertyRef::User("Device".to_string()),
                     operation: PropValueOperation::Eq,
-                    value: Some(vec![ScalarValue::String(Some("Iphone".to_string()))]),
+                    value: Some(vec![ScalarValue::Utf8(Some("Iphone".to_string()))]),
                 },
                 EventFilter::Property {
                     property: PropertyRef::User("Is Premium".to_string()),
                     operation: PropValueOperation::Eq,
-                    value: Some(vec![ScalarValue::Number(Some(Decimal::new(1, 0)))]),
+                    value: Some(vec![ScalarValue::Decimal128(Some(1), 1, 0)]),
                 },
             ]),
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
@@ -412,8 +410,6 @@ mod tests {
             organization_id: org_id,
             account_id: 1,
             project_id: proj_id,
-            roles: None,
-            permissions: None,
         };
 
         create_entities(md.clone(), org_id, proj_id).await?;
@@ -517,13 +513,12 @@ mod tests {
             organization_id: org_id,
             account_id: 1,
             project_id: proj_id,
-            roles: None,
-            permissions: None,
         };
 
         create_entities(md.clone(), org_id, proj_id).await?;
         let input = events_provider(md.database.clone(), org_id, proj_id).await?;
-        let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
+        let cur_time = Utc::now();
+        let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
 
         let config =
             ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {})).with_target_partitions(1);

@@ -1989,13 +1989,16 @@ checksum = "58893f751c9b0412871a09abd62ecd2a00298c6c83befa223ef98c52aef40cbe"
 name = "platform"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arrow",
  "axum",
  "axum-debug",
  "chrono",
  "common",
+ "convert_case",
  "criterion",
  "datafusion",
+ "datafusion-expr",
  "metadata",
  "query",
  "reqwest",
@@ -2137,6 +2140,7 @@ name = "query"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "anyhow",
  "arrow",
  "axum",
  "axum-debug",

@@ -15,7 +15,7 @@ async fn create(
     Json(request): Json<CreateRequest>,
 ) -> Result<Json<Event>> {
     if request.project_id != project_id {
-        return Err(Error::Internal(InternalError::new(
+        return Err(Error::Internal2(InternalError::new(
             "wrong project id",
             StatusCode::BAD_REQUEST,
         )));
@@ -57,13 +57,13 @@ async fn update(
     Json(request): Json<UpdateRequest>,
 ) -> Result<Json<Event>> {
     if request.project_id != project_id {
-        return Err(Error::Internal(InternalError::new(
+        return Err(Error::Internal2(InternalError::new(
             "code",
             StatusCode::BAD_REQUEST,
         )));
     }
     if request.id != event_id {
-        return Err(Error::Internal(InternalError::new(
+        return Err(Error::Internal2(InternalError::new(
             "code",
             StatusCode::BAD_REQUEST,
         )));

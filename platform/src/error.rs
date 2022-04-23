@@ -27,7 +27,8 @@ impl InternalError {
 
 #[derive(Debug)]
 pub enum Error {
-    Internal(InternalError),
+    Internal(String),
+    Internal2(InternalError),
     BadRequest(String),
     SerdeError(serde_json::Error),
     CommonError(CommonError),
@@ -45,7 +46,7 @@ impl Display for Error {
 
 impl From<InternalError> for Error {
     fn from(err: InternalError) -> Self {
-        Self::Internal(err)
+        Self::Internal2(err)
     }
 }
 
@@ -76,7 +77,11 @@ impl From<serde_json::Error> for Error {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
-            Error::Internal(err) => (err.status_code, err.code.to_string()),
+            Error::Internal(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("internal error: {:?}", err),
+            ),
+            Error::Internal2(err) => (err.status_code, err.code.to_string()),
             Error::MetadataError(err) => match err {
                 metadata::Error::KeyNotFound(_) => (StatusCode::NOT_FOUND, "not found".to_string()),
                 _ => (

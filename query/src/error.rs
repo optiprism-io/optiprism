@@ -34,8 +34,15 @@ impl Error {
 impl std::error::Error for Error {}
 
 impl Display for Error {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self)
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Error::Internal(desc) => write!(f, "Internal error: {}", desc),
+            Error::QueryError(desc) => write!(f, "Query error: {}", desc),
+            Error::DataFusionError(err) => write!(f, "DataFusion error: {}", err),
+            Error::ArrowError(err) => write!(f, "ArrowError error: {}", err),
+            Error::StoreError(err) => write!(f, "Store error: {}", err),
+            Error::MetadataError(err) => write!(f, "Metadata error: {}", err),
+        }
     }
 }
 

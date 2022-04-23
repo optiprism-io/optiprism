@@ -38,7 +38,7 @@ async fn test_events() -> Result<()> {
         let prov = Provider::new(store);
         let events_provider = Arc::new(EventsProvider::new(Arc::new(prov)));
 
-        let app = events::attach_routes(Router::new()).layer(AddExtensionLayer::new(events_provider));
+        let app = events::attach_routes(Router::new(), events_provider);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
         Server::bind(&addr)

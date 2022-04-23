@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use arrow::datatypes::Schema;
+use chrono::Utc;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
@@ -43,7 +44,8 @@ impl Provider {
             .await?
             .build()?;
 
-        let plan = event_segmentation::builder::LogicalPlanBuilder::build(ctx, self.metadata.clone(), input, es.clone()).await?;
+        let cur_time = Utc::now();
+        let plan = event_segmentation::builder::LogicalPlanBuilder::build(ctx, cur_time,self.metadata.clone(), input, es.clone()).await?;
         let config = ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {})).with_target_partitions(1);
         let ctx = ExecutionContext::with_config(config);
 
@@ -52,12 +54,12 @@ impl Provider {
         let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
         let result = concat_batches(&schema, &batches, 0)?;
 
-        let dimension_cols = es.query_names();
-        let metric_cols = plan
+        let metric_cols = es.time_columns(cur_time);
+        let dimension_cols = plan
             .schema()
             .fields()
             .iter()
-            .filter_map(|f| match dimension_cols.contains(f.name()) {
+            .filter_map(|f| match metric_cols.contains(f.name()) {
                 true => None,
                 false => Some(f.name().clone())
             })

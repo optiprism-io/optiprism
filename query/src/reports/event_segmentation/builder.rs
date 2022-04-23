@@ -57,11 +57,11 @@ impl LogicalPlanBuilder {
     /// creates logical plan for event segmentation
     pub async fn build(
         ctx: Context,
+        cur_time: DateTime<Utc>,
         metadata: Arc<Metadata>,
         input: LogicalPlan,
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {
-        let cur_time = Utc::now();
         let events = es.events.clone();
         let builder = LogicalPlanBuilder { ctx, cur_time, metadata, es: es.clone() };
 
@@ -89,8 +89,8 @@ impl LogicalPlanBuilder {
                 .iter()
                 .flat_map(|e| {
                     e.queries
-                        .iter().enumerate()
-                        .map(|(idx,q)| idx.to_string())
+                        .iter()
+                        .map(|q| q.clone().name.unwrap())
                 })
                 .collect();
 
@@ -106,20 +106,7 @@ impl LogicalPlanBuilder {
 
         // pivot date
         input = {
-            let (mut from, to) = match &es.time {
-                QueryTime::Between { from, to } => (from.clone(), to.clone()),
-                QueryTime::From(from) => (from.clone(), cur_time.clone()),
-                QueryTime::Last { last, unit } => (cur_time.sub(unit.duration(*last)), cur_time.clone())
-            };
-
-            let mut result_cols: Vec<String> = vec![];
-            let dur = es.interval_unit.duration(1);
-
-            while from <= to {
-                result_cols.push(from.naive_utc().to_string());
-                from = from.add(dur.clone());
-            }
-
+            let result_cols = es.time_columns(cur_time);
             LogicalPlan::Extension(Extension {
                 node: Arc::new(PivotNode::try_new(
                     input,
@@ -375,14 +362,21 @@ impl LogicalPlanBuilder {
 }
 
 impl EventSegmentation {
-    pub fn query_names(&self) -> Vec<String> {
-        self.events
-            .iter()
-            .flat_map(|e| {
-                e.queries
-                    .iter()
-                    .map(|q| q.clone().name.unwrap())
-            })
-            .collect()
+    pub fn time_columns(&self, cur_time: DateTime<Utc>) -> Vec<String> {
+        let (mut from, to) = match &self.time {
+            QueryTime::Between { from, to } => (from.clone(), to.clone()),
+            QueryTime::From(from) => (from.clone(), cur_time.clone()),
+            QueryTime::Last { last, unit } => (cur_time.sub(unit.duration(*last)), cur_time.clone())
+        };
+
+        let mut result_cols: Vec<String> = vec![];
+        let dur = self.interval_unit.duration(1);
+
+        while from <= to {
+            result_cols.push(from.naive_utc().to_string());
+            from = from.add(dur.clone());
+        }
+
+        result_cols
     }
 }
