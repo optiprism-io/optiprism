@@ -1,3 +1,3 @@
-pub mod dictionary;
+// pub mod dictionary;
 pub mod error;
-pub mod schema;
+// pub mod schema;

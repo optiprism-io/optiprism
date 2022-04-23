@@ -4,7 +4,7 @@ use axum::{AddExtensionLayer, Router, Server};
 use chrono::Utc;
 use metadata::metadata::ListResponse;
 use metadata::properties::Provider;
-use metadata::properties::{CreateEventPropertyRequest, Property, Scope, Status};
+use metadata::properties::{CreatePropertyRequest, Property, Scope, Status};
 use metadata::Store;
 use platform::error::Result;
 use platform::http::properties;
@@ -27,7 +27,6 @@ fn assert(l: &Property, r: &Property) {
     assert_eq!(l.status, r.status);
     assert_eq!(l.scope, r.scope);
     assert_eq!(l.typ, r.typ);
-    assert_eq!(l.col_id, r.col_id);
     assert_eq!(l.nullable, r.nullable);
     assert_eq!(l.is_array, r.is_dictionary);
     assert_eq!(l.dictionary_type, r.dictionary_type);
@@ -40,10 +39,9 @@ async fn test_event_properties() -> Result<()> {
 
     let store = Arc::new(Store::new(path));
     let prov = Arc::new(Provider::new_event(store));
-    let events_provider = Arc::new(PropertiesProvider::new_event(prov.clone()));
+    let props_provider = Arc::new(PropertiesProvider::new_event(prov.clone()));
     tokio::spawn(async {
-        let app = properties::configure_event(Router::new())
-            .layer(AddExtensionLayer::new(events_provider));
+        let app = properties::attach_event_routes(Router::new(), props_provider);
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
         Server::bind(&addr)
@@ -71,7 +69,6 @@ async fn test_event_properties() -> Result<()> {
         nullable: true,
         is_array: true,
         is_dictionary: true,
-        col_id: 1,
         dictionary_type: Some(DataType::Utf8),
     };
 
@@ -90,7 +87,6 @@ async fn test_event_properties() -> Result<()> {
             .await
             .unwrap();
 
-        println!("{}", resp.text().await.unwrap());
         /*assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
             resp.text().await.unwrap(),
@@ -122,7 +118,7 @@ async fn test_event_properties() -> Result<()> {
 
     // create request should create event prop
     {
-        let req = CreateEventPropertyRequest {
+        let req = CreatePropertyRequest {
             created_by: prop1.created_by.clone(),
             project_id: prop1.project_id.clone(),
             tags: prop1.tags.clone(),

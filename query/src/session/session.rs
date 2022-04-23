@@ -1,0 +1,7 @@
+struct SessionContext {
+
+}
+
+struct Session {
+
+}

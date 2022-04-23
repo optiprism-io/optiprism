@@ -1,10 +1,8 @@
 use crate::error::Error;
 use crate::metadata::{list, ListResponse};
-use crate::properties::types::{CreateEventPropertyRequest, Property, UpdateEventPropertyRequest};
+use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
-use crate::store::store::{
-    make_col_id_seq_key, make_data_value_key, make_id_seq_key, make_index_key, Store,
-};
+use crate::store::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
@@ -83,7 +81,7 @@ impl Provider {
     pub async fn create(
         &self,
         organization_id: u64,
-        req: CreateEventPropertyRequest,
+        req: CreatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
         self._create(organization_id, req).await
@@ -92,7 +90,7 @@ impl Provider {
     pub async fn _create(
         &self,
         organization_id: u64,
-        req: CreateEventPropertyRequest,
+        req: CreatePropertyRequest,
     ) -> Result<Property> {
         let idx_keys = index_keys(
             self.ns.clone(),
@@ -112,10 +110,6 @@ impl Provider {
             ))
             .await?;
         let created_at = Utc::now();
-        let col_id = self
-            .store
-            .next_seq(make_col_id_seq_key(organization_id, req.project_id))
-            .await?;
 
         let prop = Property {
             id,
@@ -129,7 +123,6 @@ impl Provider {
             description: req.description,
             display_name: req.display_name,
             typ: req.typ,
-            col_id,
             status: req.status,
             scope: req.scope,
             nullable: req.nullable,
@@ -158,7 +151,7 @@ impl Provider {
     pub async fn get_or_create(
         &self,
         organization_id: u64,
-        req: CreateEventPropertyRequest,
+        req: CreatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
         match self
@@ -166,7 +159,7 @@ impl Provider {
             .await
         {
             Ok(prop) => return Ok(prop),
-            Err(Error::KeyNotFound) => {}
+            Err(Error::KeyNotFound(_)) => {}
             Err(err) => return Err(err),
         }
 
@@ -179,17 +172,10 @@ impl Provider {
         project_id: u64,
         id: u64,
     ) -> Result<Property> {
-        match self
-            .store
-            .get(make_data_value_key(
-                organization_id,
-                project_id,
-                self.ns.as_bytes(),
-                id,
-            ))
-            .await?
-        {
-            None => Err(Error::KeyNotFound),
+        let key = make_data_value_key(organization_id, project_id, self.ns.as_bytes(), id);
+
+        match self.store.get(&key).await? {
+            None => Err(Error::KeyNotFound(String::from_utf8(key)?)),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -241,7 +227,7 @@ impl Provider {
     pub async fn update(
         &self,
         organization_id: u64,
-        req: UpdateEventPropertyRequest,
+        req: UpdatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
         let idx_keys = index_keys(
@@ -278,7 +264,6 @@ impl Provider {
             description: req.description,
             display_name: req.display_name,
             typ: req.typ,
-            col_id: prev_prop.col_id,
             status: req.status,
             scope: req.scope,
             nullable: req.nullable,

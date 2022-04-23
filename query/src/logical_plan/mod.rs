@@ -1,3 +1,4 @@
 pub mod expr;
-pub mod nodes;
-pub mod plan;
+pub mod merge;
+pub mod unpivot;
+pub mod pivot;

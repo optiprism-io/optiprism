@@ -1,8 +1,7 @@
 use arrow::datatypes::DataType;
 use metadata::error::Result;
-use metadata::properties::{
-    CreateEventPropertyRequest, Provider, Scope, Status, UpdateEventPropertyRequest,
-};
+use metadata::properties::provider::Namespace;
+use metadata::properties::{CreatePropertyRequest, Provider, Scope, Status, UpdatePropertyRequest};
 use metadata::store::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
@@ -15,7 +14,7 @@ async fn test_properties() -> Result<()> {
 
     let store = Arc::new(Store::new(path));
     let event_properties = Provider::new_event(store.clone());
-    let create_prop_req = CreateEventPropertyRequest {
+    let create_prop_req = CreatePropertyRequest {
         created_by: 0,
         project_id: 1,
         scope: Scope::User,
@@ -31,7 +30,7 @@ async fn test_properties() -> Result<()> {
         dictionary_type: None,
     };
 
-    let update_prop_req = UpdateEventPropertyRequest {
+    let update_prop_req = UpdatePropertyRequest {
         id: 1,
         created_by: 0,
         updated_by: None,
@@ -66,9 +65,11 @@ async fn test_properties() -> Result<()> {
     assert_eq!(res, 1);
     let res = event_properties
         .get_or_create(1, create_prop1.clone())
-        .await?
-        .id;
-    assert_eq!(res, 1);
+        .await?;
+    assert_eq!(res.id, 1);
+
+    assert_eq!(res.column_name(Namespace::User), "user_1_prop1".to_string());
+
     let mut create_prop2 = create_prop_req.clone();
     create_prop2.name = "prop2".to_string();
     let res = event_properties.create(1, create_prop2.clone()).await?.id;

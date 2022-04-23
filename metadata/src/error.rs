@@ -1,3 +1,4 @@
+use std::string::FromUtf8Error;
 use std::{
     fmt::{self, Display, Formatter},
     result,
@@ -12,8 +13,9 @@ pub enum Error {
     BincodeError(bincode::Error),
     RocksDbError(rocksdb::Error),
     KeyAlreadyExists,
-    KeyNotFound,
+    KeyNotFound(String),
     ConstraintViolation,
+    FromUtf8Error(FromUtf8Error),
 }
 
 impl std::error::Error for Error {}
@@ -39,5 +41,11 @@ impl From<rocksdb::Error> for Error {
 impl From<bincode::Error> for Error {
     fn from(err: bincode::Error) -> Self {
         Self::BincodeError(err)
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(err: FromUtf8Error) -> Self {
+        Self::FromUtf8Error(err)
     }
 }

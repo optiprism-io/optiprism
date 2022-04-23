@@ -4,6 +4,8 @@ use axum::{
 };
 use common::Error as CommonError;
 use metadata::Error as MetadataError;
+use query::Error as QueryError;
+
 use std::{
     fmt::{self, Display, Formatter},
     result,
@@ -25,11 +27,16 @@ impl InternalError {
 
 #[derive(Debug)]
 pub enum Error {
-    Internal(InternalError),
+    Internal(String),
+    Internal2(InternalError),
+    BadRequest(String),
     SerdeError(serde_json::Error),
     CommonError(CommonError),
     MetadataError(MetadataError),
+    QueryError(QueryError),
 }
+
+impl std::error::Error for Error {}
 
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
@@ -39,7 +46,7 @@ impl Display for Error {
 
 impl From<InternalError> for Error {
     fn from(err: InternalError) -> Self {
-        Self::Internal(err)
+        Self::Internal2(err)
     }
 }
 
@@ -55,6 +62,12 @@ impl From<MetadataError> for Error {
     }
 }
 
+impl From<QueryError> for Error {
+    fn from(err: QueryError) -> Self {
+        Self::QueryError(err)
+    }
+}
+
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
         Self::SerdeError(err)
@@ -64,19 +77,27 @@ impl From<serde_json::Error> for Error {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
-            Error::Internal(err) => (err.status_code, err.code.to_string()),
+            Error::Internal(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("internal error: {:?}", err),
+            ),
+            Error::Internal2(err) => (err.status_code, err.code.to_string()),
             Error::MetadataError(err) => match err {
-                metadata::Error::KeyNotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
+                metadata::Error::KeyNotFound(_) => (StatusCode::NOT_FOUND, "not found".to_string()),
                 _ => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "internal server error".to_string(),
                 ),
             },
+            Error::QueryError(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("query error: {:?}", err),
+            ),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal server error".to_string(),
             ),
         }
-        .into_response()
+            .into_response()
     }
 }

@@ -63,14 +63,6 @@ pub fn make_id_seq_key(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<
     .concat()
 }
 
-pub fn make_col_id_seq_key(organization_id: u64, project_id: u64) -> Vec<u8> {
-    [
-        make_org_proj_key(organization_id, project_id).as_slice(),
-        b"/columns/id_seq",
-    ]
-    .concat()
-}
-
 type KVBytes = (Box<[u8]>, Box<[u8]>);
 
 pub struct Store {

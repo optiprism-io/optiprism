@@ -50,8 +50,9 @@ impl Provider {
     }
 
     pub async fn get_by_id(&self, organization_id: u64, id: u64) -> Result<Project> {
-        match self.store.get(&data_key(organization_id, id)).await? {
-            None => Err(Error::KeyNotFound),
+        let key = data_key(organization_id, id);
+        match self.store.get(&key).await? {
+            None => Err(Error::KeyNotFound(String::from_utf8(key)?)),
             Some(value) => Ok(deserialize(&value)?),
         }
     }

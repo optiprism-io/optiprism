@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bincode::{deserialize, serialize};
 use chrono::Utc;
+use datafusion::parquet::data_type::AsBytes;
 use tokio::sync::RwLock;
 
 use crate::error::Error;
@@ -114,7 +115,7 @@ impl Provider {
             .await
         {
             Ok(event) => return Ok(event),
-            Err(Error::KeyNotFound) => {}
+            Err(Error::KeyNotFound(_)) => {}
             Err(err) => return Err(err),
         }
 
@@ -122,17 +123,10 @@ impl Provider {
     }
 
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
-        match self
-            .store
-            .get(make_data_value_key(
-                organization_id,
-                project_id,
-                NAMESPACE,
-                id,
-            ))
-            .await?
-        {
-            None => Err(Error::KeyNotFound),
+        let key = make_data_value_key(organization_id, project_id, NAMESPACE, id);
+
+        match self.store.get(key.clone()).await? {
+            None => Err(Error::KeyNotFound(String::from_utf8(key.clone())?)),
             Some(value) => Ok(deserialize(&value)?),
         }
     }

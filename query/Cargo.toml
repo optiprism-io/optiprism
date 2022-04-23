@@ -4,22 +4,39 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+fnv = "1.0.3"
+ahash = { version = "0.7", default-features = false }
+common = { path = "../common" }
+metadata = { path = "../metadata" }
 chrono = "0.4"
-datafusion = "6.0.0"
-arrow = { version = "6.1.0", features = ["prettyprint"] }
-platform = { path = "../platform" }
+dyn-clone = "1.0.5"
+#datafusion = "7.0.0"
+datafusion = { path = "../arrow-datafusion/datafusion" }
+datafusion-expr = { path = "../arrow-datafusion/datafusion-expr" }
+datafusion-common = { path = "../arrow-datafusion/datafusion-common" }
+#datafusion-expr = "7.0.0"
+arrow = { version = "9.0.0", features = ["prettyprint"] }
 store = { path = "../store" }
 mockall = "0.10.1"
-tokio = { version = "1.10.1", features = [
+uuid = { version = "0.8.2", features = ["serde", "v4"] }
+tokio = { version = "1.15.1", features = [
     "macros",
     "rt",
     "rt-multi-thread",
     "sync",
 ] }
+axum = { version = "0.4.3", features = ["headers"] }
+axum-debug = { version = "0.3.2" }
+serde = { version = "1.0.133", features = ["derive"] }
+serde_json = "1.0.74"
+rust_decimal = { version = "1.22.0", features = ["serde-with-float"] }
+futures = "0.3.21"
+anyhow = "1.0"
 
 [dev-dependencies]
 criterion = { version = "0.3.5", features = ["html_reports"] }
 rand = "0.8.4"
+
 
 [[bench]]
 name = "sorted_distinct_count"

@@ -7,6 +7,7 @@ Optimize your product and increase users engagement.
 
 # Roadmap
 
+
 - Analytics
   - [ ] Event segmentation
   - [ ] Funnels

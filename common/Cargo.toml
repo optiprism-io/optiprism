@@ -6,6 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+#datafusion = "7.0.0"
+datafusion = { path = "../arrow-datafusion/datafusion" }
+arrow = { version = "9.0.0", features = ["prettyprint"] }
 async-trait = "0.1.52"
 chrono = { version = "0.4.19", features = ["serde"] }
 serde = { version = "1.0.133", features = ["derive"] }
@@ -14,3 +17,4 @@ jsonwebtoken = "7.2.0"
 rand = "0.8.4"
 sha3 = "0.10.0"
 hex = "0.4.3"
+rust_decimal = { version = "1.22.0", features = ["serde-with-float"] }

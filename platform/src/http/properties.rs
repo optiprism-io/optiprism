@@ -1,14 +1,14 @@
 use crate::properties::Provider;
-use crate::{Context, Result};
+use crate::{Context, properties, PropertiesProvider, Result};
 use axum::extract::Path;
-use axum::{extract::Extension, routing, Json, Router};
+use axum::{extract::Extension, routing, Json, Router, AddExtensionLayer};
 use metadata::metadata::ListResponse;
 use metadata::properties::Property;
 use std::sync::Arc;
 
 async fn get_by_id(
     ctx: Context,
-    Extension(provider): Extension<Arc<Provider>>,
+    Extension(provider): Extension<Arc<PropertiesProvider>>,
     Path((project_id, event_id)): Path<(u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(provider.get_by_id(ctx, project_id, event_id).await?))
@@ -16,7 +16,7 @@ async fn get_by_id(
 
 async fn get_by_name(
     ctx: Context,
-    Extension(provider): Extension<Arc<Provider>>,
+    Extension(provider): Extension<Arc<PropertiesProvider>>,
     Path((project_id, prop_name)): Path<(u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
@@ -26,7 +26,7 @@ async fn get_by_name(
 
 async fn list(
     ctx: Context,
-    Extension(provider): Extension<Arc<Provider>>,
+    Extension(provider): Extension<Arc<PropertiesProvider>>,
     Path(project_id): Path<u64>,
 ) -> Result<Json<ListResponse<Property>>> {
     Ok(Json(provider.list(ctx, project_id).await?))
@@ -34,13 +34,13 @@ async fn list(
 
 async fn delete(
     ctx: Context,
-    Extension(provider): Extension<Arc<Provider>>,
+    Extension(provider): Extension<Arc<PropertiesProvider>>,
     Path((project_id, event_id)): Path<(u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(provider.delete(ctx, project_id, event_id).await?))
 }
 
-pub fn configure_user(router: Router) -> Router {
+pub fn attach_user_routes(router: Router, prop: Arc<properties::Provider>) -> Router {
     router
         .route(
             "/v1/projects/:project_id/user_properties",
@@ -54,9 +54,10 @@ pub fn configure_user(router: Router) -> Router {
             "/v1/projects/:project_id/user_properties/name/:prop_name",
             routing::get(get_by_name),
         )
+        .layer(AddExtensionLayer::new(prop))
 }
 
-pub fn configure_event(router: Router) -> Router {
+pub fn attach_event_routes(router: Router, prop: Arc<properties::Provider>) -> Router {
     router
         .route(
             "/v1/projects/:project_id/event_properties",
@@ -70,4 +71,5 @@ pub fn configure_event(router: Router) -> Router {
             "/v1/projects/:project_id/event_properties/name/:prop_name",
             routing::get(get_by_name),
         )
+        .layer(AddExtensionLayer::new(prop))
 }
