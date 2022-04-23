@@ -17,7 +17,7 @@ import { PropertyRef  } from "@/types/events"
 import { Item } from "@/components/Select/SelectTypes";
 import { useLexiconStore } from "@/stores/lexicon";
 import Select from "@/components/Select/Select.vue";
-import { PropertyType } from '@/api'
+import { DataType, PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();
 
@@ -38,7 +38,7 @@ const items = computed(() => {
     if (props.propertyRef) {
         if (props.propertyRef.type === PropertyType.Event) {
             const prop = lexiconStore.findEventPropertyById(props.propertyRef.id);
-            findOperations(prop.type, prop.nullable, prop.isArray).forEach(op =>
+            findOperations(prop.dataType || DataType.String, prop.nullable, prop.isArray).forEach(op =>
                 ret.push({
                     item: op.id,
                     name: op.name

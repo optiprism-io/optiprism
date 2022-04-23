@@ -150,7 +150,7 @@ provide('actionEvent', (payload: string) => {
     }
 })
 
-provide('editEvent', (payload: number) => {
+provide('editEvent', (payload: string) => {
     eventsStore.setEditCustomEvent(payload)
     commonStore.togglePopupCreateCustomEvent(true)
 })

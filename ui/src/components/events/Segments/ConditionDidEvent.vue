@@ -238,7 +238,7 @@ const compareEventItems = computed(() => {
             items: eventGroup.items.map(event => {
                 return {
                     ...event,
-                    disabled: props.condition.event?.ref.id === event.item.id,
+                    disabled: props.condition.event?.ref.name === event.item.name,
                 }
             })
 

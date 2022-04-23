@@ -2317,14 +2317,94 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
     return {
         /**
          * 
+         * @summary Create custom event
+         * @param {string} projectId Project ID
+         * @param {CreateCustomEventRequest} createCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createCustomEvent: async (projectId: string, createCustomEventRequest: CreateCustomEventRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('createCustomEvent', 'projectId', projectId)
+            // verify required parameter 'createCustomEventRequest' is not null or undefined
+            assertParamExists('createCustomEvent', 'createCustomEventRequest', createCustomEventRequest)
+            const localVarPath = `/v1/projects/{project_id}/schema/custom-events`
+                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createCustomEventRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Events list
+         * @param {string} projectId Project ID
+         * @param {EventListRequest} eventListRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createEventsStream: async (projectId: string, eventListRequest: EventListRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('createEventsStream', 'projectId', projectId)
+            // verify required parameter 'eventListRequest' is not null or undefined
+            assertParamExists('createEventsStream', 'eventListRequest', eventListRequest)
+            const localVarPath = `/v1/projects/{project_id}/data/events-stream`
+                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(eventListRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Custom events list
          * @param {string} projectId Project ID
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getCustomEvents: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        customEvents: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('getCustomEvents', 'projectId', projectId)
+            assertParamExists('customEvents', 'projectId', projectId)
             const localVarPath = `/v1/projects/{project_id}/schema/custom-events`
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2356,9 +2436,9 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getCustomProperties: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        customProperties: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('getCustomProperties', 'projectId', projectId)
+            assertParamExists('customProperties', 'projectId', projectId)
             const localVarPath = `/v1/projects/{project_id}/schema/custom-properties`
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2390,9 +2470,9 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getEvents: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        events: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('getEvents', 'projectId', projectId)
+            assertParamExists('events', 'projectId', projectId)
             const localVarPath = `/v1/projects/{project_id}/schema/events`
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2425,11 +2505,11 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getProperties: async (projectId: string, type: 'event' | 'user', options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        properties: async (projectId: string, type: 'event' | 'user', options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('getProperties', 'projectId', projectId)
+            assertParamExists('properties', 'projectId', projectId)
             // verify required parameter 'type' is not null or undefined
-            assertParamExists('getProperties', 'type', type)
+            assertParamExists('properties', 'type', type)
             const localVarPath = `/v1/projects/{project_id}/schema/properties`
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2469,9 +2549,9 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getPropertyValues: async (projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        propertyValues: async (projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('getPropertyValues', 'projectId', projectId)
+            assertParamExists('propertyValues', 'projectId', projectId)
             const localVarPath = `/v1/projects/{project_id}/data/property-values`
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2512,86 +2592,6 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
                 options: localVarRequestOptions,
             };
         },
-        /**
-         * 
-         * @summary Create custom event
-         * @param {string} projectId Project ID
-         * @param {CreateCustomEventRequest} createCustomEventRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        postCustomEvent: async (projectId: string, createCustomEventRequest: CreateCustomEventRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('postCustomEvent', 'projectId', projectId)
-            // verify required parameter 'createCustomEventRequest' is not null or undefined
-            assertParamExists('postCustomEvent', 'createCustomEventRequest', createCustomEventRequest)
-            const localVarPath = `/v1/projects/{project_id}/schema/custom-events`
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-
-    
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(createCustomEventRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary Events list
-         * @param {string} projectId Project ID
-         * @param {EventListRequest} eventListRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        postEventsStream: async (projectId: string, eventListRequest: EventListRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('postEventsStream', 'projectId', projectId)
-            // verify required parameter 'eventListRequest' is not null or undefined
-            assertParamExists('postEventsStream', 'eventListRequest', eventListRequest)
-            const localVarPath = `/v1/projects/{project_id}/data/events-stream`
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-
-    
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(eventListRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
     }
 };
 
@@ -2604,13 +2604,37 @@ export const DefaultApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
+         * @summary Create custom event
+         * @param {string} projectId Project ID
+         * @param {CreateCustomEventRequest} createCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async createCustomEvent(projectId: string, createCustomEventRequest: CreateCustomEventRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEvent>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createCustomEvent(projectId, createCustomEventRequest, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Events list
+         * @param {string} projectId Project ID
+         * @param {EventListRequest} eventListRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async createEventsStream(projectId: string, eventListRequest: EventListRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createEventsStream(projectId, eventListRequest, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
          * @summary Custom events list
          * @param {string} projectId Project ID
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getCustomEvents(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getCustomEvents(projectId, options);
+        async customEvents(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.customEvents(projectId, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -2620,8 +2644,8 @@ export const DefaultApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getCustomProperties(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getCustomProperties(projectId, options);
+        async customProperties(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.customProperties(projectId, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -2631,8 +2655,8 @@ export const DefaultApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getEvents(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getEvents(projectId, options);
+        async events(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.events(projectId, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -2643,8 +2667,8 @@ export const DefaultApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getProperties(projectId: string, type: 'event' | 'user', options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getProperties(projectId, type, options);
+        async properties(projectId: string, type: 'event' | 'user', options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.properties(projectId, type, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -2658,32 +2682,8 @@ export const DefaultApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getPropertyValues(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InlineResponse200>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getPropertyValues(projectId, eventName, eventType, propertyName, propertyType, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
-         * @summary Create custom event
-         * @param {string} projectId Project ID
-         * @param {CreateCustomEventRequest} createCustomEventRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async postCustomEvent(projectId: string, createCustomEventRequest: CreateCustomEventRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEvent>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.postCustomEvent(projectId, createCustomEventRequest, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
-         * @summary Events list
-         * @param {string} projectId Project ID
-         * @param {EventListRequest} eventListRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async postEventsStream(projectId: string, eventListRequest: EventListRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.postEventsStream(projectId, eventListRequest, options);
+        async propertyValues(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InlineResponse200>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.propertyValues(projectId, eventName, eventType, propertyName, propertyType, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
     }
@@ -2698,13 +2698,35 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
     return {
         /**
          * 
+         * @summary Create custom event
+         * @param {string} projectId Project ID
+         * @param {CreateCustomEventRequest} createCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createCustomEvent(projectId: string, createCustomEventRequest: CreateCustomEventRequest, options?: any): AxiosPromise<CustomEvent> {
+            return localVarFp.createCustomEvent(projectId, createCustomEventRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Events list
+         * @param {string} projectId Project ID
+         * @param {EventListRequest} eventListRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createEventsStream(projectId: string, eventListRequest: EventListRequest, options?: any): AxiosPromise<object & ListResponseMetadata> {
+            return localVarFp.createEventsStream(projectId, eventListRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Custom events list
          * @param {string} projectId Project ID
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getCustomEvents(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
-            return localVarFp.getCustomEvents(projectId, options).then((request) => request(axios, basePath));
+        customEvents(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
+            return localVarFp.customEvents(projectId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -2713,8 +2735,8 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getCustomProperties(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
-            return localVarFp.getCustomProperties(projectId, options).then((request) => request(axios, basePath));
+        customProperties(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
+            return localVarFp.customProperties(projectId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -2723,8 +2745,8 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getEvents(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
-            return localVarFp.getEvents(projectId, options).then((request) => request(axios, basePath));
+        events(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
+            return localVarFp.events(projectId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -2734,8 +2756,8 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getProperties(projectId: string, type: 'event' | 'user', options?: any): AxiosPromise<object & ListResponseMetadata> {
-            return localVarFp.getProperties(projectId, type, options).then((request) => request(axios, basePath));
+        properties(projectId: string, type: 'event' | 'user', options?: any): AxiosPromise<object & ListResponseMetadata> {
+            return localVarFp.properties(projectId, type, options).then((request) => request(axios, basePath));
         },
         /**
          * for event property you should include event_name and event_type <br/><br/> examples: <br/> /v1/projects/1/data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Name&property_type=regular /v1/projects/1/data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Total%20Revenue&property_type=custom /v1/projects/1/data/property-values?event_name=Custom&event_type=custom&property_name=SomeProp&property_type=regular /v1/projects/1/data/property-values?property_name=Country&property_type=regular /v1/projects/1/data/property-values?property_name=Full%Name&property_type=custom 
@@ -2748,30 +2770,8 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getPropertyValues(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: any): AxiosPromise<InlineResponse200> {
-            return localVarFp.getPropertyValues(projectId, eventName, eventType, propertyName, propertyType, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Create custom event
-         * @param {string} projectId Project ID
-         * @param {CreateCustomEventRequest} createCustomEventRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        postCustomEvent(projectId: string, createCustomEventRequest: CreateCustomEventRequest, options?: any): AxiosPromise<CustomEvent> {
-            return localVarFp.postCustomEvent(projectId, createCustomEventRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Events list
-         * @param {string} projectId Project ID
-         * @param {EventListRequest} eventListRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        postEventsStream(projectId: string, eventListRequest: EventListRequest, options?: any): AxiosPromise<object & ListResponseMetadata> {
-            return localVarFp.postEventsStream(projectId, eventListRequest, options).then((request) => request(axios, basePath));
+        propertyValues(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: any): AxiosPromise<InlineResponse200> {
+            return localVarFp.propertyValues(projectId, eventName, eventType, propertyName, propertyType, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -2785,14 +2785,40 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
 export class DefaultApi extends BaseAPI {
     /**
      * 
+     * @summary Create custom event
+     * @param {string} projectId Project ID
+     * @param {CreateCustomEventRequest} createCustomEventRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof DefaultApi
+     */
+    public createCustomEvent(projectId: string, createCustomEventRequest: CreateCustomEventRequest, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).createCustomEvent(projectId, createCustomEventRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Events list
+     * @param {string} projectId Project ID
+     * @param {EventListRequest} eventListRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof DefaultApi
+     */
+    public createEventsStream(projectId: string, eventListRequest: EventListRequest, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).createEventsStream(projectId, eventListRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
      * @summary Custom events list
      * @param {string} projectId Project ID
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public getCustomEvents(projectId: string, options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).getCustomEvents(projectId, options).then((request) => request(this.axios, this.basePath));
+    public customEvents(projectId: string, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).customEvents(projectId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -2803,8 +2829,8 @@ export class DefaultApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public getCustomProperties(projectId: string, options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).getCustomProperties(projectId, options).then((request) => request(this.axios, this.basePath));
+    public customProperties(projectId: string, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).customProperties(projectId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -2815,8 +2841,8 @@ export class DefaultApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public getEvents(projectId: string, options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).getEvents(projectId, options).then((request) => request(this.axios, this.basePath));
+    public events(projectId: string, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).events(projectId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -2828,8 +2854,8 @@ export class DefaultApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public getProperties(projectId: string, type: 'event' | 'user', options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).getProperties(projectId, type, options).then((request) => request(this.axios, this.basePath));
+    public properties(projectId: string, type: 'event' | 'user', options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).properties(projectId, type, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -2844,34 +2870,8 @@ export class DefaultApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public getPropertyValues(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).getPropertyValues(projectId, eventName, eventType, propertyName, propertyType, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Create custom event
-     * @param {string} projectId Project ID
-     * @param {CreateCustomEventRequest} createCustomEventRequest 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof DefaultApi
-     */
-    public postCustomEvent(projectId: string, createCustomEventRequest: CreateCustomEventRequest, options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).postCustomEvent(projectId, createCustomEventRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Events list
-     * @param {string} projectId Project ID
-     * @param {EventListRequest} eventListRequest 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof DefaultApi
-     */
-    public postEventsStream(projectId: string, eventListRequest: EventListRequest, options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).postEventsStream(projectId, eventListRequest, options).then((request) => request(this.axios, this.basePath));
+    public propertyValues(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).propertyValues(projectId, eventName, eventType, propertyName, propertyType, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

@@ -28,9 +28,9 @@ export type CustomEvents = CreateCustomEventRequest
 const schemaService = {
     events: async () => await get("/schema/events", "", null),
 
-    getCustomEvents: async (projectId: string) => await api.getCustomEvents(projectId),
-    postCustomEvent: async (projectId: string, params: CreateCustomEventRequest) => await api.postCustomEvent(projectId, params),
-    editCustomEvent: async(params: CustomEvents) => await fetch('/schema/custom-events', 'PUT', params),
+    customEvents: async (projectId: string) => await api.customEvents(projectId),
+    createCustomEvent: async (projectId: string, params: CreateCustomEventRequest) => await api.createCustomEvent(projectId, params),
+    updateCustomEvent: async(params: CustomEvents) => await fetch('/schema/custom-events', 'PUT', params),
 
     eventProperties: async () => await get("/schema/event-properties", "", null),
     eventCustomProperties: async () => await get("/schema/event-custom-properties", "", null),

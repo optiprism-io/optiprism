@@ -147,7 +147,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { EventRef, PropertyRef, EventQueryRef, EVENT_TYPE_REGULAR, EVENT_TYPE_CUSTOM } from "@/types/events";
+import { EventRef, PropertyRef, EventQueryRef } from '@/types/events'
 import { OperationId, Value } from "@/types";
 import { useLexiconStore } from "@/stores/lexicon";
 import { EventBreakdown, EventFilter, EventQuery, Event, initialQuery, EventPayload } from '@/stores/eventSegmentation/events'
@@ -326,9 +326,9 @@ const removeBreakdown = (breakdownIdx: number): void => {
 const eventName = (ref: EventRef): string => {
     switch (ref.type) {
         case EventType.Regular:
-            return lexiconStore.findEventById(ref.id).displayName;
+            return lexiconStore.findEventByName(ref.name).displayName
         case EventType.Custom:
-            return lexiconStore.findCustomEventById(ref.id).name;
+            return lexiconStore.findCustomEventByName(ref.name).name
     }
     throw new Error("unhandled");
 };

@@ -13,14 +13,12 @@ import {
     EventQueryRef,
     EventsQuery,
     EventProperty,
-    EVENT_TYPE_CUSTOM,
-    EVENT_TYPE_REGULAR,
 } from "@/types/events";
 import { Cohort } from "@/types";
 import { aggregates } from "@/types/aggregate"
 import { Group, Item } from "@/components/Select/SelectTypes";
 import { useEventsStore, Events } from "@/stores/eventSegmentation/events";
-import { PropertyType, CustomEvent } from '@/api'
+import { PropertyType, CustomEvent, EventType, Property } from '@/api'
 import { useCommonStore } from '@/stores/common'
 
 type Lexicon = {
@@ -30,7 +28,7 @@ type Lexicon = {
     customEvents: CustomEvent[]
     eventsLoading: boolean;
 
-    eventProperties: EventProperty[];
+    eventProperties: Property[];
     eventCustomProperties: EventCustomProperty[];
     eventPropertiesLoading: boolean;
 
@@ -76,10 +74,10 @@ export const useLexiconStore = defineStore("lexicon", {
             try {
                 this.events = await schemaService.events()
 
-                const responseCustomEvents = await schemaService.getCustomEvents(String(commonStore.projectId))
+                const responseCustomEvents = await schemaService.customEvents(String(commonStore.projectId))
                 this.customEvents = <CustomEvent[]>responseCustomEvents.data
             } catch (error) {
-                throw new Error('error getCustomEvents')
+                throw new Error('error customEvents')
             }
 
             this.eventsLoading = false
@@ -106,56 +104,56 @@ export const useLexiconStore = defineStore("lexicon", {
         }
     },
     getters: {
-        findEventById(state: Lexicon) {
-            return (id: number | string): Event => {
-                const e = state.events.find((event): boolean => event.id === id || id === event.name)
+        findEventByName(state: Lexicon) {
+            return (name: string): Event => {
+                const e = state.events.find((event): boolean => name === event.name)
                 if (e) {
-                    return e;
+                    return e
                 }
-                throw new Error(`undefined event id: ${id}`)
-            };
+                throw new Error(`undefined event name: ${name}`)
+            }
         },
-        findCustomEventById(state: Lexicon) {
-            return (id: number | string): CustomEvent => {
-                const e = state.customEvents.find((event): boolean => event.id === id);
+        findCustomEventByName(state: Lexicon) {
+            return (name: string): CustomEvent => {
+                const e = state.customEvents.find((event): boolean => name === event.name)
                 if (e) {
-                    return e;
+                    return e
                 }
-                throw new Error(`undefined custom event id: ${id}`)
-            };
+                throw new Error(`undefined custon event name: ${name}`)
+            }
         },
         eventName() {
             return (ref: EventRef): string => {
                 switch (ref.type) {
-                    case EVENT_TYPE_REGULAR:
-                        return this.findEventById(ref.id).name;
-                    case EVENT_TYPE_CUSTOM:
-                        return this.findCustomEventById(ref.id).name;
+                    case EventType.Regular:
+                        return this.findEventByName(ref.name).name
+                    case EventType.Custom:
+                        return this.findCustomEventByName(ref.name).name
                 }
             };
         },
         findEvent() {
             return (ref: EventRef) => {
                 switch (ref.type) {
-                    case EVENT_TYPE_REGULAR:
-                        return this.findEventById(ref.id);
-                    case EVENT_TYPE_CUSTOM:
-                        return this.findCustomEventById(ref.id);
+                    case EventType.Regular:
+                        return this.findEventByName(ref.name)
+                    case EventType.Custom:
+                        return this.findCustomEventByName(ref.name)
                 }
             };
         },
         findEventProperties(state: Lexicon) {
-            return (eventId: number | string): EventProperty[] => {
-                return state.eventProperties.filter((prop): boolean => prop.id === eventId);
+            return (name: string): Property[] => {
+                return state.eventProperties.filter((prop): boolean => prop.name === name)
             };
         },
         findEventCustomProperties(state: Lexicon) {
-            return (eventId: number | string): EventCustomProperty[] => {
-                return state.eventCustomProperties.filter((prop): boolean => prop.id === eventId);
+            return (name: string): EventCustomProperty[] => {
+                return state.eventCustomProperties.filter((prop): boolean => prop.name === name)
             };
         },
         findEventPropertyById(state: Lexicon) {
-            return (id: number | string): EventProperty => {
+            return (id: number | string): Property => {
                 const e = state.eventProperties.find((prop): boolean => prop.id === id);
                 if (e) {
                     return e;
@@ -182,7 +180,7 @@ export const useLexiconStore = defineStore("lexicon", {
             };
         },
         property() {
-            return (ref: PropertyRef): EventProperty | EventCustomProperty | UserProperty | UserCustomProperty => {
+            return (ref: PropertyRef): Property | EventCustomProperty | UserProperty | UserCustomProperty => {
                 switch (ref.type) {
                     case PropertyType.Event:
                         return this.findEventPropertyById(ref.id);

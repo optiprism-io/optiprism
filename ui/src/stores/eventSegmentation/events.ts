@@ -3,15 +3,13 @@ import {
     EventRef,
     PropertyRef,
     EventQueryRef,
-    EVENT_TYPE_REGULAR,
-    EVENT_TYPE_CUSTOM
 } from "@/types/events";
 import { OperationId, Value, Group } from '@/types'
 import queriesService, { EventSegmentation } from "@/api/services/queries.service";
 import { getYYYYMMDD, getStringDateByFormat } from "@/helpers/getStringDates";
 import { getLastNDaysRange } from "@/helpers/calendarHelper";
 import {Column, Row} from "@/components/uikit/UiTable/UiTable";
-import { PropertyType, TimeUnit } from '@/api'
+import { PropertyType, TimeUnit, EventType } from '@/api'
 
 import { useLexiconStore } from "@/stores/lexicon";
 import { useSegmentsStore } from "@/stores/eventSegmentation/segments";
@@ -72,7 +70,7 @@ export type Events = {
     eventSegmentation: any // TODO integrations backend
     eventSegmentationLoading: boolean
 
-    editCustomEvent: number | null
+    editCustomEvent: string | null
 };
 
 export const initialQuery = <EventQuery[]>[
@@ -220,8 +218,8 @@ export const useEventsStore = defineStore("events", {
 
             this.events.forEach(item => {
                 const eventRef = item.ref;
-                items.push(...computedEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.id)));
-                items.push(...computedEventProperties(PropertyType.Custom, lexiconStore.findEventCustomProperties(eventRef.id)));
+                items.push(...computedEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.name)));
+                items.push(...computedEventProperties(PropertyType.Custom, lexiconStore.findEventCustomProperties(eventRef.name)));
             });
 
             return [
@@ -308,7 +306,7 @@ export const useEventsStore = defineStore("events", {
         },
     },
     actions: {
-        setEditCustomEvent(payload: number | null) {
+        setEditCustomEvent(payload: string | null) {
             this.editCustomEvent = payload
         },
         setEvent(payload: EventPayload) {
@@ -338,25 +336,31 @@ export const useEventsStore = defineStore("events", {
 
         addEventByRef(ref: EventRef): void {
             switch (ref.type) {
-                case EVENT_TYPE_REGULAR:
-                    this.addEvent(ref.id);
+                case EventType.Regular:
+                    this.addEvent(ref.name);
                     break;
-                case EVENT_TYPE_CUSTOM:
-                    this.addCustomEvent(ref.id);
+                case EventType.Custom:
+                    this.addCustomEvent(ref.name);
                     break;
             }
         },
-        addEvent(id: number | string): void {
+        addEvent(name: string): void {
             this.events.push(<Event>{
-                ref: <EventRef>{ type: EVENT_TYPE_REGULAR, id: id },
+                ref: <EventRef>{
+                    type: EventType.Regular,
+                    name: name
+                },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,
             });
         },
-        addCustomEvent(id: number | string): void {
+        addCustomEvent(name: string): void {
             this.events.push(<Event>{
-                ref: <EventRef>{ type: EVENT_TYPE_CUSTOM, id: id },
+                ref: <EventRef>{
+                    type: EventType.Custom,
+                    name: name
+                },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,

@@ -16,17 +16,14 @@
 import { computed } from "vue";
 import {
     EventCustomProperty,
-    EventProperty,
     EventRef,
     PropertyRef,
-    UserCustomProperty,
     UserProperty,
-    EVENT_TYPE_REGULAR
 } from "@/types/events";
 import Select from "@/components/Select/Select.vue";
 import { Group, Item } from "@/components/Select/SelectTypes";
 import { useLexiconStore } from "@/stores/lexicon";
-import { PropertyType } from '@/api'
+import { PropertyType, EventType, Property } from '@/api'
 
 const lexiconStore = useLexiconStore();
 
@@ -50,12 +47,12 @@ const checkDisable = (propRef: PropertyRef): boolean => {
 const getEventProperties = (eventRef: EventRef) => {
     const properties: Group<Item<PropertyRef, null>[]>[] = [];
 
-    if (eventRef.type === EVENT_TYPE_REGULAR) {
-        const eventProperties = lexiconStore.findEventProperties(eventRef.id);
+    if (eventRef.type === EventType.Regular) {
+        const eventProperties = lexiconStore.findEventProperties(eventRef.name)
 
         if (eventProperties.length) {
             let items: Item<PropertyRef, null>[] = [];
-            eventProperties.forEach((prop: EventProperty): void => {
+            eventProperties.forEach((prop: Property): void => {
                 const propertyRef: PropertyRef = {
                     type: PropertyType.Event,
                     id: prop.id
@@ -70,7 +67,7 @@ const getEventProperties = (eventRef: EventRef) => {
             properties.push({ name: "Event Properties", items, });
         }
 
-        const eventCustomProperties = lexiconStore.findEventCustomProperties(eventRef.id);
+        const eventCustomProperties = lexiconStore.findEventCustomProperties(eventRef.name);
 
         if (eventCustomProperties.length) {
             let items: Item<PropertyRef, null>[] = [];

@@ -3,9 +3,6 @@ import { AggregateId } from '@/types/aggregate'
 import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
 import { EventType, PropertyType, DataType, Value, CustomEvent } from '@/api'
 
-export const EVENT_TYPE_REGULAR = 'regular'
-export const EVENT_TYPE_CUSTOM = 'custom'
-
 export type PropertyRef = {
     type: PropertyType;
     id: number | string
@@ -18,15 +15,15 @@ export enum EventStatus {
 
 export type EventRef = {
     type: EventType;
-    id: number | string
+    name: string
 }
 
 export function eventRef(e: Event): EventRef {
-    return <EventRef>{ type: EventType.Regular, id: e.id }
+    return <EventRef>{ type: EventType.Regular, name: e.name }
 }
 
 export function customEventRef(e: CustomEvent): EventRef {
-    return <EventRef>{ type: EventType.Custom, id: e.id };
+    return <EventRef>{ type: EventType.Custom, name: e.name }
 }
 
 export function eventPropertyRef(e: EventProperty): PropertyRef {

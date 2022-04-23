@@ -120,7 +120,7 @@ export const useSegmentsStore = defineStore("segments", {
                     const event = lexiconStore.findEvent(payload.ref);
 
                     condition.event = {
-                        name: event?.displayName || event.name,
+                        name: event.name,
                         ref: payload.ref,
                     }
                     condition.filters = []
@@ -138,7 +138,7 @@ export const useSegmentsStore = defineStore("segments", {
                     const event = lexiconStore.findEvent(payload.ref);
 
                     condition.compareEvent = {
-                        name: event?.displayName || event.name,
+                        name: event.name,
                         ref: payload.ref,
                     }
                 }

@@ -71,11 +71,11 @@ const items = computed(() => {
     }
 
     if (events.length > 0) {
-        let firstProps = lexiconStore.findEventProperties(events[0].ref.id);
-        let firstCustomProps = lexiconStore.findEventCustomProperties(events[0].ref.id);
+        let firstProps = lexiconStore.findEventProperties(events[0].ref.name);
+        let firstCustomProps = lexiconStore.findEventCustomProperties(events[0].ref.name);
         if (firstProps.length > 0) {
             for (let i = 1; i < events.length; i++) {
-                let props = lexiconStore.findEventProperties(events[i].ref.id);
+                let props = lexiconStore.findEventProperties(events[i].ref.name);
                 let rem: number[] = [];
                 for (let j = 0; j < firstProps.length; j++) {
                     let firstProp = firstProps[j];
@@ -100,7 +100,7 @@ const items = computed(() => {
 
             if (firstCustomProps.length > 0) {
                 for (let i = 1; i < events.length; i++) {
-                    let props = lexiconStore.findEventCustomProperties(events[i].ref.id);
+                    let props = lexiconStore.findEventCustomProperties(events[i].ref.name);
                     let rem: number[] = [];
                     for (let j = 0; j < firstCustomProps.length; j++) {
                         let firstProp = firstCustomProps[j];

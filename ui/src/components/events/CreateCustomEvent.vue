@@ -61,7 +61,7 @@
 
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount, inject } from 'vue'
-import { EventRef, EVENT_TYPE_REGULAR } from '@/types/events'
+import { EventRef } from '@/types/events'
 import { useLexiconStore } from '@/stores/lexicon'
 import { Event, useEventsStore, EventPayload } from '@/stores/eventSegmentation/events'
 import { useCommonStore } from '@/stores/common'
@@ -72,6 +72,7 @@ import UiFormLabel from '@/components//uikit/UiFormLabel.vue'
 import Select from '@/components/Select/Select.vue'
 import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
 import schemaService, { Event as EventScheme, CustomEvents } from '@/api/services/schema.service'
+import { EventType } from '@/api'
 
 const i18n = inject<any>('i18n')
 
@@ -98,7 +99,7 @@ const isEdit = computed(() => {
 
 const editedEvent = computed(() => {
     if (eventsStore.editCustomEvent) {
-        return lexiconStore.findCustomEventById(eventsStore.editCustomEvent)
+        return lexiconStore.findCustomEventByName(eventsStore.editCustomEvent)
     } else {
         return null
     }
@@ -115,8 +116,8 @@ const eventItems = computed(() => {
 const addEvent = (ref: EventRef) => {
     events.value.push({
         ref: {
-            type: EVENT_TYPE_REGULAR,
-            id: ref.id
+            type: EventType.Regular,
+            name: ref.name
         },
         filters: [],
         breakdowns: [],
@@ -139,7 +140,7 @@ const apply = async () => {
             projectId: commonStore.projectId,
             name: eventName.value,
             events: events.value.map(item => {
-                const event = lexiconStore.findEventById(item.ref.id)
+                const event = lexiconStore.findEventByName(item.ref.name)
 
                 const eventProps: EventScheme = {
                     eventName: event.name,
@@ -159,8 +160,6 @@ const apply = async () => {
                                     propertyType: filter.propRef.type,
                                     operation: filter.opId,
                                     value: filter.values,
-                                    propRef: filter.propRef,
-                                    valuesList: filter.valuesList
                                 })
                             }
                         }
@@ -177,9 +176,9 @@ const apply = async () => {
                 ...data,
             }
 
-            await schemaService.editCustomEvent(editData)
+            await schemaService.updateCustomEvent(editData)
         } else {
-            await schemaService.postCustomEvent(String(commonStore.projectId), data)
+            await schemaService.createCustomEvent(String(commonStore.projectId), data)
         }
 
 
