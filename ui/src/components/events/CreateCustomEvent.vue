@@ -205,7 +205,7 @@ onBeforeMount(() => {
                 return {
                     ref: {
                         type: item.eventType,
-                        id: item.eventName
+                        name: item.eventName
                     },
                     filters: item.filters ? item.filters.map(filter => {
                         return {

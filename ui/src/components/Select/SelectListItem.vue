@@ -84,7 +84,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: "click", item: any): void;
-    (e: 'edit', payload: number): void
+    (e: 'edit', payload: string): void
 }>();
 
 const isSelected = computed(() => {
@@ -104,7 +104,7 @@ const clickList = (payload: any) => {
 
 const edit = (e: Event) => {
     e.stopPropagation()
-    emit('edit', props.item.id)
+    emit('edit', props.item.name)
 }
 </script>
 

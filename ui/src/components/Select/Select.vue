@@ -75,7 +75,7 @@ const emit = defineEmits<{
     (e: "onSearch", payload: string): void;
     (e: "onHover", item: any): void;
     (e: 'action', payload: string): void
-    (e: 'edit', payload: number): void
+    (e: 'edit', payload: string): void
 }>();
 
 const props = withDefaults(

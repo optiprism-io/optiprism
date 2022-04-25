@@ -196,7 +196,7 @@ const emit = defineEmits<{
 
     (e: 'setEvent', payload: EventPayload): void
     (e: 'action', payload: string): void
-    (e: 'edit', payload: number): void
+    (e: 'edit', payload: string): void
 }>();
 
 const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()

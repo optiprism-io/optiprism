@@ -19,6 +19,7 @@ import {
     PayloadChangeValueItem,
     PayloadChangeEach,
 } from '@/components/events/Segments/Segments'
+import { EventType } from '@/api'
 
 interface Segment {
     name: string
@@ -117,10 +118,9 @@ export const useSegmentsStore = defineStore("segments", {
 
                 if (condition) {
                     const lexiconStore = useLexiconStore()
-                    const event = lexiconStore.findEvent(payload.ref);
 
                     condition.event = {
-                        name: event.name,
+                        name: payload.ref.type === EventType.Regular ? lexiconStore.findEventByName(payload.ref.name).displayName : lexiconStore.findCustomEventByName(payload.ref.name).name,
                         ref: payload.ref,
                     }
                     condition.filters = []
@@ -135,10 +135,9 @@ export const useSegmentsStore = defineStore("segments", {
 
                 if (condition) {
                     const lexiconStore = useLexiconStore()
-                    const event = lexiconStore.findEvent(payload.ref);
 
                     condition.compareEvent = {
-                        name: event.name,
+                        name: payload.ref.type === EventType.Regular ? lexiconStore.findEventByName(payload.ref.name).displayName : lexiconStore.findCustomEventByName(payload.ref.name).name,
                         ref: payload.ref,
                     }
                 }
