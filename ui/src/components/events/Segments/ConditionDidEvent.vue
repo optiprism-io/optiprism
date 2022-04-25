@@ -201,7 +201,7 @@ const conditionConfig = computed(() => {
 const changeEventCondition = inject<(payload: ChangeEventCondition) => void>('changeEventCondition')
 const changeCompareEventCondition = inject<(payload: ChangeEventCondition) => void>('changeCompareEventCondition')
 const actionEvent = inject<(payload: string) => void>('actionEvent')
-const editEvent = inject<(payload: number) => void>('editEvent')
+const editEvent = inject<(payload: string) => void>('editEvent')
 
 const changeEvent = (ref: EventRef) => {
     changeEventCondition && changeEventCondition({
@@ -215,7 +215,7 @@ const selectAction = (payload: string) => {
     actionEvent && actionEvent(payload)
 }
 
-const edit = (payload: number) => {
+const edit = (payload: string) => {
     editEvent && editEvent(payload)
 }
 
