@@ -85,13 +85,14 @@ export const useFiltersStore = defineStore("filters", {
         async addFilter(propRef: PropertyRef) {
             const lexiconStore = useLexiconStore();
             let valuesList: string[] = [];
-            const eventRef = this.eventForValues(Number(propRef.id));
+            const property = lexiconStore.property(propRef)
+            const eventRef = this.eventForValues(property.id)
 
             try {
                 const res = await schemaService.propertryValues({
                     event_name: eventRef ? lexiconStore.eventName(eventRef) : "",
                     event_type: eventRef ? eventRef.type : "",
-                    property_name: lexiconStore.propertyName(propRef),
+                    property_name: property.name,
                     property_type: propRef.type
                 });
                 if (res) {
@@ -114,13 +115,14 @@ export const useFiltersStore = defineStore("filters", {
         async changeFilterRef(filterIdx: number, propRef: PropertyRef) {
             const lexiconStore = useLexiconStore();
             let valuesList: string[] = [];
-            const eventRef = this.eventForValues(Number(propRef.id));
+            const property = lexiconStore.property(propRef)
+            const eventRef = this.eventForValues(property.id);
 
             try {
                 const res = await schemaService.propertryValues({
                     event_name: eventRef ? lexiconStore.eventName(eventRef) : "",
                     event_type: eventRef ? eventRef.type : "",
-                    property_name: lexiconStore.propertyName(propRef),
+                    property_name: property.name,
                     property_type: propRef.type
                 });
                 if (res) {

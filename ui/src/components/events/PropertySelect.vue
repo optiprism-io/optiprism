@@ -55,7 +55,7 @@ const getEventProperties = (eventRef: EventRef) => {
             eventProperties.forEach((prop: Property): void => {
                 const propertyRef: PropertyRef = {
                     type: PropertyType.Event,
-                    id: prop.id
+                    name: prop.name
                 };
 
                 items.push({
@@ -75,7 +75,7 @@ const getEventProperties = (eventRef: EventRef) => {
             eventCustomProperties.forEach((prop: EventCustomProperty): void => {
                 const propertyRef: PropertyRef = {
                     type: PropertyType.Custom,
-                    id: prop.id
+                    name: prop.name
                 };
 
                 items.push({
@@ -102,7 +102,7 @@ const items = computed(() => {
         lexiconStore.userProperties.forEach((prop: UserProperty): void => {
             const propertyRef: PropertyRef = {
                 type: PropertyType.User,
-                id: prop.id
+                name: prop.name
             };
 
             items.push({

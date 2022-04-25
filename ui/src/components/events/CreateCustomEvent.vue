@@ -151,12 +151,10 @@ const apply = async () => {
                 if (item.filters.length) {
                     item.filters.forEach(filter => {
                         if (filter.propRef) {
-                            const property = lexiconStore.findEventPropertyById(filter.propRef.id)
-
                             if (eventProps.filters) {
                                 eventProps.filters.push({
                                     filterType: 'property',
-                                    propertyName: property.name,
+                                    propertyName: filter.propRef.name,
                                     propertyType: filter.propRef.type,
                                     operation: filter.opId,
                                     value: filter.values,
@@ -196,28 +194,44 @@ const cancel = (type: string) => {
     emit('cancel')
 }
 
-onBeforeMount(() => {
+onBeforeMount(async () => {
     if (editedEvent.value) {
         eventName.value = editedEvent.value.name
 
         if (editedEvent.value.events) {
-            events.value = JSON.parse(JSON.stringify((editedEvent.value.events.map(item => {
+            events.value = JSON.parse(JSON.stringify(await Promise.all(editedEvent.value.events.map(async item => {
                 return {
                     ref: {
                         type: item.eventType,
                         name: item.eventName
                     },
-                    filters: item.filters ? item.filters.map(filter => {
+                    filters: item.filters ? await Promise.all(item.filters.map(async filter => {
+                        let valuesList: string[] = []
+
+                        try {
+                            const res = await schemaService.propertryValues({
+                                event_name: item.eventName,
+                                event_type: item.eventType,
+                                property_name: filter.propertyName,
+                                property_type: filter.propertyType
+                            })
+                            if (res) {
+                                valuesList = res
+                            }
+                        } catch (error) {
+                            throw new Error('error get events values')
+                        }
+
                         return {
                             propRef: {
                                 type: filter.propertyType,
-                                id: filter.propertyName
+                                name: filter.propertyName
                             },
                             opId: filter.operation,
                             values: filter.value,
-                            valuesList: [],
+                            valuesList: valuesList,
                         }
-                    }) : [],
+                    })) : [],
                     breakdowns: [],
                     queries: [],
                 }

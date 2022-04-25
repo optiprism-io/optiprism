@@ -5,7 +5,7 @@ import { EventType, PropertyType, DataType, Value, CustomEvent } from '@/api'
 
 export type PropertyRef = {
     type: PropertyType;
-    id: number | string
+    name: string
 };
 
 export enum EventStatus {
@@ -27,19 +27,19 @@ export function customEventRef(e: CustomEvent): EventRef {
 }
 
 export function eventPropertyRef(e: EventProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.Event, id: e.id };
+    return <PropertyRef>{ type: PropertyType.Event, name: e.name };
 }
 
 export function eventCustomPropertyRef(e: EventCustomProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.Custom, id: e.id };
+    return <PropertyRef>{ type: PropertyType.Custom, name: e.name };
 }
 
 export function userPropertyRef(e: UserProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.User, id: e.id };
+    return <PropertyRef>{ type: PropertyType.User, name: e.name };
 }
 
 export function userCustomPropertyRef(e: UserCustomProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.Custom, id: e.id };
+    return <PropertyRef>{ type: PropertyType.Custom, name: e.name };
 }
 
 export interface Event {

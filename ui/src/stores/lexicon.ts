@@ -18,7 +18,7 @@ import { Cohort } from "@/types";
 import { aggregates } from "@/types/aggregate"
 import { Group, Item } from "@/components/Select/SelectTypes";
 import { useEventsStore, Events } from "@/stores/eventSegmentation/events";
-import { PropertyType, CustomEvent, EventType, Property } from '@/api'
+import { PropertyType, CustomEvent, EventType, Property,  } from '@/api'
 import { useCommonStore } from '@/stores/common'
 
 type Lexicon = {
@@ -152,6 +152,15 @@ export const useLexiconStore = defineStore("lexicon", {
                 return state.eventCustomProperties.filter((prop): boolean => prop.name === name)
             };
         },
+        findEventPropertyByName(state: Lexicon) {
+            return (name: string | number): Property => {
+                const e = state.eventProperties.find((prop): boolean => prop.name === name)
+                if (e) {
+                    return e
+                }
+                throw new Error(`undefined property name: ${name}`)
+            }
+        },
         findEventPropertyById(state: Lexicon) {
             return (id: number | string): Property => {
                 const e = state.eventProperties.find((prop): boolean => prop.id === id);
@@ -161,6 +170,15 @@ export const useLexiconStore = defineStore("lexicon", {
                 throw new Error(`undefined property id: ${id}`)
             };
         },
+        findEventCustomPropertyByName(state: Lexicon) {
+            return (name: string): EventCustomProperty => {
+                const e = state.eventCustomProperties.find((prop): boolean => prop.name === name)
+                if (e) {
+                    return e
+                }
+                throw new Error(`undefined custom property name: ${name}`)
+            }
+        },
         findEventCustomPropertyById(state: Lexicon) {
             return (id: number | string): EventCustomProperty => {
                 const e = state.eventCustomProperties.find((prop): boolean => prop.id === id);
@@ -169,6 +187,15 @@ export const useLexiconStore = defineStore("lexicon", {
                 }
                 throw new Error(`undefined custom property id: ${id}`)
             };
+        },
+        findUserPropertyByName(state: Lexicon) {
+            return (name: string): UserProperty => {
+                const e = state.userProperties.find((prop): boolean => prop.name === name)
+                if (e) {
+                    return e
+                }
+                throw new Error(`undefined user property name: ${name}`)
+            }
         },
         findUserPropertyById(state: Lexicon) {
             return (id: number | string): UserProperty => {
@@ -183,11 +210,11 @@ export const useLexiconStore = defineStore("lexicon", {
             return (ref: PropertyRef): Property | EventCustomProperty | UserProperty | UserCustomProperty => {
                 switch (ref.type) {
                     case PropertyType.Event:
-                        return this.findEventPropertyById(ref.id);
+                        return this.findEventPropertyByName(ref.name);
                     case PropertyType.Custom:
-                        return this.findEventCustomPropertyById(ref.id);
+                        return this.findEventCustomPropertyByName(ref.name);
                     case PropertyType.User:
-                        return this.findUserPropertyById(ref.id);
+                        return this.findUserPropertyByName(ref.name);
                 }
             };
         },
@@ -195,11 +222,11 @@ export const useLexiconStore = defineStore("lexicon", {
             return (ref: PropertyRef): string => {
                 switch (ref.type) {
                     case PropertyType.Event:
-                        return this.findEventPropertyById(ref.id).name;
+                        return this.findEventPropertyByName(ref.name).name;
                     case PropertyType.Custom:
-                        return this.findEventCustomPropertyById(ref.id).name;
+                        return this.findEventCustomPropertyByName(ref.name).name;
                     case PropertyType.User:
-                        return this.findUserPropertyById(ref.id).name;
+                        return this.findUserPropertyByName(ref.name).name;
                 }
             };
         },
