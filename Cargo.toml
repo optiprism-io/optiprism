@@ -1,2 +1,14 @@
 [workspace]
-members = ["metadata", "common", "query", "store", "platform", "cmd", "arrow-datafusion/datafusion", "arrow-datafusion/datafusion-expr", "arrow-datafusion/datafusion-common"]
+members = [
+    "metadata",
+    "common",
+    "query",
+    "store",
+    "platform",
+    "cmd",
+    "arrow-datafusion/datafusion",
+    "arrow-datafusion/datafusion-expr",
+    "arrow-datafusion/datafusion-common",
+    "events-gen",
+    "exp"
+]
