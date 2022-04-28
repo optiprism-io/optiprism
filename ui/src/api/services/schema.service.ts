@@ -1,7 +1,7 @@
-import { get, fetch } from '../apiClient'
+import { get } from '../apiClient'
 import { Value, OperationId } from '@/types'
 import { EventRef, PropertyRef } from '@/types/events'
-import { DefaultApi, CreateCustomEventRequest, PropertyType, CustomEventEvent } from '@/api'
+import { DefaultApi, CreateCustomEventRequest, PropertyType, CustomEventEvent, EventType } from '@/api'
 
 const api = new DefaultApi()
 
@@ -22,15 +22,20 @@ export type FilterCustomEvent = {
     valuesList?: string[]
 }
 
-export type Event = CustomEventEvent
-export type CustomEvents = CreateCustomEventRequest
+export interface Event extends Omit<CustomEventEvent, 'eventType'> {
+    eventType: EventType
+}
+
+export interface CustomEvents extends Omit<CreateCustomEventRequest, 'events'> {
+    events: Array<Event>
+}
 
 const schemaService = {
     events: async () => await get('/schema/events', '', null),
 
-    customEvents: async (projectId: string) => await api.customEvents(projectId),
-    createCustomEvent: async (projectId: string, params: CreateCustomEventRequest) => await api.createCustomEvent(projectId, params),
-    updateCustomEvent: async(params: CustomEvents) => await fetch('/schema/custom-events', 'PUT', params),
+    customEvents: async (projectId: string) => await api.customEventsList(projectId),
+    createCustomEvent: async (projectId: string, params: CustomEvents) => await api.createCustomEvent(projectId, params),
+    updateCustomEvent: async(projectId: string, eventId: string, params: CustomEvents) => await api.updateCustomEvent(projectId, eventId, params),
 
     eventProperties: async () => await get('/schema/event-properties', '', null),
     eventCustomProperties: async () => await get('/schema/event-custom-properties', '', null),

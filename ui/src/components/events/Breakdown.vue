@@ -107,11 +107,11 @@ const handleSelectProperty = (): void => {
 const propertyName = (ref: PropertyRef): string => {
     switch (ref.type) {
         case PropertyType.Event:
-            return lexiconStore.findEventPropertyByName(ref.name).name
+            return lexiconStore.findEventPropertyById(ref.id).name
         case PropertyType.Custom:
-            return lexiconStore.findEventCustomPropertyByName(ref.name).name
+            return lexiconStore.findEventCustomPropertyById(ref.id).name
         case PropertyType.User:
-            return lexiconStore.findUserPropertyByName(ref.name).name
+            return lexiconStore.findUserPropertyById(ref.id).name
     }
     throw new Error('unhandled');
 };

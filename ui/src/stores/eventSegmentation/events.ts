@@ -70,7 +70,7 @@ export type Events = {
     eventSegmentation: any // TODO integrations backend
     eventSegmentationLoading: boolean
 
-    editCustomEvent: string | null
+    editCustomEvent: number | null
 };
 
 export const initialQuery = <EventQuery[]>[
@@ -218,8 +218,8 @@ export const useEventsStore = defineStore('events', {
 
             this.events.forEach(item => {
                 const eventRef = item.ref;
-                items.push(...computedEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.name)));
-                items.push(...computedEventProperties(PropertyType.Custom, lexiconStore.findEventCustomProperties(eventRef.name)));
+                items.push(...computedEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.id)));
+                items.push(...computedEventProperties(PropertyType.Custom, lexiconStore.findEventCustomProperties(eventRef.id)));
             });
 
             return [
@@ -306,7 +306,7 @@ export const useEventsStore = defineStore('events', {
         },
     },
     actions: {
-        setEditCustomEvent(payload: string | null) {
+        setEditCustomEvent(payload: number | null) {
             this.editCustomEvent = payload
         },
         setEvent(payload: EventPayload) {
@@ -337,29 +337,29 @@ export const useEventsStore = defineStore('events', {
         addEventByRef(ref: EventRef): void {
             switch (ref.type) {
                 case EventType.Regular:
-                    this.addEvent(ref.name);
+                    this.addEvent(ref.id);
                     break;
                 case EventType.Custom:
-                    this.addCustomEvent(ref.name);
+                    this.addCustomEvent(ref.id);
                     break;
             }
         },
-        addEvent(name: string): void {
+        addEvent(payload: number): void {
             this.events.push(<Event>{
                 ref: <EventRef>{
                     type: EventType.Regular,
-                    name: name
+                    id: payload
                 },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,
             });
         },
-        addCustomEvent(name: string): void {
+        addCustomEvent(payload: number): void {
             this.events.push(<Event>{
                 ref: <EventRef>{
                     type: EventType.Custom,
-                    name: name
+                    id: payload
                 },
                 filters: [],
                 breakdowns: [],

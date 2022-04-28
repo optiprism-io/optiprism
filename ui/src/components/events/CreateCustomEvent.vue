@@ -99,7 +99,7 @@ const isEdit = computed(() => {
 
 const editedEvent = computed(() => {
     if (eventsStore.editCustomEvent) {
-        return lexiconStore.findCustomEventByName(eventsStore.editCustomEvent)
+        return lexiconStore.findCustomEventById(eventsStore.editCustomEvent)
     } else {
         return null
     }
@@ -117,7 +117,7 @@ const addEvent = (ref: EventRef) => {
     events.value.push({
         ref: {
             type: EventType.Regular,
-            name: ref.name
+            id: ref.id
         },
         filters: [],
         breakdowns: [],
@@ -137,14 +137,14 @@ const apply = async () => {
     loading.value = true
     try {
         const data: CustomEvents = {
-            projectId: commonStore.projectId,
             name: eventName.value,
             events: events.value.map(item => {
-                const event = lexiconStore.findEventByName(item.ref.name)
+                const event = lexiconStore.findEventById(item.ref.id)
 
                 const eventProps: EventScheme = {
                     eventName: event.name,
                     eventType: item.ref.type,
+                    eventId: event.id,
                     filters: [],
                 }
 
@@ -154,8 +154,8 @@ const apply = async () => {
                             if (eventProps.filters) {
                                 eventProps.filters.push({
                                     filterType: 'property',
-                                    propertyName: filter.propRef.name,
                                     propertyType: filter.propRef.type,
+                                    propertyId: filter.propRef.id,
                                     operation: filter.opId,
                                     value: filter.values,
                                 })
@@ -169,12 +169,7 @@ const apply = async () => {
         }
 
         if (isEdit.value) {
-            const editData = {
-                id: editedEvent.value?.id,
-                ...data,
-            }
-
-            await schemaService.updateCustomEvent(editData)
+            await schemaService.updateCustomEvent(String(commonStore.projectId), String(editedEvent.value?.id), data)
         } else {
             await schemaService.createCustomEvent(String(commonStore.projectId), data)
         }
@@ -203,7 +198,7 @@ onBeforeMount(async () => {
                 return {
                     ref: {
                         type: item.eventType,
-                        name: item.eventName
+                        id: item.eventId
                     },
                     filters: item.filters ? await Promise.all(item.filters.map(async filter => {
                         let valuesList: string[] = []
@@ -212,8 +207,8 @@ onBeforeMount(async () => {
                             const res = await schemaService.propertryValues({
                                 event_name: item.eventName,
                                 event_type: item.eventType,
-                                property_name: filter.propertyName,
-                                property_type: filter.propertyType
+                                property_name: filter.propertyName || '',
+                                property_type: filter.propertyType,
                             })
                             if (res) {
                                 valuesList = res
@@ -225,7 +220,7 @@ onBeforeMount(async () => {
                         return {
                             propRef: {
                                 type: filter.propertyType,
-                                name: filter.propertyName
+                                id: filter.propertyId
                             },
                             opId: filter.operation,
                             values: filter.value,

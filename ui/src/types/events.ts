@@ -1,11 +1,11 @@
 import { OperationId } from '@/types'
 import { AggregateId } from '@/types/aggregate'
 import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
-import { EventType, PropertyType, DataType, Value, CustomEvent } from '@/api'
+import { EventType, PropertyType, DataType, Value, CustomEvent, CustomEventEventEventTypeEnum } from '@/api'
 
 export type PropertyRef = {
     type: PropertyType;
-    name: string
+    id: number
 };
 
 export enum EventStatus {
@@ -14,32 +14,32 @@ export enum EventStatus {
 }
 
 export type EventRef = {
-    type: EventType;
-    name: string
+    type: EventType | CustomEventEventEventTypeEnum
+    id: number
 }
 
 export function eventRef(e: Event): EventRef {
-    return <EventRef>{ type: EventType.Regular, name: e.name }
+    return <EventRef>{ type: EventType.Regular, id: e.id }
 }
 
 export function customEventRef(e: CustomEvent): EventRef {
-    return <EventRef>{ type: EventType.Custom, name: e.name }
+    return <EventRef>{ type: EventType.Custom, id: e.id }
 }
 
 export function eventPropertyRef(e: EventProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.Event, name: e.name };
+    return <PropertyRef>{ type: PropertyType.Event, id: e.id };
 }
 
 export function eventCustomPropertyRef(e: EventCustomProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.Custom, name: e.name };
+    return <PropertyRef>{ type: PropertyType.Custom, id: e.id };
 }
 
 export function userPropertyRef(e: UserProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.User, name: e.name };
+    return <PropertyRef>{ type: PropertyType.User, id: e.id };
 }
 
 export function userCustomPropertyRef(e: UserCustomProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.Custom, name: e.name };
+    return <PropertyRef>{ type: PropertyType.Custom, id: e.id };
 }
 
 export interface Event {
@@ -52,7 +52,7 @@ export interface Event {
     isSystyem: boolean;
     tags: string[];
     name: string;
-    displayName: string;
+    displayName?: string;
     description?: string;
     status: EventStatus;
     properties?: number[];

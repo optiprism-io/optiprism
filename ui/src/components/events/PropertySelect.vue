@@ -48,14 +48,14 @@ const getEventProperties = (eventRef: EventRef) => {
     const properties: Group<Item<PropertyRef, null>[]>[] = [];
 
     if (eventRef.type === EventType.Regular) {
-        const eventProperties = lexiconStore.findEventProperties(eventRef.name)
+        const eventProperties = lexiconStore.findEventProperties(eventRef.id)
 
         if (eventProperties.length) {
             let items: Item<PropertyRef, null>[] = [];
             eventProperties.forEach((prop: Property): void => {
                 const propertyRef: PropertyRef = {
                     type: PropertyType.Event,
-                    name: prop.name
+                    id: prop.id
                 };
 
                 items.push({
@@ -67,7 +67,7 @@ const getEventProperties = (eventRef: EventRef) => {
             properties.push({ name: 'Event Properties', items, });
         }
 
-        const eventCustomProperties = lexiconStore.findEventCustomProperties(eventRef.name);
+        const eventCustomProperties = lexiconStore.findEventCustomProperties(eventRef.id);
 
         if (eventCustomProperties.length) {
             let items: Item<PropertyRef, null>[] = [];
@@ -75,7 +75,7 @@ const getEventProperties = (eventRef: EventRef) => {
             eventCustomProperties.forEach((prop: EventCustomProperty): void => {
                 const propertyRef: PropertyRef = {
                     type: PropertyType.Custom,
-                    name: prop.name
+                    id: prop.id
                 };
 
                 items.push({
@@ -102,7 +102,7 @@ const items = computed(() => {
         lexiconStore.userProperties.forEach((prop: UserProperty): void => {
             const propertyRef: PropertyRef = {
                 type: PropertyType.User,
-                name: prop.name
+                id: prop.id
             };
 
             items.push({

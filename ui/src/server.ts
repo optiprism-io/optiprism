@@ -24,7 +24,7 @@ export default function ({ environment = 'development' } = {}) {
             });
 
             this.get(`${BASE_PATH}/v1/projects/:project_id/schema/custom-events`, (schema) => {
-                return schema.db.customEvents
+                return schema.db.customEvents.map(item => ({...item, id: Number(item.id)}))
             })
 
             this.post(`${BASE_PATH}/v1/projects/:project_id/schema/custom-events`, (schema, request) => {
@@ -33,9 +33,9 @@ export default function ({ environment = 'development' } = {}) {
                 return schema.db.customEvents.insert(customEvents)
             })
 
-            this.put('/schema/custom-events', (schema, request) => {
+            this.put(`${BASE_PATH}/v1/projects/:project_id/schema/custom-events/:event_id`, (schema, request) => {
                 const customEvent = JSON.parse(request.requestBody)
-                schema.db.customEvents.update(customEvent.id, customEvent)
+                schema.db.customEvents.update(request.params.event_id, customEvent)
 
                 return schema.db.customEvents
             })

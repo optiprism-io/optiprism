@@ -25,7 +25,7 @@ enum OpFlag {
 
 export const operations: Operation[] = [
     {
-        id: OperationId.Equal,
+        id: OperationId.Eq,
         name: 'Equal (=)',
         shortName: '='
     },

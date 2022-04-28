@@ -130,13 +130,19 @@ export interface BreakdownByProperty {
      * @type {string}
      * @memberof BreakdownByProperty
      */
-    'propertyName': string;
+    'propertyName'?: string;
     /**
      * 
-     * @type {PropertyType}
+     * @type {string}
      * @memberof BreakdownByProperty
      */
-    'propertyType': PropertyType;
+    'propertyType': BreakdownByPropertyPropertyTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof BreakdownByProperty
+     */
+    'propertyId'?: number;
 }
 
 export const BreakdownByPropertyBreakdownTypeEnum = {
@@ -144,6 +150,11 @@ export const BreakdownByPropertyBreakdownTypeEnum = {
 } as const;
 
 export type BreakdownByPropertyBreakdownTypeEnum = typeof BreakdownByPropertyBreakdownTypeEnum[keyof typeof BreakdownByPropertyBreakdownTypeEnum];
+export const BreakdownByPropertyPropertyTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type BreakdownByPropertyPropertyTypeEnum = typeof BreakdownByPropertyPropertyTypeEnum[keyof typeof BreakdownByPropertyPropertyTypeEnum];
 
 /**
  * 
@@ -187,12 +198,6 @@ export type ChartType = typeof ChartType[keyof typeof ChartType];
 export interface CreateCustomEventRequest {
     /**
      * 
-     * @type {number}
-     * @memberof CreateCustomEventRequest
-     */
-    'projectId': number;
-    /**
-     * 
      * @type {string}
      * @memberof CreateCustomEventRequest
      */
@@ -202,7 +207,7 @@ export interface CreateCustomEventRequest {
      * @type {Array<CustomEventEvent>}
      * @memberof CreateCustomEventRequest
      */
-    'events'?: Array<CustomEventEvent>;
+    'events': Array<CustomEventEvent>;
 }
 /**
  * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
@@ -314,20 +319,33 @@ export interface CustomEventEvent {
      * @type {string}
      * @memberof CustomEventEvent
      */
-    'eventName': string;
+    'eventName'?: string;
     /**
      * 
-     * @type {EventType}
+     * @type {string}
      * @memberof CustomEventEvent
      */
     'eventType': EventType;
+    /**
+     * 
+     * @type {number}
+     * @memberof CustomEventEvent
+     */
+    'eventId'?: number;
     /**
      * array of event filters
      * @type {Array<EventFilterByProperty>}
      * @memberof CustomEventEvent
      */
-    'filters'?: Array<EventFilterByProperty>;
+    'filters': Array<EventFilterByProperty>;
 }
+
+export const CustomEventEventEventTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type CustomEventEventEventTypeEnum = typeof CustomEventEventEventTypeEnum[keyof typeof CustomEventEventEventTypeEnum];
+
 /**
  * 
  * @export
@@ -478,13 +496,19 @@ export interface DidEventAggregateProperty {
      * @type {string}
      * @memberof DidEventAggregateProperty
      */
-    'propertyName': string;
+    'propertyName'?: string;
     /**
      * 
-     * @type {PropertyType}
+     * @type {string}
      * @memberof DidEventAggregateProperty
      */
-    'propertyType': PropertyType;
+    'propertyType': DidEventAggregatePropertyPropertyTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof DidEventAggregateProperty
+     */
+    'propertyId'?: number;
     /**
      * 
      * @type {QueryAggregateProperty}
@@ -516,6 +540,11 @@ export const DidEventAggregatePropertyTypeEnum = {
 } as const;
 
 export type DidEventAggregatePropertyTypeEnum = typeof DidEventAggregatePropertyTypeEnum[keyof typeof DidEventAggregatePropertyTypeEnum];
+export const DidEventAggregatePropertyPropertyTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type DidEventAggregatePropertyPropertyTypeEnum = typeof DidEventAggregatePropertyPropertyTypeEnum[keyof typeof DidEventAggregatePropertyPropertyTypeEnum];
 
 /**
  * 
@@ -810,13 +839,19 @@ export interface EventFilter {
      * @type {string}
      * @memberof EventFilter
      */
-    'propertyName': string;
+    'propertyName'?: string;
     /**
      * 
-     * @type {PropertyType}
+     * @type {string}
      * @memberof EventFilter
      */
-    'propertyType': PropertyType;
+    'propertyType': EventFilterPropertyTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof EventFilter
+     */
+    'propertyId'?: number;
     /**
      * 
      * @type {PropertyFilterOperation}
@@ -841,6 +876,11 @@ export const EventFilterFilterTypeEnum = {
 } as const;
 
 export type EventFilterFilterTypeEnum = typeof EventFilterFilterTypeEnum[keyof typeof EventFilterFilterTypeEnum];
+export const EventFilterPropertyTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type EventFilterPropertyTypeEnum = typeof EventFilterPropertyTypeEnum[keyof typeof EventFilterPropertyTypeEnum];
 
 /**
  * 
@@ -885,13 +925,19 @@ export interface EventFilterByProperty {
      * @type {string}
      * @memberof EventFilterByProperty
      */
-    'propertyName': string;
+    'propertyName'?: string;
     /**
      * 
-     * @type {PropertyType}
+     * @type {string}
      * @memberof EventFilterByProperty
      */
     'propertyType': PropertyType;
+    /**
+     * 
+     * @type {number}
+     * @memberof EventFilterByProperty
+     */
+    'propertyId'?: number;
     /**
      * 
      * @type {PropertyFilterOperation}
@@ -911,6 +957,11 @@ export const EventFilterByPropertyFilterTypeEnum = {
 } as const;
 
 export type EventFilterByPropertyFilterTypeEnum = typeof EventFilterByPropertyFilterTypeEnum[keyof typeof EventFilterByPropertyFilterTypeEnum];
+export const EventFilterByPropertyPropertyTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type EventFilterByPropertyPropertyTypeEnum = typeof EventFilterByPropertyPropertyTypeEnum[keyof typeof EventFilterByPropertyPropertyTypeEnum];
 
 /**
  * 
@@ -1046,24 +1097,64 @@ export interface EventRecord {
     'properties'?: object;
 }
 /**
+ * @type EventRef
  * reference to event by its name and type
  * @export
- * @interface EventRef
  */
-export interface EventRef {
+export type EventRef = EventRefOneOf | EventRefOneOf1;
+
+/**
+ * 
+ * @export
+ * @interface EventRefOneOf
+ */
+export interface EventRefOneOf {
     /**
      * 
      * @type {string}
-     * @memberof EventRef
+     * @memberof EventRefOneOf
      */
     'eventName'?: string;
     /**
      * 
-     * @type {EventType}
-     * @memberof EventRef
+     * @type {string}
+     * @memberof EventRefOneOf
      */
-    'eventType'?: EventType;
+    'eventType'?: EventRefOneOfEventTypeEnum;
 }
+
+export const EventRefOneOfEventTypeEnum = {
+    Regular: 'regular'
+} as const;
+
+export type EventRefOneOfEventTypeEnum = typeof EventRefOneOfEventTypeEnum[keyof typeof EventRefOneOfEventTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface EventRefOneOf1
+ */
+export interface EventRefOneOf1 {
+    /**
+     * 
+     * @type {number}
+     * @memberof EventRefOneOf1
+     */
+    'eventId'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof EventRefOneOf1
+     */
+    'eventType'?: EventRefOneOf1EventTypeEnum;
+}
+
+export const EventRefOneOf1EventTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type EventRefOneOf1EventTypeEnum = typeof EventRefOneOf1EventTypeEnum[keyof typeof EventRefOneOf1EventTypeEnum];
+
 /**
  * event segmentation report type main payload
  * @export
@@ -1161,13 +1252,19 @@ export interface EventSegmentationEvent {
      * @type {string}
      * @memberof EventSegmentationEvent
      */
-    'eventName': string;
+    'eventName'?: string;
     /**
      * 
-     * @type {EventType}
+     * @type {string}
      * @memberof EventSegmentationEvent
      */
-    'eventType': EventType;
+    'eventType': EventSegmentationEventEventTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof EventSegmentationEvent
+     */
+    'eventId'?: number;
     /**
      * array of event filters
      * @type {Array<EventFilterByProperty>}
@@ -1187,6 +1284,13 @@ export interface EventSegmentationEvent {
      */
     'queries': Array<EventQuery>;
 }
+
+export const EventSegmentationEventEventTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type EventSegmentationEventEventTypeEnum = typeof EventSegmentationEventEventTypeEnum[keyof typeof EventSegmentationEventEventTypeEnum];
+
 /**
  * 
  * @export
@@ -1257,6 +1361,74 @@ export interface InlineResponse200 {
      * @memberof InlineResponse200
      */
     'values'?: Array<string> | Array<number>;
+}
+/**
+ * 
+ * @export
+ * @interface InlineResponse2001
+ */
+export interface InlineResponse2001 {
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof InlineResponse2001
+     */
+    'dimensionHeaders'?: Array<string>;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof InlineResponse2001
+     */
+    'metricHeaders'?: Array<string>;
+    /**
+     * 
+     * @type {Array<Array<string>>}
+     * @memberof InlineResponse2001
+     */
+    'dimensions'?: Array<Array<string>>;
+    /**
+     * 
+     * @type {Array<number>}
+     * @memberof InlineResponse2001
+     */
+    'singles'?: Array<number>;
+    /**
+     * 
+     * @type {Array<Array<number>>}
+     * @memberof InlineResponse2001
+     */
+    'series'?: Array<Array<number>>;
+    /**
+     * 
+     * @type {InlineResponse2001Compare}
+     * @memberof InlineResponse2001
+     */
+    'compare'?: InlineResponse2001Compare;
+}
+/**
+ * 
+ * @export
+ * @interface InlineResponse2001Compare
+ */
+export interface InlineResponse2001Compare {
+    /**
+     * 
+     * @type {Array<Array<string>>}
+     * @memberof InlineResponse2001Compare
+     */
+    'dimensions'?: Array<Array<string>>;
+    /**
+     * 
+     * @type {Array<number>}
+     * @memberof InlineResponse2001Compare
+     */
+    'singles'?: Array<number>;
+    /**
+     * 
+     * @type {Array<Array<number>>}
+     * @memberof InlineResponse2001Compare
+     */
+    'series'?: Array<Array<number>>;
 }
 /**
  * list response metadata
@@ -1518,7 +1690,7 @@ export type PropertyStatusEnum = typeof PropertyStatusEnum[keyof typeof Property
  */
 
 export const PropertyFilterOperation = {
-    Equal: '=',
+    Eq: 'eq',
     Neq: 'neq',
     Gt: 'gt',
     Gte: 'gte',
@@ -1538,24 +1710,65 @@ export type PropertyFilterOperation = typeof PropertyFilterOperation[keyof typeo
 
 
 /**
- * reference to property by its name and type
+ * @type PropertyRef
+ * reference to a property by id or name, depends on property type
  * @export
- * @interface PropertyRef
  */
-export interface PropertyRef {
+export type PropertyRef = PropertyRefOneOf | PropertyRefOneOf1;
+
+/**
+ * 
+ * @export
+ * @interface PropertyRefOneOf
+ */
+export interface PropertyRefOneOf {
     /**
      * 
      * @type {string}
-     * @memberof PropertyRef
+     * @memberof PropertyRefOneOf
      */
     'propertyName'?: string;
     /**
      * 
-     * @type {PropertyType}
-     * @memberof PropertyRef
+     * @type {string}
+     * @memberof PropertyRefOneOf
      */
-    'propertyType'?: PropertyType;
+    'propertyType'?: PropertyRefOneOfPropertyTypeEnum;
 }
+
+export const PropertyRefOneOfPropertyTypeEnum = {
+    Event: 'event',
+    User: 'user'
+} as const;
+
+export type PropertyRefOneOfPropertyTypeEnum = typeof PropertyRefOneOfPropertyTypeEnum[keyof typeof PropertyRefOneOfPropertyTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface PropertyRefOneOf1
+ */
+export interface PropertyRefOneOf1 {
+    /**
+     * 
+     * @type {number}
+     * @memberof PropertyRefOneOf1
+     */
+    'propertyId'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof PropertyRefOneOf1
+     */
+    'propertyType'?: PropertyRefOneOf1PropertyTypeEnum;
+}
+
+export const PropertyRefOneOf1PropertyTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type PropertyRefOneOf1PropertyTypeEnum = typeof PropertyRefOneOf1PropertyTypeEnum[keyof typeof PropertyRefOneOf1PropertyTypeEnum];
+
 /**
  * possible property type
  * @export
@@ -1610,13 +1823,19 @@ export interface QueryAggregateProperty {
      * @type {string}
      * @memberof QueryAggregateProperty
      */
-    'propertyName': string;
+    'propertyName'?: string;
     /**
      * 
-     * @type {PropertyType}
+     * @type {string}
      * @memberof QueryAggregateProperty
      */
-    'propertyType': PropertyType;
+    'propertyType': QueryAggregatePropertyPropertyTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof QueryAggregateProperty
+     */
+    'propertyId'?: number;
     /**
      * 
      * @type {QueryAggregate}
@@ -1630,6 +1849,11 @@ export const QueryAggregatePropertyQueryTypeEnum = {
 } as const;
 
 export type QueryAggregatePropertyQueryTypeEnum = typeof QueryAggregatePropertyQueryTypeEnum[keyof typeof QueryAggregatePropertyQueryTypeEnum];
+export const QueryAggregatePropertyPropertyTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type QueryAggregatePropertyPropertyTypeEnum = typeof QueryAggregatePropertyPropertyTypeEnum[keyof typeof QueryAggregatePropertyPropertyTypeEnum];
 
 /**
  * 
@@ -1681,13 +1905,19 @@ export interface QueryAggregatePropertyPerGroup {
      * @type {string}
      * @memberof QueryAggregatePropertyPerGroup
      */
-    'propertyName': string;
+    'propertyName'?: string;
     /**
      * 
-     * @type {PropertyType}
+     * @type {string}
      * @memberof QueryAggregatePropertyPerGroup
      */
-    'propertyType': PropertyType;
+    'propertyType': QueryAggregatePropertyPerGroupPropertyTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof QueryAggregatePropertyPerGroup
+     */
+    'propertyId'?: number;
     /**
      * 
      * @type {QueryAggregate}
@@ -1707,6 +1937,11 @@ export const QueryAggregatePropertyPerGroupQueryTypeEnum = {
 } as const;
 
 export type QueryAggregatePropertyPerGroupQueryTypeEnum = typeof QueryAggregatePropertyPerGroupQueryTypeEnum[keyof typeof QueryAggregatePropertyPerGroupQueryTypeEnum];
+export const QueryAggregatePropertyPerGroupPropertyTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type QueryAggregatePropertyPerGroupPropertyTypeEnum = typeof QueryAggregatePropertyPerGroupPropertyTypeEnum[keyof typeof QueryAggregatePropertyPerGroupPropertyTypeEnum];
 
 /**
  * 
@@ -1859,10 +2094,16 @@ export interface SegmentConditionDidEvent {
     'eventName'?: string;
     /**
      * 
-     * @type {EventType}
+     * @type {string}
      * @memberof SegmentConditionDidEvent
      */
-    'eventType'?: EventType;
+    'eventType'?: SegmentConditionDidEventEventTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof SegmentConditionDidEvent
+     */
+    'eventId'?: number;
     /**
      * 
      * @type {Array<EventFilterByProperty>}
@@ -1882,6 +2123,11 @@ export const SegmentConditionDidEventConditionTypeEnum = {
 } as const;
 
 export type SegmentConditionDidEventConditionTypeEnum = typeof SegmentConditionDidEventConditionTypeEnum[keyof typeof SegmentConditionDidEventConditionTypeEnum];
+export const SegmentConditionDidEventEventTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type SegmentConditionDidEventEventTypeEnum = typeof SegmentConditionDidEventEventTypeEnum[keyof typeof SegmentConditionDidEventEventTypeEnum];
 
 /**
  * 
@@ -2204,6 +2450,25 @@ export const TimeWindowEachTypeEnum = {
 export type TimeWindowEachTypeEnum = typeof TimeWindowEachTypeEnum[keyof typeof TimeWindowEachTypeEnum];
 
 /**
+ * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
+ * @export
+ * @interface UpdateCustomEventRequest
+ */
+export interface UpdateCustomEventRequest {
+    /**
+     * 
+     * @type {string}
+     * @memberof UpdateCustomEventRequest
+     */
+    'name'?: string;
+    /**
+     * 
+     * @type {Array<CustomEventEvent>}
+     * @memberof UpdateCustomEventRequest
+     */
+    'events': Array<CustomEventEvent>;
+}
+/**
  * 
  * @export
  * @interface User
@@ -2357,6 +2622,40 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
         },
         /**
          * 
+         * @summary Event segmentation query
+         * @param {EventSegmentation} [eventSegmentation] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createEventSegmentation: async (eventSegmentation?: EventSegmentation, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/queries/event-segmentation`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(eventSegmentation, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Events list
          * @param {string} projectId Project ID
          * @param {EventListRequest} eventListRequest 
@@ -2402,9 +2701,9 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        customEvents: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        customEventsList: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('customEvents', 'projectId', projectId)
+            assertParamExists('customEventsList', 'projectId', projectId)
             const localVarPath = `/v1/projects/{project_id}/schema/custom-events`
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2436,9 +2735,9 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        customProperties: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        customPropertiesList: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('customProperties', 'projectId', projectId)
+            assertParamExists('customPropertiesList', 'projectId', projectId)
             const localVarPath = `/v1/projects/{project_id}/schema/custom-properties`
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2470,9 +2769,9 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        events: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        eventsList: async (projectId: string, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('events', 'projectId', projectId)
+            assertParamExists('eventsList', 'projectId', projectId)
             const localVarPath = `/v1/projects/{project_id}/schema/events`
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2505,11 +2804,11 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        properties: async (projectId: string, type: 'event' | 'user', options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        propertiesList: async (projectId: string, type: 'event' | 'user', options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('properties', 'projectId', projectId)
+            assertParamExists('propertiesList', 'projectId', projectId)
             // verify required parameter 'type' is not null or undefined
-            assertParamExists('properties', 'type', type)
+            assertParamExists('propertiesList', 'type', type)
             const localVarPath = `/v1/projects/{project_id}/schema/properties`
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2549,9 +2848,9 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        propertyValues: async (projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        propertyValuesList: async (projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('propertyValues', 'projectId', projectId)
+            assertParamExists('propertyValuesList', 'projectId', projectId)
             const localVarPath = `/v1/projects/{project_id}/data/property-values`
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -2592,6 +2891,50 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @summary Update custom event
+         * @param {string} projectId Project ID
+         * @param {string} eventId Custom Event ID
+         * @param {UpdateCustomEventRequest} updateCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateCustomEvent: async (projectId: string, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('updateCustomEvent', 'projectId', projectId)
+            // verify required parameter 'eventId' is not null or undefined
+            assertParamExists('updateCustomEvent', 'eventId', eventId)
+            // verify required parameter 'updateCustomEventRequest' is not null or undefined
+            assertParamExists('updateCustomEvent', 'updateCustomEventRequest', updateCustomEventRequest)
+            const localVarPath = `/v1/projects/{project_id}/schema/custom-events/{event_id}`
+                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"event_id"}}`, encodeURIComponent(String(eventId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateCustomEventRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -2616,6 +2959,17 @@ export const DefaultApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Event segmentation query
+         * @param {EventSegmentation} [eventSegmentation] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async createEventSegmentation(eventSegmentation?: EventSegmentation, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InlineResponse2001>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createEventSegmentation(eventSegmentation, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
          * @summary Events list
          * @param {string} projectId Project ID
          * @param {EventListRequest} eventListRequest 
@@ -2633,8 +2987,8 @@ export const DefaultApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async customEvents(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.customEvents(projectId, options);
+        async customEventsList(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.customEventsList(projectId, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -2644,8 +2998,8 @@ export const DefaultApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async customProperties(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.customProperties(projectId, options);
+        async customPropertiesList(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.customPropertiesList(projectId, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -2655,8 +3009,8 @@ export const DefaultApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async events(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.events(projectId, options);
+        async eventsList(projectId: string, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.eventsList(projectId, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -2667,8 +3021,8 @@ export const DefaultApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async properties(projectId: string, type: 'event' | 'user', options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.properties(projectId, type, options);
+        async propertiesList(projectId: string, type: 'event' | 'user', options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object & ListResponseMetadata>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.propertiesList(projectId, type, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -2682,8 +3036,21 @@ export const DefaultApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async propertyValues(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InlineResponse200>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.propertyValues(projectId, eventName, eventType, propertyName, propertyType, options);
+        async propertyValuesList(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InlineResponse200>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.propertyValuesList(projectId, eventName, eventType, propertyName, propertyType, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Update custom event
+         * @param {string} projectId Project ID
+         * @param {string} eventId Custom Event ID
+         * @param {UpdateCustomEventRequest} updateCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateCustomEvent(projectId: string, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEvent>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateCustomEvent(projectId, eventId, updateCustomEventRequest, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
     }
@@ -2709,6 +3076,16 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
         },
         /**
          * 
+         * @summary Event segmentation query
+         * @param {EventSegmentation} [eventSegmentation] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createEventSegmentation(eventSegmentation?: EventSegmentation, options?: any): AxiosPromise<InlineResponse2001> {
+            return localVarFp.createEventSegmentation(eventSegmentation, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Events list
          * @param {string} projectId Project ID
          * @param {EventListRequest} eventListRequest 
@@ -2725,8 +3102,8 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        customEvents(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
-            return localVarFp.customEvents(projectId, options).then((request) => request(axios, basePath));
+        customEventsList(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
+            return localVarFp.customEventsList(projectId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -2735,8 +3112,8 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        customProperties(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
-            return localVarFp.customProperties(projectId, options).then((request) => request(axios, basePath));
+        customPropertiesList(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
+            return localVarFp.customPropertiesList(projectId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -2745,8 +3122,8 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        events(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
-            return localVarFp.events(projectId, options).then((request) => request(axios, basePath));
+        eventsList(projectId: string, options?: any): AxiosPromise<object & ListResponseMetadata> {
+            return localVarFp.eventsList(projectId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -2756,8 +3133,8 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        properties(projectId: string, type: 'event' | 'user', options?: any): AxiosPromise<object & ListResponseMetadata> {
-            return localVarFp.properties(projectId, type, options).then((request) => request(axios, basePath));
+        propertiesList(projectId: string, type: 'event' | 'user', options?: any): AxiosPromise<object & ListResponseMetadata> {
+            return localVarFp.propertiesList(projectId, type, options).then((request) => request(axios, basePath));
         },
         /**
          * for event property you should include event_name and event_type <br/><br/> examples: <br/> /v1/projects/1/data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Name&property_type=regular /v1/projects/1/data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Total%20Revenue&property_type=custom /v1/projects/1/data/property-values?event_name=Custom&event_type=custom&property_name=SomeProp&property_type=regular /v1/projects/1/data/property-values?property_name=Country&property_type=regular /v1/projects/1/data/property-values?property_name=Full%Name&property_type=custom 
@@ -2770,8 +3147,20 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        propertyValues(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: any): AxiosPromise<InlineResponse200> {
-            return localVarFp.propertyValues(projectId, eventName, eventType, propertyName, propertyType, options).then((request) => request(axios, basePath));
+        propertyValuesList(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: any): AxiosPromise<InlineResponse200> {
+            return localVarFp.propertyValuesList(projectId, eventName, eventType, propertyName, propertyType, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Update custom event
+         * @param {string} projectId Project ID
+         * @param {string} eventId Custom Event ID
+         * @param {UpdateCustomEventRequest} updateCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateCustomEvent(projectId: string, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options?: any): AxiosPromise<CustomEvent> {
+            return localVarFp.updateCustomEvent(projectId, eventId, updateCustomEventRequest, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -2798,6 +3187,18 @@ export class DefaultApi extends BaseAPI {
 
     /**
      * 
+     * @summary Event segmentation query
+     * @param {EventSegmentation} [eventSegmentation] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof DefaultApi
+     */
+    public createEventSegmentation(eventSegmentation?: EventSegmentation, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).createEventSegmentation(eventSegmentation, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
      * @summary Events list
      * @param {string} projectId Project ID
      * @param {EventListRequest} eventListRequest 
@@ -2817,8 +3218,8 @@ export class DefaultApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public customEvents(projectId: string, options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).customEvents(projectId, options).then((request) => request(this.axios, this.basePath));
+    public customEventsList(projectId: string, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).customEventsList(projectId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -2829,8 +3230,8 @@ export class DefaultApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public customProperties(projectId: string, options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).customProperties(projectId, options).then((request) => request(this.axios, this.basePath));
+    public customPropertiesList(projectId: string, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).customPropertiesList(projectId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -2841,8 +3242,8 @@ export class DefaultApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public events(projectId: string, options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).events(projectId, options).then((request) => request(this.axios, this.basePath));
+    public eventsList(projectId: string, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).eventsList(projectId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -2854,8 +3255,8 @@ export class DefaultApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public properties(projectId: string, type: 'event' | 'user', options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).properties(projectId, type, options).then((request) => request(this.axios, this.basePath));
+    public propertiesList(projectId: string, type: 'event' | 'user', options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).propertiesList(projectId, type, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -2870,9 +3271,21 @@ export class DefaultApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public propertyValues(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: AxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).propertyValues(projectId, eventName, eventType, propertyName, propertyType, options).then((request) => request(this.axios, this.basePath));
+    public propertyValuesList(projectId: string, eventName?: string, eventType?: EventType, propertyName?: string, propertyType?: PropertyType, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).propertyValuesList(projectId, eventName, eventType, propertyName, propertyType, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Update custom event
+     * @param {string} projectId Project ID
+     * @param {string} eventId Custom Event ID
+     * @param {UpdateCustomEventRequest} updateCustomEventRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof DefaultApi
+     */
+    public updateCustomEvent(projectId: string, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options?: AxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).updateCustomEvent(projectId, eventId, updateCustomEventRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
-
-

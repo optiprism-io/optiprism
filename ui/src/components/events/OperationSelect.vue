@@ -37,7 +37,7 @@ const items = computed(() => {
 
     if (props.propertyRef) {
         if (props.propertyRef.type === PropertyType.Event) {
-            const prop = lexiconStore.findEventPropertyByName(props.propertyRef.name);
+            const prop = lexiconStore.findEventPropertyById(props.propertyRef.id);
             findOperations(prop.dataType || DataType.String, prop.nullable, prop.isArray).forEach(op =>
                 ret.push({
                     item: op.id,
@@ -45,7 +45,7 @@ const items = computed(() => {
                 })
             );
         } else if (props.propertyRef.type === PropertyType.Custom) {
-            const prop = lexiconStore.findEventCustomPropertyByName(props.propertyRef.name);
+            const prop = lexiconStore.findEventCustomPropertyById(props.propertyRef.id);
             findOperations(prop.type, prop.nullable, prop.isArray).forEach(op =>
                 ret.push({
                     item: op.id,
@@ -53,7 +53,7 @@ const items = computed(() => {
                 })
             );
         } else if (props.propertyRef.type === PropertyType.User) {
-            const prop = lexiconStore.findUserPropertyByName(props.propertyRef.name);
+            const prop = lexiconStore.findUserPropertyById(props.propertyRef.id);
             findOperations(prop.type, prop.nullable, prop.isArray).forEach(op =>
                 ret.push({
                     item: op.id,

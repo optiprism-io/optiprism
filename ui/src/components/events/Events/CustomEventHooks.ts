@@ -5,11 +5,11 @@ import { Event, EventFilter } from '@/stores/eventSegmentation/events'
 
 export default function useCustomEvent(){
     const lexiconStore = useLexiconStore()
-    const hoveredCustomEventId = ref<string | null>()
+    const hoveredCustomEventId = ref<number | null>()
 
     const editedEvent = computed(() => {
         if (hoveredCustomEventId.value) {
-            return lexiconStore.findCustomEventByName(hoveredCustomEventId.value)
+            return lexiconStore.findCustomEventById(hoveredCustomEventId.value)
         } else {
             return null
         }
@@ -21,13 +21,13 @@ export default function useCustomEvent(){
                 const event: Event = {
                     ref: {
                         type: item.eventType,
-                        name: item.eventName
+                        id: Number(item.eventId)
                     },
                     filters: item.filters ? item.filters.map(filter => {
                         return <EventFilter>{
                             propRef: {
                                 type: filter.propertyType,
-                                name: filter.propertyName
+                                id: filter.propertyId
                             },
                             opId: filter.operation,
                             values: filter.value || [],
@@ -47,7 +47,7 @@ export default function useCustomEvent(){
 
     const onHoverEvent = (payload: EventRef) => {
         if (payload.type === 'custom') {
-            hoveredCustomEventId.value = payload.name
+            hoveredCustomEventId.value = Number(payload.id)
         } else {
             hoveredCustomEventId.value = null
         }

@@ -118,9 +118,10 @@ export const useSegmentsStore = defineStore('segments', {
 
                 if (condition) {
                     const lexiconStore = useLexiconStore()
+                    const event = lexiconStore.findEvent(payload.ref)
 
                     condition.event = {
-                        name: payload.ref.type === EventType.Regular ? lexiconStore.findEventByName(payload.ref.name).displayName : lexiconStore.findCustomEventByName(payload.ref.name).name,
+                        name: 'displayName' in event ? event?.displayName || event.name : event.name,
                         ref: payload.ref,
                     }
                     condition.filters = []
@@ -135,9 +136,10 @@ export const useSegmentsStore = defineStore('segments', {
 
                 if (condition) {
                     const lexiconStore = useLexiconStore()
+                    const event = lexiconStore.findEvent(payload.ref)
 
                     condition.compareEvent = {
-                        name: payload.ref.type === EventType.Regular ? lexiconStore.findEventByName(payload.ref.name).displayName : lexiconStore.findCustomEventByName(payload.ref.name).name,
+                        name: 'displayName' in event ? event?.displayName || event.name : event.name,
                         ref: payload.ref,
                     }
                 }
@@ -171,7 +173,7 @@ export const useSegmentsStore = defineStore('segments', {
 
                     condition.filters[payload.idxFilter] = {
                         propRef: payload.propRef,
-                        opId: OperationId.Equal,
+                        opId: OperationId.Eq,
                         values: [],
                         valuesList: valuesList
                     }
@@ -201,7 +203,7 @@ export const useSegmentsStore = defineStore('segments', {
 
                 if (condition && condition.filters) {
                     condition.filters.push(<ConditionFilter>{
-                        opId: OperationId.Equal,
+                        opId: OperationId.Eq,
                         values: [],
                         valuesList: []
                     })
@@ -281,7 +283,7 @@ export const useSegmentsStore = defineStore('segments', {
                         throw new Error('error getEventsValues')
                     }
                     condition.propRef = ref
-                    condition.opId = OperationId.Equal
+                    condition.opId = OperationId.Eq
                     condition.values = []
                     condition.period = {
                         type: 'each',

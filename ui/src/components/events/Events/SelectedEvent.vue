@@ -196,7 +196,7 @@ const emit = defineEmits<{
 
     (e: 'setEvent', payload: EventPayload): void
     (e: 'action', payload: string): void
-    (e: 'edit', payload: string): void
+    (e: 'edit', payload: number): void
 }>();
 
 const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()
@@ -249,7 +249,7 @@ const addFilter = (): void => {
     }
 
     event.filters.push({
-        opId: OperationId.Equal,
+        opId: OperationId.Eq,
         values: [],
         valuesList: []
     })
@@ -280,7 +280,7 @@ const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => 
 
     event.filters[filterIdx] = {
         propRef: propRef,
-        opId: OperationId.Equal,
+        opId: OperationId.Eq,
         values: [],
         valuesList: valuesList
     }
@@ -324,11 +324,13 @@ const removeBreakdown = (breakdownIdx: number): void => {
 };
 
 const eventName = (ref: EventRef): string => {
+    let event = lexiconStore.findEventById(ref.id)
+    
     switch (ref.type) {
         case EventType.Regular:
-            return lexiconStore.findEventByName(ref.name).displayName
+            return event.displayName || event.name
         case EventType.Custom:
-            return lexiconStore.findCustomEventByName(ref.name).name
+            return lexiconStore.findCustomEventById(ref.id).name
     }
     throw new Error('unhandled');
 };

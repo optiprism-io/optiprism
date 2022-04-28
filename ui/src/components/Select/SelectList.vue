@@ -107,7 +107,7 @@ const emit = defineEmits<{
     (e: 'hover', item: any): void;
     (e: 'on-search', value: string): void;
     (e: 'action', payload: string): void
-    (e: 'edit', payload: string): void
+    (e: 'edit', payload: number): void
 }>();
 
 const props = defineProps<{

@@ -71,7 +71,7 @@ export const useFiltersStore = defineStore('filters', {
                 let eventRef;
 
                 lexiconStore.eventsList.forEach(item => {
-                    const eventStoreRef: any = item.items.find(itemInner => itemInner.item.name === event?.name)
+                    const eventStoreRef: any = item.items.find(itemInner => itemInner.item.id === event?.id)
 
                     if (event) {
                         eventRef = eventStoreRef;
@@ -104,7 +104,7 @@ export const useFiltersStore = defineStore('filters', {
 
             this.filters.push(<Filter>{
                 propRef,
-                opId: OperationId.Equal,
+                opId: OperationId.Eq,
                 values: [],
                 valuesList: valuesList,
             });
@@ -134,7 +134,7 @@ export const useFiltersStore = defineStore('filters', {
 
             this.filters[filterIdx] = <Filter>{
                 propRef,
-                opId: OperationId.Equal,
+                opId: OperationId.Eq,
                 values: [],
                 valuesList: valuesList,
             };

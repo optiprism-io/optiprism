@@ -201,7 +201,7 @@ const conditionConfig = computed(() => {
 const changeEventCondition = inject<(payload: ChangeEventCondition) => void>('changeEventCondition')
 const changeCompareEventCondition = inject<(payload: ChangeEventCondition) => void>('changeCompareEventCondition')
 const actionEvent = inject<(payload: string) => void>('actionEvent')
-const editEvent = inject<(payload: string) => void>('editEvent')
+const editEvent = inject<(payload: number) => void>('editEvent')
 
 const changeEvent = (ref: EventRef) => {
     changeEventCondition && changeEventCondition({
@@ -215,7 +215,7 @@ const selectAction = (payload: string) => {
     actionEvent && actionEvent(payload)
 }
 
-const edit = (payload: string) => {
+const edit = (payload: number) => {
     editEvent && editEvent(payload)
 }
 
@@ -238,7 +238,7 @@ const compareEventItems = computed(() => {
             items: eventGroup.items.map(event => {
                 return {
                     ...event,
-                    disabled: props.condition.event?.ref.name === event.item.name,
+                    disabled: props.condition.event?.ref.id === event.item.id,
                 }
             })
 

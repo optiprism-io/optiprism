@@ -24,5 +24,5 @@ $ npm run build
 - [Doc](https://openapi-generator.tech/docs/generators/typescript-axios/)
 
 ```
-openapi-generator generate -i api.yaml -g typescript-axios -o ./src/api
+openapi-generator generate -i ../api/openapi.yaml -g typescript-axios -o ./src/api
 ```

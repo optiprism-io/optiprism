@@ -128,8 +128,8 @@ const selectAction = (payload: string) => {
     }
 }
 
-const editEvent = (payload: string) => {
-    eventsStore.setEditCustomEvent(String(payload))
+const editEvent = (payload: number) => {
+    eventsStore.setEditCustomEvent(Number(payload))
     commonStore.togglePopupCreateCustomEvent(true)
 }
 
