@@ -75,6 +75,13 @@ paths:
                   - $ref: '#/components/schemas/ListResponseMetadata'
     post:
       summary: Create custom event
+      parameters:
+        - name: project_id
+          in: path
+          description: Project ID
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -89,7 +96,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/CustomEvent'
 
-
+  /v1/projects/{project_id}/schema/custom-events/{event_id}:
+    put:
+      summary: Update custom event
+      parameters:
+        - name: project_id
+          in: path
+          description: Project ID
+          required: true
+          schema:
+            type: string
+        - name: event_id
+          in: path
+          description: Custom Event ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomEventRequest'
+      responses:
+        201:
+          description: custom event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomEvent'
   /v1/projects/{project_id}/schema/properties:
     get:
       summary: Properties list
@@ -580,13 +615,22 @@ components:
           description: array of id of custom properties contained in expression events
 
     CreateCustomEventRequest:
-      required: [ "projectId","name","expression" ]
+      required: [ "name","events" ]
       description: Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
       type: object
       properties:
-        projectId:
-          type: integer
-          format: int64
+        name:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomEventEvent'
+
+    UpdateCustomEventRequest:
+      required: [ name","events" ]
+      description: Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
+      type: object
+      properties:
         name:
           type: string
         events:
