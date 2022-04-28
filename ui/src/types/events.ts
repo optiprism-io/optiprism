@@ -9,8 +9,8 @@ export type PropertyRef = {
 };
 
 export enum EventStatus {
-    Enabled = "enabled",
-    Disabled = "disabled"
+    Enabled = 'enabled',
+    Disabled = 'disabled'
 }
 
 export type EventRef = {
@@ -146,7 +146,7 @@ export interface UserCustomProperty {
     dictionaryType?: DataType;
 }
 
-export type QueryType = "simple" | "countPerGroup" | "aggregateProperty" | "aggregatePropertyPerGroup" | "formula";
+export type QueryType = 'simple' | 'countPerGroup' | 'aggregateProperty' | 'aggregatePropertyPerGroup' | 'formula';
 
 export type EventQueryRef = {
     type?: QueryType;
@@ -170,61 +170,61 @@ export interface EventsQuery {
 
 export const eventsQueries: EventsQuery[] = [
     {
-        type: "simple",
-        name: "countEvents",
-        displayName: "Count",
+        type: 'simple',
+        name: 'countEvents',
+        displayName: 'Count',
     },
     {
-        type: "simple",
-        name: "countUnique",
-        displayName: "Count Unique",
+        type: 'simple',
+        name: 'countUnique',
+        displayName: 'Count Unique',
         grouped: true,
     },
     {
-        type: "simple",
-        name: "dailyActive",
-        displayName: "Daily Active",
+        type: 'simple',
+        name: 'dailyActive',
+        displayName: 'Daily Active',
         grouped: true,
     },
     {
-        type: "simple",
-        name: "weeklyActive",
-        displayName: "Weekly Active",
+        type: 'simple',
+        name: 'weeklyActive',
+        displayName: 'Weekly Active',
         grouped: true,
     },
     {
-        type: "simple",
-        name: "monthlyActive",
-        displayName: "Monthly Active",
+        type: 'simple',
+        name: 'monthlyActive',
+        displayName: 'Monthly Active',
         grouped: true,
     },
     {
-        type: "countPerGroup",
-        name: "countPer",
-        displayName: "Count",
+        type: 'countPerGroup',
+        name: 'countPer',
+        displayName: 'Count',
         grouped: true,
         hasAggregate: true,
     },
     {
-        type: "aggregateProperty",
-        name: "aggregateProperty",
-        displayName: "Aggregate Property",
+        type: 'aggregateProperty',
+        name: 'aggregateProperty',
+        displayName: 'Aggregate Property',
         hasAggregate: true,
         hasProperty: true
     },
     {
-        type: "aggregatePropertyPerGroup",
-        name: "aggregatePropertyPer",
-        displayName: "Aggregate Property per",
+        type: 'aggregatePropertyPerGroup',
+        name: 'aggregatePropertyPer',
+        displayName: 'Aggregate Property per',
         grouped: true,
         hasAggregate: true,
         hasGroupAggregate: true,
         hasProperty: true
     },
     {
-        type: "formula",
-        name: "formula",
-        displayName: "Formula",
+        type: 'formula',
+        name: 'formula',
+        displayName: 'Formula',
         hasValue: true,
     },
 ]

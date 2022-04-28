@@ -12,11 +12,11 @@
 
 <script setup lang="ts">
 interface Props {
-    size?: "sm" | "md" | "lg" | "xl" | string;
+    size?: 'sm' | 'md' | 'lg' | 'xl' | string;
 }
 
 withDefaults(defineProps<Props>(), {
-    size: "md"
+    size: 'md'
 });
 </script>
 

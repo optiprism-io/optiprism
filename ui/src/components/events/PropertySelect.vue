@@ -13,22 +13,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed } from 'vue';
 import {
     EventCustomProperty,
     EventRef,
     PropertyRef,
     UserProperty,
-} from "@/types/events";
-import Select from "@/components/Select/Select.vue";
-import { Group, Item } from "@/components/Select/SelectTypes";
-import { useLexiconStore } from "@/stores/lexicon";
+} from '@/types/events';
+import Select from '@/components/Select/Select.vue';
+import { Group, Item } from '@/components/Select/SelectTypes';
+import { useLexiconStore } from '@/stores/lexicon';
 import { PropertyType, EventType, Property } from '@/api'
 
 const lexiconStore = useLexiconStore();
 
 const emit = defineEmits<{
-    (e: "select", ref: PropertyRef): void;
+    (e: 'select', ref: PropertyRef): void;
 }>();
 
 const props = defineProps<{
@@ -64,7 +64,7 @@ const getEventProperties = (eventRef: EventRef) => {
                     disabled: checkDisable(propertyRef),
                 });
             });
-            properties.push({ name: "Event Properties", items, });
+            properties.push({ name: 'Event Properties', items, });
         }
 
         const eventCustomProperties = lexiconStore.findEventCustomProperties(eventRef.name);
@@ -85,7 +85,7 @@ const getEventProperties = (eventRef: EventRef) => {
                 });
             });
             properties.push({
-                name: "Event Custom Properties",
+                name: 'Event Custom Properties',
                 items: items
             });
         }
@@ -112,7 +112,7 @@ const items = computed(() => {
                 description: prop?.description
             });
         });
-        ret.push({ name: "User Properties", items: items });
+        ret.push({ name: 'User Properties', items: items });
     }
 
     if (props.eventRef) {
@@ -148,6 +148,6 @@ const items = computed(() => {
 });
 
 const select = (item: PropertyRef) => {
-    emit("select", item);
+    emit('select', item);
 };
 </script>

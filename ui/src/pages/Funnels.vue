@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-const name = "Funnels"
+const name = 'Funnels'
 </script>
 
 <style scoped lang="scss">

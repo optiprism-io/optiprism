@@ -1,13 +1,13 @@
 import { createServer } from 'miragejs'
 import { DataType } from '@/api'
 import { BASE_PATH } from '@/api/base'
-import { EventStatus, UserProperty, UserCustomProperty } from "@/types/events";
-import splineChartMocks from "@/mocks/splineChart.json";
+import { EventStatus, UserProperty, UserCustomProperty } from '@/types/events';
+import splineChartMocks from '@/mocks/splineChart.json';
 
-import eventSegmentationsMocks from "@/mocks/eventSegmentations/eventSegmentations.json";
-import eventMocks from "@/mocks/eventSegmentations/events.json";
+import eventSegmentationsMocks from '@/mocks/eventSegmentations/eventSegmentations.json';
+import eventMocks from '@/mocks/eventSegmentations/events.json';
 
-export default function ({ environment = "development" } = {}) {
+export default function ({ environment = 'development' } = {}) {
     return createServer({
         seeds(server) {
             server.db.loadData({
@@ -19,7 +19,7 @@ export default function ({ environment = "development" } = {}) {
             this.namespace = 'api'
             this.timing = 300
 
-            this.get("/schema/events", () => {
+            this.get('/schema/events', () => {
                 return eventMocks
             });
 
@@ -40,7 +40,7 @@ export default function ({ environment = "development" } = {}) {
                 return schema.db.customEvents
             })
 
-            this.get("/schema/event-properties", () => {
+            this.get('/schema/event-properties', () => {
                 return [
                     {
                         id: 1,
@@ -49,7 +49,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Query",
+                        name: 'Query',
                         type: DataType.String,
                         nullable: false,
                         isArray: false,
@@ -63,7 +63,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Product name",
+                        name: 'Product name',
                         type: DataType.String,
                         nullable: false,
                         isArray: false,
@@ -77,7 +77,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Product Category",
+                        name: 'Product Category',
                         type: DataType.String,
                         nullable: false,
                         isArray: false,
@@ -91,7 +91,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Product Price",
+                        name: 'Product Price',
                         type: DataType.Number,
                         isArray: false,
                         nullable: false,
@@ -104,7 +104,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Product name",
+                        name: 'Product name',
                         type: DataType.String,
                         isArray: false,
                         nullable: false,
@@ -118,7 +118,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Product Category",
+                        name: 'Product Category',
                         type: DataType.String,
                         isArray: false,
                         nullable: false,
@@ -132,7 +132,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Product Price",
+                        name: 'Product Price',
                         type: DataType.Number,
                         isArray: false,
                         nullable: false,
@@ -145,7 +145,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Product name",
+                        name: 'Product name',
                         type: DataType.String,
                         isArray: false,
                         nullable: false,
@@ -159,7 +159,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Product Category",
+                        name: 'Product Category',
                         type: DataType.String,
                         isArray: false,
                         nullable: false,
@@ -173,7 +173,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Product Price",
+                        name: 'Product Price',
                         type: DataType.Number,
                         isArray: false,
                         nullable: false,
@@ -186,7 +186,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Discount",
+                        name: 'Discount',
                         type: DataType.Number,
                         isArray: false,
                         nullable: false,
@@ -199,7 +199,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "Revenue",
+                        name: 'Revenue',
                         type: DataType.Number,
                         isArray: false,
                         nullable: false,
@@ -208,7 +208,7 @@ export default function ({ environment = "development" } = {}) {
                 ];
             });
 
-            this.get("/schema/event-custom-properties", () => {
+            this.get('/schema/event-custom-properties', () => {
                 return [
                     {
                         id: 1,
@@ -217,7 +217,7 @@ export default function ({ environment = "development" } = {}) {
                         createdBy: 0,
                         updatedBy: 0,
                         tags: [],
-                        name: "custom prop 1",
+                        name: 'custom prop 1',
                         type: DataType.String,
                         isArray: false,
                         nullable: false,
@@ -226,7 +226,7 @@ export default function ({ environment = "development" } = {}) {
                 ];
             });
 
-            this.get("/schema/user-properties", (): UserProperty[] => {
+            this.get('/schema/user-properties', (): UserProperty[] => {
                 return [
                     {
                         id: 1,
@@ -236,9 +236,9 @@ export default function ({ environment = "development" } = {}) {
                         projectId: 1,
                         isSystem: true,
                         tags: [],
-                        name: "Name",
-                        displayName: "Name",
-                        description: "Name description",
+                        name: 'Name',
+                        displayName: 'Name',
+                        description: 'Name description',
                         status: EventStatus.Enabled,
                         type: DataType.String,
                         nullable: false,
@@ -254,10 +254,10 @@ export default function ({ environment = "development" } = {}) {
                         projectId: 1,
                         isSystem: true,
                         tags: [],
-                        name: "Age",
-                        displayName: "Age",
+                        name: 'Age',
+                        displayName: 'Age',
                         description:
-                            "Lorem, ipsum dolor sit amet consectetur adipisicing elit. Architecto, temporibus.",
+                            'Lorem, ipsum dolor sit amet consectetur adipisicing elit. Architecto, temporibus.',
                         status: EventStatus.Enabled,
                         type: DataType.Number,
                         nullable: false,
@@ -273,9 +273,9 @@ export default function ({ environment = "development" } = {}) {
                         projectId: 1,
                         isSystem: true,
                         tags: [],
-                        name: "Country",
-                        displayName: "Country",
-                        description: "Country description",
+                        name: 'Country',
+                        displayName: 'Country',
+                        description: 'Country description',
                         status: EventStatus.Enabled,
                         type: DataType.String,
                         nullable: true,
@@ -291,9 +291,9 @@ export default function ({ environment = "development" } = {}) {
                         projectId: 1,
                         isSystem: true,
                         tags: [],
-                        name: "Device",
-                        displayName: "Device",
-                        description: "Device description",
+                        name: 'Device',
+                        displayName: 'Device',
+                        description: 'Device description',
                         status: EventStatus.Enabled,
                         type: DataType.String,
                         nullable: false,
@@ -304,7 +304,7 @@ export default function ({ environment = "development" } = {}) {
                 ];
             });
 
-            this.get("/schema/user-custom-properties", (): UserCustomProperty[] => {
+            this.get('/schema/user-custom-properties', (): UserCustomProperty[] => {
                 return [
                     {
                         id: 1,
@@ -317,10 +317,10 @@ export default function ({ environment = "development" } = {}) {
                         isSystem: false,
                         isGlobal: true,
                         tags: [],
-                        name: "Custom user prop",
-                        displayName: "Custom user prop",
+                        name: 'Custom user prop',
+                        displayName: 'Custom user prop',
                         description:
-                            "Lorem, ipsum dolor sit amet consectetur adipisicing elit. Architecto, temporibus.",
+                            'Lorem, ipsum dolor sit amet consectetur adipisicing elit. Architecto, temporibus.',
                         status: EventStatus.Enabled,
                         type: DataType.String,
                         isRequired: false,
@@ -332,21 +332,21 @@ export default function ({ environment = "development" } = {}) {
                 ];
             });
 
-            this.get("/data/property-values", (_, request): string[] => {
+            this.get('/data/property-values', (_, request): string[] => {
                 const propertyName = request.queryParams.property_name
 
                 if (propertyName === 'Country') {
-                    return ["Spain", "USA", "United Kingdom", "Poland"]
+                    return ['Spain', 'USA', 'United Kingdom', 'Poland']
                 } else {
-                    return ["Furniture", "Doors", "Lamp", "Tables", "Shelves"]
+                    return ['Furniture', 'Doors', 'Lamp', 'Tables', 'Shelves']
                 }
             });
 
-            this.get("/chart", (): any[] => {
+            this.get('/chart', (): any[] => {
                 return splineChartMocks;
             });
 
-            this.post("/queries/event-segmentation", (_, request) => {
+            this.post('/queries/event-segmentation', (_, request) => {
                 const body = JSON.parse(request.requestBody);
 
                 if (body.events.length || body.segments) {

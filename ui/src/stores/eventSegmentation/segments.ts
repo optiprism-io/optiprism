@@ -1,12 +1,12 @@
-import { defineStore } from "pinia";
+import { defineStore } from 'pinia';
 import {
     Condition,
     PropertyRef,
     ConditionFilter,
-} from "@/types/events";
-import { OperationId, Value } from "@/types";
-import schemaService from "@/api/services/schema.service";
-import { useLexiconStore } from "@/stores/lexicon";
+} from '@/types/events';
+import { OperationId, Value } from '@/types';
+import schemaService from '@/api/services/schema.service';
+import { useLexiconStore } from '@/stores/lexicon';
 import {
     ChangeFilterPropertyCondition,
     ChangeEventCondition,
@@ -30,7 +30,7 @@ type SegmentsStore = {
     segments: Segment[]
 }
 
-export const useSegmentsStore = defineStore("segments", {
+export const useSegmentsStore = defineStore('segments', {
     state: (): SegmentsStore => ({
         segments: [],
     }),

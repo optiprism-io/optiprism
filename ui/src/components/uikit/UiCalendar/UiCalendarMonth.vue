@@ -49,7 +49,7 @@
 </template>
 
 <script lang="ts" setup>
-import {computed} from "vue";
+import {computed} from 'vue';
 import {getStringDateByFormat, getYYYYMMDD} from '@/helpers/getStringDates';
 import {
     DAYS_IN_WEEK,
@@ -100,9 +100,9 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-    (e: "on-select", payload: string): void;
-    (e: "on-mouseover", payload: string): void;
-    (e: "on-mouseleave", payload: string): void;
+    (e: 'on-select', payload: string): void;
+    (e: 'on-mouseover', payload: string): void;
+    (e: 'on-mouseleave', payload: string): void;
 }>();
 
 

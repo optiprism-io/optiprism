@@ -75,7 +75,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-    (e: "select", item: string): void;
+    (e: 'select', item: string): void;
 }>();
 
 const select = (item: UiToggleGroupItem) => {

@@ -64,10 +64,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, defineAsyncComponent } from "vue";
-import { EventQueryRef, EventRef, PropertyRef } from "@/types/events";
-import { useEventsStore, EventPayload } from "@/stores/eventSegmentation/events";
-import { useLexiconStore } from "@/stores/lexicon";
+import { computed, watch, defineAsyncComponent } from 'vue';
+import { EventQueryRef, EventRef, PropertyRef } from '@/types/events';
+import { useEventsStore, EventPayload } from '@/stores/eventSegmentation/events';
+import { useLexiconStore } from '@/stores/lexicon';
 import { useCommonStore } from '@/stores/common'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 

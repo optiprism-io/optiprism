@@ -122,22 +122,22 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from "vue";
-import { useEventsStore } from "@/stores/eventSegmentation/events";
-import { groupByMap, periodMap } from "@/configs/events/controls";
+import { computed } from 'vue';
+import { useEventsStore } from '@/stores/eventSegmentation/events';
+import { groupByMap, periodMap } from '@/configs/events/controls';
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 
-import { getStringDateByFormat } from "@/helpers/getStringDates";
+import { getStringDateByFormat } from '@/helpers/getStringDates';
 
-import UiSelect from "@/components/uikit/UiSelect.vue";
-import UiToggleGroup, { UiToggleGroupItem } from "@/components/uikit/UiToggleGroup.vue";
-import UiIcon from "@/components/uikit/UiIcon.vue";
-import UiDatePicker from "@/components/uikit/UiDatePicker.vue";
-import UiLabelGroup from "@/components/uikit/UiLabelGroup.vue";
-import UiTable from "@/components/uikit/UiTable/UiTable.vue";
-import ChartPie from "@/components/charts/ChartPie.vue";
-import ChartLine from "@/components/charts/ChartLine.vue";
-import ChartColumn from "@/components/charts/ChartColumn.vue";
+import UiSelect from '@/components/uikit/UiSelect.vue';
+import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue';
+import UiIcon from '@/components/uikit/UiIcon.vue';
+import UiDatePicker from '@/components/uikit/UiDatePicker.vue';
+import UiLabelGroup from '@/components/uikit/UiLabelGroup.vue';
+import UiTable from '@/components/uikit/UiTable/UiTable.vue';
+import ChartPie from '@/components/charts/ChartPie.vue';
+import ChartLine from '@/components/charts/ChartLine.vue';
+import ChartColumn from '@/components/charts/ChartColumn.vue';
 
 const compareToMap = ['day', 'week', 'month', 'year'];
 

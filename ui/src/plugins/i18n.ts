@@ -1,4 +1,4 @@
-import { App as Application } from "vue";
+import { App as Application } from 'vue';
 
 export type $T = (key: string) => string
 

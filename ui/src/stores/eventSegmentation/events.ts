@@ -1,18 +1,18 @@
-import { defineStore } from "pinia";
+import { defineStore } from 'pinia';
 import {
     EventRef,
     PropertyRef,
     EventQueryRef,
-} from "@/types/events";
+} from '@/types/events';
 import { OperationId, Value, Group } from '@/types'
-import queriesService, { EventSegmentation } from "@/api/services/queries.service";
-import { getYYYYMMDD, getStringDateByFormat } from "@/helpers/getStringDates";
-import { getLastNDaysRange } from "@/helpers/calendarHelper";
-import {Column, Row} from "@/components/uikit/UiTable/UiTable";
+import queriesService, { EventSegmentation } from '@/api/services/queries.service';
+import { getYYYYMMDD, getStringDateByFormat } from '@/helpers/getStringDates';
+import { getLastNDaysRange } from '@/helpers/calendarHelper';
+import {Column, Row} from '@/components/uikit/UiTable/UiTable';
 import { PropertyType, TimeUnit, EventType } from '@/api'
 
-import { useLexiconStore } from "@/stores/lexicon";
-import { useSegmentsStore } from "@/stores/eventSegmentation/segments";
+import { useLexiconStore } from '@/stores/lexicon';
+import { useSegmentsStore } from '@/stores/eventSegmentation/segments';
 
 const COLUMN_WIDTH = 170;
 export type ChartType = 'line' | 'pie' | 'column';
@@ -76,8 +76,8 @@ export type Events = {
 export const initialQuery = <EventQuery[]>[
     {
         queryRef: <EventQueryRef>{
-            type: "simple",
-            name: "countEvents"
+            type: 'simple',
+            name: 'countEvents'
         },
         noDelete: true,
     }
@@ -92,7 +92,7 @@ const computedEventProperties = (type: PropertyType, items: any): PropertyRef[] 
     });
 };
 
-export const useEventsStore = defineStore("events", {
+export const useEventsStore = defineStore('events', {
     state: (): Events => ({
         events: [],
         group: Group.User,
@@ -329,7 +329,7 @@ export const useEventsStore = defineStore("events", {
                     this.eventSegmentation = res;
                 }
             } catch (error) {
-                throw new Error("error getEventsValues");
+                throw new Error('error getEventsValues');
             }
             this.eventSegmentationLoading = false;
         },

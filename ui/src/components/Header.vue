@@ -44,18 +44,18 @@
 </template>
 
 <script setup lang="ts">
-import UiDropdown from "@/components/uikit/UiDropdown.vue";
+import UiDropdown from '@/components/uikit/UiDropdown.vue';
 
 const items = [
     {
         key: 1,
         value: 1,
-        nameDisplay: "Menu Item 1"
+        nameDisplay: 'Menu Item 1'
     },
     {
         key: 2,
         value: 2,
-        nameDisplay: "Menu Item 2"
+        nameDisplay: 'Menu Item 2'
     }
 ];
 

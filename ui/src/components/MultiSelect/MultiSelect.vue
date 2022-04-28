@@ -31,9 +31,9 @@ export interface Item {
 }
 
 const emit = defineEmits<{
-    (e: "select", item: any): void;
-    (e: "deselect", item: any): void;
-    (e: "search", payload: string): void;
+    (e: 'select', item: any): void;
+    (e: 'deselect', item: any): void;
+    (e: 'search', payload: string): void;
 }>();
 
 const props = defineProps<{
@@ -58,16 +58,16 @@ const itemsSelect = computed(() => {
 });
 
 const select = (item: any): void => {
-    emit("select", item);
+    emit('select', item);
 };
 
 const deselect = (item: any): void => {
-    emit("deselect", item);
+    emit('deselect', item);
 };
 
 const search = (payload: string) => {
     searchRef.value = payload.toLowerCase();
-    emit("search", payload);
+    emit('search', payload);
 };
 </script>
 

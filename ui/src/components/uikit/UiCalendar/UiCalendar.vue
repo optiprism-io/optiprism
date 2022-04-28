@@ -76,8 +76,8 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, onMounted, watch, inject } from "vue";
-import { VirtualisedList } from "vue-virtualised";
+import { computed, ref, onMounted, watch, inject } from 'vue';
+import { VirtualisedList } from 'vue-virtualised';
 
 import { RangeValue, CurrentValue, Value, Ranged } from './UiCalendar'
 
@@ -138,11 +138,11 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-    (e: "change-visible-range", payload: RangeValue[]): void;
-    (e: "on-apply", payload: CurrentValue): void;
-    (e: "cancel"): void;
-    (e: "on-change", payload: CurrentValue): void;
-    (e: "set-multiple", payload: boolean): void;
+    (e: 'change-visible-range', payload: RangeValue[]): void;
+    (e: 'on-apply', payload: CurrentValue): void;
+    (e: 'cancel'): void;
+    (e: 'on-change', payload: CurrentValue): void;
+    (e: 'set-multiple', payload: boolean): void;
 }>();
 
 

@@ -74,10 +74,10 @@
 </template>
 
 <script setup lang="ts">
-import { useLexiconStore } from "@/stores/lexicon";
-import BreakdownSelect from "./BreakdownSelect.vue";
-import CohortSelect from "./CohortSelect.vue";
-import { computed, ref } from "vue";
+import { useLexiconStore } from '@/stores/lexicon';
+import BreakdownSelect from './BreakdownSelect.vue';
+import CohortSelect from './CohortSelect.vue';
+import { computed, ref } from 'vue';
 import {
     Breakdown,
     BreakdownCohort,
@@ -91,7 +91,7 @@ import {
     isBreakdownUserCustomProperty,
     isBreakdownUserProperty,
     newBreakdownCohort
-} from "@/stores/eventSegmentation/breakdowns";
+} from '@/stores/eventSegmentation/breakdowns';
 
 const props = defineProps<{
     breakdown: Breakdown;
@@ -101,14 +101,14 @@ const props = defineProps<{
 let showControls = ref(false);
 
 const emit = defineEmits<{
-    (e: "removeBreakdown", index: number): void;
-    (e: "changeBreakdown", index: number, breakdown: Breakdown): void;
+    (e: 'removeBreakdown', index: number): void;
+    (e: 'changeBreakdown', index: number, breakdown: Breakdown): void;
 }>();
 
 const lexiconStore = useLexiconStore();
 
 const removeBreakdown = (): void => {
-    emit("removeBreakdown", props.index);
+    emit('removeBreakdown', props.index);
 };
 
 const breakdownCohort = computed(
@@ -117,11 +117,11 @@ const breakdownCohort = computed(
 );
 
 const changeBreakdown = (breakdown: Breakdown): void => {
-    emit("changeBreakdown", props.index, breakdown);
+    emit('changeBreakdown', props.index, breakdown);
 };
 
 const changeCohort = (id: number): void => {
-    emit("changeBreakdown", props.index, newBreakdownCohort(id));
+    emit('changeBreakdown', props.index, newBreakdownCohort(id));
 };
 
 const breakdownName = (): string => {
@@ -150,26 +150,26 @@ const breakdownName = (): string => {
         ).name;
     }
 
-    throw new Error("unhandled");
+    throw new Error('unhandled');
 };
 
 const breakdownCaption = (): string => {
     if (isBreakdownCohort(props.breakdown)) {
-        return "cohort";
+        return 'cohort';
     }
     if (isBreakdownUserProperty(props.breakdown)) {
-        return "user property";
+        return 'user property';
     }
     if (isBreakdownUserCustomProperty(props.breakdown)) {
-        return "user custom property";
+        return 'user custom property';
     }
     if (isBreakdownEventCommonProperty(props.breakdown)) {
-        return "event property";
+        return 'event property';
     }
     if (isBreakdownEventCommonCustomProperty(props.breakdown)) {
-        return "event custom property";
+        return 'event custom property';
     }
-    throw new Error("unhandled");
+    throw new Error('unhandled');
 };
 
 const identifier = computed((): number => props.index + 1);

@@ -1,5 +1,5 @@
-import { defineStore } from "pinia";
-import schemaService from "@/api/services/schema.service";
+import { defineStore } from 'pinia';
+import schemaService from '@/api/services/schema.service';
 import {
     UserCustomProperty,
     Event,
@@ -13,11 +13,11 @@ import {
     EventQueryRef,
     EventsQuery,
     EventProperty,
-} from "@/types/events";
-import { Cohort } from "@/types";
-import { aggregates } from "@/types/aggregate"
-import { Group, Item } from "@/components/Select/SelectTypes";
-import { useEventsStore, Events } from "@/stores/eventSegmentation/events";
+} from '@/types/events';
+import { Cohort } from '@/types';
+import { aggregates } from '@/types/aggregate'
+import { Group, Item } from '@/components/Select/SelectTypes';
+import { useEventsStore, Events } from '@/stores/eventSegmentation/events';
 import { PropertyType, CustomEvent, EventType, Property,  } from '@/api'
 import { useCommonStore } from '@/stores/common'
 
@@ -37,20 +37,20 @@ type Lexicon = {
     userPropertiesLoading: boolean;
 };
 
-export const useLexiconStore = defineStore("lexicon", {
+export const useLexiconStore = defineStore('lexicon', {
     state: (): Lexicon => ({
         cohorts: [
             {
                 id: 1,
-                name: "Active users"
+                name: 'Active users'
             },
             {
                 id: 2,
-                name: "iOS users"
+                name: 'iOS users'
             },
             {
                 id: 3,
-                name: "Profitable users"
+                name: 'Profitable users'
             }
         ],
 
@@ -88,7 +88,7 @@ export const useLexiconStore = defineStore("lexicon", {
                 this.eventProperties = await schemaService.eventProperties();
                 this.eventCustomProperties = await schemaService.eventCustomProperties();
             } catch (error) {
-                throw new Error("error getEventProperties");
+                throw new Error('error getEventProperties');
             }
             this.eventPropertiesLoading = false;
         },
@@ -98,7 +98,7 @@ export const useLexiconStore = defineStore("lexicon", {
                 this.userProperties = await schemaService.userProperties();
                 this.userCustomProperties = await schemaService.userCustomProperties();
             } catch (error) {
-                throw new Error("error getUserProperties");
+                throw new Error('error getUserProperties');
             }
             this.eventPropertiesLoading = false;
         }
@@ -289,7 +289,7 @@ export const useLexiconStore = defineStore("lexicon", {
                         setToList(tag, item);
                     });
                 } else {
-                    setToList("Other", item);
+                    setToList('Other', item);
                 }
             });
 

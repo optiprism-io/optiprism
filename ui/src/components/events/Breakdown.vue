@@ -67,12 +67,12 @@
 </template>
 
 <script setup lang="ts">
-import { EventBreakdown } from "@/stores/eventSegmentation/events";
-import { useLexiconStore } from "@/stores/lexicon";
-import PropertySelect from "@/components/events/PropertySelect.vue";
-import { EventRef, PropertyRef } from "@/types/events";
-import UiButton from "@/components/uikit/UiButton.vue";
-import AlphabetIdentifier from "@/components/AlphabetIdentifier.vue";
+import { EventBreakdown } from '@/stores/eventSegmentation/events';
+import { useLexiconStore } from '@/stores/lexicon';
+import PropertySelect from '@/components/events/PropertySelect.vue';
+import { EventRef, PropertyRef } from '@/types/events';
+import UiButton from '@/components/uikit/UiButton.vue';
+import AlphabetIdentifier from '@/components/AlphabetIdentifier.vue';
 import { PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();
@@ -87,21 +87,21 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    (e: "removeBreakdown", index: number): void;
-    (e: "changeBreakdownProperty", breakdownIdx: number, propRef: PropertyRef): void;
-    (e: "handleSelectProperty"): void;
+    (e: 'removeBreakdown', index: number): void;
+    (e: 'changeBreakdownProperty', breakdownIdx: number, propRef: PropertyRef): void;
+    (e: 'handleSelectProperty'): void;
 }>();
 
 const removeBreakdown = (): void => {
-    emit("removeBreakdown", props.index);
+    emit('removeBreakdown', props.index);
 };
 
 const changeProperty = (propRef: PropertyRef): void => {
-    emit("changeBreakdownProperty", props.index, propRef);
+    emit('changeBreakdownProperty', props.index, propRef);
 };
 
 const handleSelectProperty = (): void => {
-    emit("handleSelectProperty");
+    emit('handleSelectProperty');
 };
 
 const propertyName = (ref: PropertyRef): string => {
@@ -113,7 +113,7 @@ const propertyName = (ref: PropertyRef): string => {
         case PropertyType.User:
             return lexiconStore.findUserPropertyByName(ref.name).name
     }
-    throw new Error("unhandled");
+    throw new Error('unhandled');
 };
 </script>
 

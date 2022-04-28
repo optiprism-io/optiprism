@@ -11,12 +11,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { findOperations, OperationId } from "@/types";
-import { PropertyRef  } from "@/types/events"
-import { Item } from "@/components/Select/SelectTypes";
-import { useLexiconStore } from "@/stores/lexicon";
-import Select from "@/components/Select/Select.vue";
+import { computed } from 'vue';
+import { findOperations, OperationId } from '@/types';
+import { PropertyRef  } from '@/types/events'
+import { Item } from '@/components/Select/SelectTypes';
+import { useLexiconStore } from '@/stores/lexicon';
+import Select from '@/components/Select/Select.vue';
 import { DataType, PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();
@@ -29,7 +29,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    (e: "select", opId: OperationId): void;
+    (e: 'select', opId: OperationId): void;
 }>();
 
 const items = computed(() => {
@@ -77,6 +77,6 @@ let selectedItem = computed((): OperationId | undefined => {
 });
 
 const select = (opId: OperationId) => {
-    emit("select", opId);
+    emit('select', opId);
 };
 </script>

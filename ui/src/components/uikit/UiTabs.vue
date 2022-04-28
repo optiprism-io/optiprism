@@ -58,7 +58,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {});
 
 const emit = defineEmits<{
-    (e: "on-select", payload: string): void;
+    (e: 'on-select', payload: string): void;
 }>();
 
 const onSelect = (value: string) => {

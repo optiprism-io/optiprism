@@ -15,9 +15,9 @@
 
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from 'vue';
 import merge from 'lodash/merge';
-import UiSpinner from "../uikit/UiSpinner.vue";
+import UiSpinner from '../uikit/UiSpinner.vue';
 
 const props = withDefaults(
     defineProps<{

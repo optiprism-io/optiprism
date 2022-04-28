@@ -26,19 +26,19 @@ export type Event = CustomEventEvent
 export type CustomEvents = CreateCustomEventRequest
 
 const schemaService = {
-    events: async () => await get("/schema/events", "", null),
+    events: async () => await get('/schema/events', '', null),
 
     customEvents: async (projectId: string) => await api.customEvents(projectId),
     createCustomEvent: async (projectId: string, params: CreateCustomEventRequest) => await api.createCustomEvent(projectId, params),
     updateCustomEvent: async(params: CustomEvents) => await fetch('/schema/custom-events', 'PUT', params),
 
-    eventProperties: async () => await get("/schema/event-properties", "", null),
-    eventCustomProperties: async () => await get("/schema/event-custom-properties", "", null),
+    eventProperties: async () => await get('/schema/event-properties', '', null),
+    eventCustomProperties: async () => await get('/schema/event-custom-properties', '', null),
 
-    userProperties: async () => await get("/schema/user-properties", "", null),
-    userCustomProperties: async () => await get("/schema/user-custom-properties", "", null),
+    userProperties: async () => await get('/schema/user-properties', '', null),
+    userCustomProperties: async () => await get('/schema/user-custom-properties', '', null),
 
-    propertryValues: async (params: PropertiesValues) => await get("/data/property-values", "", params),
+    propertryValues: async (params: PropertiesValues) => await get('/data/property-values', '', params),
 };
 
 export default schemaService;

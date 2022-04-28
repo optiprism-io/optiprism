@@ -1,8 +1,8 @@
-import { defineStore } from "pinia";
-import { OperationId, Value } from "@/types";
-import { PropertyRef, EventRef } from "@/types/events";
-import { useLexiconStore } from "@/stores/lexicon";
-import schemaService from "@/api/services/schema.service";
+import { defineStore } from 'pinia';
+import { OperationId, Value } from '@/types';
+import { PropertyRef, EventRef } from '@/types/events';
+import { useLexiconStore } from '@/stores/lexicon';
+import schemaService from '@/api/services/schema.service';
 
 export type FilterRefUserProperty = {
     type: string;
@@ -21,27 +21,27 @@ export type FilterRefCohort = {
 export type FilterRef = FilterRefUserProperty | FilterRefUserCustomProperty | FilterRefCohort;
 
 export const newFilterCohort = () => {
-    return <FilterRefCohort>{ type: "Cohort" };
+    return <FilterRefCohort>{ type: 'Cohort' };
 };
 
 export const newFilterUserProperty = (id: number) => {
-    return <FilterRefUserProperty>{ type: "UserProperty", id: id };
+    return <FilterRefUserProperty>{ type: 'UserProperty', id: id };
 };
 
 export const newFilterUserCustomProperty = (id: number) => {
-    return <FilterRefUserCustomProperty>{ type: "UserCustomProperty", id: id };
+    return <FilterRefUserCustomProperty>{ type: 'UserCustomProperty', id: id };
 };
 
 export const isFilterUserProperty = (ref: FilterRef): boolean => {
-    return ref.type === "UserProperty";
+    return ref.type === 'UserProperty';
 };
 
 export const isFilterUserCustomProperty = (ref: FilterRef): boolean => {
-    return ref.type === "UserCustomProperty";
+    return ref.type === 'UserCustomProperty';
 };
 
 export const isFilterCohort = (ref: FilterRef): boolean => {
-    return ref.type === "Cohort";
+    return ref.type === 'Cohort';
 };
 
 export interface Filter {
@@ -55,7 +55,7 @@ type Filters = {
     filters: Filter[];
 };
 
-export const useFiltersStore = defineStore("filters", {
+export const useFiltersStore = defineStore('filters', {
     state: (): Filters => ({ filters: [] }),
     getters: {
         eventForValues() {
@@ -90,8 +90,8 @@ export const useFiltersStore = defineStore("filters", {
 
             try {
                 const res = await schemaService.propertryValues({
-                    event_name: eventRef ? lexiconStore.eventName(eventRef) : "",
-                    event_type: eventRef ? eventRef.type : "",
+                    event_name: eventRef ? lexiconStore.eventName(eventRef) : '',
+                    event_type: eventRef ? eventRef.type : '',
                     property_name: property.name,
                     property_type: propRef.type
                 });
@@ -99,7 +99,7 @@ export const useFiltersStore = defineStore("filters", {
                     valuesList = res;
                 }
             } catch (error) {
-                throw new Error("error getEventsValues");
+                throw new Error('error getEventsValues');
             }
 
             this.filters.push(<Filter>{
@@ -120,8 +120,8 @@ export const useFiltersStore = defineStore("filters", {
 
             try {
                 const res = await schemaService.propertryValues({
-                    event_name: eventRef ? lexiconStore.eventName(eventRef) : "",
-                    event_type: eventRef ? eventRef.type : "",
+                    event_name: eventRef ? lexiconStore.eventName(eventRef) : '',
+                    event_type: eventRef ? eventRef.type : '',
                     property_name: property.name,
                     property_type: propRef.type
                 });
@@ -129,7 +129,7 @@ export const useFiltersStore = defineStore("filters", {
                     valuesList = res;
                 }
             } catch (error) {
-                throw new Error("error getEventsValues");
+                throw new Error('error getEventsValues');
             }
 
             this.filters[filterIdx] = <Filter>{

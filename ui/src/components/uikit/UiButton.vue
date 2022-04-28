@@ -30,12 +30,12 @@
 </template>
 
 <script setup lang="ts">
-import UiSpinner from "./UiSpinner.vue";
+import UiSpinner from './UiSpinner.vue';
 
 interface Props {
     active?: boolean;
     disabled?: boolean;
-    type?: "submit" | "button" | "reset" | undefined;
+    type?: 'submit' | 'button' | 'reset' | undefined;
     progress?: boolean;
     icon?: string | undefined;
     ariaLabel?: string;
@@ -44,10 +44,10 @@ interface Props {
 }
 
 withDefaults(defineProps<Props>(), {
-    type: "button",
-    beforeIcon: "",
-    icon: "",
-    ariaLabel: ""
+    type: 'button',
+    beforeIcon: '',
+    icon: '',
+    ariaLabel: ''
 });
 </script>
 

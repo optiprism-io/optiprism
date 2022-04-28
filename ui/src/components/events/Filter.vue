@@ -140,15 +140,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { EventFilter } from "@/stores/eventSegmentation/events";
-import { useLexiconStore } from "@/stores/lexicon";
-import PropertySelect from "@/components/events/PropertySelect.vue";
-import OperationSelect from "@/components/events/OperationSelect.vue";
-import ValueSelect from "@/components/events/ValueSelect.vue";
-import { EventRef, PropertyRef } from "@/types/events";
-import { operationById, OperationId, Value } from "@/types";
-import AlphabetIdentifier from "@/components/AlphabetIdentifier.vue";
+import { computed } from 'vue';
+import { EventFilter } from '@/stores/eventSegmentation/events';
+import { useLexiconStore } from '@/stores/lexicon';
+import PropertySelect from '@/components/events/PropertySelect.vue';
+import OperationSelect from '@/components/events/OperationSelect.vue';
+import ValueSelect from '@/components/events/ValueSelect.vue';
+import { EventRef, PropertyRef } from '@/types/events';
+import { operationById, OperationId, Value } from '@/types';
+import AlphabetIdentifier from '@/components/AlphabetIdentifier.vue';
 import { PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();
@@ -165,12 +165,12 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    (e: "removeFilter", index: number): void;
-    (e: "changeFilterProperty", filterIdx: number, propRef: PropertyRef): void;
-    (e: "changeFilterOperation", filterIdx: number, opId: OperationId): void;
-    (e: "addFilterValue", filterIdx: number, value: Value): void;
-    (e: "removeFilterValue", filterIdx: number, value: Value): void;
-    (e: "handleSelectProperty"): void;
+    (e: 'removeFilter', index: number): void;
+    (e: 'changeFilterProperty', filterIdx: number, propRef: PropertyRef): void;
+    (e: 'changeFilterOperation', filterIdx: number, opId: OperationId): void;
+    (e: 'addFilterValue', filterIdx: number, value: Value): void;
+    (e: 'removeFilterValue', filterIdx: number, value: Value): void;
+    (e: 'handleSelectProperty'): void;
 }>();
 
 const operationButtonText = computed(() => {
@@ -192,31 +192,31 @@ const isShowValues = computed(() => {
 })
 
 const removeFilter = (): void => {
-    emit("removeFilter", props.index);
+    emit('removeFilter', props.index);
 };
 
 const changeProperty = (propRef: PropertyRef): void => {
-    emit("changeFilterProperty", props.index, propRef);
+    emit('changeFilterProperty', props.index, propRef);
 };
 
 const handleSelectProperty = (): void => {
-    emit("handleSelectProperty");
+    emit('handleSelectProperty');
 };
 
 const changeOperation = (opId: OperationId): void => {
-    emit("changeFilterOperation", props.index, opId);
+    emit('changeFilterOperation', props.index, opId);
 };
 
 const addValue = (value: Value): void => {
-    emit("addFilterValue", props.index, value);
+    emit('addFilterValue', props.index, value);
 };
 
 const removeValue = (value: Value) => {
-    emit("removeFilterValue", props.index, value);
+    emit('removeFilterValue', props.index, value);
 };
 
 const removeValueButton = (value: Value) => {
-    emit("removeFilterValue", props.index, value);
+    emit('removeFilterValue', props.index, value);
 };
 
 const propertyName = (ref: PropertyRef): string => {
