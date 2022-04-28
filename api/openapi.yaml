@@ -597,15 +597,16 @@ components:
     CustomEventEvent:
       type: object
       description: custom event will matches all of the provided events
-      required: [ "eventId","eventType" ]
-      properties:
-        eventId:
-          type: number
-        filters:
-          type: array
-          description: array of event filters
-          items:
-            $ref: '#/components/schemas/EventFilterByProperty'
+      required: [ "eventType", "filters" ]
+      allOf:
+        - $ref: '#/components/schemas/EventRef'
+        - type: object
+          properties:
+            filters:
+              type: array
+              description: array of event filters
+              items:
+                $ref: '#/components/schemas/EventFilterByProperty'
 
     Property:
       type: object
@@ -807,7 +808,7 @@ components:
           description: array of events to query
           items:
             type: object
-            required: [ "eventName","eventType" ]
+            required: [ "eventType" ]
             allOf:
               - $ref: '#/components/schemas/EventRef'
               - type: object
@@ -1033,7 +1034,7 @@ components:
 
     EventSegmentationEvent:
       description: event object
-      required: [ "eventName","eventType","queries" ]
+      required: [ "eventType","queries" ]
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
@@ -1079,7 +1080,7 @@ components:
     EventFilterByProperty:
       type: object
       description: filter by property. Use this in event filters or in common filters. If you use it in event then event will be inherited, if you use filter as a common, then property should be commnon for all events.
-      required: [ "filterType","propertyName","propertyType","operation" ]
+      required: [ "filterType","propertyType","operation" ]
       allOf:
         - type: object
           properties:
@@ -1117,7 +1118,7 @@ components:
     BreakdownByProperty:
       type: object
       description: breakdown by property.
-      required: [ "breakdownType","propertyName","propertyType" ]
+      required: [ "breakdownType", "propertyType" ]
       allOf:
         - type: object
           properties:
@@ -1391,7 +1392,7 @@ components:
       type: object
       description: aggregate property and compare to value
       example: find who made sum(revenue) >$1000 in last 30 days
-      required: [ "type","propertyName","propertyType","aggregate","operation","time" ]
+      required: [ "type","propertyType","aggregate","operation","time" ]
       allOf:
         - type: object
           properties:
@@ -1422,7 +1423,7 @@ components:
       type: object
       description: find users with Nth event occurance
       example: find who made an event 3rd time in last month
-      required: [ "type","propertyName","propertyType","operation","time" ]
+      required: [ "type", "propertyType","operation","time" ]
       properties:
         type:
           type: string
@@ -1512,7 +1513,7 @@ components:
     QueryAggregatePropertyPerGroup:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
-      required: [ "queryType","aggregate","propertyName","propertyType","aggregatePerGroup" ]
+      required: [ "queryType","aggregate","propertyType","aggregatePerGroup" ]
       type: object
       allOf:
         - type: object
@@ -1532,7 +1533,7 @@ components:
     QueryAggregateProperty:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
-      required: [ "queryType","aggregate","propertyName","propertyType" ]
+      required: [ "queryType","aggregate","propertyType" ]
       type: object
       allOf:
         - type: object
