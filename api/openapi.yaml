@@ -2,12 +2,12 @@ openapi: 3.0.0
 info:
   version: 1.0.0
   title: OptiPrism
-  termsOfService: http://optiprism.io/terms/
+  termsOfService: https://optiprism.io/terms/
   contact:
     email: api@optiprism.io
   license:
     name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
 servers:
   # Added by API Auto Mocking Plugin
   - description: SwaggerHub API Auto Mocking
@@ -597,16 +597,15 @@ components:
     CustomEventEvent:
       type: object
       description: custom event will matches all of the provided events
-      required: [ "eventName","eventType" ]
-      allOf:
-        - $ref: '#/components/schemas/EventRef'
-        - type: object
-          properties:
-            filters:
-              type: array
-              description: array of event filters
-              items:
-                $ref: '#/components/schemas/EventFilterByProperty'
+      required: [ "eventId","eventType" ]
+      properties:
+        eventId:
+          type: number
+        filters:
+          type: array
+          description: array of event filters
+          items:
+            $ref: '#/components/schemas/EventFilterByProperty'
 
     Property:
       type: object
@@ -1151,7 +1150,7 @@ components:
         - $ref: '#/components/schemas/SegmentConditionHadPropertyValue'
         - $ref: '#/components/schemas/SegmentConditionDidEvent'
         - $ref: '#/components/schemas/SegmentConditionFunnel'
-        - $ref: '#/components/schemas/SegmentConditionReteined'
+        - $ref: '#/components/schemas/SegmentConditionRetained'
 
     TimeBetween:
       type: object
@@ -1231,7 +1230,7 @@ components:
       description: time spent after the first use of event. Use in segmentation
       required: [ "type","within","unit" ]
       example: >
-        within 2 days after first use - select event which was triggered wihtin 2 daya of it's first use by user
+        within 2 days after first use - select event which was triggered within 2 days of it's first use by user
         
         {
           "time": {
@@ -1477,7 +1476,7 @@ components:
         bucket:
           $ref: '#/components/schemas/TimeUnit'
 
-    SegmentConditionReteined:
+    SegmentConditionRetained:
       type: object
 
     QuerySimple:
@@ -1602,21 +1601,46 @@ components:
 
     PropertyRef:
       type: object
-      description: reference to property by its name and type
-      properties:
-        propertyName:
-          type: string
-        propertyType:
-          $ref: '#/components/schemas/PropertyType'
+      description: reference to a property by id or name, depends on property type
+      oneOf:
+        - type: object
+          properties:
+            propertyName:
+              type: string
+            propertyType:
+              type: string
+              enum:
+                - event
+                - user
+        - type: object
+          properties:
+            propertyId:
+              type: number
+            propertyType:
+              type: string
+              enum:
+                - custom
 
     EventRef:
       type: object
       description: reference to event by its name and type
-      properties:
-        eventName:
-          type: string
-        eventType:
-          $ref: '#/components/schemas/EventType'
+      oneOf:
+        - type: object
+          properties:
+            eventName:
+              type: string
+            eventType:
+              type: string
+              enum:
+                - regular
+        - type: object
+          properties:
+            eventId:
+              type: number
+            eventType:
+              type: string
+              enum:
+                - custom
 
     EventType:
       type: string
