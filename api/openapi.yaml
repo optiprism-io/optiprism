@@ -2,12 +2,12 @@ openapi: 3.0.0
 info:
   version: 1.0.0
   title: OptiPrism
-  termsOfService: http://optiprism.io/terms/
+  termsOfService: https://optiprism.io/terms/
   contact:
     email: api@optiprism.io
   license:
     name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
 servers:
   # Added by API Auto Mocking Plugin
   - description: SwaggerHub API Auto Mocking
@@ -75,6 +75,13 @@ paths:
                   - $ref: '#/components/schemas/ListResponseMetadata'
     post:
       summary: Create custom event
+      parameters:
+        - name: project_id
+          in: path
+          description: Project ID
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -89,7 +96,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/CustomEvent'
 
-
+  /v1/projects/{project_id}/schema/custom-events/{event_id}:
+    put:
+      summary: Update custom event
+      parameters:
+        - name: project_id
+          in: path
+          description: Project ID
+          required: true
+          schema:
+            type: string
+        - name: event_id
+          in: path
+          description: Custom Event ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomEventRequest'
+      responses:
+        201:
+          description: custom event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomEvent'
   /v1/projects/{project_id}/schema/properties:
     get:
       summary: Properties list
@@ -580,13 +615,22 @@ components:
           description: array of id of custom properties contained in expression events
 
     CreateCustomEventRequest:
-      required: [ "projectId","name","expression" ]
+      required: [ "name","events" ]
       description: Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
       type: object
       properties:
-        projectId:
-          type: integer
-          format: int64
+        name:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomEventEvent'
+
+    UpdateCustomEventRequest:
+      required: [ name","events" ]
+      description: Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
+      type: object
+      properties:
         name:
           type: string
         events:
@@ -597,7 +641,7 @@ components:
     CustomEventEvent:
       type: object
       description: custom event will matches all of the provided events
-      required: [ "eventName","eventType" ]
+      required: [ "eventType", "filters" ]
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
@@ -808,7 +852,7 @@ components:
           description: array of events to query
           items:
             type: object
-            required: [ "eventName","eventType" ]
+            required: [ "eventType" ]
             allOf:
               - $ref: '#/components/schemas/EventRef'
               - type: object
@@ -1034,7 +1078,7 @@ components:
 
     EventSegmentationEvent:
       description: event object
-      required: [ "eventName","eventType","queries" ]
+      required: [ "eventType","queries" ]
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
@@ -1080,7 +1124,7 @@ components:
     EventFilterByProperty:
       type: object
       description: filter by property. Use this in event filters or in common filters. If you use it in event then event will be inherited, if you use filter as a common, then property should be commnon for all events.
-      required: [ "filterType","propertyName","propertyType","operation" ]
+      required: [ "filterType","propertyType","operation" ]
       allOf:
         - type: object
           properties:
@@ -1118,7 +1162,7 @@ components:
     BreakdownByProperty:
       type: object
       description: breakdown by property.
-      required: [ "breakdownType","propertyName","propertyType" ]
+      required: [ "breakdownType", "propertyType" ]
       allOf:
         - type: object
           properties:
@@ -1151,7 +1195,7 @@ components:
         - $ref: '#/components/schemas/SegmentConditionHadPropertyValue'
         - $ref: '#/components/schemas/SegmentConditionDidEvent'
         - $ref: '#/components/schemas/SegmentConditionFunnel'
-        - $ref: '#/components/schemas/SegmentConditionReteined'
+        - $ref: '#/components/schemas/SegmentConditionRetained'
 
     TimeBetween:
       type: object
@@ -1231,7 +1275,7 @@ components:
       description: time spent after the first use of event. Use in segmentation
       required: [ "type","within","unit" ]
       example: >
-        within 2 days after first use - select event which was triggered wihtin 2 daya of it's first use by user
+        within 2 days after first use - select event which was triggered within 2 days of it's first use by user
         
         {
           "time": {
@@ -1392,7 +1436,7 @@ components:
       type: object
       description: aggregate property and compare to value
       example: find who made sum(revenue) >$1000 in last 30 days
-      required: [ "type","propertyName","propertyType","aggregate","operation","time" ]
+      required: [ "type","propertyType","aggregate","operation","time" ]
       allOf:
         - type: object
           properties:
@@ -1423,7 +1467,7 @@ components:
       type: object
       description: find users with Nth event occurance
       example: find who made an event 3rd time in last month
-      required: [ "type","propertyName","propertyType","operation","time" ]
+      required: [ "type", "propertyType","operation","time" ]
       properties:
         type:
           type: string
@@ -1477,7 +1521,7 @@ components:
         bucket:
           $ref: '#/components/schemas/TimeUnit'
 
-    SegmentConditionReteined:
+    SegmentConditionRetained:
       type: object
 
     QuerySimple:
@@ -1513,7 +1557,7 @@ components:
     QueryAggregatePropertyPerGroup:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
-      required: [ "queryType","aggregate","propertyName","propertyType","aggregatePerGroup" ]
+      required: [ "queryType","aggregate","propertyType","aggregatePerGroup" ]
       type: object
       allOf:
         - type: object
@@ -1533,7 +1577,7 @@ components:
     QueryAggregateProperty:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
-      required: [ "queryType","aggregate","propertyName","propertyType" ]
+      required: [ "queryType","aggregate","propertyType" ]
       type: object
       allOf:
         - type: object
@@ -1602,21 +1646,46 @@ components:
 
     PropertyRef:
       type: object
-      description: reference to property by its name and type
-      properties:
-        propertyName:
-          type: string
-        propertyType:
-          $ref: '#/components/schemas/PropertyType'
+      description: reference to a property by id or name, depends on property type
+      oneOf:
+        - type: object
+          properties:
+            propertyName:
+              type: string
+            propertyType:
+              type: string
+              enum:
+                - event
+                - user
+        - type: object
+          properties:
+            propertyId:
+              type: number
+            propertyType:
+              type: string
+              enum:
+                - custom
 
     EventRef:
       type: object
       description: reference to event by its name and type
-      properties:
-        eventName:
-          type: string
-        eventType:
-          $ref: '#/components/schemas/EventType'
+      oneOf:
+        - type: object
+          properties:
+            eventName:
+              type: string
+            eventType:
+              type: string
+              enum:
+                - regular
+        - type: object
+          properties:
+            eventId:
+              type: number
+            eventType:
+              type: string
+              enum:
+                - custom
 
     EventType:
       type: string
