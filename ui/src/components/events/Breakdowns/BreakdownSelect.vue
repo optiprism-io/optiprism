@@ -10,9 +10,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import Select from "@/components/Select/Select.vue";
-import { Group, Item } from "@/components/Select/SelectTypes";
+import { computed } from 'vue';
+import Select from '@/components/Select/Select.vue';
+import { Group, Item } from '@/components/Select/SelectTypes';
 import {
     Breakdown,
     newBreakdownCohort,
@@ -23,13 +23,13 @@ import {
     BreakdownUserCustomProperty,
     BreakdownCohort,
     BreakdownEventCommonProperty,
-} from "@/stores/eventSegmentation/breakdowns";
-import { UserCustomProperty, UserProperty } from "@/types/events";
-import { useLexiconStore } from "@/stores/lexicon";
-import { useEventsStore } from "@/stores/eventSegmentation/events";
+} from '@/stores/eventSegmentation/breakdowns';
+import { UserCustomProperty, UserProperty } from '@/types/events';
+import { useLexiconStore } from '@/stores/lexicon';
+import { useEventsStore } from '@/stores/eventSegmentation/events';
 
 const emit = defineEmits<{
-    (e: "select", type: Breakdown): void;
+    (e: 'select', type: Breakdown): void;
 }>();
 
 const props = defineProps<{
@@ -44,8 +44,8 @@ const items = computed(() => {
     let ret: Group<Item<BreakdownCohort | BreakdownUserProperty | BreakdownUserCustomProperty | BreakdownEventCommonProperty, null>[]>[] = [];
     {
         let items: Item<BreakdownCohort, null>[] = [];
-        items.push({ item: newBreakdownCohort(), name: "Cohort" });
-        ret.push({ name: "", items: items });
+        items.push({ item: newBreakdownCohort(), name: 'Cohort' });
+        ret.push({ name: '', items: items });
     }
 
     if (lexiconStore.userProperties.length > 0) {
@@ -56,7 +56,7 @@ const items = computed(() => {
                 name: prop.name
             });
         });
-        ret.push({ name: "User Properties", items: items });
+        ret.push({ name: 'User Properties', items: items });
     }
 
     if (lexiconStore.userCustomProperties.length > 0) {
@@ -67,7 +67,7 @@ const items = computed(() => {
                 name: prop.name
             });
         });
-        ret.push({ name: "User Custom Properties", items: items });
+        ret.push({ name: 'User Custom Properties', items: items });
     }
 
     if (events.length > 0) {
@@ -133,7 +133,7 @@ const items = computed(() => {
                 })
             );
 
-            ret.push({ name: "Event Properties", items: items });
+            ret.push({ name: 'Event Properties', items: items });
         }
 
         if (firstCustomProps.length > 0) {
@@ -146,7 +146,7 @@ const items = computed(() => {
             );
 
             ret.push({
-                name: "Event Custom Properties",
+                name: 'Event Custom Properties',
                 items: items
             });
         }
@@ -164,6 +164,6 @@ let selectedItem = computed(() => {
 });
 
 const select = (type: Breakdown) => {
-    emit("select", type);
+    emit('select', type);
 };
 </script>

@@ -1,31 +1,14 @@
-export enum DataType {
-    String = 'string',
-    Number = 'number',
-    Boolean = 'boolean',
-}
+import { PropertyFilterOperation, Value as ApiValue, DataType } from '@/api'
 
-export type Value = string | number | boolean;
+export type Value = ApiValue
 
 export interface Cohort {
     id: number;
     name: string;
 }
 
-export enum OperationId {
-    Eq = "=",
-    Neq = "neq",
-    Gt = "gt",
-    Gte = "gte",
-    Lt = "lt",
-    Lte = "lte",
-    True = "true",
-    False = "false",
-    Exists = "exists",
-    Empty = "empty",
-    ArrAll = "arr_all",
-    ArrNone = "arr_none",
-    Regex = "regex"
-}
+export const OperationId = PropertyFilterOperation;
+export type OperationId = typeof PropertyFilterOperation[keyof typeof PropertyFilterOperation]
 
 export interface Operation {
     id: OperationId;
@@ -43,71 +26,76 @@ enum OpFlag {
 export const operations: Operation[] = [
     {
         id: OperationId.Eq,
-        name: "Equal (=)",
+        name: 'Equal (=)',
         shortName: '='
     },
     {
         id: OperationId.Neq,
-        name: "Not Equal (!=)",
+        name: 'Not Equal (!=)',
         shortName: '!=',
     },
     {
         id: OperationId.Gt,
-        name: "Greater (>)",
+        name: 'Greater (>)',
         dataTypes: [DataType.Number],
         shortName: '>',
     },
     {
         id: OperationId.Gte,
-        name: "Greater or Equal (>=)",
+        name: 'Greater or Equal (>=)',
         dataTypes: [DataType.Number],
         shortName: '>=',
     },
     {
         id: OperationId.Lt,
-        name: "Less (<)",
+        name: 'Less (<)',
         dataTypes: [DataType.Number],
         shortName: '<',
     },
     {
         id: OperationId.Lte,
-        name: "Less or Equal (<=)",
+        name: 'Less or Equal (<=)',
         dataTypes: [DataType.Number],
         shortName: '<=',
     },
     {
         id: OperationId.True,
-        name: "True",
+        name: 'True',
         dataTypes: [DataType.Boolean],
     },
     {
         id: OperationId.False,
-        name: "False",
+        name: 'False',
         dataTypes: [DataType.Boolean]
     },
     {
         id: OperationId.Exists,
-        name: "Exists",
+        name: 'Exists',
         flags: [OpFlag.Null]
     },
     {
         id: OperationId.Empty,
-        name: "Is Empty",
+        name: 'Is Empty',
         flags: [OpFlag.Null]
     },
     {
         id: OperationId.ArrAll,
-        name: "All in array",
+        name: 'All in array',
+        flags: [OpFlag.Array]
+    },
+    {
+        id: OperationId.ArrAny,
+        name: 'Any in array',
         flags: [OpFlag.Array]
     },
     {
         id: OperationId.ArrNone,
-        name: "None in array",
+        name: 'None in array',
         flags: [OpFlag.Array]
     },
     {
         id: OperationId.Regex,
-        name: "Regex",
+        name: 'Regex',
         dataTypes: [DataType.String]
     }
 ];
@@ -141,8 +129,6 @@ export const findOperations = (
 };
 
 export enum Group {
-    User = "user",
-    Country = "country"
+    User = 'user',
+    Country = 'country'
 }
-
-export type TimeUnit = 'day' | 'week' | 'month' | 'year'

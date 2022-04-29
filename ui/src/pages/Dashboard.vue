@@ -9,25 +9,25 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from "vue";
-import { useRoute } from "vue-router";
-import UiTabs from "@/components/uikit/UiTabs.vue";
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
+import UiTabs from '@/components/uikit/UiTabs.vue';
 
 const route = useRoute()
 
 const items = computed(() => {
     const mapTabs = [
         {
-            name: "Events Segmentation",
-            value: "dashboard_events_segmentation",
-            link: "/",
-            icon: "fas fa-chart-pie"
+            name: 'Events Segmentation',
+            value: 'dashboard_events_segmentation',
+            link: '/',
+            icon: 'fas fa-chart-pie'
         },
         {
-            name: "Funnels",
-            value: "dashboard_funnels",
-            link: "/funnels",
-            icon: "pf-icon pf-icon-filter"
+            name: 'Funnels',
+            value: 'dashboard_funnels',
+            link: '/funnels',
+            icon: 'pf-icon pf-icon-filter'
         },
     ];
 

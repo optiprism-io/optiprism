@@ -147,23 +147,19 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { EventRef, PropertyRef, PropertyType, EventQueryRef, EVENT_TYPE_REGULAR, EVENT_TYPE_CUSTOM } from "@/types/events";
-import { OperationId, Value } from "@/types";
-import { useLexiconStore } from "@/stores/lexicon";
-import { EventBreakdown, EventFilter, EventQuery, Event, initialQuery } from '@/stores/eventSegmentation/events'
-import Select from "@/components/Select/Select.vue";
-import Filter from "@/components/events/Filter.vue";
-import Breakdown from "@/components/events/Breakdown.vue";
-import Query from "@/components/events/Events/Query.vue";
-import { Group, Item } from "@/components/Select/SelectTypes";
-import AlphabetIdentifier from "@/components/AlphabetIdentifier.vue";
+import { EventRef, PropertyRef, EventQueryRef } from '@/types/events'
+import { OperationId, Value } from '@/types';
+import { useLexiconStore } from '@/stores/lexicon';
+import { EventBreakdown, EventFilter, EventQuery, Event, initialQuery, EventPayload } from '@/stores/eventSegmentation/events'
+import Select from '@/components/Select/Select.vue';
+import Filter from '@/components/events/Filter.vue';
+import Breakdown from '@/components/events/Breakdown.vue';
+import Query from '@/components/events/Events/Query.vue';
+import { Group, Item } from '@/components/Select/SelectTypes';
+import AlphabetIdentifier from '@/components/AlphabetIdentifier.vue';
 import schemaService from '@/api/services/schema.service'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
-
-export type SetEventPayload = {
-    event: Event
-    index: number
-}
+import { EventType } from '@/api'
 
 type Props = {
     eventRef: EventRef
@@ -188,17 +184,17 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-    (e: "changeEvent", index: number, ref: EventRef): void;
-    (e: "removeEvent", index: number): void;
-    (e: "handleSelectProperty"): void;
-    (e: "addBreakdown", index: number): void;
-    (e: "changeBreakdownProperty", eventIdx: number, breakdownIdx: number, propRef: PropertyRef): void;
-    (e: "removeBreakdown", eventIdx: number, breakdownIdx: number): void;
-    (e: "removeQuery", eventIdx: number, queryInx: number): void;
-    (e: "addQuery", index: number): void;
-    (e: "changeQuery", eventIdx: number, queryIdx: number, queryRef: EventQueryRef): void;
+    (e: 'changeEvent', index: number, ref: EventRef): void;
+    (e: 'removeEvent', index: number): void;
+    (e: 'handleSelectProperty'): void;
+    (e: 'addBreakdown', index: number): void;
+    (e: 'changeBreakdownProperty', eventIdx: number, breakdownIdx: number, propRef: PropertyRef): void;
+    (e: 'removeBreakdown', eventIdx: number, breakdownIdx: number): void;
+    (e: 'removeQuery', eventIdx: number, queryInx: number): void;
+    (e: 'addQuery', index: number): void;
+    (e: 'changeQuery', eventIdx: number, queryIdx: number, queryRef: EventQueryRef): void;
 
-    (e: 'setEvent', payload: SetEventPayload): void
+    (e: 'setEvent', payload: EventPayload): void
     (e: 'action', payload: string): void
     (e: 'edit', payload: number): void
 }>();
@@ -222,7 +218,7 @@ const setEvent = (payload: Event) => {
 }
 
 const handleSelectProperty = (): void => {
-    emit("handleSelectProperty");
+    emit('handleSelectProperty');
 };
 
 const changeEvent = (ref: EventRef): void => {
@@ -273,7 +269,7 @@ const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => 
             event_name: lexiconStore.eventName(props.event.ref),
             event_type: props.event.ref.type,
             property_name: lexiconStore.propertyName(propRef),
-            property_type: PropertyType[propRef.type]
+            property_type: propRef.type
         });
         if (res) {
             valuesList = res
@@ -310,7 +306,7 @@ const removeFilterValue = (filterIdx: number, value: Value): void => {
 };
 
 const addBreakdown = async (): Promise<void> => {
-    await emit("addBreakdown", props.index);
+    await emit('addBreakdown', props.index);
 
     updateOpenBreakdown.value = true;
 
@@ -320,29 +316,31 @@ const addBreakdown = async (): Promise<void> => {
 };
 
 const changeBreakdownProperty = (breakdownIdx: number, propRef: PropertyRef): void => {
-    emit("changeBreakdownProperty", props.index, breakdownIdx, propRef);
+    emit('changeBreakdownProperty', props.index, breakdownIdx, propRef);
 };
 
 const removeBreakdown = (breakdownIdx: number): void => {
-    emit("removeBreakdown", props.index, breakdownIdx);
+    emit('removeBreakdown', props.index, breakdownIdx);
 };
 
 const eventName = (ref: EventRef): string => {
+    let event = lexiconStore.findEventById(ref.id)
+    
     switch (ref.type) {
-        case EVENT_TYPE_REGULAR:
-            return lexiconStore.findEventById(ref.id).displayName;
-        case EVENT_TYPE_CUSTOM:
-            return lexiconStore.findCustomEventById(ref.id).name;
+        case EventType.Regular:
+            return event.displayName || event.name
+        case EventType.Custom:
+            return lexiconStore.findCustomEventById(ref.id).name
     }
-    throw new Error("unhandled");
+    throw new Error('unhandled');
 };
 
 const removeQuery = (idx: number): void => {
-    emit("removeQuery", props.index, idx);
+    emit('removeQuery', props.index, idx);
 };
 
 const addQuery = async (): Promise<void> => {
-    await emit("addQuery", props.index);
+    await emit('addQuery', props.index);
 
     updateOpenQuery.value = true;
 
@@ -352,7 +350,7 @@ const addQuery = async (): Promise<void> => {
 };
 
 const changeQuery = (idx: number, ref: EventQueryRef) => {
-    emit("changeQuery", props.index, idx, ref);
+    emit('changeQuery', props.index, idx, ref);
 };
 </script>
 

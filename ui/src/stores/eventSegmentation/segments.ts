@@ -1,13 +1,12 @@
-import { defineStore } from "pinia";
+import { defineStore } from 'pinia';
 import {
     Condition,
     PropertyRef,
     ConditionFilter,
-    PropertyType,
-} from "@/types/events";
-import { OperationId, Value } from "@/types";
-import schemaService from "@/api/services/schema.service";
-import { useLexiconStore } from "@/stores/lexicon";
+} from '@/types/events';
+import { OperationId, Value } from '@/types';
+import schemaService from '@/api/services/schema.service';
+import { useLexiconStore } from '@/stores/lexicon';
 import {
     ChangeFilterPropertyCondition,
     ChangeEventCondition,
@@ -20,6 +19,7 @@ import {
     PayloadChangeValueItem,
     PayloadChangeEach,
 } from '@/components/events/Segments/Segments'
+import { EventType } from '@/api'
 
 interface Segment {
     name: string
@@ -30,7 +30,7 @@ type SegmentsStore = {
     segments: Segment[]
 }
 
-export const useSegmentsStore = defineStore("segments", {
+export const useSegmentsStore = defineStore('segments', {
     state: (): SegmentsStore => ({
         segments: [],
     }),
@@ -118,10 +118,10 @@ export const useSegmentsStore = defineStore("segments", {
 
                 if (condition) {
                     const lexiconStore = useLexiconStore()
-                    const event = lexiconStore.findEvent(payload.ref);
+                    const event = lexiconStore.findEvent(payload.ref)
 
                     condition.event = {
-                        name: event?.displayName || event.name,
+                        name: 'displayName' in event ? event?.displayName || event.name : event.name,
                         ref: payload.ref,
                     }
                     condition.filters = []
@@ -136,10 +136,10 @@ export const useSegmentsStore = defineStore("segments", {
 
                 if (condition) {
                     const lexiconStore = useLexiconStore()
-                    const event = lexiconStore.findEvent(payload.ref);
+                    const event = lexiconStore.findEvent(payload.ref)
 
                     condition.compareEvent = {
-                        name: event?.displayName || event.name,
+                        name: 'displayName' in event ? event?.displayName || event.name : event.name,
                         ref: payload.ref,
                     }
                 }
@@ -161,7 +161,7 @@ export const useSegmentsStore = defineStore("segments", {
                             event_name: lexiconStore.eventName(eventRef),
                             event_type: eventRef.type,
                             property_name: lexiconStore.propertyName(payload.propRef),
-                            property_type: PropertyType[payload.propRef.type]
+                            property_type: payload.propRef.type
                         })
 
                         if (res) {

@@ -67,12 +67,13 @@
 </template>
 
 <script setup lang="ts">
-import { EventBreakdown } from "@/stores/eventSegmentation/events";
-import { useLexiconStore } from "@/stores/lexicon";
-import PropertySelect from "@/components/events/PropertySelect.vue";
-import { EventRef, PropertyRef, PropertyType } from "@/types/events";
-import UiButton from "@/components/uikit/UiButton.vue";
-import AlphabetIdentifier from "@/components/AlphabetIdentifier.vue";
+import { EventBreakdown } from '@/stores/eventSegmentation/events';
+import { useLexiconStore } from '@/stores/lexicon';
+import PropertySelect from '@/components/events/PropertySelect.vue';
+import { EventRef, PropertyRef } from '@/types/events';
+import UiButton from '@/components/uikit/UiButton.vue';
+import AlphabetIdentifier from '@/components/AlphabetIdentifier.vue';
+import { PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();
 const props = defineProps<{
@@ -86,35 +87,33 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    (e: "removeBreakdown", index: number): void;
-    (e: "changeBreakdownProperty", breakdownIdx: number, propRef: PropertyRef): void;
-    (e: "handleSelectProperty"): void;
+    (e: 'removeBreakdown', index: number): void;
+    (e: 'changeBreakdownProperty', breakdownIdx: number, propRef: PropertyRef): void;
+    (e: 'handleSelectProperty'): void;
 }>();
 
 const removeBreakdown = (): void => {
-    emit("removeBreakdown", props.index);
+    emit('removeBreakdown', props.index);
 };
 
 const changeProperty = (propRef: PropertyRef): void => {
-    emit("changeBreakdownProperty", props.index, propRef);
+    emit('changeBreakdownProperty', props.index, propRef);
 };
 
 const handleSelectProperty = (): void => {
-    emit("handleSelectProperty");
+    emit('handleSelectProperty');
 };
 
 const propertyName = (ref: PropertyRef): string => {
     switch (ref.type) {
         case PropertyType.Event:
-            return lexiconStore.findEventPropertyById(ref.id).name;
-        case PropertyType.EventCustom:
-            return lexiconStore.findEventCustomPropertyById(ref.id).name;
+            return lexiconStore.findEventPropertyById(ref.id).name
+        case PropertyType.Custom:
+            return lexiconStore.findEventCustomPropertyById(ref.id).name
         case PropertyType.User:
-            return lexiconStore.findUserPropertyById(ref.id).name;
-        case PropertyType.UserCustom:
-            return lexiconStore.findUserCustomPropertyById(ref.id).name;
+            return lexiconStore.findUserPropertyById(ref.id).name
     }
-    throw new Error("unhandled");
+    throw new Error('unhandled');
 };
 </script>
 

@@ -21,12 +21,12 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, inject } from "vue";
+import { computed, inject } from 'vue';
 
 const i18n = inject<any>('i18n')
 
 const emit = defineEmits<{
-    (e: "on-select-tab", payload: string): void;
+    (e: 'on-select-tab', payload: string): void;
 }>();
 
 interface Props {

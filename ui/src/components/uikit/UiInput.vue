@@ -15,7 +15,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-const emit = defineEmits(["update:modelValue", "blur"]);
+const emit = defineEmits(['update:modelValue', 'blur']);
 
 interface Props {
     modelValue?: number | string
@@ -29,8 +29,8 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    modelValue: "",
-    type: "text",
+    modelValue: '',
+    type: 'text',
     mountFocus: false,
     placeholder: undefined,
     min: undefined,
@@ -52,10 +52,10 @@ onMounted(() => {
 const updateValue = (e: Event) => {
     const target = e.target as HTMLInputElement;
 
-    emit("update:modelValue", target.value);
+    emit('update:modelValue', target.value);
 };
 
-const blur = (e: any) => emit("blur", e);
+const blur = (e: any) => emit('blur', e);
 </script>
 
 <style lang="scss"></style>

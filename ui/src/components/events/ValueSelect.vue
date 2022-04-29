@@ -11,9 +11,9 @@
 </template>
 
 <script setup lang="ts">
-import { Value } from "@/types";
-import { PropertyRef } from "@/types/events";
-import MultiSelect, { Item } from "@/components/MultiSelect/MultiSelect.vue";
+import { Value } from '@/types';
+import { PropertyRef } from '@/types/events';
+import MultiSelect, { Item } from '@/components/MultiSelect/MultiSelect.vue';
 
 const props = withDefaults(
     defineProps<{
@@ -30,15 +30,15 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-    (e: "add", value: Value): void;
-    (e: "remove", value: Value): void;
+    (e: 'add', value: Value): void;
+    (e: 'remove', value: Value): void;
 }>();
 
 const add = (value: Value) => {
-    emit("add", value);
+    emit('add', value);
 };
 
 const remove = (value: Value) => {
-    emit("remove", value);
+    emit('remove', value);
 };
 </script>

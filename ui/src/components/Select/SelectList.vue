@@ -98,14 +98,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { Group, Item } from "@/components/Select/SelectTypes";
-import SelectListItem from "@/components/Select/SelectListItem.vue";
+import { computed, ref } from 'vue';
+import { Group, Item } from '@/components/Select/SelectTypes';
+import SelectListItem from '@/components/Select/SelectListItem.vue';
 
 const emit = defineEmits<{
-    (e: "select", item: any): void;
-    (e: "hover", item: any): void;
-    (e: "on-search", value: string): void;
+    (e: 'select', item: any): void;
+    (e: 'hover', item: any): void;
+    (e: 'on-search', value: string): void;
     (e: 'action', payload: string): void
     (e: 'edit', payload: number): void
 }>();
@@ -117,7 +117,7 @@ const props = defineProps<{
     showSearch?: boolean;
 }>();
 
-const search = ref("");
+const search = ref('');
 
 const groupedItems = computed((): Group<any>[] => {
     if (props.grouped) {
@@ -136,15 +136,15 @@ const itemItems = computed((): Item<any, any>[] => {
 });
 
 const hover = (item: any): void => {
-    emit("hover", item);
+    emit('hover', item);
 };
 
 const select = (item: any): void => {
-    emit("select", item);
+    emit('select', item);
 };
 
 const onSearch = (): void => {
-    emit("on-search", search.value);
+    emit('on-search', search.value);
 };
 
 const onAction = (payload: string) => {

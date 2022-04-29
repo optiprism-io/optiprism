@@ -1,6 +1,6 @@
-import { defineStore } from "pinia";
-import { EventRef, PropertyRef } from "@/types/events";
-import { EventBreakdown } from "@/stores/eventSegmentation/events";
+import { defineStore } from 'pinia';
+import { EventRef, PropertyRef } from '@/types/events';
+import { EventBreakdown } from '@/stores/eventSegmentation/events';
 
 export type BreakdownUserProperty = {
     type: string;
@@ -41,54 +41,54 @@ export type BreakdownCohort = {
 
 export const newBreakdownCohort = (cohortId?: number) =>
     <BreakdownCohort>{
-        type: "Cohort",
+        type: 'Cohort',
         cohortId: cohortId
     };
 
 export const newBreakdownUserProperty = (propertyId: number) =>
     <BreakdownUserProperty>{
-        type: "UserProperty",
+        type: 'UserProperty',
         propertyId: propertyId
     };
 export const newBreakdownUserCustomProperty = (propertyId: number) =>
     <BreakdownUserCustomProperty>{
-        type: "UserCustomProperty",
+        type: 'UserCustomProperty',
         propertyId: propertyId
     };
 
 export const newBreakdownEventCommonProperty = (propertyId: number) =>
     <BreakdownEventCommonProperty>{
-        type: "EventCommonProperty",
+        type: 'EventCommonProperty',
         propertyId: propertyId
     };
 
 export const newBreakdownEventCommonCustomProperty = (propertyId: number) =>
     <BreakdownEventCommonCustomProperty>{
-        type: "EventCommonCustomProperty",
+        type: 'EventCommonCustomProperty',
         propertyId: propertyId
     };
 
-export const isBreakdownUserProperty = (breakdown: Breakdown) => breakdown.type === "UserProperty";
+export const isBreakdownUserProperty = (breakdown: Breakdown) => breakdown.type === 'UserProperty';
 export const isBreakdownUserCustomProperty = (breakdown: Breakdown) =>
-    breakdown.type === "UserCustomProperty";
+    breakdown.type === 'UserCustomProperty';
 export const isBreakdownEventCommonProperty = (breakdown: Breakdown) =>
-    breakdown.type === "EventCommonProperty";
+    breakdown.type === 'EventCommonProperty';
 export const isBreakdownEventCommonCustomProperty = (breakdown: Breakdown) =>
-    breakdown.type === "EventCommonCustomProperty";
+    breakdown.type === 'EventCommonCustomProperty';
 export const isBreakdownEventProperty = (breakdown: Breakdown) =>
-    breakdown.type === "EventEventProperty";
+    breakdown.type === 'EventEventProperty';
 export const isBreakdownEventCustomProperty = (breakdown: Breakdown) =>
-    breakdown.type === "EventCustomProperty";
-export const isBreakdownCohort = (breakdown: Breakdown) => breakdown.type === "Cohort";
+    breakdown.type === 'EventCustomProperty';
+export const isBreakdownCohort = (breakdown: Breakdown) => breakdown.type === 'Cohort';
 
 export type BreakdownType =
-    | "UserProperty"
-    | "UserCustomProperty"
-    | "EventCommonProperty"
-    | "EventCommonCustomProperty"
-    | "EventProperty"
-    | "EventCustomProperty"
-    | "Cohort";
+    | 'UserProperty'
+    | 'UserCustomProperty'
+    | 'EventCommonProperty'
+    | 'EventCommonCustomProperty'
+    | 'EventProperty'
+    | 'EventCustomProperty'
+    | 'Cohort';
 
 export type Breakdown =
     | BreakdownUserProperty
@@ -103,7 +103,7 @@ type Breakdowns = {
     breakdowns: EventBreakdown[];
 };
 
-export const useBreakdownsStore = defineStore("breakdowns", {
+export const useBreakdownsStore = defineStore('breakdowns', {
     state: (): Breakdowns => ({ breakdowns: [] }),
     actions: {
         removeBreakdown(idx: number): void {

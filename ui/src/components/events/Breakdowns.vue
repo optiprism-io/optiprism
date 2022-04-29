@@ -29,12 +29,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { PropertyRef } from "@/types/events";
-import Breakdown from "@/components/events/Breakdown.vue";
-import PropertySelect from "@/components/events/PropertySelect.vue";
-import { useEventsStore } from "@/stores/eventSegmentation/events";
-import { useBreakdownsStore } from "@/stores/eventSegmentation/breakdowns";
+import { computed } from 'vue';
+import { PropertyRef } from '@/types/events';
+import Breakdown from '@/components/events/Breakdown.vue';
+import PropertySelect from '@/components/events/PropertySelect.vue';
+import { useEventsStore } from '@/stores/eventSegmentation/events';
+import { useBreakdownsStore } from '@/stores/eventSegmentation/breakdowns';
 const eventsStore = useEventsStore();
 const breakdownsStore = useBreakdownsStore();
 

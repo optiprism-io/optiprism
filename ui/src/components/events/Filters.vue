@@ -31,13 +31,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { OperationId, Value } from "@/types";
-import Filter from "@/components/events/Filter.vue";
-import PropertySelect from "@/components/events/PropertySelect.vue";
-import { useFiltersStore } from "@/stores/eventSegmentation/filters";
-import { useEventsStore } from "@/stores/eventSegmentation/events";
-import { PropertyRef } from "@/types/events";
+import { computed } from 'vue';
+import { OperationId, Value } from '@/types';
+import Filter from '@/components/events/Filter.vue';
+import PropertySelect from '@/components/events/PropertySelect.vue';
+import { useFiltersStore } from '@/stores/eventSegmentation/filters';
+import { useEventsStore } from '@/stores/eventSegmentation/events';
+import { PropertyRef } from '@/types/events';
 const filtersStore = useFiltersStore();
 const eventsStore = useEventsStore();
 

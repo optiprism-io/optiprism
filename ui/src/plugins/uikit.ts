@@ -1,11 +1,11 @@
-import { App as Application } from "vue";
-import UiButton from "@/components/uikit/UiButton.vue";
-import UiIcon from "@/components/uikit/UiIcon.vue";
-import UiSpinner from "@/components/uikit/UiSpinner.vue";
-import UiDropdown from "@/components/uikit/UiDropdown.vue";
-import UiToggleGroup from "@/components/uikit/UiToggleGroup.vue";
-import UiTabs from "@/components/uikit/UiTabs.vue";
-import UiTable from "@/components/uikit/UiTable/UiTable.vue";
+import { App as Application } from 'vue';
+import UiButton from '@/components/uikit/UiButton.vue';
+import UiIcon from '@/components/uikit/UiIcon.vue';
+import UiSpinner from '@/components/uikit/UiSpinner.vue';
+import UiDropdown from '@/components/uikit/UiDropdown.vue';
+import UiToggleGroup from '@/components/uikit/UiToggleGroup.vue';
+import UiTabs from '@/components/uikit/UiTabs.vue';
+import UiTable from '@/components/uikit/UiTable/UiTable.vue';
 
 const componentMap: any = {
     UiButton,

@@ -143,8 +143,8 @@ import { inject, computed } from 'vue'
 import { useLexiconStore } from '@/stores/lexicon'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 
-import { Item } from "@/components/Select/SelectTypes";
-import { findOperations, operationById, OperationId, DataType } from '@/types'
+import { Item } from '@/components/Select/SelectTypes';
+import { findOperations, operationById, OperationId } from '@/types'
 import { PropertyRef, Condition as ConditionType, EventRef } from '@/types/events'
 import { ChangeEventCondition, PayloadChangeAgregateCondition, PayloadChangeValueItem } from '@/components/events/Segments/Segments'
 
@@ -155,6 +155,7 @@ import Select from '@/components/Select/Select.vue'
 import PropertySelect from '@/components/events/PropertySelect.vue'
 import OperationSelect from '@/components/events/OperationSelect.vue'
 import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
+import { DataType } from '@/api'
 
 const lexiconStore = useLexiconStore()
 const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()
@@ -266,7 +267,7 @@ const displayNameAggregate = computed(() => {
     if (props.condition?.aggregate?.name) {
         return props.condition?.aggregate?.typeAggregate ? i18n.$t(`events.aggregateProperty.${props.condition.aggregate.typeAggregate}`) : props.condition?.aggregate?.name
     } else {
-        return i18n.$t(`common.select_aggregate`)
+        return i18n.$t('common.select_aggregate')
     }
 })
 
@@ -293,7 +294,7 @@ const isShowSelectProp = computed(() => {
         return false
     }
 })
-const displayNameProp = computed(() => props.condition.propRef ? lexiconStore.propertyName(props.condition.propRef) : i18n.$t(`events.select_property`))
+const displayNameProp = computed(() => props.condition.propRef ? lexiconStore.propertyName(props.condition.propRef) : i18n.$t('events.select_property'))
 const isSelectedProp = computed(() =>  Boolean(props.condition.propRef))
 const changeProperty = (propRef: PropertyRef) => emit('change-property', propRef)
 

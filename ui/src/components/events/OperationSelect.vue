@@ -11,12 +11,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { findOperations, OperationId } from "@/types";
-import { PropertyRef, PropertyType } from "@/types/events"
-import { Item } from "@/components/Select/SelectTypes";
-import { useLexiconStore } from "@/stores/lexicon";
-import Select from "@/components/Select/Select.vue";
+import { computed } from 'vue';
+import { findOperations, OperationId } from '@/types';
+import { PropertyRef  } from '@/types/events'
+import { Item } from '@/components/Select/SelectTypes';
+import { useLexiconStore } from '@/stores/lexicon';
+import Select from '@/components/Select/Select.vue';
+import { DataType, PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();
 
@@ -28,7 +29,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    (e: "select", opId: OperationId): void;
+    (e: 'select', opId: OperationId): void;
 }>();
 
 const items = computed(() => {
@@ -37,13 +38,13 @@ const items = computed(() => {
     if (props.propertyRef) {
         if (props.propertyRef.type === PropertyType.Event) {
             const prop = lexiconStore.findEventPropertyById(props.propertyRef.id);
-            findOperations(prop.type, prop.nullable, prop.isArray).forEach(op =>
+            findOperations(prop.dataType || DataType.String, prop.nullable, prop.isArray).forEach(op =>
                 ret.push({
                     item: op.id,
                     name: op.name
                 })
             );
-        } else if (props.propertyRef.type === PropertyType.EventCustom) {
+        } else if (props.propertyRef.type === PropertyType.Custom) {
             const prop = lexiconStore.findEventCustomPropertyById(props.propertyRef.id);
             findOperations(prop.type, prop.nullable, prop.isArray).forEach(op =>
                 ret.push({
@@ -53,14 +54,6 @@ const items = computed(() => {
             );
         } else if (props.propertyRef.type === PropertyType.User) {
             const prop = lexiconStore.findUserPropertyById(props.propertyRef.id);
-            findOperations(prop.type, prop.nullable, prop.isArray).forEach(op =>
-                ret.push({
-                    item: op.id,
-                    name: op.name
-                })
-            );
-        } else if (props.propertyRef.type === PropertyType.UserCustom) {
-            const prop = lexiconStore.findUserCustomPropertyById(props.propertyRef.id);
             findOperations(prop.type, prop.nullable, prop.isArray).forEach(op =>
                 ret.push({
                     item: op.id,
@@ -84,6 +77,6 @@ let selectedItem = computed((): OperationId | undefined => {
 });
 
 const select = (opId: OperationId) => {
-    emit("select", opId);
+    emit('select', opId);
 };
 </script>

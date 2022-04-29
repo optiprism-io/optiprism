@@ -64,15 +64,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, defineAsyncComponent } from "vue";
-import { EventQueryRef, EventRef, PropertyRef } from "@/types/events";
-import { useEventsStore } from "@/stores/eventSegmentation/events";
-import { useLexiconStore } from "@/stores/lexicon";
+import { computed, watch, defineAsyncComponent } from 'vue';
+import { EventQueryRef, EventRef, PropertyRef } from '@/types/events';
+import { useEventsStore, EventPayload } from '@/stores/eventSegmentation/events';
+import { useLexiconStore } from '@/stores/lexicon';
 import { useCommonStore } from '@/stores/common'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 
 import Select from '@/components/Select/Select.vue'
-import { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
 const SelectedEvent = defineAsyncComponent(() => import('@/components/events/Events/SelectedEvent.vue'))
 
 const lexiconStore = useLexiconStore();
@@ -83,7 +82,7 @@ const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = us
 
 const events = computed(() => eventsStore.events);
 
-const setEvent = (payload: SetEventPayload) => {
+const setEvent = (payload: EventPayload) => {
     eventsStore.setEvent(payload)
 }
 
@@ -130,7 +129,7 @@ const selectAction = (payload: string) => {
 }
 
 const editEvent = (payload: number) => {
-    eventsStore.setEditCustomEvent(payload)
+    eventsStore.setEditCustomEvent(Number(payload))
     commonStore.togglePopupCreateCustomEvent(true)
 }
 

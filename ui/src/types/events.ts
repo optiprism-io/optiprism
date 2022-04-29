@@ -1,41 +1,29 @@
-import { DataType, OperationId, Value } from '@/types'
+import { OperationId } from '@/types'
 import { AggregateId } from '@/types/aggregate'
 import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
-import { Event as EventScheme } from '@/api/services/schema.service'
-
-export const EVENT_TYPE_REGULAR = 'regular'
-export const EVENT_TYPE_CUSTOM = 'custom'
-
-export type EventType = 'regular' | 'custom'
-
-export enum PropertyType {
-    Event,
-    EventCustom,
-    User,
-    UserCustom
-}
+import { EventType, PropertyType, DataType, Value, CustomEvent, CustomEventEventEventTypeEnum } from '@/api'
 
 export type PropertyRef = {
     type: PropertyType;
-    id: number;
+    id: number
 };
 
 export enum EventStatus {
-    Enabled = "enabled",
-    Disabled = "disabled"
+    Enabled = 'enabled',
+    Disabled = 'disabled'
 }
 
 export type EventRef = {
-    type: EventType;
-    id: number;
-};
+    type: EventType | CustomEventEventEventTypeEnum
+    id: number
+}
 
 export function eventRef(e: Event): EventRef {
-    return <EventRef>{ type: EVENT_TYPE_REGULAR, id: e.id };
+    return <EventRef>{ type: EventType.Regular, id: e.id }
 }
 
 export function customEventRef(e: CustomEvent): EventRef {
-    return <EventRef>{ type: EVENT_TYPE_CUSTOM, id: e.id };
+    return <EventRef>{ type: EventType.Custom, id: e.id }
 }
 
 export function eventPropertyRef(e: EventProperty): PropertyRef {
@@ -43,7 +31,7 @@ export function eventPropertyRef(e: EventProperty): PropertyRef {
 }
 
 export function eventCustomPropertyRef(e: EventCustomProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.EventCustom, id: e.id };
+    return <PropertyRef>{ type: PropertyType.Custom, id: e.id };
 }
 
 export function userPropertyRef(e: UserProperty): PropertyRef {
@@ -51,22 +39,7 @@ export function userPropertyRef(e: UserProperty): PropertyRef {
 }
 
 export function userCustomPropertyRef(e: UserCustomProperty): PropertyRef {
-    return <PropertyRef>{ type: PropertyType.UserCustom, id: e.id };
-}
-
-export interface CustomEvent {
-    id: number;
-    createdAt: Date;
-    updatedAt?: Date;
-    createdBy: number;
-    updatedBy: number;
-    projectId: number;
-    tags: string[];
-    name: string;
-    description?: string;
-    status: EventStatus;
-    displayName?: string;
-    events?: EventScheme[]
+    return <PropertyRef>{ type: PropertyType.Custom, id: e.id };
 }
 
 export interface Event {
@@ -79,7 +52,7 @@ export interface Event {
     isSystyem: boolean;
     tags: string[];
     name: string;
-    displayName: string;
+    displayName?: string;
     description?: string;
     status: EventStatus;
     properties?: number[];
@@ -173,7 +146,7 @@ export interface UserCustomProperty {
     dictionaryType?: DataType;
 }
 
-export type QueryType = "simple" | "countPerGroup" | "aggregateProperty" | "aggregatePropertyPerGroup" | "formula";
+export type QueryType = 'simple' | 'countPerGroup' | 'aggregateProperty' | 'aggregatePropertyPerGroup' | 'formula';
 
 export type EventQueryRef = {
     type?: QueryType;
@@ -197,61 +170,61 @@ export interface EventsQuery {
 
 export const eventsQueries: EventsQuery[] = [
     {
-        type: "simple",
-        name: "countEvents",
-        displayName: "Count",
+        type: 'simple',
+        name: 'countEvents',
+        displayName: 'Count',
     },
     {
-        type: "simple",
-        name: "countUnique",
-        displayName: "Count Unique",
+        type: 'simple',
+        name: 'countUnique',
+        displayName: 'Count Unique',
         grouped: true,
     },
     {
-        type: "simple",
-        name: "dailyActive",
-        displayName: "Daily Active",
+        type: 'simple',
+        name: 'dailyActive',
+        displayName: 'Daily Active',
         grouped: true,
     },
     {
-        type: "simple",
-        name: "weeklyActive",
-        displayName: "Weekly Active",
+        type: 'simple',
+        name: 'weeklyActive',
+        displayName: 'Weekly Active',
         grouped: true,
     },
     {
-        type: "simple",
-        name: "monthlyActive",
-        displayName: "Monthly Active",
+        type: 'simple',
+        name: 'monthlyActive',
+        displayName: 'Monthly Active',
         grouped: true,
     },
     {
-        type: "countPerGroup",
-        name: "countPer",
-        displayName: "Count",
+        type: 'countPerGroup',
+        name: 'countPer',
+        displayName: 'Count',
         grouped: true,
         hasAggregate: true,
     },
     {
-        type: "aggregateProperty",
-        name: "aggregateProperty",
-        displayName: "Aggregate Property",
+        type: 'aggregateProperty',
+        name: 'aggregateProperty',
+        displayName: 'Aggregate Property',
         hasAggregate: true,
         hasProperty: true
     },
     {
-        type: "aggregatePropertyPerGroup",
-        name: "aggregatePropertyPer",
-        displayName: "Aggregate Property per",
+        type: 'aggregatePropertyPerGroup',
+        name: 'aggregatePropertyPer',
+        displayName: 'Aggregate Property per',
         grouped: true,
         hasAggregate: true,
         hasGroupAggregate: true,
         hasProperty: true
     },
     {
-        type: "formula",
-        name: "formula",
-        displayName: "Formula",
+        type: 'formula',
+        name: 'formula',
+        displayName: 'Formula',
         hasValue: true,
     },
 ]

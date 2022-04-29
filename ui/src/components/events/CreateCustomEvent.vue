@@ -61,21 +61,24 @@
 
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount, inject } from 'vue'
-import { EventRef, EVENT_TYPE_REGULAR, PropertyType } from '@/types/events'
+import { EventRef } from '@/types/events'
 import { useLexiconStore } from '@/stores/lexicon'
-import { Event, useEventsStore } from '@/stores/eventSegmentation/events'
+import { Event, useEventsStore, EventPayload } from '@/stores/eventSegmentation/events'
+import { useCommonStore } from '@/stores/common'
 
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
 import UiInput from '@/components/uikit/UiInput.vue'
 import UiFormLabel from '@/components//uikit/UiFormLabel.vue'
 import Select from '@/components/Select/Select.vue'
-import SelectedEvent, { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
+import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
 import schemaService, { Event as EventScheme, CustomEvents } from '@/api/services/schema.service'
+import { EventType } from '@/api'
 
 const i18n = inject<any>('i18n')
 
 const lexiconStore = useLexiconStore()
 const eventsStore = useEventsStore()
+const commonStore = useCommonStore()
 
 const emit = defineEmits<{
     (e: 'cancel'): void
@@ -113,7 +116,7 @@ const eventItems = computed(() => {
 const addEvent = (ref: EventRef) => {
     events.value.push({
         ref: {
-            type: EVENT_TYPE_REGULAR,
+            type: ref.type,
             id: ref.id
         },
         filters: [],
@@ -122,7 +125,7 @@ const addEvent = (ref: EventRef) => {
     })
 }
 
-const setEvent = (payload: SetEventPayload) => {
+const setEvent = (payload: EventPayload) => {
     events.value[payload.index] = payload.event
 }
 
@@ -133,8 +136,7 @@ const removeEvent = (idx: number): void => {
 const apply = async () => {
     loading.value = true
     try {
-
-        const params: CustomEvents = {
+        const data: CustomEvents = {
             name: eventName.value,
             events: events.value.map(item => {
                 const event = lexiconStore.findEventById(item.ref.id)
@@ -142,24 +144,20 @@ const apply = async () => {
                 const eventProps: EventScheme = {
                     eventName: event.name,
                     eventType: item.ref.type,
+                    eventId: event.id,
                     filters: [],
-                    ref: item.ref,
                 }
 
                 if (item.filters.length) {
                     item.filters.forEach(filter => {
                         if (filter.propRef) {
-                            const property = lexiconStore.findEventPropertyById(filter.propRef.id)
-
                             if (eventProps.filters) {
                                 eventProps.filters.push({
                                     filterType: 'property',
-                                    propertyName: property.name,
-                                    propertyType: PropertyType[filter.propRef.type],
+                                    propertyType: filter.propRef.type,
+                                    propertyId: filter.propRef.id,
                                     operation: filter.opId,
                                     value: filter.values,
-                                    propRef: filter.propRef,
-                                    valuesList: filter.valuesList
                                 })
                             }
                         }
@@ -171,18 +169,16 @@ const apply = async () => {
         }
 
         if (isEdit.value) {
-            params.id = editedEvent.value?.id
-
-            await schemaService.editCustomEvent(params)
+            await schemaService.updateCustomEvent(String(commonStore.projectId), String(editedEvent.value?.id), data)
         } else {
-            await schemaService.createCustomEvent(params)
+            await schemaService.createCustomEvent(String(commonStore.projectId), data)
         }
 
 
         await lexiconStore.getEvents()
-    } catch {
+    } catch(error: unknown) {
         loading.value = false
-        throw new Error('create custom events error');
+        throw Error(JSON.stringify(error))
     }
 
     loading.value = false
@@ -193,22 +189,44 @@ const cancel = (type: string) => {
     emit('cancel')
 }
 
-onBeforeMount(() => {
+onBeforeMount(async () => {
     if (editedEvent.value) {
         eventName.value = editedEvent.value.name
 
         if (editedEvent.value.events) {
-            events.value = JSON.parse(JSON.stringify((editedEvent.value.events.map(item => {
+            events.value = JSON.parse(JSON.stringify(await Promise.all(editedEvent.value.events.map(async item => {
                 return {
-                    ref: item.ref,
-                    filters: item.filters ? item.filters.map(filter => {
+                    ref: {
+                        type: item.eventType,
+                        id: item.eventId
+                    },
+                    filters: item.filters ? await Promise.all(item.filters.map(async filter => {
+                        let valuesList: string[] = []
+
+                        try {
+                            const res = await schemaService.propertryValues({
+                                event_name: item.eventName,
+                                event_type: item.eventType,
+                                property_name: filter.propertyName || '',
+                                property_type: filter.propertyType,
+                            })
+                            if (res) {
+                                valuesList = res
+                            }
+                        } catch (error) {
+                            throw new Error('error get events values')
+                        }
+
                         return {
-                            propRef: filter.propRef,
+                            propRef: {
+                                type: filter.propertyType,
+                                id: filter.propertyId
+                            },
                             opId: filter.operation,
                             values: filter.value,
-                            valuesList: filter.valuesList || [],
+                            valuesList: valuesList,
                         }
-                    }) : [],
+                    })) : [],
                     breakdowns: [],
                     queries: [],
                 }

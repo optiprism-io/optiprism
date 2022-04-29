@@ -1,5 +1,5 @@
 import { fetch } from '../apiClient'
-import { TimeUnit } from '@/types'
+import { TimeUnit } from '@/api'
 
 type Breakdown = {
     breakdownType: string

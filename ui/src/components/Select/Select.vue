@@ -65,15 +65,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onBeforeMount, watchEffect } from "vue";
-import SelectList from "@/components/Select/SelectList.vue";
-import UiSpinner from "@/components/uikit/UiSpinner.vue";
-import { Group, Item } from "@/components/Select/SelectTypes";
+import { computed, ref, onBeforeMount, watchEffect } from 'vue';
+import SelectList from '@/components/Select/SelectList.vue';
+import UiSpinner from '@/components/uikit/UiSpinner.vue';
+import { Group, Item } from '@/components/Select/SelectTypes';
 
 const emit = defineEmits<{
-    (e: "select", item: any): void;
-    (e: "onSearch", payload: string): void;
-    (e: "onHover", item: any): void;
+    (e: 'select', item: any): void;
+    (e: 'onSearch', payload: string): void;
+    (e: 'onHover', item: any): void;
     (e: 'action', payload: string): void
     (e: 'edit', payload: number): void
 }>();
@@ -107,7 +107,7 @@ const props = withDefaults(
 const key = ref(0);
 const isOpen = ref(false);
 const selectedItemLocal = ref(false);
-const search = ref("");
+const search = ref('');
 const description = ref();
 
 const firstElement = computed(() => props.items[0]);
@@ -169,7 +169,7 @@ const selectedDescription = computed(() => {
         });
     }
 
-    return item ? item.description : "";
+    return item ? item.description : '';
 });
 
 watchEffect(() => {
@@ -182,21 +182,21 @@ const select = (item: any): void => {
     isOpen.value = false;
     selectedItemLocal.value = false;
     key.value++;
-    emit("select", item);
+    emit('select', item);
 };
 
 const hover = (item: Item<any, any>): void => {
     if (item) {
-        description.value = item?.description || "";
+        description.value = item?.description || '';
         selectedItemLocal.value = item.item;
-        emit("onHover", item.item);
+        emit('onHover', item.item);
     }
 };
 
 const onSearch = (payload: string) => {
     search.value = payload.toLowerCase();
-    description.value = "";
-    emit("onSearch", payload);
+    description.value = '';
+    emit('onSearch', payload);
 };
 
 const onHide = () => {

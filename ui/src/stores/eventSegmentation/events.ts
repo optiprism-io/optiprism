@@ -1,21 +1,18 @@
-import { defineStore } from "pinia";
+import { defineStore } from 'pinia';
 import {
     EventRef,
     PropertyRef,
-    PropertyType,
     EventQueryRef,
-    EVENT_TYPE_REGULAR,
-    EVENT_TYPE_CUSTOM
-} from "@/types/events";
-import { OperationId, Value, Group, TimeUnit } from '@/types'
-import queriesService, { EventSegmentation } from "@/api/services/queries.service";
-import { getYYYYMMDD, getStringDateByFormat } from "@/helpers/getStringDates";
-import { getLastNDaysRange } from "@/helpers/calendarHelper";
-import {Column, Row} from "@/components/uikit/UiTable/UiTable";
-import { SetEventPayload } from '@/components/events/Events/SelectedEvent.vue'
+} from '@/types/events';
+import { OperationId, Value, Group } from '@/types'
+import queriesService, { EventSegmentation } from '@/api/services/queries.service';
+import { getYYYYMMDD, getStringDateByFormat } from '@/helpers/getStringDates';
+import { getLastNDaysRange } from '@/helpers/calendarHelper';
+import {Column, Row} from '@/components/uikit/UiTable/UiTable';
+import { PropertyType, TimeUnit, EventType } from '@/api'
 
-import { useLexiconStore } from "@/stores/lexicon";
-import { useSegmentsStore } from "@/stores/eventSegmentation/segments";
+import { useLexiconStore } from '@/stores/lexicon';
+import { useSegmentsStore } from '@/stores/eventSegmentation/segments';
 
 const COLUMN_WIDTH = 170;
 export type ChartType = 'line' | 'pie' | 'column';
@@ -28,7 +25,7 @@ export interface EventFilter {
     propRef?: PropertyRef;
     opId: OperationId;
     values: Value[];
-    valuesList: string[];
+    valuesList: string[] | []
     error?: boolean;
 }
 
@@ -48,6 +45,11 @@ export type Event = {
     breakdowns: EventBreakdown[];
     queries: EventQuery[];
 };
+
+export interface EventPayload {
+    event: Event
+    index: number
+}
 
 export type Events = {
     events: Event[]
@@ -74,8 +76,8 @@ export type Events = {
 export const initialQuery = <EventQuery[]>[
     {
         queryRef: <EventQueryRef>{
-            type: "simple",
-            name: "countEvents"
+            type: 'simple',
+            name: 'countEvents'
         },
         noDelete: true,
     }
@@ -90,7 +92,7 @@ const computedEventProperties = (type: PropertyType, items: any): PropertyRef[] 
     });
 };
 
-export const useEventsStore = defineStore("events", {
+export const useEventsStore = defineStore('events', {
     state: (): Events => ({
         events: [],
         group: Group.User,
@@ -217,13 +219,12 @@ export const useEventsStore = defineStore("events", {
             this.events.forEach(item => {
                 const eventRef = item.ref;
                 items.push(...computedEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.id)));
-                items.push(...computedEventProperties(PropertyType.EventCustom, lexiconStore.findEventCustomProperties(eventRef.id)));
+                items.push(...computedEventProperties(PropertyType.Custom, lexiconStore.findEventCustomProperties(eventRef.id)));
             });
 
             return [
                 ...new Set(items),
                 ...computedEventProperties(PropertyType.User, lexiconStore.userProperties),
-                ...computedEventProperties(PropertyType.UserCustom, lexiconStore.userCustomProperties),
             ];
         },
         propsForEventSegmentationResult(): EventSegmentation {
@@ -308,7 +309,7 @@ export const useEventsStore = defineStore("events", {
         setEditCustomEvent(payload: number | null) {
             this.editCustomEvent = payload
         },
-        setEvent(payload: SetEventPayload) {
+        setEvent(payload: EventPayload) {
             this.events[payload.index] = payload.event
         },
         initPeriod(): void {
@@ -328,32 +329,38 @@ export const useEventsStore = defineStore("events", {
                     this.eventSegmentation = res;
                 }
             } catch (error) {
-                throw new Error("error getEventsValues");
+                throw new Error('error getEventsValues');
             }
             this.eventSegmentationLoading = false;
         },
 
         addEventByRef(ref: EventRef): void {
             switch (ref.type) {
-                case EVENT_TYPE_REGULAR:
+                case EventType.Regular:
                     this.addEvent(ref.id);
                     break;
-                case EVENT_TYPE_CUSTOM:
+                case EventType.Custom:
                     this.addCustomEvent(ref.id);
                     break;
             }
         },
-        addEvent(id: number): void {
+        addEvent(payload: number): void {
             this.events.push(<Event>{
-                ref: <EventRef>{ type: EVENT_TYPE_REGULAR, id: id },
+                ref: <EventRef>{
+                    type: EventType.Regular,
+                    id: payload
+                },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,
             });
         },
-        addCustomEvent(id: number): void {
+        addCustomEvent(payload: number): void {
             this.events.push(<Event>{
-                ref: <EventRef>{ type: EVENT_TYPE_CUSTOM, id: id },
+                ref: <EventRef>{
+                    type: EventType.Custom,
+                    id: payload
+                },
                 filters: [],
                 breakdowns: [],
                 queries: initialQuery,

@@ -1,18 +1,18 @@
-import "@patternfly/patternfly/patternfly.scss";
-import "@patternfly/patternfly/patternfly-addons.scss";
+import '@patternfly/patternfly/patternfly.scss';
+import '@patternfly/patternfly/patternfly-addons.scss';
 import 'floating-vue/dist/style.css'
-import "@/assets/styles/main.scss";
+import '@/assets/styles/main.scss';
 import lang from '@/lang';
-import { createApp } from "vue";
-import { createPinia } from "pinia";
-import App from "@/App.vue";
-import makeServer from "@/server";
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import App from '@/App.vue';
+import makeServer from '@/server';
 import FloatingVue from 'floating-vue'
 import { router } from '@/router'
-import uikitPlugin from "@/plugins/uikit";
-import i18nPlugin from "@/plugins/i18n";
+import uikitPlugin from '@/plugins/uikit';
+import i18nPlugin from '@/plugins/i18n';
 
-if (typeof makeServer === "function") {
+if (typeof makeServer === 'function') {
     makeServer();
 }
 
@@ -40,7 +40,7 @@ app.directive('click-outside', {
     }
 })
 
-app.mount("#app");
+app.mount('#app');
 
 app.config.errorHandler = (err, vm, info) => {
     console.log(err, vm, info);

@@ -1,10 +1,10 @@
 import axios, { Method } from 'axios'
 
 const client = axios.create({
-    baseURL: "/api"
+    baseURL: '/api'
 });
 
-const getUrl = (endpoint = "/", path?: string): string => {
+const getUrl = (endpoint = '/', path?: string): string => {
     return path ? `${endpoint}/${path}` : endpoint;
 };
 
@@ -12,7 +12,7 @@ const getResponse = (responseClient: any) => {
     return responseClient && responseClient.data ? responseClient.data : false;
 };
 
-export const get = async (endpoint = "/", path: string, params: any, settings = {}) => {
+export const get = async (endpoint = '/', path: string, params: any, settings = {}) => {
     const response = await client.get(getUrl(endpoint, path), {
         params,
         ...settings
@@ -34,7 +34,7 @@ export const fetch = async (endpoint: string, method: Method = 'POST', data: any
         data: file ? formData : data,
         withCredentials: true,
         headers: {
-            "content-type": file ? "multipart/form-data" : "application/json"
+            'content-type': file ? 'multipart/form-data' : 'application/json'
         },
         maxRedirects: 0,
         ...settings

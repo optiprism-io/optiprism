@@ -56,12 +56,12 @@
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { getYYYYMMDD } from "@/helpers/getStringDates";
-import { getLastNDaysRange, dateDiff, isDate } from "@/helpers/calendarHelper";
+import { getYYYYMMDD } from '@/helpers/getStringDates';
+import { getLastNDaysRange, dateDiff, isDate } from '@/helpers/calendarHelper';
 
-import UiCalendarControls from "@/components/uikit/UiCalendar/UiCalendarControls.vue";
+import UiCalendarControls from '@/components/uikit/UiCalendar/UiCalendarControls.vue';
 import UiCalendarInputs from './UiCalendar/UiCalendarInputs.vue'
-import UiCalendar from "@/components/uikit/UiCalendar/UiCalendar.vue";
+import UiCalendar from '@/components/uikit/UiCalendar/UiCalendar.vue';
 
 import { Each, ApplyPayload, CurrentValue, Value } from '@/components/uikit/UiCalendar/UiCalendar'
 
@@ -84,8 +84,8 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-    (e: "on-select", payload: string): void;
-    (e: "on-apply", payload: ApplyPayload): void;
+    (e: 'on-select', payload: string): void;
+    (e: 'on-apply', payload: ApplyPayload): void;
     (e: 'on-change-each', payload: Each): void;
 }>();
 

@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 
-import {DefineComponent} from "vue";
+import {DefineComponent} from 'vue';
 
-declare module "*.vue" {
+declare module '*.vue' {
     import { defineComponent } from 'vue'
     const component: ReturnType<typeof defineComponent>
 
@@ -14,5 +14,5 @@ declare module '@vue/runtime-core' {
         $t: (key: string) => string
     }
 }
-declare module "v-tooltip";
-declare module "VirtualisedList";
+declare module 'v-tooltip';
+declare module 'VirtualisedList';

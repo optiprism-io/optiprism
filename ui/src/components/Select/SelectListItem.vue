@@ -71,7 +71,7 @@
 
 <script lang="ts" setup>
 // TODO add generic
-import { computed } from "vue";
+import { computed } from 'vue';
 
 const props = defineProps<{
     item: any;
@@ -83,7 +83,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    (e: "click", item: any): void;
+    (e: 'click', item: any): void;
     (e: 'edit', payload: number): void
 }>();
 
