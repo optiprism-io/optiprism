@@ -116,7 +116,7 @@ const eventItems = computed(() => {
 const addEvent = (ref: EventRef) => {
     events.value.push({
         ref: {
-            type: EventType.Regular,
+            type: ref.type,
             id: ref.id
         },
         filters: [],
