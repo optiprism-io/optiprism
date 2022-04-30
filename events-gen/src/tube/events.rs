@@ -1,7 +1,4 @@
-use std::borrow::Borrow;
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use lazy_static::lazy_static;
 use rand::Rng;
@@ -33,6 +30,7 @@ pub enum Event {
     OrderRefunded,
 }
 
+#[derive(Debug, Clone)]
 pub enum Intention {
     JustBrowsing,
     BuyNewProduct,
@@ -42,6 +40,7 @@ pub enum Intention {
     RateProduct,
 }
 
+#[derive(Debug, Clone)]
 pub enum Source {
     SearchEngine,
     SocialMedia,
@@ -49,37 +48,81 @@ pub enum Source {
     TypedIn,
 }
 
+#[derive(Debug, Clone)]
 pub enum Target {
     Index,
     Product,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Product {
     id: u64,
 }
 
+#[derive(Debug, Clone)]
 struct ProductsProvider {
     promoted_products_weights: WeightedIndex<i32>,
     promoted_product_choices: Vec<Product>,
 }
 
 impl ProductsProvider {
-    fn rand_promoted_product(&mut self, rng: &mut ThreadRng) -> &Product {
-        &self.promoted_product_choices[self.promoted_products_weights.sample(rng)]
+    fn rand_promoted_product(&mut self, rng: &mut ThreadRng) -> Product {
+        self.promoted_product_choices[self.promoted_products_weights.sample(rng)].clone()
     }
 
-    fn top_promoted_products(&self, n: usize) -> &[Product] {
-        self.promoted_product_choices[..n].as_ref()
+    fn top_promoted_products(&self, n: usize) -> Vec<Product> {
+        self.promoted_product_choices[..n].to_vec()
     }
 }
 
-type SessionRef = Rc<RefCell<Session>>;
+struct ViewIndexPage {}
 
+impl ActionTr for ViewIndexPage {
+    fn evaluate(&mut self, model: &ActionProbabilities) -> Result<(), String> {
+        self.events_store.push(EventRecord::new(IndexPageViewed));
+        self.wait_between(Duration::seconds(10), Duration::seconds(30));
+        Ok(())
+    }
+
+    fn name() -> &str {
+        "view_index_page"
+    }
+}
+
+struct ViewIndexPagePromotion {}
+
+impl ActionTr for ViewIndexPagePromotion {
+    fn evaluate(&mut self, session: &mut Session) -> Result<(), String> {
+        session.wait_between(Duration::seconds(10), Duration::seconds(30));
+
+        for product in session.products.top_promoted_products(3).iter() {
+            let bought_products = session.bought_products.len();
+            if session.viewed_products.contains_key(&product.id) {
+                continue;
+            }
+
+            if session.transition_chance(&Action::ViewIndexPagePromotion) {
+                session.invoke(&Action::ViewProduct);
+                if session.bought_products.len() - bought_products > session.max_products_to_buy {
+                    return;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn name() -> &str {
+        "view_index_page_promotion"
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Session {
     rng: ThreadRng,
     bought_products: HashMap<u64, ()>,
     viewed_products: HashMap<u64, ()>,
+    max_products_to_buy: usize,
     events_store: EventStore,
     cur_time: DateTime<Utc>,
     intention: Intention,
@@ -90,78 +133,129 @@ pub struct Session {
     slowness_ratio: f64,
     view_index_page_choices: WeightedIndex<i32>,
     products: ProductsProvider,
+    action_probabilities: HashMap<String, Vec<TransitionTo>>,
 }
 
 #[derive(Debug, Clone)]
-pub enum Choice {
-    Search,
-    ViewIndexPage,
-    ViewIndexPagePromotion,
-    ViewDeals,
-    ViewProduct,
+enum Page {
+    Index,
+    Product,
+    Deals,
 }
 
-fn invoke(session_ref: SessionRef, choice: &Choice) -> Option<Choice> {
-    match choice {
-        Choice::Search => search(session_ref),
-        Choice::ViewIndexPage => view_index_page(session_ref),
-        Choice::ViewIndexPagePromotion => view_index_page_promotion(session_ref),
-        Choice::ViewDeals => view_deals(session_ref),
-        Choice::ViewProduct => view_product(session_ref),
+pub enum PageSection {
+    IndexFeatured,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq)]
+enum Action {
+    Search,
+    OpenPage(Page),
+    ScrollTo(PageSection),
+}
+
+pub enum Probability {
+    Uniform(f64),
+    Steps(Vec<f64>),
+}
+
+pub struct TransitionTo {
+    to: Box<dyn ActionTr>,
+    probability: Probability,
+    limit: Option<usize>,
+}
+
+impl TransitionTo {
+    pub fn new(to: Box<dyn ActionTr>, probability: Probability, limit: Option<usize>) -> Self {
+        Self {
+            to,
+            probability,
+            limit,
+        }
     }
 }
 
-pub fn view_index_page(session_ref: Rc<RefCell<Session>>) -> Option<Choice> {
-    let mut session = session_ref.borrow_mut();
-    session.events_store.push(EventRecord::new(IndexPageViewed));
-    session.wait_between(Duration::seconds(10), Duration::seconds(30));
-    let choices = [&Choice::Search, &Choice::ViewIndexPagePromotion];
-    let choice = choices[session.view_index_page_choices_sample()];
-    invoke(session_ref.clone(), choice)
+pub struct Transitions {
+    transitions: Vec<TransitionTo>,
 }
 
-pub fn search(session_ref: SessionRef) -> Option<Choice> {
-    None
+trait ActionTr<> {
+    fn evaluate(&mut self, model: &ActionProbabilities) -> Result<(), String>;
+    fn name() -> &str;
 }
 
-pub fn view_index_page_promotion(session_ref: SessionRef) -> Option<Choice> {
-    let mut session = session_ref.borrow_mut();
+pub struct ActionProbabilities {
+    transitions: HashMap<String, Vec<TransitionTo>>,
+}
+
+impl ActionProbabilities {
+    pub fn new() -> Self {
+        ActionProbabilities { transitions: Default::default() }
+    }
+}
+
+impl ActionProbabilities {
+    pub fn transition(&mut self, from: Action, to: Action, probability: Probability, limit: Option<usize>) {
+        let transition = TransitionTo::new(to, probability, limit);
+        if Some(t) = self.transitions.get_mut(&from) {
+            t.push(transition);
+        } else {
+            self.transitions.insert(from, vec![transition]);
+        }
+    }
+}
+
+impl Transition {
+    pub fn new(from: Action, to: Action, probability: Probability, limit: Option<usize>) -> Self {
+        Self {
+            from,
+            to,
+            probability,
+            limit,
+        }
+    }
+}
+
+fn view_index_page_promotion(session: &mut Session) {
     session.wait_between(Duration::seconds(10), Duration::seconds(30));
 
-    for product in session_ref.borrow_mut().products.top_promoted_products(10).iter() {
+    for product in session.products.top_promoted_products(3).iter() {
         let bought_products = session.bought_products.len();
         if session.viewed_products.contains_key(&product.id) {
             continue;
         }
 
-        if session.rng.gen_ratio(10, 100) {
-            if invoke(session_ref.clone(), &Choice::ViewProduct).is_none() || session.bought_products.len() - bought_products > 0 {
-                return None;
+        if session.transition_chance(&Action::ViewIndexPagePromotion) {
+            session.invoke(&Action::ViewProduct);
+            if session.bought_products.len() - bought_products > session.max_products_to_buy {
+                return;
             }
         }
     }
-
-    None
-}
-
-pub fn view_deals(session_ref: SessionRef) -> Option<Choice> {
-    None
-}
-
-pub fn view_product(session_ref: SessionRef) -> Option<Choice> {
-    let mut session = session_ref.borrow_mut();
-    session.events_store.push(EventRecord::new(ProductViewed));
-    None
 }
 
 impl Session {
-    fn view_index_page_choices_sample(&mut self) -> usize {
-        self.view_index_page_choices.sample(&mut self.rng)
+    pub fn transition_chance(&self, from: &Action, to: &Action) -> bool {
+        session.rng.gen::<f64>()
+    }
+
+    fn invoke(&mut self, choice: &Action) {
+        match choice {
+            Action::Search => self.search(),
+            Action::ViewIndexPage => self.view_index_page(),
+            Action::ViewIndexPagePromotion => view_index_page_promotion(self),
+            Action::ViewDeals => self.view_deals(),
+            Action::ViewProduct => self.view_product(),
+        }
     }
 
     fn wait_between(&mut self, from: Duration, to: Duration) {
         let wait = Duration::seconds(self.rng.gen_range(from.num_seconds()..=to.num_seconds()));
         self.cur_time = self.cur_time.clone() + wait;
+    }
+
+    fn check_action_probability(&mut self, from_action: &str, to_action: &str) -> bool {
+        true
     }
 }
 
@@ -192,6 +286,7 @@ impl EventRecord {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct EventStore {
     events: Vec<EventRecord>,
     // fixed props
@@ -222,27 +317,20 @@ impl EventStore {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-    use std::rc::Rc;
     use chrono::Utc;
     use rand::distributions::WeightedIndex;
-    use rand::rngs::ThreadRng;
-    use crate::tube::events::{Choice, EventStore, Intention, invoke, Product, ProductsProvider, Session, Source, Target, view_index_page};
+    use crate::tube::events::{Action, EventStore, Intention, ActionProbabilities, Page, PageSection, Probability, Product, ProductsProvider, Session, Source, Target, Transition};
 
     #[test]
     fn test() {
-        let data = Rc::new(RefCell::new(Vec::new()));
-        data.borrow_mut().push(5);
-        println!("{:?}", data.borrow().last());
-
-        let mut es = EventStore {
+        let es = EventStore {
             events: vec![],
             event_properties: Default::default(),
             user_properties: Default::default(),
         };
 
-        let mut prods = ProductsProvider {
-            promoted_products_weights: WeightedIndex::new(&[2, 1]).unwrap(),
+        let prods = ProductsProvider {
+            promoted_products_weights: WeightedIndex::new(&[2, 1, 1]).unwrap(),
             promoted_product_choices: vec![
                 Product {
                     id: 1
@@ -256,7 +344,7 @@ mod tests {
             ],
         };
 
-        let mut session_ref = Rc::new(RefCell::new(Session {
+        let mut sess = Session {
             rng: Default::default(),
             bought_products: Default::default(),
             viewed_products: Default::default(),
@@ -269,13 +357,26 @@ mod tests {
             churn_ratio: 0.1,
             slowness_ratio: 0.0,
             view_index_page_choices: {
-                let weights = [2, 1, 1];
+                let weights = [2, 1];
                 WeightedIndex::new(&weights).unwrap()
             },
             products: prods,
-        }));
+        };
 
-        let mut rng = ThreadRng::default();
-        invoke(session_ref, &Choice::ViewIndexPage);
+        sess.view_index_page();
+
+        let prob = Transition::new(
+            Action::OpenPage(Page::Index),
+            Action::OpenPage(Page::Index),
+        );
+
+        let mut model = ActionProbabilities::new();
+        // Index page
+        model.transition(
+            Action::OpenPage(Page::Index),
+            Action::ScrollTo(PageSection::IndexFeatured),
+            Probability::Uniform(0.3),
+            None,
+        );
     }
 }
