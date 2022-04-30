@@ -132,14 +132,12 @@ impl<DP, DS, I, EP, UP, A> Session<DP, DS, I, EP, UP, A> where EP: Clone, UP: Cl
     }
 
     pub fn check_transition_probability(&mut self, transition: &ActionTransition<A>) -> bool {
-        let maybe_rule = self.transition_probabilities.get(&transition);
-        if maybe_rule.is_none() {
-            return false;
-        }
-        let rule = maybe_rule.unwrap();
-        let maybe_state = self.transitions_state.get(&transition);
+        let rule = match self.transition_probabilities.get(&transition) {
+            None => return false,
+            Some(v) => v
+        };
 
-        match maybe_state {
+        match self.transitions_state.get(&transition) {
             Some(state) => {
                 if rule.limit.is_some() && state.evaluations_count > rule.limit.unwrap() {
                     return false;
