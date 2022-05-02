@@ -32,6 +32,10 @@
     "title": "Users"
   },
 
+  "reports": {
+    "title": "Reports"
+  },
+
   "events": {
     "live_stream": {
       "title": "Live srteam"

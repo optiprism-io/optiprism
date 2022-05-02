@@ -1,5 +1,4 @@
 <template>
-    <EventNav />
     <h1 class="pf-u-font-size-2xl pf-u-mb-md">
         {{ $t('events.live_stream.title') }}
     </h1>
@@ -21,7 +20,6 @@
 </template>
 
 <script lang="ts" setup>
-import EventNav from '@/components/events/EventNav.vue'
 </script>
 
 <style scoped lang="scss">

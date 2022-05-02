@@ -10,7 +10,7 @@
                 class="pf-c-nav__item"
             >
                 <router-link
-                    :to="item.link"
+                    :to="item.to"
                     class="pf-c-nav__link"
                     :class="{
                         'pf-m-current': item.active
@@ -33,22 +33,31 @@ const route = useRoute()
 const items = computed(() => {
     const mapTabs = [
         {
+            name: i18n.$t('reports.title'),
+            to: {
+                name: 'reports_event_segmentation',
+            },
+            active: typeof route.name === 'string' && route.name.includes('reports'),
+        },
+        {
             name: i18n.$t('events.events'),
-            value: 'events.events',
-            link: '/',
+            to: {
+                name: 'events_live_stream',
+            },
             active: typeof route.name === 'string' && route.name.includes('events'),
         },
         {
             name: i18n.$t('users.title'),
-            value: 'users',
-            link: '/users',
+            to: {
+                name: 'users',
+            }
         },
     ]
 
     return mapTabs.map(item => {
         return {
             ...item,
-            active: route.name === item.value || item.active,
+            active: route.name === item.to.name || item.active,
         }
     })
 })
@@ -61,5 +70,4 @@ const items = computed(() => {
     color: var(--pf-c-nav__link--m-current--Color);
     background-color: var(--pf-global--palette--cyan-700);
 }
-
 </style>
