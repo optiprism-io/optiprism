@@ -8,13 +8,13 @@ const routes = [
         children: [
             {
                 path: '/',
-                name: 'dashboard_events_segmentation',
+                name: 'dashboard_events_live_stream',
                 component: () => import('@/pages/Index.vue'),
             },
             {
-                path: '/funnels',
-                name: 'dashboard_funnels',
-                component: () => import('@/pages/Funnels.vue'),
+                path: '/events',
+                name: 'dashboard_events',
+                component: () => import('@/pages/Events.vue'),
             },
         ],
     },

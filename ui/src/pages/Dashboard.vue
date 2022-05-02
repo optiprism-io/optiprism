@@ -9,24 +9,25 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue';
+import { computed, inject } from 'vue'
 import { useRoute } from 'vue-router';
 import UiTabs from '@/components/uikit/UiTabs.vue';
+const i18n = inject<any>('i18n')
 
 const route = useRoute()
 
 const items = computed(() => {
     const mapTabs = [
         {
-            name: 'Events Segmentation',
-            value: 'dashboard_events_segmentation',
+            name: i18n.$t('events.live_stream.title'),
+            value: 'dashboard_events_live_stream',
             link: '/',
             icon: 'fas fa-chart-pie'
         },
         {
-            name: 'Funnels',
-            value: 'dashboard_funnels',
-            link: '/funnels',
+            name: i18n.$t('events.events'),
+            value: 'dashboard_events',
+            link: '/events',
             icon: 'pf-icon pf-icon-filter'
         },
     ];
