@@ -156,7 +156,7 @@ import Filter from '@/components/events/Filter.vue';
 import Breakdown from '@/components/events/Breakdown.vue';
 import Query from '@/components/events/Events/Query.vue';
 import { Group, Item } from '@/components/Select/SelectTypes';
-import AlphabetIdentifier from '@/components/AlphabetIdentifier.vue';
+import AlphabetIdentifier from '@/components/common/AlphabetIdentifier.vue';
 import schemaService from '@/api/services/schema.service'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 import { EventType } from '@/api'
@@ -325,7 +325,7 @@ const removeBreakdown = (breakdownIdx: number): void => {
 
 const eventName = (ref: EventRef): string => {
     let event = lexiconStore.findEventById(ref.id)
-    
+
     switch (ref.type) {
         case EventType.Regular:
             return event.displayName || event.name

@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, onUnmounted } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import Events from '@/components/events/Events/Events.vue';
 import Breakdowns from '@/components/events/Breakdowns.vue';
 import Filters from '@/components/events/Filters.vue';
@@ -72,7 +72,7 @@ const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
 const commonStore = useCommonStore()
 
-onBeforeMount(async () => {
+onMounted(async () => {
     await lexiconStore.getEvents();
     await lexiconStore.getEventProperties();
     await lexiconStore.getUserProperties();

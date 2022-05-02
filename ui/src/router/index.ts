@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
     {
         path: '/',
-        name: 'index',
+        name: 'main',
         component: () => import('@/pages/Index.vue'),
         redirect: () => {
             return { name: 'events_live_stream' }
@@ -20,12 +20,12 @@ const routes = [
         component: () => import('@/pages/events/Events.vue'),
         children: [
             {
-                path: '/events',
+                path: '',
                 name: 'events_live_stream',
                 component: () => import('@/pages/events/LiveStream.vue'),
             },
             {
-                path: '/events/event_anagement',
+                path: 'event_anagement',
                 name: 'events_event_management',
                 component: () => import('@/pages/events/EventManagement.vue'),
             },
@@ -37,7 +37,7 @@ const routes = [
         component: () => import('@/pages/reports/Reports.vue'),
         children: [
             {
-                path: '/reports',
+                path: '',
                 name: 'reports_event_segmentation',
                 component: () => import('@/pages/reports/EventSegmentation.vue'),
             },
@@ -45,7 +45,7 @@ const routes = [
     },
     {
         path: '/:pathMatch(.*)*',
-        name: 'nof_found',
+        name: 'index',
         redirect: '/'
     },
 ]
