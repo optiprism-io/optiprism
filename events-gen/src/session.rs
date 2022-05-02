@@ -8,14 +8,14 @@ use rand::prelude::*;
 use crate::error::{Error, Result};
 
 #[derive(Debug, Clone)]
-pub struct EventRecord<EP> {
+pub struct EventRecord {
     event_name: String,
     created_at: DateTime<Utc>,
-    properties: Option<EP>,
+    properties: Option<Vec<Property>>,
 }
 
-impl<EP> EventRecord<EP> {
-    pub fn new(event_name: String, created_at: DateTime<Utc>, properties: Option<EP>) -> Self {
+impl EventRecord {
+    pub fn new(event_name: String, created_at: DateTime<Utc>, properties: Option<Vec<Property>>) -> Self {
         Self {
             event_name,
             created_at,
@@ -24,8 +24,22 @@ impl<EP> EventRecord<EP> {
     }
 }
 
-pub trait OutputWriter<EP, UP> {
-    fn write(&mut self, event: &EventRecord<EP>, user_props: &UP) -> Result<()>;
+#[derive(Debug, Clone)]
+enum Value {
+    Number(Option<f64>),
+    String(Option<String>),
+    Boolean(Option<bool>),
+    DateTime(Option<DateTime<Utc>>),
+}
+
+#[derive(Debug, Clone)]
+pub struct Property {
+    name: String,
+    value: Value,
+}
+
+pub trait OutputWriter {
+    fn write(&mut self, event: &EventRecord, user_props: &Option<Vec<Property>>) -> Result<()>;
 }
 
 #[derive(Debug, Clone)]
@@ -35,16 +49,32 @@ pub enum Probability {
 }
 
 #[derive(Debug, Clone)]
-pub struct TransitionRule {
+pub struct TransitionRules {
     probability: Probability,
     limit: Option<usize>,
 }
 
-impl TransitionRule {
+impl TransitionRules {
     pub fn new(probability: Probability, limit: Option<usize>) -> Self {
         Self {
             probability,
             limit,
+        }
+    }
+}
+
+pub struct TransitionState {
+    probability: Probability,
+    limit: Option<usize>,
+    pub evaluations_count: usize,
+}
+
+impl TransitionState {
+    pub fn new(probability: Probability, limit: Option<usize>) -> Self {
+        Self {
+            probability,
+            limit,
+            evaluations_count: 0,
         }
     }
 }
@@ -62,67 +92,42 @@ impl ActionTransitionState {
     }
 }
 
-pub trait Action<DP, DS, I, EP, UP, A> where EP: Clone, UP: Clone, A: Clone + Hash + Eq + PartialEq {
-    fn evaluate(&self, session: &mut Session<DP, DS, I, EP, UP, A>) -> Result<()>;
-    // fn name() -> A where Self: Sized;
-    fn dyn_name(&self) -> A;
+pub trait Action<T> {
+    fn evaluate(&self, session: &mut Session<T>) -> Result<()>;
+    fn name(&self) -> String;
 }
 
-pub struct Session<DP, DS, I, EP, UP, A> where EP: Clone, UP: Clone, A: Clone + Hash + Eq + PartialEq {
+pub struct Session<T> {
     pub cur_time: DateTime<Utc>,
     pub rng: ThreadRng,
-    pub data_provider: DP,
-    pub data_state: DS,
-    pub input: I,
-    pub transition_probabilities: HashMap<ActionTransition<A>, TransitionRule>,
-    pub transitions_state: HashMap<ActionTransition<A>, ActionTransitionState>,
-    pub output: Box<dyn OutputWriter<EP, UP>>,
-    pub event_properties: EP,
-    pub user_properties: UP,
-    actions: HashMap<A, Rc<dyn Action<DP, DS, I, EP, UP, A>>>,
-    action_keys: Vec<A>,
+    pub data: T,
+    pub transitions: HashMap<(String, String), TransitionState>,
+    pub output: Box<dyn OutputWriter>,
+    pub event_properties: Option<Vec<Property>>,
+    pub user_properties: Option<Vec<Property>>,
+    action_keys: Vec<String>,
+    actions: HashMap<String, Rc<dyn Action<T>>>,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct ActionTransition<A> where A: Clone + Hash + Eq + PartialEq {
-    from: A,
-    to: A,
-}
-
-impl<A> ActionTransition<A> where A: Clone + Hash + Eq + PartialEq {
-    pub fn new(from: A, to: A) -> Self {
-        Self {
-            from,
-            to,
-        }
-    }
-}
-
-impl<DP, DS, I, EP, UP, A> Session<DP, DS, I, EP, UP, A> where EP: Clone, UP: Clone, A: Clone + Hash + Eq + PartialEq {
-    pub fn new(
+impl<T> Session<T> {
+    pub fn new<A: ToString>(
         cur_time: DateTime<Utc>,
-        data_provider: DP,
-        data_state: DS,
-        input: I,
-        output: Box<dyn OutputWriter<EP, UP>>,
-        actions: Vec<Rc<dyn Action<DP, DS, I, EP, UP, A>>>,
-        transition_probabilities: Vec<(ActionTransition<A>, TransitionRule)>,
-        ep: EP,
-        up: UP,
+        data: T,
+        output: Box<dyn OutputWriter>,
+        actions: Vec<Rc<dyn Action<T>>>,
+        transitions: Vec<((A, A), TransitionRules)>,
+        user_properties: Option<Vec<Property>>,
     ) -> Self {
         Self {
             rng: Default::default(),
-            data_provider,
-            data_state,
-            input,
+            data,
             output,
-            event_properties: ep,
+            event_properties: None,
+            user_properties,
             cur_time,
-            transition_probabilities: transition_probabilities.into_iter().collect(),
-            transitions_state: Default::default(),
-            action_keys: actions.iter().map(|action| action.dyn_name()).collect(),
-            actions: actions.into_iter().map(|action| (action.dyn_name(), action)).collect(),
-            user_properties: up,
+            transitions: transitions.iter().map(|t| ((t.0.0.to_string(), t.0.1.to_string()), TransitionState::new(t.1.probability.clone(), t.1.limit.clone()))).collect(),
+            action_keys: actions.iter().map(|action| action.name()).collect(),
+            actions: actions.into_iter().map(|action| (action.name(), action)).collect(),
         }
     }
 
@@ -131,70 +136,59 @@ impl<DP, DS, I, EP, UP, A> Session<DP, DS, I, EP, UP, A> where EP: Clone, UP: Cl
         self.cur_time = self.cur_time.clone() + wait;
     }
 
-    pub fn check_transition_probability(&mut self, transition: &ActionTransition<A>) -> bool {
-        let rule = match self.transition_probabilities.get(&transition) {
+    pub fn check_transition_probability<A: ToString>(&mut self, from: A, to: A) -> bool {
+        let state = match self.transitions.get_mut(&(from.to_string(), to.to_string())) {
             None => return false,
             Some(v) => v
         };
 
-        match self.transitions_state.get(&transition) {
-            Some(state) => {
-                if rule.limit.is_some() && state.evaluations_count > rule.limit.unwrap() {
-                    return false;
-                }
+        if state.limit.is_some() && state.evaluations_count > state.limit.unwrap() {
+            return false;
+        }
 
-                match &rule.probability {
-                    Probability::Uniform(prob) => self.rng.gen::<f64>() < *prob,
-                    Probability::Steps(steps) => {
-                        if state.evaluations_count > steps.len() - 1 {
-                            false
-                        } else {
-                            self.rng.gen::<f64>() < steps[state.evaluations_count]
-                        }
-                    }
+        match &state.probability {
+            Probability::Uniform(prob) => self.rng.gen::<f64>() < *prob,
+            Probability::Steps(steps) => {
+                if state.evaluations_count > steps.len() - 1 {
+                    false
+                } else {
+                    self.rng.gen::<f64>() < steps[state.evaluations_count]
                 }
             }
-            None => match &rule.probability {
-                Probability::Uniform(prob) => self.rng.gen::<f64>() < *prob,
-                Probability::Steps(steps) => {
-                    self.rng.gen::<f64>() < steps[0]
-                }
-            },
         }
     }
 
-    pub fn run(&mut self, action: A) -> Result<()> {
-        self.actions.get(&action).unwrap().clone().evaluate(self)?;
+    pub fn run<A: ToString>(&mut self, action: A) -> Result<()> {
+        self.actions.get(&action.to_string()).unwrap().clone().evaluate(self)?;
         Ok(())
     }
 
-    pub fn transit(&mut self, action_transition: ActionTransition<A>) -> Result<()> {
+    pub fn transit<A: ToString>(&mut self, from: A, to: A) -> Result<()> {
         let state =
-            self.transitions_state
-                .entry(action_transition.clone())
-                .or_insert(ActionTransitionState::new());
+            self.transitions
+                .get_mut(&(from.to_string(), to.to_string())).ok_or_else(|| Error::Internal("transition not found".to_owned()))?;
         state.evaluations_count += 1;
 
-        self.actions.get(&action_transition.to).unwrap().clone().evaluate(self)?;
+        self.actions.get(&to.to_string()).unwrap().clone().evaluate(self)?;
         Ok(())
     }
 
-    pub fn try_transit(&mut self, action_transition: ActionTransition<A>) -> Result<bool> {
-        if !self.check_transition_probability(&action_transition) {
+    pub fn try_transit<A: ToString + Clone>(&mut self, from: A, to: A) -> Result<bool> {
+        if !self.check_transition_probability(from.clone(), to.clone()) {
             return Ok(false);
         }
 
-        self.transit(action_transition)?;
+        self.transit(from, to)?;
         Ok(true)
     }
 
-    pub fn try_auto_transit(&mut self, from: A) -> Result<bool> where A: Clone {
+    pub fn try_auto_transit<A: ToString + Clone>(&mut self, from: A) -> Result<bool> {
+        let from_str = from.to_string();
         let keys = self.action_keys.clone();
-        for to in keys.iter() {
-            if from != *to {
-                let transition = ActionTransition::new(from.clone(), to.clone());
-                if self.check_transition_probability(&transition) {
-                    self.transit(transition)?;
+        for to in keys {
+            if from_str != *to {
+                if self.check_transition_probability(from_str.clone(), to.clone()) {
+                    self.transit(from_str, to.to_string())?;
                     return Ok(true);
                 }
             }
@@ -203,8 +197,8 @@ impl<DP, DS, I, EP, UP, A> Session<DP, DS, I, EP, UP, A> where EP: Clone, UP: Cl
         Ok(false)
     }
 
-    pub fn write_event(&mut self, name: String, props: Option<EP>) -> Result<()> {
-        let event = EventRecord::new(name.clone(), self.cur_time.clone(), props);
+    pub fn write_event<N: ToString>(&mut self, name: N, props: Option<Vec<Property>>) -> Result<()> {
+        let event = EventRecord::new(name.to_string(), self.cur_time.clone(), props);
         self.output.write(&event, &self.user_properties)?;
         Ok(())
     }
