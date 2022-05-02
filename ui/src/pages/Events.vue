@@ -1,4 +1,5 @@
 <template>
+    <EventNav />
     <h1 class="pf-u-font-size-2xl pf-u-mb-md">
         {{ $t('events.event_segmentation') }}
     </h1>
@@ -63,6 +64,7 @@ import Filters from '@/components/events/Filters.vue';
 import Segments from '@/components/events/Segments/Segments.vue';
 import EventsViews from '@/components/events/EventsViews.vue';
 import CreateCustomEvent from '@/components/events/CreateCustomEvent.vue'
+import EventNav from '@/components/events/EventNav.vue'
 
 import { useLexiconStore } from '@/stores/lexicon';
 import { useEventsStore } from '@/stores/eventSegmentation/events';

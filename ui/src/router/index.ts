@@ -3,19 +3,24 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
     {
         path: '/',
-        name: 'dashboard.index',
-        component: () => import('@/pages/Dashboard.vue'),
+        name: 'main',
+        component: () => import('@/pages/Index.vue'),
         children: [
             {
                 path: '/',
-                name: 'dashboard_events_live_stream',
-                component: () => import('@/pages/Index.vue'),
+                name: 'events_live_stream',
+                component: () => import('@/pages/LiveStream.vue'),
             },
             {
                 path: '/events',
-                name: 'dashboard_events',
+                name: 'events',
                 component: () => import('@/pages/Events.vue'),
             },
+            {
+                path: '/users',
+                name: 'users',
+                component: () => import('@/pages/Users.vue'),
+            }
         ],
     },
     {

@@ -28,6 +28,10 @@
     }
   },
 
+  "users": {
+    "title": "Users"
+  },
+
   "events": {
     "live_stream": {
       "title": "Live srteam"
