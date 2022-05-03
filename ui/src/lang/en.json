@@ -28,7 +28,18 @@
     }
   },
 
+  "users": {
+    "title": "Users"
+  },
+
+  "reports": {
+    "title": "Reports"
+  },
+
   "events": {
+    "live_stream": {
+      "title": "Live srteam"
+    },
     "create_custom": "Create Custom Event",
     "edit_custom": "Edit Custom Event",
     "create_custom_description": "Enter information for create Custom Event.",

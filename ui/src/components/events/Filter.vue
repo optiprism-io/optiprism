@@ -148,7 +148,7 @@ import OperationSelect from '@/components/events/OperationSelect.vue';
 import ValueSelect from '@/components/events/ValueSelect.vue';
 import { EventRef, PropertyRef } from '@/types/events';
 import { operationById, OperationId, Value } from '@/types';
-import AlphabetIdentifier from '@/components/AlphabetIdentifier.vue';
+import AlphabetIdentifier from '@/components/common/AlphabetIdentifier.vue';
 import { PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();

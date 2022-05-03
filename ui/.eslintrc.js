@@ -35,6 +35,7 @@ module.exports = {
             "ignores": []
         }],
         "vue/script-setup-uses-vars": "error",
-        "vue/require-default-prop": "off"
+        "vue/require-default-prop": "off",
+        "vue/multi-word-component-names": "off"
     }
 };

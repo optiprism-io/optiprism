@@ -54,7 +54,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import AlphabetIdentifier from '@/components/AlphabetIdentifier.vue'
+import AlphabetIdentifier from '@/components/common/AlphabetIdentifier.vue'
 import UiEditableText from '@/components/uikit/UiEditableText.vue'
 import Condition from '@/components/events/Segments/Condition.vue'
 import { Condition as ConditionType } from '@/types/events'

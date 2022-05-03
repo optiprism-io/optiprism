@@ -1,6 +1,6 @@
 <template>
     <header class="app-header">
-        <div class="pf-l-flex pf-m-justify-content-space-between">
+        <div class="pf-l-flex">
             <div class="pf-l-flex__item">
                 <div class="app-header__menu">
                     <UiDropdown
@@ -11,6 +11,9 @@
                 </div>
             </div>
             <div class="pf-l-flex__item">
+                <Nav />
+            </div>
+            <div class="pf-l-flex__item pf-m-align-right">
                 <div class="app-header__tools">
                     <div class="pf-c-page__header-tools-group">
                         <div class="pf-c-page__header-tools-item">
@@ -44,7 +47,8 @@
 </template>
 
 <script setup lang="ts">
-import UiDropdown from '@/components/uikit/UiDropdown.vue';
+import UiDropdown from '@/components/uikit/UiDropdown.vue'
+import Nav from '@/components/common/Nav.vue'
 
 const items = [
     {
@@ -66,8 +70,7 @@ const items = [
     position: sticky;
     top: 0;
     z-index: 101;
-    padding: 8px 15px;
-    height: 50px;
+    height: 44px;
     grid-area: header;
     background-color: var(--op-base-color);
 

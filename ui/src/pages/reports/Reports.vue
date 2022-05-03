@@ -9,24 +9,19 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
-import UiTabs from '@/components/uikit/UiTabs.vue';
-
+import { computed, inject } from 'vue'
+import { useRoute } from 'vue-router'
+const i18n = inject<any>('i18n')
 const route = useRoute()
 
 const items = computed(() => {
     const mapTabs = [
         {
-            name: 'Events Segmentation',
-            value: 'dashboard_events_segmentation',
-            link: '/',
-            icon: 'fas fa-chart-pie'
-        },
-        {
-            name: 'Funnels',
-            value: 'dashboard_funnels',
-            link: '/funnels',
+            name: i18n.$t('events.event_segmentation'),
+            value: 'reports_event_segmentation',
+            link: {
+                name: 'reports_event_segmentation'
+            },
             icon: 'pf-icon pf-icon-filter'
         },
     ];
@@ -35,10 +30,7 @@ const items = computed(() => {
         return {
             ...item,
             active: route.name === item.value,
-        };
-    });
-});
+        }
+    })
+})
 </script>
-
-<style lang="scss">
-</style>
