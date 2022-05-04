@@ -72,7 +72,6 @@ import UiFormLabel from '@/components//uikit/UiFormLabel.vue'
 import Select from '@/components/Select/Select.vue'
 import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
 import schemaService, { Event as EventScheme, CustomEvents } from '@/api/services/schema.service'
-import { EventType } from '@/api'
 
 const i18n = inject<any>('i18n')
 
