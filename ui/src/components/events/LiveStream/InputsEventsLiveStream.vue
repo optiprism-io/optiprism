@@ -63,7 +63,6 @@ const setEvent = (payload: EventPayload) => {
 const removeEvent = (idx: number): void => {
     events.value.splice(idx, 1)
 }
-
 </script>
 
 <style scoped lang="scss">

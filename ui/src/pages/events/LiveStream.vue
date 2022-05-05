@@ -15,9 +15,7 @@
         </div>
         <div class="pf-l-grid__item">
             <div class="pf-c-card pf-m-compact pf-u-h-100">
-                <div class="pf-c-card__body">
-                    <TableLiveStream />
-                </div>
+                <TableLiveStream />
             </div>
         </div>
     </div>
