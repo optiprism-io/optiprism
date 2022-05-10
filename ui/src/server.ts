@@ -3,6 +3,7 @@ import { DataType } from '@/api'
 import { BASE_PATH } from '@/api/base'
 import { EventStatus, UserProperty, UserCustomProperty } from '@/types/events';
 import splineChartMocks from '@/mocks/splineChart.json';
+import liveStresmMocks from '@/mocks/reports/liveStream.json'
 
 import eventSegmentationsMocks from '@/mocks/eventSegmentations/eventSegmentations.json';
 import eventMocks from '@/mocks/eventSegmentations/events.json';
@@ -38,6 +39,10 @@ export default function ({ environment = 'development' } = {}) {
                 schema.db.customEvents.update(request.params.event_id, customEvent)
 
                 return schema.db.customEvents
+            })
+
+            this.post(`${BASE_PATH}/v1/projects/:project_id/data/events-stream`, (schema, request) => {
+                return liveStresmMocks
             })
 
             this.get('/schema/event-properties', () => {

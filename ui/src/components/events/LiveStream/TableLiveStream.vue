@@ -18,7 +18,7 @@
                                     <button
                                         class="pf-c-toggle-group__button"
                                         :class="{
-                                            'pf-m-selected': isPeriodActive,
+                                            'pf-m-selected': liveStreamStore.isPeriodActive,
                                         }"
                                         type="button"
                                     >
@@ -59,6 +59,10 @@ const itemsPeriod = computed(() => {
     }))
 })
 
+const updateReport = () => {
+    liveStreamStore.getReportLiveStream()
+}
+
 const perios = computed(() => {
     return liveStreamStore.period
 })
@@ -76,10 +80,8 @@ const calendarValue = computed(() => {
     }
 })
 
-const isPeriodActive = computed(() => liveStreamStore.period.from && liveStreamStore.period.to && liveStreamStore.controlsPeriod === 'calendar')
-
 const calendarValueString = computed(() => {
-    if (isPeriodActive.value) {
+    if (liveStreamStore.isPeriodActive) {
         switch(liveStreamStore.period.type) {
             case 'last':
                 return `Last ${liveStreamStore.period.last} ${liveStreamStore.period.last === 1 ? 'day' : 'days'}`
@@ -98,6 +100,8 @@ const calendarValueString = computed(() => {
 
 const onSelectPerion = (payload: string) => {
     liveStreamStore.controlsPeriod = payload
+    liveStreamStore.period.type = 'notCustom'
+    updateReport()
 }
 
 const onApplyPeriod = (payload: ApplyPayload): void => {
@@ -109,6 +113,8 @@ const onApplyPeriod = (payload: ApplyPayload): void => {
         type: payload.type,
         last: payload.last,
     }
+
+    updateReport()
 }
 </script>
 

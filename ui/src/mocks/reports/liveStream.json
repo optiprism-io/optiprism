@@ -1,0 +1,17 @@
+[
+    {
+        "name": "Buy Product",
+        "properties": {
+            "Product Name": "TV",
+            "createdAt": "2017-07-21T17:32:28Z"
+        },
+        "userProperties": {
+            "country": "UK"
+        },
+        "matchedCustomEvents": [
+            {
+                "id": 1
+            }
+        ]
+    }
+]
