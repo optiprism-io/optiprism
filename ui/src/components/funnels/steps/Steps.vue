@@ -1,19 +1,19 @@
 <template>
-    <div
-        v-for="(step, index) in stepsStore.steps"
-        :key="index"
+  <div
+    v-for="(step, index) in stepsStore.steps"
+    :key="index"
+  >
+    {{ step.eventName }}
+  </div>
+  <EventSelector @select="addStepWithEvent">
+    <UiButton
+      class="pf-m-main"
+      :is-link="true"
+      :before-icon="'fas fa-plus'"
     >
-        {{ step.eventName }}
-    </div>
-    <EventSelector @select="addStepWithEvent">
-        <UiButton
-            class="pf-m-main"
-            :is-link="true"
-            :before-icon="'fas fa-plus'"
-        >
-            {{ $t('common.add_step') }}
-        </UiButton>
-    </EventSelector>
+      {{ $t('common.add_step') }}
+    </UiButton>
+  </EventSelector>
 </template>
 
 <script setup lang="ts">
@@ -27,9 +27,9 @@ const stepsStore = useStepsStore();
 const lexiconStore = useLexiconStore();
 
 const addStepWithEvent = (eventRef: EventRef) => {
-    const step: Step = {
-        eventRef: eventRef,
-        filters: []
-    }
+  const step: Step = {
+    eventRef: eventRef,
+    filters: []
+  }
 }
 </script>

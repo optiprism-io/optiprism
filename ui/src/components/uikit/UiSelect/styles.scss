@@ -1,0 +1,43 @@
+.ui-select {
+  position: relative;
+
+  &__content {
+    display: flex;
+  }
+
+  &__box {
+    width: 230px;
+    flex: 1;
+
+    &_width-auto {
+      width: initial;
+    }
+  }
+
+  &__loader-wrap {
+    min-width: 20rem;
+    min-height: 18rem;
+  }
+
+  &__loader {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  &__description {
+    min-width: 200px;
+    border-left: 1px solid var(--pf-global--BackgroundColor--200);
+  }
+
+  &__description-icon {
+    float: left;
+    margin-right: .5rem;
+  }
+
+  &__description-text {
+    font-size: .9rem;
+    max-width: 200px;
+  }
+}

@@ -1,39 +1,39 @@
 <template>
-    <ToolsLayout>
-        <template #title>
-            {{ $t('funnels.untitledFunnel') }}
-        </template>
+  <ToolsLayout>
+    <template #title>
+      {{ $t('funnels.untitledFunnel') }}
+    </template>
 
-        <UiCardContainer :title="$t('funnels.steps')">
-            <UiCardTitle>
-                {{ $t('funnels.steps') }}
-            </UiCardTitle>
+    <UiCardContainer :title="$t('funnels.steps')">
+      <UiCardTitle>
+        {{ $t('funnels.steps') }}
+      </UiCardTitle>
+          
+      <UiCardBody>
+        <Steps />
+      </UiCardBody>
 
-            <UiCardBody>
-                <Steps />
-            </UiCardBody>
+      <UiCardTitle>
+        {{ $t('criteria.label') }}
+      </UiCardTitle>
 
-            <UiCardTitle>
-                {{ $t('criteria.label') }}
-            </UiCardTitle>
+      <UiCardBody>
+        <Criteria />
+      </UiCardBody>
+    </UiCardContainer>
 
-            <UiCardBody>
-                <Criteria />
-            </UiCardBody>
-        </UiCardContainer>
+    <UiCard :title="$t('funnels.userSegments')">
+      {{ $t('funnels.userSegments') }}
+    </UiCard>
 
-        <UiCard :title="$t('funnels.userSegments')">
-            {{ $t('funnels.userSegments') }}
-        </UiCard>
+    <UiCard :title="$t('funnels.filters')">
+      {{ $t('funnels.filters') }}
+    </UiCard>
 
-        <UiCard :title="$t('funnels.filters')">
-            {{ $t('funnels.filters') }}
-        </UiCard>
-
-        <UiCard :title="$t('funnels.breakdowns')">
-            <Breakdowns />
-        </UiCard>
-    </ToolsLayout>
+    <UiCard :title="$t('funnels.breakdowns')">
+      <Breakdowns />
+    </UiCard>
+  </ToolsLayout>
 </template>
 
 <script setup lang="ts">
