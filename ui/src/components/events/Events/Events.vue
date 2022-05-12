@@ -23,42 +23,7 @@
             @change-query="changeQuery"
         />
         <div class="pf-l-flex">
-            <Select
-                grouped
-                :items="lexiconStore.eventsList"
-                :width-auto="true"
-                :auto-hide="!commonStore.showCreateCustomEvent"
-                @action="selectAction"
-                @select="addEvent"
-                @edit="editEvent"
-                @on-hover="onHoverEvent"
-            >
-                <UiButton
-                    class="pf-m-main"
-                    :is-link="true"
-                    :before-icon="'fas fa-plus'"
-                >
-                    {{ $t('common.add_event') }}
-                </UiButton>
-                <template
-                    v-if="hoveredCustomEventId"
-                    #description
-                >
-                    <div class="pf-l-flex pf-m-column">
-                        <SelectedEvent
-                            v-for="(event, index) in hoveredCustomEventDescription"
-                            :key="index"
-                            :event="event"
-                            :event-ref="event.ref"
-                            :filters="event.filters"
-                            :index="index"
-                            :show-breakdowns="false"
-                            :show-query="false"
-                            :for-preview="true"
-                        />
-                    </div>
-                </template>
-            </Select>
+            <EventSelector />
         </div>
     </div>
 </template>
@@ -72,6 +37,7 @@ import { useCommonStore } from '@/stores/common'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 
 import Select from '@/components/Select/Select.vue'
+import EventSelector from '@/components/events/Events/EventSelector.vue';
 const SelectedEvent = defineAsyncComponent(() => import('@/components/events/Events/SelectedEvent.vue'))
 
 const lexiconStore = useLexiconStore();

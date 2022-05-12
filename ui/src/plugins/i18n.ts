@@ -1,8 +1,9 @@
 import { App as Application } from 'vue';
 
+export type I18N = { $t: $T}
 export type $T = (key: string) => string
 
-const validateKey = (key: string) => {
+const validateKey = (key?: string) => {
     if (typeof key !== 'string') {
         return `$t: only the string is supported, key - ${JSON.stringify(key)}`
     }

@@ -6,6 +6,7 @@
     "select_aggregate": "Select aggregate",
     "add_filter": "Add Filter",
     "add_event": "Add Event",
+    "add_step": "Add Step",
     "enter_value": "Enter a value",
     "create": "Create",
     "edit": "Edit",
@@ -25,6 +26,15 @@
       },
       "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
       "week_days": ["mo", "tu", "we", "th", "fr", "sa", "su"]
+    },
+    "timeUnits": {
+      "seconds": "seconds",
+      "minutes": "minutes",
+      "hours": "hours",
+      "days": "days",
+      "weeks": "weeks",
+      "months": "months",
+      "years": "years"
     }
   },
 
@@ -90,6 +100,27 @@
       "75thPercentile": "75th Percentile of property",
       "90thPercentile": "90th Percentile of property",
       "99thPercentile": "99th Percentile of property"
+    }
+  },
+
+  "funnels": {
+    "funnels": "Funnels",
+    "untitledFunnel": "Untitled Funnel",
+    "steps": "Steps",
+    "userSegments": "User Segments",
+    "filters": "Filters",
+    "breakdowns": "Breakdowns"
+  },
+
+  "criteria": {
+    "label": "Criteria",
+    "within": "within",
+    "timeWindow": "time window",
+    "in": "in",
+    "order": "order",
+    "orderType": {
+      "exact": "exact",
+      "any": "any"
     }
   }
 }

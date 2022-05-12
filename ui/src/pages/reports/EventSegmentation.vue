@@ -1,58 +1,35 @@
 <template>
-    <h1 class="pf-u-font-size-2xl pf-u-mb-md">
-        {{ $t('events.event_segmentation') }}
-    </h1>
-    <div class="pf-l-grid pf-m-gutter">
-        <div class="pf-l-grid__item pf-m-12-col pf-m-6-col-on-lg">
-            <div class="pf-c-card pf-m-compact pf-u-h-100">
-                <div class="pf-c-card__title">
-                    <p>{{ $t('events.events') }}</p>
-                </div>
-                <div class="pf-c-card__body">
-                    <Events />
-                </div>
-            </div>
-        </div>
-        <div class="pf-l-grid__item pf-m-12-col pf-m-6-col-on-lg">
-            <div class="pf-c-card pf-m-compact pf-u-h-100">
-                <div class="pf-c-card__title">
-                    <p>{{ $t('events.segments.label') }}</p>
-                </div>
-                <div class="pf-c-card__body">
-                    <Segments />
-                </div>
-            </div>
-        </div>
-        <div class="pf-l-grid__item pf-m-12-col pf-m-6-col-on-lg">
-            <div class="pf-c-card pf-m-compact pf-u-h-100">
-                <div class="pf-c-card__title">
-                    <p>{{ $t('events.filters') }}</p>
-                </div>
-                <div class="pf-c-card__body">
-                    <Filters />
-                </div>
-            </div>
-        </div>
-        <div class="pf-l-grid__item pf-m-12-col pf-m-6-col-on-lg">
-            <div class="pf-c-card pf-m-compact pf-u-h-100">
-                <div class="pf-c-card__title">
-                    <p>{{ $t('events.breakdowns') }}</p>
-                </div>
-                <div class="pf-c-card__body">
-                    <Breakdowns />
-                </div>
-            </div>
-        </div>
-        <div class="pf-l-grid__item pf-m-12-col">
-            <EventsViews />
-        </div>
+    <ToolsLayout>
+        <template #title>
+            {{ $t('events.event_segmentation') }}
+        </template>
 
-        <CreateCustomEvent
-            v-if="commonStore.showCreateCustomEvent"
-            @apply="applyCreateCustomEvent"
-            @cancel="togglePopupCreateCustomEvent(false)"
-        />
-    </div>
+        <UiCard :title="$t('events.events')">
+            <Events />
+        </UiCard>
+
+        <UiCard :title="$t('events.segments.label')">
+            <Segments />
+        </UiCard>
+
+        <UiCard :title="$t('events.filters')">
+            <Filters />
+        </UiCard>
+
+        <UiCard :title="$t('events.breakdowns')">
+            <Breakdowns />
+        </UiCard>
+
+        <template #main>
+            <EventsViews />
+        </template>
+    </ToolsLayout>
+
+    <CreateCustomEvent
+        v-if="commonStore.showCreateCustomEvent"
+        @apply="applyCreateCustomEvent"
+        @cancel="togglePopupCreateCustomEvent(false)"
+    />
 </template>
 
 <script setup lang="ts">
@@ -63,10 +40,12 @@ import Filters from '@/components/events/Filters.vue';
 import Segments from '@/components/events/Segments/Segments.vue';
 import EventsViews from '@/components/events/EventsViews.vue';
 import CreateCustomEvent from '@/components/events/CreateCustomEvent.vue'
+import UiCard from '@/components/uikit/UiCard/UiCard.vue';
 
 import { useLexiconStore } from '@/stores/lexicon';
 import { useEventsStore } from '@/stores/eventSegmentation/events';
 import { useCommonStore } from '@/stores/common'
+import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
 
 const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();

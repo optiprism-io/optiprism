@@ -24,6 +24,14 @@ const items = computed(() => {
             },
             icon: 'pf-icon pf-icon-filter'
         },
+        {
+            name: i18n.$t('funnels.funnels'),
+            value: 'reports_funnels',
+            link: {
+                name: 'reports_funnels'
+            },
+            icon: 'pf-icon pf-icon-filter'
+        }
     ];
 
     return mapTabs.map(item => {
