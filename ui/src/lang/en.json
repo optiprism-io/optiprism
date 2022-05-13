@@ -41,7 +41,11 @@
 
   "events": {
     "live_stream": {
-      "title": "Live srteam"
+      "title": "Live srteam",
+      "columns": {
+        "createdAt": "Date",
+        "eventName": "Event Name"
+      }
     },
     "create_custom": "Create Custom Event",
     "edit_custom": "Edit Custom Event",

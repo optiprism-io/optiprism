@@ -21,4 +21,8 @@ export type Cell = {
     left?: number
 }
 
+export type ColumnMap = {
+    [key: string]: Column;
+}
+
 export type Row = Cell[];

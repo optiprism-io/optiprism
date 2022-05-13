@@ -5,7 +5,7 @@ import dataService from '@/api/services/datas.service'
 import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
 
-interface Report {
+export interface Report {
     name: string
     properties: {
         [key: string]: string | number
@@ -30,6 +30,7 @@ type LiveStream = {
     reports: Array<Report | object> | any
     activeColumns: string[]
     defaultColumns: string[]
+    loading: boolean
 }
 
 export const useLiveStreamStore = defineStore('liveStream', {
@@ -44,7 +45,8 @@ export const useLiveStreamStore = defineStore('liveStream', {
         },
         reports: [],
         activeColumns: [],
-        defaultColumns: ['eventName', 'date']
+        defaultColumns: ['eventName', 'createdAt'],
+        loading: false,
     }),
     getters: {
         isPeriodActive(): boolean {
@@ -127,12 +129,17 @@ export const useLiveStreamStore = defineStore('liveStream', {
                         items.push(key)
                     }
                 })
-                Object.keys(item.userProperties).forEach((key: string) => {
-                    items.push(key)
-                })
+                if (item.userProperties) {
+                    Object.keys(item.userProperties).forEach((key: string) => {
+                        items.push(key)
+                    })
+                }
             })
 
             return [...new Set(items)]
+        },
+        isNoData(): boolean {
+            return !this.reports.length && !this.loading
         },
     },
     actions: {
@@ -144,6 +151,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
             }
         },
         async getReportLiveStream() {
+            this.loading = true
             const commonStore = useCommonStore()
 
             const res = await dataService.createEventsStream(String(commonStore.projectId), {
@@ -154,7 +162,13 @@ export const useLiveStreamStore = defineStore('liveStream', {
 
             if (res?.data) {
                 this.reports = res.data
+
+                if (this.columnsMap) {
+                    this.activeColumns = this.columnsMap
+                }
             }
+
+            this.loading = false
         },
     }
 })

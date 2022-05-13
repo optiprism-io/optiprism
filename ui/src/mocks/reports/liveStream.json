@@ -5,11 +5,39 @@
             "Product Name": "TV",
             "createdAt": "2017-07-21T17:32:28Z"
         },
+        "matchedCustomEvents": [
+            {
+                "id": 1
+            }
+        ]
+    },
+    {
+        "name": "Click on Element",
+        "properties": {
+            "createdAt": "2022-01-03T17:32:28Z"
+        },
         "userProperties": {
             "country": "UK",
             "element": "Button",
             "name": "View Product",
             "class": ".buy-product"
+        },
+        "matchedCustomEvents": [
+            {
+                "id": 1
+            }
+        ]
+    },
+    {
+        "name": "Click on Element",
+        "properties": {
+            "createdAt": "2022-01-01T17:32:28Z"
+        },
+        "userProperties": {
+            "country": "UK",
+            "element": "a",
+            "name": "Search Product",
+            "class": ".search-product"
         },
         "matchedCustomEvents": [
             {
