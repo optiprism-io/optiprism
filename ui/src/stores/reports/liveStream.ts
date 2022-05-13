@@ -5,6 +5,19 @@ import dataService from '@/api/services/datas.service'
 import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
 
+interface Report {
+    name: string
+    properties: {
+        [key: string]: string | number
+    }
+    userProperties: {
+        [key: string]: string | number
+    }
+    matchedCustomEvents: Array<{
+        id: number | string
+    }>
+}
+
 type LiveStream = {
     events: Event[],
     controlsPeriod: string
@@ -14,7 +27,9 @@ type LiveStream = {
         last: number
         type: string
     },
-    report: any // TODO integrations backend
+    reports: Array<Report | object> | any
+    activeColumns: string[]
+    defaultColumns: string[]
 }
 
 export const useLiveStreamStore = defineStore('liveStream', {
@@ -27,7 +42,9 @@ export const useLiveStreamStore = defineStore('liveStream', {
             type: 'last',
             last: 30,
         },
-        report: [],
+        reports: [],
+        activeColumns: [],
+        defaultColumns: ['eventName', 'date']
     }),
     getters: {
         isPeriodActive(): boolean {
@@ -101,8 +118,31 @@ export const useLiveStreamStore = defineStore('liveStream', {
                     }
             }
         },
+        columnsMap(): string[] {
+            const items: string[] = []
+
+            this.reports.forEach((item: Report) => {
+                Object.keys(item.properties).forEach((key: string) => {
+                    if (key !== 'createdAt') {
+                        items.push(key)
+                    }
+                })
+                Object.keys(item.userProperties).forEach((key: string) => {
+                    items.push(key)
+                })
+            })
+
+            return [...new Set(items)]
+        },
     },
     actions: {
+        toggleColumns(key: string) {
+            if (this.activeColumns.includes(key)) {
+                this.activeColumns = this.activeColumns.filter(item => item !== key)
+            } else {
+                this.activeColumns.push(key)
+            }
+        },
         async getReportLiveStream() {
             const commonStore = useCommonStore()
 
@@ -113,7 +153,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
             })
 
             if (res?.data) {
-                this.report = res.data
+                this.reports = res.data
             }
         },
     }

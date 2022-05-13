@@ -33,6 +33,18 @@
                         </template>
                     </UiToggleGroup>
                 </div>
+                <div
+                    v-if="liveStreamStore.columnsMap.length"
+                    class="pf-c-toolbar__item pf-u-ml-auto"
+                >
+                    <UiSelect
+                        :items="columns"
+                        :variant="'multiple'"
+                        :text-button="columnsButtonText"
+                        :selections="liveStreamStore.activeColumns"
+                        @on-select="liveStreamStore.toggleColumns"
+                    />
+                </div>
             </div>
         </div>
     </div>
@@ -46,6 +58,7 @@ import { getStringDateByFormat } from '@/helpers/getStringDates'
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue'
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
+import UiSelect from '@/components/uikit/UiSelect.vue'
 
 const i18n = inject<any>('i18n')
 const liveStreamStore = useLiveStreamStore()
@@ -80,13 +93,27 @@ const calendarValue = computed(() => {
     }
 })
 
+const columnsButtonText = computed(() => {
+    return `${liveStreamStore.columnsMap.length} ${i18n.$t('common.columns')}`
+})
+
+const columns = computed(() => {
+    return liveStreamStore.columnsMap.map(key => {
+        return {
+            key: key,
+            nameDisplay: key.charAt(0).toUpperCase() + key.slice(1),
+            value: key,
+        }
+    })
+})
+
 const calendarValueString = computed(() => {
     if (liveStreamStore.isPeriodActive) {
         switch(liveStreamStore.period.type) {
             case 'last':
-                return `Last ${liveStreamStore.period.last} ${liveStreamStore.period.last === 1 ? 'day' : 'days'}`
+                return `${i18n.$t('common.calendar.last')} ${liveStreamStore.period.last} ${i18n.$t(liveStreamStore.period.last === 1 ? 'common.calendar.day' : 'common.calendar.days')}`
             case 'since':
-                return `Since ${getStringDateByFormat(liveStreamStore.period.from, '%d %b, %Y')}`
+                return `${i18n.$t('common.calendar.since')} ${getStringDateByFormat(liveStreamStore.period.from, '%d %b, %Y')}`
             case 'between':
                 return `${getStringDateByFormat(liveStreamStore.period.from, '%d %b, %Y')} - ${getStringDateByFormat(liveStreamStore.period.to, '%d %b, %Y')}`
             default:
