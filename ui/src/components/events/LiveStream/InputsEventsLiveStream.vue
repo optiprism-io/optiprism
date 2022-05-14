@@ -36,7 +36,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { EventRef } from '@/types/events'
 import { EventPayload } from '@/stores/eventSegmentation/events'
 
@@ -47,7 +47,6 @@ import { useEventsStore } from '@/stores/eventSegmentation/events'
 
 import Select from '@/components/Select/Select.vue'
 import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
-
 
 const lexiconStore = useLexiconStore()
 const liveStreamStore = useLiveStreamStore()
