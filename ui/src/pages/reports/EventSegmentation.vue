@@ -1,35 +1,35 @@
 <template>
-    <ToolsLayout>
-        <template #title>
-            {{ $t('events.event_segmentation') }}
-        </template>
+  <ToolsLayout>
+    <template #title>
+      {{ $t('events.event_segmentation') }}
+    </template>
 
-        <UiCard :title="$t('events.events')">
-            <Events />
-        </UiCard>
+    <UiCard :title="$t('events.events')">
+      <Events />
+    </UiCard>
 
-        <UiCard :title="$t('events.segments.label')">
-            <Segments />
-        </UiCard>
+    <UiCard :title="$t('events.segments.label')">
+      <Segments />
+    </UiCard>
 
-        <UiCard :title="$t('events.filters')">
-            <Filters />
-        </UiCard>
+    <UiCard :title="$t('events.filters')">
+      <Filters />
+    </UiCard>
 
-        <UiCard :title="$t('events.breakdowns')">
-            <Breakdowns />
-        </UiCard>
+    <UiCard :title="$t('events.breakdowns')">
+      <Breakdowns />
+    </UiCard>
 
-        <template #main>
-            <EventsViews />
-        </template>
-    </ToolsLayout>
+    <template #main>
+      <EventsViews />
+    </template>
+  </ToolsLayout>
 
-    <CreateCustomEvent
-        v-if="commonStore.showCreateCustomEvent"
-        @apply="applyCreateCustomEvent"
-        @cancel="togglePopupCreateCustomEvent(false)"
-    />
+  <CreateCustomEvent
+    v-if="commonStore.showCreateCustomEvent"
+    @apply="applyCreateCustomEvent"
+    @cancel="togglePopupCreateCustomEvent(false)"
+  />
 </template>
 
 <script setup lang="ts">
@@ -42,33 +42,23 @@ import EventsViews from '@/components/events/EventsViews.vue';
 import CreateCustomEvent from '@/components/events/CreateCustomEvent.vue'
 import UiCard from '@/components/uikit/UiCard/UiCard.vue';
 
-import { useLexiconStore } from '@/stores/lexicon';
 import { useEventsStore } from '@/stores/eventSegmentation/events';
 import { useCommonStore } from '@/stores/common'
 import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
 
-const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
 const commonStore = useCommonStore()
 
-onMounted(async () => {
-    await lexiconStore.getEvents();
-    await lexiconStore.getEventProperties();
-    await lexiconStore.getUserProperties();
-
-    await eventsStore.initPeriod();
-});
-
 onUnmounted(() => {
-    eventsStore.$reset();
+  eventsStore.$reset();
 });
 
 const togglePopupCreateCustomEvent = (payload: boolean) => {
-    commonStore.togglePopupCreateCustomEvent(payload)
+  commonStore.togglePopupCreateCustomEvent(payload)
 }
 
 const applyCreateCustomEvent = () => {
-    togglePopupCreateCustomEvent(false)
+  togglePopupCreateCustomEvent(false)
 }
 </script>
 
