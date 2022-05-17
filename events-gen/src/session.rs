@@ -64,8 +64,8 @@ impl TransitionRules {
 }
 
 pub struct TransitionState {
-    probability: Probability,
-    limit: Option<usize>,
+    pub probability: Probability,
+    pub limit: Option<usize>,
     pub evaluations_count: usize,
 }
 
@@ -92,12 +92,12 @@ impl ActionTransitionState {
     }
 }
 
-pub trait Action<T> {
-    fn evaluate(&self, session: &mut Session<T>) -> Result<()>;
-    fn name(&self) -> String;
+pub trait Action<T, N> {
+    fn evaluate(&self, session: &mut Session<T, N>) -> Result<()>;
+    fn name(&self) -> N;
 }
 
-pub struct Session<T> {
+pub struct Session<T, N> {
     pub cur_time: DateTime<Utc>,
     pub rng: ThreadRng,
     pub data: T,
@@ -106,15 +106,15 @@ pub struct Session<T> {
     pub event_properties: Option<Vec<Property>>,
     pub user_properties: Option<Vec<Property>>,
     action_keys: Vec<String>,
-    actions: HashMap<String, Rc<dyn Action<T>>>,
+    actions: HashMap<String, Rc<dyn Action<T, N>>>,
 }
 
-impl<T> Session<T> {
+impl<T, N> Session<T, N> {
     pub fn new<A: ToString>(
         cur_time: DateTime<Utc>,
         data: T,
         output: Box<dyn OutputWriter>,
-        actions: Vec<Rc<dyn Action<T>>>,
+        actions: Vec<Rc<dyn Action<T, N>>>,
         transitions: Vec<((A, A), TransitionRules)>,
         user_properties: Option<Vec<Property>>,
     ) -> Self {
@@ -125,7 +125,15 @@ impl<T> Session<T> {
             event_properties: None,
             user_properties,
             cur_time,
-            transitions: transitions.iter().map(|t| ((t.0.0.to_string(), t.0.1.to_string()), TransitionState::new(t.1.probability.clone(), t.1.limit.clone()))).collect(),
+            transitions: transitions
+                .iter()
+                .map(|t|
+                    (
+                        (t.0.0.to_string(), t.0.1.to_string()),
+                        TransitionState::new(t.1.probability.clone(), t.1.limit.clone())
+                    )
+                )
+                .collect(),
             action_keys: actions.iter().map(|action| action.name()).collect(),
             actions: actions.into_iter().map(|action| (action.name(), action)).collect(),
         }
@@ -136,23 +144,27 @@ impl<T> Session<T> {
         self.cur_time = self.cur_time.clone() + wait;
     }
 
-    pub fn check_transition_probability<A: ToString>(&mut self, from: A, to: A) -> bool {
+    pub fn check_transition_probability<A: ToString, B: ToString>(&mut self, from: A, to: B) -> bool {
+        self.rng.gen::<f64>() < self.transition_probability(from, to)
+    }
+
+    pub fn transition_probability<A: ToString, B: ToString>(&mut self, from: A, to: B) -> f64 {
         let state = match self.transitions.get_mut(&(from.to_string(), to.to_string())) {
-            None => return false,
+            None => return 0.,
             Some(v) => v
         };
 
         if state.limit.is_some() && state.evaluations_count > state.limit.unwrap() {
-            return false;
+            return 0.;
         }
 
         match &state.probability {
-            Probability::Uniform(prob) => self.rng.gen::<f64>() < *prob,
+            Probability::Uniform(prob) => *prob,
             Probability::Steps(steps) => {
                 if state.evaluations_count > steps.len() - 1 {
-                    false
+                    0.
                 } else {
-                    self.rng.gen::<f64>() < steps[state.evaluations_count]
+                    steps[state.evaluations_count]
                 }
             }
         }
@@ -163,7 +175,7 @@ impl<T> Session<T> {
         Ok(())
     }
 
-    pub fn transit<A: ToString>(&mut self, from: A, to: A) -> Result<()> {
+    pub fn transit<A: ToString, B: ToString>(&mut self, from: A, to: B) -> Result<()> {
         let state =
             self.transitions
                 .get_mut(&(from.to_string(), to.to_string())).ok_or_else(|| Error::Internal("transition not found".to_owned()))?;
@@ -173,8 +185,8 @@ impl<T> Session<T> {
         Ok(())
     }
 
-    pub fn try_transit<A: ToString + Clone>(&mut self, from: A, to: A) -> Result<bool> {
-        if !self.check_transition_probability(from.clone(), to.clone()) {
+    pub fn try_transit<A: ToString, B: ToString>(&mut self, from: A, to: B) -> Result<bool> {
+        if !self.check_transition_probability(from.to_string(), to.to_string()) {
             return Ok(false);
         }
 
@@ -195,6 +207,26 @@ impl<T> Session<T> {
         }
 
         Ok(false)
+    }
+
+    pub fn check_transition_or_try_auto_transit<A: ToString, B: ToString>(&mut self, from: A, to: B) -> Result<()> {
+        match self.next_action(from)? {
+            v if v != to => return session.transit(from, v),
+            _ => {}
+        }
+    }
+    pub fn next_action<A: ToString + Clone>(&mut self, from: A, coefficient: Option<(A, f64)>) -> Result<A> {
+        let from_str = from.to_string();
+        let keys = self.action_keys.clone();
+        for to in keys {
+            if from_str != to {
+                if self.check_transition_probability(from_str.clone(), &to.clone()) {
+                    return Some(to);
+                }
+            }
+        }
+
+        None
     }
 
     pub fn write_event<N: ToString>(&mut self, name: N, props: Option<Vec<Property>>) -> Result<()> {

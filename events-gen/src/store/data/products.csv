@@ -1,0 +1,15 @@
+id,name,category,subcategory,brand,author,size,color,price,discount_price
+1,Apple Pencil,Computers,Accessories,Apple,,,,99.0,
+2,Logitech MK270 Wireless Keyboard,Computers,Accessories,Logitech,,,,32.0,28.0
+3,Acer Nitro 5,Computers,Notebooks,Acer,,,,549.99,500.95
+4,DualShock 4 Wireless Controller for PlayStation 4,Video Games,Accessories,Sony,,,,39.95,
+5,LEGO Star Wars: The Skywalker Saga,Video Games,Platformers,Lego,,,,57.89,50.99
+6,Just Dance 2022,Video Games,Party,Ubisoft,,,,19.99,15.99
+7,Beach Read,Books,Bestsellers,,Emily Henry,,,8.99,
+8,1984,Books,Antiutopia,,George Orwell,,,7.48,5.05
+9,Goodthreads Men's Slim-Fit Short-Sleeve Cotton Crewneck T-Shirt,Men Fashion,TShirts,Goodthreads,,L,Red,14.70,12.99
+10,Goodthreads Men's Slim-Fit Short-Sleeve Cotton Crewneck T-Shirt,Men Fashion,TShirts,Goodthreads,,M,Red,14.70,12.99
+11,Goodthreads Men's Slim-Fit Short-Sleeve Cotton Crewneck T-Shirt,Men Fashion,TShirts,Goodthreads,,M,Green,12.70,11.99
+12,Steve Madden Women's Skyler Flat Sandal,Women Fashion,Shoes,Steve Madden,,6,,49.99,30.99
+13,BURTON Flight Attendant Snowboard,Sports,Snowboards,Burton,,162cm,purple,463.95,
+14,Volkl 2022 Kendo 88 Mens Skis,Sports,Skis,Volkl,,177,Blue,519.99,470.39

@@ -1,3 +1,7 @@
+[[bin]]
+name = "daemon"
+path = "src/exp/main.rs"
+
 [package]
 name = "events-gen"
 version = "0.1.0"
@@ -9,3 +13,8 @@ rand = "0.8.0"
 lazy_static = "1.4.0"
 strum = "0.24"
 strum_macros = "0.24"
+csv = "1.1"
+rand_distr = "0.4.3"
+serde = { version = "1.0.133", features = ["derive"] }
+cubic_spline = "1.0.0"
+splines = "4.1.0"
