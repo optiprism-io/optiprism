@@ -79,6 +79,7 @@
                 v-else
                 :items="tableData"
                 :columns="tableColumnsValues"
+                @on-action="onAction"
             />
         </div>
     </div>
@@ -86,11 +87,14 @@
 
 <script lang="ts" setup>
 import { computed, inject } from 'vue'
-import { useLiveStreamStore, Report } from '@/stores/reports/liveStream'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
 
+import { useLiveStreamStore, Report } from '@/stores/reports/liveStream'
+import { useCommonStore } from '@/stores/common'
+
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
-import { Column } from '@/components/uikit/UiTable/UiTable'
+import { Column, Cell, Action } from '@/components/uikit/UiTable/UiTable'
+import UiTableEventCell from '@/components/uikit/UiTable/UiTableCells/UiTableEventCell.vue'
 
 import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue'
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
@@ -100,6 +104,7 @@ import UiSpinner from '@/components/uikit/UiSpinner.vue'
 
 const i18n = inject<any>('i18n')
 const liveStreamStore = useLiveStreamStore()
+const commonStore = useCommonStore()
 const COLUMN_WIDTH = 170;
 
 const itemsPeriod = computed(() => {
@@ -138,7 +143,7 @@ const tableColumnsValues = computed(() => {
 
 const tableData = computed(() => {
     return liveStreamStore.reports.map((data: Report) => {
-        return tableColumnsValues.value.map((column: Column) => {
+        return tableColumnsValues.value.map((column: Column): Cell => {
             if (liveStreamStore.defaultColumns.includes(column.value)) {
                 const value = column.value === 'eventName' ? data.name : getStringDateByFormat(String(data.properties[column.value]), '%d %b, %Y')
 
@@ -148,12 +153,17 @@ const tableData = computed(() => {
                     pinned: true,
                     lastPinned: column.lastPinned,
                     left: column.left,
+                    actions: column.value === 'eventName' ? [{
+                        name: 'create',
+                        icon: 'fas fa-plus-circle'
+                    }] : [],
+                    component: UiTableEventCell,
                 }
             } else {
                 const value = column.value in data.properties ? data.properties[column.value] : data.userProperties && column.value in data.userProperties ? data.userProperties[column.value] : ''
 
                 return {
-                    value,
+                    value: value,
                     title: value || '-'
                 }
             }
@@ -227,6 +237,12 @@ const onApplyPeriod = (payload: ApplyPayload): void => {
     }
 
     updateReport()
+}
+
+const onAction = (payload: Action) => {
+    if (payload.name === 'create') {
+        commonStore.togglePopupCreateCustomEvent(true)
+    }
 }
 </script>
 

@@ -1,6 +1,6 @@
 [
     {
-        "name": "Buy Product",
+        "name": "Search",
         "properties": {
             "Product Name": "TV",
             "createdAt": "2017-07-21T17:32:28Z"
@@ -12,7 +12,7 @@
         ]
     },
     {
-        "name": "Click on Element",
+        "name": "Purchase Product",
         "properties": {
             "createdAt": "2022-01-03T17:32:28Z"
         },
@@ -21,15 +21,10 @@
             "element": "Button",
             "name": "View Product",
             "class": ".buy-product"
-        },
-        "matchedCustomEvents": [
-            {
-                "id": 1
-            }
-        ]
+        }
     },
     {
-        "name": "Click on Element",
+        "name": "Sign Up",
         "properties": {
             "createdAt": "2022-01-01T17:32:28Z"
         },
@@ -42,6 +37,9 @@
         "matchedCustomEvents": [
             {
                 "id": 1
+            },
+            {
+                "id": 2
             }
         ]
     }

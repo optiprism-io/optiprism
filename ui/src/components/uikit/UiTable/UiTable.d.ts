@@ -1,3 +1,10 @@
+import { defineComponent } from 'vue'
+
+export type Action = {
+    name: string
+    icon: string
+}
+
 export type Column = {
     value: string
     title: string
@@ -13,12 +20,14 @@ export type Column = {
 }
 
 export type Cell = {
-    value: string
-    title: string
+    value: string | number
+    title: string | number
     pinned?: boolean
     truncate?: boolean
     lastPinned?: boolean
     left?: number
+    actions?: Action[]
+    component?: ReturnType<typeof defineComponent>
 }
 
 export type ColumnMap = {

@@ -26,13 +26,12 @@
                     :key="i"
                     role="row"
                 >
-                    <UiTableCell
+                    <component
                         v-for="cell in row"
                         :key="cell.value"
-                        :last-pinned="cell.lastPinned"
-                        :left="cell.left"
-                        :pinned="cell.pinned"
-                        :title="cell.title"
+                        :is="cell.component || UiTableCell"
+                        v-bind="cell"
+                        @on-action="onAction"
                     />
                 </tr>
             </tbody>
@@ -42,7 +41,7 @@
 
 <script lang="ts" setup>
 import { computed } from 'vue'
-import { Row, Column } from '@/components/uikit/UiTable/UiTable'
+import { Row, Column, Action } from '@/components/uikit/UiTable/UiTable'
 import UiTableHeadCell from '@/components/uikit/UiTable/UiTableHeadCell.vue'
 import UiTableCell from '@/components/uikit/UiTable/UiTableCell.vue'
 
@@ -59,8 +58,16 @@ const props = withDefaults(defineProps<Props>(), {
     items: () => [],
 })
 
+const emit = defineEmits<{
+    (e: 'on-action', payload: Action): void
+}>()
+
 const stickyColumnMinWidth = computed(() => `${props.stickyColumnMinWidth}px`)
 const stickyColumnWidth = computed(() => `${props.stickyColumnWidth}px`)
+
+const onAction = (payload: Action) => {
+    emit('on-action', payload)
+}
 </script>
 
 <style lang="scss" scoped>
