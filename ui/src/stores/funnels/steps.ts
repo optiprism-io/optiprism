@@ -69,6 +69,9 @@ export const useStepsStore = defineStore('steps', {
       if (steps) {
         this.excludedEvents[index].steps = steps
       }
+    },
+    deleteExcludedEvent(index: number): void {
+      this.excludedEvents.splice(index, 1);
     }
   }
 })

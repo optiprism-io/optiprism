@@ -109,7 +109,15 @@
     "steps": "Steps",
     "userSegments": "User Segments",
     "filters": "Filters",
-    "breakdowns": "Breakdowns"
+    "breakdowns": "Breakdowns",
+    "excludeSteps": {
+      "add": "Add exclude step",
+      "exclude": "exclude",
+      "between": "between",
+      "steps": "steps",
+      "and": "and",
+      "all": "All"
+    }
   },
 
   "criteria": {

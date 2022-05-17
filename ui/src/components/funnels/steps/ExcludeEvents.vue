@@ -1,40 +1,57 @@
 <template>
-  <div
+  <UiActionList
     v-for="(item, index) in excludedEvents"
     :key="index"
-    class="pf-l-flex pf-u-mb-md"
+    class="pf-u-mb-md"
   >
-    <span class="pf-l-flex__item">exclude</span>
+    <template #main>
+      <div class="pf-l-flex">
+        <span class="pf-l-flex__item">
+          {{ $t('funnels.excludeSteps.exclude') }}
+        </span>
 
-    <EventSelector
-      class="pf-l-flex__item"
-      @select="editEvent($event, index)"
-    >
-      <UiButton
-        class="pf-m-main pf-m-secondary"
-        is-link
-      >
-        {{ eventName(item.event) }}
-      </UiButton>
-    </EventSelector>
+        <EventSelector
+          class="pf-l-flex__item"
+          @select="editEvent($event, index)"
+        >
+          <UiButton
+            class="pf-m-main pf-m-secondary"
+            is-link
+          >
+            {{ eventName(item.event) }}
+          </UiButton>
+        </EventSelector>
 
-    <span class="pf-l-flex__item">between</span>
+        <span class="pf-l-flex__item">
+          {{ $t('funnels.excludeSteps.between') }}
+        </span>
 
-    <UiSelect
-      :items="excludeSteps"
-      :show-search="false"
-      @update:model-value="editEventSteps($event, index)"
-    >
-      <UiButton
-        class="pf-m-main pf-m-secondary pf-l-flex__item"
-        :is-link="true"
-      >
-        {{ excludeStepsToString(item.steps) }}
-      </UiButton>
-    </UiSelect>
+        <UiSelect
+          :items="excludeSteps"
+          :show-search="false"
+          @update:model-value="editEventSteps($event, index)"
+        >
+          <UiButton
+            class="pf-m-main pf-m-secondary pf-l-flex__item"
+            :is-link="true"
+          >
+            {{ excludeStepsToString(item.steps) }}
+          </UiButton>
+        </UiSelect>
 
-    <span class="pf-l-flex__item">steps</span>
-  </div>
+        <span class="pf-l-flex__item">steps</span>
+      </div>
+    </template>
+
+    <UiActionListItem @click="stepsStore.deleteExcludedEvent(index)">
+      <VTooltip popper-class="ui-hint">
+        <UiIcon icon="fas fa-trash" />
+        <template #popper>
+          Remove step
+        </template>
+      </VTooltip>
+    </UiActionListItem>
+  </UiActionList>
 
   <EventSelector @select="excludeEvent">
     <UiButton
@@ -42,7 +59,7 @@
       :is-link="true"
       :before-icon="'fas fa-plus'"
     >
-      {{ $t('common.add_step') }}
+      {{ $t('funnels.excludeSteps.add') }}
     </UiButton>
   </EventSelector>
 </template>
@@ -51,17 +68,22 @@
 import {useEventsStore} from '@/stores/eventSegmentation/events';
 import {useLexiconStore} from '@/stores/lexicon';
 import EventSelector from '@/components/events/Events/EventSelector.vue';
-import {computed} from 'vue';
+import {computed, inject} from 'vue';
 import {ExcludedEventSteps, useStepsStore} from '@/stores/funnels/steps';
 import {EventRef} from '@/types/events';
 import {EventType} from '@/api';
 import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
 import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
+import {I18N} from '@/plugins/i18n';
+import UiActionList from '@/components/uikit/UiActionList/UiActionList.vue';
+import UiActionListItem from '@/components/uikit/UiActionList/UiActionListItem.vue';
 const UiSelect = UiSelectGeneric();
 
 const eventsStore = useEventsStore();
 const lexiconStore = useLexiconStore();
 const stepsStore = useStepsStore();
+
+const { $t } = inject('i18n') as I18N;
 
 const excludedEvents = computed(() => stepsStore.excludedEvents)
 
@@ -72,13 +94,13 @@ const excludeSteps = computed<UiSelectItemInterface<string>[]>(() => {
       return {
         __type: 'group',
         id: `${index}`,
-        label: `${index + 1}`,
+        label: `${index + 1} ${$t('funnels.excludeSteps.and')} ...`,
         items: Array.from({ length: eventsStore.events.length - index - 1 }).map((_, subIndex) => {
           const idx = index + subIndex + 2;
           return {
             __type: 'item',
             id: `${index}-${subIndex}`,
-            label: `${index + 1} and ${idx}`,
+            label: `${index + 1} ${$t('funnels.excludeSteps.and')} ${idx}`,
             value: `${index + 1}-${idx}`,
           }
         })
@@ -89,7 +111,7 @@ const excludeSteps = computed<UiSelectItemInterface<string>[]>(() => {
     {
       __type: 'item',
       id: 'all',
-      label: 'All',
+      label: $t('funnels.excludeSteps.all'),
       value: 'all',
     },
     ...groups
@@ -151,9 +173,9 @@ const excludeStepsFromString = (stepsString: string): ExcludedEventSteps => {
 
 const excludeStepsToString = (steps: ExcludedEventSteps): string => {
   if (steps.type === 'all') {
-    return 'all'
+    return $t('funnels.excludeSteps.all');
   } else {
-    return `${steps.from} and ${steps.to}`
+    return `${steps.from} ${$t('funnels.excludeSteps.and')} ${steps.to}`
   }
 }
 </script>
