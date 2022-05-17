@@ -27,9 +27,9 @@
                     role="row"
                 >
                     <component
+                        :is="cell.component || UiTableCell"
                         v-for="cell in row"
                         :key="cell.value"
-                        :is="cell.component || UiTableCell"
                         v-bind="cell"
                         @on-action="onAction"
                     />

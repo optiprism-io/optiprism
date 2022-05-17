@@ -20,16 +20,15 @@
             >
                 <div class="pf-c-action-list ui-table-event-cell__action-list">
                     <div
-                        class="pf-c-action-list__item"
                         v-for="action in props.actions"
                         :key="action.name"
+                        class="pf-c-action-list__item"
                     >
                         <UiButton
                             class="pf-m-link"
                             :before-icon="action.icon"
                             @click="onAction(action)"
-                        >
-                        </UiButton>
+                        />
                     </div>
                 </div>
             </div>
