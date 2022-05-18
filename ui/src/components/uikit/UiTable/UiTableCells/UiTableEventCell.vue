@@ -5,14 +5,32 @@
             'pf-m-truncate': truncate,
             'pf-m-border-right': lastPinned,
         }"
+        class="ui-table-event-cell"
         role="columnheader"
         :data-label="title"
         scope="col"
         :style="style"
     >
-        <div class="pf-l-flex">
+        <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
             <div class="pf-l-flex__item">
-                {{ title }}
+                <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
+                    <div>{{ title }}</div>
+
+                    <div
+                        v-if="props.customEvents && props.customEvents.length"
+                        class="pf-u-display-flex pf-u-flex-direction-row"
+                    >
+                        <div
+                            v-for="event in props.customEvents"
+                            :key="event"
+                            class="pf-u-ml-md ui-table-event-cell__custom-event"
+                        >
+                            <UiButton class="pf-m-main pf-m-secondary">
+                                {{ event }}
+                            </UiButton>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div
                 v-if="hasAction"
@@ -47,6 +65,7 @@ type Props = {
     left?: number
     lastPinned?: boolean
     actions?: Action[]
+    customEvents?: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -76,9 +95,16 @@ const onAction = (payload: Action) => {
 
 <style lang="scss">
 .ui-table-event-cell {
+    width: auto !important;
+    max-width: initial !important;
+
     &__action-list {
         opacity: 0;
         cursor: pointer;
+    }
+
+    &__custom-event {
+        pointer-events: none;
     }
 }
 

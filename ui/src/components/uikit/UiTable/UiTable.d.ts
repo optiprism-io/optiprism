@@ -30,6 +30,10 @@ export type Cell = {
     component?: ReturnType<typeof defineComponent>
 }
 
+export type EventCell = Cell & {
+    customEvents: string[]
+}
+
 export type ColumnMap = {
     [key: string]: Column;
 }

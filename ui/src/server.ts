@@ -12,7 +12,25 @@ export default function ({ environment = 'development' } = {}) {
     return createServer({
         seeds(server) {
             server.db.loadData({
-                customEvents: [],
+                customEvents: [{
+                    id: 1,
+                    name: 'Create Product',
+                    events: [{
+                        eventId: 3,
+                        eventName: 'view_product',
+                        eventType: 'regular',
+                        filters: []
+                    }]
+                }, {
+                    id: 2,
+                    name: 'Find Product',
+                    events: [{
+                        eventId: 2,
+                        eventName: 'search',
+                        eventType: 'regular',
+                        filters: []
+                    }]
+                }],
             })
         },
 

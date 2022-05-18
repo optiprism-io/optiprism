@@ -91,9 +91,10 @@ import { getStringDateByFormat } from '@/helpers/getStringDates'
 
 import { useLiveStreamStore, Report } from '@/stores/reports/liveStream'
 import { useCommonStore } from '@/stores/common'
+import { useLexiconStore } from '@/stores/lexicon'
 
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
-import { Column, Cell, Action } from '@/components/uikit/UiTable/UiTable'
+import { Column, Cell, Action, EventCell } from '@/components/uikit/UiTable/UiTable'
 import UiTableEventCell from '@/components/uikit/UiTable/UiTableCells/UiTableEventCell.vue'
 
 import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue'
@@ -105,6 +106,7 @@ import UiSpinner from '@/components/uikit/UiSpinner.vue'
 const i18n = inject<any>('i18n')
 const liveStreamStore = useLiveStreamStore()
 const commonStore = useCommonStore()
+const lexiconStore = useLexiconStore()
 const COLUMN_WIDTH = 170;
 
 const itemsPeriod = computed(() => {
@@ -143,7 +145,7 @@ const tableColumnsValues = computed(() => {
 
 const tableData = computed(() => {
     return liveStreamStore.reports.map((data: Report) => {
-        return tableColumnsValues.value.map((column: Column): Cell => {
+        return tableColumnsValues.value.map((column: Column): Cell | EventCell => {
             if (liveStreamStore.defaultColumns.includes(column.value)) {
                 const value = column.value === 'eventName' ? data.name : getStringDateByFormat(String(data.properties[column.value]), '%d %b, %Y')
 
@@ -157,6 +159,10 @@ const tableData = computed(() => {
                         name: 'create',
                         icon: 'fas fa-plus-circle'
                     }] : [],
+                    customEvents: column.value === 'eventName' && Array.isArray(data.matchedCustomEvents) ? data.matchedCustomEvents.map(event => {
+                        const customEvent = lexiconStore.findCustomEventById(Number(event.id))
+                        return customEvent ? customEvent.name : ''
+                    }) : [],
                     component: UiTableEventCell,
                 }
             } else {
