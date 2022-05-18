@@ -1,55 +1,55 @@
 <template>
-  <li
-    class="ui-select-item pf-c-menu__list-item"
-    :class="{
-      'pf-c-menu__list-item--selected': selected,
-      'pf-c-menu__list-item--disabled': disabled,
-    }"
-    @click="emit('click')"
-    @mouseover="emit('mouseOver')"
-    @mouseout="emit('mouseOut')"
-  >
-    <div
-      class="pf-c-menu__item"
+    <li
+        class="ui-select-item pf-c-menu__list-item"
+        :class="{
+            'pf-c-menu__list-item--selected': selected,
+            'pf-c-menu__list-item--disabled': disabled,
+        }"
+        @click="emit('click')"
+        @mouseover="emit('mouseOver')"
+        @mouseout="emit('mouseOut')"
     >
-      <span class="ui-select-item__content">
-        <span class="pf-c-menu__item-text">{{ label }}</span>
-        <span
-          v-if="editable"
-          class="ui-select-item__content-edit"
+        <div
+            class="pf-c-menu__item"
         >
-          <VTooltip
-            popper-class="ui-hint"
-          >
-            <UiIcon icon="fas fa-edit" />
-            <template #popper>
-              {{ $t('common.edit') }}
-            </template>
-          </VTooltip>
-        </span>
-      </span>
-    </div>
-  </li>
+            <span class="ui-select-item__content">
+                <span class="pf-c-menu__item-text">{{ label }}</span>
+                <span
+                    v-if="editable"
+                    class="ui-select-item__content-edit"
+                >
+                    <VTooltip
+                        popper-class="ui-hint"
+                    >
+                        <UiIcon icon="fas fa-edit" />
+                        <template #popper>
+                            {{ $t('common.edit') }}
+                        </template>
+                    </VTooltip>
+                </span>
+            </span>
+        </div>
+    </li>
 </template>
 
 <script setup lang="ts">
 defineProps({
-  label: {
-    type: String,
-    default: '',
-  },
-  selected: {
-    type: Boolean,
-    default: false,
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-  editable: {
-    type: Boolean,
-    default: false,
-  },
+    label: {
+        type: String,
+        default: '',
+    },
+    selected: {
+        type: Boolean,
+        default: false,
+    },
+    disabled: {
+        type: Boolean,
+        default: false,
+    },
+    editable: {
+        type: Boolean,
+        default: false,
+    },
 })
 
 const emit = defineEmits(['click', 'mouseOver', 'mouseOut'])

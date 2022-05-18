@@ -1,56 +1,56 @@
 <template>
-  <ToolsLayout>
-    <template #title>
-      {{ $t('funnels.untitledFunnel') }}
-    </template>
+    <ToolsLayout>
+        <template #title>
+            {{ $t('funnels.untitledFunnel') }}
+        </template>
 
-    <UiCardContainer :title="$t('funnels.steps')">
-      <UiCardTitle>
-        {{ $t('funnels.steps') }}
-      </UiCardTitle>
+        <UiCardContainer :title="$t('funnels.steps')">
+            <UiCardTitle>
+                {{ $t('funnels.steps') }}
+            </UiCardTitle>
 
-      <UiCardBody>
-        <Events
-          identifier="numeric"
-          :create-with-query="false"
-        >
-          <template #new>
-            <UiButton
-              class="pf-m-main"
-              :is-link="true"
-              :before-icon="'fas fa-plus'"
-            >
-              {{ $t('common.add_step') }}
-            </UiButton>
-          </template>
-        </Events>
-      </UiCardBody>
+            <UiCardBody>
+                <Events
+                    identifier="numeric"
+                    :create-with-query="false"
+                >
+                    <template #new>
+                        <UiButton
+                            class="pf-m-main"
+                            :is-link="true"
+                            :before-icon="'fas fa-plus'"
+                        >
+                            {{ $t('common.add_step') }}
+                        </UiButton>
+                    </template>
+                </Events>
+            </UiCardBody>
 
-      <UiCardTitle>
-        {{ $t('criteria.label') }}
-      </UiCardTitle>
+            <UiCardTitle>
+                {{ $t('criteria.label') }}
+            </UiCardTitle>
 
-      <UiCardBody>
-        <TimeWindow />
-      </UiCardBody>
+            <UiCardBody>
+                <TimeWindow />
+            </UiCardBody>
 
-      <UiCardBody>
-        <ExcludeEvents />
-      </UiCardBody>
-    </UiCardContainer>
+            <UiCardBody>
+                <ExcludeEvents />
+            </UiCardBody>
+        </UiCardContainer>
 
-    <UiCard :title="$t('funnels.userSegments')">
-      {{ $t('funnels.userSegments') }}
-    </UiCard>
+        <UiCard :title="$t('funnels.userSegments')">
+            {{ $t('funnels.userSegments') }}
+        </UiCard>
 
-    <UiCard :title="$t('funnels.filters')">
-      {{ $t('funnels.filters') }}
-    </UiCard>
+        <UiCard :title="$t('funnels.filters')">
+            {{ $t('funnels.filters') }}
+        </UiCard>
 
-    <UiCard :title="$t('funnels.breakdowns')">
-      <Breakdowns />
-    </UiCard>
-  </ToolsLayout>
+        <UiCard :title="$t('funnels.breakdowns')">
+            <Breakdowns />
+        </UiCard>
+    </ToolsLayout>
 </template>
 
 <script setup lang="ts">
@@ -69,6 +69,6 @@ import ExcludeEvents from '@/components/funnels/steps/ExcludeEvents.vue';
 const eventsStore = useEventsStore();
 
 onUnmounted(() => {
-  eventsStore.$reset();
+    eventsStore.$reset();
 });
 </script>

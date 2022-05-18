@@ -1,14 +1,14 @@
 <template>
-  <NumericIdentifier
-    v-if="type === 'numeric'"
-    :index="index"
-    class="common-identifier"
-  />
-  <AlphabetIdentifier
-    v-else
-    :index="index"
-    class="common-identifier"
-  />
+    <NumericIdentifier
+        v-if="type === 'numeric'"
+        :index="index"
+        class="common-identifier"
+    />
+    <AlphabetIdentifier
+        v-else
+        :index="index"
+        class="common-identifier"
+    />
 </template>
 
 <script setup lang="ts">
@@ -17,14 +17,14 @@ import NumericIdentifier from '@/components/common/identifier/NumericIdentifier.
 import AlphabetIdentifier from '@/components/common/identifier/AlphabetIdentifier.vue';
 
 defineProps({
-  type: {
-    type: String as PropType<'numeric' | 'alphabet'>,
-    default: 'alphabet',
-  },
-  index: {
-    type: Number,
-    required: true,
-  },
+    type: {
+        type: String as PropType<'numeric' | 'alphabet'>,
+        default: 'alphabet',
+    },
+    index: {
+        type: Number,
+        required: true,
+    },
 })
 </script>
 

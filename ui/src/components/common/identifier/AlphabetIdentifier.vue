@@ -1,7 +1,7 @@
 <template>
-  <div>
-    {{ identifier }}
-  </div>
+    <div>
+        {{ identifier }}
+    </div>
 </template>
 
 <script setup lang="ts">

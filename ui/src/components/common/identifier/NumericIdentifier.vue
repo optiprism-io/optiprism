@@ -1,7 +1,7 @@
 <template>
-  <div>
-    {{ `${index + 1}` }}
-  </div>
+    <div>
+        {{ `${index + 1}` }}
+    </div>
 </template>
 
 <script setup lang="ts">

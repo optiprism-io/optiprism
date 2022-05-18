@@ -1,52 +1,52 @@
 <template>
-  <div class="pf-l-flex">
-    <span class="pf-l-flex__item">within</span>
+    <div class="pf-l-flex">
+        <span class="pf-l-flex__item">within</span>
 
-    <UiSelect
-      v-model="size"
-      :items="sizeItems"
-      @search="handleSizeSearch"
-    >
-      <UiButton
-        class="pf-m-main pf-m-secondary pf-l-flex__item"
-        :is-link="true"
-      >
-        {{ stepsStore.size }}
-      </UiButton>
-    </UiSelect>
+        <UiSelectSize
+            v-model="size"
+            :items="sizeItems"
+            @search="handleSizeSearch"
+        >
+            <UiButton
+                class="pf-m-main pf-m-secondary pf-l-flex__item"
+                :is-link="true"
+            >
+                {{ stepsStore.size }}
+            </UiButton>
+        </UiSelectSize>
 
-    <UiSelect
-      v-model="unit"
-      :items="unitItems"
-      :show-search="false"
-    >
-      <UiButton
-        class="pf-m-main pf-m-secondary pf-l-flex__item"
-        :is-link="true"
-      >
-        {{ $t(`common.timeUnits.${stepsStore.unit}`) }}
-      </UiButton>
-    </UiSelect>
+        <UiSelectUnit
+            v-model="unit"
+            :items="unitItems"
+            :show-search="false"
+        >
+            <UiButton
+                class="pf-m-main pf-m-secondary pf-l-flex__item"
+                :is-link="true"
+            >
+                {{ $t(`common.timeUnits.${stepsStore.unit}`) }}
+            </UiButton>
+        </UiSelectUnit>
 
-    <span class="pf-l-flex__item">
-      {{ $t('criteria.timeWindow') }} {{ $t('criteria.in') }}
-    </span>
+        <span class="pf-l-flex__item">
+            {{ $t('criteria.timeWindow') }} {{ $t('criteria.in') }}
+        </span>
 
-    <UiSelect
-      v-model="order"
-      :items="orderItems"
-      :show-search="false"
-    >
-      <UiButton
-        class="pf-m-main pf-m-secondary pf-l-flex__item"
-        :is-link="true"
-      >
-        {{ $t(`criteria.orderType.${stepsStore.order}`) }}
-      </UiButton>
-    </UiSelect>
+        <UiSelectOrder
+            v-model="order"
+            :items="orderItems"
+            :show-search="false"
+        >
+            <UiButton
+                class="pf-m-main pf-m-secondary pf-l-flex__item"
+                :is-link="true"
+            >
+                {{ $t(`criteria.orderType.${stepsStore.order}`) }}
+            </UiButton>
+        </UiSelectOrder>
 
-    <span class="pf-l-flex__item">order</span>
-  </div>
+        <span class="pf-l-flex__item">order</span>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -56,7 +56,9 @@ import {I18N} from '@/plugins/i18n';
 import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
 import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
 
-const UiSelect = UiSelectGeneric();
+const UiSelectSize = UiSelectGeneric<number>();
+const UiSelectUnit = UiSelectGeneric<StepUnit>();
+const UiSelectOrder = UiSelectGeneric<StepOrder>();
 
 const stepsStore = useStepsStore()
 const i18n = inject<I18N>('i18n')
@@ -64,75 +66,75 @@ const i18n = inject<I18N>('i18n')
 const dynamicSize = ref<number| null>(null)
 
 const defaultSizes = Array.from({length: 10}).map((_, i) => {
-  return 10 * (i + 1)
+    return 10 * (i + 1)
 })
 
 const sizeItems = computed<UiSelectItemInterface<number>[]>(() => {
-  const sizes = dynamicSize.value ? [dynamicSize.value, ...defaultSizes] : defaultSizes
+    const sizes = dynamicSize.value ? [dynamicSize.value, ...defaultSizes] : defaultSizes
 
-  return sizes.map(item => {
-    return {
-      __type: 'item',
-      id: item,
-      label: `${item}`,
-      value: item,
-    }
-  })
+    return sizes.map(item => {
+        return {
+            __type: 'item',
+            id: item,
+            label: `${item}`,
+            value: item,
+        }
+    })
 });
 
 const unitItems = computed<UiSelectItemInterface<StepUnit>[]>(() => {
-  return stepUnits.map(item => ({
-    __type: 'item',
-    id: item,
-    label: i18n?.$t(`common.timeUnits.${item}`) ?? item,
-    value: item
-  }))
+    return stepUnits.map(item => ({
+        __type: 'item',
+        id: item,
+        label: i18n?.$t(`common.timeUnits.${item}`) ?? item,
+        value: item
+    }))
 })
 
 const orderItems = computed<UiSelectItemInterface<StepOrder>[]>(() => {
-  return stepOrders.map(item => ({
-    __type: 'item',
-    id: item,
-    label: i18n?.$t(`criteria.orderType.${item}`) ?? item,
-    value: item
-  }))
+    return stepOrders.map(item => ({
+        __type: 'item',
+        id: item,
+        label: i18n?.$t(`criteria.orderType.${item}`) ?? item,
+        value: item
+    }))
 })
 
 const size = computed({
-  get(): number {
-    return stepsStore.size
-  },
-  set(value: number) {
-    stepsStore.setSize(value)
-  }
+    get(): number {
+        return stepsStore.size
+    },
+    set(value: number) {
+        stepsStore.setSize(value)
+    }
 })
 
 const unit = computed({
-  get(): StepUnit {
-    return stepsStore.unit
-  },
-  set(value: StepUnit) {
-    stepsStore.setUnit(value)
-  }
+    get(): StepUnit {
+        return stepsStore.unit
+    },
+    set(value: StepUnit) {
+        stepsStore.setUnit(value)
+    }
 })
 
 const order = computed({
-  get(): StepOrder {
-    return stepsStore.order
-  },
-  set(value: StepOrder) {
-    stepsStore.setOrder(value)
-  }
+    get(): StepOrder {
+        return stepsStore.order
+    },
+    set(value: StepOrder) {
+        stepsStore.setOrder(value)
+    }
 })
 
 const handleSizeSearch = (value: string, items: UiSelectItemInterface<number>[]) => {
-  dynamicSize.value = null
+    dynamicSize.value = null
 
-  const parsedSize = Number(value)
-  if (isNaN(parsedSize)) {
-    return
-  }
+    const parsedSize = Number(value)
+    if (isNaN(parsedSize)) {
+        return
+    }
 
-  dynamicSize.value = parsedSize
+    dynamicSize.value = parsedSize
 }
 </script>

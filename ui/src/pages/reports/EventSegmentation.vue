@@ -1,35 +1,35 @@
 <template>
-  <ToolsLayout>
-    <template #title>
-      {{ $t('events.event_segmentation') }}
-    </template>
+    <ToolsLayout>
+        <template #title>
+            {{ $t('events.event_segmentation') }}
+        </template>
 
-    <UiCard :title="$t('events.events')">
-      <Events />
-    </UiCard>
+        <UiCard :title="$t('events.events')">
+            <Events />
+        </UiCard>
 
-    <UiCard :title="$t('events.segments.label')">
-      <Segments />
-    </UiCard>
+        <UiCard :title="$t('events.segments.label')">
+            <Segments />
+        </UiCard>
 
-    <UiCard :title="$t('events.filters')">
-      <Filters />
-    </UiCard>
+        <UiCard :title="$t('events.filters')">
+            <Filters />
+        </UiCard>
 
-    <UiCard :title="$t('events.breakdowns')">
-      <Breakdowns />
-    </UiCard>
+        <UiCard :title="$t('events.breakdowns')">
+            <Breakdowns />
+        </UiCard>
 
-    <template #main>
-      <EventsViews />
-    </template>
-  </ToolsLayout>
+        <template #main>
+            <EventsViews />
+        </template>
+    </ToolsLayout>
 
-  <CreateCustomEvent
-    v-if="commonStore.showCreateCustomEvent"
-    @apply="applyCreateCustomEvent"
-    @cancel="togglePopupCreateCustomEvent(false)"
-  />
+    <CreateCustomEvent
+        v-if="commonStore.showCreateCustomEvent"
+        @apply="applyCreateCustomEvent"
+        @cancel="togglePopupCreateCustomEvent(false)"
+    />
 </template>
 
 <script setup lang="ts">
@@ -50,15 +50,15 @@ const eventsStore = useEventsStore();
 const commonStore = useCommonStore()
 
 onUnmounted(() => {
-  eventsStore.$reset();
+    eventsStore.$reset();
 });
 
 const togglePopupCreateCustomEvent = (payload: boolean) => {
-  commonStore.togglePopupCreateCustomEvent(payload)
+    commonStore.togglePopupCreateCustomEvent(payload)
 }
 
 const applyCreateCustomEvent = () => {
-  togglePopupCreateCustomEvent(false)
+    togglePopupCreateCustomEvent(false)
 }
 </script>
 

@@ -1,7 +1,7 @@
 <template>
-  <div class="pf-c-action-list parent">
-    <slot name="main" />
+    <div class="pf-c-action-list parent">
+        <slot name="main" />
 
-    <slot />
-  </div>
+        <slot />
+    </div>
 </template>

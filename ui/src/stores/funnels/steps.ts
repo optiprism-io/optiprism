@@ -36,42 +36,42 @@ interface StepsStore {
 }
 
 export const useStepsStore = defineStore('steps', {
-  state: (): StepsStore => ({
-    steps: [],
-    size: 10,
-    unit: 'hours',
-    order: 'any',
-    excludedEvents: []
-  }),
-  getters: {},
-  actions: {
-    addStep(step: Step): void {
-      this.steps.push(step);
-    },
-    setSize(size: number): void {
-      this.size = size;
-    },
-    setUnit(unit: StepUnit): void {
-      this.unit = unit;
-    },
-    setOrder(order: StepOrder): void {
-      this.order = order;
-    },
+    state: (): StepsStore => ({
+        steps: [],
+        size: 10,
+        unit: 'hours',
+        order: 'any',
+        excludedEvents: []
+    }),
+    getters: {},
+    actions: {
+        addStep(step: Step): void {
+            this.steps.push(step);
+        },
+        setSize(size: number): void {
+            this.size = size;
+        },
+        setUnit(unit: StepUnit): void {
+            this.unit = unit;
+        },
+        setOrder(order: StepOrder): void {
+            this.order = order;
+        },
 
-    addExcludedEvent({ event, steps }: ExcludedEvent): void {
-      this.excludedEvents.push({ event, steps });
-    },
-    editExcludedEvent({ index, excludedEvent }: EditExcludedEventPayload): void {
-      const { event, steps } = excludedEvent
-      if (event) {
-        this.excludedEvents[index].event = event
-      }
-      if (steps) {
-        this.excludedEvents[index].steps = steps
-      }
-    },
-    deleteExcludedEvent(index: number): void {
-      this.excludedEvents.splice(index, 1);
+        addExcludedEvent({ event, steps }: ExcludedEvent): void {
+            this.excludedEvents.push({ event, steps });
+        },
+        editExcludedEvent({ index, excludedEvent }: EditExcludedEventPayload): void {
+            const { event, steps } = excludedEvent
+            if (event) {
+                this.excludedEvents[index].event = event
+            }
+            if (steps) {
+                this.excludedEvents[index].steps = steps
+            }
+        },
+        deleteExcludedEvent(index: number): void {
+            this.excludedEvents.splice(index, 1);
+        }
     }
-  }
 })

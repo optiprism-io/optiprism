@@ -1,34 +1,34 @@
 <template>
-  <div class="pf-l-flex pf-m-column">
-    <SelectedEvent
-      v-for="(event, index) in events"
-      :key="index"
-      :event="event"
-      :event-ref="event.ref"
-      :filters="event.filters"
-      :index="index"
-      :event-items="lexiconStore.eventsList"
-      :breakdowns="event.breakdowns"
-      :queries="event.queries"
-      :auto-hide="!commonStore.showCreateCustomEvent"
-      :identifier="identifier"
-      @action="selectAction"
-      @edit="editEvent"
-      @set-event="setEvent"
-      @remove-event="removeEvent"
-      @add-breakdown="addBreakdown"
-      @change-breakdown-property="changeBreakdownProperty"
-      @remove-breakdown="removeBreakdown"
-      @remove-query="removeQuery"
-      @add-query="addQuery"
-      @change-query="changeQuery"
-    />
-    <div class="pf-l-flex">
-      <EventSelector @select="addEvent">
-        <slot name="new" />
-      </EventSelector>
+    <div class="pf-l-flex pf-m-column">
+        <SelectedEvent
+            v-for="(event, index) in events"
+            :key="index"
+            :event="event"
+            :event-ref="event.ref"
+            :filters="event.filters"
+            :index="index"
+            :event-items="lexiconStore.eventsList"
+            :breakdowns="event.breakdowns"
+            :queries="event.queries"
+            :auto-hide="!commonStore.showCreateCustomEvent"
+            :identifier="identifier"
+            @action="selectAction"
+            @edit="editEvent"
+            @set-event="setEvent"
+            @remove-event="removeEvent"
+            @add-breakdown="addBreakdown"
+            @change-breakdown-property="changeBreakdownProperty"
+            @remove-breakdown="removeBreakdown"
+            @remove-query="removeQuery"
+            @add-query="addQuery"
+            @change-query="changeQuery"
+        />
+        <div class="pf-l-flex">
+            <EventSelector @select="addEvent">
+                <slot name="new" />
+            </EventSelector>
+        </div>
     </div>
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -41,14 +41,14 @@ import EventSelector from '@/components/events/Events/EventSelector.vue';
 const SelectedEvent = defineAsyncComponent(() => import('@/components/events/Events/SelectedEvent.vue'))
 
 const props = defineProps({
-  identifier: {
-    type: String as PropType<'numeric' | 'alphabet'>,
-    default: 'alphabet',
-  },
-  createWithQuery: {
-    type: Boolean,
-    default: true,
-  },
+    identifier: {
+        type: String as PropType<'numeric' | 'alphabet'>,
+        default: 'alphabet',
+    },
+    createWithQuery: {
+        type: Boolean,
+        default: true,
+    },
 })
 
 const lexiconStore = useLexiconStore();
@@ -58,54 +58,54 @@ const commonStore = useCommonStore()
 const events = computed(() => eventsStore.events);
 
 const setEvent = (payload: EventPayload) => {
-  eventsStore.setEvent(payload);
+    eventsStore.setEvent(payload);
 }
 
 const updateEventSegmentationResult = (): void => {
-  eventsStore.fetchEventSegmentationResult()
+    eventsStore.fetchEventSegmentationResult()
 }
 
 const addEvent = (ref: EventRef) => {
-  eventsStore.addEventByRef(ref, props.createWithQuery);
+    eventsStore.addEventByRef(ref, props.createWithQuery);
 };
 
 const removeEvent = (idx: number): void => {
-  eventsStore.deleteEvent(idx);
+    eventsStore.deleteEvent(idx);
 };
 
 const addBreakdown = (idx: number): void => {
-  eventsStore.addBreakdown(idx);
+    eventsStore.addBreakdown(idx);
 };
 
 const changeBreakdownProperty = (eventIdx: number, breakdownIdx: number, propRef: PropertyRef) => {
-  eventsStore.changeBreakdownProperty(eventIdx, breakdownIdx, propRef);
+    eventsStore.changeBreakdownProperty(eventIdx, breakdownIdx, propRef);
 };
 
 const removeBreakdown = (eventIdx: number, breakdownIdx: number): void => {
-  eventsStore.removeBreakdown(eventIdx, breakdownIdx);
+    eventsStore.removeBreakdown(eventIdx, breakdownIdx);
 };
 
 const addQuery = (idx: number): void => {
-  eventsStore.addQuery(idx);
+    eventsStore.addQuery(idx);
 };
 
 const removeQuery = (eventIdx: number, queryIdx: number): void => {
-  eventsStore.removeQuery(eventIdx, queryIdx);
+    eventsStore.removeQuery(eventIdx, queryIdx);
 };
 
 const changeQuery = (eventIdx: number, queryIdx: number, ref: EventQueryRef) => {
-  eventsStore.changeQuery(eventIdx, queryIdx, ref);
+    eventsStore.changeQuery(eventIdx, queryIdx, ref);
 };
 
 const selectAction = (payload: string) => {
-  if (payload === 'createCustomEvent') {
-    commonStore.togglePopupCreateCustomEvent(true)
-  }
+    if (payload === 'createCustomEvent') {
+        commonStore.togglePopupCreateCustomEvent(true)
+    }
 }
 
 const editEvent = (payload: number) => {
-  eventsStore.setEditCustomEvent(Number(payload))
-  commonStore.togglePopupCreateCustomEvent(true)
+    eventsStore.setEditCustomEvent(Number(payload))
+    commonStore.togglePopupCreateCustomEvent(true)
 }
 
 watch(eventsStore.events, updateEventSegmentationResult)

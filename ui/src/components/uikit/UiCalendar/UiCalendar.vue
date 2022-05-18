@@ -332,7 +332,7 @@ const apply = () => {
         case 'single':
             emit('on-apply', currentValue.value);
             break;
-        // TOOD other mode calendate
+            // TOOD other mode calendate
         default:
             emit('on-apply', currentValue.value);
     }
