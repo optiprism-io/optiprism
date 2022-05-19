@@ -230,11 +230,9 @@ pub fn run(preferences: Preferences, time: &mut Time, products: &mut Products, r
                     break 'events;
                 }
                 _ => {
-                    // (prev_action, action) = (action, next_action(action, &transitions, rng))
                 }
             }
 
-            println!("{action}");
             (prev_action, action) = (action, next_action(action, &transitions, rng));
         }
         println!();
@@ -281,31 +279,6 @@ pub struct Coefficients {
     pub view_product_to_buy: f64,
     pub refund: f64,
     pub product_rating: f64,
-}
-
-macro_rules! first_coeff {
-    ($a:expr,$b:expr)=>{
-        {
-            if $a>0 {
-                $a as f64
-            }
-
-            $b as f64
-        }
-    };
-    ($a:expr,$b:expr,$c:expr)=>{
-        {
-            if $a>0 {
-                $a as f64
-            }
-
-            if $b>0 {
-                $b as f64
-            }
-
-            $c as f64
-        }
-    }
 }
 
 pub fn make_transitions(coef: &Coefficients) -> Vec<(Action, Vec<(Action, f64)>)> {
