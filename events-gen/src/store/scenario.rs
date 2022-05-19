@@ -66,6 +66,7 @@ pub enum Action {
     Bounce,
     AbandonCart,
     EndSession,
+    None, // special case
 }
 
 fn write_event(event: Event) -> Result<()> {
@@ -104,10 +105,6 @@ enum Intention<'a> {
 }
 
 
-pub fn make_state(transitions: &Vec<(Action, Vec<(Action, Vec<f64>)>)>) -> Vec<Vec<usize>> {
-    transitions.iter().map(|(from, v)| vec![0; v.len()]).collect()
-}
-
 pub fn run(preferences: Preferences, time: &mut Time, products: &mut Products, rng: &mut ThreadRng) -> Result<()> {
     let mut selected_product: Option<&Product> = None;
     let mut products_bought: HashMap<usize, usize> = HashMap::default();
@@ -144,171 +141,74 @@ pub fn run(preferences: Preferences, time: &mut Time, products: &mut Products, r
             break;
         }
 
+        let mut prev_action: Action = Action::None;
         let mut action = Action::ViewIndex;
         'events: loop {
             println!("action: {:?}", action);
-            match action {
-                Action::EndSession => {
+            match (prev_action, action, intention) {
+                (_, Action::EndSession, _) => {
                     if cart.len() == 0 {
-                        break;
+                        break 'events;
                     }
 
                     if rng.gen::<f64>() < coefficients.abandon_cart {
-                        break;
+                        break 'events;
                     }
 
                     action = Action::ViewCartAndPay;
                 }
-                Action::ViewIndex => {
-                    write_event(Event::IndexPageViewed)?;
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
+                (_, Action::ViewIndex, _) => {
                     action = next_action(action, &transitions, rng);
                 }
-                Action::SearchProduct => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    action = next_action(action, &transitions, rng);
-                    // TODO move to a common matcher of prev-next action pairs
-                    match action {
-                        Action::ViewProduct => {
-                            match intention {
-                                Intention::BuyCertainProduct(product) => {
-                                    search_query = Some(product.name.as_str());
-                                    selected_product = Some(product);
-                                }
-                                Intention::BuyAnyProduct => {
-                                    for (idx, product) in products.products.iter().enumerate() {
-                                        if products_viewed.contains_key(&product.id) {
-                                            continue;
-                                        }
-                                        if rng.gen::<f64>() < product_popularity[idx] {
-                                            selected_product = Some(product);
-                                            break;
-                                        }
-                                    }
-
-                                    if selected_product.is_none() {
-                                        action = Action::EndSession
-                                    }
-                                }
-                                _ => unimplemented!(),
-                            }
-                        }
-                        Action::NotFound => {
-                            action = next_action(Action::NotFound, &transitions, rng);
-                        }
-                        Action::EndSession => {}
-                        // _ => unreachable!("{action}"),
-                        _=>{}
-                    }
-
-                    write_event(Event::ProductSearched)?;
+                (Action::SearchProduct, Action::ViewProduct, Intention::BuyCertainProduct(product)) => {
+                    search_query = Some(product.name.as_str());
+                    selected_product = Some(product);
                 }
-                Action::ViewIndexPromotions => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    action = next_action(action, &transitions, rng);
-                    if action != Action::ViewProduct {
-                        continue;
+                (Action::SearchProduct, Action::ViewProduct, _) => {
+                    for (idx, product) in products.products.iter().enumerate() {
+                        if products_viewed.contains_key(&product.id) {
+                            continue;
+                        }
+                        if rng.gen::<f64>() < product_popularity[idx] {
+                            selected_product = Some(product);
+                            search_query = Some(product.name.as_str());
+                            break;
+                        }
                     }
 
+                    if selected_product.is_none() {
+                        (prev_action, action) = (action, Action::EndSession)
+                    }
+                }
+                (Action::ViewIndexPromotions, Action::ViewProduct, _) => {
                     let sp = products.promoted_product_sample(rng);
                     if products_viewed.contains_key(&sp.id) {
                         action = Action::EndSession;
                         continue;
                     }
                     selected_product.insert(sp);
-                    action = next_action(action, &transitions, rng);
                 }
-                Action::ViewProduct => {
-                    write_event(Event::ProductViewed)?;
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    *products_viewed.entry(selected_product.unwrap().id).or_insert(0) += 1;
-
-                    let buy_coefficient = selected_product.unwrap().calc_buy_coefficient(&preferences, &rating_weights);
-                    coefficients.view_product_to_buy = selected_product.unwrap().calc_buy_coefficient(&preferences, &rating_weights);
-                    // transitions = transitions_fn(&coefficients);
-                    action = next_action(action, &transitions, rng)
-                }
-                Action::AddProductToCart => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::ProductAddedToCart)?;
+                (_, Action::AddProductToCart, _) => {
                     cart.push(selected_product.unwrap());
-                    action = next_action(action, &transitions, rng);
                 }
-                Action::ViewCartAndPay => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::CartViewed)?;
-
-                    action = next_action(action, &transitions, rng);
-                }
-                Action::ViewCart => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::CartViewed)?;
-
-                    action = next_action(action, &transitions, rng);
-                }
-                Action::EnterCustomerInformation => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::CustomerInformationEntered)?;
-
-                    action = next_action(action, &transitions, rng);
-                }
-                Action::EnterShippingMethod => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::ShippingMethodEntered)?;
-
-                    action = next_action(action, &transitions, rng);
-                }
-                Action::EnterPaymentMethod => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::PaymentMethodEntered)?;
-
-                    action = next_action(action, &transitions, rng);
-                }
-                Action::VerifyOrder => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::OrderVerified)?;
-
-                    action = next_action(action, &transitions, rng);
-                }
-                Action::CompleteOrder => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::OrderCompleted)?;
-
+                (_, Action::CompleteOrder, _) => {
                     for product in cart.iter() {
                         *products_bought.entry(product.id).or_insert(0) += 1;
                         spent_total += product.final_price(preferences.has_coupon);
                     }
 
                     cart.truncate(0);
-                    action = next_action(action, &transitions, rng);
                 }
-                Action::RefundProduct => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::ProductRefunded)?;
-                    spent_total -= selected_product.unwrap().final_price(preferences.has_coupon);
-                    action = next_action(action, &transitions, rng);
-                }
-                Action::ViewDeals => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::DealsViewed)?;
-
-                    action = next_action(action, &transitions, rng);
-                    match action {
-                        Action::ViewProduct => {
-                            let sp = products.deal_product_sample(rng);
-                            if products_viewed.contains_key(&sp.id) {
-                                action = Action::EndSession;
-                                continue;
-                            }
-                            selected_product.insert(sp);
-                        }
-                        _ => {}
+                (Action::ViewDeals, Action::ViewProduct, _) => {
+                    let sp = products.deal_product_sample(rng);
+                    if products_viewed.contains_key(&sp.id) {
+                        action = Action::EndSession;
+                        continue;
                     }
+                    selected_product.insert(sp);
+                    *products_viewed.entry(selected_product.unwrap().id).or_insert(0) += 1;
                 }
-                Action::NotFound => {
-                    unimplemented!()
-                }
-                Action::ViewRelatedProduct => {
+                (_, Action::ViewRelatedProduct, _) => {
                     let product = &selected_product.unwrap();
                     let found = products.products
                         .iter()
@@ -318,33 +218,24 @@ pub fn run(preferences: Preferences, time: &mut Time, products: &mut Products, r
                         action = Action::EndSession;
                         continue;
                     }
-
-                    action = Action::ViewProduct;
+                    *products_viewed.entry(selected_product.unwrap().id).or_insert(0) += 1;
                 }
-                Action::ViewOrders => {
-                    time.wait_between(Duration::seconds(10), Duration::seconds(30));
-                    write_event(Event::OrdersViewed)?;
-
-                    action = next_action(action, &transitions, rng);
-
-                    match action {
-                        Action::RefundProduct => {
-                            if let Intention::MakeRefund(prod) = intention {
-                                selected_product = Some(prod);
-                            } else {
-                                unreachable!();
-                            }
-                        }
-                        _ => {}
-                    }
+                (Action::ViewOrders, Action::RefundProduct, Intention::MakeRefund(product)) => {
+                    spent_total -= product.final_price(preferences.has_coupon);
                 }
-                Action::Bounce => {
-                    break;
+                (_, Action::Bounce, _) => {
+                    break 'events;
                 }
-                Action::AbandonCart => {
-                    break;
+                (_, Action::AbandonCart, _) => {
+                    break 'events;
+                }
+                _ => {
+                    // (prev_action, action) = (action, next_action(action, &transitions, rng))
                 }
             }
+
+            println!("{action}");
+            (prev_action, action) = (action, next_action(action, &transitions, rng));
         }
         println!();
     }
@@ -367,11 +258,14 @@ pub fn next_action(from: Action, transitions: &Vec<(Action, Vec<(Action, f64)>)>
         for (t_to, weight) in to.iter() {
             total_weights -= weight;
             if total_weights < 0. {
-                return t_to.clone();
+                return *t_to;
             }
         }
+
+        unreachable!("{total_weights} weight>0")
     }
-    unreachable!()
+
+    unreachable!("transition from {} does not exists", from);
 }
 
 pub struct Coefficients {
@@ -469,8 +363,17 @@ pub fn make_transitions(coef: &Coefficients) -> Vec<(Action, Vec<(Action, f64)>)
             Action::ViewProduct,
             vec![
                 (Action::ViewIndex, coef.go_to_index),
-                (Action::ViewRelatedProduct, coef.discover*0.5),
+                (Action::ViewRelatedProduct, coef.discover * 0.5),
                 (Action::AddProductToCart, coef.view_product_to_buy),
+                (Action::Bounce, coef.bounce_rate),
+            ]
+        ),
+        (
+            Action::ViewRelatedProduct,
+            vec![
+                (Action::ViewIndex, coef.go_to_index),
+                (Action::ViewRelatedProduct, coef.discover * 0.3),
+                (Action::AddProductToCart, coef.view_product_to_buy * 0.9),
                 (Action::Bounce, coef.bounce_rate),
             ]
         ),
