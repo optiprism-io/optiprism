@@ -131,7 +131,7 @@ const tableColumnsValues = computed(() => {
                 title: i18n.$t(`events.live_stream.columns.${key}`),
                 truncate: true,
                 lastPinned: liveStreamStore.defaultColumns.length - 1 === i,
-                left: i * COLUMN_WIDTH,
+                left: i === 1 ? 380 : i * COLUMN_WIDTH,
             }
         }),
         ...liveStreamStore.activeColumns.map(key => {
@@ -163,7 +163,7 @@ const tableData = computed(() => {
                         const customEvent = lexiconStore.findCustomEventById(Number(event.id))
                         return customEvent ? customEvent.name : ''
                     }) : [],
-                    component: UiTableEventCell,
+                    component: column.value === 'eventName' ? UiTableEventCell : null,
                 }
             } else {
                 const value = column.value in data.properties ? data.properties[column.value] : data.userProperties && column.value in data.userProperties ? data.userProperties[column.value] : ''

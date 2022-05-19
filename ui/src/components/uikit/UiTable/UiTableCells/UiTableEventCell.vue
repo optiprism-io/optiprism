@@ -14,16 +14,21 @@
         <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
             <div class="pf-l-flex__item">
                 <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
-                    <div>{{ title }}</div>
+                    <div class="pf-u-text-nowrap">
+                        {{ title }}
+                    </div>
 
                     <div
                         v-if="props.customEvents && props.customEvents.length"
-                        class="pf-u-display-flex pf-u-flex-direction-row"
+                        class="pf-u-display-flex pf-u-flex-wrap"
                     >
                         <div
                             v-for="event in props.customEvents"
                             :key="event"
                             class="pf-u-ml-md ui-table-event-cell__custom-event"
+                            :class="{
+                                'pf-u-mb-md': customEventsMargin,
+                            }"
                         >
                             <UiButton class="pf-m-main pf-m-secondary">
                                 {{ event }}
@@ -88,6 +93,10 @@ const style = computed(() => {
     }
 })
 
+const customEventsMargin = computed(() => {
+    return props.customEvents && props.customEvents.length >= 3
+})
+
 const onAction = (payload: Action) => {
     emit('on-action', payload)
 }
@@ -96,7 +105,7 @@ const onAction = (payload: Action) => {
 <style lang="scss">
 .ui-table-event-cell {
     width: auto !important;
-    max-width: initial !important;
+    min-width: 380px !important;
 
     &__action-list {
         opacity: 0;
