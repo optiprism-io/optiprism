@@ -85,6 +85,7 @@ const removeEvent = (idx: number): void => {
 
 const selectAction = (payload: string) => {
     if (payload === 'createCustomEvent') {
+        eventsStore.setEditCustomEvent(null)
         commonStore.togglePopupCreateCustomEvent(true)
     }
 }

@@ -24,14 +24,19 @@
                     >
                         <div
                             v-for="event in props.customEvents"
-                            :key="event"
+                            :key="event.value"
                             class="pf-u-ml-md ui-table-event-cell__custom-event"
                             :class="{
                                 'pf-u-mb-md': customEventsMargin,
                             }"
+                            @click="onAction({
+                                name: String(event.value),
+                                icon: '',
+                                type: 'event'
+                            })"
                         >
                             <UiButton class="pf-m-main pf-m-secondary">
-                                {{ event }}
+                                {{ event.name }}
                             </UiButton>
                         </div>
                     </div>
@@ -70,7 +75,10 @@ type Props = {
     left?: number
     lastPinned?: boolean
     actions?: Action[]
-    customEvents?: string[]
+    customEvents?: {
+        name: string,
+        value: number
+    }[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -110,10 +118,6 @@ const onAction = (payload: Action) => {
     &__action-list {
         opacity: 0;
         cursor: pointer;
-    }
-
-    &__custom-event {
-        pointer-events: none;
     }
 }
 

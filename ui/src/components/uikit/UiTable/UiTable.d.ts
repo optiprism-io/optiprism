@@ -3,6 +3,7 @@ import { defineComponent } from 'vue'
 export type Action = {
     name: string
     icon: string
+    type?: string
 }
 
 export type Column = {
@@ -31,7 +32,10 @@ export type Cell = {
 }
 
 export type EventCell = Cell & {
-    customEvents: string[]
+    customEvents: {
+        name: string,
+        value: number
+    }[]
 }
 
 export type ColumnMap = {

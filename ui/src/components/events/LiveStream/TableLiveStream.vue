@@ -92,6 +92,7 @@ import { getStringDateByFormat } from '@/helpers/getStringDates'
 import { useLiveStreamStore, Report } from '@/stores/reports/liveStream'
 import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
+import { useEventsStore } from '@/stores/eventSegmentation/events'
 
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 import { Column, Cell, Action, EventCell } from '@/components/uikit/UiTable/UiTable'
@@ -107,6 +108,7 @@ const i18n = inject<any>('i18n')
 const liveStreamStore = useLiveStreamStore()
 const commonStore = useCommonStore()
 const lexiconStore = useLexiconStore()
+const eventsStore = useEventsStore()
 const COLUMN_WIDTH = 170;
 
 const itemsPeriod = computed(() => {
@@ -159,9 +161,13 @@ const tableData = computed(() => {
                         name: 'create',
                         icon: 'fas fa-plus-circle'
                     }] : [],
-                    customEvents: column.value === 'eventName' && Array.isArray(data.matchedCustomEvents) ? data.matchedCustomEvents.map(event => {
+                    customEvents: column.value === 'eventName' && lexiconStore.customEvents?.length && Array.isArray(data.matchedCustomEvents) ? data.matchedCustomEvents.map(event => {
                         const customEvent = lexiconStore.findCustomEventById(Number(event.id))
-                        return customEvent ? customEvent.name : ''
+
+                        return {
+                            name: customEvent.name,
+                            value: Number(event.id)
+                        }
                     }) : [],
                     component: column.value === 'eventName' ? UiTableEventCell : null,
                 }
@@ -247,6 +253,12 @@ const onApplyPeriod = (payload: ApplyPayload): void => {
 
 const onAction = (payload: Action) => {
     if (payload.name === 'create') {
+        eventsStore.setEditCustomEvent(null)
+        commonStore.togglePopupCreateCustomEvent(true)
+    }
+
+    if (payload.type === 'event') {
+        eventsStore.setEditCustomEvent(Number(payload.name))
         commonStore.togglePopupCreateCustomEvent(true)
     }
 }
