@@ -1,57 +1,83 @@
 <template>
-    <UiActionList
+    <div
         v-for="(item, index) in excludedEvents"
         :key="index"
-        class="pf-u-mb-md"
+        class="pf-u-mb-md pf-l-flex pf-m-column"
     >
-        <template #main>
-            <div class="pf-l-flex">
-                <span class="pf-l-flex__item">
-                    {{ $t('funnels.excludeSteps.exclude') }}
-                </span>
+        <UiActionList>
+            <template #main>
+                <div class="pf-l-flex">
+                    <span class="pf-l-flex__item">
+                        {{ $t('funnels.excludeSteps.exclude') }}
+                    </span>
 
-                <EventSelector
-                    class="pf-l-flex__item"
-                    @select="editEvent($event, index)"
-                >
-                    <UiButton
-                        class="pf-m-main pf-m-secondary"
-                        is-link
+                    <EventSelector
+                        class="pf-l-flex__item"
+                        @select="editEvent($event, index)"
                     >
-                        {{ eventName(item.event) }}
-                    </UiButton>
-                </EventSelector>
+                        <UiButton
+                            class="pf-m-main pf-m-secondary"
+                            is-link
+                        >
+                            {{ eventName(item.event) }}
+                        </UiButton>
+                    </EventSelector>
 
-                <span class="pf-l-flex__item">
-                    {{ $t('funnels.excludeSteps.between') }}
-                </span>
+                    <span class="pf-l-flex__item">
+                        {{ $t('funnels.excludeSteps.between') }}
+                    </span>
 
-                <UiSelect
-                    :items="excludeSteps"
-                    :show-search="false"
-                    @update:model-value="editEventSteps($event, index)"
-                >
-                    <UiButton
-                        class="pf-m-main pf-m-secondary pf-l-flex__item"
-                        :is-link="true"
+                    <UiSelect
+                        :items="excludeSteps"
+                        :show-search="false"
+                        @update:model-value="editEventSteps($event, index)"
                     >
-                        {{ excludeStepsToString(item.steps) }}
-                    </UiButton>
-                </UiSelect>
+                        <UiButton
+                            class="pf-m-main pf-m-secondary pf-l-flex__item"
+                            :is-link="true"
+                        >
+                            {{ excludeStepsToString(item.steps) }}
+                        </UiButton>
+                    </UiSelect>
 
-                <span class="pf-l-flex__item">steps</span>
-            </div>
-        </template>
+                    <span class="pf-l-flex__item">
+                        {{ $t('funnels.excludeSteps.steps') }}
+                    </span>
+                </div>
+            </template>
 
-        <UiActionListItem @click="stepsStore.deleteExcludedEvent(index)">
-            <VTooltip popper-class="ui-hint">
-                <UiIcon icon="fas fa-trash" />
-                <template #popper>
-                    Remove step
-                </template>
-            </VTooltip>
-        </UiActionListItem>
-    </UiActionList>
+            <UiActionListItem @click="createFilterForEvent(index)">
+                <VTooltip popper-class="ui-hint">
+                    <UiIcon icon="fas fa-filter" />
+                    <template #popper>
+                        {{ $t('common.add_filter') }}
+                    </template>
+                </VTooltip>
+            </UiActionListItem>
+
+            <UiActionListItem @click="stepsStore.deleteExcludedEvent(index)">
+                <VTooltip popper-class="ui-hint">
+                    <UiIcon icon="fas fa-trash" />
+                    <template #popper>
+                        {{ $t('funnels.excludeSteps.remove') }}
+                    </template>
+                </VTooltip>
+            </UiActionListItem>
+        </UiActionList>
+
+        <Filter
+            v-for="(filter, filterIndex) in item.filters"
+            :key="filterIndex"
+            :filter="filter"
+            :event-ref="item.event"
+            :index="filterIndex"
+            @remove-filter="removeFilterForEvent(index, filterIndex)"
+            @change-filter-property="(...args) => changeFilterPropertyForEvent(index, ...args)"
+            @change-filter-operation="(...args) => changeFilterOperationForEvent(index, ...args)"
+            @add-filter-value="(...args) => addFilterValueForEvent(index, ...args)"
+            @remove-filter-value="(...args) => removeFilterValueForEvent(index, ...args)"
+        />
+    </div>
 
     <EventSelector @select="excludeEvent">
         <UiButton
@@ -70,18 +96,23 @@ import {useLexiconStore} from '@/stores/lexicon';
 import EventSelector from '@/components/events/Events/EventSelector.vue';
 import {computed, inject} from 'vue';
 import {ExcludedEventSteps, useStepsStore} from '@/stores/funnels/steps';
-import {EventRef} from '@/types/events';
-import {EventType} from '@/api';
+import {EventRef, PropertyRef} from '@/types/events';
 import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
 import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
 import {I18N} from '@/plugins/i18n';
 import UiActionList from '@/components/uikit/UiActionList/UiActionList.vue';
 import UiActionListItem from '@/components/uikit/UiActionList/UiActionListItem.vue';
+import {useEventName} from '@/helpers/useEventName';
+import Filter from '@/components/events/Filter.vue';
+import {OperationId, Value} from '@/types';
+import schemaService from '@/api/services/schema.service';
+
 const UiSelect = UiSelectGeneric();
 
 const eventsStore = useEventsStore();
 const lexiconStore = useLexiconStore();
 const stepsStore = useStepsStore();
+const eventName = useEventName()
 
 const { $t } = inject('i18n') as I18N;
 
@@ -144,17 +175,86 @@ const editEventSteps = (stepsString: string, index: number): void => {
     })
 }
 
-const eventName = (ref: EventRef): string => {
-    let event = lexiconStore.findEventById(ref.id)
+const createFilterForEvent = (index: number): void => {
+    stepsStore.editExcludedEvent({
+        index,
+        excludedEvent: {
+            filters: [
+                {
+                    opId: OperationId.Eq,
+                    values: [],
+                    valuesList: [],
+                }
+            ]
+        }
+    })
+}
 
-    switch (ref.type) {
-        case EventType.Regular:
-            return event.displayName || event.name
-        case EventType.Custom:
-            return lexiconStore.findCustomEventById(ref.id).name
+const removeFilterForEvent = (index: number, filterIndex: number): void => {
+    stepsStore.removeFilterForEvent({index, filterIndex})
+}
+
+const changeFilterPropertyForEvent = async (index: number, filterIndex: number, payload: PropertyRef): Promise<void> => {
+    const eventRef = stepsStore.excludedEvents[index].event;
+    let valuesList = [];
+
+    try {
+        const res = await schemaService.propertryValues({
+            event_name: lexiconStore.eventName(eventRef),
+            event_type: eventRef.type,
+            property_name: lexiconStore.propertyName(payload),
+            property_type: payload.type
+        })
+        valuesList = res ?? [];
+    } catch (e) {
+        throw new Error('error getEventsValues')
     }
-    throw new Error('unhandled');
-};
+
+    stepsStore.editFilterForEvent({
+        index,
+        filterIndex,
+        filter: {
+            propRef: payload,
+            valuesList
+        }
+    })
+}
+
+const changeFilterOperationForEvent = (index: number, filterIndex: number, payload: OperationId): void => {
+    stepsStore.editFilterForEvent({
+        index,
+        filterIndex,
+        filter: {
+            opId: payload
+        }
+    })
+}
+const addFilterValueForEvent = (index: number, filterIndex: number, payload: Value): void => {
+    stepsStore.editFilterForEvent({
+        index,
+        filterIndex,
+        filter: {
+            values: [
+                ...stepsStore.excludedEvents[index].filters[filterIndex].values,
+                payload
+            ]
+        }
+    })
+}
+
+const removeFilterValueForEvent = (index: number, filterIndex: number, value: Value): void => {
+    stepsStore.editFilterForEvent({
+        index,
+        filterIndex,
+        filter: {
+            values: stepsStore
+                .excludedEvents[index]
+                .filters[filterIndex]
+                .values
+                .filter(item => item !== value)
+        }
+    })
+}
 
 const excludeStepsFromString = (stepsString: string): ExcludedEventSteps => {
     if (stepsString === 'all') {

@@ -3,3 +3,9 @@
         <slot />
     </div>
 </template>
+
+<style lang="scss" scoped>
+.pf-c-action-list__item {
+  color: var(--op-base-color-text)
+}
+</style>

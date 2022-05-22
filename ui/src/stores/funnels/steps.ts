@@ -1,6 +1,7 @@
 import {defineStore} from 'pinia';
 import {Step} from '@/types/steps';
 import {EventRef} from '@/types/events';
+import {EventFilter} from '@/stores/eventSegmentation/events';
 
 export const stepUnits = ['seconds', 'minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const;
 export type StepUnit = typeof stepUnits[number];
@@ -9,22 +10,32 @@ export const stepOrders = ['exact', 'any'] as const;
 export type StepOrder = typeof stepOrders[number];
 
 export type ExcludedEventSteps = {
-  type: 'all';
+    type: 'all';
 } | {
-  type: 'between';
-  from: number;
-  to: number;
+    type: 'between';
+    from: number;
+    to: number;
 }
 
 interface ExcludedEvent {
-  event: EventRef;
-  steps: ExcludedEventSteps;
+    event: EventRef;
+    steps: ExcludedEventSteps;
+    filters: EventFilter[];
 }
 
-type AddExcludedEventPayload = ExcludedEvent;
+type AddExcludedEventPayload = Omit<ExcludedEvent, 'filters'>;
 type EditExcludedEventPayload = {
-  index: number;
-  excludedEvent: Partial<ExcludedEvent>;
+    index: number;
+    excludedEvent: Partial<ExcludedEvent>;
+}
+type RemoveFilterForEventPayload = {
+    index: number;
+    filterIndex: number;
+}
+type EditFilterForEventPayload = {
+    index: number;
+    filterIndex: number;
+    filter: Partial<EventFilter>;
 }
 
 interface StepsStore {
@@ -57,17 +68,36 @@ export const useStepsStore = defineStore('steps', {
         setOrder(order: StepOrder): void {
             this.order = order;
         },
-
-        addExcludedEvent({ event, steps }: ExcludedEvent): void {
-            this.excludedEvents.push({ event, steps });
+        addExcludedEvent({ event, steps }: AddExcludedEventPayload): void {
+            this.excludedEvents.push({
+                event,
+                steps,
+                filters: []
+            });
         },
         editExcludedEvent({ index, excludedEvent }: EditExcludedEventPayload): void {
-            const { event, steps } = excludedEvent
+            const { event, steps, filters } = excludedEvent
             if (event) {
                 this.excludedEvents[index].event = event
             }
             if (steps) {
                 this.excludedEvents[index].steps = steps
+            }
+            if (filters) {
+                this.excludedEvents[index].filters = [
+                    ...this.excludedEvents[index].filters,
+                    ...filters
+                ]
+            }
+        },
+        removeFilterForEvent({index, filterIndex}: RemoveFilterForEventPayload): void {
+            this.excludedEvents[index].filters.splice(filterIndex, 1)
+        },
+        editFilterForEvent({index, filterIndex, filter}: EditFilterForEventPayload): void {
+            const prevFilter = this.excludedEvents[index].filters[filterIndex];
+            this.excludedEvents[index].filters[filterIndex] = {
+                ...prevFilter,
+                ...filter
             }
         },
         deleteExcludedEvent(index: number): void {
