@@ -2,7 +2,7 @@
     <div
         v-for="(item, index) in excludedEvents"
         :key="index"
-        class="pf-u-mb-md pf-l-flex pf-m-column"
+        class="pf-l-flex pf-m-column"
     >
         <UiActionList>
             <template #main>
@@ -78,16 +78,6 @@
             @remove-filter-value="(...args) => removeFilterValueForEvent(index, ...args)"
         />
     </div>
-
-    <EventSelector @select="excludeEvent">
-        <UiButton
-            class="pf-m-main"
-            :is-link="true"
-            :before-icon="'fas fa-plus'"
-        >
-            {{ $t('funnels.excludeSteps.add') }}
-        </UiButton>
-    </EventSelector>
 </template>
 
 <script lang="ts" setup>

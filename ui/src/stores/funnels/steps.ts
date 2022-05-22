@@ -1,6 +1,6 @@
 import {defineStore} from 'pinia';
 import {Step} from '@/types/steps';
-import {EventRef} from '@/types/events';
+import {EventProperty, EventRef} from '@/types/events';
 import {EventFilter} from '@/stores/eventSegmentation/events';
 
 export const stepUnits = ['seconds', 'minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const;
@@ -16,6 +16,8 @@ export type ExcludedEventSteps = {
     from: number;
     to: number;
 }
+
+export type HoldingProperty = Pick<EventProperty, 'id' | 'name'>;
 
 interface ExcludedEvent {
     event: EventRef;
@@ -44,6 +46,8 @@ interface StepsStore {
     unit: StepUnit;
     order: StepOrder;
     excludedEvents: ExcludedEvent[];
+    holdingProperties: HoldingProperty[];
+    propsAvailableToHold: HoldingProperty[];
 }
 
 export const useStepsStore = defineStore('steps', {
@@ -52,7 +56,9 @@ export const useStepsStore = defineStore('steps', {
         size: 10,
         unit: 'hours',
         order: 'any',
-        excludedEvents: []
+        excludedEvents: [],
+        holdingProperties: [],
+        propsAvailableToHold: [],
     }),
     getters: {},
     actions: {
@@ -102,6 +108,18 @@ export const useStepsStore = defineStore('steps', {
         },
         deleteExcludedEvent(index: number): void {
             this.excludedEvents.splice(index, 1);
-        }
+        },
+        addHoldingProperty(property: HoldingProperty): void {
+            this.holdingProperties.push(property);
+        },
+        deleteHoldingProperty(index: number): void {
+            this.holdingProperties.splice(index, 1);
+        },
+        clearHoldingProperties(): void {
+            this.holdingProperties = [];
+        },
+        setPropsAvailableToHold(properties: HoldingProperty[]): void {
+            this.propsAvailableToHold = properties;
+        },
     }
 })

@@ -30,12 +30,15 @@
                 {{ $t('criteria.label') }}
             </UiCardTitle>
 
-            <UiCardBody>
+            <UiCardBody class="pf-l-flex pf-m-column">
                 <TimeWindow />
+                <HoldingConstantList />
+                <ExcludeStepsList />
             </UiCardBody>
 
-            <UiCardBody>
-                <ExcludeEvents />
+            <UiCardBody class="pf-l-flex">
+                <ExcludeStepSelect />
+                <HoldingConstantSelect />
             </UiCardBody>
         </UiCardContainer>
 
@@ -64,7 +67,10 @@ import Breakdowns from '@/components/events/Breakdowns.vue';
 import Events from '@/components/events/Events/Events.vue';
 import {onUnmounted} from 'vue';
 import {useEventsStore} from '@/stores/eventSegmentation/events';
-import ExcludeEvents from '@/components/funnels/steps/ExcludeEvents.vue';
+import ExcludeStepsList from '@/components/funnels/exclude/ExcludeStepsList.vue';
+import HoldingConstantSelect from '@/components/funnels/holding/HoldingConstantSelect.vue';
+import ExcludeStepSelect from '@/components/funnels/exclude/ExcludeStepSelect.vue';
+import HoldingConstantList from '@/components/funnels/holding/HoldingConstantList.vue';
 
 const eventsStore = useEventsStore();
 

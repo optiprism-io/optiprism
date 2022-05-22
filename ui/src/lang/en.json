@@ -111,13 +111,18 @@
     "filters": "Filters",
     "breakdowns": "Breakdowns",
     "excludeSteps": {
-      "add": "Add exclude step",
+      "add": "Exclude step",
       "exclude": "exclude",
       "between": "between",
       "steps": "steps",
       "and": "and",
       "all": "All",
       "remove": "Remove step"
+    },
+    "holdingConstant": {
+      "add": "Holding constant",
+      "holding": "holding",
+      "clear": "Clear holding constant"
     }
   },
 
