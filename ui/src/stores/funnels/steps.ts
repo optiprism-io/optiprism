@@ -39,6 +39,11 @@ type EditFilterForEventPayload = {
     filterIndex: number;
     filter: Partial<EventFilter>;
 }
+type AddHoldingPropertyPayload = HoldingProperty;
+type EditHoldingPropertyPayload = {
+    index: number;
+    property: HoldingProperty;
+}
 
 interface StepsStore {
     steps: Step[];
@@ -109,8 +114,11 @@ export const useStepsStore = defineStore('steps', {
         deleteExcludedEvent(index: number): void {
             this.excludedEvents.splice(index, 1);
         },
-        addHoldingProperty(property: HoldingProperty): void {
-            this.holdingProperties.push(property);
+        addHoldingProperty(payload: AddHoldingPropertyPayload): void {
+            this.holdingProperties.push(payload);
+        },
+        editHoldingProperty({index, property}: EditHoldingPropertyPayload): void {
+            this.holdingProperties[index] = property;
         },
         deleteHoldingProperty(index: number): void {
             this.holdingProperties.splice(index, 1);

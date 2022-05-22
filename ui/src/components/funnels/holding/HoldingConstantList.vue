@@ -13,6 +13,7 @@
                     :key="index"
                     :items="propertiesItems"
                     class="pf-l-flex__item"
+                    @update:model-value="editHoldingProperty(index, $event)"
                 >
                     <UiButton class="pf-m-main pf-m-secondary">
                         {{ item.name }}
@@ -47,7 +48,7 @@ import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
 import UiActionList from '@/components/uikit/UiActionList/UiActionList.vue';
 import UiActionListItem from '@/components/uikit/UiActionList/UiActionListItem.vue';
 
-const UiSelectProperty = UiSelectGeneric<string>()
+const UiSelectProperty = UiSelectGeneric<HoldingProperty>()
 
 const stepsStore = useStepsStore();
 
@@ -66,6 +67,10 @@ const propertiesItems = computed<UiSelectItemInterface<HoldingProperty>[]>(() =>
         }
     })
 })
+
+const editHoldingProperty = (index: number, property: HoldingProperty) => {
+    stepsStore.editHoldingProperty({index, property})
+}
 
 const deleteHoldingProperty = (index: number) : void => {
     stepsStore.deleteHoldingProperty(index)
