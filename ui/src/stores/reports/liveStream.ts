@@ -154,18 +154,22 @@ export const useLiveStreamStore = defineStore('liveStream', {
             this.loading = true
             const commonStore = useCommonStore()
 
-            const res = await dataService.createEventsStream(String(commonStore.projectId), {
-                time: this.timeRequest,
-                events: this.eventsRequest,
-                filters: this.filtersRequest,
-            })
+            try {
+                const res = await dataService.createEventsStream(String(commonStore.projectId), {
+                    time: this.timeRequest,
+                    events: this.eventsRequest,
+                    filters: this.filtersRequest,
+                })
 
-            if (res?.data) {
-                this.reports = res.data
+                if (res?.data) {
+                    this.reports = res.data
 
-                if (this.columnsMap) {
-                    this.activeColumns = this.columnsMap
+                    if (this.columnsMap) {
+                        this.activeColumns = this.columnsMap
+                    }
                 }
+            } catch (error) {
+                throw new Error('error get report live stream');
             }
 
             this.loading = false
