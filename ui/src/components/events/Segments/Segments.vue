@@ -146,6 +146,7 @@ provide('changeCompareEventCondition', (payload: ChangeEventCondition) => {
 
 provide('actionEvent', (payload: string) => {
     if (payload === 'createCustomEvent') {
+        eventsStore.setEditCustomEvent(null)
         commonStore.togglePopupCreateCustomEvent(true)
     }
 })

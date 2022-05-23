@@ -124,6 +124,7 @@ const changeQuery = (eventIdx: number, queryIdx: number, ref: EventQueryRef) => 
 
 const selectAction = (payload: string) => {
     if (payload === 'createCustomEvent') {
+        eventsStore.setEditCustomEvent(null)
         commonStore.togglePopupCreateCustomEvent(true)
     }
 }

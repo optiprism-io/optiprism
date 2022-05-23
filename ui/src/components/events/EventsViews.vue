@@ -80,7 +80,7 @@
                     />
                 </div>
                 <div class="pf-c-card__title pf-u-text-align-center pf-u-font-size-lg pf-u-color-400">
-                    {{ $t('events.select_to_start') }}
+                    {{ $t('common.no_data') }}
                 </div>
             </div>
             <component

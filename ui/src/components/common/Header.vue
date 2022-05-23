@@ -69,7 +69,7 @@ const items = [
 .app-header {
     position: sticky;
     top: 0;
-    z-index: 101;
+    z-index: var(--pf-global--ZIndex--2xl);
     height: 44px;
     grid-area: header;
     background-color: var(--op-base-color);
