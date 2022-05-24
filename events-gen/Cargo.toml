@@ -1,14 +1,22 @@
 [[bin]]
-name = "daemon"
-path = "src/exp/main.rs"
+name = "store"
+path = "src/bin/store/main.rs"
+
+[profile.release]
+codegen-units = 1
 
 [package]
 name = "events-gen"
 version = "0.1.0"
 edition = "2021"
 
+[dev-dependencies]
+criterion = "0.3"
+
 [dependencies]
+common = { path = "../common" }
 chrono = { version = "0.4.19" }
+rust_decimal = { version = "1.22.0", features = ["serde-float"] }
 rand = "0.8.0"
 lazy_static = "1.4.0"
 strum = "0.24"
@@ -18,3 +26,5 @@ rand_distr = "0.4.3"
 serde = { version = "1.0.133", features = ["derive"] }
 cubic_spline = "1.0.0"
 splines = "4.1.0"
+crossbeam-channel = "0.3.9"
+arrow = { version = "9.0.0", features = ["prettyprint"] }

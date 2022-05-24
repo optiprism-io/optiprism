@@ -1,5 +1,2 @@
-// mod actions;
-mod products;
-// mod output;
-// mod data;
+pub mod products;
 pub mod scenario;
