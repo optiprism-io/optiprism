@@ -10,7 +10,7 @@
         ],
         "name": "sign_up",
         "displayName": "Sign Up",
-        "description": "When user signs up",
+        "description": "Customize session timeout length, exclude events from sessions, or define event based sessions in project settings.",
         "status": "enabled"
     },
     {
@@ -24,7 +24,7 @@
         ],
         "name": "search",
         "displayName": "Search",
-        "description": "",
+        "description": "Triggered when a search for an item is conducted from the search bar.",
         "status": "enabled",
         "properties": [
             1
@@ -41,7 +41,7 @@
         ],
         "name": "view_product",
         "displayName": "View Product",
-        "description": "View product",
+        "description": "Triggered when viewing the details page of an item.",
         "status": "enabled",
         "properties": [
             2,
@@ -60,7 +60,7 @@
         ],
         "name": "add_product_to_cart",
         "displayName": "Add Product to Cart",
-        "description": "Add Product to Cart",
+        "description": "Triggered when a user adds an item to their cart.",
         "status": "enabled",
         "properties": [
             5,
@@ -79,7 +79,7 @@
         ],
         "name": "purchase_product",
         "displayName": "Purchase Product",
-        "description": "When product was purchased",
+        "description": "Triggered when a user completes their purchase in the checkout flow.",
         "status": "enabled",
         "properties": [
             8,

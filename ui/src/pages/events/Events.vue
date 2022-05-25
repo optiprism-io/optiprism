@@ -9,11 +9,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-const i18n = inject<any>('i18n')
+import { useLexiconStore } from '@/stores/lexicon'
+import { useLiveStreamStore } from '@/stores/reports/liveStream'
 
+const i18n = inject<any>('i18n')
 const route = useRoute()
+const lexiconStore = useLexiconStore()
+const liveStreamStore = useLiveStreamStore()
 
 const items = computed(() => {
     const mapTabs = [
@@ -41,6 +45,13 @@ const items = computed(() => {
             active: route.name === item.value,
         }
     })
+})
+
+onMounted(async () => {
+    liveStreamStore.getReportLiveStream()
+    await lexiconStore.getEvents()
+    await lexiconStore.getEventProperties()
+    await lexiconStore.getUserProperties()
 })
 </script>
 

@@ -41,6 +41,13 @@
   },
 
   "events": {
+    "event_management": {
+      "columns": {
+        "name": "Name",
+        "displayName": "Display name",
+        "description": "Description"
+      }
+    },
     "live_stream": {
       "title": "Live stream",
       "columns": {
