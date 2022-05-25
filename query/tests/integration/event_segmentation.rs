@@ -81,7 +81,7 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable),
+                Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable, prop.dictionary_type.clone()),
             )
             .await?;
 
@@ -99,7 +99,7 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(event_fields::USER_ID.to_string(), DFDataType::UInt64, false),
+                Column::new(event_fields::USER_ID.to_string(), DFDataType::UInt64, false, None),
             )
             .await?;
         md.database
@@ -109,18 +109,20 @@ mod tests {
                     event_fields::CREATED_AT.to_string(),
                     DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
                     false,
+                    None,
                 ),
             )
             .await?;
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(event_fields::EVENT.to_string(), DFDataType::UInt16, false),
+                Column::new(event_fields::EVENT.to_string(), DFDataType::UInt16, false, None),
             )
             .await?;
 
         // create user props
-        create_property(
+
+        let country_prop = create_property(
             &md,
             Namespace::User,
             org_id,
@@ -138,11 +140,13 @@ mod tests {
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
-                dictionary_type: None,
+                dictionary_type: Some(DFDataType::UInt8),
             },
         )
             .await?;
 
+        md.dictionaries.get_key_or_create(org_id, proj_id, country_prop.column_name(Namespace::User).as_str(), "spain").await?;
+        md.dictionaries.get_key_or_create(org_id, proj_id, country_prop.column_name(Namespace::User).as_str(), "german").await?;
         create_property(
             &md,
             Namespace::User,
@@ -450,11 +454,18 @@ mod tests {
             events: vec![
                 Event::new(
                     EventRef::Regular("View Product".to_string()),
-                    Some(vec![EventFilter::Property {
-                        property: PropertyRef::User("Is Premium".to_string()),
-                        operation: PropValueOperation::Eq,
-                        value: Some(vec![ScalarValue::Boolean(Some(true))]),
-                    }]),
+                    Some(vec![
+                        EventFilter::Property {
+                            property: PropertyRef::User("Is Premium".to_string()),
+                            operation: PropValueOperation::Eq,
+                            value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                        },
+                        EventFilter::Property {
+                            property: PropertyRef::User("Country".to_string()),
+                            operation: PropValueOperation::Eq,
+                            value: Some(vec![ScalarValue::Utf8(Some("spain".to_string())), ScalarValue::Utf8(Some("german".to_string()))]),
+                        },
+                    ]),
                     Some(vec![Breakdown::Property(PropertyRef::User(
                         "Device".to_string(),
                     ))]),

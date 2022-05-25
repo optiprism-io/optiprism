@@ -36,6 +36,7 @@ async fn test_database() -> Result<()> {
         name: "c1".to_string(),
         data_type: DataType::Null,
         nullable: false,
+        dictionary: None
     };
 
     // add column, non-existent table

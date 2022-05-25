@@ -174,7 +174,6 @@ pub struct Segment {
     conditions: Vec<SegmentCondition>,
 }
 
-
 #[derive(Clone, Debug)]
 pub struct EventSegmentation {
     pub time: QueryTime,

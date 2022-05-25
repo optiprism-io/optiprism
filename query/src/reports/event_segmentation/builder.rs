@@ -297,7 +297,7 @@ impl LogicalPlanBuilder {
                 let mut expr = binary_expr(
                     col(event_fields::EVENT),
                     Operator::Eq,
-                    lit(ScalarValue::from(e.id as u16)),
+                    lit(ScalarValue::from(e.id)),
                 );
 
                 // apply filters

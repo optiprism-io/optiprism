@@ -1572,6 +1572,7 @@ dependencies = [
  "async-mutex",
  "axum",
  "bincode",
+ "byteorder",
  "chrono",
  "common",
  "convert_case",

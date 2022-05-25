@@ -1,10 +1,13 @@
 use std::ops::Sub;
 use std::sync::Arc;
+use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
+use futures::executor;
+use datafusion::logical_plan::ExprSchemable;
 use datafusion_common::{Column, ScalarValue};
 use datafusion_expr::{col, Expr, lit, Operator};
 use datafusion_expr::expr_fn::{and, binary_expr};
-use metadata::Metadata;
+use metadata::{dictionaries, Metadata};
 use metadata::properties::provider::Namespace;
 use crate::{Context, Error, event_fields};
 use crate::logical_plan::expr::{lit_timestamp, multi_or};
@@ -62,18 +65,102 @@ pub fn time_expression(time: &QueryTime, cur_time: &DateTime<Utc>) -> Expr {
     }
 }
 
-/// builds name [property] [op] [value] expression
+pub async fn values_to_dict_keys(
+    ctx: &Context,
+    dictionaries: &Arc<dictionaries::Provider>,
+    dict_type: &DataType,
+    col_name: &str,
+    values: &Vec<ScalarValue>,
+) -> Result<Vec<ScalarValue>> {
+    let mut ret: Vec<ScalarValue> = Vec::with_capacity(values.len());
+    for value in values.iter() {
+        if let ScalarValue::Utf8(inner) = value {
+            if let Some(str_value) = inner {
+                let key = dictionaries.get_key(
+                    ctx.organization_id,
+                    ctx.project_id,
+                    col_name,
+                    str_value.as_str(),
+                ).await?;
+
+                let scalar_value = match dict_type {
+                    DataType::UInt8 => ScalarValue::UInt8(Some(key as u8)),
+                    DataType::UInt16 => ScalarValue::UInt16(Some(key as u16)),
+                    DataType::UInt32 => ScalarValue::UInt32(Some(key as u32)),
+                    DataType::UInt64 => ScalarValue::UInt64(Some(key as u64)),
+                    _ => return Err(Error::QueryError("value type should be string".to_owned()))
+                };
+
+                ret.push(scalar_value);
+            } else {
+                ret.push(ScalarValue::try_from(dict_type)?);
+            }
+        } else {
+            return Err(Error::QueryError("value type should be string".to_owned()));
+        }
+    }
+
+    return Ok(ret);
+}
+
+/// builds name [property] [operation] [value] expression
 pub async fn property_expression(
     ctx: &Context,
     md: &Arc<Metadata>,
     property: &PropertyRef,
     operation: &PropValueOperation,
-    value: Option<Vec<ScalarValue>>,
+    values: Option<Vec<ScalarValue>>,
 ) -> Result<Expr> {
     match property {
-        PropertyRef::User(_) | PropertyRef::Event(_) => {
-            let prop_col = property_col(ctx, md, &property).await?;
-            named_property_expression(prop_col, operation, value)
+        PropertyRef::User(prop_name) => {
+            let prop = md
+                .user_properties
+                .get_by_name(ctx.organization_id, ctx.project_id, prop_name)
+                .await?;
+            let col_name = prop.column_name(Namespace::User);
+            let col = col(col_name.as_str());
+
+            if values.is_none() {
+                return named_property_expression(col, operation, None);
+            }
+
+            if let Some(dict_type) = prop.dictionary_type {
+                let dict_values = values_to_dict_keys(
+                    &ctx,
+                    &md.dictionaries,
+                    &dict_type,
+                    col_name.as_str(),
+                    &values.unwrap(),
+                ).await?;
+                return named_property_expression(col, operation, Some(dict_values));
+            } else {
+                return named_property_expression(col, operation, values);
+            };
+        }
+        PropertyRef::Event(prop_name) => {
+            let prop = md
+                .event_properties
+                .get_by_name(ctx.organization_id, ctx.project_id, prop_name)
+                .await?;
+            let col_name = prop.column_name(Namespace::Event);
+            let col = col(col_name.as_str());
+
+            if values.is_none() {
+                return named_property_expression(col, operation, values);
+            }
+
+            if let Some(dict_type) = prop.dictionary_type {
+                let dict_values = values_to_dict_keys(
+                    &ctx,
+                    &md.dictionaries,
+                    &dict_type,
+                    col_name.as_str(),
+                    &values.unwrap(),
+                ).await?;
+                return named_property_expression(col, operation, Some(dict_values));
+            } else {
+                return named_property_expression(col, operation, values);
+            };
         }
         PropertyRef::Custom(_) => unimplemented!(),
     }
@@ -113,8 +200,6 @@ pub fn named_property_expression(
     match operation {
         PropValueOperation::Eq | PropValueOperation::Neq => {
             // expressions for OR
-            let mut exprs: Vec<Expr> = vec![];
-
             let values_vec = values.ok_or_else(|| {
                 Error::QueryError("value should be defined for this kind of operation".to_owned())
             })?;
