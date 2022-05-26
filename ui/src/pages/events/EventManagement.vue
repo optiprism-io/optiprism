@@ -9,21 +9,33 @@
                     <UiTable
                         :items="items"
                         :columns="columns"
+                        @on-action="onAction"
                     />
                 </div>
             </div>
         </div>
     </div>
+    <EventManagementPopup
+        v-if="commonStore.showEventManagementPopup"
+        :name="editEventManagementPopup ? editEventManagementPopup.name : ''"
+        @apply="eventManagementPopupApply"
+        @cancel="eventManagementPopupCancel"
+    />
 </template>
 
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import { useLexiconStore } from '@/stores/lexicon'
+import { useCommonStore } from '@/stores/common'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
+import { Row, Action } from '@/components/uikit/UiTable/UiTable'
 import { Event } from '@/types/events'
+import UiTablePressedCell from '@/components/uikit/UiTable/UiTableCells/UiTablePressedCell.vue'
+import EventManagementPopup from '@/components/events/EventManagementPopup.vue'
 
 const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
+const commonStore = useCommonStore()
 
 const columns = computed(() => {
     return ['name', 'displayName', 'description'].map(key => {
@@ -35,11 +47,16 @@ const columns = computed(() => {
 })
 
 const items = computed(() => {
-    return lexiconStore.events.map((event: Event) => {
+    return lexiconStore.events.map((event: Event): Row => {
         return [
             {
                 value: 'name',
-                title: event.name
+                title: event.name,
+                component: UiTablePressedCell,
+                action: {
+                    type: event.id,
+                    name: event.name,
+                }
             },
             {
                 value: 'displayName',
@@ -52,6 +69,27 @@ const items = computed(() => {
         ]
     })
 })
+
+const editEventManagementPopup = computed(() => {
+    if (commonStore.editEventManagementPopupId) {
+        return lexiconStore.findEventById(commonStore.editEventManagementPopupId)
+    } else {
+        return null
+    }
+})
+
+const onAction = (payload: Action) => {
+    commonStore.updateEditEventManagementPopupId(Number(payload.type) || null)
+    commonStore.toggleEventManagementPopup(true)
+}
+
+const eventManagementPopupApply = () => {
+    commonStore.toggleEventManagementPopup(false)
+}
+
+const eventManagementPopupCancel = () => {
+    commonStore.toggleEventManagementPopup(false)
+}
 </script>
 
 <style scoped lang="scss">

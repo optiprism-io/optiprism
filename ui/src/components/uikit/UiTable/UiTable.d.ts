@@ -2,8 +2,8 @@ import { defineComponent } from 'vue'
 
 export type Action = {
     name: string
-    icon: string
-    type?: string
+    icon?: string
+    type?: string | number
 }
 
 export type Column = {
@@ -28,6 +28,7 @@ export type Cell = {
     lastPinned?: boolean
     left?: number
     actions?: Action[]
+    action?: Action,
     component?: ReturnType<typeof defineComponent>
 }
 

@@ -42,6 +42,7 @@
 
   "events": {
     "event_management": {
+      "event": "Event",
       "columns": {
         "name": "Name",
         "displayName": "Display name",
