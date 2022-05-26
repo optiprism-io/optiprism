@@ -17,6 +17,7 @@ use datafusion::physical_plan::hash_utils::create_hashes;
 use datafusion_common::ScalarValue;
 use crate::{Result, Error};
 use arrow::error::{ArrowError, Result as ArrowResult};
+use arrow::util::pretty::pretty_format_batches;
 use datafusion::error::Result as DFResult;
 use axum::{async_trait};
 

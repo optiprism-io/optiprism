@@ -1,10 +1,10 @@
 use std::ops::Sub;
 use std::sync::Arc;
-use arrow::datatypes::DataType;
+use arrow::datatypes::{DataType, Schema};
 use chrono::{DateTime, Utc};
 use futures::executor;
 use datafusion::logical_plan::ExprSchemable;
-use datafusion_common::{Column, ScalarValue};
+use datafusion_common::{Column, ExprSchema, ScalarValue};
 use datafusion_expr::{col, Expr, lit, Operator};
 use datafusion_expr::expr_fn::{and, binary_expr};
 use metadata::{dictionaries, Metadata};
@@ -15,20 +15,20 @@ use crate::reports::types::{PropertyRef, PropValueOperation, QueryTime};
 use crate::Result;
 
 /// builds expression on timestamp
-pub fn time_expression(time: &QueryTime, cur_time: &DateTime<Utc>) -> Expr {
-    let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
-    match time {
+pub fn time_expression<S: ExprSchema>(ts_col: Expr, schema: &S, time: &QueryTime, cur_time: &DateTime<Utc>) -> Result<Expr> {
+    let ts_type = ts_col.get_type(schema)?;
+    Ok(match time {
         QueryTime::Between { from, to } => {
             let from = binary_expr(
                 ts_col.clone(),
                 Operator::GtEq,
-                lit_timestamp(from.timestamp_nanos() / 1_000),
+                lit_timestamp(ts_type.clone(), from)?,
             );
 
             let to = binary_expr(
                 ts_col,
                 Operator::LtEq,
-                lit_timestamp(to.timestamp_nanos() / 1_000),
+                lit_timestamp(ts_type, to)?,
             );
 
             and(from, to)
@@ -37,12 +37,13 @@ pub fn time_expression(time: &QueryTime, cur_time: &DateTime<Utc>) -> Expr {
             let from = binary_expr(
                 ts_col.clone(),
                 Operator::GtEq,
-                lit_timestamp(from.timestamp_nanos() / 1_000));
+                lit_timestamp(ts_type.clone(), from)?,
+            );
 
             let to = binary_expr(
                 ts_col,
                 Operator::LtEq,
-                lit_timestamp(cur_time.timestamp_nanos() / 1_000),
+                lit_timestamp(ts_type, cur_time)?,
             );
 
             and(from, to)
@@ -52,17 +53,18 @@ pub fn time_expression(time: &QueryTime, cur_time: &DateTime<Utc>) -> Expr {
             let from = binary_expr(
                 ts_col.clone(),
                 Operator::GtEq,
-                lit_timestamp(from_time.timestamp_nanos() / 1_000));
+                lit_timestamp(ts_type.clone(), &from_time)?,
+            );
 
             let to = binary_expr(
                 ts_col,
                 Operator::LtEq,
-                lit_timestamp(cur_time.timestamp_nanos() / 1_000),
+                lit_timestamp(ts_type, cur_time)?,
             );
 
             and(from, to)
         }
-    }
+    })
 }
 
 pub async fn values_to_dict_keys(

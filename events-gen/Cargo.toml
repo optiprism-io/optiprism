@@ -28,3 +28,4 @@ cubic_spline = "1.0.0"
 splines = "4.1.0"
 crossbeam-channel = "0.3.9"
 arrow = { version = "9.0.0", features = ["prettyprint"] }
+metadata = { path = "../metadata" }

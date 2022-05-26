@@ -1,9 +1,36 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use rand::thread_rng;
 use events_gen::generator::Generator;
 use events_gen::store::products::{Preferences, Products};
 use events_gen::store::scenario::{RecordBatchBuilder, run};
+use metadata::database::{Column, TableType};
+use metadata::Metadata;
+use metadata::properties::{CreatePropertyRequest, Property};
+use metadata::properties::provider::Namespace;
+
+async fn create_property(
+    md: &Arc<Metadata>,
+    ns: Namespace,
+    org_id: u64,
+    proj_id: u64,
+    req: CreatePropertyRequest,
+) -> Result<Property> {
+    let prop = match ns {
+        Namespace::Event => md.event_properties.create(org_id, req).await?,
+        Namespace::User => md.user_properties.create(org_id, req).await?,
+    };
+
+    md.database
+        .add_column(
+            TableType::Events(org_id, proj_id),
+            Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable, prop.dictionary_type.clone()),
+        )
+        .await?;
+
+    Ok(prop)
+}
 
 fn main() {
     let mut rng = thread_rng();

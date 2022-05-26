@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::{fmt, result};
 use arrow::error::ArrowError;
+use metadata::error::Error as MetadataError;
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -10,6 +11,7 @@ pub enum Error {
     External(String),
     ArrowError(ArrowError),
     CSVError(csv::Error),
+    MetadataError(MetadataError),
     UserSessionEnded,
 }
 
@@ -35,5 +37,11 @@ impl From<ArrowError> for Error {
 impl From<csv::Error> for Error {
     fn from(err: csv::Error) -> Self {
         Self::CSVError(err)
+    }
+}
+
+impl From<MetadataError> for Error {
+    fn from(err: MetadataError) -> Self {
+        Self::MetadataError(err)
     }
 }

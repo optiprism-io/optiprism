@@ -39,8 +39,19 @@ pub fn multi_and(exprs: Vec<Expr>) -> Expr {
     expr
 }
 
-pub fn lit_timestamp(ts: i64) -> Expr {
-    lit(ScalarValue::TimestampMicrosecond(Some(ts), None))
+pub fn lit_timestamp(data_type: DataType, date_time: &DateTime<Utc>) -> Result<Expr> {
+    Ok(lit(match data_type {
+        DataType::Timestamp(arrow::datatypes::TimeUnit::Second, tz) => {
+            ScalarValue::TimestampSecond(Some(date_time.timestamp()), tz)
+        }
+        DataType::Timestamp(arrow::datatypes::TimeUnit::Millisecond, tz) => {
+            ScalarValue::TimestampMillisecond(Some(date_time.timestamp_millis()), tz)
+        }
+        DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, tz) => {
+            ScalarValue::TimestampMicrosecond(Some(date_time.timestamp_nanos() / 1000), tz)
+        }
+        _ => return Err(Error::QueryError("unsupported data type".to_owned()))
+    }))
 }
 
 pub fn sorted_distinct_count(input_schema: &DFSchema, col: Expr) -> Result<Expr> {

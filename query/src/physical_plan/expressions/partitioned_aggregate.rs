@@ -305,7 +305,6 @@ impl PartitionedAggregateAccumulator {
         agg_return_type: &DataType,
         outer_agg: &AggregateFunction,
     ) -> Result<Self> {
-        let expr = Arc::new(Literal::new(ScalarValue::from(true)));
         let outer_acc: Box<dyn Accumulator> = Box::new(match outer_agg {
             AggregateFunction::Avg => Ok(AvgAccumulator::try_new(agg_return_type)?),
             _ => Err(Error::Internal(format!(

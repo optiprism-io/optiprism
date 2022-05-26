@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 use chrono::{DateTime, Duration, Utc};
 use datafusion::logical_plan::{
-    create_udaf, exprlist_to_fields, Column, DFField, DFSchema, LogicalPlan, Operator,
+    create_udaf, exprlist_to_fields, Column, DFField, DFSchema, ExprSchema, LogicalPlan, Operator,
 };
 use datafusion::physical_plan::aggregates::{return_type, AggregateFunction};
 
@@ -24,7 +24,6 @@ use datafusion_expr::{
     ReturnTypeFunction, Signature, StateTypeFunction, Volatility,
 };
 
-
 use std::io::{self, Write};
 use std::ops::{Add, Sub};
 use futures::executor;
@@ -38,6 +37,7 @@ use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan::unpivot::UnpivotExec;
 use serde::{Deserialize, Serialize};
 use datafusion_common::ScalarValue;
+
 use crate::reports::event_segmentation::types::{Breakdown, Event, EventFilter, EventSegmentation, Query};
 use crate::reports::expr::{property_col, property_expression, time_expression};
 
@@ -139,7 +139,8 @@ impl LogicalPlanBuilder {
         event: &Event,
     ) -> Result<LogicalPlan> {
         // time filter
-        let mut expr = time_expression(&self.es.time, &self.cur_time);
+        let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
+        let mut expr = time_expression(ts_col, input.schema(), &self.es.time, &self.cur_time)?;
 
         // event filter (event name, properties)
         expr = and(expr, self.event_expression(event).await?);
@@ -147,7 +148,7 @@ impl LogicalPlanBuilder {
         // global event filters
         if let Some(filters) = &self.es.filters {
             match &event.event {
-                EventRef::Regular(event_name) => {
+                EventRef::Regular(_) => {
                     expr = and(expr.clone(), self.event_filters_expression(filters).await?);
                 }
                 EventRef::Custom(_) => unimplemented!(),
