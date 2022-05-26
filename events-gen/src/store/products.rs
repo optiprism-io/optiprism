@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ops::Div;
 use std::path::Path;
+use std::sync::Arc;
 use rand::distributions::WeightedIndex;
 use rand::rngs::ThreadRng;
 use rand::prelude::*;
@@ -12,19 +13,7 @@ use crate::probability;
 use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 use common::DECIMAL_SCALE;
-
-pub struct Preferences {
-    pub categories: Option<Vec<String>>,
-    pub subcategories: Option<Vec<String>>,
-    pub brand: Option<Vec<String>>,
-    pub author: Option<Vec<String>>,
-    pub size: Option<Vec<String>>,
-    pub color: Option<Vec<String>>,
-    pub max_price: Option<Decimal>,
-    pub min_price: Option<Decimal>,
-    pub min_rating: Option<f64>,
-    pub has_coupon: bool,
-}
+use metadata::{dictionaries, Metadata};
 
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
@@ -35,7 +24,6 @@ struct CSVProduct {
     pub brand: Option<String>,
     pub price: Decimal,
 }
-
 
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
@@ -66,53 +54,13 @@ pub struct ProductStr<'a> {
 }
 
 impl Product {
-    pub fn final_price(&self, has_coupon: bool) -> Decimal {
+    pub fn final_price(&self) -> Decimal {
         self.discount_price.unwrap_or(self.price)
     }
 }
 
-pub enum Dict {
-    ProductName = 0,
-    Category = 1,
-    Subcategory = 2,
-    Brand = 3,
-}
-
 #[derive(Debug, Clone)]
-pub struct Dicts {
-    key_values: Vec<HashMap<u64, String>>,
-    value_keys: Vec<HashMap<String, u64>>,
-}
-
-impl Dicts {
-    pub fn new() -> Self {
-        Self {
-            key_values: vec![HashMap::default(); 4],
-            value_keys: vec![HashMap::default(); 4],
-        }
-    }
-
-    pub fn get_key_or_create(&mut self, dict: Dict, value: String) -> u64 {
-        let usize_dict = dict as usize;
-        if let Some(key) = self.value_keys[usize_dict].get(&value) {
-            return *key;
-        }
-
-        let key = self.value_keys[usize_dict].len() as u64 + 1;
-        self.value_keys[usize_dict].insert(value.clone(), key);
-        self.key_values[usize_dict].insert(key, value);
-
-        key
-    }
-
-    pub fn get_value(&self, dict: Dict, key: u64) -> &String {
-        self.key_values[dict as usize].get(&key).unwrap()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Products {
-    pub dicts: Dicts,
+pub struct ProductProvider {
     pub products: Vec<Product>,
     product_weight_idx: WeightedIndex<f64>,
     pub product_weights: Vec<f64>,
@@ -125,11 +73,10 @@ pub struct Products {
     pub rating_weights: Vec<f64>,
 }
 
-impl Products {
-    pub fn try_new_from_csv<P: AsRef<Path>>(path: P, rng: &mut ThreadRng) -> Result<Self> {
+impl ProductProvider {
+    pub fn try_new_from_csv<P: AsRef<Path>>(path: P, rng: &mut ThreadRng, org_id: u64, proj_id: u64, dicts: &Arc<dictionaries::Provider>) -> Result<Self> {
         let mut rdr = csv::Reader::from_path(path)?;
-        let mut dicts = Dicts::new();
-        let products = rdr.deserialize().into_iter().enumerate().map(|(id, p)| {
+        let mut products = rdr.deserialize().into_iter().enumerate().map(|(id, p)| {
             match p {
                 Ok(v) => {
                     let mut rec: CSVProduct = v;
@@ -142,10 +89,10 @@ impl Products {
 
                     Ok(Product {
                         id: id + 1,
-                        name: dicts.get_key_or_create(Dict::ProductName, rec.name),
-                        category: dicts.get_key_or_create(Dict::Category, rec.category),
-                        subcategory: rec.subcategory.and_then(|v| Some(dicts.get_key_or_create(Dict::Subcategory, v))),
-                        brand: rec.brand.and_then(|v| Some(dicts.get_key_or_create(Dict::Brand, v))),
+                        name: dicts.get_key_or_create(org_id, proj_id, "event_name", rec.name.as_str())?,
+                        category: dicts.get_key_or_create(org_id, proj_id, "event_category", rec.name.as_str())?,
+                        subcategory: rec.subcategory.and_then(|v| Some(dicts.get_key_or_create(org_id, proj_id, "event_name", v.as_str())?)),
+                        brand: rec.brand.and_then(|v| Some(dicts.get_key_or_create(org_id, proj_id, "event_name", v.as_str())?)),
                         price: rec.price,
                         discount_price,
                         margin: 0.,
@@ -157,6 +104,8 @@ impl Products {
                 Err(e) => Err(e)
             }
         }).collect::<csv::Result<Vec<Product>>>()?;
+
+        products.shuffle(rng);
 
         let product_weights = probability::calc_cubic_spline(products.len(), vec![1., 0.5, 0.3, 0.1])?;
         let product_weight_idx = WeightedIndex::new(&[1., 0.5, 0.3, 0.1]).unwrap();
@@ -195,18 +144,6 @@ impl Products {
             category_weight_idx,
             rating_weights,
         })
-    }
-
-    pub fn with_dict_values(&self, product: &Product) -> ProductStr {
-        ProductStr {
-            id: product.id,
-            name: self.dicts.get_value(Dict::ProductName, product.name).as_ref(),
-            category: self.dicts.get_value(Dict::Category, product.category).as_ref(),
-            subcategory: product.subcategory.and_then(|v| Some(self.dicts.get_value(Dict::Subcategory, v).as_ref())),
-            brand: product.brand.and_then(|v| Some(self.dicts.get_value(Dict::Brand, v).as_ref())),
-            price: product.price,
-            discount_price: product.discount_price,
-        }
     }
 
     pub fn str_name(&self, id: u64) -> &str {

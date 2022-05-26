@@ -15,6 +15,7 @@ criterion = "0.3"
 
 [dependencies]
 common = { path = "../common" }
+query = { path = "../query" }
 chrono = { version = "0.4.19" }
 rust_decimal = { version = "1.22.0", features = ["serde-float"] }
 rand = "0.8.0"
@@ -29,3 +30,5 @@ splines = "4.1.0"
 crossbeam-channel = "0.3.9"
 arrow = { version = "9.0.0", features = ["prettyprint"] }
 metadata = { path = "../metadata" }
+tokio = { version = "1.15.0", features = ["full"] }
+enum-iterator = "0.8.1"

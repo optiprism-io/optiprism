@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 common = { path = "../common" }
+events-gen = { path = "../events-gen" }
 query = { path = "../query" }
 metadata = { path = "../metadata" }
 platform = { path = "../platform" }

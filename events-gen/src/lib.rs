@@ -5,7 +5,7 @@ pub mod store;
 pub mod error;
 pub mod probability;
 pub mod generator;
-pub mod profile;
+pub mod profiles;
 // pub mod time;
 
 use cubic_spline::TryFrom;

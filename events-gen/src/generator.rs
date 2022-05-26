@@ -2,35 +2,37 @@ use chrono::{DateTime, Duration, Utc};
 use rand::distributions::WeightedIndex;
 use rand::rngs::ThreadRng;
 use rand::prelude::*;
+use crate::profiles::{Profile, ProfileProvider};
 
 pub struct Generator {
     rng: ThreadRng,
+    profiles: ProfileProvider,
     cur_timestamp: i64,
     to_timestamp: i64,
     daily_users_left: usize,
     new_daily_users: usize,
     total_users: usize,
     traffic_hourly_weight_idx: WeightedIndex<f64>,
-    closed: bool,
 }
 
 pub struct Sample {
     pub cur_timestamp: i64,
+    pub profile: Profile,
 }
 
 impl Generator {
-    pub fn new(rng: ThreadRng, from: DateTime<Utc>, to: DateTime<Utc>, new_daily_users: usize, traffic_hourly_weights: &[f64; 24]) -> Self {
+    pub fn new(rng: ThreadRng, profiles: ProfileProvider,from: DateTime<Utc>, to: DateTime<Utc>, new_daily_users: usize, traffic_hourly_weights: &[f64; 24]) -> Self {
         assert!(to > from);
 
         Self {
             rng,
+            profiles,
             cur_timestamp: from.timestamp(),
             to_timestamp: to.timestamp(),
             traffic_hourly_weight_idx: WeightedIndex::new(traffic_hourly_weights).unwrap(),
             daily_users_left: new_daily_users,
             new_daily_users,
             total_users: 0,
-            closed: false,
         }
     }
 
@@ -39,6 +41,7 @@ impl Generator {
         let minute: i64 = self.rng.gen_range(0..=59);
         let sample = Sample {
             cur_timestamp: self.cur_timestamp + (hour * 3600) + minute * 60,
+            profile: self.profiles.sample(&mut self.rng),
         };
         self.total_users += 1;
         self.daily_users_left -= 1;

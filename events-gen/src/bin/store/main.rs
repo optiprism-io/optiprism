@@ -3,40 +3,45 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use rand::thread_rng;
 use events_gen::generator::Generator;
-use events_gen::store::products::{Preferences, Products};
+use events_gen::store::products::{Preferences, ProductProvider};
 use events_gen::store::scenario::{RecordBatchBuilder, run};
 use metadata::database::{Column, TableType};
-use metadata::Metadata;
+use metadata::{events, Metadata};
 use metadata::properties::{CreatePropertyRequest, Property};
 use metadata::properties::provider::Namespace;
+use events_gen::error::Result;
+use events_gen::store;
 
-async fn create_property(
-    md: &Arc<Metadata>,
-    ns: Namespace,
-    org_id: u64,
-    proj_id: u64,
-    req: CreatePropertyRequest,
-) -> Result<Property> {
-    let prop = match ns {
-        Namespace::Event => md.event_properties.create(org_id, req).await?,
-        Namespace::User => md.user_properties.create(org_id, req).await?,
-    };
 
-    md.database
-        .add_column(
-            TableType::Events(org_id, proj_id),
-            Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable, prop.dictionary_type.clone()),
-        )
-        .await?;
-
-    Ok(prop)
-}
-
-fn main() {
+#[tokio::main]
+async fn main() -> Result<()> {
     let mut rng = thread_rng();
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("src/store/data/products.csv");
-    let mut products = Products::try_new_from_csv(path, &mut rng).unwrap();
+    let root_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+    let mut products_path = root_path.clone();
+    products_path.push("src/store/data/products.csv");
+
+    let mut geo_path = root_path.clone();
+    geo_path.push("src/data/geo.csv");
+
+    let mut device_path = root_path.clone();
+    device_path.push("src/data/device.csv");
+
+    cfg = store::Config{
+        org_id: 0,
+        project_id: 0,
+        md: Arc::new(Metadata {}),
+        dicts: Arc::new(()),
+        from: (),
+        to: (),
+        products_path: (),
+        geo_path: (),
+        device_path: (),
+        new_daily_users: 0,
+        batch_size: 0,
+        partitions: 0
+    }
+    let mut products = ProductProvider::try_new_from_csv(products_path, &mut rng).unwrap();
 
     let from = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00").unwrap().with_timezone(&Utc);
     let to = DateTime::parse_from_rfc3339("2022-09-08T14:42:00.000000+00:00").unwrap().with_timezone(&Utc);
@@ -48,5 +53,7 @@ fn main() {
         30,
         &hour_weights,
     );
-    run(rng, &mut gen, &mut products, to, 10_000).unwrap();
+
+    create_entities()
+    run(rng, &mut gen, &mut products, to, 10_000)
 }
