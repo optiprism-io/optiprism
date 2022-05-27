@@ -110,32 +110,25 @@ const excludedEvents = computed(() => stepsStore.excludedEvents)
 
 const excludeSteps = computed<UiSelectItemInterface<string>[]>(() => {
     const groups: UiSelectItemInterface<string>[] = Array
-        .from({ length: eventsStore.events.length })
+        .from({ length: eventsStore.events.length - 1 })
         .map((_, index) => {
+            const idx = index + 2;
             return {
-                __type: 'group',
+                __type: 'item',
                 id: `${index}`,
-                label: `${index + 1} ${$t('funnels.excludeSteps.and')} ...`,
-                items: Array.from({ length: eventsStore.events.length - index - 1 }).map((_, subIndex) => {
-                    const idx = index + subIndex + 2;
-                    return {
-                        __type: 'item',
-                        id: `${index}-${subIndex}`,
-                        label: `${index + 1} ${$t('funnels.excludeSteps.and')} ${idx}`,
-                        value: `${index + 1}-${idx}`,
-                    }
-                })
+                label: `1 ${$t('funnels.excludeSteps.and')} ${idx}`,
+                value: `1-${idx}`
             }
         })
 
     return [
+        ...groups.slice(0, -1),
         {
             __type: 'item',
             id: 'all',
             label: $t('funnels.excludeSteps.all'),
             value: 'all',
         },
-        ...groups
     ]
 })
 
