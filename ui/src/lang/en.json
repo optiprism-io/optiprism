@@ -10,6 +10,9 @@
     "enter_value": "Enter a value",
     "create": "Create",
     "edit": "Edit",
+    "castom": "Castom",
+    "columns": "columns",
+    "no_data": "No data",
     "calendar": {
       "last": "Last",
       "since": "Since",
@@ -25,7 +28,8 @@
         "minute": "Minute"
       },
       "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-      "week_days": ["mo", "tu", "we", "th", "fr", "sa", "su"]
+      "week_days": ["mo", "tu", "we", "th", "fr", "sa", "su"],
+      "day_short": "d"
     },
     "timeUnits": {
       "seconds": "seconds",
@@ -48,7 +52,11 @@
 
   "events": {
     "live_stream": {
-      "title": "Live srteam"
+      "title": "Live stream",
+      "columns": {
+        "createdAt": "Date",
+        "eventName": "Event Name"
+      }
     },
     "create_custom": "Create Custom Event",
     "edit_custom": "Edit Custom Event",

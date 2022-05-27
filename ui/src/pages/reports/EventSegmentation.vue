@@ -24,12 +24,6 @@
             <EventsViews />
         </template>
     </ToolsLayout>
-
-    <CreateCustomEvent
-        v-if="commonStore.showCreateCustomEvent"
-        @apply="applyCreateCustomEvent"
-        @cancel="togglePopupCreateCustomEvent(false)"
-    />
 </template>
 
 <script setup lang="ts">
@@ -47,19 +41,10 @@ import { useCommonStore } from '@/stores/common'
 import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
 
 const eventsStore = useEventsStore();
-const commonStore = useCommonStore()
 
 onUnmounted(() => {
     eventsStore.$reset();
 });
-
-const togglePopupCreateCustomEvent = (payload: boolean) => {
-    commonStore.togglePopupCreateCustomEvent(payload)
-}
-
-const applyCreateCustomEvent = () => {
-    togglePopupCreateCustomEvent(false)
-}
 </script>
 
 <style scoped lang="scss">
