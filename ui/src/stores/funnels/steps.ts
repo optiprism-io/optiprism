@@ -44,6 +44,31 @@ type EditHoldingPropertyPayload = {
     index: number;
     property: HoldingProperty;
 }
+type AddEventToStepPayload = {
+    index: number;
+    event: EventRef;
+}
+type EditStepEventPayload = {
+    index: number;
+    eventIndex: number;
+    eventRef: EventRef;
+}
+type AddFilterToStepPayload = {
+    index: number;
+    eventIndex: number;
+    filter: EventFilter;
+}
+type RemoveFilterForStepEventPayload = {
+    index: number;
+    eventIndex: number;
+    filterIndex: number;
+}
+type EditFilterForStepEventPayload = {
+    index: number;
+    eventIndex: number;
+    filterIndex: number;
+    filter: Partial<EventFilter>;
+}
 
 interface StepsStore {
     steps: Step[];
@@ -69,6 +94,9 @@ export const useStepsStore = defineStore('steps', {
     actions: {
         addStep(step: Step): void {
             this.steps.push(step);
+        },
+        deleteStep(index: number): void {
+            this.steps.splice(index, 1);
         },
         setSize(size: number): void {
             this.size = size;
@@ -128,6 +156,54 @@ export const useStepsStore = defineStore('steps', {
         },
         setPropsAvailableToHold(properties: HoldingProperty[]): void {
             this.propsAvailableToHold = properties;
+        },
+        addEventToStep({index, event}: AddEventToStepPayload): void {
+            this.steps[index].events.push({
+                event,
+                filters: []
+            })
+        },
+        editStepEvent({index, eventIndex, eventRef}: EditStepEventPayload): void {
+            const event = this.steps[index]
+            if (event) {
+                event.events[eventIndex].event = eventRef;
+                event.events[eventIndex].filters = [];
+            }
+        },
+        deleteEventFromStep(index: number): void {
+            this.steps[index].events.splice(index, 1);
+        },
+        addFilterToStep({index, eventIndex, filter}: AddFilterToStepPayload): void {
+            this.steps[index].events[eventIndex].filters.push(filter);
+        },
+        removeFilterForStepEvent({index, eventIndex, filterIndex}: RemoveFilterForStepEventPayload): void {
+            const step = this.steps[index];
+            if (!step) {
+                return
+            }
+
+            const event = step.events[eventIndex];
+            if (!event) {
+                return
+            }
+
+            event.filters.splice(filterIndex, 1);
+        },
+        editFilterForStepEvent({index, eventIndex, filterIndex, filter}: EditFilterForStepEventPayload): void {
+            const step = this.steps[index];
+            if (!step) {
+                return
+            }
+
+            const event = step.events[eventIndex];
+            if (!event) {
+                return
+            }
+
+            event.filters[filterIndex] = {
+                ...event.filters[filterIndex],
+                ...filter
+            }
         },
     }
 })

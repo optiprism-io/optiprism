@@ -106,10 +106,15 @@
   "funnels": {
     "funnels": "Funnels",
     "untitledFunnel": "Untitled Funnel",
-    "steps": "Steps",
     "userSegments": "User Segments",
     "filters": "Filters",
     "breakdowns": "Breakdowns",
+    "steps": {
+      "title": "Steps",
+      "addEvent": "Add event to step",
+      "addFilter": "Add filter to step",
+      "removeEvent": "Remove event from step"
+    },
     "excludeSteps": {
       "add": "Exclude step",
       "exclude": "exclude",

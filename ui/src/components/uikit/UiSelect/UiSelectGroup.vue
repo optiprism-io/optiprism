@@ -27,7 +27,8 @@
     </VMenu>
 </template>
 
-<script setup lang="ts">defineProps({
+<script setup lang="ts">
+defineProps({
     label: {
         type: String,
         default: '',
