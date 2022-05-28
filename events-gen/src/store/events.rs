@@ -1,7 +1,7 @@
 use strum_macros::{Display};
-use enum_iterator::IntoEnumIterator;
+use enum_iterator::Sequence;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Display, IntoEnumIterator)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Display, Sequence)]
 pub enum Event {
     #[strum(serialize = "User Registered")]
     UserRegistered,

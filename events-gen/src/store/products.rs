@@ -3,6 +3,7 @@ use std::env;
 use std::ops::Div;
 use std::path::Path;
 use std::sync::Arc;
+use futures::executor::block_on;
 use rand::distributions::WeightedIndex;
 use rand::rngs::ThreadRng;
 use rand::prelude::*;
@@ -14,6 +15,7 @@ use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 use common::DECIMAL_SCALE;
 use metadata::{dictionaries, Metadata};
+use futures::stream::{self, StreamExt};
 
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
@@ -59,8 +61,10 @@ impl Product {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct ProductProvider {
+    dicts: Arc<dictionaries::Provider>,
+    org_id: u64,
+    proj_id: u64,
     pub products: Vec<Product>,
     product_weight_idx: WeightedIndex<f64>,
     pub product_weights: Vec<f64>,
@@ -74,36 +78,34 @@ pub struct ProductProvider {
 }
 
 impl ProductProvider {
-    pub fn try_new_from_csv<P: AsRef<Path>>(path: P, rng: &mut ThreadRng, org_id: u64, proj_id: u64, dicts: &Arc<dictionaries::Provider>) -> Result<Self> {
+    pub async fn try_new_from_csv<P: AsRef<Path>>(org_id: u64, proj_id: u64, rng: &mut ThreadRng, dicts: Arc<dictionaries::Provider>, path: P) -> Result<Self> {
         let mut rdr = csv::Reader::from_path(path)?;
-        let mut products = rdr.deserialize().into_iter().enumerate().map(|(id, p)| {
-            match p {
-                Ok(v) => {
-                    let mut rec: CSVProduct = v;
-                    rec.price.rescale(DECIMAL_SCALE as u32);
-                    let discount_price = if rng.gen::<f64>() < 0.3 {
-                        Some(rec.price * Decimal::new(9, 1))
-                    } else {
-                        None
-                    };
 
-                    Ok(Product {
-                        id: id + 1,
-                        name: dicts.get_key_or_create(org_id, proj_id, "event_name", rec.name.as_str())?,
-                        category: dicts.get_key_or_create(org_id, proj_id, "event_category", rec.name.as_str())?,
-                        subcategory: rec.subcategory.and_then(|v| Some(dicts.get_key_or_create(org_id, proj_id, "event_name", v.as_str())?)),
-                        brand: rec.brand.and_then(|v| Some(dicts.get_key_or_create(org_id, proj_id, "event_name", v.as_str())?)),
-                        price: rec.price,
-                        discount_price,
-                        margin: 0.,
-                        satisfaction_ratio: 0.0,
-                        rating_count: 0,
-                        rating_sum: 0.0,
-                    })
-                }
-                Err(e) => Err(e)
-            }
-        }).collect::<csv::Result<Vec<Product>>>()?;
+        let mut products = Vec::with_capacity(1000);
+        for (id, res) in rdr.deserialize().into_iter().enumerate() {
+            let mut rec: CSVProduct = res?;
+            rec.price.rescale(DECIMAL_SCALE as u32);
+            let discount_price = if rng.gen::<f64>() < 0.3 {
+                Some(rec.price * Decimal::new(9, 1))
+            } else {
+                None
+            };
+
+            let product = Product {
+                id: id + 1,
+                name: dicts.get_key_or_create(org_id, proj_id, "event_product_name", rec.name.as_str()).await?,
+                category: dicts.get_key_or_create(org_id, proj_id, "event_product_category", rec.name.as_str()).await?,
+                subcategory: rec.subcategory.and_then(|v| Some(block_on(dicts.get_key_or_create(org_id, proj_id, "event_product_subcategory", v.as_str())))).transpose()?,
+                brand: rec.brand.and_then(|v| Some(block_on(dicts.get_key_or_create(org_id, proj_id, "event_product_brand", v.as_str())))).transpose()?,
+                price: rec.price,
+                discount_price,
+                margin: 0.,
+                satisfaction_ratio: 0.0,
+                rating_count: 0,
+                rating_sum: 0.0,
+            };
+            products.push(product);
+        }
 
         products.shuffle(rng);
 
@@ -133,6 +135,8 @@ impl ProductProvider {
         let rating_weights = probability::calc_cubic_spline(50, vec![0.01, 0.01, 0.1, 0.7, 1.])?;
         Ok(Self {
             dicts,
+            org_id,
+            proj_id,
             products,
             product_weights,
             product_weight_idx,
@@ -144,10 +148,6 @@ impl ProductProvider {
             category_weight_idx,
             rating_weights,
         })
-    }
-
-    pub fn str_name(&self, id: u64) -> &str {
-        self.dicts.get_value(Dict::ProductName, id as u64).as_ref()
     }
 
     pub fn deal_product_sample(&self, rng: &mut ThreadRng) -> &Product {
@@ -168,5 +168,9 @@ impl ProductProvider {
         let product = &mut self.products[id];
         product.rating_count += 1;
         product.rating_sum += rating;
+    }
+
+    pub async fn string_name(&self, key: u64) -> Result<String> {
+        Ok(self.dicts.get_value(self.org_id, self.proj_id, "event_product_name", key).await?)
     }
 }

@@ -10,6 +10,7 @@ pub struct Series {
 }
 
 impl Series {
+    // todo remove, use record batches and convert right into api in platform
     pub fn try_from_batch_record(batch: &RecordBatch, dimension_headers: Vec<String>, metric_headers: Vec<String>) -> Result<Self> {
         let mut dimensions: Vec<Vec<ScalarValue>> = vec![vec![]; dimension_headers.len()];
         for (col_idx, header) in dimension_headers.iter().enumerate() {

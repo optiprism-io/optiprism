@@ -1,8 +1,9 @@
 use rand::rngs::ThreadRng;
 use crate::store::products::{Product, ProductProvider};
 use crate::store::scenario::State;
+use rand::prelude::*;
 
-#[derive(Clone, Copy, Debug, EnumDisplay)]
+#[derive(Clone, Copy, Debug)]
 pub enum Intention<'a> {
     BuyCertainProduct(&'a Product),
     BuyAnyProduct,
@@ -14,7 +15,7 @@ pub fn select_intention<'a>(state: &State, products: &'a ProductProvider, rng: &
     if state.session_id > 0 && !state.products_bought.is_empty() && rng.gen::<f64>() < 0.1 {
         for (id, _) in state.products_bought.iter() {
             if rng.gen::<f64>() < 0.5 && !state.products_refunded.contains_key(id) {
-                return Intention::MakeRefund(&products.products[*id]);
+                return Intention::MakeRefund(&products.products[*id-1]);
             }
         }
     }

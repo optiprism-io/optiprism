@@ -4,15 +4,15 @@ use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use rust_decimal::Decimal;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use crate::store::scenario::{Action, Event, State};
+use crate::store::scenario::State;
+use crate::store::events::Event;
 use crate::error::Result;
 use crate::profiles::Profile;
-use crate::store::events::Event;
 
 pub struct RecordBatchBuilder {
     user_id: UInt64Builder,
     created_at: TimestampSecondBuilder,
-    event: UInt16Builder,
+    event: UInt64Builder,
     product_name: UInt16Builder,
     product_category: UInt16Builder,
     product_subcategory: UInt16Builder,
@@ -40,7 +40,7 @@ impl RecordBatchBuilder {
         Self {
             user_id: UInt64Builder::new(cap),
             created_at: TimestampSecondBuilder::new(cap),
-            event: UInt16Builder::new(cap),
+            event: UInt64Builder::new(cap),
             product_name: UInt16Builder::new(cap),
             product_category: UInt16Builder::new(cap),
             product_subcategory: UInt16Builder::new(cap),
@@ -97,7 +97,7 @@ impl RecordBatchBuilder {
         Ok(batch)
     }
 
-    pub fn write_event(&mut self, event: Event, event_id: u16, state: &State, profile: &Profile) -> Result<()> {
+    pub fn write_event(&mut self, event: Event, event_id: u64, state: &State, profile: &Profile) -> Result<()> {
         // println!("event: {event}, time: {}", NaiveDateTime::from_timestamp(state.cur_timestamp, 0));
         self.user_id.append_value(state.user_id);
         self.created_at.append_value(state.cur_timestamp);
@@ -164,14 +164,15 @@ impl RecordBatchBuilder {
             }
         }
 
-        self.country.append_option(profile.geo.country);
-        self.city.append_option(profile.geo.city);
-        self.device.append_option(profile.device.device);
-        self.device_category.append_option(profile.device.device_category);
-        self.os.append_option(profile.device.os);
-        self.os_version.append_option(profile.device.os_version);
+        self.country.append_option(profile.geo.country.map(|v| v as u16));
+        self.city.append_option(profile.geo.city.map(|v| v as u16));
+        self.device.append_option(profile.device.device.map(|v| v as u16));
+        self.device_category.append_option(profile.device.device_category.map(|v| v as u16));
+        self.os.append_option(profile.device.os.map(|v| v as u16));
+        self.os_version.append_option(profile.device.os_version.map(|v| v as u16));
 
         self.len += 1;
+
         Ok(())
     }
 

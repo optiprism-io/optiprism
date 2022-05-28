@@ -30,8 +30,6 @@ async fn main() -> Result<()> {
     cfg = store::Config{
         org_id: 0,
         project_id: 0,
-        md: Arc::new(Metadata {}),
-        dicts: Arc::new(()),
         from: (),
         to: (),
         products_path: (),

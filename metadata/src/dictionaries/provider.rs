@@ -38,8 +38,8 @@ impl Provider {
     }
 
     pub async fn get_key_or_create(&self, organization_id: u64, project_id: u64, dict: &str, value: &str) -> Result<u64> {
-        self.guard.write().await;
-
+        // todo investigate hanging
+        // self.guard.write().await;
         match self.store.get(make_value_key(organization_id, project_id, dict, value)).await? {
             None => {
                 let id = self

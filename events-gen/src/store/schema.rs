@@ -10,6 +10,7 @@ use metadata::properties::provider::Namespace;
 use query::event_fields;
 use crate::error::{Result, Error};
 use crate::store::events::Event;
+use enum_iterator::all;
 
 async fn create_event(md: &Arc<Metadata>, org_id: u64, proj_id: u64, name: String, scope: events::Scope) -> Result<MDEvent> {
     Ok(
@@ -71,7 +72,7 @@ async fn create_property(
     Ok(prop)
 }
 
-pub async fn create_entities(md: &Arc<Metadata>, org_id: u64, proj_id: u64) -> Result<Schema> {
+pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> Result<Schema> {
     let mut cols: Vec<Column> = Vec::new();
 
     create_property(
@@ -109,7 +110,7 @@ pub async fn create_entities(md: &Arc<Metadata>, org_id: u64, proj_id: u64) -> R
         DataType::Utf8,
         properties::Scope::System,
         false,
-        Some(DataType::UInt16),
+        Some(DataType::UInt64),
         &mut cols,
     ).await?;
 
@@ -336,7 +337,7 @@ pub async fn create_entities(md: &Arc<Metadata>, org_id: u64, proj_id: u64) -> R
     ).await?;
 
 
-    for event in Event::into_enum_iter() {
+    for event in all::<Event>() {
         create_event(md, org_id, proj_id, event.to_string(), events::Scope::User).await?;
     }
 
@@ -347,7 +348,7 @@ pub async fn create_entities(md: &Arc<Metadata>, org_id: u64, proj_id: u64) -> R
     match md.database
         .create_table(table.clone())
         .await {
-        Ok(table) | Err(Error::MetadataError(metadata::error::Error::KeyAlreadyExists)) => {}
+        Ok(_) | Err(metadata::error::Error::KeyAlreadyExists) => {}
         Err(err) => return Err(err.into()),
     };
 

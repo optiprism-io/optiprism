@@ -20,18 +20,27 @@ pub struct Sample {
     pub profile: Profile,
 }
 
+pub struct Config {
+    pub rng: ThreadRng,
+    pub profiles: ProfileProvider,
+    pub from: DateTime<Utc>,
+    pub to: DateTime<Utc>,
+    pub new_daily_users: usize,
+    pub traffic_hourly_weights: [f64; 24],
+}
+
 impl Generator {
-    pub fn new(rng: ThreadRng, profiles: ProfileProvider,from: DateTime<Utc>, to: DateTime<Utc>, new_daily_users: usize, traffic_hourly_weights: &[f64; 24]) -> Self {
-        assert!(to > from);
+    pub fn new(cfg: Config) -> Self {
+        assert!(cfg.from < cfg.to);
 
         Self {
-            rng,
-            profiles,
-            cur_timestamp: from.timestamp(),
-            to_timestamp: to.timestamp(),
-            traffic_hourly_weight_idx: WeightedIndex::new(traffic_hourly_weights).unwrap(),
-            daily_users_left: new_daily_users,
-            new_daily_users,
+            rng: cfg.rng,
+            profiles: cfg.profiles,
+            cur_timestamp: cfg.from.timestamp(),
+            to_timestamp: cfg.to.timestamp(),
+            traffic_hourly_weight_idx: WeightedIndex::new(cfg.traffic_hourly_weights).unwrap(),
+            daily_users_left: cfg.new_daily_users,
+            new_daily_users: cfg.new_daily_users,
             total_users: 0,
         }
     }

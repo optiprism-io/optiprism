@@ -24,7 +24,8 @@ impl Display for Error {
             Error::External(desc) => write!(f, "External error: {}", desc),
             Error::CSVError(err) => write!(f, "CSV error: {}", err),
             Error::UserSessionEnded => write!(f, "User session ended"),
-            Error::ArrowError(err) => write!(f, "Arrow error: {}", err)
+            Error::ArrowError(err) => write!(f, "Arrow error: {}", err),
+            Error::MetadataError(err) => write!(f, "Metadata error: {}", err),
         }
     }
 }
