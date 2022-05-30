@@ -5,19 +5,17 @@
     <div class="pf-l-grid pf-m-gutter">
         <div class="pf-l-grid__item">
             <div class="pf-c-card pf-m-compact pf-u-h-100">
-                <div class="pf-c-card__body">
-                    <UiTable
-                        :items="items"
-                        :columns="columns"
-                        @on-action="onAction"
-                    />
-                </div>
+                <UiTable
+                    :items="items"
+                    :columns="columns"
+                    @on-action="onAction"
+                />
             </div>
         </div>
     </div>
     <EventManagementPopup
         v-if="commonStore.showEventManagementPopup"
-        :name="editEventManagementPopup ? editEventManagementPopup.name : ''"
+        :event="editEventManagementPopup"
         @apply="eventManagementPopupApply"
         @cancel="eventManagementPopupCancel"
     />

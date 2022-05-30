@@ -47,6 +47,12 @@
         "name": "Name",
         "displayName": "Display name",
         "description": "Description"
+      },
+      "popup": {
+        "tabs": {
+          "event": "Event",
+          "properties": "Properties"
+        }
       }
     },
     "live_stream": {

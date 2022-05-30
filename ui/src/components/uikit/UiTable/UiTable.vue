@@ -2,6 +2,9 @@
     <div class="ui-table">
         <table
             class="pf-c-table"
+            :class="{
+                'pf-m-compact': props.compact
+            }"
             role="grid"
             aria-label=""
         >
@@ -46,8 +49,9 @@ import UiTableHeadCell from '@/components/uikit/UiTable/UiTableHeadCell.vue'
 import UiTableCell from '@/components/uikit/UiTable/UiTableCell.vue'
 
 type Props = {
-    items?: Row[];
-    columns: Column[],
+    compact?: boolean
+    items?: Row[]
+    columns: Column[]
     stickyColumnMinWidth?: number
     stickyColumnWidth?: number
 }
@@ -56,6 +60,7 @@ const props = withDefaults(defineProps<Props>(), {
     stickyColumnMinWidth: 170,
     stickyColumnWidth: 170,
     items: () => [],
+    compact: true,
 })
 
 const emit = defineEmits<{
