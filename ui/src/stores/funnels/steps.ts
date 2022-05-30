@@ -48,6 +48,10 @@ type AddEventToStepPayload = {
     index: number;
     event: EventRef;
 }
+type DeleteEventFormStepPayload = {
+    index: number;
+    eventIndex: number;
+}
 type EditStepEventPayload = {
     index: number;
     eventIndex: number;
@@ -170,8 +174,11 @@ export const useStepsStore = defineStore('steps', {
                 event.events[eventIndex].filters = [];
             }
         },
-        deleteEventFromStep(index: number): void {
-            this.steps[index].events.splice(index, 1);
+        deleteEventFromStep({index, eventIndex}: DeleteEventFormStepPayload): void {
+            const step = this.steps[index];
+            if (step) {
+                step.events.splice(eventIndex, 1);
+            }
         },
         addFilterToStep({index, eventIndex, filter}: AddFilterToStepPayload): void {
             this.steps[index].events[eventIndex].filters.push(filter);
