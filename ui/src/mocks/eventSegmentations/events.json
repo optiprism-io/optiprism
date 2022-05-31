@@ -6,7 +6,9 @@
         "updatedBy": 0,
         "projectId": 0,
         "tags": [
-            "Onboarding"
+            "Onboarding",
+            "Login",
+            "Sign up form"
         ],
         "name": "sign_up",
         "displayName": "Sign Up",
@@ -20,7 +22,8 @@
         "updatedBy": 0,
         "projectId": 0,
         "tags": [
-            "General"
+            "General",
+            "Product"
         ],
         "name": "search",
         "displayName": "Search",
@@ -41,7 +44,7 @@
         ],
         "name": "view_product",
         "displayName": "View Product",
-        "description": "Triggered when viewing the details page of an item.",
+        "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Amet animi architecto aspernatur beatae blanditiis culpa cupiditate dolorem doloribus ea et eveniet explicabo, harum illo inventore laudantium modi obcaecati quibusdam ratione recusandae reiciendis reprehenderit sapiente similique totam.",
         "status": "enabled",
         "properties": [
             2,

@@ -184,7 +184,7 @@ const apply = async () => {
     emit('apply')
 }
 
-const cancel = (type: string) => {
+const cancel = () => {
     emit('cancel')
 }
 
@@ -203,7 +203,7 @@ onBeforeMount(async () => {
                         let valuesList: string[] = []
 
                         try {
-                            const res = await schemaService.propertryValues({
+                            const res = await schemaService.propertyValues({
                                 event_name: item.eventName,
                                 event_type: item.eventType,
                                 property_name: filter.propertyName || '',

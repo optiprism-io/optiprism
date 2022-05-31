@@ -1,6 +1,6 @@
 import { get } from '../apiClient'
 import { Value, OperationId } from '@/types'
-import { EventRef, PropertyRef } from '@/types/events'
+import { PropertyRef } from '@/types/events'
 import { DefaultApi, CreateCustomEventRequest, PropertyType, CustomEventEvent, EventType } from '@/api'
 
 const api = new DefaultApi()
@@ -43,7 +43,7 @@ const schemaService = {
     userProperties: async () => await get('/schema/user-properties', '', null),
     userCustomProperties: async () => await get('/schema/user-custom-properties', '', null),
 
-    propertryValues: async (params: PropertiesValues) => await get('/data/property-values', '', params),
+    propertyValues: async (params: PropertiesValues) => await get('/data/property-values', '', params),
 };
 
 export default schemaService;

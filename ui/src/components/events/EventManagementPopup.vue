@@ -3,7 +3,7 @@
         :apply-button="$t('common.apply')"
         :cancel-button="$t('common.cancel')"
         :title="title"
-        :apply-loading="loading"
+        :apply-loading="props.loading"
         class="event-management-popup"
         @apply="apply"
         @cancel="cancel"
@@ -31,6 +31,7 @@ import { Event } from '@/types/events'
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
 import UiTabs from '@/components/uikit/UiTabs.vue'
 import UiDescriptionList, { Item } from '@/components/uikit/UiDescriptionList.vue'
+import { getStringDateByFormat } from '@/helpers/getStringDates';
 
 const i18n = inject<any>('i18n')
 
@@ -64,16 +65,42 @@ const itemsTabs = computed(() => {
 })
 
 const eventItems = computed<Item[]>(() => {
-    return props.event ? (Object.keys(props.event) as (keyof typeof props.event)[]).map(key => {
-        return {
-            label: key,
-            text:  props.event ? JSON.stringify(props.event[key]) : '',
-            type: 'text'
-        }
-    }) : []
+    const hiddenKeys = ['id', 'properties', 'createdBy', 'updatedBy', 'projectId'];
+    const items: Item[] = [];
+    const event = props.event;
+
+    if (event) {
+        const keys = (Object.keys(props.event) as (keyof typeof props.event)[]).filter(key => !hiddenKeys.includes(key))
+
+        keys.forEach(key => {
+            if (event[key]) {
+                const item: Item = {
+                    label: key,
+                    text: '',
+                    type: 'text'
+                }
+
+                switch (key) {
+                    case 'createdAt':
+                        item.text = getStringDateByFormat(event[key], '%d %b, %Y')
+                        break
+                    case 'tags':
+                        item.text = event[key]
+                        item.type = 'label'
+                        break
+                    default:
+                        item.text = event[key]
+                }
+
+                items.push(item)
+            }
+        })
+    }
+
+    return items
 })
 
-const title = computed(() => `${i18n.$t('events.event_management.event')}: ${props.name}`)
+const title = computed(() => props.event ? `${i18n.$t('events.event_management.event')}: ${props.event.name}` : '')
 
 const onSelectTab = (payload: string) => {
     activeTab.value = payload

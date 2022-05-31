@@ -89,7 +89,7 @@ export const useFiltersStore = defineStore('filters', {
             const eventRef = this.eventForValues(property.id)
 
             try {
-                const res = await schemaService.propertryValues({
+                const res = await schemaService.propertyValues({
                     event_name: eventRef ? lexiconStore.eventName(eventRef) : '',
                     event_type: eventRef ? eventRef.type : '',
                     property_name: property.name,
@@ -119,7 +119,7 @@ export const useFiltersStore = defineStore('filters', {
             const eventRef = this.eventForValues(property.id);
 
             try {
-                const res = await schemaService.propertryValues({
+                const res = await schemaService.propertyValues({
                     event_name: eventRef ? lexiconStore.eventName(eventRef) : '',
                     event_type: eventRef ? eventRef.type : '',
                     property_name: property.name,

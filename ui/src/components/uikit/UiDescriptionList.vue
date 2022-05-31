@@ -2,8 +2,8 @@
     <dl
         class="pf-c-description-list"
         :class="{
-            'pf-m-horizontal': horizontal,
-            'pf-m-compact': compact,
+            'pf-m-horizontal': props.horizontal,
+            'pf-m-compact': props.compact,
         }"
     >
         <div
@@ -15,7 +15,19 @@
                 <span class="pf-c-description-list__text">{{ item.label }}</span>
             </dt>
             <dd class="pf-c-description-list__description">
-                <div class="pf-c-description-list__text">
+                <div v-if="item.type === 'label'">
+                    <span
+                        v-for="label in item.text"
+                        :key="label"
+                        class="pf-c-label pf-m-blue pf-u-mr-sm"
+                    >
+                        <span class="pf-c-label__content">{{ label }}</span>
+                    </span>
+                </div>
+                <div
+                    v-else
+                    class="pf-c-description-list__text"
+                >
                     {{ item.text }}
                 </div>
             </dd>
@@ -27,7 +39,7 @@
 export type Item = {
     label: string
     text: string
-    type: string
+    type: 'label' | 'text'
 }
 
 type Props = {
