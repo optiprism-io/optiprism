@@ -49,9 +49,14 @@
         "description": "Description"
       },
       "popup": {
+        "properties_columns": {
+            "name": "Name",
+            "dataType": "Data Type"
+        },
         "tabs": {
           "event": "Event",
-          "properties": "Properties"
+          "properties": "Properties",
+          "user_properties": "User Properties"
         }
       }
     },

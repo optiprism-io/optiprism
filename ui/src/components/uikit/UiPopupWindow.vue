@@ -48,7 +48,7 @@
                 </div>
                 <footer
                     v-if="props.applyButton || props.cancelButton"
-                    class="pf-c-modal-box__footer"
+                    class="pf-c-modal-box__footer pf-u-mt-md"
                 >
                     <div class="pf-c-action-list">
                         <div

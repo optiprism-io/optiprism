@@ -55,8 +55,8 @@ export interface Event {
     displayName?: string;
     description?: string;
     status: EventStatus;
-    properties?: number[];
-    custom_properties?: number[];
+    event_properties?: number[];
+    user_properties?: number[];
 }
 
 export interface EventProperty {
@@ -95,7 +95,7 @@ export interface EventCustomProperty {
     status: EventStatus;
     name: string;
     description: string;
-    type: DataType;
+    dataType: DataType;
     nullable: boolean;
     isArray: boolean;
     tags: string[];
@@ -114,7 +114,7 @@ export interface UserProperty {
     displayName: string;
     description: string;
     status: EventStatus;
-    type: DataType;
+    dataType: DataType;
     db_col?: any;
     nullable: boolean;
     isArray: boolean;

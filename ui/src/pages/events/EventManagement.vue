@@ -16,6 +16,8 @@
     <EventManagementPopup
         v-if="commonStore.showEventManagementPopup"
         :event="editEventManagementPopup"
+        :properties="eventProperties"
+        :user-properties="userProperties"
         @apply="eventManagementPopupApply"
         @cancel="eventManagementPopupCancel"
     />
@@ -74,6 +76,16 @@ const editEventManagementPopup = computed(() => {
     } else {
         return null
     }
+})
+
+const eventProperties = computed(() => {
+    return editEventManagementPopup.value && editEventManagementPopup.value?.event_properties ?
+        editEventManagementPopup.value?.event_properties.map(id => lexiconStore.findEventPropertyById(id)) : []
+})
+
+const userProperties = computed(() => {
+    return editEventManagementPopup.value && editEventManagementPopup.value?.user_properties ?
+        editEventManagementPopup.value?.user_properties.map(id => lexiconStore.findUserPropertyById(id)) : []
 })
 
 const onAction = (payload: Action) => {

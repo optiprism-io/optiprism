@@ -1,7 +1,5 @@
 <template>
     <UiPopupWindow
-        :apply-button="$t('common.apply')"
-        :cancel-button="$t('common.cancel')"
         :title="title"
         :apply-loading="props.loading"
         class="event-management-popup"
@@ -13,25 +11,42 @@
             :items="itemsTabs"
             @on-select="onSelectTab"
         />
-        <UiDescriptionList
-            v-if="activeTab === 'event'"
-            :items="eventItems"
-            :horizontal="true"
-        />
-        <div v-else>
-            TODO
+        <div class="event-management-popup__content">
+            <UiDescriptionList
+                v-if="activeTab === 'event'"
+                :items="eventItems"
+                :horizontal="true"
+            />
+            <UiTable
+                v-if="activeTab === 'properties'"
+                :compact="true"
+                :items="itemsProperties"
+                :columns="columnsProperties"
+            />
+            <UiTable
+                v-if="activeTab === 'user_properties'"
+                :compact="true"
+                :items="itemsUserProperties"
+                :columns="columnsProperties"
+            />
         </div>
     </UiPopupWindow>
 </template>
 
 <script lang="ts" setup>
 import { computed, inject, ref } from 'vue'
-import { Event } from '@/types/events'
+import { Event, UserProperty } from '@/types/events'
+import { Row } from '@/components/uikit/UiTable/UiTable'
+import { Property } from '@/api'
 
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
 import UiTabs from '@/components/uikit/UiTabs.vue'
+import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import UiDescriptionList, { Item } from '@/components/uikit/UiDescriptionList.vue'
-import { getStringDateByFormat } from '@/helpers/getStringDates';
+
+import { getStringDateByFormat } from '@/helpers/getStringDates'
+import propertiesColumnsConfig from '@/configs/events/propertiesTable.json'
+const mapTabs = ['event', 'properties', 'user_properties']
 
 const i18n = inject<any>('i18n')
 
@@ -39,6 +54,8 @@ type Props = {
     name?: string
     loading?: boolean
     event: Event | null
+    properties: Property[]
+    userProperties: UserProperty[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -52,9 +69,25 @@ const emit = defineEmits<{
 
 const activeTab = ref('event')
 
-const itemsTabs = computed(() => {
-    const mapTabs = ['event', 'properties']
+const getTableRows = (properties: Property[] | UserProperty[]) => {
+    return properties.map((prop: Property | UserProperty): Row => {
+        const keys = (propertiesColumnsConfig.map(item => item.key) as (keyof typeof prop)[])
+        const rows: Row = [];
 
+        keys.forEach((key) => {
+            if (prop[key]) {
+                rows.push({
+                    value: key,
+                    title: String(prop[key]) || '',
+                })
+            }
+        })
+
+        return rows
+    })
+}
+
+const itemsTabs = computed(() => {
     return mapTabs.map(key => {
         return {
             name: i18n.$t(`events.event_management.popup.tabs.${key}`),
@@ -65,7 +98,7 @@ const itemsTabs = computed(() => {
 })
 
 const eventItems = computed<Item[]>(() => {
-    const hiddenKeys = ['id', 'properties', 'createdBy', 'updatedBy', 'projectId'];
+    const hiddenKeys = ['id', 'properties', 'createdBy', 'updatedBy', 'projectId', 'event_properties', 'user_properties'];
     const items: Item[] = [];
     const event = props.event;
 
@@ -102,6 +135,18 @@ const eventItems = computed<Item[]>(() => {
 
 const title = computed(() => props.event ? `${i18n.$t('events.event_management.event')}: ${props.event.name}` : '')
 
+const columnsProperties = computed(() => {
+    return propertiesColumnsConfig.map(item => {
+        return {
+            value: item.key,
+            title: i18n.$t(item.string),
+        }
+    })
+})
+
+const itemsProperties = computed(() => getTableRows(props.properties))
+const itemsUserProperties = computed(() => getTableRows(props.userProperties))
+
 const onSelectTab = (payload: string) => {
     activeTab.value = payload
 }
@@ -115,4 +160,10 @@ const cancel = () => {
 }
 </script>
 
-<style lang="scss"></style>
+<style lang="scss">
+.event-management-popup {
+    &__content {
+        min-height: 15rem;
+    }
+}
+</style>
