@@ -1,15 +1,6 @@
 <template>
-    <td
-        :class="{
-            'pf-c-table__sticky-column': pinned,
-            'pf-m-truncate': truncate,
-            'pf-m-border-right': lastPinned,
-        }"
+    <div
         class="ui-table-event-cell"
-        role="columnheader"
-        :data-label="title"
-        scope="col"
-        :style="style"
     >
         <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
             <div class="pf-l-flex__item">
@@ -23,7 +14,7 @@
                 </div>
             </div>
         </div>
-    </td>
+    </div>
 </template>
 
 <script lang="ts" setup>

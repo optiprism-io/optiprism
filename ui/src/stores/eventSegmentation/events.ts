@@ -133,7 +133,11 @@ export const useEventsStore = defineStore('events', {
                             title: key,
                             truncate: true,
                             lastPinned: this.eventSegmentation.dimensionHeaders.length - 1 === i,
-                            left: i * COLUMN_WIDTH,
+                            style: {
+                                left: i ? `${i * COLUMN_WIDTH}px` : '',
+                                width: 'auto',
+                                minWidth: i === 0 ? `${COLUMN_WIDTH}x` : '',
+                            },
                         }
 
                         return acc
@@ -163,7 +167,11 @@ export const useEventsStore = defineStore('events', {
                                 title: dimension,
                                 pinned: true,
                                 lastPinned: i === items.length - 1,
-                                left: i * COLUMN_WIDTH,
+                                style: {
+                                    left: i ? `${i * COLUMN_WIDTH}px` : '',
+                                    width: 'auto',
+                                    minWidth: i === 0 ? `${COLUMN_WIDTH}x` : '',
+                                },
                             };
                         }),
                         ...values.map((value: number | undefined) => {

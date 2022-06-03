@@ -127,13 +127,19 @@ const updateReport = () => {
 const tableColumnsValues = computed(() => {
     return [
         ...liveStreamStore.defaultColumns.map((key, i) => {
+            const left = i === 1 ? 380 : i * COLUMN_WIDTH
+
             return {
                 pinned: true,
                 value: key,
                 title: i18n.$t(`events.live_stream.columns.${key}`),
                 truncate: true,
                 lastPinned: liveStreamStore.defaultColumns.length - 1 === i,
-                left: i === 1 ? 380 : i * COLUMN_WIDTH,
+                style: {
+                    left: `${left}px`,
+                    width: 'auto',
+                    minWidth: i === 0 ? '380px' : '',
+                },
             }
         }),
         ...liveStreamStore.activeColumns.map(key => {
@@ -156,7 +162,7 @@ const tableData = computed(() => {
                     title: value,
                     pinned: true,
                     lastPinned: column.lastPinned,
-                    left: column.left,
+                    style: column.style || undefined,
                     actions: column.value === 'eventName' ? [{
                         name: 'create',
                         icon: 'fas fa-plus-circle'

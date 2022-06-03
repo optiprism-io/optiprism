@@ -6,21 +6,28 @@
                 'pf-m-compact': props.compact
             }"
             role="grid"
-            aria-label=""
         >
             <thead>
                 <tr role="row">
-                    <UiTableHeadCell
+                    <th
                         v-for="column in columns"
                         :key="column.value"
-                        :value="column.value"
-                        :title="column.title"
-                        :sorted="column.sorted"
-                        :pinned="column.pinned"
-                        :truncate="column.truncate"
-                        :left="column.left"
-                        :last-pinned="column.lastPinned"
-                    />
+                        :class="{
+                            'pf-c-table__sort': column.sorted,
+                            'pf-c-table__sticky-column': column.pinned,
+                            'pf-m-truncate': column.truncate,
+                            'pf-m-border-right': column.lastPinned,
+                        }"
+                        role="columnheader"
+                        scope="col"
+                        :style="column.style"
+                    >
+                        <UiTableHeadCell
+                            :value="column.value"
+                            :title="column.title"
+                            :sorted="column.sorted"
+                        />
+                    </th>
                 </tr>
             </thead>
             <tbody role="rowgroup">
@@ -29,13 +36,23 @@
                     :key="i"
                     role="row"
                 >
-                    <component
-                        :is="cell.component || UiTableCell"
+                    <td
                         v-for="cell in row"
                         :key="cell.value"
-                        v-bind="cell"
-                        @on-action="onAction"
-                    />
+                        :class="{
+                            'pf-c-table__sticky-column': cell.pinned,
+                            'pf-m-truncate': cell.truncate,
+                            'pf-m-border-right': cell.lastPinned,
+                        }"
+                        :style="cell.style"
+                    >
+                        <component
+                            :is="cell.component || UiTableCell"
+                            v-bind="cell"
+                            :style="null"
+                            @on-action="onAction"
+                        />
+                    </td>
                 </tr>
             </tbody>
         </table>
