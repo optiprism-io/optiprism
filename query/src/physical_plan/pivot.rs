@@ -229,7 +229,6 @@ impl Stream for PivotStream {
                             scalars.resize(unique_groups_len, ScalarValue::try_from(&value_type).unwrap());
                         }
 
-                        // TODO remove clone
                         ScalarValue::iter_to_array(scalars.clone()).unwrap()
                     }).collect();
 

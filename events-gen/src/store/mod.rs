@@ -49,7 +49,7 @@ pub async fn gen(cfg: Config) -> Result<Vec<Vec<RecordBatch>>> {
     info!("loading products");
     let mut products = ProductProvider::try_new_from_csv(cfg.org_id, cfg.project_id, &mut rng, cfg.md.dictionaries.clone(), cfg.products_path).await?;
     info!("creating entities");
-    let schema = create_entities(cfg.org_id, cfg.project_id, &cfg.md).await?;
+    let schema = Arc::new(create_entities(cfg.org_id, cfg.project_id, &cfg.md).await?);
 
     info!("creating generator");
     let gen_cfg = generator::Config {
@@ -73,7 +73,7 @@ pub async fn gen(cfg: Config) -> Result<Vec<Vec<RecordBatch>>> {
     let run_cfg = scenario::Config {
         rng: rng.clone(),
         gen,
-        schema: Arc::new(schema),
+        schema: schema.clone(),
         events_map,
         products,
         to: cfg.to,
@@ -81,5 +81,8 @@ pub async fn gen(cfg: Config) -> Result<Vec<Vec<RecordBatch>>> {
         partitions: cfg.partitions,
     };
 
-    Ok(Scenario::new(run_cfg).run().await?)
+    let mut scenario = Scenario::new(run_cfg);
+    let result = scenario.run().await?;
+    println!("!");
+    Ok(result)
 }

@@ -21,6 +21,7 @@ use crate::{Result, Error};
 use axum::{async_trait};
 use arrow::error::{ArrowError, Result as ArrowResult};
 
+/// `UNPIVOT` execution plan operator. Unpivot transforms columns into rows. E.g.
 pub struct UnpivotExec {
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
@@ -142,13 +143,15 @@ impl Stream for UnpivotStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.stream.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(
-                unpivot(
+            Poll::Ready(Some(Ok(batch))) => {
+                let result = unpivot(
                     &batch,
                     self.schema.clone(),
                     &self.cols,
-                ).map_err(|err| ArrowError::ExternalError(Box::new(err)))
-            )),
+                ).map_err(|err| ArrowError::ExternalError(Box::new(err)));
+
+                Poll::Ready(Some(result))
+            }
             other => other,
         }
     }

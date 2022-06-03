@@ -85,7 +85,11 @@ impl Scenario {
 
     pub async fn run(&mut self) -> Result<Vec<Vec<RecordBatch>>> {
         let mut result: Vec<Vec<RecordBatch>> = vec![Vec::with_capacity(self.batch_size); self.partitions];
-        let mut batch_builder = RecordBatchBuilder::new(self.batch_size, self.schema.clone());
+        let mut batch_builders: Vec<RecordBatchBuilder> = Vec::with_capacity(self.partitions);
+        for _ in 0..self.partitions {
+            batch_builders.push(RecordBatchBuilder::new(self.batch_size, self.schema.clone()));
+        }
+
         let events_per_sec = Arc::new(AtomicUsize::new(0));
         let events_per_sec_clone = events_per_sec.clone();
         let users_per_sec = Arc::new(AtomicUsize::new(0));
@@ -109,9 +113,14 @@ impl Scenario {
 
         let mut user_id: u64 = 0;
         let mut overall_events: usize = 0;
-        while let Some(sample) = self.gen.next() {
+        let mut partition_id: usize = 0;
+        'main: while let Some(sample) = self.gen.next() {
             users_per_sec.fetch_add(1, Ordering::SeqCst);
             user_id += 1;
+            partition_id = user_id as usize % self.partitions;
+            let batch_builder = &mut batch_builders[partition_id];
+            let partition_result = &mut result[partition_id];
+
             let mut state = State {
                 session_id: 0,
                 event_id: 0,
@@ -249,7 +258,7 @@ impl Scenario {
                         overall_events += 1;
                         batch_builder.write_event(event, *self.events_map.get(&event).unwrap(), &state, &sample.profile)?;
                         if batch_builder.len() >= self.batch_size {
-                            result[user_id as usize % self.partitions].push(batch_builder.to_record_batch()?);
+                            partition_result.push(batch_builder.to_record_batch()?);
                         }
                     }
 
@@ -279,6 +288,16 @@ impl Scenario {
         is_ended.store(true, Ordering::Relaxed);
 
         info!("overall events: {overall_events}");
+
+        // flush the rest
+        for (idx, builder) in batch_builders.iter_mut().enumerate() {
+            if builder.len() > 0 {
+                result[idx].push(builder.to_record_batch()?);
+            }
+        }
+
+        // remove unused partitions
+        result = result.iter().cloned().filter(|v| !v.is_empty()).collect();
 
         Ok(result)
     }

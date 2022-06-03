@@ -94,7 +94,7 @@ impl ProductProvider {
             let product = Product {
                 id: id + 1,
                 name: dicts.get_key_or_create(org_id, proj_id, "event_product_name", rec.name.as_str()).await?,
-                category: dicts.get_key_or_create(org_id, proj_id, "event_product_category", rec.name.as_str()).await?,
+                category: dicts.get_key_or_create(org_id, proj_id, "event_product_category", rec.category.as_str()).await?,
                 subcategory: rec.subcategory.and_then(|v| Some(block_on(dicts.get_key_or_create(org_id, proj_id, "event_product_subcategory", v.as_str())))).transpose()?,
                 brand: rec.brand.and_then(|v| Some(block_on(dicts.get_key_or_create(org_id, proj_id, "event_product_brand", v.as_str())))).transpose()?,
                 price: rec.price,

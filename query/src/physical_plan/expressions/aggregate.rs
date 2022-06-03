@@ -14,6 +14,8 @@ pub fn state_types(data_type: DataType, agg: &AggregateFunction) -> Result<Vec<D
         AggregateFunction::Count => vec![DataType::UInt64],
         AggregateFunction::Sum => vec![data_type],
         AggregateFunction::Avg => vec![DataType::UInt64, data_type],
-        _ => unimplemented!(),
+        AggregateFunction::Min => vec![data_type],
+        AggregateFunction::Max => vec![data_type],
+        _ => unimplemented!("{}", agg),
     })
 }

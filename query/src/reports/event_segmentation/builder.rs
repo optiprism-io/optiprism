@@ -1,12 +1,12 @@
 use crate::error::{Error, Result};
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, DurationRound, NaiveDateTime, Utc};
 use datafusion::logical_plan::{
     create_udaf, exprlist_to_fields, Column, DFField, DFSchema, ExprSchema, LogicalPlan, Operator,
 };
 use datafusion::physical_plan::aggregates::{return_type, AggregateFunction};
 
 use crate::reports::types::{PropValueOperation, PropertyRef, QueryTime, TimeUnit, EventRef};
-use crate::logical_plan::expr::{aggregate_partitioned, multi_and, sorted_distinct_count};
+use crate::logical_plan::expr::{aggregate_partitioned, lit_timestamp, multi_and, sorted_distinct_count};
 use crate::physical_plan::expressions::aggregate::state_types;
 use crate::physical_plan::expressions::partitioned_aggregate::{
     PartitionedAggregate, PartitionedAggregateFunction,
@@ -24,6 +24,7 @@ use datafusion_expr::{
     ReturnTypeFunction, Signature, StateTypeFunction, Volatility,
 };
 
+use chrono::prelude::*;
 use std::io::{self, Write};
 use std::ops::{Add, Sub};
 use futures::executor;
@@ -31,6 +32,9 @@ use futures::executor::block_on;
 use metadata::properties::provider::Namespace;
 use metadata::Metadata;
 use std::sync::Arc;
+use arrow::array::TimestampSecondArray;
+use chronoutil::DateRule;
+use mockall::predicate::ge;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
@@ -63,7 +67,7 @@ impl LogicalPlanBuilder {
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {
         let events = es.events.clone();
-        let builder = LogicalPlanBuilder { ctx, cur_time, metadata, es: es.clone() };
+        let builder = LogicalPlanBuilder { ctx, cur_time: cur_time.clone(), metadata, es: es.clone() };
 
         // build main query
         let mut input = match events.len() {
@@ -106,7 +110,8 @@ impl LogicalPlanBuilder {
 
         // pivot date
         input = {
-            let result_cols = es.time_columns(cur_time);
+            let (from_time, to_time) = es.time.range(cur_time.clone());
+            let result_cols = time_columns(from_time, to_time, &es.interval_unit);
             LogicalPlan::Extension(Extension {
                 node: Arc::new(PivotNode::try_new(
                     input,
@@ -138,11 +143,10 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         event: &Event,
     ) -> Result<LogicalPlan> {
-        // time filter
-        let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
-        let mut expr = time_expression(ts_col, input.schema(), &self.es.time, &self.cur_time)?;
+        // time expression
+        let mut expr = time_expression(event_fields::CREATED_AT, input.schema(), &self.es.time, self.cur_time.clone())?;
 
-        // event filter (event name, properties)
+        // event expression
         expr = and(expr, self.event_expression(event).await?);
 
         // global event filters
@@ -183,7 +187,7 @@ impl LogicalPlanBuilder {
         let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
         let time_expr = Expr::ScalarFunction {
             fun: BuiltinScalarFunction::DateTrunc,
-            args: vec![lit(time_granularity), ts_col],
+            args: vec![lit(self.es.interval_unit.as_str()), ts_col],
         };
 
         group_expr.push(Expr::Alias(Box::new(lit(event.event.name())), COL_EVENT.to_string()));
@@ -364,20 +368,57 @@ impl LogicalPlanBuilder {
 
 impl EventSegmentation {
     pub fn time_columns(&self, cur_time: DateTime<Utc>) -> Vec<String> {
-        let (mut from, to) = match &self.time {
-            QueryTime::Between { from, to } => (from.clone(), to.clone()),
-            QueryTime::From(from) => (from.clone(), cur_time.clone()),
-            QueryTime::Last { last, unit } => (cur_time.sub(unit.duration(*last)), cur_time.clone())
-        };
+        let (from, to) = self.time.range(cur_time);
 
-        let mut result_cols: Vec<String> = vec![];
-        let dur = self.interval_unit.duration(1);
-
-        while from <= to {
-            result_cols.push(from.naive_utc().to_string());
-            from = from.add(dur.clone());
-        }
-
-        result_cols
+        time_columns(from, to, &self.interval_unit)
     }
+}
+
+pub fn time_columns(from: DateTime<Utc>, to: DateTime<Utc>, granularity: &TimeUnit) -> Vec<String> {
+    let from = date_trunc(granularity, from).unwrap();
+    let to = date_trunc(granularity, to).unwrap();
+    let rule = match granularity {
+        TimeUnit::Second => DateRule::secondly(from),
+        TimeUnit::Minute => DateRule::minutely(from),
+        TimeUnit::Hour => DateRule::hourly(from),
+        TimeUnit::Day => DateRule::daily(from),
+        TimeUnit::Week => DateRule::weekly(from),
+        TimeUnit::Month => DateRule::monthly(from),
+        TimeUnit::Year => DateRule::yearly(from),
+    };
+
+    rule.with_end(to + granularity.relative_duration(1)).map(|dt| dt.naive_utc().to_string()).collect()
+}
+
+pub fn date_trunc(granularity: &TimeUnit, value: DateTime<Utc>) -> Result<DateTime<Utc>> {
+    let value = Some(value);
+    let value = match granularity {
+        TimeUnit::Second => value,
+        TimeUnit::Minute => value.and_then(|d| d.with_second(0)),
+        TimeUnit::Hour => value
+            .and_then(|d| d.with_second(0))
+            .and_then(|d| d.with_minute(0)),
+        TimeUnit::Day => value
+            .and_then(|d| d.with_second(0))
+            .and_then(|d| d.with_minute(0))
+            .and_then(|d| d.with_hour(0)),
+        TimeUnit::Week => value
+            .and_then(|d| d.with_second(0))
+            .and_then(|d| d.with_minute(0))
+            .and_then(|d| d.with_hour(0))
+            .map(|d| d - Duration::seconds(60 * 60 * 24 * d.weekday() as i64)),
+        TimeUnit::Month => value
+            .and_then(|d| d.with_second(0))
+            .and_then(|d| d.with_minute(0))
+            .and_then(|d| d.with_hour(0))
+            .and_then(|d| d.with_day0(0)),
+        TimeUnit::Year => value
+            .and_then(|d| d.with_second(0))
+            .and_then(|d| d.with_minute(0))
+            .and_then(|d| d.with_hour(0))
+            .and_then(|d| d.with_day0(0))
+            .and_then(|d| d.with_month0(0)),
+    };
+
+    Ok(value.unwrap())
 }

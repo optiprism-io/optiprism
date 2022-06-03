@@ -87,7 +87,7 @@ pub fn aggregate_partitioned(
     // make partitioned aggregate factory
     let pagg = PartitionedAggregate::try_new(
         partition_by.get_type(input_schema)?,
-        rtype.clone(),
+        args[0].get_type(input_schema)?,
         fun,
         rtype.clone(),
         outer_fun,
@@ -98,6 +98,7 @@ pub fn aggregate_partitioned(
         pagg.create_accumulator()
             .map_err(Error::into_datafusion_plan_error)
     });
+
     let return_type_fn: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(rtype.clone())));
     let state_type_fn: StateTypeFunction = Arc::new(move |_| Ok(Arc::new(state_types.clone())));
 

@@ -1,6 +1,8 @@
 use std::sync::Arc;
+use std::time::Instant;
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::pretty_format_batches;
 use chrono::Utc;
 use datafusion::catalog::schema::MemorySchemaProvider;
 use datafusion::datasource::{MemTable, TableProvider};
@@ -40,11 +42,22 @@ impl Provider {
 impl Provider {
     pub async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<Series> {
         let cur_time = Utc::now();
-        let plan = event_segmentation::builder::LogicalPlanBuilder::build(ctx, cur_time, self.metadata.clone(), self.input.clone(), es.clone()).await?;
-        let config = ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {})).with_target_partitions(self.partitions);
+        let start = Instant::now();
+        let plan = event_segmentation::builder::LogicalPlanBuilder::build(
+            ctx,
+            cur_time.clone(),
+            self.metadata.clone(),
+            self.input.clone(),
+            es.clone()
+        ).await?;
+        let config = ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {}));
         let exec_ctx = ExecutionContext::with_config(config);
+        println!("logical plan: {:?}", plan);
         let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
+        println!("physical plan: {:?}", physical_plan);
         let batches = collect(physical_plan, Arc::new(RuntimeEnv::new(RuntimeConfig::new())?)).await?;
+        let duration = start.elapsed();
+        println!("elapsed: {:?}", duration);
         let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
         let result = concat_batches(&schema, &batches, 0)?;
 

@@ -1,3 +1,7 @@
+#[macro_use] extern crate log;
+
+extern crate bytesize;
+
 mod error;
 
 use axum::{Router, Server};
@@ -5,6 +9,7 @@ use metadata::{Metadata, Store};
 use platform::{accounts::Provider as AccountProvider, auth::Provider as AuthProvider, events::Provider as EventsProvider, properties::Provider as PropertiesProvider};
 use std::{env::set_var, net::SocketAddr, sync::Arc};
 use std::path::PathBuf;
+use bytesize::ByteSize;
 use chrono::{DateTime, Utc};
 use tower_http::add_extension::AddExtensionLayer;
 use platform::platform::Platform;
@@ -50,14 +55,27 @@ async fn main() -> Result<()> {
             products_path,
             geo_path,
             device_path,
-            new_daily_users: 30,
+            new_daily_users: 1,
             batch_size: 4096,
             partitions: num_cpus::get(),
         };
 
         events_gen::store::gen(cfg).await?
     };
-    info!("successfully generated");
+
+    println!("successfully generated");
+    let mut rows: usize = 0;
+    let mut data_size_bytes: usize = 0;
+    for partition in batches.iter() {
+        for batch in partition.iter() {
+            rows += batch.num_rows();
+            for column in batch.columns() {
+                data_size_bytes += column.get_array_memory_size();
+            }
+        }
+    }
+    println!("partitions: {}, batches: {}, rows: {rows}",batches.len(),batches[0].len());
+    println!("total size: {}",ByteSize::b(data_size_bytes as u64));
 
     let query_provider = Arc::new(QueryProvider::try_new(md.clone(), batches[0][0].schema(), batches)?);
     let platform = platform::Platform::new(md.clone(), query_provider);

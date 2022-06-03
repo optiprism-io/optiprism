@@ -19,3 +19,4 @@ num_cpus = "1.13.1"
 chrono = { version = "0.4.19" }
 log = "0.4.17"
 env_logger = "0.9.0"
+bytesize = "1.1.0"

@@ -14,7 +14,7 @@ use query::reports::event_segmentation::types::NamedQuery;
 use convert_case::{Case, Casing};
 
 #[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum QueryTime {
     Between {
         from: DateTime<Utc>,
@@ -243,7 +243,7 @@ impl TryInto<query_es_types::ChartType> for ChartType {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum Analysis {
     Linear,
     RollingAverage { window: usize, unit: TimeUnit },
