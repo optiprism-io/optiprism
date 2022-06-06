@@ -44,8 +44,8 @@ import UiTabs from '@/components/uikit/UiTabs.vue'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import UiDescriptionList, { Item } from '@/components/uikit/UiDescriptionList.vue'
 
-import { getStringDateByFormat } from '@/helpers/getStringDates'
 import propertiesColumnsConfig from '@/configs/events/propertiesTable.json'
+import eventValuesConfig, { Item as EventValuesConfig } from '@/configs/events/eventValues'
 const mapTabs = ['event', 'properties', 'user_properties']
 
 const i18n = inject<any>('i18n')
@@ -98,31 +98,21 @@ const itemsTabs = computed(() => {
 })
 
 const eventItems = computed<Item[]>(() => {
-    const hiddenKeys = ['id', 'properties', 'createdBy', 'updatedBy', 'projectId', 'event_properties', 'user_properties'];
     const items: Item[] = [];
     const event = props.event;
 
     if (event) {
-        const keys = (Object.keys(props.event) as (keyof typeof props.event)[]).filter(key => !hiddenKeys.includes(key))
+        const keys = (Object.keys(eventValuesConfig) as (keyof typeof props.event)[])
 
         keys.forEach(key => {
+            const config: EventValuesConfig = eventValuesConfig[key];
+
             if (event[key]) {
                 const item: Item = {
-                    label: key,
-                    text: '',
-                    type: 'text'
-                }
-
-                switch (key) {
-                    case 'createdAt':
-                        item.text = getStringDateByFormat(event[key], '%d %b, %Y')
-                        break
-                    case 'tags':
-                        item.text = event[key]
-                        item.type = 'label'
-                        break
-                    default:
-                        item.text = event[key]
+                    label: i18n.$t(config.string),
+                    text: event[key],
+                    type: config.type,
+                    key,
                 }
 
                 items.push(item)

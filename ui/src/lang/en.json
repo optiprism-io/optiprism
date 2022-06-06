@@ -53,6 +53,13 @@
             "name": "Name",
             "dataType": "Data Type"
         },
+        "event_columns": {
+          "tags": "Tags",
+          "name": "Name",
+          "displayName": "Display name",
+          "description": "Description",
+          "status": "Status"
+        },
         "tabs": {
           "event": "Event",
           "properties": "Properties",

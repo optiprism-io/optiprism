@@ -3,18 +3,17 @@
         :id="props.name"
         ref="input"
         class="pf-c-form-control"
-        :value="props.modelValue"
+        :value="value"
         :placeholder="props.placeholder"
         :min="props.min"
         :required="props.required"
         :name="props.name"
-        @input="updateValue"
         @blur="blur"
     >
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 const emit = defineEmits(['update:modelValue', 'blur']);
 
 interface Props {
@@ -49,11 +48,14 @@ onMounted(() => {
     }
 })
 
-const updateValue = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-
-    emit('update:modelValue', target.value);
-};
+const value = computed({
+    get() {
+        return props.modelValue
+    },
+    set(value) {
+        emit('update:modelValue', value)
+    }
+})
 
 const blur = (e: any) => emit('blur', e);
 </script>
