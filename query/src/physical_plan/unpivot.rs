@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -15,7 +16,7 @@ use datafusion::arrow::array::{
     UInt32Array,
 };
 use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream, Statistics};
+use datafusion::physical_plan::{DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream, Statistics};
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use crate::{Result, Error};
 use axum::{async_trait};
@@ -118,6 +119,10 @@ impl ExecutionPlan for UnpivotExec {
             schema: self.schema.clone(),
             cols: self.cols.clone(),
         }))
+    }
+
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "UnpivotExec")
     }
 
     fn statistics(&self) -> Statistics {

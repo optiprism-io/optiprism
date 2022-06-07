@@ -9,7 +9,7 @@ use datafusion::datasource::{MemTable, TableProvider};
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
-use datafusion::physical_plan::collect;
+use datafusion::physical_plan::{collect, displayable};
 use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
 use metadata::database::TableType;
 use metadata::Metadata;
@@ -50,12 +50,18 @@ impl Provider {
             self.input.clone(),
             es.clone()
         ).await?;
-        let config = ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {}));
+        let config = ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {})).with_target_partitions(1);
         let exec_ctx = ExecutionContext::with_config(config);
         println!("logical plan: {:?}", plan);
         let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
-        println!("physical plan: {:?}", physical_plan);
+        let displayable_plan = displayable(physical_plan.as_ref());
+
+        println!("physical plan: {}", displayable_plan.indent());
         let batches = collect(physical_plan, Arc::new(RuntimeEnv::new(RuntimeConfig::new())?)).await?;
+        for batch in batches.iter() {
+            println!("{}", pretty_format_batches(&[batch.clone()])?);
+        }
+
         let duration = start.elapsed();
         println!("elapsed: {:?}", duration);
         let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());

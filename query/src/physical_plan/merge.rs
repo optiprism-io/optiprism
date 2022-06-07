@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::pin::Pin;
@@ -11,7 +12,7 @@ use arrow::record_batch::RecordBatch;
 use futures::executor::block_on;
 use futures::{Stream, StreamExt};
 use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::physical_plan::{collect, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream, Statistics};
+use datafusion::physical_plan::{collect, DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream, Statistics};
 use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use datafusion::physical_plan::cross_join::stats_cartesian_product;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
@@ -19,6 +20,7 @@ use datafusion_common::{DataFusionError, ScalarValue};
 use crate::Result;
 use axum::{async_trait};
 use arrow::error::Result as ArrowResult;
+use arrow::util::pretty::pretty_format_batches;
 use datafusion_common::Result as DFResult;
 use crate::Error;
 
@@ -87,6 +89,10 @@ impl ExecutionPlan for MergeExec {
         }))
     }
 
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MergeExec")
+    }
+
     fn statistics(&self) -> Statistics {
         Statistics::default()
     }
@@ -123,7 +129,9 @@ impl Stream for MergeStream {
                         }
                     }).collect::<DFResult<Vec<ArrayRef>>>()?;
 
-                    return Poll::Ready(Some(Ok(RecordBatch::try_new(self.schema.clone(), cols)?)));
+                    let result = RecordBatch::try_new(self.schema.clone(), cols)?;
+
+                    return Poll::Ready(Some(Ok(result)));
                 }
                 Poll::Ready(None) => {
                     if self.stream_idx >= self.streams.len() - 1 {

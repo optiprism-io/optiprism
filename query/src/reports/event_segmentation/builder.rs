@@ -1,8 +1,6 @@
 use crate::error::{Error, Result};
 use chrono::{DateTime, Duration, DurationRound, NaiveDateTime, Utc};
-use datafusion::logical_plan::{
-    create_udaf, exprlist_to_fields, Column, DFField, DFSchema, ExprSchema, LogicalPlan, Operator,
-};
+use datafusion::logical_plan::{create_udaf, exprlist_to_fields, Column, DFField, DFSchema, ExprSchema, LogicalPlan, Operator, Repartition, Partitioning};
 use datafusion::physical_plan::aggregates::{return_type, AggregateFunction};
 
 use crate::reports::types::{PropValueOperation, PropertyRef, QueryTime, TimeUnit, EventRef};
@@ -87,16 +85,22 @@ impl LogicalPlanBuilder {
             }
         };
 
+        Ok(input)
+    }
+
+    async fn build_event_logical_plan(
+        &self,
+        input: LogicalPlan,
+        event_id: usize,
+    ) -> Result<LogicalPlan> {
+        let mut input = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id]).await?;
+        input = self
+            .build_aggregate_logical_plan(input, &self.es.events[event_id])
+            .await?;
+
         // unpivot aggregate values into value column
         input = {
-            let agg_cols = events
-                .iter()
-                .flat_map(|e| {
-                    e.queries
-                        .iter()
-                        .map(|q| q.clone().name.unwrap())
-                })
-                .collect();
+            let agg_cols = self.es.events[event_id].queries.iter().map(|q| q.clone().name.unwrap()).collect();
 
             LogicalPlan::Extension(Extension {
                 node: Arc::new(UnpivotNode::try_new(
@@ -110,8 +114,8 @@ impl LogicalPlanBuilder {
 
         // pivot date
         input = {
-            let (from_time, to_time) = es.time.range(cur_time.clone());
-            let result_cols = time_columns(from_time, to_time, &es.interval_unit);
+            let (from_time, to_time) = self.es.time.range(self.cur_time.clone());
+            let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
             LogicalPlan::Extension(Extension {
                 node: Arc::new(PivotNode::try_new(
                     input,
@@ -123,18 +127,6 @@ impl LogicalPlanBuilder {
         };
 
         Ok(input)
-    }
-
-    async fn build_event_logical_plan(
-        &self,
-        input: LogicalPlan,
-        event_id: usize,
-    ) -> Result<LogicalPlan> {
-        let filter = self.build_filter_logical_plan(input.clone(), &self.es.events[event_id]).await?;
-        let agg = self
-            .build_aggregate_logical_plan(filter, &self.es.events[event_id])
-            .await?;
-        Ok(agg)
     }
 
     /// builds filter plan

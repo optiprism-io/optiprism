@@ -83,6 +83,6 @@ pub async fn gen(cfg: Config) -> Result<Vec<Vec<RecordBatch>>> {
 
     let mut scenario = Scenario::new(run_cfg);
     let result = scenario.run().await?;
-    println!("!");
+
     Ok(result)
 }

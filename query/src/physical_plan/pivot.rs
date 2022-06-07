@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
+use std::fmt;
 use ahash::RandomState;
 use std::pin::Pin;
 use futures::{Stream, StreamExt};
@@ -11,7 +12,7 @@ use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use fnv::FnvHashMap;
 use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream, Statistics};
+use datafusion::physical_plan::{DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream, Statistics};
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::hash_utils::create_hashes;
 use datafusion_common::ScalarValue;
@@ -122,6 +123,10 @@ impl ExecutionPlan for PivotExec {
         }))
     }
 
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "PivotExec")
+    }
+
     fn statistics(&self) -> Statistics {
         Statistics::default()
     }
@@ -215,6 +220,11 @@ impl Stream for PivotStream {
                 }
                 Poll::Ready(None) => {
                     self.finished = true;
+
+                    // nothing was actually processed
+                    if self.unique_groups.len() == 0 {
+                        return Poll::Ready(None);
+                    }
 
                     let group_arrs: Vec<ArrayRef> = self.group_cols.iter().enumerate().map(|(idx, _)| {
                         let scalars: Vec<ScalarValue> = self.unique_groups.iter().map(|(_, values)| values[idx].clone()).collect();
