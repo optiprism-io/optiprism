@@ -1259,7 +1259,7 @@ components:
     EventFilterByCohort:
       type: object
       properties:
-        filteType:
+        type:
           type: string
           enum:
             - cohort
@@ -1274,7 +1274,7 @@ components:
       allOf:
         - type: object
           properties:
-            filterType:
+            type:
               type: string
               enum:
                 - property
@@ -1312,7 +1312,7 @@ components:
       allOf:
         - type: object
           properties:
-            breakdownType:
+            type:
               type: string
               enum:
                 - property
@@ -1482,9 +1482,9 @@ components:
     SegmentConditionHasPropertyValue:
       type: object
       description: check whether the user currently has a property with a value
-      required: [ "conditionType","propertyName","operation" ]
+      required: [ "type","propertyName","operation" ]
       properties:
-        conditionType:
+        type:
           type: string
           enum:
             - hasPropertyValue
@@ -1505,9 +1505,9 @@ components:
     SegmentConditionHadPropertyValue:
       type: object
       description: check whether the user had a property with a value
-      required: [ "conditionType","propertyName","operation","time" ]
+      required: [ "type","propertyName","operation","time" ]
       properties:
-        conditionType:
+        type:
           type: string
           enum:
             - hadPropertyValue
@@ -1636,7 +1636,7 @@ components:
       allOf:
         - type: object
           properties:
-            conditionType:
+            type:
               type: string
               enum:
                 - didEvent
@@ -1658,7 +1658,7 @@ components:
     SegmentConditionFunnel:
       type: object
       properties:
-        conditionType:
+        type:
           type: string
           enum:
             - funnel
@@ -1673,9 +1673,9 @@ components:
     QuerySimple:
       type: object
       description: simple query without any additional agruments
-      required: [ "queryType","query" ]
+      required: [ "type","query" ]
       properties:
-        queryType:
+        type:
           type: string
           enum:
             - simple
@@ -1691,9 +1691,9 @@ components:
       type: object
       description: event count aggregate by group
       example: avegate event count per user
-      required: [ "queryType","aggregate" ]
+      required: [ "type","aggregate" ]
       properties:
-        queryType:
+        type:
           type: string
           enum:
             - countPerGroup
@@ -1703,12 +1703,12 @@ components:
     QueryAggregatePropertyPerGroup:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
-      required: [ "queryType","aggregate","propertyType","aggregatePerGroup" ]
+      required: [ "type","aggregate","propertyType","aggregatePerGroup" ]
       type: object
       allOf:
         - type: object
           properties:
-            queryType:
+            type:
               type: string
               enum:
                 - aggregatePropertyPerGroup
@@ -1723,12 +1723,12 @@ components:
     QueryAggregateProperty:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
-      required: [ "queryType","aggregate","propertyType" ]
+      required: [ "type","aggregate","propertyType" ]
       type: object
       allOf:
         - type: object
           properties:
-            queryType:
+            type:
               type: string
               enum:
                 - aggregateProperty
@@ -1742,7 +1742,7 @@ components:
       description: apply formula
       type: object
       properties:
-        queryType:
+        type:
           type: string
           enum:
             - formula
