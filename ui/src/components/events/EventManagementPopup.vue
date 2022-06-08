@@ -110,9 +110,8 @@ const eventItems = computed<Item[]>(() => {
             if (event[key]) {
                 const item: Item = {
                     label: i18n.$t(config.string),
-                    text: event[key],
-                    type: config.type,
-                    key,
+                    value: event[key],
+                    component: config.component || 'p'
                 }
 
                 items.push(item)
