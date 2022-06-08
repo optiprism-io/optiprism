@@ -1557,14 +1557,57 @@ components:
               ]
             }
           ],
-          "filters": [
-            {
-              "filterType": "property",
-              "propertyName": "Region",
-              "propertyType": "user",
-              "operation": "exists"
-            }
-          ]
+          "filters": {
+            "groupsCondition": "or",
+            "groups": [
+              {
+                "filtersCondition": "and",
+                "filters": [
+                  {
+                    "type": "property",
+                    "propertyName": "Country",
+                    "propertyType": "user",
+                    "operation": "eq",
+                    "value": [
+                      "UK"
+                    ]
+                  },
+                  {
+                    "type": "property",
+                    "propertyName": "Device",
+                    "propertyType": "user",
+                    "operation": "eq",
+                    "value": [
+                      "Iphone"
+                    ]
+                  }
+                ]
+              },
+              {
+                "filtersCondition": "or",
+                "filters": [
+                  {
+                    "type": "property",
+                    "propertyName": "Country",
+                    "propertyType": "user",
+                    "operation": "eq",
+                    "value": [
+                      "General"
+                    ]
+                  },
+                  {
+                    "type": "property",
+                    "propertyName": "Country",
+                    "propertyType": "user",
+                    "operation": "eq",
+                    "value": [
+                      "Electronics"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
       properties:
         time:
@@ -1604,13 +1647,7 @@ components:
                     items:
                       $ref: '#/components/schemas/EventFilterByProperty'
         filters:
-          type: array
-          description: array of common filters (which applies to all events)
-          items:
-            type: object
-            oneOf:
-              - $ref: '#/components/schemas/EventFilterByProperty'
-              - $ref: '#/components/schemas/EventFilterByCohort'
+          $ref: '#/components/schemas/EventFilters'
 
     FunnelQuery:
       type: object
@@ -1947,14 +1984,57 @@ components:
               "propertyType": "event"
             }
           ],
-          "filters": [
-            {
-              "filterType": "property",
-              "propertyName": "Region",
-              "propertyType": "user",
-              "operation": "exists"
-            }
-          ]
+          "filters": {
+            "groupsCondition": "or",
+            "groups": [
+              {
+                "filtersCondition": "and",
+                "filters": [
+                  {
+                    "type": "property",
+                    "propertyName": "Country",
+                    "propertyType": "user",
+                    "operation": "eq",
+                    "value": [
+                      "UK"
+                    ]
+                  },
+                  {
+                    "type": "property",
+                    "propertyName": "Device",
+                    "propertyType": "user",
+                    "operation": "eq",
+                    "value": [
+                      "Iphone"
+                    ]
+                  }
+                ]
+              },
+              {
+                "filtersCondition": "or",
+                "filters": [
+                  {
+                    "type": "property",
+                    "propertyName": "Country",
+                    "propertyType": "user",
+                    "operation": "eq",
+                    "value": [
+                      "General"
+                    ]
+                  },
+                  {
+                    "type": "property",
+                    "propertyName": "Country",
+                    "propertyType": "user",
+                    "operation": "eq",
+                    "value": [
+                      "Electronics"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
       properties:
         time:
@@ -2007,14 +2087,10 @@ components:
           description: array of events to query
           items:
             $ref: '#/components/schemas/EventSegmentationEvent'
+
         filters:
-          type: array
-          description: array of common filters (which applies to all events)
-          items:
-            type: object
-            oneOf:
-              - $ref: '#/components/schemas/EventFilterByProperty'
-              - $ref: '#/components/schemas/EventFilterByCohort'
+          $ref: '#/components/schemas/EventFilters'
+
         breakdowns:
           type: array
           description: array of common breakdowns (which applies to all events)
@@ -2053,12 +2129,29 @@ components:
               items:
                 $ref: '#/components/schemas/EventQuery'
 
-    EventFilter:
+    EventFilters:
       type: object
-      description: event filter
-      anyOf:
-        - $ref: '#/components/schemas/EventFilterByCohort'
-        - $ref: '#/components/schemas/EventFilterByProperty'
+      description: event filters
+      properties:
+        groupsCondition:
+          type: string
+          enum:
+            - and
+            - or
+        groups:
+          type: object
+          properties:
+            filtersCondition:
+              type: string
+              enum:
+                - and
+                - or
+            filters:
+              type: array
+              items:
+                anyOf:
+                  - $ref: '#/components/schemas/EventFilterByCohort'
+                  - $ref: '#/components/schemas/EventFilterByProperty'
 
     EventFilterByCohort:
       type: object
@@ -2073,7 +2166,7 @@ components:
 
     EventFilterByProperty:
       type: object
-      description: filter by property. Use this in event filters or in common filters. If you use it in event then event will be inherited, if you use filter as a common, then property should be commnon for all events.
+      description: filter by property
       required: [ "filterType","propertyType","operation" ]
       allOf:
         - type: object
