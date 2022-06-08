@@ -4,8 +4,8 @@
             class="pf-c-switch__input"
             type="checkbox"
             checked
-        />
-        <span class="pf-c-switch__toggle"></span>
+        >
+        <span class="pf-c-switch__toggle" />
         <span
             v-if="props.label"
             class="pf-c-switch__label pf-m-on"

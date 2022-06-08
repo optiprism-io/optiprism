@@ -1,12 +1,11 @@
 <template>
     <textarea
-        class="ui-textarea pf-c-form-control"
         ref="textarea"
-        v-model="props.value"
+        :value="props.value"
+        class="ui-textarea pf-c-form-control"
         :placeholder="props.placeholder"
         @input="handleInput"
-    >
-    </textarea>
+    />
 </template>
 
 <script setup lang="ts">
