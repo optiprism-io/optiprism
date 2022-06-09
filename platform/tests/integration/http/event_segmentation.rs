@@ -51,7 +51,7 @@ mod tests {
     use platform::event_segmentation::result::Series;
     use platform::event_segmentation::types::{Query, Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, EventType, PropertyType, PropValueOperation, QueryTime, TimeUnit, PartitionedAggregateFunction, AggregateFunction};
     use query::physical_plan::expressions;
-    use query::reports::event_segmentation::builder::LogicalPlanBuilder;
+    use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
     use query::reports::types::EventRef;
     use query::reports::event_segmentation::types as query_es_types;
     use query::reports::types as query_types;

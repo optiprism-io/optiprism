@@ -43,7 +43,7 @@ impl Provider {
     pub async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<Series> {
         let cur_time = Utc::now();
         let start = Instant::now();
-        let plan = event_segmentation::builder::LogicalPlanBuilder::build(
+        let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx,
             cur_time.clone(),
             self.metadata.clone(),

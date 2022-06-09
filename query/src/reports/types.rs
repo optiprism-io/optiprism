@@ -88,10 +88,10 @@ pub enum EventRef {
 }
 
 impl EventRef {
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> &str {
         match self {
-            EventRef::Regular(name) => name.clone(),
-            EventRef::Custom(name) => name.clone(),
+            EventRef::Regular(name) => name.as_str(),
+            EventRef::Custom(name) => name.as_str(),
         }
     }
 }

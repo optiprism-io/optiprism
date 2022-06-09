@@ -73,3 +73,21 @@ impl Provider {
         }
     }
 }
+
+pub struct SingleDictionaryProvider {
+    organization_id: u64,
+    project_id: u64,
+    dict: String,
+    provider: Arc<Provider>,
+}
+
+impl SingleDictionaryProvider {
+    pub fn new(organization_id: u64, project_id: u64, dict: String, provider: Arc<Provider>) -> Self {
+        Self {
+            organization_id,
+            project_id,
+            dict,
+            provider,
+        }
+    }
+}

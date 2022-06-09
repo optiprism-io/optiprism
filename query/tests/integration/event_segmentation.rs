@@ -42,7 +42,7 @@ mod tests {
     use datafusion::scalar::ScalarValue as DFScalarValue;
     use datafusion_common::ScalarValue;
     use query::physical_plan::unpivot::unpivot;
-    use query::reports::event_segmentation::builder::LogicalPlanBuilder;
+    use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
     use query::reports::event_segmentation::types::{Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, NamedQuery, Query};
 
     pub async fn events_provider(
