@@ -339,20 +339,11 @@ paths:
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
   /v1/projects/{project_id}/data/property-values:
-    get:
-      summary: List property values
+    post:
+      summary: List of property values
       operationId: PropertyValuesList
       tags:
         - properties
-      description: >
-        list of property values
-        property_name and property_type are required values
-        event_name is required for property_type=event
-        <br/><br/>
-        examples:
-        <br/>
-        /v1/projects/1/data/property-values?property_name=Country&property_type=user
-        /v1/projects/1/data/property-values?event_name=Buy%20Product&property_name=Name&property_type=event
       parameters:
         - name: project_id
           in: path
@@ -360,24 +351,16 @@ paths:
           required: true
           schema:
             type: string
-        - name: property_name
-          in: query
-          description: Property Name
-          required: true
-          schema:
-            type: string
-        - name: property_type
-          in: query
-          description: Property Name
-          required: true
-          schema:
-            $ref: '#/components/schemas/PropertyType'
-        - name: event_name
-          in: query
-          description: Event Name. Required if property_type=event
-          required: false
-          schema:
-            type: string
+      requestBody:
+        required: true
+        description: property type and property id/name must be specified. Event is optional and works as a filter for values
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/EventRef'
+                - $ref: '#/components/schemas/PropertyRef'
+
       responses:
         '200':
           description: list property values

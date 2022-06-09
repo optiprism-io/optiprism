@@ -1,0 +1,592 @@
+2022/06/03-14:59:20.285010 120ca9dc0 RocksDB version: 6.20.3
+2022/06/03-14:59:20.285708 120ca9dc0 Git sha 8608d75d85f8e1b3b64b73a4fb6d19baec61ba5c
+2022/06/03-14:59:20.285715 120ca9dc0 Compile date 2021-05-05 20:35:30
+2022/06/03-14:59:20.285761 120ca9dc0 DB SUMMARY
+2022/06/03-14:59:20.285765 120ca9dc0 DB Session ID:  77YHA4G0ARAM6JJEEBKB
+2022/06/03-14:59:20.285952 120ca9dc0 CURRENT file:  CURRENT
+2022/06/03-14:59:20.285956 120ca9dc0 IDENTITY file:  IDENTITY
+2022/06/03-14:59:20.285973 120ca9dc0 MANIFEST file:  MANIFEST-000191 size: 732 Bytes
+2022/06/03-14:59:20.285978 120ca9dc0 SST files in db dir, Total Num: 6, files: 000168.sst 000172.sst 000178.sst 000184.sst 000190.sst 000195.sst 
+2022/06/03-14:59:20.285983 120ca9dc0 Write Ahead Log file in db: 000192.log size: 800 ; 
+2022/06/03-14:59:20.285990 120ca9dc0                         Options.error_if_exists: 0
+2022/06/03-14:59:20.285992 120ca9dc0                       Options.create_if_missing: 1
+2022/06/03-14:59:20.285993 120ca9dc0                         Options.paranoid_checks: 1
+2022/06/03-14:59:20.285994 120ca9dc0                               Options.track_and_verify_wals_in_manifest: 0
+2022/06/03-14:59:20.285996 120ca9dc0                                     Options.env: 0x10f81a338
+2022/06/03-14:59:20.285997 120ca9dc0                                      Options.fs: Posix File System
+2022/06/03-14:59:20.285999 120ca9dc0                                Options.info_log: 0x7ff92f706840
+2022/06/03-14:59:20.286000 120ca9dc0                Options.max_file_opening_threads: 16
+2022/06/03-14:59:20.286001 120ca9dc0                              Options.statistics: 0x0
+2022/06/03-14:59:20.286002 120ca9dc0                               Options.use_fsync: 0
+2022/06/03-14:59:20.286004 120ca9dc0                       Options.max_log_file_size: 0
+2022/06/03-14:59:20.286005 120ca9dc0                  Options.max_manifest_file_size: 1073741824
+2022/06/03-14:59:20.286006 120ca9dc0                   Options.log_file_time_to_roll: 0
+2022/06/03-14:59:20.286007 120ca9dc0                       Options.keep_log_file_num: 1000
+2022/06/03-14:59:20.286009 120ca9dc0                    Options.recycle_log_file_num: 0
+2022/06/03-14:59:20.286010 120ca9dc0                         Options.allow_fallocate: 1
+2022/06/03-14:59:20.286011 120ca9dc0                        Options.allow_mmap_reads: 0
+2022/06/03-14:59:20.286012 120ca9dc0                       Options.allow_mmap_writes: 0
+2022/06/03-14:59:20.286014 120ca9dc0                        Options.use_direct_reads: 0
+2022/06/03-14:59:20.286015 120ca9dc0                        Options.use_direct_io_for_flush_and_compaction: 0
+2022/06/03-14:59:20.286016 120ca9dc0          Options.create_missing_column_families: 1
+2022/06/03-14:59:20.286018 120ca9dc0                              Options.db_log_dir: 
+2022/06/03-14:59:20.286019 120ca9dc0                                 Options.wal_dir: db
+2022/06/03-14:59:20.286020 120ca9dc0                Options.table_cache_numshardbits: 6
+2022/06/03-14:59:20.286021 120ca9dc0                         Options.WAL_ttl_seconds: 0
+2022/06/03-14:59:20.286022 120ca9dc0                       Options.WAL_size_limit_MB: 0
+2022/06/03-14:59:20.286024 120ca9dc0                        Options.max_write_batch_group_size_bytes: 1048576
+2022/06/03-14:59:20.286025 120ca9dc0             Options.manifest_preallocation_size: 4194304
+2022/06/03-14:59:20.286026 120ca9dc0                     Options.is_fd_close_on_exec: 1
+2022/06/03-14:59:20.286027 120ca9dc0                   Options.advise_random_on_open: 1
+2022/06/03-14:59:20.286029 120ca9dc0                    Options.db_write_buffer_size: 0
+2022/06/03-14:59:20.286030 120ca9dc0                    Options.write_buffer_manager: 0x7ff92f7059b0
+2022/06/03-14:59:20.286031 120ca9dc0         Options.access_hint_on_compaction_start: 1
+2022/06/03-14:59:20.286032 120ca9dc0  Options.new_table_reader_for_compaction_inputs: 0
+2022/06/03-14:59:20.286033 120ca9dc0           Options.random_access_max_buffer_size: 1048576
+2022/06/03-14:59:20.286035 120ca9dc0                      Options.use_adaptive_mutex: 0
+2022/06/03-14:59:20.286036 120ca9dc0                            Options.rate_limiter: 0x0
+2022/06/03-14:59:20.286077 120ca9dc0     Options.sst_file_manager.rate_bytes_per_sec: 0
+2022/06/03-14:59:20.286079 120ca9dc0                       Options.wal_recovery_mode: 2
+2022/06/03-14:59:20.286081 120ca9dc0                  Options.enable_thread_tracking: 0
+2022/06/03-14:59:20.286082 120ca9dc0                  Options.enable_pipelined_write: 0
+2022/06/03-14:59:20.286083 120ca9dc0                  Options.unordered_write: 0
+2022/06/03-14:59:20.286084 120ca9dc0         Options.allow_concurrent_memtable_write: 1
+2022/06/03-14:59:20.286085 120ca9dc0      Options.enable_write_thread_adaptive_yield: 1
+2022/06/03-14:59:20.286086 120ca9dc0             Options.write_thread_max_yield_usec: 100
+2022/06/03-14:59:20.286088 120ca9dc0            Options.write_thread_slow_yield_usec: 3
+2022/06/03-14:59:20.286089 120ca9dc0                               Options.row_cache: None
+2022/06/03-14:59:20.286090 120ca9dc0                              Options.wal_filter: None
+2022/06/03-14:59:20.286091 120ca9dc0             Options.avoid_flush_during_recovery: 0
+2022/06/03-14:59:20.286092 120ca9dc0             Options.allow_ingest_behind: 0
+2022/06/03-14:59:20.286093 120ca9dc0             Options.preserve_deletes: 0
+2022/06/03-14:59:20.286095 120ca9dc0             Options.two_write_queues: 0
+2022/06/03-14:59:20.286096 120ca9dc0             Options.manual_wal_flush: 0
+2022/06/03-14:59:20.286097 120ca9dc0             Options.atomic_flush: 0
+2022/06/03-14:59:20.286098 120ca9dc0             Options.avoid_unnecessary_blocking_io: 0
+2022/06/03-14:59:20.286099 120ca9dc0                 Options.persist_stats_to_disk: 0
+2022/06/03-14:59:20.286100 120ca9dc0                 Options.write_dbid_to_manifest: 0
+2022/06/03-14:59:20.286102 120ca9dc0                 Options.log_readahead_size: 0
+2022/06/03-14:59:20.286103 120ca9dc0                 Options.file_checksum_gen_factory: Unknown
+2022/06/03-14:59:20.286106 120ca9dc0                 Options.best_efforts_recovery: 0
+2022/06/03-14:59:20.286107 120ca9dc0                Options.max_bgerror_resume_count: 2147483647
+2022/06/03-14:59:20.286109 120ca9dc0            Options.bgerror_resume_retry_interval: 1000000
+2022/06/03-14:59:20.286110 120ca9dc0             Options.allow_data_in_errors: 0
+2022/06/03-14:59:20.286111 120ca9dc0             Options.db_host_id: __hostname__
+2022/06/03-14:59:20.286112 120ca9dc0             Options.max_background_jobs: 2
+2022/06/03-14:59:20.286113 120ca9dc0             Options.max_background_compactions: -1
+2022/06/03-14:59:20.286115 120ca9dc0             Options.max_subcompactions: 1
+2022/06/03-14:59:20.286116 120ca9dc0             Options.avoid_flush_during_shutdown: 0
+2022/06/03-14:59:20.286117 120ca9dc0           Options.writable_file_max_buffer_size: 1048576
+2022/06/03-14:59:20.286118 120ca9dc0             Options.delayed_write_rate : 16777216
+2022/06/03-14:59:20.286119 120ca9dc0             Options.max_total_wal_size: 0
+2022/06/03-14:59:20.286121 120ca9dc0             Options.delete_obsolete_files_period_micros: 21600000000
+2022/06/03-14:59:20.286122 120ca9dc0                   Options.stats_dump_period_sec: 600
+2022/06/03-14:59:20.286123 120ca9dc0                 Options.stats_persist_period_sec: 600
+2022/06/03-14:59:20.286124 120ca9dc0                 Options.stats_history_buffer_size: 1048576
+2022/06/03-14:59:20.286125 120ca9dc0                          Options.max_open_files: -1
+2022/06/03-14:59:20.286127 120ca9dc0                          Options.bytes_per_sync: 0
+2022/06/03-14:59:20.286128 120ca9dc0                      Options.wal_bytes_per_sync: 0
+2022/06/03-14:59:20.286129 120ca9dc0                   Options.strict_bytes_per_sync: 0
+2022/06/03-14:59:20.286130 120ca9dc0       Options.compaction_readahead_size: 0
+2022/06/03-14:59:20.286131 120ca9dc0                  Options.max_background_flushes: -1
+2022/06/03-14:59:20.286132 120ca9dc0 Compression algorithms supported:
+2022/06/03-14:59:20.286137 120ca9dc0 	kZSTD supported: 1
+2022/06/03-14:59:20.286139 120ca9dc0 	kZlibCompression supported: 1
+2022/06/03-14:59:20.286140 120ca9dc0 	kXpressCompression supported: 0
+2022/06/03-14:59:20.286164 120ca9dc0 	kSnappyCompression supported: 1
+2022/06/03-14:59:20.286166 120ca9dc0 	kZSTDNotFinalCompression supported: 1
+2022/06/03-14:59:20.286167 120ca9dc0 	kLZ4HCCompression supported: 1
+2022/06/03-14:59:20.286169 120ca9dc0 	kLZ4Compression supported: 1
+2022/06/03-14:59:20.286170 120ca9dc0 	kBZip2Compression supported: 1
+2022/06/03-14:59:20.286175 120ca9dc0 Fast CRC32 supported: Not supported on x86
+2022/06/03-14:59:20.286740 120ca9dc0 [db/version_set.cc:4627] Recovering from manifest file: db/MANIFEST-000191
+2022/06/03-14:59:20.286955 120ca9dc0 [db/column_family.cc:598] --------------- Options for column family [default]:
+2022/06/03-14:59:20.286963 120ca9dc0               Options.comparator: leveldb.BytewiseComparator
+2022/06/03-14:59:20.286967 120ca9dc0           Options.merge_operator: None
+2022/06/03-14:59:20.286968 120ca9dc0        Options.compaction_filter: None
+2022/06/03-14:59:20.286970 120ca9dc0        Options.compaction_filter_factory: None
+2022/06/03-14:59:20.286971 120ca9dc0  Options.sst_partitioner_factory: None
+2022/06/03-14:59:20.286972 120ca9dc0         Options.memtable_factory: SkipListFactory
+2022/06/03-14:59:20.286974 120ca9dc0            Options.table_factory: BlockBasedTable
+2022/06/03-14:59:20.286999 120ca9dc0            table_factory options:   flush_block_policy_factory: FlushBlockBySizePolicyFactory (0x7ff92f705d20)
+  cache_index_and_filter_blocks: 0
+  cache_index_and_filter_blocks_with_high_priority: 1
+  pin_l0_filter_and_index_blocks_in_cache: 0
+  pin_top_level_index_and_filter: 1
+  index_type: 0
+  data_block_index_type: 0
+  index_shortening: 1
+  data_block_hash_table_util_ratio: 0.750000
+  hash_index_allow_collision: 1
+  checksum: 1
+  no_block_cache: 0
+  block_cache: 0x7ff92f705d68
+  block_cache_name: LRUCache
+  block_cache_options:
+    capacity : 8388608
+    num_shard_bits : 4
+    strict_capacity_limit : 0
+    memory_allocator : None
+    high_pri_pool_ratio: 0.000
+  block_cache_compressed: 0x0
+  persistent_cache: 0x0
+  block_size: 4096
+  block_size_deviation: 10
+  block_restart_interval: 16
+  index_block_restart_interval: 1
+  metadata_block_size: 4096
+  partition_filters: 0
+  use_delta_encoding: 1
+  filter_policy: nullptr
+  whole_key_filtering: 1
+  verify_compression: 0
+  read_amp_bytes_per_bit: 0
+  format_version: 5
+  enable_index_compression: 1
+  block_align: 0
+2022/06/03-14:59:20.287005 120ca9dc0        Options.write_buffer_size: 67108864
+2022/06/03-14:59:20.287007 120ca9dc0  Options.max_write_buffer_number: 2
+2022/06/03-14:59:20.287009 120ca9dc0          Options.compression: Snappy
+2022/06/03-14:59:20.287010 120ca9dc0                  Options.bottommost_compression: Disabled
+2022/06/03-14:59:20.287012 120ca9dc0       Options.prefix_extractor: nullptr
+2022/06/03-14:59:20.287013 120ca9dc0   Options.memtable_insert_with_hint_prefix_extractor: nullptr
+2022/06/03-14:59:20.287014 120ca9dc0             Options.num_levels: 7
+2022/06/03-14:59:20.287015 120ca9dc0        Options.min_write_buffer_number_to_merge: 1
+2022/06/03-14:59:20.287017 120ca9dc0     Options.max_write_buffer_number_to_maintain: 0
+2022/06/03-14:59:20.287018 120ca9dc0     Options.max_write_buffer_size_to_maintain: 0
+2022/06/03-14:59:20.287019 120ca9dc0            Options.bottommost_compression_opts.window_bits: -14
+2022/06/03-14:59:20.287020 120ca9dc0                  Options.bottommost_compression_opts.level: 32767
+2022/06/03-14:59:20.287022 120ca9dc0               Options.bottommost_compression_opts.strategy: 0
+2022/06/03-14:59:20.287023 120ca9dc0         Options.bottommost_compression_opts.max_dict_bytes: 0
+2022/06/03-14:59:20.287024 120ca9dc0         Options.bottommost_compression_opts.zstd_max_train_bytes: 0
+2022/06/03-14:59:20.287026 120ca9dc0         Options.bottommost_compression_opts.parallel_threads: 1
+2022/06/03-14:59:20.287027 120ca9dc0                  Options.bottommost_compression_opts.enabled: false
+2022/06/03-14:59:20.287028 120ca9dc0         Options.bottommost_compression_opts.max_dict_buffer_bytes: 0
+2022/06/03-14:59:20.287029 120ca9dc0            Options.compression_opts.window_bits: -14
+2022/06/03-14:59:20.287063 120ca9dc0                  Options.compression_opts.level: 32767
+2022/06/03-14:59:20.287064 120ca9dc0               Options.compression_opts.strategy: 0
+2022/06/03-14:59:20.287066 120ca9dc0         Options.compression_opts.max_dict_bytes: 0
+2022/06/03-14:59:20.287067 120ca9dc0         Options.compression_opts.zstd_max_train_bytes: 0
+2022/06/03-14:59:20.287068 120ca9dc0         Options.compression_opts.parallel_threads: 1
+2022/06/03-14:59:20.287069 120ca9dc0                  Options.compression_opts.enabled: false
+2022/06/03-14:59:20.287071 120ca9dc0         Options.compression_opts.max_dict_buffer_bytes: 0
+2022/06/03-14:59:20.287072 120ca9dc0      Options.level0_file_num_compaction_trigger: 4
+2022/06/03-14:59:20.287073 120ca9dc0          Options.level0_slowdown_writes_trigger: 20
+2022/06/03-14:59:20.287074 120ca9dc0              Options.level0_stop_writes_trigger: 36
+2022/06/03-14:59:20.287076 120ca9dc0                   Options.target_file_size_base: 67108864
+2022/06/03-14:59:20.287077 120ca9dc0             Options.target_file_size_multiplier: 1
+2022/06/03-14:59:20.287078 120ca9dc0                Options.max_bytes_for_level_base: 268435456
+2022/06/03-14:59:20.287079 120ca9dc0 Options.level_compaction_dynamic_level_bytes: 0
+2022/06/03-14:59:20.287080 120ca9dc0          Options.max_bytes_for_level_multiplier: 10.000000
+2022/06/03-14:59:20.287082 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[0]: 1
+2022/06/03-14:59:20.287084 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[1]: 1
+2022/06/03-14:59:20.287085 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[2]: 1
+2022/06/03-14:59:20.287086 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[3]: 1
+2022/06/03-14:59:20.287087 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[4]: 1
+2022/06/03-14:59:20.287089 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[5]: 1
+2022/06/03-14:59:20.287090 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[6]: 1
+2022/06/03-14:59:20.287091 120ca9dc0       Options.max_sequential_skip_in_iterations: 8
+2022/06/03-14:59:20.287092 120ca9dc0                    Options.max_compaction_bytes: 1677721600
+2022/06/03-14:59:20.287094 120ca9dc0                        Options.arena_block_size: 8388608
+2022/06/03-14:59:20.287095 120ca9dc0   Options.soft_pending_compaction_bytes_limit: 68719476736
+2022/06/03-14:59:20.287096 120ca9dc0   Options.hard_pending_compaction_bytes_limit: 274877906944
+2022/06/03-14:59:20.287097 120ca9dc0       Options.rate_limit_delay_max_milliseconds: 100
+2022/06/03-14:59:20.287099 120ca9dc0                Options.disable_auto_compactions: 0
+2022/06/03-14:59:20.287101 120ca9dc0                        Options.compaction_style: kCompactionStyleLevel
+2022/06/03-14:59:20.287103 120ca9dc0                          Options.compaction_pri: kMinOverlappingRatio
+2022/06/03-14:59:20.287104 120ca9dc0 Options.compaction_options_universal.size_ratio: 1
+2022/06/03-14:59:20.287106 120ca9dc0 Options.compaction_options_universal.min_merge_width: 2
+2022/06/03-14:59:20.287107 120ca9dc0 Options.compaction_options_universal.max_merge_width: 4294967295
+2022/06/03-14:59:20.287108 120ca9dc0 Options.compaction_options_universal.max_size_amplification_percent: 200
+2022/06/03-14:59:20.287109 120ca9dc0 Options.compaction_options_universal.compression_size_percent: -1
+2022/06/03-14:59:20.287114 120ca9dc0 Options.compaction_options_universal.stop_style: kCompactionStopStyleTotalSize
+2022/06/03-14:59:20.287115 120ca9dc0 Options.compaction_options_fifo.max_table_files_size: 1073741824
+2022/06/03-14:59:20.287117 120ca9dc0 Options.compaction_options_fifo.allow_compaction: 0
+2022/06/03-14:59:20.287127 120ca9dc0                   Options.table_properties_collectors: 
+2022/06/03-14:59:20.287128 120ca9dc0                   Options.inplace_update_support: 0
+2022/06/03-14:59:20.287130 120ca9dc0                 Options.inplace_update_num_locks: 10000
+2022/06/03-14:59:20.287131 120ca9dc0               Options.memtable_prefix_bloom_size_ratio: 0.000000
+2022/06/03-14:59:20.287132 120ca9dc0               Options.memtable_whole_key_filtering: 0
+2022/06/03-14:59:20.287153 120ca9dc0   Options.memtable_huge_page_size: 0
+2022/06/03-14:59:20.287155 120ca9dc0                           Options.bloom_locality: 0
+2022/06/03-14:59:20.287156 120ca9dc0                    Options.max_successive_merges: 0
+2022/06/03-14:59:20.287157 120ca9dc0                Options.optimize_filters_for_hits: 0
+2022/06/03-14:59:20.287158 120ca9dc0                Options.paranoid_file_checks: 0
+2022/06/03-14:59:20.287159 120ca9dc0                Options.force_consistency_checks: 1
+2022/06/03-14:59:20.287160 120ca9dc0                Options.report_bg_io_stats: 0
+2022/06/03-14:59:20.287162 120ca9dc0                               Options.ttl: 2592000
+2022/06/03-14:59:20.287163 120ca9dc0          Options.periodic_compaction_seconds: 0
+2022/06/03-14:59:20.287164 120ca9dc0                    Options.enable_blob_files: false
+2022/06/03-14:59:20.287165 120ca9dc0                        Options.min_blob_size: 0
+2022/06/03-14:59:20.287166 120ca9dc0                       Options.blob_file_size: 268435456
+2022/06/03-14:59:20.287168 120ca9dc0                Options.blob_compression_type: NoCompression
+2022/06/03-14:59:20.287169 120ca9dc0       Options.enable_blob_garbage_collection: false
+2022/06/03-14:59:20.287170 120ca9dc0   Options.blob_garbage_collection_age_cutoff: 0.250000
+2022/06/03-14:59:20.287891 120ca9dc0 [db/column_family.cc:598] --------------- Options for column family [general]:
+2022/06/03-14:59:20.287897 120ca9dc0               Options.comparator: leveldb.BytewiseComparator
+2022/06/03-14:59:20.287899 120ca9dc0           Options.merge_operator: None
+2022/06/03-14:59:20.287900 120ca9dc0        Options.compaction_filter: None
+2022/06/03-14:59:20.287902 120ca9dc0        Options.compaction_filter_factory: None
+2022/06/03-14:59:20.287903 120ca9dc0  Options.sst_partitioner_factory: None
+2022/06/03-14:59:20.287904 120ca9dc0         Options.memtable_factory: SkipListFactory
+2022/06/03-14:59:20.287906 120ca9dc0            Options.table_factory: BlockBasedTable
+2022/06/03-14:59:20.287924 120ca9dc0            table_factory options:   flush_block_policy_factory: FlushBlockBySizePolicyFactory (0x7ff92f705000)
+  cache_index_and_filter_blocks: 0
+  cache_index_and_filter_blocks_with_high_priority: 1
+  pin_l0_filter_and_index_blocks_in_cache: 0
+  pin_top_level_index_and_filter: 1
+  index_type: 0
+  data_block_index_type: 0
+  index_shortening: 1
+  data_block_hash_table_util_ratio: 0.750000
+  hash_index_allow_collision: 1
+  checksum: 1
+  no_block_cache: 0
+  block_cache: 0x7ff92f705048
+  block_cache_name: LRUCache
+  block_cache_options:
+    capacity : 8388608
+    num_shard_bits : 4
+    strict_capacity_limit : 0
+    memory_allocator : None
+    high_pri_pool_ratio: 0.000
+  block_cache_compressed: 0x0
+  persistent_cache: 0x0
+  block_size: 4096
+  block_size_deviation: 10
+  block_restart_interval: 16
+  index_block_restart_interval: 1
+  metadata_block_size: 4096
+  partition_filters: 0
+  use_delta_encoding: 1
+  filter_policy: nullptr
+  whole_key_filtering: 1
+  verify_compression: 0
+  read_amp_bytes_per_bit: 0
+  format_version: 5
+  enable_index_compression: 1
+  block_align: 0
+2022/06/03-14:59:20.287928 120ca9dc0        Options.write_buffer_size: 67108864
+2022/06/03-14:59:20.287929 120ca9dc0  Options.max_write_buffer_number: 2
+2022/06/03-14:59:20.287931 120ca9dc0          Options.compression: Snappy
+2022/06/03-14:59:20.287932 120ca9dc0                  Options.bottommost_compression: Disabled
+2022/06/03-14:59:20.287936 120ca9dc0       Options.prefix_extractor: first_three
+2022/06/03-14:59:20.287938 120ca9dc0   Options.memtable_insert_with_hint_prefix_extractor: nullptr
+2022/06/03-14:59:20.287939 120ca9dc0             Options.num_levels: 7
+2022/06/03-14:59:20.287940 120ca9dc0        Options.min_write_buffer_number_to_merge: 1
+2022/06/03-14:59:20.287941 120ca9dc0     Options.max_write_buffer_number_to_maintain: 0
+2022/06/03-14:59:20.287943 120ca9dc0     Options.max_write_buffer_size_to_maintain: 0
+2022/06/03-14:59:20.287944 120ca9dc0            Options.bottommost_compression_opts.window_bits: -14
+2022/06/03-14:59:20.287976 120ca9dc0                  Options.bottommost_compression_opts.level: 32767
+2022/06/03-14:59:20.287978 120ca9dc0               Options.bottommost_compression_opts.strategy: 0
+2022/06/03-14:59:20.287979 120ca9dc0         Options.bottommost_compression_opts.max_dict_bytes: 0
+2022/06/03-14:59:20.287980 120ca9dc0         Options.bottommost_compression_opts.zstd_max_train_bytes: 0
+2022/06/03-14:59:20.287982 120ca9dc0         Options.bottommost_compression_opts.parallel_threads: 1
+2022/06/03-14:59:20.287983 120ca9dc0                  Options.bottommost_compression_opts.enabled: false
+2022/06/03-14:59:20.287984 120ca9dc0         Options.bottommost_compression_opts.max_dict_buffer_bytes: 0
+2022/06/03-14:59:20.287985 120ca9dc0            Options.compression_opts.window_bits: -14
+2022/06/03-14:59:20.287987 120ca9dc0                  Options.compression_opts.level: 32767
+2022/06/03-14:59:20.287988 120ca9dc0               Options.compression_opts.strategy: 0
+2022/06/03-14:59:20.287989 120ca9dc0         Options.compression_opts.max_dict_bytes: 0
+2022/06/03-14:59:20.287990 120ca9dc0         Options.compression_opts.zstd_max_train_bytes: 0
+2022/06/03-14:59:20.287991 120ca9dc0         Options.compression_opts.parallel_threads: 1
+2022/06/03-14:59:20.287993 120ca9dc0                  Options.compression_opts.enabled: false
+2022/06/03-14:59:20.287994 120ca9dc0         Options.compression_opts.max_dict_buffer_bytes: 0
+2022/06/03-14:59:20.287995 120ca9dc0      Options.level0_file_num_compaction_trigger: 4
+2022/06/03-14:59:20.287996 120ca9dc0          Options.level0_slowdown_writes_trigger: 20
+2022/06/03-14:59:20.287997 120ca9dc0              Options.level0_stop_writes_trigger: 36
+2022/06/03-14:59:20.287999 120ca9dc0                   Options.target_file_size_base: 67108864
+2022/06/03-14:59:20.288000 120ca9dc0             Options.target_file_size_multiplier: 1
+2022/06/03-14:59:20.288001 120ca9dc0                Options.max_bytes_for_level_base: 268435456
+2022/06/03-14:59:20.288002 120ca9dc0 Options.level_compaction_dynamic_level_bytes: 0
+2022/06/03-14:59:20.288003 120ca9dc0          Options.max_bytes_for_level_multiplier: 10.000000
+2022/06/03-14:59:20.288005 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[0]: 1
+2022/06/03-14:59:20.288007 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[1]: 1
+2022/06/03-14:59:20.288008 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[2]: 1
+2022/06/03-14:59:20.288009 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[3]: 1
+2022/06/03-14:59:20.288010 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[4]: 1
+2022/06/03-14:59:20.288011 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[5]: 1
+2022/06/03-14:59:20.288013 120ca9dc0 Options.max_bytes_for_level_multiplier_addtl[6]: 1
+2022/06/03-14:59:20.288014 120ca9dc0       Options.max_sequential_skip_in_iterations: 8
+2022/06/03-14:59:20.288015 120ca9dc0                    Options.max_compaction_bytes: 1677721600
+2022/06/03-14:59:20.288016 120ca9dc0                        Options.arena_block_size: 8388608
+2022/06/03-14:59:20.288018 120ca9dc0   Options.soft_pending_compaction_bytes_limit: 68719476736
+2022/06/03-14:59:20.288019 120ca9dc0   Options.hard_pending_compaction_bytes_limit: 274877906944
+2022/06/03-14:59:20.288020 120ca9dc0       Options.rate_limit_delay_max_milliseconds: 100
+2022/06/03-14:59:20.288021 120ca9dc0                Options.disable_auto_compactions: 0
+2022/06/03-14:59:20.288023 120ca9dc0                        Options.compaction_style: kCompactionStyleLevel
+2022/06/03-14:59:20.288025 120ca9dc0                          Options.compaction_pri: kMinOverlappingRatio
+2022/06/03-14:59:20.288027 120ca9dc0 Options.compaction_options_universal.size_ratio: 1
+2022/06/03-14:59:20.288028 120ca9dc0 Options.compaction_options_universal.min_merge_width: 2
+2022/06/03-14:59:20.288029 120ca9dc0 Options.compaction_options_universal.max_merge_width: 4294967295
+2022/06/03-14:59:20.288031 120ca9dc0 Options.compaction_options_universal.max_size_amplification_percent: 200
+2022/06/03-14:59:20.288032 120ca9dc0 Options.compaction_options_universal.compression_size_percent: -1
+2022/06/03-14:59:20.288053 120ca9dc0 Options.compaction_options_universal.stop_style: kCompactionStopStyleTotalSize
+2022/06/03-14:59:20.288055 120ca9dc0 Options.compaction_options_fifo.max_table_files_size: 1073741824
+2022/06/03-14:59:20.288056 120ca9dc0 Options.compaction_options_fifo.allow_compaction: 0
+2022/06/03-14:59:20.288059 120ca9dc0                   Options.table_properties_collectors: 
+2022/06/03-14:59:20.288060 120ca9dc0                   Options.inplace_update_support: 0
+2022/06/03-14:59:20.288061 120ca9dc0                 Options.inplace_update_num_locks: 10000
+2022/06/03-14:59:20.288063 120ca9dc0               Options.memtable_prefix_bloom_size_ratio: 0.000000
+2022/06/03-14:59:20.288064 120ca9dc0               Options.memtable_whole_key_filtering: 0
+2022/06/03-14:59:20.288065 120ca9dc0   Options.memtable_huge_page_size: 0
+2022/06/03-14:59:20.288066 120ca9dc0                           Options.bloom_locality: 0
+2022/06/03-14:59:20.288068 120ca9dc0                    Options.max_successive_merges: 0
+2022/06/03-14:59:20.288069 120ca9dc0                Options.optimize_filters_for_hits: 0
+2022/06/03-14:59:20.288070 120ca9dc0                Options.paranoid_file_checks: 0
+2022/06/03-14:59:20.288071 120ca9dc0                Options.force_consistency_checks: 1
+2022/06/03-14:59:20.288072 120ca9dc0                Options.report_bg_io_stats: 0
+2022/06/03-14:59:20.288073 120ca9dc0                               Options.ttl: 2592000
+2022/06/03-14:59:20.288075 120ca9dc0          Options.periodic_compaction_seconds: 0
+2022/06/03-14:59:20.288076 120ca9dc0                    Options.enable_blob_files: false
+2022/06/03-14:59:20.288077 120ca9dc0                        Options.min_blob_size: 0
+2022/06/03-14:59:20.288078 120ca9dc0                       Options.blob_file_size: 268435456
+2022/06/03-14:59:20.288080 120ca9dc0                Options.blob_compression_type: NoCompression
+2022/06/03-14:59:20.288081 120ca9dc0       Options.enable_blob_garbage_collection: false
+2022/06/03-14:59:20.288082 120ca9dc0   Options.blob_garbage_collection_age_cutoff: 0.250000
+2022/06/03-14:59:20.289962 120ca9dc0 [db/version_set.cc:4675] Recovered from manifest file:db/MANIFEST-000191 succeeded,manifest_file_number is 191, next_file_number is 197, last_sequence is 16774, log_number is 187,prev_log_number is 0,max_column_family is 1,min_log_number_to_keep is 0
+2022/06/03-14:59:20.289971 120ca9dc0 [db/version_set.cc:4684] Column family [default] (ID 0), log number is 187
+2022/06/03-14:59:20.289973 120ca9dc0 [db/version_set.cc:4684] Column family [general] (ID 1), log number is 187
+2022/06/03-14:59:20.290665 120ca9dc0 [db/version_set.cc:4119] Creating manifest 198
+2022/06/03-14:59:20.293693 120ca9dc0 EVENT_LOG_v1 {"time_micros": 1654261160293676, "job": 1, "event": "recovery_started", "wal_files": [192]}
+2022/06/03-14:59:20.293703 120ca9dc0 [db/db_impl/db_impl_open.cc:856] Recovering log #192 mode 2
+2022/06/03-14:59:20.295243 120ca9dc0 EVENT_LOG_v1 {"time_micros": 1654261160295194, "cf_name": "default", "job": 1, "event": "table_file_creation", "file_number": 199, "file_size": 1293, "file_checksum": "", "file_checksum_func_name": "Unknown", "table_properties": {"data_size": 390, "index_size": 26, "index_partitions": 0, "top_level_index_size": 0, "index_key_is_user_key": 1, "index_value_is_delta_encoded": 1, "filter_size": 0, "raw_key_size": 16, "raw_average_key_size": 16, "raw_value_size": 769, "raw_average_value_size": 769, "num_data_blocks": 1, "num_entries": 1, "num_deletions": 0, "num_merge_operands": 0, "num_range_deletions": 0, "format_version": 0, "fixed_key_len": 0, "filter_policy": "", "column_family_name": "default", "column_family_id": 0, "comparator": "leveldb.BytewiseComparator", "merge_operator": "nullptr", "prefix_extractor_name": "nullptr", "property_collectors": "[]", "compression": "Snappy", "compression_options": "window_bits=-14; level=32767; strategy=0; max_dict_bytes=0; zstd_max_train_bytes=0; enabled=0; max_dict_buffer_bytes=0; ", "creation_time": 1654261160, "oldest_key_time": 0, "file_creation_time": 0, "slow_compression_estimated_data_size": 0, "fast_compression_estimated_data_size": 0, "db_id": "16f4d35a3347456b-c5c7142365084e20", "db_session_id": "77YHA4G0ARAM6JJEEBKB"}}
+2022/06/03-14:59:20.295440 120ca9dc0 [db/version_set.cc:4119] Creating manifest 200
+2022/06/03-14:59:20.296528 120ca9dc0 EVENT_LOG_v1 {"time_micros": 1654261160296520, "job": 1, "event": "recovery_finished"}
+2022/06/03-14:59:20.298213 120ca9dc0 [file/delete_scheduler.cc:77] Deleted file db/000192.log immediately, rate_bytes_per_sec 0, total_trash_size 0 max_trash_db_ratio 0.250000
+2022/06/03-14:59:20.298336 120ca9dc0 [file/delete_scheduler.cc:77] Deleted file db/000190.sst immediately, rate_bytes_per_sec 0, total_trash_size 0 max_trash_db_ratio 0.250000
+2022/06/03-14:59:20.298356 120ca9dc0 EVENT_LOG_v1 {"time_micros": 1654261160298348, "job": 2, "event": "table_file_deletion", "file_number": 190}
+2022/06/03-14:59:20.299375 120ca9dc0 [file/delete_scheduler.cc:77] Deleted file db/000184.sst immediately, rate_bytes_per_sec 0, total_trash_size 0 max_trash_db_ratio 0.250000
+2022/06/03-14:59:20.299396 120ca9dc0 EVENT_LOG_v1 {"time_micros": 1654261160299387, "job": 2, "event": "table_file_deletion", "file_number": 184}
+2022/06/03-14:59:20.300376 120ca9dc0 [file/delete_scheduler.cc:77] Deleted file db/000178.sst immediately, rate_bytes_per_sec 0, total_trash_size 0 max_trash_db_ratio 0.250000
+2022/06/03-14:59:20.300396 120ca9dc0 EVENT_LOG_v1 {"time_micros": 1654261160300388, "job": 2, "event": "table_file_deletion", "file_number": 178}
+2022/06/03-14:59:20.300536 120ca9dc0 [file/delete_scheduler.cc:77] Deleted file db/000172.sst immediately, rate_bytes_per_sec 0, total_trash_size 0 max_trash_db_ratio 0.250000
+2022/06/03-14:59:20.300551 120ca9dc0 EVENT_LOG_v1 {"time_micros": 1654261160300544, "job": 2, "event": "table_file_deletion", "file_number": 172}
+2022/06/03-14:59:20.301730 120ca9dc0 [file/delete_scheduler.cc:77] Deleted file db/000168.sst immediately, rate_bytes_per_sec 0, total_trash_size 0 max_trash_db_ratio 0.250000
+2022/06/03-14:59:20.301756 120ca9dc0 EVENT_LOG_v1 {"time_micros": 1654261160301746, "job": 2, "event": "table_file_deletion", "file_number": 168}
+2022/06/03-14:59:20.307509 120ca9dc0 [db/db_impl/db_impl_open.cc:1757] SstFileManager instance 0x7ff92f706a80
+2022/06/03-14:59:20.307677 120ca9dc0 DB pointer 0x7ff93100e200
+2022/06/03-14:59:20.308454 70000735a000 [db/db_impl/db_impl.cc:932] ------- DUMPING STATS -------
+2022/06/03-14:59:20.308462 70000735a000 [db/db_impl/db_impl.cc:933] 
+** DB Stats **
+Uptime(secs): 0.0 total, 0.0 interval
+Cumulative writes: 0 writes, 0 keys, 0 commit groups, 0.0 writes per commit group, ingest: 0.00 GB, 0.00 MB/s
+Cumulative WAL: 0 writes, 0 syncs, 0.00 writes per sync, written: 0.00 GB, 0.00 MB/s
+Cumulative stall: 00:00:0.000 H:M:S, 0.0 percent
+Interval writes: 0 writes, 0 keys, 0 commit groups, 0.0 writes per commit group, ingest: 0.00 MB, 0.00 MB/s
+Interval WAL: 0 writes, 0 syncs, 0.00 writes per sync, written: 0.00 MB, 0.00 MB/s
+Interval stall: 00:00:0.000 H:M:S, 0.0 percent
+
+** Compaction Stats [default] **
+Level    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  L0      1/0    1.26 KB   0.2      0.0     0.0      0.0       0.0      0.0       0.0   1.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+  L1      1/0   421.34 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+ Sum      2/0   422.60 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   1.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+ Int      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   1.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+
+** Compaction Stats [default] **
+Priority    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+User      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+
+Blob file count: 0, total size: 0.0 GB
+
+Uptime(secs): 0.0 total, 0.0 interval
+Flush(GB): cumulative 0.000, interval 0.000
+AddFile(GB): cumulative 0.000, interval 0.000
+AddFile(Total Files): cumulative 0, interval 0
+AddFile(L0 Files): cumulative 0, interval 0
+AddFile(Keys): cumulative 0, interval 0
+Cumulative compaction: 0.00 GB write, 0.06 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Interval compaction: 0.00 GB write, 0.06 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Stalls(count): 0 level0_slowdown, 0 level0_slowdown_with_compaction, 0 level0_numfiles, 0 level0_numfiles_with_compaction, 0 stop for pending_compaction_bytes, 0 slowdown for pending_compaction_bytes, 0 memtable_compaction, 0 memtable_slowdown, interval 0 total count
+
+** File Read Latency Histogram By Level [default] **
+
+** Compaction Stats [general] **
+Level    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sum      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+ Int      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+
+** Compaction Stats [general] **
+Priority    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Blob file count: 0, total size: 0.0 GB
+
+Uptime(secs): 0.0 total, 0.0 interval
+Flush(GB): cumulative 0.000, interval 0.000
+AddFile(GB): cumulative 0.000, interval 0.000
+AddFile(Total Files): cumulative 0, interval 0
+AddFile(L0 Files): cumulative 0, interval 0
+AddFile(Keys): cumulative 0, interval 0
+Cumulative compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Interval compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Stalls(count): 0 level0_slowdown, 0 level0_slowdown_with_compaction, 0 level0_numfiles, 0 level0_numfiles_with_compaction, 0 stop for pending_compaction_bytes, 0 slowdown for pending_compaction_bytes, 0 memtable_compaction, 0 memtable_slowdown, interval 0 total count
+
+** File Read Latency Histogram By Level [general] **
+
+** Compaction Stats [default] **
+Level    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  L0      1/0    1.26 KB   0.2      0.0     0.0      0.0       0.0      0.0       0.0   1.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+  L1      1/0   421.34 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+ Sum      2/0   422.60 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   1.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+ Int      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+
+** Compaction Stats [default] **
+Priority    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+User      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+
+Blob file count: 0, total size: 0.0 GB
+
+Uptime(secs): 0.0 total, 0.0 interval
+Flush(GB): cumulative 0.000, interval 0.000
+AddFile(GB): cumulative 0.000, interval 0.000
+AddFile(Total Files): cumulative 0, interval 0
+AddFile(L0 Files): cumulative 0, interval 0
+AddFile(Keys): cumulative 0, interval 0
+Cumulative compaction: 0.00 GB write, 0.06 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Interval compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Stalls(count): 0 level0_slowdown, 0 level0_slowdown_with_compaction, 0 level0_numfiles, 0 level0_numfiles_with_compaction, 0 stop for pending_compaction_bytes, 0 slowdown for pending_compaction_bytes, 0 memtable_compaction, 0 memtable_slowdown, interval 0 total count
+
+** File Read Latency Histogram By Level [default] **
+
+** Compaction Stats [general] **
+Level    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sum      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+ Int      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+
+** Compaction Stats [general] **
+Priority    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Blob file count: 0, total size: 0.0 GB
+
+Uptime(secs): 0.0 total, 0.0 interval
+Flush(GB): cumulative 0.000, interval 0.000
+AddFile(GB): cumulative 0.000, interval 0.000
+AddFile(Total Files): cumulative 0, interval 0
+AddFile(L0 Files): cumulative 0, interval 0
+AddFile(Keys): cumulative 0, interval 0
+Cumulative compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Interval compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Stalls(count): 0 level0_slowdown, 0 level0_slowdown_with_compaction, 0 level0_numfiles, 0 level0_numfiles_with_compaction, 0 stop for pending_compaction_bytes, 0 slowdown for pending_compaction_bytes, 0 memtable_compaction, 0 memtable_slowdown, interval 0 total count
+
+** File Read Latency Histogram By Level [general] **
+2022/06/03-15:09:20.311859 70000735a000 [db/db_impl/db_impl.cc:932] ------- DUMPING STATS -------
+2022/06/03-15:09:20.311926 70000735a000 [db/db_impl/db_impl.cc:933] 
+** DB Stats **
+Uptime(secs): 600.0 total, 600.0 interval
+Cumulative writes: 1 writes, 1 keys, 1 commit groups, 0.5 writes per commit group, ingest: 0.00 GB, 0.00 MB/s
+Cumulative WAL: 1 writes, 0 syncs, 1.00 writes per sync, written: 0.00 GB, 0.00 MB/s
+Cumulative stall: 00:00:0.000 H:M:S, 0.0 percent
+Interval writes: 1 writes, 1 keys, 1 commit groups, 0.5 writes per commit group, ingest: 0.00 MB, 0.00 MB/s
+Interval WAL: 1 writes, 0 syncs, 1.00 writes per sync, written: 0.00 MB, 0.00 MB/s
+Interval stall: 00:00:0.000 H:M:S, 0.0 percent
+
+** Compaction Stats [default] **
+Level    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  L0      1/0    1.26 KB   0.2      0.0     0.0      0.0       0.0      0.0       0.0   1.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+  L1      1/0   421.34 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+ Sum      2/0   422.60 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   1.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+ Int      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+
+** Compaction Stats [default] **
+Priority    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+User      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+
+Blob file count: 0, total size: 0.0 GB
+
+Uptime(secs): 600.0 total, 600.0 interval
+Flush(GB): cumulative 0.000, interval 0.000
+AddFile(GB): cumulative 0.000, interval 0.000
+AddFile(Total Files): cumulative 0, interval 0
+AddFile(L0 Files): cumulative 0, interval 0
+AddFile(Keys): cumulative 0, interval 0
+Cumulative compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Interval compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Stalls(count): 0 level0_slowdown, 0 level0_slowdown_with_compaction, 0 level0_numfiles, 0 level0_numfiles_with_compaction, 0 stop for pending_compaction_bytes, 0 slowdown for pending_compaction_bytes, 0 memtable_compaction, 0 memtable_slowdown, interval 0 total count
+
+** File Read Latency Histogram By Level [default] **
+
+** Compaction Stats [general] **
+Level    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sum      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+ Int      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+
+** Compaction Stats [general] **
+Priority    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Blob file count: 0, total size: 0.0 GB
+
+Uptime(secs): 600.0 total, 600.0 interval
+Flush(GB): cumulative 0.000, interval 0.000
+AddFile(GB): cumulative 0.000, interval 0.000
+AddFile(Total Files): cumulative 0, interval 0
+AddFile(L0 Files): cumulative 0, interval 0
+AddFile(Keys): cumulative 0, interval 0
+Cumulative compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Interval compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Stalls(count): 0 level0_slowdown, 0 level0_slowdown_with_compaction, 0 level0_numfiles, 0 level0_numfiles_with_compaction, 0 stop for pending_compaction_bytes, 0 slowdown for pending_compaction_bytes, 0 memtable_compaction, 0 memtable_slowdown, interval 0 total count
+
+** File Read Latency Histogram By Level [general] **
+
+** Compaction Stats [default] **
+Level    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  L0      1/0    1.26 KB   0.2      0.0     0.0      0.0       0.0      0.0       0.0   1.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+  L1      1/0   421.34 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+ Sum      2/0   422.60 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   1.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+ Int      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+
+** Compaction Stats [default] **
+Priority    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+User      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      1.0      0.00              0.00         1    0.001       0      0       0.0       0.0
+
+Blob file count: 0, total size: 0.0 GB
+
+Uptime(secs): 600.0 total, 0.0 interval
+Flush(GB): cumulative 0.000, interval 0.000
+AddFile(GB): cumulative 0.000, interval 0.000
+AddFile(Total Files): cumulative 0, interval 0
+AddFile(L0 Files): cumulative 0, interval 0
+AddFile(Keys): cumulative 0, interval 0
+Cumulative compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Interval compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Stalls(count): 0 level0_slowdown, 0 level0_slowdown_with_compaction, 0 level0_numfiles, 0 level0_numfiles_with_compaction, 0 stop for pending_compaction_bytes, 0 slowdown for pending_compaction_bytes, 0 memtable_compaction, 0 memtable_slowdown, interval 0 total count
+
+** File Read Latency Histogram By Level [default] **
+
+** Compaction Stats [general] **
+Level    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sum      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+ Int      0/0    0.00 KB   0.0      0.0     0.0      0.0       0.0      0.0       0.0   0.0      0.0      0.0      0.00              0.00         0    0.000       0      0       0.0       0.0
+
+** Compaction Stats [general] **
+Priority    Files   Size     Score Read(GB)  Rn(GB) Rnp1(GB) Write(GB) Wnew(GB) Moved(GB) W-Amp Rd(MB/s) Wr(MB/s) Comp(sec) CompMergeCPU(sec) Comp(cnt) Avg(sec) KeyIn KeyDrop Rblob(GB) Wblob(GB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Blob file count: 0, total size: 0.0 GB
+
+Uptime(secs): 600.0 total, 0.0 interval
+Flush(GB): cumulative 0.000, interval 0.000
+AddFile(GB): cumulative 0.000, interval 0.000
+AddFile(Total Files): cumulative 0, interval 0
+AddFile(L0 Files): cumulative 0, interval 0
+AddFile(Keys): cumulative 0, interval 0
+Cumulative compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Interval compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+Stalls(count): 0 level0_slowdown, 0 level0_slowdown_with_compaction, 0 level0_numfiles, 0 level0_numfiles_with_compaction, 0 stop for pending_compaction_bytes, 0 slowdown for pending_compaction_bytes, 0 memtable_compaction, 0 memtable_slowdown, interval 0 total count
+
+** File Read Latency Histogram By Level [general] **
