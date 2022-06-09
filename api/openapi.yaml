@@ -15,10 +15,12 @@ servers:
   - description: OptiPrism API server
     url: /df
 tags:
-  - name: event
-    description: Event
-  - name: property
-    description: Property
+  - name: events
+    description: Events
+  - name: properties
+    description: Properties
+  - name: reports
+    description: Reports
 externalDocs:
   description: Find out more about OptiPrism api
   url: https://dev.optiprism.io/api
@@ -28,6 +30,8 @@ paths:
     get:
       summary: Events list
       operationId: eventsList
+      tags:
+        - events
       parameters:
         - name: project_id
           in: path
@@ -50,10 +54,45 @@ paths:
                           $ref: '#/components/schemas/Event'
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
+  /v1/projects/{project_id}/schema/events/{event_id}:
+    put:
+      summary: Update event
+      operationId: updateEvent
+      tags:
+        - events
+      parameters:
+        - name: project_id
+          in: path
+          description: Project ID
+          required: true
+          schema:
+            type: string
+        - name: event_id
+          in: path
+          description: Event ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventRequest'
+      responses:
+        201:
+          description: event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+
   /v1/projects/{project_id}/schema/custom-events:
     get:
       summary: Custom events list
       operationId: customEventsList
+      tags:
+        - events
       parameters:
         - name: project_id
           in: path
@@ -78,6 +117,8 @@ paths:
     post:
       summary: Create custom event
       operationId: createCustomEvent
+      tags:
+        - events
       parameters:
         - name: project_id
           in: path
@@ -103,6 +144,8 @@ paths:
     put:
       summary: Update custom event
       operationId: updateCustomEvent
+      tags:
+        - events
       parameters:
         - name: project_id
           in: path
@@ -129,10 +172,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomEvent'
+
   /v1/projects/{project_id}/schema/properties:
     get:
       summary: Properties list
       operationId: propertiesList
+      tags:
+        - properties
       parameters:
         - name: project_id
           in: path
@@ -166,10 +212,45 @@ paths:
                           $ref: '#/components/schemas/Property'
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
+  /v1/projects/{project_id}/schema/properties/{property_id}:
+    put:
+      summary: Update property
+      operationId: updateProperty
+      tags:
+        - properties
+      parameters:
+        - name: project_id
+          in: path
+          description: Project ID
+          required: true
+          schema:
+            type: string
+        - name: property_id
+          in: path
+          description: Property ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePropertyRequest'
+      responses:
+        201:
+          description: property
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+
   /v1/projects/{project_id}/schema/custom-properties:
     get:
       summary: Event custom properties list
       operationId: customPropertiesList
+      tags:
+        - properties
       parameters:
         - name: project_id
           in: path
@@ -194,8 +275,10 @@ paths:
 
   /v1/projects/{project_id}/data/events-stream:
     post:
-      summary: Events list
-      operationId: createEventsStream
+      summary: Get ingested events
+      operationId: eventsStream
+      tags:
+        - events
       parameters:
         - name: project_id
           in: path
@@ -256,19 +339,11 @@ paths:
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
   /v1/projects/{project_id}/data/property-values:
-    get:
-      summary: List property values
+    post:
+      summary: List of property values
       operationId: PropertyValuesList
-      description: >
-        for event property you should include event_name and event_type
-        <br/><br/>
-        examples:
-        <br/>
-        /v1/projects/1/data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Name&property_type=regular
-        /v1/projects/1/data/property-values?event_name=Buy%20Product&event_type=regular&property_name=Total%20Revenue&property_type=custom
-        /v1/projects/1/data/property-values?event_name=Custom&event_type=custom&property_name=SomeProp&property_type=regular
-        /v1/projects/1/data/property-values?property_name=Country&property_type=regular
-        /v1/projects/1/data/property-values?property_name=Full%Name&property_type=custom
+      tags:
+        - properties
       parameters:
         - name: project_id
           in: path
@@ -276,30 +351,16 @@ paths:
           required: true
           schema:
             type: string
-        - name: event_name
-          in: query
-          description: Event Name. Required if property has event type
-          required: false
-          schema:
-            type: string
-        - name: event_type
-          in: query
-          description: Event Type. Required if property has event type
-          required: false
-          schema:
-            $ref: '#/components/schemas/EventType'
-        - name: property_name
-          in: query
-          description: Property Name
-          required: false
-          schema:
-            type: string
-        - name: property_type
-          in: query
-          description: Property Name
-          required: false
-          schema:
-            $ref: '#/components/schemas/PropertyType'
+      requestBody:
+        required: true
+        description: property type and property id/name must be specified. Event is optional and works as a filter for values
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/EventRef'
+                - $ref: '#/components/schemas/PropertyRef'
+
       responses:
         '200':
           description: list property values
@@ -316,12 +377,16 @@ paths:
                       - type: array
                         items:
                           type: number
+                      - type: array
+                        items:
+                          type: boolean
 
-
-  /queries/event-segmentation:
+  /reports/event-segmentation:
     post:
       summary: Event segmentation query
       operationId: createEventSegmentation
+      tags:
+        - reports
       requestBody:
         content:
           application/json:
@@ -568,6 +633,26 @@ components:
             format: i64
           description: array of id of attached to event custom properties
 
+    UpdateEventRequest:
+      description: Update event request
+      type: object
+      properties:
+        displayName:
+          type: string
+          description: event name to display. If empty then name property is used.
+        description:
+          type: string
+          description: description
+        status:
+          type: string
+          enum:
+            - enabled
+            - disabled
+        tags:
+          type: array
+          items:
+            type: string
+
     CustomEvent:
       required: [ "id","createdAt","createdBy","projectId","isSystem","name","status" ]
       description: Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
@@ -630,18 +715,35 @@ components:
       properties:
         name:
           type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
         events:
           type: array
           items:
             $ref: '#/components/schemas/CustomEventEvent'
 
     UpdateCustomEventRequest:
-      required: [ name","events" ]
+      required: [ "name","events" ]
       description: Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
       type: object
       properties:
         name:
           type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum:
+            - enabled
+            - disabled
+        tags:
+          type: array
+          items:
+            type: string
         events:
           type: array
           items:
@@ -696,7 +798,7 @@ components:
             type: integer
             format: i64
           description: list of id of events which use this property
-        scope:
+        type:
           type: string
           enum:
             - event
@@ -742,6 +844,24 @@ components:
             - type: object
               description: type of integer to pack. Between 8bits and 16bits
             - $ref: '#/components/schemas/DataType'
+
+    UpdatePropertyRequest:
+      type: object
+      description: Propetty update
+      properties:
+        displayName:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum:
+            - enabled
+            - disabled
+        tags:
+          type: array
+          items:
+            type: string
 
     CustomProperty:
       type: object
@@ -1122,7 +1242,7 @@ components:
     EventFilterByCohort:
       type: object
       properties:
-        filteType:
+        type:
           type: string
           enum:
             - cohort
@@ -1137,7 +1257,7 @@ components:
       allOf:
         - type: object
           properties:
-            filterType:
+            type:
               type: string
               enum:
                 - property
@@ -1175,7 +1295,7 @@ components:
       allOf:
         - type: object
           properties:
-            breakdownType:
+            type:
               type: string
               enum:
                 - property
@@ -1345,9 +1465,9 @@ components:
     SegmentConditionHasPropertyValue:
       type: object
       description: check whether the user currently has a property with a value
-      required: [ "conditionType","propertyName","operation" ]
+      required: [ "type","propertyName","operation" ]
       properties:
-        conditionType:
+        type:
           type: string
           enum:
             - hasPropertyValue
@@ -1368,9 +1488,9 @@ components:
     SegmentConditionHadPropertyValue:
       type: object
       description: check whether the user had a property with a value
-      required: [ "conditionType","propertyName","operation","time" ]
+      required: [ "type","propertyName","operation","time" ]
       properties:
-        conditionType:
+        type:
           type: string
           enum:
             - hadPropertyValue
@@ -1499,7 +1619,7 @@ components:
       allOf:
         - type: object
           properties:
-            conditionType:
+            type:
               type: string
               enum:
                 - didEvent
@@ -1521,7 +1641,7 @@ components:
     SegmentConditionFunnel:
       type: object
       properties:
-        conditionType:
+        type:
           type: string
           enum:
             - funnel
@@ -1536,9 +1656,9 @@ components:
     QuerySimple:
       type: object
       description: simple query without any additional agruments
-      required: [ "queryType","query" ]
+      required: [ "type","query" ]
       properties:
-        queryType:
+        type:
           type: string
           enum:
             - simple
@@ -1554,9 +1674,9 @@ components:
       type: object
       description: event count aggregate by group
       example: avegate event count per user
-      required: [ "queryType","aggregate" ]
+      required: [ "type","aggregate" ]
       properties:
-        queryType:
+        type:
           type: string
           enum:
             - countPerGroup
@@ -1566,12 +1686,12 @@ components:
     QueryAggregatePropertyPerGroup:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
-      required: [ "queryType","aggregate","propertyType","aggregatePerGroup" ]
+      required: [ "type","aggregate","propertyType","aggregatePerGroup" ]
       type: object
       allOf:
         - type: object
           properties:
-            queryType:
+            type:
               type: string
               enum:
                 - aggregatePropertyPerGroup
@@ -1586,12 +1706,12 @@ components:
     QueryAggregateProperty:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
-      required: [ "queryType","aggregate","propertyType" ]
+      required: [ "type","aggregate","propertyType" ]
       type: object
       allOf:
         - type: object
           properties:
-            queryType:
+            type:
               type: string
               enum:
                 - aggregateProperty
@@ -1605,7 +1725,7 @@ components:
       description: apply formula
       type: object
       properties:
-        queryType:
+        type:
           type: string
           enum:
             - formula
