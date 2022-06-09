@@ -14,8 +14,10 @@ use datafusion::{
 use crate::logical_plan::merge::MergeNode;
 use crate::physical_plan::merge::MergeExec;
 use axum::{async_trait};
+use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
+use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
 use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::unpivot::UnpivotExec;
 
@@ -67,6 +69,16 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 node.result_cols.clone(),
             ).map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
+        } else if let Some(node) = any.downcast_ref::<DictionaryDecodeNode>() {
+            let schema = node.input.schema();
+            let decode_cols = node.decode_cols
+                .iter()
+                .map(|(col, dict)| expressions::Column::new(
+                    col.name.as_str(),
+                    schema.index_of_column(col).unwrap()
+                ))
+                .collect::<Result<_>>()?;
+            let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
         } else {
             None
         };

@@ -5,23 +5,24 @@ use arrow::datatypes::{DataType, Field};
 use datafusion::logical_plan::{LogicalPlan, DFSchemaRef, UserDefinedLogicalNode};
 use datafusion_common::{Column, DFSchema};
 use datafusion_expr::Expr;
+use metadata::dictionaries::provider::SingleDictionaryProvider;
 use crate::{Error, Result};
 
 pub struct DictionaryDecodeNode {
-    input: LogicalPlan,
-    decode_cols: Vec<String>,
-    schema: DFSchemaRef,
+    pub input: LogicalPlan,
+    pub decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>,
+    pub schema: DFSchemaRef,
 }
 
 impl DictionaryDecodeNode {
-    pub fn try_new(input: LogicalPlan, decode_cols: Vec<String>) -> Result<Self> {
+    pub fn try_new(input: LogicalPlan, decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>) -> Result<Self> {
         let fields = input
             .schema()
             .fields()
             .iter()
-            .map(|field| match decode_cols.contains(field.name()) {
-                true => Field::new(field.name().as_str(), DataType::Utf8, field.is_nullable()),
-                false => field.clone()
+            .map(|field| match decode_cols.iter().find(|(col, _)| field.name() == col.name) {
+                Some(_) => Field::new(field.name().as_str(), DataType::Utf8, field.is_nullable()),
+                None => field.clone()
             })
             .collect();
 
@@ -63,7 +64,7 @@ impl UserDefinedLogicalNode for DictionaryDecodeNode {
     }
 
     fn from_template(&self, _exprs: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
-        Arc::new(DictionaryDecodeNode::new(
+        Arc::new(DictionaryDecodeNode::try_new(
             inputs[0].clone(),
             self.decode_cols.clone(),
         ))

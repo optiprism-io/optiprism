@@ -90,4 +90,16 @@ impl SingleDictionaryProvider {
             provider,
         }
     }
+
+    pub async fn get_key_or_create(&self, value: &str) -> Result<u64> {
+        self.provider.get_key_or_create(self.organization_id, self.project_id, self.dict.as_str(), value)
+    }
+
+    pub async fn get_value(&self, key: u64) -> Result<String> {
+        self.provider.get_value(self.organization_id, self.project_id, self.dict.as_str(), key)
+    }
+
+    pub async fn get_key(&self, organization_id: u64, project_id: u64, dict: &str, value: &str) -> Result<u64> {
+        self.provider.get_key(self.organization_id, self.project_id, self.dict.as_str(), value)
+    }
 }
