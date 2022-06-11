@@ -1,12 +1,11 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use datafusion::arrow::error::ArrowError;
+use arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
 use metadata::error::Error as MetadataError;
 use std::fmt::{Display, Formatter};
 use std::{fmt, result};
 use store::error::StoreError;
-
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
@@ -69,6 +68,16 @@ impl From<MetadataError> for Error {
         Self::MetadataError(err)
     }
 }
+
+impl From<Error> for ArrowError {
+    fn from(e: Error) -> Self {
+        match e {
+            Error::ArrowError(e) => e,
+            other => ArrowError::ExternalError(Box::new(other)),
+        }
+    }
+}
+
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {

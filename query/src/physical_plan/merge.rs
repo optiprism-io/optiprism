@@ -21,12 +21,14 @@ use crate::Result;
 use axum::{async_trait};
 use arrow::error::Result as ArrowResult;
 use arrow::util::pretty::pretty_format_batches;
+use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 use datafusion_common::Result as DFResult;
 use crate::Error;
 
 pub struct MergeExec {
     inputs: Vec<Arc<dyn ExecutionPlan>>,
     schema: SchemaRef,
+    metrics: ExecutionPlanMetricsSet,
 }
 
 impl MergeExec {
@@ -37,6 +39,7 @@ impl MergeExec {
         Ok(Self {
             inputs,
             schema: Arc::new(schema),
+            metrics: ExecutionPlanMetricsSet::new(),
         })
     }
 }
@@ -82,15 +85,21 @@ impl ExecutionPlan for MergeExec {
             streams.push(stream)
         }
 
+        let baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
         Ok(Box::pin(MergeStream {
             streams,
             stream_idx: 0,
             schema: self.schema.clone(),
+            baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
         }))
     }
 
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MergeExec")
+    }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
     }
 
     fn statistics(&self) -> Statistics {
@@ -102,19 +111,14 @@ struct MergeStream {
     streams: Vec<SendableRecordBatchStream>,
     stream_idx: usize,
     schema: SchemaRef,
+    baseline_metrics: BaselineMetrics,
 }
 
-impl RecordBatchStream for MergeStream {
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-}
+impl MergeStream {
+    fn poll_next_inner(self: &mut Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<ArrowResult<RecordBatch>>> {
+        let cloned_time = self.baseline_metrics.elapsed_compute().clone();
+        let _timer = cloned_time.timer();
 
-#[async_trait]
-impl Stream for MergeStream {
-    type Item = ArrowResult<RecordBatch>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
             let stream_idx = self.stream_idx;
             match self.streams[stream_idx].poll_next_unpin(cx) {
@@ -142,8 +146,22 @@ impl Stream for MergeStream {
                 other => return other,
             }
         }
+    }
+}
+impl RecordBatchStream for MergeStream {
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+}
 
-        unreachable!()
+#[async_trait]
+impl Stream for MergeStream {
+    type Item = ArrowResult<RecordBatch>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let poll = self.poll_next_inner(cx);
+        self.baseline_metrics.record_poll(poll)
+
     }
 }
 

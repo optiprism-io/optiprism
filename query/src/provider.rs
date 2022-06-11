@@ -7,7 +7,7 @@ use chrono::Utc;
 use datafusion::catalog::schema::MemorySchemaProvider;
 use datafusion::datasource::{MemTable, TableProvider};
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-use datafusion::logical_plan::LogicalPlan;
+use datafusion::logical_plan::{LogicalPlan, LogicalPlanBuilder};
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::{collect, displayable};
 use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
@@ -18,6 +18,7 @@ use crate::physical_plan::planner::QueryPlanner;
 use crate::reports::results::Series;
 use crate::Result;
 use datafusion::datasource::object_store::local::LocalFileSystem;
+use datafusion::logical_plan::plan::Explain;
 use crate::reports::event_segmentation;
 use crate::reports::event_segmentation::types::EventSegmentation;
 
@@ -48,8 +49,11 @@ impl Provider {
             cur_time.clone(),
             self.metadata.clone(),
             self.input.clone(),
-            es.clone()
+            es.clone(),
         ).await?;
+
+        // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
+
         let config = ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {})).with_target_partitions(1);
         let exec_ctx = ExecutionContext::with_config(config);
         println!("logical plan: {:?}", plan);

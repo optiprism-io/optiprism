@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
             products_path,
             geo_path,
             device_path,
-            new_daily_users: 100,
+            new_daily_users: 1,
             batch_size: 4096,
             partitions: num_cpus::get(),
         };

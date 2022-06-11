@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::error::{Error, Result};
 use chrono::{DateTime, Duration, DurationRound, NaiveDateTime, Utc};
 use datafusion::logical_plan::{create_udaf, exprlist_to_fields, Column, DFField, DFSchema, ExprSchema, LogicalPlan, Operator, Repartition, Partitioning};
@@ -36,9 +37,11 @@ use mockall::predicate::ge;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
-use crate::physical_plan::unpivot::UnpivotExec;
 use serde::{Deserialize, Serialize};
+use datafusion::prelude::Partitioning::Hash;
 use datafusion_common::ScalarValue;
+use metadata::dictionaries::provider::SingleDictionaryProvider;
+use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 
 use crate::reports::event_segmentation::types::{Breakdown, Event, EventFilter, EventSegmentation, Query};
 use crate::reports::expr::{property_col, property_expression, time_expression};
@@ -55,6 +58,45 @@ pub struct LogicalPlanBuilder {
     es: EventSegmentation,
 }
 
+macro_rules! breakdowns_to_dicts {
+    ($self:expr, $breakdowns:expr, $cols_hash:expr,$decode_cols:expr)=> {{
+        for breakdown in $breakdowns.iter() {
+            if let Breakdown::Property(prop) = &breakdown {
+                if $cols_hash.contains_key(prop) {
+                    continue;
+                }
+
+                match prop {
+                    PropertyRef::User(name) => dictionary_prop_to_col!($self,user_properties,Namespace::User,name,$decode_cols),
+                    PropertyRef::Event(name) => dictionary_prop_to_col!($self,event_properties,Namespace::Event,name,$decode_cols),
+                    _ => {}
+                }
+            }
+        }
+    }}
+}
+
+macro_rules! dictionary_prop_to_col {
+    ($self:expr, $md_namespace:ident, $namespace:expr, $prop_name:expr,  $decode_cols:expr)=> {{
+        let prop = $self.metadata
+            .$md_namespace
+            .get_by_name($self.ctx.organization_id, $self.ctx.project_id, $prop_name.as_str()).await?;
+        if !prop.is_dictionary {
+            continue;
+        }
+
+        let col_name = prop.column_name($namespace);
+        let dict = SingleDictionaryProvider::new(
+            $self.ctx.organization_id,
+            $self.ctx.project_id,
+            col_name.clone(),
+            $self.metadata.dictionaries.clone(),
+        );
+        let col = Column::from_name(col_name);
+
+        $decode_cols.push((col, Arc::new(dict)));
+    }}
+}
 impl LogicalPlanBuilder {
     /// creates logical plan for event segmentation
     pub async fn build(
@@ -65,7 +107,7 @@ impl LogicalPlanBuilder {
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {
         let events = es.events.clone();
-        let builder = LogicalPlanBuilder { ctx, cur_time: cur_time.clone(), metadata, es: es.clone() };
+        let builder = LogicalPlanBuilder { ctx: ctx.clone(), cur_time: cur_time.clone(), metadata, es: es.clone() };
 
         // build main query
         let mut input = match events.len() {
@@ -85,7 +127,32 @@ impl LogicalPlanBuilder {
             }
         };
 
+        input = builder.decode_dictionaries(input).await?;
+
         Ok(input)
+    }
+
+    async fn decode_dictionaries(&self, input: LogicalPlan) -> Result<LogicalPlan> {
+        let mut cols_hash: HashMap<PropertyRef, ()> = HashMap::new();
+        let mut decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)> = Vec::new();
+
+        for event in &self.es.events {
+            if let Some(breakdowns) = &event.breakdowns {
+                breakdowns_to_dicts!(self,breakdowns,cols_hash,decode_cols);
+            }
+        }
+
+        if let Some(breakdowns) = &self.es.breakdowns {
+            breakdowns_to_dicts!(self,breakdowns,cols_hash,decode_cols);
+        }
+
+        if decode_cols.is_empty() {
+            return Ok(input);
+        }
+
+        Ok(LogicalPlan::Extension(Extension {
+            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols).map_err(|e| e.into_datafusion_plan_error())?)
+        }))
     }
 
     async fn build_event_logical_plan(
@@ -340,7 +407,8 @@ impl LogicalPlanBuilder {
             Breakdown::Property(prop_ref) => match prop_ref {
                 PropertyRef::User(prop_name) | PropertyRef::Event(prop_name) => {
                     let prop_col = property_col(&self.ctx, &self.metadata, &prop_ref).await?;
-                    Ok(Expr::Alias(Box::new(prop_col), prop_name.clone()))
+                    Ok(prop_col)
+                    // Ok(Expr::Alias(Box::new(prop_col), prop_name.clone()))
                 }
                 PropertyRef::Custom(_) => unimplemented!(),
             },

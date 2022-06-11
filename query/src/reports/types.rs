@@ -64,7 +64,7 @@ impl TimeUnit {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum PropertyRef {
     User(String),
     Event(String),

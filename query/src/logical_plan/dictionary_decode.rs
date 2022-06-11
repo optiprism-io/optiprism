@@ -3,7 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use arrow::datatypes::{DataType, Field};
 use datafusion::logical_plan::{LogicalPlan, DFSchemaRef, UserDefinedLogicalNode};
-use datafusion_common::{Column, DFSchema};
+use datafusion_common::{Column, DFField, DFSchema};
 use datafusion_expr::Expr;
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use crate::{Error, Result};
@@ -20,9 +20,9 @@ impl DictionaryDecodeNode {
             .schema()
             .fields()
             .iter()
-            .map(|field| match decode_cols.iter().find(|(col, _)| field.name() == col.name) {
-                Some(_) => Field::new(field.name().as_str(), DataType::Utf8, field.is_nullable()),
-                None => field.clone()
+            .map(|field| match decode_cols.iter().find(|(col, _)| *field.name() == col.name) {
+                Some(_) => DFField::new(field.qualifier().map(|q| q.as_str()), field.name().as_str(), DataType::Utf8, field.is_nullable()),
+                None => field.to_owned()
             })
             .collect();
 
@@ -64,9 +64,6 @@ impl UserDefinedLogicalNode for DictionaryDecodeNode {
     }
 
     fn from_template(&self, _exprs: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
-        Arc::new(DictionaryDecodeNode::try_new(
-            inputs[0].clone(),
-            self.decode_cols.clone(),
-        ))
+        Arc::new(DictionaryDecodeNode::try_new(inputs[0].clone(), self.decode_cols.clone()).unwrap())
     }
 }

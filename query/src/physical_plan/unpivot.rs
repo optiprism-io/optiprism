@@ -21,6 +21,7 @@ use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use crate::{Result, Error};
 use axum::{async_trait};
 use arrow::error::{ArrowError, Result as ArrowResult};
+use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 
 /// `UNPIVOT` execution plan operator. Unpivot transforms columns into rows. E.g.
 pub struct UnpivotExec {
@@ -29,6 +30,7 @@ pub struct UnpivotExec {
     cols: Vec<String>,
     name_col: String,
     value_col: String,
+    metrics: ExecutionPlanMetricsSet,
 }
 
 impl UnpivotExec {
@@ -68,6 +70,7 @@ impl UnpivotExec {
             cols,
             name_col,
             value_col,
+            metrics: ExecutionPlanMetricsSet::new(),
         })
     }
 }
@@ -118,11 +121,16 @@ impl ExecutionPlan for UnpivotExec {
             stream,
             schema: self.schema.clone(),
             cols: self.cols.clone(),
+            baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
         }))
     }
 
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "UnpivotExec")
+    }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
     }
 
     fn statistics(&self) -> Statistics {
@@ -134,6 +142,7 @@ struct UnpivotStream {
     stream: SendableRecordBatchStream,
     schema: SchemaRef,
     cols: Vec<String>,
+    baseline_metrics: BaselineMetrics,
 }
 
 impl RecordBatchStream for UnpivotStream {
@@ -147,18 +156,15 @@ impl Stream for UnpivotStream {
     type Item = ArrowResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.stream.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok(batch))) => {
-                let result = unpivot(
-                    &batch,
-                    self.schema.clone(),
-                    &self.cols,
-                ).map_err(|err| ArrowError::ExternalError(Box::new(err)));
+        let elapsed_compute = self.baseline_metrics.elapsed_compute().clone();
+        let _timer = elapsed_compute.timer();
 
-                Poll::Ready(Some(result))
-            }
+        let poll = match self.stream.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(unpivot(&batch, self.schema.clone(), &self.cols))),
             other => other,
-        }
+        };
+
+        self.baseline_metrics.record_poll(poll)
     }
 }
 
@@ -214,7 +220,7 @@ macro_rules! build_value_arr {
     }};
 }
 
-pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Result<RecordBatch> {
+pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> ArrowResult<RecordBatch> {
     let builder_cap = batch.num_rows() * cols.len();
     let unpivot_cols_len = cols.len();
 

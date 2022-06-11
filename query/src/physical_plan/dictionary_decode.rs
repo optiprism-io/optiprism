@@ -8,7 +8,7 @@ use std::pin::Pin;
 use futures::{Stream, StreamExt};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use arrow::array::{Array, ArrayRef, Float64Array, StringArray, StringBuilder, UInt8Array};
+use arrow::array::{Array, ArrayRef, Float64Array, StringArray, StringBuilder, UInt8Array, UInt16Array, UInt32Array, UInt64Array};
 use arrow::compute::kernels;
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
@@ -25,12 +25,14 @@ use datafusion::error::Result as DFResult;
 use axum::{async_trait};
 use metadata::dictionaries;
 use metadata::dictionaries::provider::SingleDictionaryProvider;
+use futures::executor::block_on;
+use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 
-#[derive(Debug)]
 pub struct DictionaryDecodeExec {
     input: Arc<dyn ExecutionPlan>,
     decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>,
     schema: SchemaRef,
+    metrics: ExecutionPlanMetricsSet,
 }
 
 impl DictionaryDecodeExec {
@@ -52,6 +54,7 @@ impl DictionaryDecodeExec {
             input,
             decode_cols,
             schema,
+            metrics: ExecutionPlanMetricsSet::new(),
         }
     }
 }
@@ -92,7 +95,16 @@ impl ExecutionPlan for DictionaryDecodeExec {
             stream,
             schema: self.schema.clone(),
             decode_cols: self.decode_cols.clone(),
+            baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
         }))
+    }
+
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "DictionaryDecodeExec")
+    }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
     }
 
     fn statistics(&self) -> Statistics {
@@ -110,12 +122,7 @@ struct DictionaryDecodeStream {
     stream: SendableRecordBatchStream,
     decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>,
     schema: SchemaRef,
-}
-
-impl RecordBatchStream for DictionaryDecodeStream {
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
+    baseline_metrics: BaselineMetrics,
 }
 
 macro_rules! decode_array {
@@ -125,10 +132,10 @@ macro_rules! decode_array {
 
         for v in src_arr.iter() {
             match v {
-                None=>result.append_null(),
+                None=>result.append_null().unwrap(),
                 Some(key)=> {
-                 let value = $dict.get_value(key as u64).await.map_err(|err|ArrowError::ExternalError(Box::new(err)))?;
-                    result.append_value(value);
+                 let value = block_on($dict.get_value(key as u64)).map_err(|err|ArrowError::ExternalError(Box::new(err))).unwrap();
+                    result.append_value(value).unwrap();
                 }
             }
         }
@@ -136,26 +143,29 @@ macro_rules! decode_array {
         Arc::new(result.finish()) as ArrayRef
     }}
 }
-#[async_trait]
-impl Stream for DictionaryDecodeStream {
-    type Item = ArrowResult<RecordBatch>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+impl DictionaryDecodeStream {
+    fn poll_next_inner(self: &mut Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<ArrowResult<RecordBatch>>> {
+        let cloned_time = self.baseline_metrics.elapsed_compute().clone();
+        let _timer = cloned_time.timer();
+
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => {
                 let columns = batch
                     .columns()
                     .iter()
                     .enumerate()
-                    .map(|(idx, array_ref)| match self.decode_cols.iter().find(|(col, _)| idx == col.index()) {
-                        None => array_ref.clone(),
-                        Some((_, dict)) => {
-                            match array_ref.data_type() {
-                                DataType::UInt8 => decode_array!(array_ref,UInt8,dict),
-                                DataType::UInt16 => decode_array!(array_ref,UInt16,dict),
-                                DataType::UInt32 => decode_array!(array_ref,UInt32,dict),
-                                DataType::UInt64 => decode_array!(array_ref,UInt64,dict),
-                                _ => unimplemented!(),
+                    .map(|(idx, array_ref)| {
+                        match self.decode_cols.iter().find(|(col, _)| idx == col.index()) {
+                            None => array_ref.to_owned(),
+                            Some((_, dict)) => {
+                                match array_ref.data_type() {
+                                    DataType::UInt8 => decode_array!(array_ref,UInt8Array,dict),
+                                    DataType::UInt16 => decode_array!(array_ref,UInt16Array,dict),
+                                    DataType::UInt32 => decode_array!(array_ref,UInt32Array,dict),
+                                    DataType::UInt64 => decode_array!(array_ref,UInt64Array,dict),
+                                    _ => unimplemented!(),
+                                }
                             }
                         }
                     }).collect();
@@ -163,5 +173,22 @@ impl Stream for DictionaryDecodeStream {
             }
             other => other,
         }
+    }
+}
+
+impl RecordBatchStream for DictionaryDecodeStream {
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+}
+
+#[async_trait]
+impl Stream for DictionaryDecodeStream {
+    type Item = ArrowResult<RecordBatch>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let poll = self.poll_next_inner(cx);
+
+        self.baseline_metrics.record_poll(poll)
     }
 }

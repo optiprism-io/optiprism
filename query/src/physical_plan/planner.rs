@@ -73,12 +73,13 @@ impl DFExtensionPlanner for ExtensionPlanner {
             let schema = node.input.schema();
             let decode_cols = node.decode_cols
                 .iter()
-                .map(|(col, dict)| expressions::Column::new(
+                .map(|(col, dict)| (expressions::Column::new(
                     col.name.as_str(),
-                    schema.index_of_column(col).unwrap()
-                ))
-                .collect::<Result<_>>()?;
+                    schema.index_of_column(col).unwrap(),
+                ), dict.to_owned()))
+                .collect();
             let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
+            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else {
             None
         };
