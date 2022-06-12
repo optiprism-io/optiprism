@@ -109,17 +109,19 @@ const { $t } = inject('i18n') as I18N;
 const excludedEvents = computed(() => stepsStore.excludedEvents)
 
 const excludeSteps = computed<UiSelectItemInterface<string>[]>(() => {
-    const groups: UiSelectItemInterface<string>[] = Array
-        .from({ length: eventsStore.events.length - 1 })
-        .map((_, index) => {
-            const idx = index + 2;
-            return {
-                __type: 'item',
-                id: `${index}`,
-                label: `1 ${$t('funnels.excludeSteps.and')} ${idx}`,
-                value: `1-${idx}`
-            }
-        })
+    const groups: UiSelectItemInterface<string>[] =
+      stepsStore.steps.length > 2
+          ? Array.from({ length: stepsStore.steps.length })
+              .map((_, index) => {
+                  const idx = index + 2;
+                  return {
+                      __type: 'item',
+                      id: `${index}`,
+                      label: `${idx - 1} ${$t('funnels.excludeSteps.and')} ${idx}`,
+                      value: `${idx - 1}-${idx}`
+                  }
+              })
+          : []
 
     return [
         ...groups.slice(0, -1),
