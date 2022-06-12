@@ -105,11 +105,11 @@ export const useLexiconStore = defineStore('lexicon', {
     getters: {
         findEventById(state: Lexicon) {
             return (id: number): Event => {
-                const e = state.events.find((event): boolean => event.id === id)
+                const e = state.events.find((event): boolean => Number(event.id) === Number(id))
                 if (e) {
                     return e
                 }
-                throw new Error(`undefined custon event id: ${id}`)
+                throw new Error(`undefined event id: ${id}`)
             }
         },
         findEventByName(state: Lexicon) {
@@ -123,7 +123,7 @@ export const useLexiconStore = defineStore('lexicon', {
         },
         findCustomEventById(state: Lexicon) {
             return (id: number): CustomEvent => {
-                const e = state.customEvents.find((event): boolean => id === event.id)
+                const e = state.customEvents.find((event): boolean => Number(event.id) === Number(id))
                 if (e) {
                     return e
                 }

@@ -71,8 +71,8 @@ import UiInput from '@/components/uikit/UiInput.vue'
 import UiFormLabel from '@/components//uikit/UiFormLabel.vue'
 import Select from '@/components/Select/Select.vue'
 import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
-import schemaService, { Event as EventScheme, CustomEvents } from '@/api/services/schema.service'
-
+import schemaService from '@/api/services/schema.service'
+import { CreateCustomEventRequest, CustomEventEvent } from '@/api'
 const i18n = inject<any>('i18n')
 
 const lexiconStore = useLexiconStore()
@@ -135,14 +135,14 @@ const removeEvent = (idx: number): void => {
 const apply = async () => {
     loading.value = true
     try {
-        const data: CustomEvents = {
+        const data: CreateCustomEventRequest = {
             name: eventName.value,
-            events: events.value.map(item => {
+            events: events.value.map((item): CustomEventEvent => {
                 const event = lexiconStore.findEventById(item.ref.id)
 
-                const eventProps: EventScheme = {
+                const eventProps: CustomEventEvent = {
                     eventName: event.name,
-                    eventType: item.ref.type,
+                    eventType: 'custom',
                     eventId: event.id,
                     filters: [],
                 }
@@ -152,8 +152,8 @@ const apply = async () => {
                         if (filter.propRef) {
                             if (eventProps.filters) {
                                 eventProps.filters.push({
-                                    filterType: 'property',
-                                    propertyType: filter.propRef.type,
+                                    type: 'property',
+                                    propertyType: 'custom',
                                     propertyId: filter.propRef.id,
                                     operation: filter.opId,
                                     value: filter.values,

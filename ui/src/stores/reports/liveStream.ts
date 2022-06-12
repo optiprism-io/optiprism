@@ -60,8 +60,8 @@ export const useLiveStreamStore = defineStore('liveStream', {
                     event.filters.forEach(filter => {
                         if (filter.propRef) {
                             filters.push({
-                                filterType: 'property',
-                                propertyType: filter.propRef.type,
+                                type: 'property',
+                                propertyType: 'custom',
                                 propertyId: filter.propRef.id,
                                 operation: filter.opId,
                                 value: filter.values,

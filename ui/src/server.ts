@@ -12,6 +12,7 @@ export default function ({ environment = 'development' } = {}) {
     return createServer({
         seeds(server) {
             server.db.loadData({
+                events: eventMocks,
                 customEvents: [{
                     id: 1,
                     name: 'Create Product',
@@ -38,9 +39,16 @@ export default function ({ environment = 'development' } = {}) {
             this.namespace = 'api'
             this.timing = 300
 
-            this.get('/schema/events', () => {
-                return eventMocks
+            this.get('/schema/events', (schema) => {
+                return schema.db.events
             });
+
+            this.put(`${BASE_PATH}/v1/projects/:project_id/schema/events/:event_id`, (schema, request) => {
+                const customEvent = JSON.parse(request.requestBody)
+                schema.db.events.update(request.params.event_id, customEvent)
+
+                return schema.db.customEvents
+            })
 
             this.get(`${BASE_PATH}/v1/projects/:project_id/schema/custom-events`, (schema) => {
                 return schema.db.customEvents.map(item => ({...item, id: Number(item.id)}))
