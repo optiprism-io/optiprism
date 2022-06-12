@@ -30,7 +30,7 @@ const stepsStore = useStepsStore();
 const eventsStore = useEventsStore();
 
 const propertiesItems = computed<UiSelectItemInterface<HoldingProperty>[]>(() => {
-    return stepsStore.propsAvailableToHold
+    return lexiconStore.eventProperties
         .filter(item => !stepsStore.holdingProperties.map(p => p.id).includes(item.id))
         .map(item => {
             return {
