@@ -59,7 +59,6 @@ impl Property {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CreatePropertyRequest {
     pub created_by: u64,
-    pub project_id: u64,
     pub tags: Option<Vec<String>>,
     pub name: String,
     pub description: Option<String>,
@@ -76,10 +75,8 @@ pub struct CreatePropertyRequest {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct UpdatePropertyRequest {
-    pub id: u64,
     pub created_by: u64,
     pub updated_by: Option<u64>,
-    pub project_id: u64,
     pub scope: Scope,
     pub tags: Option<Vec<String>>,
     pub name: String,

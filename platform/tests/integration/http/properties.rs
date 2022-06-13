@@ -120,7 +120,6 @@ async fn test_event_properties() -> Result<()> {
     {
         let req = CreatePropertyRequest {
             created_by: prop1.created_by.clone(),
-            project_id: prop1.project_id.clone(),
             tags: prop1.tags.clone(),
             name: prop1.name.clone(),
             description: prop1.description.clone(),
@@ -134,7 +133,7 @@ async fn test_event_properties() -> Result<()> {
             dictionary_type: prop1.dictionary_type.clone(),
         };
 
-        let resp = prov.create(0, req).await?;
+        let resp = prov.create(0, 0, req).await?;
         assert_eq!(resp.id, 1);
     }
 

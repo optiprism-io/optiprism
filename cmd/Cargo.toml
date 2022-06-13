@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 common = { path = "../common" }
 events-gen = { path = "../events-gen" }
+datafusion = { path = "../arrow-datafusion/datafusion" }
 query = { path = "../query" }
 metadata = { path = "../metadata" }
 platform = { path = "../platform" }

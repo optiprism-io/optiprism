@@ -46,7 +46,7 @@ fn index_keys(
             IDX_DISPLAY_NAME,
             display_name,
         )
-        .to_vec()
+            .to_vec()
     }));
 
     idx
@@ -81,21 +81,23 @@ impl Provider {
     pub async fn create(
         &self,
         organization_id: u64,
+        project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
-        self._create(organization_id, req).await
+        self._create(organization_id, project_id, req).await
     }
 
     pub async fn _create(
         &self,
         organization_id: u64,
+        project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let idx_keys = index_keys(
             self.ns.clone(),
             organization_id,
-            req.project_id,
+            project_id,
             &req.name,
             &req.display_name,
         );
@@ -105,7 +107,7 @@ impl Provider {
             .store
             .next_seq(make_id_seq_key(
                 organization_id,
-                req.project_id,
+                project_id,
                 self.ns.as_bytes(),
             ))
             .await?;
@@ -117,7 +119,7 @@ impl Provider {
             updated_at: None,
             created_by: req.created_by,
             updated_by: None,
-            project_id: req.project_id,
+            project_id,
             tags: req.tags,
             name: req.name,
             description: req.description,
@@ -136,7 +138,7 @@ impl Provider {
             .put(
                 make_data_value_key(
                     organization_id,
-                    prop.project_id,
+                    project_id,
                     self.ns.as_bytes(),
                     prop.id,
                 ),
@@ -151,11 +153,12 @@ impl Provider {
     pub async fn get_or_create(
         &self,
         organization_id: u64,
+        project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
         match self
-            ._get_by_name(organization_id, req.project_id, req.name.as_str())
+            ._get_by_name(organization_id, project_id, req.name.as_str())
             .await
         {
             Ok(prop) => return Ok(prop),
@@ -163,7 +166,7 @@ impl Provider {
             Err(err) => return Err(err),
         }
 
-        self._create(organization_id, req).await
+        self._create(organization_id, project_id, req).await
     }
 
     pub async fn get_by_id(
@@ -221,29 +224,31 @@ impl Provider {
             project_id,
             self.ns.as_bytes(),
         )
-        .await
+            .await
     }
 
     pub async fn update(
         &self,
         organization_id: u64,
+        project_id: u64,
+        property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
         let idx_keys = index_keys(
             self.ns.clone(),
             organization_id,
-            req.project_id,
+            project_id,
             &req.name,
             &req.display_name,
         );
         let prev_prop = self
-            .get_by_id(organization_id, req.project_id, req.id)
+            .get_by_id(organization_id, project_id, property_id)
             .await?;
         let idx_prev_keys = index_keys(
             self.ns.clone(),
             organization_id,
-            prev_prop.project_id,
+            project_id,
             &prev_prop.name,
             &prev_prop.display_name,
         );
@@ -253,12 +258,12 @@ impl Provider {
 
         let updated_at = Utc::now();
         let prop = Property {
-            id: req.id,
+            id: property_id,
             created_at: prev_prop.created_at,
             updated_at: Some(updated_at),
             created_by: req.created_by,
             updated_by: req.updated_by,
-            project_id: req.project_id,
+            project_id,
             tags: req.tags,
             name: req.name,
             description: req.description,
@@ -277,7 +282,7 @@ impl Provider {
             .put(
                 make_data_value_key(
                     organization_id,
-                    prop.project_id,
+                    project_id,
                     self.ns.as_bytes(),
                     prop.id,
                 ),
@@ -312,7 +317,7 @@ impl Provider {
                     &prop.name,
                     &prop.display_name,
                 )
-                .as_ref(),
+                    .as_ref(),
             )
             .await?;
         Ok(prop)

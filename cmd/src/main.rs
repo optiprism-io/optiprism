@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
 extern crate bytesize;
 
@@ -18,6 +19,7 @@ use events_gen::generator;
 use query::QueryProvider;
 use crate::error::Error;
 use log::{info};
+use datafusion::datasource::MemTable;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -74,10 +76,11 @@ async fn main() -> Result<()> {
             }
         }
     }
-    println!("partitions: {}, batches: {}, rows: {rows}",batches.len(),batches[0].len());
-    println!("total size: {}",ByteSize::b(data_size_bytes as u64));
+    println!("partitions: {}, batches: {}, rows: {rows}", batches.len(), batches[0].len());
+    println!("total size: {}", ByteSize::b(data_size_bytes as u64));
 
-    let query_provider = Arc::new(QueryProvider::try_new(md.clone(), batches[0][0].schema(), batches)?);
+    let provider = Arc::new(MemTable::try_new(batches[0][0].schema(), batches)?);
+    let query_provider = Arc::new(QueryProvider::try_new(md.clone(), provider)?);
     let platform = platform::Platform::new(md.clone(), query_provider);
 
     let mut router = Router::new();

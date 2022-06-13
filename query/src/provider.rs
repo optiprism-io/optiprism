@@ -26,17 +26,14 @@ use crate::reports::event_segmentation::types::EventSegmentation;
 pub struct Provider {
     metadata: Arc<Metadata>,
     input: LogicalPlan,
-    partitions: usize,
 }
 
 impl Provider {
-    pub fn try_new(metadata: Arc<Metadata>, schema: SchemaRef, batches: Vec<Vec<RecordBatch>>) -> Result<Self> {
-        let partitions = batches.len();
-        let input = datafusion::logical_plan::LogicalPlanBuilder::scan_memory(batches, schema, None)?.build()?;
+    pub fn try_new(metadata: Arc<Metadata>, provider: Arc<dyn TableProvider>) -> Result<Self> {
+        let input = datafusion::logical_plan::LogicalPlanBuilder::scan("table", provider, None)?.build()?;
         Ok(Self {
             metadata,
             input,
-            partitions,
         })
     }
 }

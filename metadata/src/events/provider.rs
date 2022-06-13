@@ -21,24 +21,25 @@ fn index_keys(
     organization_id: u64,
     project_id: u64,
     name: &str,
-    display_name: &Option<String>,
+    display_name: Option<String>,
 ) -> Vec<Option<Vec<u8>>> {
-    let mut idx: Vec<Option<Vec<u8>>> = vec![];
-    idx.push(Some(
-        make_index_key(organization_id, project_id, NAMESPACE, IDX_NAME, name).to_vec(),
-    ));
-    idx.push(display_name.as_ref().map(|display_name| {
-        make_index_key(
-            organization_id,
-            project_id,
-            NAMESPACE,
-            IDX_DISPLAY_NAME,
-            display_name,
-        )
-        .to_vec()
-    }));
+    [index_name_key(organization_id, project_id, name), index_display_name_key(organization_id, project_id, display_name)].to_vec()
+}
 
-    idx
+fn index_name_key(
+    organization_id: u64,
+    project_id: u64,
+    name: &str,
+) -> Option<Vec<u8>> {
+    Some(make_index_key(organization_id, project_id, NAMESPACE, IDX_NAME, name).to_vec())
+}
+
+fn index_display_name_key(
+    organization_id: u64,
+    project_id: u64,
+    display_name: Option<String>,
+) -> Option<Vec<u8>> {
+    display_name.map(|v| make_index_key(organization_id, project_id, NAMESPACE, IDX_DISPLAY_NAME, v.as_str()).to_vec()).to_owned()
 }
 
 pub struct Provider {
@@ -56,24 +57,24 @@ impl Provider {
         }
     }
 
-    pub async fn create(&self, organization_id: u64, req: CreateEventRequest) -> Result<Event> {
+    pub async fn create(&self, organization_id: u64, project_id: u64, req: CreateEventRequest) -> Result<Event> {
         let _guard = self.guard.write().await;
-        self._create(organization_id, req).await
+        self._create(organization_id, project_id, req).await
     }
 
-    pub async fn _create(&self, organization_id: u64, req: CreateEventRequest) -> Result<Event> {
+    pub async fn _create(&self, organization_id: u64, project_id: u64, req: CreateEventRequest) -> Result<Event> {
         let idx_keys = index_keys(
             organization_id,
-            req.project_id,
+            project_id,
             &req.name,
-            &req.display_name,
+            req.display_name.clone(),
         );
         self.idx.check_insert_constraints(idx_keys.as_ref()).await?;
 
         let created_at = Utc::now();
         let id = self
             .store
-            .next_seq(make_id_seq_key(organization_id, req.project_id, NAMESPACE))
+            .next_seq(make_id_seq_key(organization_id, project_id, NAMESPACE))
             .await?;
 
         let event = Event {
@@ -82,20 +83,20 @@ impl Provider {
             updated_at: None,
             created_by: req.created_by,
             updated_by: None,
-            project_id: req.project_id,
+            project_id,
             tags: req.tags,
             name: req.name,
             display_name: req.display_name,
             description: req.description,
             status: req.status,
-            scope: req.scope,
+            is_system: req.is_system,
             properties: req.properties,
             custom_properties: req.custom_properties,
         };
         let data = serialize(&event)?;
         self.store
             .put(
-                make_data_value_key(organization_id, event.project_id, NAMESPACE, event.id),
+                make_data_value_key(organization_id, project_id, NAMESPACE, event.id),
                 &data,
             )
             .await?;
@@ -107,11 +108,12 @@ impl Provider {
     pub async fn get_or_create(
         &self,
         organization_id: u64,
+        project_id: u64,
         req: CreateEventRequest,
     ) -> Result<Event> {
         let _guard = self.guard.write().await;
         match self
-            ._get_by_name(organization_id, req.project_id, req.name.as_str())
+            ._get_by_name(organization_id, project_id, req.name.as_str())
             .await
         {
             Ok(event) => return Ok(event),
@@ -119,7 +121,7 @@ impl Provider {
             Err(err) => return Err(err),
         }
 
-        self._create(organization_id, req).await
+        self._create(organization_id, project_id, req).await
     }
 
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
@@ -165,48 +167,55 @@ impl Provider {
         list(self.store.clone(), organization_id, project_id, NAMESPACE).await
     }
 
-    pub async fn update(&self, organization_id: u64, req: UpdateEventRequest) -> Result<Event> {
+    pub async fn update(&self, organization_id: u64, project_id: u64, event_id: u64, req: UpdateEventRequest) -> Result<Event> {
         let _guard = self.guard.write().await;
-        let idx_keys = index_keys(
-            organization_id,
-            req.project_id,
-            &req.name,
-            &req.display_name,
-        );
+
         let prev_event = self
-            .get_by_id(organization_id, req.project_id, req.id)
+            .get_by_id(organization_id, project_id, event_id)
             .await?;
-        let idx_prev_keys = index_keys(
-            organization_id,
-            prev_event.project_id,
-            &prev_event.name,
-            &prev_event.display_name,
-        );
+        let mut event = prev_event.clone();
+
+        let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
+        let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
+        if let Some(name) = &req.name {
+            idx_keys.push(index_name_key(organization_id, project_id, name.as_str()));
+            idx_prev_keys.push(index_name_key(organization_id, project_id, prev_event.name.as_str()));
+            event.name = name.to_owned();
+        }
+        if let Some(display_name) = &req.display_name {
+            idx_keys.push(index_display_name_key(organization_id, project_id, display_name.to_owned()));
+            idx_prev_keys.push(index_display_name_key(organization_id, project_id, prev_event.display_name));
+            event.display_name = display_name.to_owned();
+        }
         self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await?;
 
-        let updated_at = Utc::now(); // TODO add updated_by
-        let event = Event {
-            id: req.id,
-            created_at: prev_event.created_at,
-            updated_at: Some(updated_at),
-            created_by: prev_event.created_by,
-            updated_by: Some(req.updated_by),
-            project_id: req.project_id,
-            tags: req.tags,
-            name: req.name,
-            display_name: req.display_name,
-            description: req.description,
-            status: req.status,
-            scope: req.scope,
-            properties: req.properties,
-            custom_properties: req.custom_properties,
-        };
+        event.updated_at = Some(Utc::now());
+        event.updated_by = Some(req.updated_by);
+        if let Some(tags) = req.tags {
+            event.tags = tags;
+        }
+        if let Some(description) = req.description {
+            event.description = description;
+        }
+        if let Some(status) = req.status {
+            event.status = status;
+        }
+        if let Some(is_system) = req.is_system {
+            event.is_system = is_system;
+        }
+        if let Some(properties) = req.properties {
+            event.properties = properties;
+        }
+        if let Some(custom_properties) = req.custom_properties {
+            event.custom_properties = custom_properties;
+        }
+
         let data = serialize(&event)?;
         self.store
             .put(
-                make_data_value_key(organization_id, event.project_id, NAMESPACE, event.id),
+                make_data_value_key(organization_id, project_id, NAMESPACE, event.id),
                 &data,
             )
             .await?;
@@ -289,11 +298,11 @@ impl Provider {
             .delete(
                 index_keys(
                     organization_id,
-                    event.project_id,
+                    project_id,
                     &event.name,
-                    &event.display_name,
+                    event.display_name.clone(),
                 )
-                .as_ref(),
+                    .as_ref(),
             )
             .await?;
 

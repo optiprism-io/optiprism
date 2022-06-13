@@ -454,6 +454,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "common",
+ "datafusion",
  "env_logger",
  "events-gen",
  "log",
