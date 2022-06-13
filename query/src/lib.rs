@@ -10,7 +10,9 @@ pub use error::{Error, Result};
 pub use provider::Provider as QueryProvider;
 
 pub mod event_fields {
-    pub const EVENT: &str = "event";
-    pub const CREATED_AT: &str = "created_at";
-    pub const USER_ID: &str = "user_id";
+    pub const EVENT: &str = "event_event";
+    pub const CREATED_AT: &str = "event_created_at";
+    pub const USER_ID: &str = "event_user_id";
 }
+
+pub const DEFAULT_BATCH_SIZE: usize = 4096;

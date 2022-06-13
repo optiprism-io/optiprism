@@ -6,6 +6,8 @@ use platform::Error as PlatformError;
 use query::Error as QueryError;
 use common::Error as CommonError;
 use metadata::Error as MetadataError;
+use events_gen::error::Error as EventsGenError;
+
 use std::{
     fmt::{self, Display, Formatter},
     result,
@@ -32,7 +34,8 @@ pub enum Error {
     QueryError(QueryError),
     CommonError(CommonError),
     MetadataError(MetadataError),
-    ExternalError(String)
+    ExternalError(String),
+    EventsGenError(EventsGenError),
 }
 
 impl Display for Error {
@@ -68,6 +71,12 @@ impl From<CommonError> for Error {
 impl From<MetadataError> for Error {
     fn from(err: MetadataError) -> Self {
         Self::MetadataError(err)
+    }
+}
+
+impl From<EventsGenError> for Error {
+    fn from(err: EventsGenError) -> Self {
+        Self::EventsGenError(err)
     }
 }
 

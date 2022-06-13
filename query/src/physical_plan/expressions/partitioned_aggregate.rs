@@ -25,10 +25,7 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
-use arrow::array::{
-    Array, ArrayRef, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array,
-    UInt32Array, UInt64Array, UInt8Array,
-};
+use arrow::array::{Array, ArrayRef, DecimalArray, DecimalBuilder, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
 use arrow::datatypes::DataType;
 use datafusion::error::{DataFusionError, Result as DFResult};
 use dyn_clone::DynClone;
@@ -36,7 +33,7 @@ use dyn_clone::DynClone;
 use crate::physical_plan::expressions::partitioned_count::PartitionedCountAccumulator;
 use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
 use datafusion::physical_plan::aggregates::return_type;
-use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, Min, Sum};
+use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, MaxAccumulator, Min, MinAccumulator, Sum};
 use datafusion::physical_plan::{Accumulator, AggregateExpr};
 use datafusion::scalar::ScalarValue;
 use datafusion_expr::AggregateFunction;
@@ -58,7 +55,7 @@ pub struct Buffer {
 }
 
 macro_rules! buffer_to_array_ref {
-    ($buffer:ident, $type:ident, $vtype:ident, $ARRAYTYPE:ident) => {{
+    ($buffer:ident, $type:ident, $ARRAYTYPE:ident) => {{
         Arc::new($ARRAYTYPE::from(
             $buffer.iter().map(|v| v.into()).collect::<Vec<$type>>(),
         )) as ArrayRef
@@ -88,28 +85,29 @@ impl Buffer {
     pub fn flush_with_value(&self, value: Value) -> Result<()> {
         let mut buffer = self.buffer.clone();
         buffer.push(value);
-        let arr = match self.data_type {
-            DataType::Int64 => buffer_to_array_ref!(buffer, i64, Int64, Int64Array),
-            DataType::UInt64 => buffer_to_array_ref!(buffer, u64, UInt64, UInt64Array),
-            DataType::Float64 => buffer_to_array_ref!(buffer, f64, Float64, Float64Array),
-            _ => unimplemented!(),
-        };
-
-        let mut acc = self.acc.lock().unwrap();
-        Ok(acc.update_batch(&[arr])?)
+        self._flush(&buffer)
     }
 
     pub fn flush(&self) -> Result<()> {
         if self.buffer.is_empty() {
             return Ok(());
         }
+        self._flush(&self.buffer)
+    }
 
-        let buf = &self.buffer;
+    fn _flush(&self, buffer: &Vec<Value>) -> Result<()> {
         let arr = match self.data_type {
-            DataType::Int64 => buffer_to_array_ref!(buf, i64, Int64, Int64Array),
-            DataType::UInt64 => buffer_to_array_ref!(buf, u64, UInt64, UInt64Array),
-            DataType::Float64 => buffer_to_array_ref!(buf, f64, Float64, Float64Array),
-            _ => unimplemented!(),
+            DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => buffer_to_array_ref!(buffer, i64, Int64Array),
+            DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => buffer_to_array_ref!(buffer, u64, UInt64Array),
+            DataType::Float32 | DataType::Float64 => buffer_to_array_ref!(buffer, f64, Float64Array),
+            DataType::Decimal(precision, scale) => {
+                let mut builder = DecimalBuilder::new(buffer.len(), precision, scale);
+                for v in buffer.iter() {
+                    builder.append_value(v.into());
+                }
+                Arc::new(builder.finish()) as ArrayRef
+            }
+            _ => unimplemented!("{:?}", self.data_type),
         };
 
         let mut acc = self.acc.lock().unwrap();
@@ -158,18 +156,8 @@ pub enum Value {
     Int64(i64),
     UInt64(u64),
     Float64(f64),
+    Decimal(i128),
     Null,
-}
-
-impl Value {
-    pub fn get_datatype(&self) -> DataType {
-        match self {
-            Value::Int64(_) => DataType::Int64,
-            Value::UInt64(_) => DataType::UInt64,
-            Value::Float64(_) => DataType::Float64,
-            _ => unreachable!(),
-        }
-    }
 }
 
 impl From<Value> for i64 {
@@ -185,6 +173,24 @@ impl From<&Value> for i64 {
     fn from(v: &Value) -> Self {
         match v {
             Value::Int64(v) => *v,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<Value> for i128 {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::Decimal(v) => v,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<&Value> for i128 {
+    fn from(v: &Value) -> Self {
+        match v {
+            Value::Decimal(v) => *v,
             _ => unreachable!(),
         }
     }
@@ -231,8 +237,6 @@ impl From<u64> for Value {
         Value::UInt64(v)
     }
 }
-
-const MAX_BUFFER_SIZE: usize = 1000;
 
 // partitioned aggregate is used as a accumulator factory from closure
 pub struct PartitionedAggregate {
@@ -305,14 +309,15 @@ impl PartitionedAggregateAccumulator {
         agg_return_type: &DataType,
         outer_agg: &AggregateFunction,
     ) -> Result<Self> {
-        let expr = Arc::new(Literal::new(ScalarValue::from(true)));
-        let outer_acc: Box<dyn Accumulator> = Box::new(match outer_agg {
-            AggregateFunction::Avg => Ok(AvgAccumulator::try_new(agg_return_type)?),
+        let outer_acc = match outer_agg {
+            AggregateFunction::Avg => Ok(Box::new(AvgAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>),
+            AggregateFunction::Min => Ok(Box::new(MinAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>),
+            AggregateFunction::Max => Ok(Box::new(MaxAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>),
             _ => Err(Error::Internal(format!(
                 "{:?} doesn't supported",
                 outer_agg
             ))),
-        }?);
+        }?;
 
         Ok(Self {
             last_partition_value: ScalarValue::try_from(partition_type)?,
@@ -322,7 +327,7 @@ impl PartitionedAggregateAccumulator {
     }
 }
 
-macro_rules! update_batch {
+macro_rules! make_spans {
     ($self:ident, $values:expr,$type:ident, $scalar_type:ident, $ARRAYTYPE:ident) => {{
         let mut spans = Vec::with_capacity($values[0].len());
 
@@ -370,14 +375,14 @@ impl Accumulator for PartitionedAggregateAccumulator {
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
         match values[0].data_type() {
-            DataType::Int8 => update_batch!(self, values, i8, Int8, Int8Array),
-            DataType::Int16 => update_batch!(self, values, i16, Int16, Int16Array),
-            DataType::Int32 => update_batch!(self, values, i32, Int32, Int32Array),
-            DataType::Int64 => update_batch!(self, values, i64, Int64, Int64Array),
-            DataType::UInt8 => update_batch!(self, values, u8, UInt8, UInt8Array),
-            DataType::UInt16 => update_batch!(self, values, u16, UInt16, UInt16Array),
-            DataType::UInt32 => update_batch!(self, values, u32, UInt32, UInt32Array),
-            DataType::UInt64 => update_batch!(self, values, u64, UInt64, UInt64Array),
+            DataType::Int8 => make_spans!(self, values, i8, Int8, Int8Array),
+            DataType::Int16 => make_spans!(self, values, i16, Int16, Int16Array),
+            DataType::Int32 => make_spans!(self, values, i32, Int32, Int32Array),
+            DataType::Int64 => make_spans!(self, values, i64, Int64, Int64Array),
+            DataType::UInt8 => make_spans!(self, values, u8, UInt8, UInt8Array),
+            DataType::UInt16 => make_spans!(self, values, u16, UInt16, UInt16Array),
+            DataType::UInt32 => make_spans!(self, values, u32, UInt32, UInt32Array),
+            DataType::UInt64 => make_spans!(self, values, u64, UInt64, UInt64Array),
             _ => unimplemented!(),
         };
         Ok(())

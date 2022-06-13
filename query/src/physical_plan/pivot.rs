@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
+use std::fmt;
 use ahash::RandomState;
 use std::pin::Pin;
 use futures::{Stream, StreamExt};
@@ -11,14 +12,16 @@ use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use fnv::FnvHashMap;
 use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream, Statistics};
+use datafusion::physical_plan::{DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream, Statistics};
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::hash_utils::create_hashes;
 use datafusion_common::ScalarValue;
 use crate::{Result, Error};
 use arrow::error::{ArrowError, Result as ArrowResult};
+use arrow::util::pretty::pretty_format_batches;
 use datafusion::error::Result as DFResult;
 use axum::{async_trait};
+use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 
 #[derive(Debug)]
 pub struct PivotExec {
@@ -32,6 +35,7 @@ pub struct PivotExec {
     value_type: DataType,
     group_cols: Vec<Column>,
     result_cols: Vec<String>,
+    metrics: ExecutionPlanMetricsSet,
 }
 
 const BUFFER_LENGTH: usize = 1024;
@@ -64,6 +68,7 @@ impl PivotExec {
             value_type,
             group_cols,
             result_cols,
+            metrics: ExecutionPlanMetricsSet::new(),
         })
     }
 }
@@ -118,7 +123,16 @@ impl ExecutionPlan for PivotExec {
             unique_groups: Vec::with_capacity(BUFFER_LENGTH),
             result_map,
             finished: false,
+            baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
         }))
+    }
+
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "PivotExec")
+    }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
     }
 
     fn statistics(&self) -> Statistics {
@@ -138,6 +152,31 @@ struct PivotStream {
     unique_groups: Vec<(u64, Vec<ScalarValue>)>,
     result_map: FnvHashMap<String, Vec<ScalarValue>>,
     finished: bool,
+    baseline_metrics: BaselineMetrics,
+}
+
+impl PivotStream {
+    fn poll_next_inner(self: &mut Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<ArrowResult<RecordBatch>>> {
+        let elapsed_compute = self.baseline_metrics.elapsed_compute().clone();
+        let _timer = elapsed_compute.timer();
+
+        loop {
+            match self.stream.poll_next_unpin(cx) {
+                Poll::Ready(Some(Ok(batch))) => self.pivot_batch(&batch)?,
+                Poll::Ready(None) => {
+                    self.finished = true;
+
+                    // nothing was actually processed
+                    if self.unique_groups.len() == 0 {
+                        return Poll::Ready(None);
+                    }
+
+                    return Poll::Ready(Some(self.finish()));
+                }
+                other => return other,
+            }
+        }
+    }
 }
 
 impl RecordBatchStream for PivotStream {
@@ -148,7 +187,7 @@ impl RecordBatchStream for PivotStream {
 
 
 impl PivotStream {
-    fn pivot_batch(&mut self, batch: &RecordBatch) -> Result<()> {
+    fn pivot_batch(&mut self, batch: &RecordBatch) -> ArrowResult<()> {
         let random_state = RandomState::with_seeds(0, 0, 0, 0);
         let mut batch_hashes = vec![0; batch.num_rows()];
 
@@ -177,7 +216,7 @@ impl PivotStream {
             let col_name = name_arr.value(row);
 
             match self.result_map.get_mut(col_name) {
-                None => return Err(Error::QueryError("unknown name column".to_string())),
+                None => return Err(Error::QueryError("unknown name column".to_string()).into()),
                 Some(values) => {
                     if values.len() - 1 < group_idx {
                         values.resize(values.len() + BUFFER_LENGTH, ScalarValue::try_from(&self.value_type)?);
@@ -193,6 +232,39 @@ impl PivotStream {
 
         Ok(())
     }
+
+    fn finish(&mut self) -> ArrowResult<RecordBatch> {
+        let group_arrs: Vec<ArrayRef> = self.group_cols
+            .iter()
+            .enumerate()
+            .map(|(idx, _)| {
+                let scalars: Vec<ScalarValue> = self.unique_groups
+                    .iter()
+                    .map(|(_, values)| values[idx].to_owned())
+                    .collect();
+                ScalarValue::iter_to_array(scalars)
+            }).collect::<DFResult<_>>()?;
+
+        let result_arrs: Vec<ArrayRef> = self.result_cols
+            .iter()
+            .map(|col| {
+                let unique_groups_len = self.unique_groups.len();
+                let value_type = self.value_type.clone();
+                let scalars = self.result_map.get_mut(col).unwrap();
+                if scalars.len() != unique_groups_len {
+                    scalars.resize(unique_groups_len, ScalarValue::try_from(&value_type).unwrap());
+                }
+
+                ScalarValue::iter_to_array(scalars.clone())
+            }).collect::<DFResult<_>>()?;
+
+        let result_batch = RecordBatch::try_new(
+            self.schema.clone(),
+            [group_arrs, result_arrs].concat(),
+        )?;
+
+        Ok(result_batch)
+    }
 }
 
 #[async_trait]
@@ -204,44 +276,8 @@ impl Stream for PivotStream {
             return Poll::Ready(None);
         }
 
-        loop {
-            match self.stream.poll_next_unpin(cx) {
-                Poll::Ready(Some(Ok(batch))) => {
-                    match self.pivot_batch(&batch) {
-                        Ok(_) => {}
-                        Err(err) => return Poll::Ready(Some(Err(ArrowError::ExternalError(Box::new(err)))))
-                    }
-                }
-                Poll::Ready(None) => {
-                    self.finished = true;
-
-                    let group_arrs: Vec<ArrayRef> = self.group_cols.iter().enumerate().map(|(idx, _)| {
-                        let scalars: Vec<ScalarValue> = self.unique_groups.iter().map(|(_, values)| values[idx].clone()).collect();
-                        ScalarValue::iter_to_array(scalars).unwrap()
-                    }).collect();
-
-                    let result_arrs: Vec<ArrayRef> = self.result_cols.clone().iter().map(|col| {
-                        let unique_groups_len = self.unique_groups.len();
-                        let value_type = self.value_type.clone();
-                        let scalars = self.result_map.get_mut(col).unwrap();
-                        if scalars.len() != unique_groups_len {
-                            scalars.resize(unique_groups_len, ScalarValue::try_from(&value_type).unwrap());
-                        }
-
-                        // TODO remove clone
-                        ScalarValue::iter_to_array(scalars.clone()).unwrap()
-                    }).collect();
-
-                    let result_batch = RecordBatch::try_new(
-                        self.schema.clone(),
-                        [group_arrs, result_arrs].concat(),
-                    );
-
-                    return Poll::Ready(Some(result_batch));
-                }
-                other => return other,
-            }
-        }
+        let poll = self.poll_next_inner(cx);
+        self.baseline_metrics.record_poll(poll)
     }
 }
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use query::QueryProvider;
 use crate::event_segmentation::types::EventSegmentation;
 use crate::Context;
-use crate::event_segmentation::result::Series;
+use crate::event_segmentation::result::DataTable;
 use crate::Result;
 
 pub struct Provider {
@@ -14,9 +14,9 @@ impl Provider {
         Self { query }
     }
 
-    pub async fn event_segmentation(&self, ctx: Context, req: EventSegmentation) -> Result<Series> {
+    pub async fn event_segmentation(&self, ctx: Context, project_id: u64, req: EventSegmentation) -> Result<DataTable> {
         let lreq = req.try_into()?;
-        let result = self.query.event_segmentation(ctx.into(),lreq).await?;
+        let result = self.query.event_segmentation(ctx.into_query_context(project_id), lreq).await?;
         Ok(result.try_into()?)
     }
 }

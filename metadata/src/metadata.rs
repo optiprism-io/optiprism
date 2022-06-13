@@ -1,5 +1,5 @@
 use crate::store::store::make_data_key;
-use crate::{accounts, database, events, organizations, projects, properties, Result, Store};
+use crate::{accounts, database, dictionaries, events, organizations, projects, properties, Result, Store};
 use bincode::deserialize;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -22,8 +22,8 @@ pub async fn list<'a, T>(
     project_id: u64,
     ns: &[u8],
 ) -> Result<ListResponse<T>>
-where
-    T: DeserializeOwned,
+    where
+        T: DeserializeOwned,
 {
     let prefix = make_data_key(organization_id, project_id, ns);
 
@@ -54,6 +54,7 @@ pub struct Metadata {
     pub projects: Arc<projects::Provider>,
     pub accounts: Arc<accounts::Provider>,
     pub database: Arc<database::Provider>,
+    pub dictionaries: Arc<dictionaries::Provider>,
 }
 
 impl Metadata {
@@ -66,6 +67,7 @@ impl Metadata {
             projects: Arc::new(projects::Provider::new(store.clone())),
             accounts: Arc::new(accounts::Provider::new(store.clone())),
             database: Arc::new(database::Provider::new(store.clone())),
+            dictionaries:Arc::new(dictionaries::Provider::new(store.clone()))
         })
     }
 }

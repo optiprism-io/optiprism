@@ -39,8 +39,19 @@ pub fn multi_and(exprs: Vec<Expr>) -> Expr {
     expr
 }
 
-pub fn lit_timestamp(ts: i64) -> Expr {
-    lit(ScalarValue::TimestampMicrosecond(Some(ts), None))
+pub fn lit_timestamp(data_type: DataType, date_time: &DateTime<Utc>) -> Result<Expr> {
+    Ok(lit(match data_type {
+        DataType::Timestamp(arrow::datatypes::TimeUnit::Second, tz) => {
+            ScalarValue::TimestampSecond(Some(date_time.timestamp()), tz)
+        }
+        DataType::Timestamp(arrow::datatypes::TimeUnit::Millisecond, tz) => {
+            ScalarValue::TimestampMillisecond(Some(date_time.timestamp_millis()), tz)
+        }
+        DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, tz) => {
+            ScalarValue::TimestampMicrosecond(Some(date_time.timestamp_nanos() / 1000), tz)
+        }
+        _ => return Err(Error::QueryError("unsupported data type".to_owned()))
+    }))
 }
 
 pub fn sorted_distinct_count(input_schema: &DFSchema, col: Expr) -> Result<Expr> {
@@ -76,7 +87,7 @@ pub fn aggregate_partitioned(
     // make partitioned aggregate factory
     let pagg = PartitionedAggregate::try_new(
         partition_by.get_type(input_schema)?,
-        rtype.clone(),
+        args[0].get_type(input_schema)?,
         fun,
         rtype.clone(),
         outer_fun,
@@ -87,6 +98,7 @@ pub fn aggregate_partitioned(
         pagg.create_accumulator()
             .map_err(Error::into_datafusion_plan_error)
     });
+
     let return_type_fn: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(rtype.clone())));
     let state_type_fn: StateTypeFunction = Arc::new(move |_| Ok(Arc::new(state_types.clone())));
 

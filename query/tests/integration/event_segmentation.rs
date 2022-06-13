@@ -42,7 +42,7 @@ mod tests {
     use datafusion::scalar::ScalarValue as DFScalarValue;
     use datafusion_common::ScalarValue;
     use query::physical_plan::unpivot::unpivot;
-    use query::reports::event_segmentation::builder::LogicalPlanBuilder;
+    use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
     use query::reports::event_segmentation::types::{Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, NamedQuery, Query};
 
     pub async fn events_provider(
@@ -81,7 +81,7 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable),
+                Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable, prop.dictionary_type.clone()),
             )
             .await?;
 
@@ -99,7 +99,7 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(event_fields::USER_ID.to_string(), DFDataType::UInt64, false),
+                Column::new(event_fields::USER_ID.to_string(), DFDataType::UInt64, false, None),
             )
             .await?;
         md.database
@@ -109,18 +109,20 @@ mod tests {
                     event_fields::CREATED_AT.to_string(),
                     DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
                     false,
+                    None,
                 ),
             )
             .await?;
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(event_fields::EVENT.to_string(), DFDataType::UInt16, false),
+                Column::new(event_fields::EVENT.to_string(), DFDataType::UInt16, false, None),
             )
             .await?;
 
         // create user props
-        create_property(
+
+        let country_prop = create_property(
             &md,
             Namespace::User,
             org_id,
@@ -138,11 +140,13 @@ mod tests {
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
-                dictionary_type: None,
+                dictionary_type: Some(DFDataType::UInt8),
             },
         )
             .await?;
 
+        md.dictionaries.get_key_or_create(org_id, proj_id, country_prop.column_name(Namespace::User).as_str(), "spain").await?;
+        md.dictionaries.get_key_or_create(org_id, proj_id, country_prop.column_name(Namespace::User).as_str(), "german").await?;
         create_property(
             &md,
             Namespace::User,
@@ -431,30 +435,38 @@ mod tests {
 
     #[tokio::test]
     async fn test_query() -> Result<()> {
-        let from = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
+        let from = DateTime::parse_from_rfc3339("2020-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
         let to = DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
         let es = EventSegmentation {
-            time: QueryTime::Between {
+            /*time: QueryTime::Between {
                 from,
                 to,
-            },
+            },*/
+            time:QueryTime::Last { last: 30, unit: TimeUnit::Day },
             group: event_fields::USER_ID.to_string(),
-            interval_unit: TimeUnit::Minute,
+            interval_unit: TimeUnit::Week,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
             events: vec![
                 Event::new(
                     EventRef::Regular("View Product".to_string()),
-                    Some(vec![EventFilter::Property {
-                        property: PropertyRef::User("Is Premium".to_string()),
-                        operation: PropValueOperation::Eq,
-                        value: Some(vec![ScalarValue::Boolean(Some(true))]),
-                    }]),
+                    Some(vec![
+                        EventFilter::Property {
+                            property: PropertyRef::User("Is Premium".to_string()),
+                            operation: PropValueOperation::Eq,
+                            value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                        },
+                        EventFilter::Property {
+                            property: PropertyRef::User("Country".to_string()),
+                            operation: PropValueOperation::Eq,
+                            value: Some(vec![ScalarValue::Utf8(Some("spain".to_string())), ScalarValue::Utf8(Some("german".to_string()))]),
+                        },
+                    ]),
                     Some(vec![Breakdown::Property(PropertyRef::User(
                         "Device".to_string(),
                     ))]),
@@ -517,7 +529,9 @@ mod tests {
 
         create_entities(md.clone(), org_id, proj_id).await?;
         let input = events_provider(md.database.clone(), org_id, proj_id).await?;
-        let cur_time = Utc::now();
+        let cur_time = DateTime::parse_from_rfc3339("2020-09-08T13:42:00.000000+00:00")
+            .unwrap()
+            .with_timezone(&Utc);
         let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
 
         let config =

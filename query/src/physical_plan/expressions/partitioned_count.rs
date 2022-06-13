@@ -18,6 +18,7 @@ use datafusion::physical_plan::aggregates::return_type;
 use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, Min, Sum};
 use datafusion::physical_plan::{expressions, Accumulator, AggregateExpr, PhysicalExpr};
 use datafusion::scalar::ScalarValue;
+use crate::DEFAULT_BATCH_SIZE;
 
 #[derive(Debug)]
 pub struct PartitionedCountAccumulator {
@@ -25,13 +26,11 @@ pub struct PartitionedCountAccumulator {
     buffer: Buffer,
 }
 
-const CAP: usize = 1000;
-
 impl PartitionedCountAccumulator {
     pub fn try_new(outer_acc: Box<dyn Accumulator>) -> Result<Self> {
         Ok(Self {
             count: 0,
-            buffer: Buffer::new(CAP, DataType::UInt64, outer_acc),
+            buffer: Buffer::new(DEFAULT_BATCH_SIZE, DataType::UInt64, outer_acc),
         })
     }
 }

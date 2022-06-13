@@ -1,37 +1,46 @@
-use arrow::record_batch::RecordBatch;
-use datafusion_common::ScalarValue;
-use crate::Result;
+use arrow::array::ArrayRef;
+use arrow::datatypes::{DataType, SchemaRef};
 
-pub struct Series {
-    pub dimension_headers: Vec<String>,
-    pub metric_headers: Vec<String>,
-    pub dimensions: Vec<Vec<ScalarValue>>,
-    pub series: Vec<Vec<ScalarValue>>,
+pub struct Column {
+    pub name: String,
+    pub group: String,
+    pub is_nullable: bool,
+    pub data_type: DataType,
+    pub data: ArrayRef,
 }
 
-impl Series {
-    pub fn try_from_batch_record(batch: &RecordBatch, dimension_headers: Vec<String>, metric_headers: Vec<String>) -> Result<Self> {
-        let mut dimensions: Vec<Vec<ScalarValue>> = vec![vec![]; dimension_headers.len()];
-        for (col_idx, header) in dimension_headers.iter().enumerate() {
-            let arr = batch.column(batch.schema().index_of(header)?);
-            for idx in 0..arr.len() {
-                dimensions[col_idx].push(ScalarValue::try_from_array(arr, idx)?);
-            }
-        }
+impl Column {
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
 
-        let mut series: Vec<Vec<ScalarValue>> = vec![vec![]; metric_headers.len()];
-        for (col_idx, header) in metric_headers.iter().enumerate() {
-            let arr = batch.column(batch.schema().index_of(header)?);
-            for idx in 0..arr.len() {
-                series[col_idx].push(ScalarValue::try_from_array(arr, idx)?);
-            }
-        }
+    pub fn group(&self) -> &str {
+        self.group.as_str()
+    }
 
-        Ok(Series {
-            dimension_headers,
-            metric_headers,
-            dimensions,
-            series,
-        })
+    pub fn is_nullable(&self) -> bool {
+        self.is_nullable
+    }
+
+    pub fn data_type(&self) -> &DataType {
+        &self.data_type
+    }
+
+    pub fn data(&self) -> &ArrayRef {
+        &self.data
+    }
+}
+
+pub struct DataTable {
+    pub schema: SchemaRef,
+    pub columns: Vec<Column>,
+}
+
+impl DataTable {
+    pub fn new(schema: SchemaRef, columns: Vec<Column>) -> Self {
+        Self {
+            schema,
+            columns,
+        }
     }
 }

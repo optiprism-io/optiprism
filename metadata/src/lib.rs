@@ -7,6 +7,7 @@ pub mod organizations;
 pub mod projects;
 pub mod properties;
 pub mod store;
+pub mod dictionaries;
 
 pub use crate::metadata::Metadata;
 pub use error::{Error, Result};

@@ -16,7 +16,6 @@ use std::collections::HashMap;
 pub struct Context {
     pub organization_id: u64,
     pub account_id: u64,
-    pub project_id: u64,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
 }
@@ -73,6 +72,14 @@ impl Context {
 
         return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));*/
     }
+
+    pub fn into_query_context(self, project_id: u64) -> query::Context {
+        query::Context {
+            organization_id: self.organization_id,
+            account_id: self.account_id,
+            project_id,
+        }
+    }
 }
 
 /*fn check_permissions(permissions: &[Permission], permission: &Permission) -> bool {
@@ -94,7 +101,12 @@ impl<B> FromRequest<B> for Context
     async fn from_request(
         request: &mut RequestParts<B>,
     ) -> core::result::Result<Self, Self::Rejection> {
-        let mut ctx = Context::default();
+        let mut ctx = Context {
+            organization_id: 1,
+            account_id: 0,
+            roles: None,
+            permissions: None,
+        };
         if let Ok(TypedHeader(Authorization(bearer))) =
         TypedHeader::<Authorization<Bearer>>::from_request(request).await
         {
@@ -108,11 +120,5 @@ impl<B> FromRequest<B> for Context
             }
         }
         Ok(ctx)
-    }
-}
-
-impl Into<query::Context> for Context {
-    fn into(self) -> query::Context {
-        query::Context::new(self.organization_id, self.account_id, self.project_id)
     }
 }
