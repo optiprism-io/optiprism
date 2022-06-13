@@ -18,6 +18,7 @@
         :event="editEventManagementPopup"
         :properties="eventProperties"
         :user-properties="userProperties"
+        @update-event="updateEvent"
         @apply="eventManagementPopupApply"
         @cancel="eventManagementPopupCancel"
     />
@@ -30,9 +31,11 @@ import { useCommonStore } from '@/stores/common'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import { Row, Action } from '@/components/uikit/UiTable/UiTable'
 import { Event } from '@/types/events'
+import schemaService from '@/api/services/schema.service'
+import { UpdateEventRequest } from '@/api'
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTableCells/UiTablePressedCell.vue'
 import EventManagementPopup from '@/components/events/EventManagementPopup.vue'
-
+import { ActionPayload } from '@/components/uikit/UiDescriptionList.vue'
 const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
 const commonStore = useCommonStore()
@@ -99,6 +102,22 @@ const eventManagementPopupApply = () => {
 
 const eventManagementPopupCancel = () => {
     commonStore.toggleEventManagementPopup(false)
+}
+
+const updateEvent = async (payload: ActionPayload) => {
+    const requestKeysMap = ['status', 'displayName', 'description', 'tags']
+
+    const requestData: UpdateEventRequest = {
+        [payload.key]: payload.value
+    }
+
+    if (requestKeysMap.includes(payload.key)) {
+        if (payload.key === 'status') {
+            requestData.status = payload.value ? 'enabled' : 'disabled'
+        }
+    }
+
+    await schemaService.updateEvent(String(commonStore.projectId), String(commonStore.editEventManagementPopupId), requestData)
 }
 </script>
 

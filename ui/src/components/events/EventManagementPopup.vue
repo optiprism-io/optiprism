@@ -16,6 +16,7 @@
                 v-if="activeTab === 'event'"
                 :items="eventItems"
                 :horizontal="true"
+                @on-input="onInputEventItem"
             />
             <UiTable
                 v-if="activeTab === 'properties'"
@@ -42,7 +43,7 @@ import { Property } from '@/api'
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
 import UiTabs from '@/components/uikit/UiTabs.vue'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
-import UiDescriptionList, { Item } from '@/components/uikit/UiDescriptionList.vue'
+import UiDescriptionList, { Item, ActionPayload } from '@/components/uikit/UiDescriptionList.vue'
 
 import propertiesColumnsConfig from '@/configs/events/propertiesTable.json'
 import eventValuesConfig, { Item as EventValuesConfig } from '@/configs/events/eventValues'
@@ -65,6 +66,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     (e: 'cancel'): void
     (e: 'apply'): void
+    (e: 'update-event', payload: ActionPayload): void
 }>()
 
 const activeTab = ref('event')
@@ -110,7 +112,8 @@ const eventItems = computed<Item[]>(() => {
             if (event[key]) {
                 const item: Item = {
                     label: i18n.$t(config.string),
-                    value: event[key],
+                    key,
+                    value: key === 'status' ? event[key] === 'enabled' : event[key],
                     component: config.component || 'p'
                 }
 
@@ -146,6 +149,10 @@ const apply = () => {
 
 const cancel = () => {
     emit('cancel')
+}
+
+const onInputEventItem = async (payload: ActionPayload) => {
+    emit('update-event', payload)
 }
 </script>
 

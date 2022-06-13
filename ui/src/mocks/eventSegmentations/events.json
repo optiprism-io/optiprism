@@ -39,7 +39,7 @@
         "name": "search",
         "displayName": "Search",
         "description": "Triggered when a search for an item is conducted from the search bar.",
-        "status": "enabled",
+        "status": "disabled",
         "event_properties": [
             8,
             9,

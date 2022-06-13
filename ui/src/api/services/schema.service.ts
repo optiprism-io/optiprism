@@ -1,7 +1,14 @@
 import { get } from '../apiClient'
 import { Value, OperationId } from '@/types'
 import { PropertyRef } from '@/types/events'
-import { EventsApi, CreateCustomEventRequest, PropertyType, CustomEventEvent, EventType } from '@/api'
+import {
+    EventsApi,
+    CreateCustomEventRequest,
+    PropertyType,
+    CustomEventEvent,
+    EventType,
+    UpdateEventRequest
+} from '@/api'
 
 const api = new EventsApi()
 
@@ -32,7 +39,7 @@ export interface CustomEvents extends Omit<CreateCustomEventRequest, 'events'> {
 
 const schemaService = {
     events: async () => await get('/schema/events', '', null),
-    // updateEvent: async(projectId: string, eventId: string, params: Events) => await api.updateEvent(projectId, eventId, params),
+    updateEvent: async(projectId: string, eventId: string, params: UpdateEventRequest) => await api.updateEvent(projectId, eventId, params),
 
     customEvents: async (projectId: string) => await api.customEventsList(projectId),
     createCustomEvent: async (projectId: string, params: CreateCustomEventRequest) => await api.createCustomEvent(projectId, params),

@@ -18,6 +18,7 @@
                 <component
                     :is="item.component"
                     :value="item.value"
+                    @input="onInput($event, item.key)"
                 >
                     {{ item.value }}
                 </component>
@@ -31,9 +32,14 @@ import { defineComponent } from 'vue'
 
 export type Item = {
     label: string
-    key?: string
-    value: string | string[]
+    key: string
+    value: string | string[] | boolean
     component?: ReturnType<typeof defineComponent> | 'p'
+}
+
+export type ActionPayload = {
+    key: string
+    value: string | string[] | boolean
 }
 
 type Props = {
@@ -44,17 +50,18 @@ type Props = {
 
 
 const emit = defineEmits<{
-    (e: 'onInput', payload: string): void
+    (e: 'onInput', payload: ActionPayload): void
 }>()
 
 const props = withDefaults(defineProps<Props>(), {
     compact: true
 })
 
-const onInput = (e: Event) => {
-    const target = e.target as HTMLInputElement
-
-    emit('onInput', target.value)
+const onInput = (payload: Event | string | boolean, key: string) => {
+    emit('onInput', {
+        key,
+        value: typeof payload === 'object' ? String(payload) : payload,
+    })
 }
 </script>
 
