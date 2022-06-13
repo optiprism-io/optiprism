@@ -31,6 +31,7 @@ pub enum Error {
     Internal2(InternalError),
     BadRequest(String),
     SerdeError(serde_json::Error),
+    DecimalError(rust_decimal::Error),
     CommonError(CommonError),
     MetadataError(MetadataError),
     QueryError(QueryError),
@@ -71,6 +72,12 @@ impl From<QueryError> for Error {
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
         Self::SerdeError(err)
+    }
+}
+
+impl From<rust_decimal::Error> for Error {
+    fn from(err: rust_decimal::Error) -> Self {
+        Self::DecimalError(err)
     }
 }
 

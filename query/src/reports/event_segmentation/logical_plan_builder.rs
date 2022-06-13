@@ -46,7 +46,7 @@ use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::reports::event_segmentation::types::{Breakdown, Event, EventFilter, EventSegmentation, Query};
 use crate::reports::expr::{property_col, property_expression, time_expression};
 
-const COL_NAME: &str = "name";
+pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
 const COL_EVENT: &str = "event";
 const COL_DATE: &str = "date";
@@ -65,6 +65,7 @@ macro_rules! breakdowns_to_dicts {
                 if $cols_hash.contains_key(prop) {
                     continue;
                 }
+                $cols_hash.insert(prop.to_owned(),());
 
                 match prop {
                     PropertyRef::User(name) => dictionary_prop_to_col!($self,user_properties,Namespace::User,name,$decode_cols),
@@ -173,7 +174,7 @@ impl LogicalPlanBuilder {
                 node: Arc::new(UnpivotNode::try_new(
                     input,
                     agg_cols,
-                    COL_NAME.to_string(),
+                    COL_AGG_NAME.to_string(),
                     COL_VALUE.to_string(),
                 )?),
             })

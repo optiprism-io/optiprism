@@ -15,11 +15,12 @@ use metadata::database::TableType;
 use metadata::Metadata;
 use crate::{Context};
 use crate::physical_plan::planner::QueryPlanner;
-use crate::reports::results::Series;
+use crate::reports::results::{DataTable};
 use crate::Result;
 use datafusion::datasource::object_store::local::LocalFileSystem;
 use datafusion::logical_plan::plan::Explain;
-use crate::reports::event_segmentation;
+use crate::reports::{event_segmentation, results};
+use crate::reports::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::reports::event_segmentation::types::EventSegmentation;
 
 pub struct Provider {
@@ -41,7 +42,7 @@ impl Provider {
 }
 
 impl Provider {
-    pub async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<Series> {
+    pub async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable> {
         let cur_time = Utc::now();
         let start = Instant::now();
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
@@ -72,16 +73,33 @@ impl Provider {
         let result = concat_batches(&schema, &batches, 0)?;
 
         let metric_cols = es.time_columns(cur_time);
-        let dimension_cols = plan
+        let cols = result
             .schema()
             .fields()
             .iter()
-            .filter_map(|f| match metric_cols.contains(f.name()) {
-                true => None,
-                false => Some(f.name().clone())
+            .enumerate()
+            .map(|(idx, field)| {
+                let group = match metric_cols.contains(field.name()) {
+                    true => "metric",
+                    false => {
+                        if field.name() == COL_AGG_NAME {
+                            "agg_name"
+                        } else {
+                            "dimension"
+                        }
+                    }
+                };
+
+                results::Column {
+                    name: field.name().to_owned(),
+                    group: group.to_string(),
+                    is_nullable: field.is_nullable(),
+                    data_type: field.data_type().to_owned(),
+                    data: result.column(idx).to_owned(),
+                }
             })
             .collect();
 
-        Ok(Series::try_from_batch_record(&result, dimension_cols, metric_cols)?)
+        Ok(DataTable::new(result.schema(), cols))
     }
 }

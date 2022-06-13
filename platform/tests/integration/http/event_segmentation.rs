@@ -48,7 +48,6 @@ mod tests {
     use serde_json::Value;
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use datafusion::scalar::{ScalarValue as DFScalarValue, ScalarValue};
-    use platform::event_segmentation::result::Series;
     use platform::event_segmentation::types::{Query, Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, EventType, PropertyType, PropValueOperation, QueryTime, TimeUnit, PartitionedAggregateFunction, AggregateFunction};
     use query::physical_plan::expressions;
     use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
@@ -71,7 +70,7 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable),
+                Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable, None),
             )
             .await?;
 
@@ -89,7 +88,7 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new("user_id".to_string(), DFDataType::UInt64, false),
+                Column::new("user_id".to_string(), DFDataType::UInt64, false, None),
             )
             .await?;
         md.database
@@ -99,13 +98,14 @@ mod tests {
                     "created_at".to_string(),
                     DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
                     false,
+                    None,
                 ),
             )
             .await?;
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new("event".to_string(), DFDataType::UInt16, false),
+                Column::new("event".to_string(), DFDataType::UInt16, false, None),
             )
             .await?;
 
@@ -274,7 +274,7 @@ mod tests {
             let store = Arc::new(Store::new(path));
             let md = Arc::new(Metadata::try_new(store).unwrap());
             create_entities(md.clone(), 0, 0).await.unwrap();
-            let query = QueryProvider::try_new(md).unwrap();
+            let query = -QueryProvider::try_new(md).unwrap();
             let es_provider = Arc::new(EventSegmentationProvider::new(Arc::new(query)));
             let app = event_segmentation::attach_routes(Router::new(), es_provider);
 

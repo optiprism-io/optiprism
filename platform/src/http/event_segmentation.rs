@@ -4,7 +4,7 @@ use axum::{AddExtensionLayer, Json, Router, routing};
 
 use crate::event_segmentation::types::EventSegmentation;
 use crate::{Context, EventSegmentationProvider};
-use crate::event_segmentation::result::Series;
+use crate::event_segmentation::result::DataTable;
 use crate::Result;
 
 async fn event_segmentation(
@@ -12,7 +12,7 @@ async fn event_segmentation(
     Extension(provider): Extension<Arc<EventSegmentationProvider>>,
     Path(project_id): Path<u64>,
     Json(request): Json<EventSegmentation>,
-) -> Result<Json<Series>> {
+) -> Result<Json<DataTable>> {
     Ok(Json(provider.event_segmentation(ctx, project_id, request).await?))
 }
 
