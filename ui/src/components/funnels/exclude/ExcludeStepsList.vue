@@ -95,7 +95,7 @@ import UiActionListItem from '@/components/uikit/UiActionList/UiActionListItem.v
 import {useEventName} from '@/helpers/useEventName';
 import Filter from '@/components/events/Filter.vue';
 import {OperationId, Value} from '@/types';
-import schemaService from '@/api/services/schema.service';
+import {useFilter} from '@/hooks/useFilter';
 
 const UiSelect = UiSelectGeneric();
 
@@ -103,6 +103,7 @@ const eventsStore = useEventsStore();
 const lexiconStore = useLexiconStore();
 const stepsStore = useStepsStore();
 const eventName = useEventName()
+const filterHelpers = useFilter()
 
 const { $t } = inject('i18n') as I18N;
 
@@ -180,27 +181,12 @@ const removeFilterForEvent = (index: number, filterIndex: number): void => {
 }
 
 const changeFilterPropertyForEvent = async (index: number, filterIndex: number, payload: PropertyRef): Promise<void> => {
-    const eventRef = stepsStore.excludedEvents[index].event;
-    let valuesList = [];
-
-    try {
-        const res = await schemaService.propertryValues({
-            event_name: lexiconStore.eventName(eventRef),
-            event_type: eventRef.type,
-            property_name: lexiconStore.propertyName(payload),
-            property_type: payload.type
-        })
-        valuesList = res ?? [];
-    } catch (e) {
-        throw new Error('error getEventsValues')
-    }
-
     stepsStore.editFilterForEvent({
         index,
         filterIndex,
         filter: {
             propRef: payload,
-            valuesList
+            valuesList: await filterHelpers.getValues(payload)
         }
     })
 }

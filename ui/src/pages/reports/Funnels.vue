@@ -30,11 +30,11 @@
         </UiCardContainer>
 
         <UiCard :title="$t('funnels.userSegments')">
-            {{ $t('funnels.userSegments') }}
+            <Segments />
         </UiCard>
 
         <UiCard :title="$t('funnels.filters')">
-            {{ $t('funnels.filters') }}
+            <FilterGroupsList />
         </UiCard>
 
         <UiCard :title="$t('funnels.breakdowns')">
@@ -58,6 +58,9 @@ import HoldingConstantSelect from '@/components/funnels/holding/HoldingConstantS
 import ExcludeStepSelect from '@/components/funnels/exclude/ExcludeStepSelect.vue';
 import HoldingConstantList from '@/components/funnels/holding/HoldingConstantList.vue';
 import StepsList from '@/components/funnels/steps/StepsList.vue';
+import Filters from '@/components/events/Filters.vue';
+import FilterGroupsList from '@/components/funnels/filters/FilterGroupsList.vue';
+import Segments from '@/components/events/Segments/Segments.vue';
 
 const eventsStore = useEventsStore();
 
