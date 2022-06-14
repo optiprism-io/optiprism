@@ -18,6 +18,7 @@
                 <component
                     :is="item.component"
                     :value="item.value"
+                    :editable="item.editable"
                     @input="onInput($event, item.key)"
                 >
                     {{ item.value }}
@@ -34,6 +35,7 @@ export type Item = {
     label: string
     key: string
     value: string | string[] | boolean
+    editable?: boolean
     component?: ReturnType<typeof defineComponent> | 'p'
 }
 
@@ -60,7 +62,7 @@ const props = withDefaults(defineProps<Props>(), {
 const onInput = (payload: Event | string | boolean, key: string) => {
     emit('onInput', {
         key,
-        value: typeof payload === 'object' ? String(payload) : payload,
+        value: typeof payload === 'object' && !Array.isArray(payload) ? String(payload) : payload,
     })
 }
 </script>

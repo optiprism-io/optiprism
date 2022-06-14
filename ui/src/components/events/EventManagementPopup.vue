@@ -124,7 +124,8 @@ const eventItems = computed<Item[]>(() => {
                 const item: Item = {
                     label: i18n.$t(config.string),
                     key,
-                    value: key === 'status' ? event[key] === 'enabled' : event[key],
+                    value: key === 'status' ? event[key] === 'enabled' : editEvent[key] || event[key],
+                    editable: Boolean(config.editable),
                     component: config.component || 'p'
                 }
 

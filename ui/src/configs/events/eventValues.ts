@@ -1,4 +1,6 @@
-import UiCellTags from '@/components/uikit/cells/UiCellTegs.vue'
+import { defineComponent } from 'vue'
+
+import UiTags from '@/components/uikit/UiTags.vue'
 import UiInput from '@/components/uikit/UiInput.vue'
 import UiSwitch from '@/components/uikit/UiSwitch.vue'
 import UiTextarea from '@/components/uikit/UiTextarea.vue'
@@ -7,14 +9,16 @@ export type Item = {
     key: string,
     type: 'label' | 'text' | 'input' | 'select'
     string: string
-    component?: 'UiCellTags'
+    editable?: boolean
+    component?: ReturnType<typeof defineComponent>
 }
 
 export default {
     'tags': {
         'key': 'tags',
         'string': 'events.event_management.popup.event_columns.tags',
-        'component': UiCellTags
+        'component': UiTags,
+        'editable': true
     },
     'name': {
         'key': 'name',
