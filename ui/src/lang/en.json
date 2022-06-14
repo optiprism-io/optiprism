@@ -149,5 +149,12 @@
       "exact": "exact",
       "any": "any"
     }
+  },
+
+  "filters": {
+    "conditions": {
+      "and": "Any",
+      "or": "All"
+    }
   }
 }

@@ -36,11 +36,13 @@ type EditFilterForGroupPayload = {
 }
 
 interface FilterGroupsStore {
+    condition: FilterCondition;
     filterGroups: FilterGroup[];
 }
 
 export const useFilterGroupsStore = defineStore('filter-groups', {
     state: (): FilterGroupsStore => ({
+        condition: 'and',
         filterGroups: [
             {
                 condition: 'and',
@@ -49,6 +51,9 @@ export const useFilterGroupsStore = defineStore('filter-groups', {
         ]
     }),
     actions: {
+        setCondition(payload: FilterCondition): void {
+            this.condition = payload;
+        },
         addFilterGroup(): void {
             this.filterGroups.push({
                 condition: 'and',

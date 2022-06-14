@@ -9,7 +9,7 @@
                     <span class="pf-l-flex__item">match</span>
 
                     <UiSelectMatch
-                        :items="matchItems"
+                        :items="conditionsItems"
                         :show-search="false"
                         :value="filterGroup.condition"
                         @update:model-value="changeFilterGroupCondition"
@@ -18,7 +18,7 @@
                             class="pf-m-main pf-m-secondary pf-l-flex__item"
                             :is-link="true"
                         >
-                            {{ filterGroup.condition }}
+                            {{ $t(`filters.conditions.${filterGroup.condition}`) }}
                         </UiButton>
                     </UiSelectMatch>
 
@@ -78,7 +78,7 @@
 </template>
 
 <script lang="ts" setup>
-import {computed} from 'vue';
+import {computed, inject} from 'vue';
 import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
 import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
 import UiActionList from '@/components/uikit/UiActionList/UiActionList.vue';
@@ -90,6 +90,7 @@ import {useStepsStore} from '@/stores/funnels/steps';
 import {PropertyRef} from '@/types/events';
 import {useLexiconStore} from '@/stores/lexicon';
 import {useFilter} from '@/hooks/useFilter';
+import {I18N} from '@/plugins/i18n';
 
 const UiSelectMatch = UiSelectGeneric<FilterCondition>();
 
@@ -97,6 +98,7 @@ const lexiconStore = useLexiconStore();
 const filterGroupsStore = useFilterGroupsStore()
 const stepsStore = useStepsStore()
 const filterHelpers = useFilter()
+const { $t } = inject('i18n') as I18N
 
 const props = defineProps({
     index: {
@@ -117,7 +119,7 @@ const filterGroup = computed<FilterGroup | null>(() => {
     return filterGroupsStore.filterGroups[props.index] ?? null;
 });
 
-const matchItems = computed<UiSelectItemInterface<FilterCondition>[]>(() => {
+const conditionsItems = computed<UiSelectItemInterface<FilterCondition>[]>(() => {
     const conditions = (filterGroup.value?.filters.length ?? 0) > 1
         ? filterConditions
         : filterConditions.filter(item => item === 'and')
@@ -125,7 +127,7 @@ const matchItems = computed<UiSelectItemInterface<FilterCondition>[]>(() => {
     return conditions.map(item => ({
         __type: 'item',
         id: item,
-        label: item,
+        label: $t(`filters.conditions.${item}`),
         value: item,
     }));
 })
