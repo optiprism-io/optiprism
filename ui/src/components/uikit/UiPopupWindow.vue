@@ -43,12 +43,12 @@
                         {{ props.description }}
                     </div>
                 </header>
-                <div class="pf-c-modal-box__body">
+                <div class="pf-c-modal-box__body pf-u-mb-md pf-u-pb-md">
                     <slot />
                 </div>
                 <footer
                     v-if="props.applyButton || props.cancelButton"
-                    class="pf-c-modal-box__footer pf-u-mt-md"
+                    class="pf-c-modal-box__footer"
                 >
                     <div class="pf-c-action-list">
                         <div

@@ -2,6 +2,7 @@
   "common": {
     "apply": "Apply",
     "cancel": "Cancel",
+    "close": "Close",
     "select_period": "Select period",
     "select_aggregate": "Select aggregate",
     "add_filter": "Add Filter",

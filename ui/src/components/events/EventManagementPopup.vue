@@ -3,6 +3,9 @@
         :title="title"
         :apply-loading="props.loading"
         class="event-management-popup"
+        :apply-button="$t('common.apply')"
+        :cancel-button="$t('common.close')"
+        :apply-disabled="applyDisabled"
         @apply="apply"
         @cancel="cancel"
     >
@@ -47,6 +50,12 @@ import UiDescriptionList, { Item, ActionPayload } from '@/components/uikit/UiDes
 
 import propertiesColumnsConfig from '@/configs/events/propertiesTable.json'
 import eventValuesConfig, { Item as EventValuesConfig } from '@/configs/events/eventValues'
+
+export type EventObject = {
+    [key: string]: string | string[] | boolean
+}
+export type ApplyPayload = EventObject
+
 const mapTabs = ['event', 'properties', 'user_properties']
 
 const i18n = inject<any>('i18n')
@@ -65,11 +74,13 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
     (e: 'cancel'): void
-    (e: 'apply'): void
-    (e: 'update-event', payload: ActionPayload): void
+    (e: 'apply', payload: ApplyPayload): void
 }>()
 
 const activeTab = ref('event')
+
+const editEvent = ref<EventObject | null>(null)
+const applyDisabled = computed(() => !editEvent.value)
 
 const getTableRows = (properties: Property[] | UserProperty[]) => {
     return properties.map((prop: Property | UserProperty): Row => {
@@ -144,7 +155,10 @@ const onSelectTab = (payload: string) => {
 }
 
 const apply = () => {
-    emit('apply')
+    if (editEvent.value) {
+        emit('apply', editEvent.value)
+        editEvent.value = null
+    }
 }
 
 const cancel = () => {
@@ -152,7 +166,19 @@ const cancel = () => {
 }
 
 const onInputEventItem = async (payload: ActionPayload) => {
-    emit('update-event', payload)
+    let value = payload.value
+
+    if (payload.key === 'status') {
+        value = payload.value ? 'enabled' : 'disabled'
+    }
+
+    if (editEvent.value) {
+        editEvent.value[payload.key] = value
+    } else {
+        editEvent.value = {
+            [payload.key]: value
+        }
+    }
 }
 </script>
 
