@@ -1,5 +1,5 @@
-use super::CreateRequest;
-use crate::events::types::UpdateRequest;
+use super::CreateEventRequest;
+use crate::events::types::UpdateEventRequest;
 use crate::{Context, Result};
 use common::rbac::Permission;
 use metadata::events::{CreateEventRequest, Event, Provider as EventsProvider, UpdateEventRequest};
@@ -15,7 +15,7 @@ impl Provider {
         Self { prov }
     }
 
-    pub async fn create(&self, ctx: Context, organization_id: u64, project_id: u64, request: CreateRequest) -> Result<Event> {
+    pub async fn create(&self, ctx: Context, organization_id: u64, project_id: u64, request: CreateEventRequest) -> Result<Event> {
         ctx.check_permission(
             organization_id,
             project_id,
@@ -66,7 +66,7 @@ impl Provider {
         Ok(self.prov.list(organization_id, project_id).await?)
     }
 
-    pub async fn update(&self, ctx: Context, organization_id: u64, project_id: u64, event_id: u64, req: UpdateRequest) -> Result<Event> {
+    pub async fn update(&self, ctx: Context, organization_id: u64, project_id: u64, event_id: u64, req: UpdateEventRequest) -> Result<Event> {
         ctx.check_permission(organization_id, project_id, Permission::UpdateEvent)?;
         let mut md_req = UpdateEventRequest::default();
         md_req.updated_by = ctx.account_id;

@@ -1,5 +1,5 @@
 use crate::error::{Error, InternalError};
-use crate::events::{CreateRequest, Provider, UpdateRequest};
+use crate::events::{CreateEventRequest, Provider, UpdateEventRequest};
 use crate::{Context, events, EventsProvider, Result};
 use axum::extract::Path;
 use axum::http::StatusCode;
@@ -12,7 +12,7 @@ async fn create(
     ctx: Context,
     Extension(provider): Extension<Arc<EventsProvider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
-    Json(request): Json<CreateRequest>,
+    Json(request): Json<CreateEventRequest>,
 ) -> Result<Json<Event>> {
     Ok(Json(provider.create(ctx, organization_id, project_id, request).await?))
 }
@@ -48,7 +48,7 @@ async fn update(
     ctx: Context,
     Extension(provider): Extension<Arc<EventsProvider>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
-    Json(request): Json<UpdateRequest>,
+    Json(request): Json<UpdateEventRequest>,
 ) -> Result<Json<Event>> {
     Ok(Json(provider.update(ctx, organization_id, project_id, event_id, request).await?))
 }
@@ -88,23 +88,23 @@ async fn detach_property(
 pub fn attach_routes(router: Router, events: Arc<EventsProvider>) -> Router {
     router
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/events",
+            "/v1/organizations/:organization_id/projects/:project_id/schema/events",
             routing::post(create).get(list),
         )
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/events/:event_id",
+            "/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id",
             routing::get(get_by_id).delete(delete).put(update),
         )
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/events/name/:event_name",
+            "/v1/organizations/:organization_id/projects/:project_id/schema/events/name/:event_name",
             routing::get(get_by_name),
         )
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/events/:event_id/properties/:property_id",
+            "/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id/properties/:property_id",
             routing::post(attach_property),
         )
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/events/:event_id/properties/:property_id",
+            "/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id/properties/:property_id",
             routing::delete(detach_property),
         )
         .layer(AddExtensionLayer::new(events))

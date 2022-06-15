@@ -25,6 +25,13 @@ impl DataType {
     }
 }
 
+pub enum DictionaryDataType {
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ScalarValue {
     Number(Option<Decimal>),

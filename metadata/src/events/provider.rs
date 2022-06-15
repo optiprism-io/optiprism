@@ -177,13 +177,13 @@ impl Provider {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let Some(name) = &req.name {
+        if let Some(name) = req.name {
             idx_keys.push(index_name_key(organization_id, project_id, name.as_str()));
             idx_prev_keys.push(index_name_key(organization_id, project_id, prev_event.name.as_str()));
             event.name = name.to_owned();
         }
-        if let Some(display_name) = &req.display_name {
-            idx_keys.push(index_display_name_key(organization_id, project_id, display_name.to_owned()));
+        if let Some(display_name) = req.display_name {
+            idx_keys.push(index_display_name_key(organization_id, project_id, display_name.clone()));
             idx_prev_keys.push(index_display_name_key(organization_id, project_id, prev_event.display_name));
             event.display_name = display_name.to_owned();
         }
