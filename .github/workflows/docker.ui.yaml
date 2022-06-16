@@ -36,7 +36,6 @@ jobs:
           input: template.json
           output: deployment.json
 
-      - name: Deploy to k8s
       - uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBECONFIG }}
