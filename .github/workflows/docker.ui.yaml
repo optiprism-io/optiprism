@@ -41,5 +41,5 @@ jobs:
       - uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-      with:
-        args: apply -f cloud/kubernetes/ui/deployment.yaml
+        with:
+          args: apply -f cloud/kubernetes/ui/deployment.yaml
