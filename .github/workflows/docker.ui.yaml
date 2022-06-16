@@ -8,6 +8,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - run: docker context create mycontext
+      - run: docker context use mycontext
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -20,8 +22,9 @@ jobs:
         with:
           context: .
           file: docker/ui.dev.Dockerfile
-          tags: optiprism/ui:${{ github.head_ref }}
+          tags: eu.gcr.io/optiprism/ui:${{ github.head_ref }}
 
+      - run: docker images
       - name: Push
         uses: mattes/gce-docker-push-action@v1
         with:
