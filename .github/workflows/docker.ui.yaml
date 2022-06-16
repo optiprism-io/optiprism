@@ -12,8 +12,8 @@ on:
         required: true
         type: choice
         options:
-          - nikolai_kushner
-          - evgeniy_kozlov
+          - nikolai-kushner
+          - evgeniy-kozlov
 
 jobs:
   docker:
