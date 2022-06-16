@@ -1,0 +1,28 @@
+name: docker
+
+on: workflow_dispatch
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      -
+        name: Build
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: docker/ui.dev.Dockerfile
+          tags: optiprism/ui:${{ github.head_ref }}
+
+      - name: Push
+        uses: mattes/gce-docker-push-action@v1
+        with:
+          creds: ${{ secrets.GCP_CONTAINER_SERVICE_ACCOUNT }}
+          src: optiprism/ui:${{ github.head_ref }}
+          dst: eu.gcr.io/optiprism/ui:${{ github.head_ref }}
