@@ -37,13 +37,13 @@ jobs:
           output: deployment.json
 
       - name: Deploy to k8s
-        uses: actions-hub/kubectl@master
+      - uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBECONFIG }}
           IMAGE_REPO: eu.gcr.io/optiprism/ui
           IMAGE_TAG: test-github-runner
           SEAT: a
-        run: |
+      - run: |
           apk add gettext
           envsubst < cloud/kubernetes/ui/service.yaml | kubectl apply -f -
           envsubst < cloud/kubernetes/ui/ingress.yaml | kubectl apply -f -
