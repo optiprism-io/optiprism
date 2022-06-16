@@ -9,7 +9,7 @@
 #COPY ui/index.html .
 #COPY ui/public .
 #RUN yarn install
-RUN yarn build
+#RUN yarn build
 
 #webserver
 FROM nginx:stable-alpine
