@@ -30,7 +30,7 @@ jobs:
 
       - uses: actions-hub/kubectl@master
         env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIdG }}
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
           IMAGE_REPO: eu.gcr.io/optiprism/ui
           IMAGE_TAG: test-github-runner
           SEAT: a
