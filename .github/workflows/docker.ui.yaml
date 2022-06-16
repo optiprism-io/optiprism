@@ -12,33 +12,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v0'
-        with:
-          credentials_json: '${{ secrets.GCR_JSON_KEY }}'
-
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
-
-      - name: Authorize Docker push
-        run: gcloud auth configure-docker
-
-      - name: Build and Push Container
-        run: |-
-          docker build -f docker/ui.dev.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.head_ref }} .
-          docker push eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.head_ref }}
-
-      - uses: danielr1996/envsubst-action@1.0.0
-        env:
-          IMAGE_REPO: eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}
-          IMAGE_TAG: ${{ github.head_ref }}
-        with:
-          input: template.json
-          output: deployment.json
+#      - name: Authenticate to Google Cloud
+#        uses: google-github-actions/auth@v0
+#        with:
+#          credentials_json: ${{ secrets.GCR_JSON_KEY }}
+#
+#      - name: Set up Cloud SDK
+#        uses: google-github-actions/setup-gcloud@v0
+#
+#      - name: Authorize Docker push
+#        run: gcloud auth configure-docker
+#
+#      - name: Build and Push Container
+#        run: |-
+#          docker build -f docker/ui.dev.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.head_ref }} .
+#          docker push eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.head_ref }}
 
       - uses: actions-hub/kubectl@master
         env:
-          KUBE_CONFIG: ${{ secrets.KUBECONFIG }}
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
           IMAGE_REPO: eu.gcr.io/optiprism/ui
           IMAGE_TAG: test-github-runner
           SEAT: a
