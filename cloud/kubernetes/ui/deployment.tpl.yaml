@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui-$SEAT-deployment
+spec:
+  selector:
+    matchLabels:
+      app: ui-$SEAT
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ui-$SEAT
+    spec:
+      containers:
+        - name: ui
+          image: $IMAGE_REPO:$IMAGE_TAG
+          ports:
+            - containerPort: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ui-$SEAT-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: "ui-$SEAT.optiprism"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ui-$SEAT
+                port:
+                  number: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui-$SEAT
+spec:
+  selector:
+    app: ui-$SEAT
+  ports:
+    - protocol: TCP
+      port: 80
