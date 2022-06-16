@@ -22,6 +22,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v0
         with:
@@ -30,18 +35,18 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v0
 
-      - name: Authorize Docker push
+      - name: Authorize Docker
         run: gcloud auth configure-docker
 
       - name: Build and Push Container
         run: |-
-          docker build -f docker/ui.dev.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.head_ref }} .
-          docker push eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.head_ref }}
+          docker build -f docker/ui.dev.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ steps.extract_branch.outputs.branch }} .
+          docker push eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ steps.extract_branch.outputs.branch }}
 
       - uses: danielr1996/envsubst-action@1.0.0
         env:
           IMAGE_REPO: eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}
-          IMAGE_TAG: ${{ github.head_ref }}
+          IMAGE_TAG: ${{ steps.extract_branch.outputs.branch }}
           SEAT: ${{ github.event.inputs.seat }}
         with:
           input: cloud/kubernetes/ui/deployment.tpl.yaml
