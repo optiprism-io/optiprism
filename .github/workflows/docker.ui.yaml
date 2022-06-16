@@ -25,5 +25,26 @@ jobs:
 
       - name: Build and Push Container
         run: |-
-          docker build -f docker/ui.dev.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{  github.head_ref }} .
-          docker push eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{  github.head_ref }}
+          docker build -f docker/ui.dev.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.head_ref }} .
+          docker push eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.head_ref }}
+
+      - uses: danielr1996/envsubst-action@1.0.0
+        env:
+          IMAGE_REPO: eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}
+          IMAGE_TAG: ${{ github.head_ref }}
+        with:
+          input: template.json
+          output: deployment.json
+
+      - name: Deploy to k8s
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBECONFIG }}
+          IMAGE_REPO: eu.gcr.io/optiprism/ui
+          IMAGE_TAG: test-github-runner
+          SEAT: a
+        run: |
+          apk add gettext
+          envsubst < cloud/kubernetes/ui/service.yaml | kubectl apply -f -
+          envsubst < cloud/kubernetes/ui/ingress.yaml | kubectl apply -f -
+          envsubst < cloud/kubernetes/ui/deployment.yaml | kubectl apply -f -
