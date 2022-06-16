@@ -2,6 +2,7 @@ name: docker
 env:
   PROJECT_ID: optiprism
   SERVICE: ui
+  SEAT: a
 
 on: pull_request
 
@@ -28,14 +29,17 @@ jobs:
 #          docker build -f docker/ui.dev.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.head_ref }} .
 #          docker push eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.head_ref }}
 
+      - uses: danielr1996/envsubst-action@1.0.0
+        env:
+          IMAGE_REPO: eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}
+          IMAGE_TAG: ${{ github.head_ref }}
+          SEAT: a
+        with:
+          input: cloud/kubernetes/ui/deployment.tpl.yaml
+          output: cloud/kubernetes/ui/deployment.yaml
+
       - uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-          IMAGE_REPO: eu.gcr.io/optiprism/ui
-          IMAGE_TAG: test-github-runner
-          SEAT: a
-      - run: |
-          apk add gettext
-          envsubst < cloud/kubernetes/ui/service.yaml | kubectl apply -ns ui -f -
-          envsubst < cloud/kubernetes/ui/ingress.yaml | kubectl apply -ns ui -f -
-          envsubst < cloud/kubernetes/ui/deployment.yaml | kubectl apply -ns ui -f -
+      with:
+        args: apply -f cloud/kubernetes/ui/deployment.yaml
