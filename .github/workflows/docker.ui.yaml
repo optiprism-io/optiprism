@@ -9,8 +9,10 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - id: 'auth'
-        name: 'Authenticate to Google Cloud'
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: 'Authenticate to Google Cloud'
         uses: 'google-github-actions/auth@v0'
         with:
           credentials_json: '${{ secrets.GCR_JSON_KEY }}'
@@ -20,9 +22,6 @@ jobs:
 
       - name: Authorize Docker push
         run: gcloud auth configure-docker
-
-      - name: Checkout
-        uses: actions/checkout@v3
 
       - name: Build and Push Container
         run: |-
