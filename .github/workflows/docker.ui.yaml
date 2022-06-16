@@ -29,5 +29,5 @@ jobs:
         uses: mattes/gce-docker-push-action@v1
         with:
           creds: ${{ secrets.GCP_CONTAINER_SERVICE_ACCOUNT }}
-          src: optiprism/ui:${{ github.head_ref }}
+          src: eu.gcr.io/optiprism/ui:${{ github.head_ref }}
           dst: eu.gcr.io/optiprism/ui:${{ github.head_ref }}
