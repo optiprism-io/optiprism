@@ -30,12 +30,12 @@ jobs:
 
       - uses: actions-hub/kubectl@master
         env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIdG }}
           IMAGE_REPO: eu.gcr.io/optiprism/ui
           IMAGE_TAG: test-github-runner
           SEAT: a
       - run: |
           apk add gettext
-          envsubst < cloud/kubernetes/ui/service.yaml | kubectl apply -f -
-          envsubst < cloud/kubernetes/ui/ingress.yaml | kubectl apply -f -
-          envsubst < cloud/kubernetes/ui/deployment.yaml | kubectl apply -f -
+          envsubst < cloud/kubernetes/ui/service.yaml | kubectl apply -ns ui -f -
+          envsubst < cloud/kubernetes/ui/ingress.yaml | kubectl apply -ns ui -f -
+          envsubst < cloud/kubernetes/ui/deployment.yaml | kubectl apply -ns ui -f -
