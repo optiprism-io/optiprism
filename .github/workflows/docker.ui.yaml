@@ -3,8 +3,6 @@ name: docker
 env:
   PROJECT_ID: optiprism
   SERVICE: ui
-  SEAT: a
-
 
 on:
   workflow_dispatch:
@@ -44,7 +42,7 @@ jobs:
         env:
           IMAGE_REPO: eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}
           IMAGE_TAG: ${{ github.head_ref }}
-          SEAT: a
+          SEAT: ${{ github.event.inputs.seat }}
         with:
           input: cloud/kubernetes/ui/deployment.tpl.yaml
           output: cloud/kubernetes/ui/deployment.yaml
