@@ -11,7 +11,7 @@ COPY ui/public .
 RUN yarn install
 RUN yarn build
 RUN ls -al
-RUN ls -al app/dist
+RUN ls -al /app/dist
 
 #webserver
 FROM nginx:stable-alpine

@@ -1,4 +1,4 @@
-name: docker
+name: Build and Deploy UI
 
 env:
   PROJECT_ID: optiprism
