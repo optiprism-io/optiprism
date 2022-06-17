@@ -100,16 +100,16 @@ const updateEvent = async (payload: ApplyPayload) => {
     await schemaService.updateEvent(String(commonStore.projectId), String(commonStore.editEventManagementPopupId), payload)
 }
 
-const eventManagementPopupApply = async (payload: ApplyPayload) => {
-    eventManagementPopupLoading.value = true
-    await updateEvent(payload)
-    eventManagementPopupLoading.value = false
-}
-
 const eventManagementPopupCancel = () => {
     commonStore.toggleEventManagementPopup(false)
 }
 
+const eventManagementPopupApply = async (payload: ApplyPayload) => {
+    eventManagementPopupLoading.value = true
+    await updateEvent(payload)
+    eventManagementPopupLoading.value = false
+    eventManagementPopupCancel()
+}
 </script>
 
 <style scoped lang="scss">

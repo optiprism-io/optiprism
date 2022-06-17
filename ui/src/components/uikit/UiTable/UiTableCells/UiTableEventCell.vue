@@ -86,6 +86,9 @@ const onAction = (payload: Action) => {
 
 <style lang="scss">
 .ui-table-event-cell {
+    width: auto !important;
+    min-width: 380px !important;
+
     &__action-list {
         opacity: 0;
         cursor: pointer;

@@ -14,7 +14,7 @@ import { onMounted, ref } from 'vue'
 const emit = defineEmits(['input', 'blur']);
 
 interface Props {
-    value: string | string[] | number | undefined
+    value: string | number | undefined
     placeholder?: string
     mountFocus?: boolean
 }

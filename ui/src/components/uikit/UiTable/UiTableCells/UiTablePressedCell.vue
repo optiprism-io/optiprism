@@ -58,16 +58,6 @@ const onAction = (payload: Action) => {
 </script>
 
 <style lang="scss">
-.ui-table-event-cell {
-    width: auto !important;
-    min-width: 380px !important;
-
-    &__action-list {
-        opacity: 0;
-        cursor: pointer;
-    }
-}
-
 .pf-c-table {
     tr:hover {
         .ui-table-event-cell__action-list {

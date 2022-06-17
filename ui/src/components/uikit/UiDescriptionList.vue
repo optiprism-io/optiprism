@@ -18,7 +18,6 @@
                 <component
                     :is="item.component"
                     :value="item.value"
-                    :editable="item.editable"
                     @input="onInput($event, item.key)"
                 >
                     {{ item.value }}

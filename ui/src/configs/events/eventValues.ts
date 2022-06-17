@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
 
-import UiTags from '@/components/uikit/UiTags.vue'
+import UiInputTags from '@/components/uikit/UiInputTags.vue'
 import UiInput from '@/components/uikit/UiInput.vue'
 import UiSwitch from '@/components/uikit/UiSwitch.vue'
 import UiTextarea from '@/components/uikit/UiTextarea.vue'
@@ -17,8 +17,7 @@ export default {
     'tags': {
         'key': 'tags',
         'string': 'events.event_management.popup.event_columns.tags',
-        'component': UiTags,
-        'editable': true
+        'component': UiInputTags,
     },
     'name': {
         'key': 'name',
