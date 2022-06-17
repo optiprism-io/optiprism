@@ -15,6 +15,7 @@ spec:
       containers:
         - name: ui
           image: $IMAGE_REPO:$IMAGE_TAG
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
 
@@ -28,7 +29,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: "ui-$SEAT.optiprism"
+    - host: "$SEAT.dev.optiprism.io"
       http:
         paths:
           - path: /
