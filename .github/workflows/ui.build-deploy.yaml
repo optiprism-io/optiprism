@@ -41,7 +41,7 @@ jobs:
 
       - name: Build and Push Container
         run: |-
-          docker build -f docker/ui.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ steps.extract_branch.outputs.branch }} .
+          docker build -f docker/ui.dev.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ steps.extract_branch.outputs.branch }} .
           docker push eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ steps.extract_branch.outputs.branch }}
 
       - uses: danielr1996/envsubst-action@1.0.0
