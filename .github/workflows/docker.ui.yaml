@@ -3,6 +3,7 @@ name: docker
 env:
   PROJECT_ID: optiprism
   SERVICE: ui
+  DEV_HOST: dev.optiprism.io
 
 on:
   workflow_dispatch:
