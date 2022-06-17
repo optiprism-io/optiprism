@@ -38,7 +38,7 @@ spec:
               service:
                 name: ui-$SEAT
                 port:
-                  number: 3000
+                  number: 80
 ---
 apiVersion: v1
 kind: Service

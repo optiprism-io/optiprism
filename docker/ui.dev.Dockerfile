@@ -8,6 +8,7 @@ COPY ui/vite.config.ts .
 COPY ui/yarn.lock .
 COPY ui/index.html .
 COPY ui/public .
+ENV PORT 80
 RUN yarn install
-EXPOSE 3000
-CMD ["yarn", "run", "dev"]
+EXPOSE 80
+CMD ["yarn", "run", "dev","--host"]

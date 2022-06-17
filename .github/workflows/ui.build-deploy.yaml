@@ -15,6 +15,13 @@ on:
         options:
           - nikolai-kushner
           - evgeniy-kozlov
+      build:
+        description: 'Specify version to build. Prod for static files after build and dev for running node server'
+        required: true
+        type: choice
+        options:
+          - prod
+          - dev
 
 jobs:
   docker:
@@ -41,7 +48,7 @@ jobs:
 
       - name: Build and Push Container
         run: |-
-          docker build -f docker/ui.dev.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ steps.extract_branch.outputs.branch }} .
+          docker build -f docker/ui.${{ github.event.inputs.build }}.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ steps.extract_branch.outputs.branch }} .
           docker push eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ steps.extract_branch.outputs.branch }}
 
       - uses: danielr1996/envsubst-action@1.0.0
