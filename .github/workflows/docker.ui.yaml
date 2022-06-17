@@ -18,7 +18,6 @@ on:
 
 jobs:
   docker:
-    needs: quality-assurance
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
