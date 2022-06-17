@@ -8,10 +8,10 @@ COPY ui/vite.config.ts .
 COPY ui/yarn.lock .
 COPY ui/index.html .
 COPY ui/public .
-RUN ls -al
-RUN ls -al app/dist
 RUN yarn install
 RUN yarn build
+RUN ls -al
+RUN ls -al app/dist
 
 #webserver
 FROM nginx:stable-alpine
