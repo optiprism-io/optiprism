@@ -1,10 +1,9 @@
-name: Quality Assurance
+name: UI Quality Assurance
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    paths:
+      - 'ui/**'
 
 jobs:
   quality-assurance:

@@ -1,4 +1,4 @@
-name: Build and Deploy UI
+name: UI Build and Deploy
 
 env:
   PROJECT_ID: optiprism
