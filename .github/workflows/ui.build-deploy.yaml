@@ -16,7 +16,7 @@ on:
           - nikolai-kushner
           - evgeniy-kozlov
       build:
-        description: 'Specify version to build. Prod for static files after build and dev for running node server'
+        description: 'prod - static files, dev - node server'
         required: true
         type: choice
         options:
