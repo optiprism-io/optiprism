@@ -1,5 +1,5 @@
-use crate::properties::provider::Namespace;
 use arrow::datatypes::DataType;
+use crate::properties::provider::Namespace;
 use chrono::{DateTime, Utc};
 use convert_case::{Case, Casing};
 use serde::{Deserialize, Serialize};

@@ -1,10 +1,10 @@
-use super::CreateEventRequest;
 use crate::events::types::UpdateEventRequest;
 use crate::{Context, Result};
 use common::rbac::Permission;
-use metadata::events::{CreateEventRequest, Event, Provider as EventsProvider, UpdateEventRequest};
+use metadata::events::{Event, Provider as EventsProvider};
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
+use crate::events::CreateEventRequest;
 
 pub struct Provider {
     prov: Arc<EventsProvider>,
@@ -27,7 +27,7 @@ impl Provider {
             .create(
                 organization_id,
                 project_id,
-                CreateEventRequest {
+                metadata::events::CreateEventRequest {
                     created_by: ctx.account_id,
                     tags: request.tags,
                     name: request.name,
@@ -68,7 +68,7 @@ impl Provider {
 
     pub async fn update(&self, ctx: Context, organization_id: u64, project_id: u64, event_id: u64, req: UpdateEventRequest) -> Result<Event> {
         ctx.check_permission(organization_id, project_id, Permission::UpdateEvent)?;
-        let mut md_req = UpdateEventRequest::default();
+        let mut md_req = metadata::events::UpdateEventRequest::default();
         md_req.updated_by = ctx.account_id;
         md_req.tags.insert(req.tags);
         md_req.display_name.insert(req.display_name);

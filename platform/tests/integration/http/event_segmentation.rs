@@ -46,7 +46,8 @@ mod tests {
     use axum::http::StatusCode;
     use reqwest::Client;
     use serde_json::Value;
-    use datafusion::datasource::listing::{ListingTable, ListingTableConfig};
+    use datafusion::datasource::file_format::csv::CsvFormat;
+    use datafusion::datasource::listing::{ListingOptions, ListingTable, ListingTableConfig};
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use datafusion::scalar::{ScalarValue as DFScalarValue, ScalarValue};
     use platform::event_segmentation::types::{Query, Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, EventType, PropertyType, PropValueOperation, QueryTime, TimeUnit, PartitionedAggregateFunction, AggregateFunction};
@@ -96,7 +97,7 @@ mod tests {
             .add_column(
                 TableType::Events(org_id, proj_id),
                 Column::new(
-                    "created_at".to_string(),
+                    "event_created_at".to_string(),
                     DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
                     false,
                     None,
@@ -106,7 +107,7 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new("event".to_string(), DFDataType::UInt16, false, None),
+                Column::new("event_event".to_string(), DFDataType::UInt16, false, None),
             )
             .await?;
 
@@ -124,7 +125,7 @@ mod tests {
                 display_name: None,
                 typ: DFDataType::Utf8,
                 status: properties::Status::Enabled,
-                scope: properties::Scope::User,
+                is_system: false,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
@@ -146,7 +147,7 @@ mod tests {
                 display_name: None,
                 typ: DFDataType::Utf8,
                 status: properties::Status::Enabled,
-                scope: properties::Scope::User,
+                is_system: false,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
@@ -168,7 +169,7 @@ mod tests {
                 display_name: None,
                 typ: DFDataType::Boolean,
                 status: properties::Status::Enabled,
-                scope: properties::Scope::User,
+                is_system: false,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
@@ -228,11 +229,11 @@ mod tests {
                 display_name: None,
                 typ: DFDataType::Utf8,
                 status: properties::Status::Enabled,
-                scope: properties::Scope::User,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
                 dictionary_type: None,
+                is_system: false
             },
         )
             .await?;
@@ -250,7 +251,7 @@ mod tests {
                 display_name: None,
                 typ: DFDataType::Float64,
                 status: properties::Status::Enabled,
-                scope: properties::Scope::User,
+                is_system: false,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
@@ -269,9 +270,9 @@ mod tests {
             path.push(format!("{}.db", Uuid::new_v4()));
             let store = Arc::new(Store::new(path));
             let md = Arc::new(Metadata::try_new(store).unwrap());
-            create_entities(md.clone(), 0, 0).await.unwrap();
+            create_entities(md.clone(), 1, 1).await.unwrap();
 
-            let table = md.database.get_table(TableType::Events(0, 0)).await.unwrap();
+            let table = md.database.get_table(TableType::Events(1, 1)).await.unwrap();
             let schema = table.arrow_schema();
             let options = CsvReadOptions::new().schema(&schema);
             let path = "../tests/events.csv";
@@ -285,7 +286,8 @@ mod tests {
                 .await.unwrap()
                 .build().unwrap();
 
-            let config = ListingTableConfig::new(Arc::new(LocalFileSystem {}), path)
+            let opt = ListingOptions::new(Arc::new(CsvFormat::default()));
+            let config = ListingTableConfig::new(Arc::new(LocalFileSystem {}), path).with_listing_options(opt)
                 .with_schema(Arc::new(schema));
 
             let provider = ListingTable::try_new(config).unwrap();
@@ -381,7 +383,7 @@ mod tests {
         let body = serde_json::to_string(&es).unwrap();
 
         let resp = cl
-            .post("http://127.0.0.1:8080/v1/projects/0/queries/event-segmentation")
+            .post("http://127.0.0.1:8080/v1/organizations/1/projects/1/queries/event-segmentation")
             .body(body)
             .headers(headers.clone())
             .send()

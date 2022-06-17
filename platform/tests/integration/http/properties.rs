@@ -4,11 +4,11 @@ use axum::{AddExtensionLayer, Router, Server};
 use chrono::Utc;
 use metadata::metadata::ListResponse;
 use metadata::properties::Provider;
-use metadata::properties::{CreatePropertyRequest, Property, Scope, Status};
+use metadata::properties::{CreatePropertyRequest, Property, Status};
 use metadata::Store;
 use platform::error::Result;
 use platform::http::properties;
-use platform::properties::{Provider as PropertiesProvider, UpdatePropertyRequest, UpdateRequest};
+use platform::properties::{Provider as PropertiesProvider, UpdatePropertyRequest};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, StatusCode};
 use std::env::temp_dir;
@@ -26,7 +26,6 @@ fn assert(l: &Property, r: &Property) {
     assert_eq!(l.display_name, r.display_name);
     assert_eq!(l.description, r.description);
     assert_eq!(l.status, r.status);
-    assert_eq!(l.scope, r.scope);
     assert_eq!(l.typ, r.typ);
     assert_eq!(l.nullable, r.nullable);
     assert_eq!(l.is_array, r.is_dictionary);
@@ -82,7 +81,7 @@ async fn test_event_properties() -> Result<()> {
     // list without props should be empty
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/projects/1/event_properties")
+            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties")
             .headers(headers.clone())
             .send()
             .await
@@ -98,7 +97,7 @@ async fn test_event_properties() -> Result<()> {
     // get of unexisting event prop 1 should return 404 not found error
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/projects/1/event_properties/1")
+            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
             .headers(headers.clone())
             .send()
             .await
@@ -109,7 +108,7 @@ async fn test_event_properties() -> Result<()> {
     // delete of unexisting event prop 1 should return 404 not found error
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/projects/1/event_properties/1")
+            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
             .headers(headers.clone())
             .send()
             .await
@@ -134,7 +133,7 @@ async fn test_event_properties() -> Result<()> {
             is_system: false
         };
 
-        let resp = prov.create(0, 0, req).await?;
+        let resp = prov.create(1, 1, req).await?;
         assert_eq!(resp.id, 1);
     }
 
@@ -170,7 +169,7 @@ async fn test_event_properties() -> Result<()> {
     // get should return event prop
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/projects/1/event_properties/1")
+            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
             .headers(headers.clone())
             .send()
             .await
@@ -183,7 +182,7 @@ async fn test_event_properties() -> Result<()> {
     // list events should return list with one event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/projects/1/event_properties")
+            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties")
             .headers(headers.clone())
             .send()
             .await
@@ -198,7 +197,7 @@ async fn test_event_properties() -> Result<()> {
     // delete request should delete event
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/projects/1/event_properties/1")
+            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
             .headers(headers.clone())
             .send()
             .await
@@ -206,7 +205,7 @@ async fn test_event_properties() -> Result<()> {
         assert_eq!(resp.status(), StatusCode::OK);
 
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/projects/1/event_properties/1")
+            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
             .headers(headers.clone())
             .send()
             .await

@@ -3,9 +3,9 @@ use common::rbac::Permission;
 use metadata::metadata::ListResponse;
 use metadata::properties::provider::Namespace;
 use metadata::properties::provider::Provider as PropertiesProvider;
-use metadata::properties::{Property, UpdatePropertyRequest};
+use metadata::properties::{Property};
 use std::sync::Arc;
-use crate::properties::UpdateRequest;
+use crate::properties::{UpdatePropertyRequest};
 
 pub struct Provider {
     prov: Arc<PropertiesProvider>,
@@ -59,9 +59,9 @@ impl Provider {
         Ok(self.prov.list(organization_id, project_id).await?)
     }
 
-    pub async fn update(&self, ctx: Context, organization_id: u64, project_id: u64, property_id: u64, req: UpdateRequest) -> Result<Event> {
+    pub async fn update(&self, ctx: Context, organization_id: u64, project_id: u64, property_id: u64, req: UpdatePropertyRequest) -> Result<Property> {
         ctx.check_permission(organization_id, project_id, Permission::UpdateEvent)?;
-        let mut md_req = UpdatePropertyRequest::default();
+        let mut md_req = metadata::properties::UpdatePropertyRequest::default();
         md_req.updated_by = ctx.account_id;
         md_req.tags.insert(req.tags);
         md_req.display_name.insert(req.display_name);

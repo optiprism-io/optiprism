@@ -1,4 +1,4 @@
-use crate::properties::{Provider, UpdateRequest};
+use crate::properties::{Provider, UpdatePropertyRequest};
 use crate::{Context, properties, PropertiesProvider, Result};
 use axum::extract::Path;
 use axum::{extract::Extension, routing, Json, Router, AddExtensionLayer};
@@ -35,49 +35,51 @@ async fn list(
 async fn update(
     ctx: Context,
     Extension(provider): Extension<Arc<PropertiesProvider>>,
-    Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
-    Json(request): Json<UpdateRequest>,
+    Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
+    Json(request): Json<UpdatePropertyRequest>,
 ) -> Result<Json<Property>> {
-    Ok(Json(provider.update(ctx, organization_id, project_id, event_id, request).await?))
+    Ok(Json(provider.update(ctx, organization_id, project_id, prop_id, request).await?))
 }
 
 async fn delete(
     ctx: Context,
     Extension(provider): Extension<Arc<PropertiesProvider>>,
-    Path((organization_id,project_id, event_id)): Path<(u64,u64, u64)>,
+    Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
-    Ok(Json(provider.delete(ctx, organization_id,project_id, event_id).await?))
+    Ok(Json(provider.delete(ctx, organization_id, project_id, prop_id).await?))
 }
 
 pub fn attach_user_routes(router: Router, prop: Arc<properties::Provider>) -> Router {
+    let path = "/v1/organizations/:organization_id/projects/:project_id/schema/user_properties";
     router
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/schema/user_properties",
+            path.clone(),
             routing::get(list),
         )
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/schema/user_properties/:prop_id",
+            format!("{}/:prop_id",path).as_str(),
             routing::get(get_by_id).delete(delete).put(update),
         )
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/schema/user_properties/name/:prop_name",
+            format!("{}/name/:prop_name",path).as_str(),
             routing::get(get_by_name),
         )
         .layer(AddExtensionLayer::new(prop))
 }
 
 pub fn attach_event_routes(router: Router, prop: Arc<properties::Provider>) -> Router {
+    let path = "/v1/organizations/:organization_id/projects/:project_id/schema/event_properties";
     router
         .route(
-            "/v1/projects/:project_id/event_properties",
+            path.clone(),
             routing::get(list),
         )
         .route(
-            "/v1/projects/:project_id/event_properties/:prop_id",
-            routing::get(get_by_id).delete(delete),
+            format!("{}/:prop_id",path).as_str(),
+            routing::get(get_by_id).delete(delete).put(update),
         )
         .route(
-            "/v1/projects/:project_id/event_properties/name/:prop_name",
+            format!("{}/name/:prop_name",path).as_str(),
             routing::get(get_by_name),
         )
         .layer(AddExtensionLayer::new(prop))

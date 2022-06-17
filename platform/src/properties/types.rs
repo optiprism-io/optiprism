@@ -1,6 +1,4 @@
 use serde::{Deserialize, Serialize};
-use common::DataType;
-use common::r#type::DictionaryDataType;
 use metadata::properties::{Status};
 use crate::Error;
 

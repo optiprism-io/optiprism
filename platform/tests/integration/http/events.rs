@@ -167,7 +167,7 @@ async fn test_events() -> Result<()> {
     // get should return event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/events/1")
+            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events/1")
             .headers(headers.clone())
             .send()
             .await
@@ -180,7 +180,7 @@ async fn test_events() -> Result<()> {
     // list events should return list with one event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/events")
+            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events")
             .headers(headers.clone())
             .send()
             .await
