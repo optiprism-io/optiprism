@@ -454,6 +454,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "common",
+ "datafusion",
  "env_logger",
  "events-gen",
  "log",
@@ -2130,6 +2131,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "url",
  "uuid",
 ]
 

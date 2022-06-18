@@ -12,6 +12,7 @@ use std::{
     fmt::{self, Display, Formatter},
     result,
 };
+use datafusion::error::DataFusionError;
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -36,11 +37,18 @@ pub enum Error {
     MetadataError(MetadataError),
     ExternalError(String),
     EventsGenError(EventsGenError),
+    DataFusionError(DataFusionError),
 }
 
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         write!(formatter, "{}", self)
+    }
+}
+
+impl From<DataFusionError> for Error {
+    fn from(err: DataFusionError) -> Self {
+        Self::DataFusionError(err)
     }
 }
 

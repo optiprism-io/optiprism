@@ -12,22 +12,22 @@ use crate::error::{Result, Error};
 use crate::store::events::Event;
 use enum_iterator::all;
 
-async fn create_event(md: &Arc<Metadata>, org_id: u64, proj_id: u64, name: String, scope: events::Scope) -> Result<MDEvent> {
+async fn create_event(md: &Arc<Metadata>, org_id: u64, proj_id: u64, name: String) -> Result<MDEvent> {
     Ok(
         md.events
             .get_or_create(
                 org_id,
+                proj_id,
                 events::CreateEventRequest {
                     created_by: 0,
-                    project_id: proj_id,
                     tags: None,
                     name,
                     display_name: None,
                     description: None,
                     status: events::Status::Enabled,
-                    scope,
                     properties: None,
                     custom_properties: None,
+                    is_system: false
                 },
             )
             .await?
@@ -41,21 +41,19 @@ async fn create_property(
     proj_id: u64,
     name: String,
     data_type: DataType,
-    scope: properties::Scope,
     nullable: bool,
     dict: Option<DataType>,
     cols: &mut Vec<Column>,
 ) -> Result<Property> {
     let req = CreatePropertyRequest {
         created_by: 0,
-        project_id: proj_id,
         tags: None,
         name,
         description: None,
         display_name: None,
         typ: data_type.clone(),
         status: properties::Status::Enabled,
-        scope,
+        is_system: false,
         nullable,
         is_array: false,
         is_dictionary: dict.is_some(),
@@ -63,8 +61,8 @@ async fn create_property(
     };
 
     let prop = match ns {
-        Namespace::Event => md.event_properties.get_or_create(org_id, req).await?,
-        Namespace::User => md.user_properties.get_or_create(org_id, req).await?,
+        Namespace::Event => md.event_properties.get_or_create(org_id, proj_id, req).await?,
+        Namespace::User => md.user_properties.get_or_create(org_id, proj_id, req).await?,
     };
 
     cols.push(Column::new(prop.column_name(ns), data_type, nullable, dict));
@@ -82,7 +80,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "User ID".to_string(),
         DataType::UInt64,
-        properties::Scope::System,
         false,
         None,
         &mut cols,
@@ -95,7 +92,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Created At".to_string(),
         DataType::Timestamp(TimeUnit::Second, None),
-        properties::Scope::System,
         false,
         None,
         &mut cols,
@@ -108,7 +104,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Event".to_string(),
         DataType::Utf8,
-        properties::Scope::System,
         false,
         Some(DataType::UInt64),
         &mut cols,
@@ -122,7 +117,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Product Name".to_string(),
         DataType::Utf8,
-        properties::Scope::User,
         true,
         Some(DataType::UInt16),
         &mut cols,
@@ -135,7 +129,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Product Category".to_string(),
         DataType::Utf8,
-        properties::Scope::User,
         true,
         Some(DataType::UInt16),
         &mut cols,
@@ -148,7 +141,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Product Subcategory".to_string(),
         DataType::Utf8,
-        properties::Scope::User,
         true,
         Some(DataType::UInt16),
         &mut cols,
@@ -161,7 +153,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Product Brand".to_string(),
         DataType::Utf8,
-        properties::Scope::User,
         true,
         Some(DataType::UInt16),
         &mut cols,
@@ -174,7 +165,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Product Price".to_string(),
         DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
-        properties::Scope::User,
         true,
         None,
         &mut cols,
@@ -187,7 +177,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Product Discount Price".to_string(),
         DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
-        properties::Scope::User,
         true,
         None,
         &mut cols,
@@ -200,7 +189,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Spent Total".to_string(),
         DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
-        properties::Scope::User,
         true,
         None,
         &mut cols,
@@ -213,7 +201,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Products Bought".to_string(),
         UInt8,
-        properties::Scope::User,
         true,
         None,
         &mut cols,
@@ -226,7 +213,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Cart Items Number".to_string(),
         UInt8,
-        properties::Scope::User,
         true,
         None,
         &mut cols,
@@ -239,7 +225,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Cart Amount".to_string(),
         DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
-        properties::Scope::User,
         true,
         None,
         &mut cols,
@@ -252,7 +237,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Revenue".to_string(),
         DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
-        properties::Scope::System,
         true,
         None,
         &mut cols,
@@ -265,7 +249,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Country".to_string(),
         DataType::Utf8,
-        properties::Scope::System,
         true,
         Some(DataType::UInt16),
         &mut cols,
@@ -278,7 +261,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "City".to_string(),
         DataType::Utf8,
-        properties::Scope::System,
         true,
         Some(DataType::UInt16),
         &mut cols,
@@ -291,7 +273,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Device".to_string(),
         DataType::Utf8,
-        properties::Scope::System,
         true,
         Some(DataType::UInt16),
         &mut cols,
@@ -304,7 +285,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Device Category".to_string(),
         DataType::Utf8,
-        properties::Scope::System,
         true,
         Some(DataType::UInt16),
         &mut cols,
@@ -317,7 +297,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Os".to_string(),
         DataType::Utf8,
-        properties::Scope::System,
         true,
         Some(DataType::UInt16),
         &mut cols,
@@ -330,7 +309,6 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         "Os Version".to_string(),
         DataType::Utf8,
-        properties::Scope::System,
         true,
         Some(DataType::UInt16),
         &mut cols,
@@ -338,7 +316,7 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
 
 
     for event in all::<Event>() {
-        create_event(md, org_id, proj_id, event.to_string(), events::Scope::User).await?;
+        create_event(md, org_id, proj_id, event.to_string()).await?;
     }
 
     let table = Table {

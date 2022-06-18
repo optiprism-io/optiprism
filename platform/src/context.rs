@@ -12,7 +12,7 @@ use common::{
 };
 use std::collections::HashMap;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Context {
     pub organization_id: u64,
     pub account_id: u64,

@@ -26,19 +26,15 @@ externalDocs:
   url: https://dev.optiprism.io/api
 
 paths:
-  /v1/projects/{project_id}/schema/events:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/events:
     get:
       summary: Events list
       operationId: eventsList
       tags:
         - events
       parameters:
-        - name: project_id
-          in: path
-          description: Project ID
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
       responses:
         '200':
           description: event list
@@ -54,19 +50,37 @@ paths:
                           $ref: '#/components/schemas/Event'
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
-  /v1/projects/{project_id}/schema/events/{event_id}:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/events/{event_id}:
+    get:
+      summary: Get event
+      operationId: getEvent
+      tags:
+        - events
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: event_id
+          in: path
+          description: Event ID
+          required: true
+          schema:
+            type: number
+      responses:
+        201:
+          description: event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+
     put:
       summary: Update event
       operationId: updateEvent
       tags:
         - events
       parameters:
-        - name: project_id
-          in: path
-          description: Project ID
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
         - name: event_id
           in: path
           description: Event ID
@@ -87,19 +101,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/Event'
 
-  /v1/projects/{project_id}/schema/custom-events:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events:
     get:
       summary: Custom events list
       operationId: customEventsList
       tags:
         - events
       parameters:
-        - name: project_id
-          in: path
-          description: Project ID
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
       responses:
         '200':
           description: custom event list
@@ -120,12 +130,8 @@ paths:
       tags:
         - events
       parameters:
-        - name: project_id
-          in: path
-          description: Project ID
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
       requestBody:
         required: true
         content:
@@ -140,7 +146,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/CustomEvent'
 
-  /v1/projects/{project_id}/schema/custom-events/{event_id}:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events/{event_id}:
+    get:
+      summary: Get custom event
+      operationId: getCustomEvent
+      tags:
+        - events
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: event_id
+          in: path
+          description: Event ID
+          required: true
+          schema:
+            type: number
+      responses:
+        201:
+          description: custom event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomEvent'
+
     put:
       summary: Update custom event
       operationId: updateCustomEvent
@@ -173,30 +201,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/CustomEvent'
 
-  /v1/projects/{project_id}/schema/properties:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties:
     get:
-      summary: Properties list
-      operationId: propertiesList
+      summary: User properties list
+      operationId: userPropertiesList
       tags:
         - properties
       parameters:
-        - name: project_id
-          in: path
-          description: Project ID
-          required: true
-          schema:
-            type: string
-        - name: type
-          in: query
-          description: Property type
-          required: true
-          schema:
-            type:
-              string
-            enum:
-              - event
-              - user
-
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
       responses:
         '200':
           description: properties list
@@ -212,19 +225,112 @@ paths:
                           $ref: '#/components/schemas/Property'
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
-  /v1/projects/{project_id}/schema/properties/{property_id}:
-    put:
-      summary: Update property
-      operationId: updateProperty
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties:
+    get:
+      summary: Event properties list
+      operationId: eventPropertiesList
       tags:
         - properties
       parameters:
-        - name: project_id
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200':
+          description: properties list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Property'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties/{property_id}:
+    get:
+      summary: Get user property
+      operationId: getUserProperty
+      tags:
+        - events
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: property_id
           in: path
-          description: Project ID
+          description: Property ID
           required: true
           schema:
-            type: string
+            type: number
+      responses:
+        201:
+          description: user property
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+
+    put:
+      summary: Update user property
+      operationId: updateUserProperty
+      tags:
+        - properties
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: property_id
+          in: path
+          description: Property ID
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePropertyRequest'
+      responses:
+        201:
+          description: property
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties/{property_id}:
+    get:
+      summary: Get event property
+      operationId: getEventProperty
+      tags:
+        - events
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: property_id
+          in: path
+          description: Property ID
+          required: true
+          schema:
+            type: number
+      responses:
+        201:
+          description: event property
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+
+    put:
+      summary: Update event property
+      operationId: updateEventProperty
+      tags:
+        - properties
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
         - name: property_id
           in: path
           description: Property ID
@@ -244,20 +350,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Property'
-
-  /v1/projects/{project_id}/schema/custom-properties:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-properties:
     get:
       summary: Event custom properties list
       operationId: customPropertiesList
       tags:
         - properties
       parameters:
-        - name: project_id
-          in: path
-          description: Project ID
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
       responses:
         '200':
           description: event custom properties list
@@ -273,19 +374,15 @@ paths:
                           $ref: '#/components/schemas/CustomProperty'
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
-  /v1/projects/{project_id}/data/events-stream:
+  /v1/organizations/{organization_id}/projects/{project_id}/data/events-stream:
     post:
       summary: Get ingested events
       operationId: eventsStream
       tags:
         - events
       parameters:
-        - name: project_id
-          in: path
-          description: Project ID
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
       requestBody:
         required: true
         content:
@@ -338,19 +435,15 @@ paths:
 
                   - $ref: '#/components/schemas/ListResponseMetadata'
 
-  /v1/projects/{project_id}/data/property-values:
+  /v1/organizations/{organization_id}/projects/{project_id}/data/property-values:
     post:
       summary: List of property values
       operationId: PropertyValuesList
       tags:
         - properties
       parameters:
-        - name: project_id
-          in: path
-          description: Project ID
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
       requestBody:
         required: true
         description: property type and property id/name must be specified. Event is optional and works as a filter for values
@@ -381,12 +474,15 @@ paths:
                         items:
                           type: boolean
 
-  /reports/event-segmentation:
+  /organizations/{organization_id}/projects/{project_id}/reports/event-segmentation:
     post:
       summary: Event segmentation query
       operationId: createEventSegmentation
       tags:
         - reports
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
       requestBody:
         content:
           application/json:
@@ -445,6 +541,18 @@ paths:
                             type: number
 
 components:
+  parameters:
+    OrganizationID:
+      name: organization_id
+      in: path
+      schema:
+        type: number
+    ProjectID:
+      name: project_id
+      in: path
+      schema:
+        type: number
+
   schemas:
     ListResponseMetadata:
       description: list response metadata
