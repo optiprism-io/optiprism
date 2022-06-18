@@ -7,8 +7,6 @@ use serde::{Deserialize, Serialize};
 pub const DECIMAL_PRECISION: usize = 19;
 pub const DECIMAL_SCALE: usize = 10;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
 pub enum DataType {
     Number,
     String,
@@ -25,15 +23,6 @@ impl DataType {
             DataType::Timestamp => ArrowDataType::Timestamp(Second, None),
         }
     }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub enum DictionaryDataType {
-    UInt8,
-    UInt16,
-    UInt32,
-    UInt64,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

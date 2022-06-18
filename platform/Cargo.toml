@@ -17,7 +17,6 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
-url = "2.2.2"
 anyhow = "1.0"
 datafusion = { path = "../arrow-datafusion/datafusion" }
 datafusion-expr = { path = "../arrow-datafusion/datafusion-expr" }

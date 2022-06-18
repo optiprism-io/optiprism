@@ -46,8 +46,6 @@ mod tests {
     use axum::http::StatusCode;
     use reqwest::Client;
     use serde_json::Value;
-    use datafusion::datasource::file_format::csv::CsvFormat;
-    use datafusion::datasource::listing::{ListingOptions, ListingTable, ListingTableConfig};
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use datafusion::scalar::{ScalarValue as DFScalarValue, ScalarValue};
     use platform::event_segmentation::types::{Query, Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, EventType, PropertyType, PropValueOperation, QueryTime, TimeUnit, PartitionedAggregateFunction, AggregateFunction};
@@ -65,8 +63,8 @@ mod tests {
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let prop = match ns {
-            Namespace::Event => md.event_properties.create(org_id, proj_id, req).await?,
-            Namespace::User => md.user_properties.create(org_id, proj_id, req).await?,
+            Namespace::Event => md.event_properties.create(org_id, req).await?,
+            Namespace::User => md.user_properties.create(org_id, req).await?,
         };
 
         md.database
@@ -97,7 +95,7 @@ mod tests {
             .add_column(
                 TableType::Events(org_id, proj_id),
                 Column::new(
-                    "event_created_at".to_string(),
+                    "created_at".to_string(),
                     DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
                     false,
                     None,
@@ -107,7 +105,7 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new("event_event".to_string(), DFDataType::UInt16, false, None),
+                Column::new("event".to_string(), DFDataType::UInt16, false, None),
             )
             .await?;
 
@@ -119,13 +117,14 @@ mod tests {
             proj_id,
             CreatePropertyRequest {
                 created_by: 0,
+                project_id: proj_id,
                 tags: None,
                 name: "Country".to_string(),
                 description: None,
                 display_name: None,
                 typ: DFDataType::Utf8,
                 status: properties::Status::Enabled,
-                is_system: false,
+                scope: properties::Scope::User,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
@@ -141,13 +140,14 @@ mod tests {
             proj_id,
             CreatePropertyRequest {
                 created_by: 0,
+                project_id: proj_id,
                 tags: None,
                 name: "Device".to_string(),
                 description: None,
                 display_name: None,
                 typ: DFDataType::Utf8,
                 status: properties::Status::Enabled,
-                is_system: false,
+                scope: properties::Scope::User,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
@@ -163,13 +163,14 @@ mod tests {
             proj_id,
             CreatePropertyRequest {
                 created_by: 0,
+                project_id: proj_id,
                 tags: None,
                 name: "Is Premium".to_string(),
                 description: None,
                 display_name: None,
                 typ: DFDataType::Boolean,
                 status: properties::Status::Enabled,
-                is_system: false,
+                scope: properties::Scope::User,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
@@ -182,15 +183,15 @@ mod tests {
         md.events
             .create(
                 org_id,
-                proj_id,
                 events::CreateEventRequest {
                     created_by: 0,
+                    project_id: proj_id,
                     tags: None,
                     name: "View Product".to_string(),
                     display_name: None,
                     description: None,
                     status: events::Status::Enabled,
-                    is_system: false,
+                    scope: events::Scope::User,
                     properties: None,
                     custom_properties: None,
                 },
@@ -200,15 +201,15 @@ mod tests {
         md.events
             .create(
                 org_id,
-                proj_id,
                 events::CreateEventRequest {
                     created_by: 0,
+                    project_id: proj_id,
                     tags: None,
                     name: "Buy Product".to_string(),
                     display_name: None,
                     description: None,
                     status: events::Status::Enabled,
-                    is_system: false,
+                    scope: events::Scope::User,
                     properties: None,
                     custom_properties: None,
                 },
@@ -223,17 +224,18 @@ mod tests {
             proj_id,
             CreatePropertyRequest {
                 created_by: 0,
+                project_id: proj_id,
                 tags: None,
                 name: "Product Name".to_string(),
                 description: None,
                 display_name: None,
                 typ: DFDataType::Utf8,
                 status: properties::Status::Enabled,
+                scope: properties::Scope::User,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
                 dictionary_type: None,
-                is_system: false
             },
         )
             .await?;
@@ -245,13 +247,14 @@ mod tests {
             proj_id,
             CreatePropertyRequest {
                 created_by: 0,
+                project_id: proj_id,
                 tags: None,
                 name: "Revenue".to_string(),
                 description: None,
                 display_name: None,
                 typ: DFDataType::Float64,
                 status: properties::Status::Enabled,
-                is_system: false,
+                scope: properties::Scope::User,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
@@ -270,28 +273,8 @@ mod tests {
             path.push(format!("{}.db", Uuid::new_v4()));
             let store = Arc::new(Store::new(path));
             let md = Arc::new(Metadata::try_new(store).unwrap());
-            create_entities(md.clone(), 1, 1).await.unwrap();
-
-            let table = md.database.get_table(TableType::Events(1, 1)).await.unwrap();
-            let schema = table.arrow_schema();
-            let options = CsvReadOptions::new().schema(&schema);
-            let path = "../tests/events.csv";
-            let input = datafusion::logical_plan::LogicalPlanBuilder::scan_csv(
-                Arc::new(LocalFileSystem {}),
-                path,
-                options,
-                None,
-                1,
-            )
-                .await.unwrap()
-                .build().unwrap();
-
-            let opt = ListingOptions::new(Arc::new(CsvFormat::default()));
-            let config = ListingTableConfig::new(Arc::new(LocalFileSystem {}), path).with_listing_options(opt)
-                .with_schema(Arc::new(schema));
-
-            let provider = ListingTable::try_new(config).unwrap();
-            let query = QueryProvider::try_new(md, Arc::new(provider)).unwrap();
+            create_entities(md.clone(), 0, 0).await.unwrap();
+            let query = -QueryProvider::try_new(md).unwrap();
             let es_provider = Arc::new(EventSegmentationProvider::new(Arc::new(query)));
             let app = event_segmentation::attach_routes(Router::new(), es_provider);
 
@@ -383,7 +366,7 @@ mod tests {
         let body = serde_json::to_string(&es).unwrap();
 
         let resp = cl
-            .post("http://127.0.0.1:8080/v1/organizations/1/projects/1/queries/event-segmentation")
+            .post("http://127.0.0.1:8080/v1/projects/0/queries/event-segmentation")
             .body(body)
             .headers(headers.clone())
             .send()
