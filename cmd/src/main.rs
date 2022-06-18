@@ -9,6 +9,7 @@ use axum::{Router, Server};
 use metadata::{Metadata, Store};
 use platform::{accounts::Provider as AccountProvider, auth::Provider as AuthProvider, events::Provider as EventsProvider, properties::Provider as PropertiesProvider};
 use std::{env::set_var, net::SocketAddr, sync::Arc};
+use std::env::temp_dir;
 use std::path::PathBuf;
 use bytesize::ByteSize;
 use chrono::{DateTime, Utc};
@@ -19,6 +20,7 @@ use events_gen::generator;
 use query::QueryProvider;
 use crate::error::Error;
 use log::{info};
+use uuid::Uuid;
 use datafusion::datasource::MemTable;
 
 #[tokio::main]
@@ -32,7 +34,9 @@ async fn main() -> Result<()> {
         set_var("FNP_REFRESH_TOKEN_KEY", "FNP_REFRESH_TOKEN_KEY");
     }
 
-    let store = Arc::new(Store::new("db"));
+    let mut path = temp_dir();
+    path.push(format!("{}.db", Uuid::new_v4()));
+    let store = Arc::new(Store::new(path));
     let md = Arc::new(Metadata::try_new(store)?);
 
     info!("starting sample data generation");
