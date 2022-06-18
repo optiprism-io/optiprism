@@ -175,12 +175,8 @@ paths:
       tags:
         - events
       parameters:
-        - name: project_id
-          in: path
-          description: Project ID
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
         - name: event_id
           in: path
           description: Custom Event ID
@@ -494,66 +490,64 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  dimensionHeaders:
-                    type: array
-                    items:
-                      type: string
-                  metricHeaders:
-                    type: array
-                    items:
-                      type: string
-                  dimensions:
-                    type: array
-                    items:
-                      type: array
-                      items:
-                        type: string
-                  singles:
-                    type: array
-                    items:
-                      type: integer
-                  series:
-                    type: array
-                    items:
-                      type: array
-                      items:
-                        type: number
-                  compare:
-                    type: object
-                    properties:
-                      dimensions:
-                        type: array
-                        items:
-                          type: array
-                          items:
-                            type: string
-                      singles:
-                        type: array
-                        items:
-                          type: number
-                      series:
-                        type: array
-                        items:
-                          type: array
-                          items:
-                            type: number
+                $ref: '#/components/schemas/DataTableResponse'
 
 components:
   parameters:
     OrganizationID:
       name: organization_id
       in: path
+      required: true
       schema:
         type: number
     ProjectID:
       name: project_id
       in: path
+      required: true
       schema:
         type: number
 
   schemas:
+    DataTableResponse:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum:
+                  - dimension
+                  - metric
+                  - metricValue
+              dataType:
+                $ref: '#/components/schemas/DataType'
+              name:
+                type: string
+              values:
+                oneOf:
+                  - type: array
+                    items:
+                      type: string
+                  - type: array
+                    items:
+                      type: number
+                  - type: array
+                    items:
+                      type: boolean
+              compareValues:
+                oneOf:
+                  - type: array
+                    items:
+                      type: string
+                  - type: array
+                    items:
+                      type: number
+                  - type: array
+                    items:
+                      type: boolean
     ListResponseMetadata:
       description: list response metadata
       type: object
