@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use std::borrow::BorrowMut;
     use query::error::Result;
+    use std::borrow::BorrowMut;
     use std::env::temp_dir;
 
     use chrono::{DateTime, Duration, Utc};
@@ -19,31 +19,40 @@ mod tests {
     use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
     use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
 
+    use arrow::array::{
+        make_builder, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray,
+        DecimalBuilder, Float64Builder, Int16Array, Int16Builder, Int8BufferBuilder, Int8Builder,
+        StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt64Builder,
+        UInt8Builder,
+    };
+    use arrow::buffer::MutableBuffer;
+    use arrow::ipc::{TimestampBuilder, Utf8Builder};
     use datafusion::execution::context::ExecutionContextState;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-    use datafusion::logical_plan::{LogicalPlan, LogicalPlanBuilder as DFLogicalPlanBuilder, TableScan};
+    use datafusion::logical_plan::{
+        LogicalPlan, LogicalPlanBuilder as DFLogicalPlanBuilder, TableScan,
+    };
+    use datafusion::physical_plan::coalesce_batches::concat_batches;
+    use datafusion::scalar::ScalarValue as DFScalarValue;
+    use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;
     use metadata::database::{Column, Table, TableType};
     use metadata::properties::provider::Namespace;
     use metadata::properties::{CreatePropertyRequest, Property};
     use metadata::{database, events, properties, Metadata, Store};
-    use query::reports::types::{PropValueOperation, PropertyRef, QueryTime, TimeUnit, EventRef};
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
+    use query::physical_plan::planner::QueryPlanner;
+    use query::physical_plan::unpivot::unpivot;
+    use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
+    use query::reports::event_segmentation::types::{
+        Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, NamedQuery, Query,
+    };
+    use query::reports::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
     use query::{event_fields, Context, Error};
     use rust_decimal::Decimal;
     use std::ops::Sub;
     use std::sync::Arc;
-    use arrow::array::{Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray, DecimalBuilder, Float64Builder, Int16Array, Int16Builder, Int8BufferBuilder, Int8Builder, make_builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt64Builder, UInt8Builder};
-    use arrow::buffer::MutableBuffer;
-    use arrow::ipc::{TimestampBuilder, Utf8Builder};
     use uuid::Uuid;
-    use datafusion::physical_plan::coalesce_batches::concat_batches;
-    use query::physical_plan::planner::QueryPlanner;
-    use datafusion::scalar::ScalarValue as DFScalarValue;
-    use datafusion_common::ScalarValue;
-    use query::physical_plan::unpivot::unpivot;
-    use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
-    use query::reports::event_segmentation::types::{Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, NamedQuery, Query};
 
     pub async fn events_provider(
         db: Arc<database::Provider>,
@@ -61,7 +70,7 @@ mod tests {
             None,
             1,
         )
-            .await?;
+        .await?;
 
         Ok(df_input.build()?)
     }
@@ -81,7 +90,12 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable, prop.dictionary_type.clone()),
+                Column::new(
+                    prop.column_name(ns),
+                    prop.typ.clone(),
+                    prop.nullable,
+                    prop.dictionary_type.clone(),
+                ),
             )
             .await?;
 
@@ -99,7 +113,12 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(event_fields::USER_ID.to_string(), DFDataType::UInt64, false, None),
+                Column::new(
+                    event_fields::USER_ID.to_string(),
+                    DFDataType::UInt64,
+                    false,
+                    None,
+                ),
             )
             .await?;
         md.database
@@ -116,7 +135,12 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(event_fields::EVENT.to_string(), DFDataType::UInt16, false, None),
+                Column::new(
+                    event_fields::EVENT.to_string(),
+                    DFDataType::UInt16,
+                    false,
+                    None,
+                ),
             )
             .await?;
 
@@ -143,10 +167,24 @@ mod tests {
                 dictionary_type: Some(DFDataType::UInt8),
             },
         )
-            .await?;
+        .await?;
 
-        md.dictionaries.get_key_or_create(org_id, proj_id, country_prop.column_name(Namespace::User).as_str(), "spain").await?;
-        md.dictionaries.get_key_or_create(org_id, proj_id, country_prop.column_name(Namespace::User).as_str(), "german").await?;
+        md.dictionaries
+            .get_key_or_create(
+                org_id,
+                proj_id,
+                country_prop.column_name(Namespace::User).as_str(),
+                "spain",
+            )
+            .await?;
+        md.dictionaries
+            .get_key_or_create(
+                org_id,
+                proj_id,
+                country_prop.column_name(Namespace::User).as_str(),
+                "german",
+            )
+            .await?;
         create_property(
             &md,
             Namespace::User,
@@ -168,7 +206,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-            .await?;
+        .await?;
 
         create_property(
             &md,
@@ -191,7 +229,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-            .await?;
+        .await?;
 
         // create events
         md.events
@@ -252,7 +290,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-            .await?;
+        .await?;
 
         create_property(
             &md,
@@ -275,7 +313,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-            .await?;
+        .await?;
 
         Ok(())
     }
@@ -446,7 +484,10 @@ mod tests {
                 from,
                 to,
             },*/
-            time:QueryTime::Last { last: 30, unit: TimeUnit::Day },
+            time: QueryTime::Last {
+                last: 30,
+                unit: TimeUnit::Day,
+            },
             group: event_fields::USER_ID.to_string(),
             interval_unit: TimeUnit::Week,
             chart_type: ChartType::Line,
@@ -464,7 +505,10 @@ mod tests {
                         EventFilter::Property {
                             property: PropertyRef::User("Country".to_string()),
                             operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::Utf8(Some("spain".to_string())), ScalarValue::Utf8(Some("german".to_string()))]),
+                            value: Some(vec![
+                                ScalarValue::Utf8(Some("spain".to_string())),
+                                ScalarValue::Utf8(Some("german".to_string())),
+                            ]),
                         },
                     ]),
                     Some(vec![Breakdown::Property(PropertyRef::User(
@@ -534,8 +578,9 @@ mod tests {
             .with_timezone(&Utc);
         let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
 
-        let config =
-            ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {})).with_target_partitions(1);
+        let config = ExecutionConfig::new()
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_target_partitions(1);
 
         let ctx = ExecutionContext::with_config(config);
 
@@ -545,10 +590,9 @@ mod tests {
             physical_plan,
             Arc::new(RuntimeEnv::new(RuntimeConfig::new())?),
         )
-            .await?;
+        .await?;
 
         let concated = concat_batches(&result[0].schema(), &result, 0)?;
-
 
         print_batches(&[concated.clone()])?;
         Ok(())

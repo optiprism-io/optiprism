@@ -1,5 +1,5 @@
-use cubic_spline::{Points, SplineOpts};
 use crate::error::{Error, Result};
+use cubic_spline::{Points, SplineOpts};
 
 pub fn calc_cubic_spline(total_points: usize, key_points: Vec<f64>) -> Result<Vec<f64>> {
     assert!(key_points.len() <= total_points);
@@ -14,7 +14,8 @@ pub fn calc_cubic_spline(total_points: usize, key_points: Vec<f64>) -> Result<Ve
         .num_of_segments(segments as u32);
 
     let result = Points::from(&source)
-        .calc_spline(&opts).map_err(|e| Error::External(e.to_string()))?
+        .calc_spline(&opts)
+        .map_err(|e| Error::External(e.to_string()))?
         .into_inner()
         .iter()
         .map(|v| v.y)

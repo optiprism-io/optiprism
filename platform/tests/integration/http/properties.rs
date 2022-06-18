@@ -69,7 +69,7 @@ async fn test_event_properties() -> Result<()> {
         is_array: true,
         is_dictionary: true,
         dictionary_type: Some(DataType::Utf8),
-        is_system: false
+        is_system: false,
     };
 
     let cl = Client::new();
@@ -130,7 +130,7 @@ async fn test_event_properties() -> Result<()> {
             is_array: prop1.is_array.clone(),
             is_dictionary: prop1.is_dictionary.clone(),
             dictionary_type: prop1.dictionary_type.clone(),
-            is_system: false
+            is_system: false,
         };
 
         let resp = prov.create(1, 1, req).await?;

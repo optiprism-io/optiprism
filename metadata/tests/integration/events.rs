@@ -42,7 +42,10 @@ async fn test_events() -> Result<()> {
     assert!(events.get_by_id(1, 1, 1).await.is_err());
     assert!(events.get_by_name(1, 1, "test").await.is_err());
     assert!(events.delete(1, 1, 1).await.is_err());
-    assert!(events.update(1, 1, 1, update_event_req.clone()).await.is_err());
+    assert!(events
+        .update(1, 1, 1, update_event_req.clone())
+        .await
+        .is_err());
     // assert_eq!(events.list_events().await?, vec![]);
     // create two events
     let mut create_event1 = create_event_req.clone();
@@ -83,7 +86,10 @@ async fn test_events() -> Result<()> {
 
     update_event1.display_name.insert(Some("e".to_string()));
     assert_eq!(
-        events.update(1, 1, 1, update_event1.clone()).await?.display_name,
+        events
+            .update(1, 1, 1, update_event1.clone())
+            .await?
+            .display_name,
         Some("e".to_string())
     );
 
@@ -92,11 +98,17 @@ async fn test_events() -> Result<()> {
     assert!(events.update(1, 1, 2, update_event2.clone()).await.is_err());
     update_event1.display_name.insert(Some("ee".to_string()));
     assert_eq!(
-        events.update(1, 1, 1, update_event1.clone()).await?.display_name,
+        events
+            .update(1, 1, 1, update_event1.clone())
+            .await?
+            .display_name,
         Some("ee".to_string())
     );
     assert_eq!(
-        events.update(1, 1, 2, update_event2.clone()).await?.display_name,
+        events
+            .update(1, 1, 2, update_event2.clone())
+            .await?
+            .display_name,
         Some("e".to_string())
     );
 

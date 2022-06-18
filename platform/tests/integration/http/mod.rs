@@ -1,3 +1,3 @@
+mod event_segmentation;
 mod events;
 mod properties;
-mod event_segmentation;

@@ -1,37 +1,41 @@
-use std::sync::Arc;
-use arrow::datatypes::{DataType, Schema, TimeUnit};
-use arrow::datatypes::DataType::UInt8;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use metadata::database::{Column, Table, TableType};
-use metadata::{events, Metadata, properties};
-use metadata::events::Event as MDEvent;
-use metadata::properties::{CreatePropertyRequest, Property};
-use metadata::properties::provider::Namespace;
-use query::event_fields;
-use crate::error::{Result, Error};
+use crate::error::{Error, Result};
 use crate::store::events::Event;
+use arrow::datatypes::DataType::UInt8;
+use arrow::datatypes::{DataType, Schema, TimeUnit};
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use enum_iterator::all;
+use metadata::database::{Column, Table, TableType};
+use metadata::events::Event as MDEvent;
+use metadata::properties::provider::Namespace;
+use metadata::properties::{CreatePropertyRequest, Property};
+use metadata::{events, properties, Metadata};
+use query::event_fields;
+use std::sync::Arc;
 
-async fn create_event(md: &Arc<Metadata>, org_id: u64, proj_id: u64, name: String) -> Result<MDEvent> {
-    Ok(
-        md.events
-            .get_or_create(
-                org_id,
-                proj_id,
-                events::CreateEventRequest {
-                    created_by: 0,
-                    tags: None,
-                    name,
-                    display_name: None,
-                    description: None,
-                    status: events::Status::Enabled,
-                    properties: None,
-                    custom_properties: None,
-                    is_system: false
-                },
-            )
-            .await?
-    )
+async fn create_event(
+    md: &Arc<Metadata>,
+    org_id: u64,
+    proj_id: u64,
+    name: String,
+) -> Result<MDEvent> {
+    Ok(md
+        .events
+        .get_or_create(
+            org_id,
+            proj_id,
+            events::CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name,
+                display_name: None,
+                description: None,
+                status: events::Status::Enabled,
+                properties: None,
+                custom_properties: None,
+                is_system: false,
+            },
+        )
+        .await?)
 }
 
 async fn create_property(
@@ -61,8 +65,16 @@ async fn create_property(
     };
 
     let prop = match ns {
-        Namespace::Event => md.event_properties.get_or_create(org_id, proj_id, req).await?,
-        Namespace::User => md.user_properties.get_or_create(org_id, proj_id, req).await?,
+        Namespace::Event => {
+            md.event_properties
+                .get_or_create(org_id, proj_id, req)
+                .await?
+        }
+        Namespace::User => {
+            md.user_properties
+                .get_or_create(org_id, proj_id, req)
+                .await?
+        }
     };
 
     cols.push(Column::new(prop.column_name(ns), data_type, nullable, dict));
@@ -83,7 +95,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         false,
         None,
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -95,7 +108,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         false,
         None,
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -107,7 +121,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         false,
         Some(DataType::UInt64),
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     // create event props
     create_property(
@@ -120,7 +135,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         Some(DataType::UInt16),
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -132,7 +148,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         Some(DataType::UInt16),
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -144,7 +161,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         Some(DataType::UInt16),
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -156,7 +174,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         Some(DataType::UInt16),
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -168,7 +187,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         None,
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -180,7 +200,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         None,
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -192,7 +213,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         None,
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -204,7 +226,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         None,
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -216,7 +239,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         None,
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -228,7 +252,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         None,
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -240,7 +265,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         None,
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -252,7 +278,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         Some(DataType::UInt16),
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -264,7 +291,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         Some(DataType::UInt16),
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -276,7 +304,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         Some(DataType::UInt16),
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -288,7 +317,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         Some(DataType::UInt16),
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -300,7 +330,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         Some(DataType::UInt16),
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
@@ -312,8 +343,8 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         true,
         Some(DataType::UInt16),
         &mut cols,
-    ).await?;
-
+    )
+    .await?;
 
     for event in all::<Event>() {
         create_event(md, org_id, proj_id, event.to_string()).await?;
@@ -323,9 +354,7 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         typ: TableType::Events(org_id, proj_id),
         columns: cols,
     };
-    match md.database
-        .create_table(table.clone())
-        .await {
+    match md.database.create_table(table.clone()).await {
         Ok(_) | Err(metadata::error::Error::KeyAlreadyExists) => {}
         Err(err) => return Err(err.into()),
     };

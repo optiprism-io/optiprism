@@ -77,6 +77,6 @@ pub fn make_coefficients(intention: &Intention) -> Coefficients {
             view_product_to_buy: 0.,
             refund: 1.0,
             product_rating: 0.,
-        }
+        },
     }
 }

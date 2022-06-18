@@ -1,9 +1,7 @@
 use super::{LogInRequest, SignUpRequest, TokensResponse};
-use crate::{
-    accounts::{Provider as AccountProvider},
-    Context, Result,
-};
+use crate::{accounts::Provider as AccountProvider, Context, Result};
 use chrono::Utc;
+use common::auth::{make_password_hash, make_salt};
 use common::{
     auth::{
         is_valid_password, make_token, AccessClaims, RefreshClaims, ACCESS_TOKEN_DURATION,
@@ -11,9 +9,11 @@ use common::{
     },
     rbac::{Permission, Role, Scope},
 };
-use metadata::{organizations::CreateRequest as CreateOrganizationRequest, accounts::CreateRequest as CreateAccountRequest, Metadata};
+use metadata::{
+    accounts::CreateRequest as CreateAccountRequest,
+    organizations::CreateRequest as CreateOrganizationRequest, Metadata,
+};
 use std::{collections::HashMap, ops::Add, sync::Arc};
-use common::auth::{make_password_hash, make_salt};
 
 pub struct Provider {
     md: Arc<Metadata>,
@@ -40,21 +40,19 @@ impl Provider {
         let account = self
             .md
             .accounts
-            .create(
-                CreateAccountRequest {
-                    created_by: ctx.account_id,
-                    admin: false,
-                    salt,
-                    password,
-                    organization_id: organization.id,
-                    email: request.email,
-                    roles: Some(roles),
-                    permissions: None,
-                    first_name: request.first_name,
-                    middle_name: request.middle_name,
-                    last_name: request.last_name,
-                },
-            )
+            .create(CreateAccountRequest {
+                created_by: ctx.account_id,
+                admin: false,
+                salt,
+                password,
+                organization_id: organization.id,
+                email: request.email,
+                roles: Some(roles),
+                permissions: None,
+                first_name: request.first_name,
+                middle_name: request.middle_name,
+                last_name: request.last_name,
+            })
             .await?;
         make_token_response(
             account.organization_id,

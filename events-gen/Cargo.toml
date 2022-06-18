@@ -1,7 +1,3 @@
-[[bin]]
-name = "store"
-path = "src/bin/store/main.rs"
-
 [profile.release]
 codegen-units = 1
 

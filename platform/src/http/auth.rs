@@ -1,8 +1,12 @@
-use crate::{auth::{
-    provider::Provider,
-    types::{LogInRequest, SignUpRequest, TokensResponse},
-}, auth, AuthProvider, Context, Result};
-use axum::{extract::Extension, routing::post, Json, Router, AddExtensionLayer};
+use crate::{
+    auth,
+    auth::{
+        provider::Provider,
+        types::{LogInRequest, SignUpRequest, TokensResponse},
+    },
+    AuthProvider, Context, Result,
+};
+use axum::{extract::Extension, routing::post, AddExtensionLayer, Json, Router};
 use std::sync::Arc;
 
 async fn sign_up(

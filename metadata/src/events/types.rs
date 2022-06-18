@@ -1,6 +1,6 @@
+use crate::OptionalProperty;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::OptionalProperty;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -40,7 +40,7 @@ pub struct CreateEventRequest {
     pub custom_properties: Option<Vec<u64>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq,Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct UpdateEventRequest {
     pub updated_by: u64,
     pub tags: OptionalProperty<Option<Vec<String>>>,

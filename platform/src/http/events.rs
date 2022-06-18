@@ -1,9 +1,9 @@
 use crate::error::{Error, InternalError};
 use crate::events::{CreateEventRequest, Provider, UpdateEventRequest};
-use crate::{Context, events, EventsProvider, Result};
+use crate::{events, Context, EventsProvider, Result};
 use axum::extract::Path;
 use axum::http::StatusCode;
-use axum::{extract::Extension, routing, Json, Router, AddExtensionLayer};
+use axum::{extract::Extension, routing, AddExtensionLayer, Json, Router};
 use metadata::events::Event;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
@@ -14,7 +14,11 @@ async fn create(
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<CreateEventRequest>,
 ) -> Result<Json<Event>> {
-    Ok(Json(provider.create(ctx, organization_id, project_id, request).await?))
+    Ok(Json(
+        provider
+            .create(ctx, organization_id, project_id, request)
+            .await?,
+    ))
 }
 
 async fn get_by_id(
@@ -22,7 +26,11 @@ async fn get_by_id(
     Extension(provider): Extension<Arc<EventsProvider>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Event>> {
-    Ok(Json(provider.get_by_id(ctx, organization_id, project_id, event_id).await?))
+    Ok(Json(
+        provider
+            .get_by_id(ctx, organization_id, project_id, event_id)
+            .await?,
+    ))
 }
 
 async fn get_by_name(
@@ -32,7 +40,9 @@ async fn get_by_name(
     Path(event_name): Path<String>,
 ) -> Result<Json<Event>> {
     Ok(Json(
-        provider.get_by_name(ctx, organization_id, project_id, &event_name).await?,
+        provider
+            .get_by_name(ctx, organization_id, project_id, &event_name)
+            .await?,
     ))
 }
 
@@ -50,7 +60,11 @@ async fn update(
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
     Json(request): Json<UpdateEventRequest>,
 ) -> Result<Json<Event>> {
-    Ok(Json(provider.update(ctx, organization_id, project_id, event_id, request).await?))
+    Ok(Json(
+        provider
+            .update(ctx, organization_id, project_id, event_id, request)
+            .await?,
+    ))
 }
 
 async fn delete(
@@ -58,7 +72,11 @@ async fn delete(
     Extension(provider): Extension<Arc<EventsProvider>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Event>> {
-    Ok(Json(provider.delete(ctx, organization_id, project_id, event_id).await?))
+    Ok(Json(
+        provider
+            .delete(ctx, organization_id, project_id, event_id)
+            .await?,
+    ))
 }
 
 async fn attach_property(

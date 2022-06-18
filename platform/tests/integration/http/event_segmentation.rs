@@ -1,17 +1,17 @@
 #[cfg(test)]
 mod tests {
-    use std::env::temp_dir;
-    use std::sync::Arc;
     use axum::{AddExtensionLayer, Router, Server};
-    use uuid::Uuid;
     use metadata::{Metadata, Store};
     use platform::error::Result;
+    use platform::http::event_segmentation;
     use platform::{Context, EventSegmentationProvider};
     use query::{event_fields, QueryProvider};
-    use platform::http::event_segmentation;
-    use std::{net::SocketAddr};
+    use std::env::temp_dir;
+    use std::net::SocketAddr;
+    use std::sync::Arc;
     use std::time::Duration;
     use tokio::time::sleep;
+    use uuid::Uuid;
 
     use std::borrow::BorrowMut;
 
@@ -30,32 +30,41 @@ mod tests {
     use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
     use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
 
-    use datafusion::execution::context::ExecutionContextState;
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-    use datafusion::logical_plan::{LogicalPlan, TableScan};
-    use metadata::database::{Column, Table, TableType};
-    use metadata::properties::provider::Namespace;
-    use metadata::properties::{CreatePropertyRequest, Property};
-    use metadata::{database, events, properties};
-    use rust_decimal::Decimal;
-    use std::ops::Sub;
-    use arrow::array::{Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray, DecimalBuilder, Float64Builder, Int16Array, Int16Builder, Int8BufferBuilder, Int8Builder, make_builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt64Builder, UInt8Builder};
+    use arrow::array::{
+        make_builder, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray,
+        DecimalBuilder, Float64Builder, Int16Array, Int16Builder, Int8BufferBuilder, Int8Builder,
+        StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt64Builder,
+        UInt8Builder,
+    };
     use arrow::buffer::MutableBuffer;
     use arrow::ipc::{TimestampBuilder, Utf8Builder};
     use axum::headers::{HeaderMap, HeaderValue};
     use axum::http::StatusCode;
-    use reqwest::Client;
-    use serde_json::Value;
     use datafusion::datasource::file_format::csv::CsvFormat;
     use datafusion::datasource::listing::{ListingOptions, ListingTable, ListingTableConfig};
+    use datafusion::execution::context::ExecutionContextState;
+    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+    use datafusion::logical_plan::{LogicalPlan, TableScan};
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use datafusion::scalar::{ScalarValue as DFScalarValue, ScalarValue};
-    use platform::event_segmentation::types::{Query, Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, EventType, PropertyType, PropValueOperation, QueryTime, TimeUnit, PartitionedAggregateFunction, AggregateFunction};
+    use metadata::database::{Column, Table, TableType};
+    use metadata::properties::provider::Namespace;
+    use metadata::properties::{CreatePropertyRequest, Property};
+    use metadata::{database, events, properties};
+    use platform::event_segmentation::types::{
+        AggregateFunction, Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation,
+        EventType, PartitionedAggregateFunction, PropValueOperation, PropertyType, Query,
+        QueryTime, TimeUnit,
+    };
     use query::physical_plan::expressions;
     use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
-    use query::reports::types::EventRef;
     use query::reports::event_segmentation::types as query_es_types;
     use query::reports::types as query_types;
+    use query::reports::types::EventRef;
+    use reqwest::Client;
+    use rust_decimal::Decimal;
+    use serde_json::Value;
+    use std::ops::Sub;
 
     async fn create_property(
         md: &Arc<Metadata>,
@@ -132,7 +141,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-            .await?;
+        .await?;
 
         create_property(
             &md,
@@ -154,7 +163,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-            .await?;
+        .await?;
 
         create_property(
             &md,
@@ -176,7 +185,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-            .await?;
+        .await?;
 
         // create events
         md.events
@@ -233,10 +242,10 @@ mod tests {
                 is_array: false,
                 is_dictionary: false,
                 dictionary_type: None,
-                is_system: false
+                is_system: false,
             },
         )
-            .await?;
+        .await?;
 
         create_property(
             &md,
@@ -258,7 +267,7 @@ mod tests {
                 dictionary_type: None,
             },
         )
-            .await?;
+        .await?;
 
         Ok(())
     }
@@ -272,7 +281,11 @@ mod tests {
             let md = Arc::new(Metadata::try_new(store).unwrap());
             create_entities(md.clone(), 1, 1).await.unwrap();
 
-            let table = md.database.get_table(TableType::Events(1, 1)).await.unwrap();
+            let table = md
+                .database
+                .get_table(TableType::Events(1, 1))
+                .await
+                .unwrap();
             let schema = table.arrow_schema();
             let options = CsvReadOptions::new().schema(&schema);
             let path = "../tests/events.csv";
@@ -283,11 +296,14 @@ mod tests {
                 None,
                 1,
             )
-                .await.unwrap()
-                .build().unwrap();
+            .await
+            .unwrap()
+            .build()
+            .unwrap();
 
             let opt = ListingOptions::new(Arc::new(CsvFormat::default()));
-            let config = ListingTableConfig::new(Arc::new(LocalFileSystem {}), path).with_listing_options(opt)
+            let config = ListingTableConfig::new(Arc::new(LocalFileSystem {}), path)
+                .with_listing_options(opt)
                 .with_schema(Arc::new(schema));
 
             let provider = ListingTable::try_new(config).unwrap();
@@ -312,10 +328,7 @@ mod tests {
             .with_timezone(&Utc);
 
         let es = EventSegmentation {
-            time: QueryTime::Between {
-                from,
-                to,
-            },
+            time: QueryTime::Between { from, to },
             group: "user_id".to_string(),
             interval_unit: TimeUnit::Minute,
             chart_type: ChartType::Line,
@@ -325,18 +338,16 @@ mod tests {
                 Event {
                     event_name: "View Product".to_string(),
                     event_type: EventType::Regular,
-                    filters: Some(vec![
-                        EventFilter::Property {
-                            property_name: "Is Premium".to_string(),
-                            property_type: PropertyType::User,
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![Value::Bool(true)]),
-                        }]),
-                    breakdowns: Some(vec![
-                        Breakdown::Property {
-                            property_name: "Device".to_string(),
-                            property_type: PropertyType::User,
-                        }]),
+                    filters: Some(vec![EventFilter::Property {
+                        property_name: "Is Premium".to_string(),
+                        property_type: PropertyType::User,
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![Value::Bool(true)]),
+                    }]),
+                    breakdowns: Some(vec![Breakdown::Property {
+                        property_name: "Device".to_string(),
+                        property_type: PropertyType::User,
+                    }]),
                     queries: vec![Query::CountEvents],
                 },
                 Event {
@@ -362,14 +373,13 @@ mod tests {
                             aggregate: AggregateFunction::Sum,
                         },
                     ],
-                }],
-            filters: None,
-            breakdowns: Some(vec![
-                Breakdown::Property {
-                    property_name: "Country".to_string(),
-                    property_type: PropertyType::User,
                 },
-            ]),
+            ],
+            filters: None,
+            breakdowns: Some(vec![Breakdown::Property {
+                property_name: "Country".to_string(),
+                property_type: PropertyType::User,
+            }]),
             segments: None,
         };
 

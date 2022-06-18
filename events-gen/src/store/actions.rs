@@ -1,5 +1,5 @@
 use crate::store::events::Event;
-use strum_macros::{Display};
+use strum_macros::Display;
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Display)]
 pub enum Action {

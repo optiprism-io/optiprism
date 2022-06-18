@@ -1,21 +1,26 @@
-use std::ops::Sub;
+use crate::physical_plan::expressions::aggregate::state_types;
+use crate::physical_plan::expressions::partitioned_aggregate::{
+    PartitionedAggregate, PartitionedAggregateFunction,
+};
+use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
 use crate::reports::types::{PropValueOperation, PropertyRef, QueryTime};
 use crate::{event_fields, Context, Error, Result};
+use arrow::datatypes::DataType;
+use chrono::{DateTime, Utc};
 use datafusion::error::Result as DFResult;
+use datafusion::logical_plan::ExprSchemable;
+use datafusion::physical_plan::aggregates::return_type;
 use datafusion_common::{Column, DFSchema, ScalarValue};
 use datafusion_expr::expr_fn::{and, binary_expr, or};
-use datafusion_expr::{AccumulatorFunctionImplementation, AggregateFunction, AggregateUDF, col, Expr, Operator, ReturnTypeFunction, Signature, StateTypeFunction, Volatility};
+use datafusion_expr::{
+    col, AccumulatorFunctionImplementation, AggregateFunction, AggregateUDF, Expr, Operator,
+    ReturnTypeFunction, Signature, StateTypeFunction, Volatility,
+};
 pub use datafusion_expr::{lit, lit_timestamp_nano, Literal};
 use metadata::properties::provider::Namespace;
 use metadata::Metadata;
+use std::ops::Sub;
 use std::sync::Arc;
-use arrow::datatypes::DataType;
-use chrono::{DateTime, Utc};
-use datafusion::physical_plan::aggregates::return_type;
-use crate::physical_plan::expressions::aggregate::state_types;
-use crate::physical_plan::expressions::partitioned_aggregate::{PartitionedAggregate, PartitionedAggregateFunction};
-use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
-use datafusion::logical_plan::ExprSchemable;
 
 pub fn multi_or(exprs: Vec<Expr>) -> Expr {
     // combine multiple values with OR
@@ -50,7 +55,7 @@ pub fn lit_timestamp(data_type: DataType, date_time: &DateTime<Utc>) -> Result<E
         DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, tz) => {
             ScalarValue::TimestampMicrosecond(Some(date_time.timestamp_nanos() / 1000), tz)
         }
-        _ => return Err(Error::QueryError("unsupported data type".to_owned()))
+        _ => return Err(Error::QueryError("unsupported data type".to_owned())),
     }))
 }
 

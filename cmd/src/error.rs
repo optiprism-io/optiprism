@@ -2,17 +2,17 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use common::Error as CommonError;
+use events_gen::error::Error as EventsGenError;
+use metadata::Error as MetadataError;
 use platform::Error as PlatformError;
 use query::Error as QueryError;
-use common::Error as CommonError;
-use metadata::Error as MetadataError;
-use events_gen::error::Error as EventsGenError;
 
+use datafusion::error::DataFusionError;
 use std::{
     fmt::{self, Display, Formatter},
     result,
 };
-use datafusion::error::DataFusionError;
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -41,8 +41,17 @@ pub enum Error {
 }
 
 impl Display for Error {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self)
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Error::Internal(err) => write!(f, "Internal error: {:?}", err),
+            Error::PlatformError(err) => write!(f, "PlatformError error: {}", err),
+            Error::QueryError(err) => write!(f, "QueryError error: {}", err),
+            Error::CommonError(err) => write!(f, "CommonError error: {}", err),
+            Error::MetadataError(err) => write!(f, "MetadataError error: {}", err),
+            Error::ExternalError(err) => write!(f, "ExternalError error: {}", err),
+            Error::EventsGenError(err) => write!(f, "EventsGenError error: {}", err),
+            Error::DataFusionError(err) => write!(f, "DataFusionError error: {}", err),
+        }
     }
 }
 
@@ -88,7 +97,6 @@ impl From<EventsGenError> for Error {
     }
 }
 
-
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
@@ -105,6 +113,6 @@ impl IntoResponse for Error {
                 "internal server error".to_string(),
             ),
         }
-            .into_response()
+        .into_response()
     }
 }

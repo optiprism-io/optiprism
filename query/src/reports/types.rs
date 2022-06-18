@@ -1,8 +1,8 @@
+use crate::physical_plan::expressions::partitioned_aggregate;
 use chrono::{DateTime, Duration, Utc};
 use chronoutil::RelativeDuration;
-use datafusion_expr::Operator;
 use datafusion::physical_plan::aggregates::AggregateFunction as DFAggregateFunction;
-use crate::physical_plan::expressions::partitioned_aggregate;
+use datafusion_expr::Operator;
 
 #[derive(Clone, Debug)]
 pub enum QueryTime {
@@ -22,7 +22,7 @@ impl QueryTime {
         match self {
             QueryTime::Between { from, to } => (*from, *to),
             QueryTime::From(from) => (*from, cur_time),
-            QueryTime::Last { last, unit } => (cur_time + unit.relative_duration(*last), cur_time)
+            QueryTime::Last { last, unit } => (cur_time + unit.relative_duration(*last), cur_time),
         }
     }
 }

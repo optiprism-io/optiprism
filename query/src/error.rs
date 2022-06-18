@@ -1,6 +1,6 @@
+use arrow::error::ArrowError;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
 use metadata::error::Error as MetadataError;
 use std::fmt::{Display, Formatter};
@@ -78,7 +78,6 @@ impl From<Error> for ArrowError {
     }
 }
 
-
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
@@ -87,6 +86,6 @@ impl IntoResponse for Error {
                 "internal server error".to_string(),
             ),
         }
-            .into_response()
+        .into_response()
     }
 }

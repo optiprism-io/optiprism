@@ -44,9 +44,9 @@ pub enum ScalarValue {
     Timestamp(Option<i64>),
 }
 
-impl Into<DFScalarValue> for ScalarValue {
-    fn into(self) -> DFScalarValue {
-        match self {
+impl From<ScalarValue> for DFScalarValue {
+    fn from(v: ScalarValue) -> Self {
+        match v {
             ScalarValue::Number(v) => match v {
                 None => DFScalarValue::Decimal128(None, 0, 0),
                 Some(v) => DFScalarValue::Decimal128(

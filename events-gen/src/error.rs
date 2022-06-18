@@ -1,7 +1,7 @@
-use std::fmt::{Display, Formatter};
-use std::{fmt, result};
 use arrow::error::ArrowError;
 use metadata::error::Error as MetadataError;
+use std::fmt::{Display, Formatter};
+use std::{fmt, result};
 
 pub type Result<T> = result::Result<T, Error>;
 

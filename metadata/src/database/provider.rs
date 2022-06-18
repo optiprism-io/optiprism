@@ -1,18 +1,18 @@
-use arrow::datatypes::DataType;
+
 use std::sync::Arc;
 
 use crate::database::types::{Column, Table, TableType};
-use bincode::{deserialize, serialize};
-use chrono::Utc;
-use datafusion::parquet::data_type::AsBytes;
+use bincode::{serialize};
+
+
 use tokio::sync::RwLock;
 
 use crate::error::Error;
-use crate::events::types::{CreateEventRequest, UpdateEventRequest};
-use crate::events::Event;
-use crate::metadata::{list, ListResponse};
-use crate::store::index::hash_map::HashMap;
-use crate::store::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
+
+
+
+
+use crate::store::store::{Store};
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"database";
@@ -25,7 +25,7 @@ pub struct Provider {
 impl Provider {
     pub fn new(store: Arc<Store>) -> Self {
         Provider {
-            store: store.clone(),
+            store,
             tables: RwLock::new(vec![]),
         }
     }
@@ -64,7 +64,7 @@ impl Provider {
 
         table.columns.push(col.clone());
 
-        self.persist(&table).await
+        self.persist(table).await
     }
 
     async fn persist(&self, table: &Table) -> Result<()> {

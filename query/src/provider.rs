@@ -1,27 +1,27 @@
-use std::sync::Arc;
-use std::time::Instant;
+use crate::physical_plan::planner::QueryPlanner;
+use crate::reports::event_segmentation::logical_plan_builder::COL_AGG_NAME;
+use crate::reports::event_segmentation::types::EventSegmentation;
+use crate::reports::results::DataTable;
+use crate::reports::{event_segmentation, results};
+use crate::Context;
+use crate::Result;
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
 use chrono::Utc;
 use datafusion::catalog::schema::MemorySchemaProvider;
+use datafusion::datasource::object_store::local::LocalFileSystem;
 use datafusion::datasource::{MemTable, TableProvider};
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+use datafusion::logical_plan::plan::Explain;
 use datafusion::logical_plan::{LogicalPlan, LogicalPlanBuilder};
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::{collect, displayable};
 use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
 use metadata::database::TableType;
 use metadata::Metadata;
-use crate::{Context};
-use crate::physical_plan::planner::QueryPlanner;
-use crate::reports::results::{DataTable};
-use crate::Result;
-use datafusion::datasource::object_store::local::LocalFileSystem;
-use datafusion::logical_plan::plan::Explain;
-use crate::reports::{event_segmentation, results};
-use crate::reports::event_segmentation::logical_plan_builder::COL_AGG_NAME;
-use crate::reports::event_segmentation::types::EventSegmentation;
+use std::sync::Arc;
+use std::time::Instant;
 
 pub struct Provider {
     metadata: Arc<Metadata>,
@@ -30,16 +30,18 @@ pub struct Provider {
 
 impl Provider {
     pub fn try_new(metadata: Arc<Metadata>, provider: Arc<dyn TableProvider>) -> Result<Self> {
-        let input = datafusion::logical_plan::LogicalPlanBuilder::scan("table", provider, None)?.build()?;
-        Ok(Self {
-            metadata,
-            input,
-        })
+        let input =
+            datafusion::logical_plan::LogicalPlanBuilder::scan("table", provider, None)?.build()?;
+        Ok(Self { metadata, input })
     }
 }
 
 impl Provider {
-    pub async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable> {
+    pub async fn event_segmentation(
+        &self,
+        ctx: Context,
+        es: EventSegmentation,
+    ) -> Result<DataTable> {
         let cur_time = Utc::now();
         let start = Instant::now();
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
@@ -48,18 +50,25 @@ impl Provider {
             self.metadata.clone(),
             self.input.clone(),
             es.clone(),
-        ).await?;
+        )
+        .await?;
 
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 
-        let config = ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {})).with_target_partitions(1);
+        let config = ExecutionConfig::new()
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_target_partitions(1);
         let exec_ctx = ExecutionContext::with_config(config);
         println!("logical plan: {:?}", plan);
         let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
         let displayable_plan = displayable(physical_plan.as_ref());
 
         println!("physical plan: {}", displayable_plan.indent());
-        let batches = collect(physical_plan, Arc::new(RuntimeEnv::new(RuntimeConfig::new())?)).await?;
+        let batches = collect(
+            physical_plan,
+            Arc::new(RuntimeEnv::new(RuntimeConfig::new())?),
+        )
+        .await?;
         for batch in batches.iter() {
             println!("{}", pretty_format_batches(&[batch.clone()])?);
         }

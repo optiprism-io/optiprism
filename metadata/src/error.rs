@@ -21,8 +21,18 @@ pub enum Error {
 impl std::error::Error for Error {}
 
 impl Display for Error {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self)
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Error::Internal(err) => write!(f, "Internal error: {}", err),
+            Error::Plan(err) => write!(f, "Plan error: {}", err),
+            Error::BincodeError(err) => write!(f, "BincodeError error: {}", err),
+            Error::RocksDbError(err) => write!(f, "RocksDbError error: {}", err),
+            Error::KeyAlreadyExists => write!(f, "KeyAlreadyExists"),
+            Error::KeyNotFound(err) => write!(f, "KeyNotFound: {}", err),
+            Error::ConstraintViolation => write!(f, "ConstraintViolation"),
+            Error::FromUtf8Error(err) => write!(f, "FromUtf8Error: {}", err),
+        }
+
     }
 }
 

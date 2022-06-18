@@ -25,7 +25,10 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
-use arrow::array::{Array, ArrayRef, DecimalArray, DecimalBuilder, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+use arrow::array::{
+    Array, ArrayRef, DecimalArray, DecimalBuilder, Float64Array, Int16Array, Int32Array,
+    Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+};
 use arrow::datatypes::DataType;
 use datafusion::error::{DataFusionError, Result as DFResult};
 use dyn_clone::DynClone;
@@ -33,7 +36,9 @@ use dyn_clone::DynClone;
 use crate::physical_plan::expressions::partitioned_count::PartitionedCountAccumulator;
 use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
 use datafusion::physical_plan::aggregates::return_type;
-use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, MaxAccumulator, Min, MinAccumulator, Sum};
+use datafusion::physical_plan::expressions::{
+    Avg, AvgAccumulator, Count, Literal, Max, MaxAccumulator, Min, MinAccumulator, Sum,
+};
 use datafusion::physical_plan::{Accumulator, AggregateExpr};
 use datafusion::scalar::ScalarValue;
 use datafusion_expr::AggregateFunction;
@@ -97,9 +102,15 @@ impl Buffer {
 
     fn _flush(&self, buffer: &Vec<Value>) -> Result<()> {
         let arr = match self.data_type {
-            DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => buffer_to_array_ref!(buffer, i64, Int64Array),
-            DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => buffer_to_array_ref!(buffer, u64, UInt64Array),
-            DataType::Float32 | DataType::Float64 => buffer_to_array_ref!(buffer, f64, Float64Array),
+            DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => {
+                buffer_to_array_ref!(buffer, i64, Int64Array)
+            }
+            DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => {
+                buffer_to_array_ref!(buffer, u64, UInt64Array)
+            }
+            DataType::Float32 | DataType::Float64 => {
+                buffer_to_array_ref!(buffer, f64, Float64Array)
+            }
             DataType::Decimal(precision, scale) => {
                 let mut builder = DecimalBuilder::new(buffer.len(), precision, scale);
                 for v in buffer.iter() {
@@ -310,9 +321,15 @@ impl PartitionedAggregateAccumulator {
         outer_agg: &AggregateFunction,
     ) -> Result<Self> {
         let outer_acc = match outer_agg {
-            AggregateFunction::Avg => Ok(Box::new(AvgAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>),
-            AggregateFunction::Min => Ok(Box::new(MinAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>),
-            AggregateFunction::Max => Ok(Box::new(MaxAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>),
+            AggregateFunction::Avg => {
+                Ok(Box::new(AvgAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>)
+            }
+            AggregateFunction::Min => {
+                Ok(Box::new(MinAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>)
+            }
+            AggregateFunction::Max => {
+                Ok(Box::new(MaxAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>)
+            }
             _ => Err(Error::Internal(format!(
                 "{:?} doesn't supported",
                 outer_agg

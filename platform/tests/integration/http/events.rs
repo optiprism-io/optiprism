@@ -62,7 +62,7 @@ async fn test_events() -> Result<()> {
         status: Status::Enabled,
         properties: None,
         custom_properties: None,
-        is_system: false
+        is_system: false,
     };
 
     let cl = Client::new();
@@ -117,7 +117,7 @@ async fn test_events() -> Result<()> {
             display_name: event1.display_name.clone(),
             description: event1.description.clone(),
             status: event1.status.clone(),
-            is_system: false
+            is_system: false,
         };
 
         let body = serde_json::to_string(&req).unwrap();

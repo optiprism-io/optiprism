@@ -23,7 +23,12 @@ pub struct Column {
 }
 
 impl Column {
-    pub fn new(name: String, data_type: DataType, nullable: bool, dictionary: Option<DataType>) -> Column {
+    pub fn new(
+        name: String,
+        data_type: DataType,
+        nullable: bool,
+        dictionary: Option<DataType>,
+    ) -> Column {
         Column {
             name,
             data_type,
@@ -39,11 +44,13 @@ impl Table {
             self.columns
                 .iter()
                 .cloned()
-                .map(|c| Field::new(
-                    &c.name,
-                    c.dictionary.unwrap_or(c.data_type.clone()),
-                    c.nullable,
-                ))
+                .map(|c| {
+                    Field::new(
+                        &c.name,
+                        c.dictionary.unwrap_or(c.data_type.clone()),
+                        c.nullable,
+                    )
+                })
                 .collect(),
         )
     }

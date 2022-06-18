@@ -1,8 +1,8 @@
+use crate::profiles::{Profile, ProfileProvider};
 use chrono::{DateTime, Duration, Utc};
 use rand::distributions::WeightedIndex;
-use rand::rngs::ThreadRng;
 use rand::prelude::*;
-use crate::profiles::{Profile, ProfileProvider};
+use rand::rngs::ThreadRng;
 
 pub struct Generator {
     rng: ThreadRng,
@@ -61,7 +61,11 @@ impl Generator {
 
             self.daily_users_left = self.new_daily_users;
             self.cur_timestamp += 3600 * 24;
-            println!("generated users: {}. {} days left", self.total_users, Duration::seconds(self.to_timestamp - self.cur_timestamp).num_days())
+            println!(
+                "generated users: {}. {} days left",
+                self.total_users,
+                Duration::seconds(self.to_timestamp - self.cur_timestamp).num_days()
+            )
         }
 
         Some(sample)

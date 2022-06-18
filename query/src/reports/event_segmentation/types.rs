@@ -1,9 +1,9 @@
+use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
+use crate::reports::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
 use chrono::{DateTime, Utc};
-use crate::reports::types::{EventRef, PropertyRef, PropValueOperation, QueryTime, TimeUnit};
-use serde::{Deserialize, Serialize};
 use datafusion_common::ScalarValue;
 use datafusion_expr::AggregateFunction;
-use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
 pub enum SegmentTime {
@@ -190,13 +190,16 @@ pub struct EventSegmentation {
 
 #[cfg(test)]
 mod tests {
+    use crate::event_fields;
+    use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
+    use crate::reports::event_segmentation::types::{
+        Analysis, Breakdown, ChartType, Compare, Event, EventFilter, EventSegmentation, NamedQuery,
+        Query,
+    };
+    use crate::reports::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
     use chrono::{DateTime, Utc};
     use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;
-    use crate::event_fields;
-    use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-    use crate::reports::types::{ EventRef, PropertyRef, PropValueOperation, QueryTime, TimeUnit};
-    use crate::reports::event_segmentation::types::{Analysis, Breakdown, ChartType, Compare, Event, EventFilter, EventSegmentation, NamedQuery, Query};
 
     #[test]
     fn test_serialize() {
@@ -207,85 +210,81 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
         let es = EventSegmentation {
-            time: QueryTime::Between {
-                from,
-                to,
-            },
+            time: QueryTime::Between { from, to },
             group: event_fields::USER_ID.to_string(),
             interval_unit: TimeUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
-            compare: Some(Compare { offset: 1, unit: TimeUnit::Second }),
-            events: vec![
-                Event::new(
-                    EventRef::Regular("e1".to_string()),
-                    Some(vec![
-                        EventFilter::Property {
-                            property: PropertyRef::User("p1".to_string()),
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::Boolean(Some(true))]),
+            compare: Some(Compare {
+                offset: 1,
+                unit: TimeUnit::Second,
+            }),
+            events: vec![Event::new(
+                EventRef::Regular("e1".to_string()),
+                Some(vec![
+                    EventFilter::Property {
+                        property: PropertyRef::User("p1".to_string()),
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                    },
+                    EventFilter::Property {
+                        property: PropertyRef::Event("p2".to_string()),
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![ScalarValue::Boolean(None)]),
+                    },
+                    EventFilter::Property {
+                        property: PropertyRef::Event("p3".to_string()),
+                        operation: PropValueOperation::Empty,
+                        value: None,
+                    },
+                    EventFilter::Property {
+                        property: PropertyRef::Event("p4".to_string()),
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![ScalarValue::Utf8(Some("s".to_string()))]),
+                    },
+                    EventFilter::Property {
+                        property: PropertyRef::Event("p5".to_string()),
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![ScalarValue::Utf8(None)]),
+                    },
+                ]),
+                Some(vec![Breakdown::Property(PropertyRef::User(
+                    "Device".to_string(),
+                ))]),
+                vec![
+                    NamedQuery::new(Query::CountEvents, Some("count".to_string())),
+                    NamedQuery::new(
+                        Query::CountUniqueGroups,
+                        Some("count_unique_users".to_string()),
+                    ),
+                    NamedQuery::new(
+                        Query::CountPerGroup {
+                            aggregate: AggregateFunction::Avg,
                         },
-                        EventFilter::Property {
-                            property: PropertyRef::Event("p2".to_string()),
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::Boolean(None)]),
+                        Some("count_per_user".to_string()),
+                    ),
+                    NamedQuery::new(
+                        Query::AggregatePropertyPerGroup {
+                            property: PropertyRef::Event("Revenue".to_string()),
+                            aggregate_per_group: PartitionedAggregateFunction::Sum,
+                            aggregate: AggregateFunction::Avg,
                         },
-                        EventFilter::Property {
-                            property: PropertyRef::Event("p3".to_string()),
-                            operation: PropValueOperation::Empty,
-                            value: None,
+                        Some("avg_revenue_per_user".to_string()),
+                    ),
+                    NamedQuery::new(
+                        Query::AggregateProperty {
+                            property: PropertyRef::Event("Revenue".to_string()),
+                            aggregate: AggregateFunction::Sum,
                         },
-                        EventFilter::Property {
-                            property: PropertyRef::Event("p4".to_string()),
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::Utf8(Some("s".to_string()))]),
-                        },
-                        EventFilter::Property {
-                            property: PropertyRef::Event("p5".to_string()),
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::Utf8(None)]),
-                        },
-                    ]),
-                    Some(vec![Breakdown::Property(PropertyRef::User(
-                        "Device".to_string(),
-                    ))]),
-                    vec![
-                        NamedQuery::new(Query::CountEvents, Some("count".to_string())),
-                        NamedQuery::new(
-                            Query::CountUniqueGroups,
-                            Some("count_unique_users".to_string()),
-                        ),
-                        NamedQuery::new(
-                            Query::CountPerGroup {
-                                aggregate: AggregateFunction::Avg,
-                            },
-                            Some("count_per_user".to_string()),
-                        ),
-                        NamedQuery::new(
-                            Query::AggregatePropertyPerGroup {
-                                property: PropertyRef::Event("Revenue".to_string()),
-                                aggregate_per_group: PartitionedAggregateFunction::Sum,
-                                aggregate: AggregateFunction::Avg,
-                            },
-                            Some("avg_revenue_per_user".to_string()),
-                        ),
-                        NamedQuery::new(
-                            Query::AggregateProperty {
-                                property: PropertyRef::Event("Revenue".to_string()),
-                                aggregate: AggregateFunction::Sum,
-                            },
-                            Some("sum_revenue".to_string()),
-                        ),
-                    ],
-                ),
-            ],
-            filters: Some(vec![
-                EventFilter::Property {
-                    property: PropertyRef::User("p1".to_string()),
-                    operation: PropValueOperation::Eq,
-                    value: Some(vec![ScalarValue::Boolean(Some(true))]),
-                },
-            ]),
+                        Some("sum_revenue".to_string()),
+                    ),
+                ],
+            )],
+            filters: Some(vec![EventFilter::Property {
+                property: PropertyRef::User("p1".to_string()),
+                operation: PropValueOperation::Eq,
+                value: Some(vec![ScalarValue::Boolean(Some(true))]),
+            }]),
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Country".to_string(),
             ))]),

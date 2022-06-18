@@ -1,30 +1,30 @@
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use arrow::record_batch::RecordBatch;
-use chrono::{DateTime, Utc};
-use enum_iterator::all;
-use futures::future::join_all;
-use rand::thread_rng;
-use metadata::{dictionaries, Metadata};
+use crate::error::Result;
+use crate::generator;
 use crate::generator::Generator;
 use crate::profiles::{Profile, ProfileProvider};
 use crate::store::events::Event;
 use crate::store::products::ProductProvider;
-use crate::store::schema::create_entities;
-use crate::error::Result;
-use crate::generator;
 use crate::store::scenario::Scenario;
+use crate::store::schema::create_entities;
+use arrow::record_batch::RecordBatch;
+use chrono::{DateTime, Utc};
+use enum_iterator::all;
+use futures::future::join_all;
 use log::info;
+use metadata::{dictionaries, Metadata};
+use rand::thread_rng;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+pub mod actions;
+mod batch_builder;
+mod coefficients;
+pub mod events;
+mod intention;
 mod products;
 pub mod scenario;
 mod schema;
-mod batch_builder;
-pub mod events;
-pub mod actions;
-mod intention;
-mod coefficients;
 mod transitions;
 
 pub struct Config {
@@ -45,9 +45,22 @@ pub async fn gen(cfg: Config) -> Result<Vec<Vec<RecordBatch>>> {
     let mut rng = thread_rng();
 
     info!("loading profiles");
-    let mut profiles = ProfileProvider::try_new_from_csv(cfg.org_id, cfg.project_id, &cfg.md.dictionaries, cfg.geo_path, cfg.device_path)?;
+    let mut profiles = ProfileProvider::try_new_from_csv(
+        cfg.org_id,
+        cfg.project_id,
+        &cfg.md.dictionaries,
+        cfg.geo_path,
+        cfg.device_path,
+    )?;
     info!("loading products");
-    let mut products = ProductProvider::try_new_from_csv(cfg.org_id, cfg.project_id, &mut rng, cfg.md.dictionaries.clone(), cfg.products_path).await?;
+    let mut products = ProductProvider::try_new_from_csv(
+        cfg.org_id,
+        cfg.project_id,
+        &mut rng,
+        cfg.md.dictionaries.clone(),
+        cfg.products_path,
+    )
+    .await?;
     info!("creating entities");
     let schema = Arc::new(create_entities(cfg.org_id, cfg.project_id, &cfg.md).await?);
 
@@ -58,14 +71,21 @@ pub async fn gen(cfg: Config) -> Result<Vec<Vec<RecordBatch>>> {
         from: cfg.from,
         to: cfg.to,
         new_daily_users: cfg.new_daily_users,
-        traffic_hourly_weights: [0.4, 0.37, 0.39, 0.43, 0.45, 0.47, 0.52, 0.6, 0.8, 0.9, 0.85, 0.8, 0.75, 0.85, 1., 0.85, 0.7, 0.63, 0.62, 0.61, 0.59, 0.57, 0.48, 0.4],
+        traffic_hourly_weights: [
+            0.4, 0.37, 0.39, 0.43, 0.45, 0.47, 0.52, 0.6, 0.8, 0.9, 0.85, 0.8, 0.75, 0.85, 1.,
+            0.85, 0.7, 0.63, 0.62, 0.61, 0.59, 0.57, 0.48, 0.4,
+        ],
     };
 
     let gen = Generator::new(gen_cfg);
 
     let mut events_map: HashMap<Event, u64> = HashMap::default();
     for event in all::<Event>() {
-        let md_event = cfg.md.events.get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str()).await?;
+        let md_event = cfg
+            .md
+            .events
+            .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str())
+            .await?;
         events_map.insert(event, md_event.id);
     }
 

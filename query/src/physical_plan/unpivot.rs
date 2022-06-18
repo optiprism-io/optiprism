@@ -1,27 +1,34 @@
+use crate::{Error, Result};
+use arrow::array::{
+    make_builder, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray,
+    DecimalBuilder, Float32Builder, Float64Builder, Int16Array, Int16Builder, Int32Array,
+    Int32Builder, Int64Array, Int64Builder, Int8Array, Int8BufferBuilder, Int8Builder,
+    StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt16Builder,
+    UInt32Builder, UInt64Builder, UInt8Builder,
+};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use arrow::error::{ArrowError, Result as ArrowResult};
+use arrow::record_batch::RecordBatch;
+use axum::async_trait;
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+use datafusion::arrow::array::{
+    Float32Array, Float64Array, StringArray, TimestampMicrosecondArray, UInt16Array, UInt32Array,
+    UInt64Array, UInt8Array,
+};
+use datafusion::execution::runtime_env::RuntimeEnv;
+use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
+use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
+use datafusion::physical_plan::{
+    DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
+    Statistics,
+};
+use futures::{Stream, StreamExt};
 use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-use arrow::record_batch::RecordBatch;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use arrow::array::{Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray, Int8Array, DecimalBuilder, Float32Builder, Float64Builder, UInt16Builder, UInt32Builder, UInt64Builder, Int16Array, Int32Array, Int64Array, Int16Builder, Int32Builder, Int64Builder, Int8BufferBuilder, Int8Builder, make_builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt8Builder};
-use futures::{Stream, StreamExt};
-use datafusion::arrow::array::{
-    Float32Array, Float64Array, StringArray, TimestampMicrosecondArray, UInt16Array,
-    UInt64Array,
-    UInt8Array,
-    UInt32Array,
-};
-use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::physical_plan::{DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream, Statistics};
-use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
-use crate::{Result, Error};
-use axum::{async_trait};
-use arrow::error::{ArrowError, Result as ArrowResult};
-use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 
 /// `UNPIVOT` execution plan operator. Unpivot transforms columns into rows. E.g.
 pub struct UnpivotExec {
@@ -34,7 +41,12 @@ pub struct UnpivotExec {
 }
 
 impl UnpivotExec {
-    pub fn try_new(input: Arc<dyn ExecutionPlan>, cols: Vec<String>, name_col: String, value_col: String) -> Result<Self> {
+    pub fn try_new(
+        input: Arc<dyn ExecutionPlan>,
+        cols: Vec<String>,
+        name_col: String,
+        value_col: String,
+    ) -> Result<Self> {
         let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let mut uniq_cols = cols.clone();
@@ -49,12 +61,15 @@ impl UnpivotExec {
         }
 
         let schema = {
-            let mut fields: Vec<Field> = input.schema().fields().iter().filter_map(|f| {
-                match cols.contains(f.name()) {
+            let mut fields: Vec<Field> = input
+                .schema()
+                .fields()
+                .iter()
+                .filter_map(|f| match cols.contains(f.name()) {
                     true => None,
-                    false => Some(f.clone())
-                }
-            }).collect();
+                    false => Some(f.clone()),
+                })
+                .collect();
 
             let name_field = Field::new(name_col.as_str(), DataType::Utf8, false);
             fields.push(name_field);
@@ -103,18 +118,30 @@ impl ExecutionPlan for UnpivotExec {
         false
     }
 
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> { vec![self.input.clone()] }
-
-    fn with_new_children(&self, children: Vec<Arc<dyn ExecutionPlan>>) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(UnpivotExec::try_new(
-            children[0].clone(),
-            self.cols.clone(),
-            self.name_col.clone(),
-            self.value_col.clone(),
-        ).map_err(Error::into_datafusion_execution_error)?))
+    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
+        vec![self.input.clone()]
     }
 
-    async fn execute(&self, partition: usize, runtime: Arc<RuntimeEnv>) -> datafusion_common::Result<SendableRecordBatchStream> {
+    fn with_new_children(
+        &self,
+        children: Vec<Arc<dyn ExecutionPlan>>,
+    ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
+        Ok(Arc::new(
+            UnpivotExec::try_new(
+                children[0].clone(),
+                self.cols.clone(),
+                self.name_col.clone(),
+                self.value_col.clone(),
+            )
+            .map_err(Error::into_datafusion_execution_error)?,
+        ))
+    }
+
+    async fn execute(
+        &self,
+        partition: usize,
+        runtime: Arc<RuntimeEnv>,
+    ) -> datafusion_common::Result<SendableRecordBatchStream> {
         let stream = self.input.execute(partition, runtime.clone()).await?;
 
         Ok(Box::pin(UnpivotStream {
@@ -160,7 +187,9 @@ impl Stream for UnpivotStream {
         let _timer = elapsed_compute.timer();
 
         let poll = match self.stream.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(unpivot(&batch, self.schema.clone(), &self.cols))),
+            Poll::Ready(Some(Ok(batch))) => {
+                Poll::Ready(Some(unpivot(&batch, self.schema.clone(), &self.cols)))
+            }
             other => other,
         };
 
@@ -220,7 +249,11 @@ macro_rules! build_value_arr {
     }};
 }
 
-pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> ArrowResult<RecordBatch> {
+pub fn unpivot(
+    batch: &RecordBatch,
+    schema: SchemaRef,
+    cols: &[String],
+) -> ArrowResult<RecordBatch> {
     let builder_cap = batch.num_rows() * cols.len();
     let unpivot_cols_len = cols.len();
 
@@ -230,19 +263,93 @@ pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Arrow
         .enumerate()
         .filter(|(idx, _)| !cols.contains(batch.schema().field(*idx).name()))
         .map(|(_, arr)| match arr.data_type() {
-            DataType::Int8 => build_group_arr!(batch_col_idx, arr, Int8Array, unpivot_cols_len, Int8Builder),
-            DataType::Int16 => build_group_arr!(batch_col_idx, arr, Int16Array, unpivot_cols_len, Int16Builder),
-            DataType::Int32 => build_group_arr!(batch_col_idx, arr, Int32Array, unpivot_cols_len, Int32Builder),
-            DataType::Int64 => build_group_arr!(batch_col_idx, arr, Int64Array, unpivot_cols_len, Int64Builder),
-            DataType::UInt8 => build_group_arr!(batch_col_idx, arr, UInt8Array, unpivot_cols_len, UInt8Builder),
-            DataType::UInt16 => build_group_arr!(batch_col_idx, arr, UInt16Array, unpivot_cols_len, UInt16Builder),
-            DataType::UInt32 => build_group_arr!(batch_col_idx, arr, UInt32Array, unpivot_cols_len, UInt32Builder),
-            DataType::UInt64 => build_group_arr!(batch_col_idx, arr, UInt64Array, unpivot_cols_len, UInt64Builder),
-            DataType::Boolean => build_group_arr!(batch_col_idx, arr, BooleanArray, unpivot_cols_len, BooleanBuilder),
-            DataType::Float32 => build_group_arr!(batch_col_idx, arr, Float32Array, unpivot_cols_len, Float32Builder),
-            DataType::Float64 => build_group_arr!(batch_col_idx, arr, Float64Array, unpivot_cols_len, Float64Builder),
-            DataType::Utf8 => build_group_arr!(batch_col_idx, arr, StringArray, unpivot_cols_len, StringBuilder),
-            DataType::Timestamp(Nanosecond, None) => build_group_arr!(batch_col_idx, arr, TimestampNanosecondArray, unpivot_cols_len, TimestampNanosecondBuilder),
+            DataType::Int8 => {
+                build_group_arr!(batch_col_idx, arr, Int8Array, unpivot_cols_len, Int8Builder)
+            }
+            DataType::Int16 => build_group_arr!(
+                batch_col_idx,
+                arr,
+                Int16Array,
+                unpivot_cols_len,
+                Int16Builder
+            ),
+            DataType::Int32 => build_group_arr!(
+                batch_col_idx,
+                arr,
+                Int32Array,
+                unpivot_cols_len,
+                Int32Builder
+            ),
+            DataType::Int64 => build_group_arr!(
+                batch_col_idx,
+                arr,
+                Int64Array,
+                unpivot_cols_len,
+                Int64Builder
+            ),
+            DataType::UInt8 => build_group_arr!(
+                batch_col_idx,
+                arr,
+                UInt8Array,
+                unpivot_cols_len,
+                UInt8Builder
+            ),
+            DataType::UInt16 => build_group_arr!(
+                batch_col_idx,
+                arr,
+                UInt16Array,
+                unpivot_cols_len,
+                UInt16Builder
+            ),
+            DataType::UInt32 => build_group_arr!(
+                batch_col_idx,
+                arr,
+                UInt32Array,
+                unpivot_cols_len,
+                UInt32Builder
+            ),
+            DataType::UInt64 => build_group_arr!(
+                batch_col_idx,
+                arr,
+                UInt64Array,
+                unpivot_cols_len,
+                UInt64Builder
+            ),
+            DataType::Boolean => build_group_arr!(
+                batch_col_idx,
+                arr,
+                BooleanArray,
+                unpivot_cols_len,
+                BooleanBuilder
+            ),
+            DataType::Float32 => build_group_arr!(
+                batch_col_idx,
+                arr,
+                Float32Array,
+                unpivot_cols_len,
+                Float32Builder
+            ),
+            DataType::Float64 => build_group_arr!(
+                batch_col_idx,
+                arr,
+                Float64Array,
+                unpivot_cols_len,
+                Float64Builder
+            ),
+            DataType::Utf8 => build_group_arr!(
+                batch_col_idx,
+                arr,
+                StringArray,
+                unpivot_cols_len,
+                StringBuilder
+            ),
+            DataType::Timestamp(Nanosecond, None) => build_group_arr!(
+                batch_col_idx,
+                arr,
+                TimestampNanosecondArray,
+                unpivot_cols_len,
+                TimestampNanosecondBuilder
+            ),
             DataType::Decimal(precision, scale) => {
                 // build group array realisation for decimal type
                 let src_arr_typed = arr.as_any().downcast_ref::<DecimalArray>().unwrap();
@@ -263,8 +370,8 @@ pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Arrow
                 Arc::new(result.finish()) as ArrayRef
             }
             _ => unimplemented!("{}", arr.data_type()),
-        }).collect();
-
+        })
+        .collect();
 
     // define value type
     let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
@@ -282,9 +389,9 @@ pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Arrow
                 let int_arr = arrow::compute::cast(arr, &DataType::Int64).unwrap();
                 arrow::compute::cast(&int_arr, &value_type).unwrap()
             }
-            other => arrow::compute::cast(arr, &value_type).unwrap()
-        }).collect();
-
+            other => arrow::compute::cast(arr, &value_type).unwrap(),
+        })
+        .collect();
 
     let name_arr = {
         let mut builder = StringBuilder::new(builder_cap);
@@ -301,7 +408,9 @@ pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Arrow
         DataType::Int8 => build_value_arr!(Int8Array, Int8Builder, builder_cap, unpivot_arrs),
         DataType::Int16 => build_value_arr!(Int16Array, Int16Builder, builder_cap, unpivot_arrs),
         DataType::UInt64 => build_value_arr!(UInt64Array, UInt64Builder, builder_cap, unpivot_arrs),
-        DataType::Float64 => build_value_arr!(Float64Array, Float64Builder, builder_cap, unpivot_arrs),
+        DataType::Float64 => {
+            build_value_arr!(Float64Array, Float64Builder, builder_cap, unpivot_arrs)
+        }
         DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE) => {
             let arrs: Vec<&DecimalArray> = unpivot_arrs
                 .iter()
@@ -334,31 +443,54 @@ pub fn unpivot(batch: &RecordBatch, schema: SchemaRef, cols: &[String]) -> Arrow
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use crate::physical_plan::unpivot::UnpivotExec;
     use arrow::array::{ArrayRef, Float32Array, Float64Array, Int32Array, StringArray};
     use arrow::record_batch::RecordBatch;
+    pub use datafusion::error::Result;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
-    use crate::physical_plan::unpivot::UnpivotExec;
     use datafusion::physical_plan::ExecutionPlan;
-    pub use datafusion::error::Result;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test() -> Result<()> {
         let input = {
             let batches = vec![
                 RecordBatch::try_from_iter(vec![
-                    ("d1", Arc::new(StringArray::from(vec!["a".to_string(), "b".to_string()])) as ArrayRef),
+                    (
+                        "d1",
+                        Arc::new(StringArray::from(vec!["a".to_string(), "b".to_string()]))
+                            as ArrayRef,
+                    ),
                     ("d2", Arc::new(Int32Array::from(vec![1, 2])) as ArrayRef),
-                    ("v1", Arc::new(Float64Array::from(vec![1.34, 2.0])) as ArrayRef),
-                    ("v2", Arc::new(Float32Array::from(vec![4.3, 6.3])) as ArrayRef),
+                    (
+                        "v1",
+                        Arc::new(Float64Array::from(vec![1.34, 2.0])) as ArrayRef,
+                    ),
+                    (
+                        "v2",
+                        Arc::new(Float32Array::from(vec![4.3, 6.3])) as ArrayRef,
+                    ),
                 ])?,
                 RecordBatch::try_from_iter(vec![
-                    ("d1", Arc::new(StringArray::from(vec!["a".to_string(), "b".to_string(), "c".to_string()])) as ArrayRef),
+                    (
+                        "d1",
+                        Arc::new(StringArray::from(vec![
+                            "a".to_string(),
+                            "b".to_string(),
+                            "c".to_string(),
+                        ])) as ArrayRef,
+                    ),
                     ("d2", Arc::new(Int32Array::from(vec![1, 2, 3])) as ArrayRef),
-                    ("v1", Arc::new(Float64Array::from(vec![2.72, 23.0, 33.3])) as ArrayRef),
-                    ("v2", Arc::new(Float32Array::from(vec![1.0, 11.0, 2.23])) as ArrayRef),
+                    (
+                        "v1",
+                        Arc::new(Float64Array::from(vec![2.72, 23.0, 33.3])) as ArrayRef,
+                    ),
+                    (
+                        "v2",
+                        Arc::new(Float32Array::from(vec![1.0, 11.0, 2.23])) as ArrayRef,
+                    ),
                 ])?,
             ];
 
@@ -371,7 +503,8 @@ mod tests {
             vec!["v1".to_string(), "v2".to_string()],
             "name".to_string(),
             "value".to_string(),
-        ).unwrap();
+        )
+        .unwrap();
         let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
         let stream = exec.execute(0, runtime).await?;
         let result = collect(stream).await?;

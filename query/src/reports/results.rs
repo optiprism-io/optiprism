@@ -38,9 +38,6 @@ pub struct DataTable {
 
 impl DataTable {
     pub fn new(schema: SchemaRef, columns: Vec<Column>) -> Self {
-        Self {
-            schema,
-            columns,
-        }
+        Self { schema, columns }
     }
 }

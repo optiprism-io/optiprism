@@ -7,6 +7,7 @@ use crate::error::{Error, Result};
 use crate::physical_plan::expressions::partitioned_aggregate::{
     Buffer, PartitionedAccumulator, PartitionedAggregate, Value,
 };
+use crate::DEFAULT_BATCH_SIZE;
 use arrow::array::{
     Array, ArrayBuilder, ArrayRef, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array,
     Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
@@ -18,7 +19,6 @@ use datafusion::physical_plan::aggregates::return_type;
 use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, Min, Sum};
 use datafusion::physical_plan::{expressions, Accumulator, AggregateExpr, PhysicalExpr};
 use datafusion::scalar::ScalarValue;
-use crate::DEFAULT_BATCH_SIZE;
 
 #[derive(Debug)]
 pub struct PartitionedCountAccumulator {

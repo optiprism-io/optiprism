@@ -68,7 +68,10 @@ async fn test_properties() -> Result<()> {
 
     let mut create_prop2 = create_prop_req.clone();
     create_prop2.name = "prop2".to_string();
-    let res = event_properties.create(1, 1, create_prop2.clone()).await?.id;
+    let res = event_properties
+        .create(1, 1, create_prop2.clone())
+        .await?
+        .id;
     assert_eq!(res, 2);
     // check existence by id
     assert_eq!(event_properties.get_by_id(1, 1, 1).await?.id, 1);
@@ -83,7 +86,9 @@ async fn test_properties() -> Result<()> {
         .await
         .is_err());
     update_prop1.name.insert("prop1_new".to_string());
-    let res = event_properties.update(1, 1, 1, update_prop1.clone()).await?;
+    let res = event_properties
+        .update(1, 1, 1, update_prop1.clone())
+        .await?;
     assert_eq!(res.id, 1);
 
     assert!(event_properties.get_by_name(1, 1, "prop1").await.is_err());

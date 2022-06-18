@@ -7,7 +7,11 @@ use crate::error::{Error, Result};
 use crate::physical_plan::expressions::partitioned_aggregate::{
     Buffer, PartitionedAccumulator, PartitionedAggregate, Value,
 };
-use arrow::array::{Array, ArrayBuilder, ArrayRef, DecimalArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+use crate::DEFAULT_BATCH_SIZE;
+use arrow::array::{
+    Array, ArrayBuilder, ArrayRef, DecimalArray, Float32Array, Float64Array, Int16Array,
+    Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+};
 use arrow::compute;
 use arrow::datatypes::DataType;
 use datafusion::error::Result as DFResult;
@@ -16,7 +20,6 @@ use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal
 use datafusion::physical_plan::{expressions, Accumulator, AggregateExpr, PhysicalExpr};
 use datafusion::scalar::ScalarValue;
 use dyn_clone::DynClone;
-use crate::DEFAULT_BATCH_SIZE;
 
 #[derive(Debug)]
 pub struct PartitionedSumAccumulator {
@@ -28,7 +31,9 @@ impl PartitionedSumAccumulator {
     pub fn try_new(data_type: DataType, outer_acc: Box<dyn Accumulator>) -> Result<Self> {
         let value = match data_type {
             DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => Value::Int64(0),
-            DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => Value::UInt64(0),
+            DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => {
+                Value::UInt64(0)
+            }
             DataType::Float16 | DataType::Float32 | DataType::Float64 => Value::Float64(0.0),
             DataType::Decimal(_, _) => Value::Decimal(0),
             _ => unimplemented!(),
@@ -126,9 +131,9 @@ mod tests {
     use datafusion::scalar::ScalarValue as DFScalarValue;
     use datafusion_common::ScalarValue;
     use datafusion_expr::Accumulator;
-    use std::sync::Arc;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
+    use std::sync::Arc;
 
     #[test]
     fn test_int64() -> Result<()> {
@@ -180,10 +185,8 @@ mod tests {
             Arc::new(builder.finish())
         };
 
-
         sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
         sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
-
 
         let list = vec![
             dec!(1.23) + dec!(2.31),
@@ -198,7 +201,10 @@ mod tests {
         let mut mean = sum / rust_decimal::Decimal::new(list.len() as i64, 0);
 
         mean.rescale(2);
-        assert_eq!(sum_acc.evaluate()?, DFScalarValue::Decimal128(Some(mean.mantissa()), 10, 2));
+        assert_eq!(
+            sum_acc.evaluate()?,
+            DFScalarValue::Decimal128(Some(mean.mantissa()), 10, 2)
+        );
         Ok(())
     }
 }

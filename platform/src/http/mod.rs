@@ -1,10 +1,10 @@
 pub mod auth;
+pub mod event_segmentation;
 pub mod events;
 pub mod properties;
-pub mod event_segmentation;
 
-use axum::{Router};
 use crate::Platform;
+use axum::Router;
 
 pub fn attach_routes(router: Router, platform: Platform) -> Router {
     let mut router = auth::attach_routes(router, platform.auth.clone());
