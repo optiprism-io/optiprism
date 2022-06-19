@@ -6,6 +6,3 @@ node_modules
 dist
 dist-ssr
 *.local
-src/api/git_push.sh
-src/api/.openapi-generator
-
