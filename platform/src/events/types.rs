@@ -1,4 +1,4 @@
-use metadata::events::{Status};
+use metadata::events::Status;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

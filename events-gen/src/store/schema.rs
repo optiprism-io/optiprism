@@ -1,37 +1,47 @@
-use std::sync::Arc;
-use arrow::datatypes::{DataType, Schema, TimeUnit};
-use arrow::datatypes::DataType::UInt8;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use metadata::database::{Column, Table, TableType};
-use metadata::{events, Metadata, properties};
-use metadata::events::Event as MDEvent;
-use metadata::properties::{CreatePropertyRequest, Property};
-use metadata::properties::provider::Namespace;
-use query::event_fields;
-use crate::error::{Result, Error};
+use crate::error::Result;
 use crate::store::events::Event;
+use arrow::datatypes::{DataType, Schema, TimeUnit};
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use enum_iterator::all;
+use metadata::database::{Column, Table, TableType};
+use metadata::events::Event as MDEvent;
+use metadata::properties::provider::Namespace;
+use metadata::properties::{CreatePropertyRequest, Property};
+use metadata::{events, properties, Metadata};
 
-async fn create_event(md: &Arc<Metadata>, org_id: u64, proj_id: u64, name: String) -> Result<MDEvent> {
-    Ok(
-        md.events
-            .get_or_create(
-                org_id,
-                proj_id,
-                events::CreateEventRequest {
-                    created_by: 0,
-                    tags: None,
-                    name,
-                    display_name: None,
-                    description: None,
-                    status: events::Status::Enabled,
-                    properties: None,
-                    custom_properties: None,
-                    is_system: false
-                },
-            )
-            .await?
-    )
+use std::sync::Arc;
+
+async fn create_event(
+    md: &Arc<Metadata>,
+    org_id: u64,
+    proj_id: u64,
+    name: String,
+) -> Result<MDEvent> {
+    Ok(md
+        .events
+        .get_or_create(
+            org_id,
+            proj_id,
+            events::CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name,
+                display_name: None,
+                description: None,
+                status: events::Status::Enabled,
+                properties: None,
+                custom_properties: None,
+                is_system: false,
+            },
+        )
+        .await?)
+}
+
+pub struct CreatePropertyMainRequest {
+    name: String,
+    data_type: DataType,
+    nullable: bool,
+    dict: Option<DataType>,
 }
 
 async fn create_property(
@@ -39,33 +49,43 @@ async fn create_property(
     ns: Namespace,
     org_id: u64,
     proj_id: u64,
-    name: String,
-    data_type: DataType,
-    nullable: bool,
-    dict: Option<DataType>,
+    main_req: CreatePropertyMainRequest,
     cols: &mut Vec<Column>,
 ) -> Result<Property> {
     let req = CreatePropertyRequest {
         created_by: 0,
         tags: None,
-        name,
+        name: main_req.name.clone(),
         description: None,
         display_name: None,
-        typ: data_type.clone(),
+        typ: main_req.data_type.clone(),
         status: properties::Status::Enabled,
         is_system: false,
-        nullable,
+        nullable: main_req.nullable,
         is_array: false,
-        is_dictionary: dict.is_some(),
-        dictionary_type: dict.clone(),
+        is_dictionary: main_req.dict.is_some(),
+        dictionary_type: main_req.dict.clone(),
     };
 
     let prop = match ns {
-        Namespace::Event => md.event_properties.get_or_create(org_id, proj_id, req).await?,
-        Namespace::User => md.user_properties.get_or_create(org_id, proj_id, req).await?,
+        Namespace::Event => {
+            md.event_properties
+                .get_or_create(org_id, proj_id, req)
+                .await?
+        }
+        Namespace::User => {
+            md.user_properties
+                .get_or_create(org_id, proj_id, req)
+                .await?
+        }
     };
 
-    cols.push(Column::new(prop.column_name(ns), data_type, nullable, dict));
+    cols.push(Column::new(
+        prop.column_name(ns),
+        main_req.data_type,
+        main_req.nullable,
+        main_req.dict,
+    ));
 
     Ok(prop)
 }
@@ -78,36 +98,45 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         Namespace::Event,
         org_id,
         proj_id,
-        "User ID".to_string(),
-        DataType::UInt64,
-        false,
-        None,
+        CreatePropertyMainRequest {
+            name: "User ID".to_string(),
+            data_type: DataType::UInt64,
+            nullable: false,
+            dict: None,
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::Event,
         org_id,
         proj_id,
-        "Created At".to_string(),
-        DataType::Timestamp(TimeUnit::Second, None),
-        false,
-        None,
+        CreatePropertyMainRequest {
+            name: "Created At".to_string(),
+            data_type: DataType::Timestamp(TimeUnit::Second, None),
+            nullable: false,
+            dict: None,
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::Event,
         org_id,
         proj_id,
-        "Event".to_string(),
-        DataType::Utf8,
-        false,
-        Some(DataType::UInt64),
+        CreatePropertyMainRequest {
+            name: "Event".to_string(),
+            data_type: DataType::Utf8,
+            nullable: false,
+            dict: Some(DataType::UInt64),
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     // create event props
     create_property(
@@ -115,205 +144,255 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         Namespace::Event,
         org_id,
         proj_id,
-        "Product Name".to_string(),
-        DataType::Utf8,
-        true,
-        Some(DataType::UInt16),
+        CreatePropertyMainRequest {
+            name: "Product Name".to_string(),
+            data_type: DataType::Utf8,
+            nullable: true,
+            dict: Some(DataType::UInt16),
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::Event,
         org_id,
         proj_id,
-        "Product Category".to_string(),
-        DataType::Utf8,
-        true,
-        Some(DataType::UInt16),
+        CreatePropertyMainRequest {
+            name: "Product Category".to_string(),
+            data_type: DataType::Utf8,
+            nullable: true,
+            dict: Some(DataType::UInt16),
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::Event,
         org_id,
         proj_id,
-        "Product Subcategory".to_string(),
-        DataType::Utf8,
-        true,
-        Some(DataType::UInt16),
+        CreatePropertyMainRequest {
+            name: "Product Subcategory".to_string(),
+            data_type: DataType::Utf8,
+            nullable: true,
+            dict: Some(DataType::UInt16),
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::Event,
         org_id,
         proj_id,
-        "Product Brand".to_string(),
-        DataType::Utf8,
-        true,
-        Some(DataType::UInt16),
+        CreatePropertyMainRequest {
+            name: "Product Brand".to_string(),
+            data_type: DataType::Utf8,
+            nullable: true,
+            dict: Some(DataType::UInt16),
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::Event,
         org_id,
         proj_id,
-        "Product Price".to_string(),
-        DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
-        true,
-        None,
+        CreatePropertyMainRequest {
+            name: "Product Price".to_string(),
+            data_type: DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            nullable: true,
+            dict: None,
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::Event,
         org_id,
         proj_id,
-        "Product Discount Price".to_string(),
-        DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
-        true,
-        None,
+        CreatePropertyMainRequest {
+            name: "Product Discount Price".to_string(),
+            data_type: DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            nullable: true,
+            dict: None,
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::User,
         org_id,
         proj_id,
-        "Spent Total".to_string(),
-        DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
-        true,
-        None,
+        CreatePropertyMainRequest {
+            name: "Spent Total".to_string(),
+            data_type: DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            nullable: true,
+            dict: None,
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::User,
         org_id,
         proj_id,
-        "Products Bought".to_string(),
-        UInt8,
-        true,
-        None,
+        CreatePropertyMainRequest {
+            name: "Products Bought".to_string(),
+            data_type: DataType::UInt8,
+            nullable: true,
+            dict: None,
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::User,
         org_id,
         proj_id,
-        "Cart Items Number".to_string(),
-        UInt8,
-        true,
-        None,
+        CreatePropertyMainRequest {
+            name: "Cart Items Number".to_string(),
+            data_type: DataType::UInt8,
+            nullable: true,
+            dict: None,
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::User,
         org_id,
         proj_id,
-        "Cart Amount".to_string(),
-        DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
-        true,
-        None,
+        CreatePropertyMainRequest {
+            name: "Cart Amount".to_string(),
+            data_type: DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            nullable: true,
+            dict: None,
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::Event,
         org_id,
         proj_id,
-        "Revenue".to_string(),
-        DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
-        true,
-        None,
+        CreatePropertyMainRequest {
+            name: "Revenue".to_string(),
+            data_type: DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            nullable: true,
+            dict: None,
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::User,
         org_id,
         proj_id,
-        "Country".to_string(),
-        DataType::Utf8,
-        true,
-        Some(DataType::UInt16),
+        CreatePropertyMainRequest {
+            name: "Country".to_string(),
+            data_type: DataType::Utf8,
+            nullable: true,
+            dict: Some(DataType::UInt16),
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::User,
         org_id,
         proj_id,
-        "City".to_string(),
-        DataType::Utf8,
-        true,
-        Some(DataType::UInt16),
+        CreatePropertyMainRequest {
+            name: "City".to_string(),
+            data_type: DataType::Utf8,
+            nullable: true,
+            dict: Some(DataType::UInt16),
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::User,
         org_id,
         proj_id,
-        "Device".to_string(),
-        DataType::Utf8,
-        true,
-        Some(DataType::UInt16),
+        CreatePropertyMainRequest {
+            name: "Device".to_string(),
+            data_type: DataType::Utf8,
+            nullable: true,
+            dict: Some(DataType::UInt16),
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::User,
         org_id,
         proj_id,
-        "Device Category".to_string(),
-        DataType::Utf8,
-        true,
-        Some(DataType::UInt16),
+        CreatePropertyMainRequest {
+            name: "Device Category".to_string(),
+            data_type: DataType::Utf8,
+            nullable: true,
+            dict: Some(DataType::UInt16),
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::User,
         org_id,
         proj_id,
-        "Os".to_string(),
-        DataType::Utf8,
-        true,
-        Some(DataType::UInt16),
+        CreatePropertyMainRequest {
+            name: "Os".to_string(),
+            data_type: DataType::Utf8,
+            nullable: true,
+            dict: Some(DataType::UInt16),
+        },
         &mut cols,
-    ).await?;
+    )
+    .await?;
 
     create_property(
         md,
         Namespace::User,
         org_id,
         proj_id,
-        "Os Version".to_string(),
-        DataType::Utf8,
-        true,
-        Some(DataType::UInt16),
+        CreatePropertyMainRequest {
+            name: "Os Version".to_string(),
+            data_type: DataType::Utf8,
+            nullable: true,
+            dict: Some(DataType::UInt16),
+        },
         &mut cols,
-    ).await?;
-
+    )
+    .await?;
 
     for event in all::<Event>() {
         create_event(md, org_id, proj_id, event.to_string()).await?;
@@ -323,9 +402,7 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         typ: TableType::Events(org_id, proj_id),
         columns: cols,
     };
-    match md.database
-        .create_table(table.clone())
-        .await {
+    match md.database.create_table(table.clone()).await {
         Ok(_) | Err(metadata::error::Error::KeyAlreadyExists) => {}
         Err(err) => return Err(err.into()),
     };

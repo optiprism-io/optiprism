@@ -11,8 +11,11 @@ pub enum StoreError {
 }
 
 impl Display for StoreError {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self)
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            StoreError::Plan(desc) => write!(f, "Plan error: {}", desc),
+            StoreError::DataFusionError(err) => write!(f, "DataFusion error: {}", err),
+        }
     }
 }
 

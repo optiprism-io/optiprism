@@ -25,7 +25,10 @@ impl From<DataFusionError> for Error {
     }
 }
 impl Display for Error {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self)
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Error::JWTError(err) => write!(f, "JWT error: {}", err),
+            Error::DataFusionError(err) => write!(f, "DataFusion error: {}", err),
+        }
     }
 }

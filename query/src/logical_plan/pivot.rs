@@ -1,11 +1,11 @@
+use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
+use datafusion_common::{Column, DFField, DFSchema};
+use datafusion_expr::Expr;
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use datafusion::logical_plan::{LogicalPlan, DFSchemaRef, UserDefinedLogicalNode};
-use datafusion_common::{Column, DFField, DFSchema};
-use datafusion_expr::Expr;
 
-use crate::{Error, Result};
+use crate::Result;
 
 pub struct PivotNode {
     pub input: LogicalPlan,
@@ -16,7 +16,12 @@ pub struct PivotNode {
 }
 
 impl PivotNode {
-    pub fn try_new(input: LogicalPlan, name_col: Column, value_col: Column, result_cols: Vec<String>) -> Result<Self> {
+    pub fn try_new(
+        input: LogicalPlan,
+        name_col: Column,
+        value_col: Column,
+        result_cols: Vec<String>,
+    ) -> Result<Self> {
         let schema = {
             let mut fields: Vec<DFField> = input
                 .schema()
@@ -25,7 +30,7 @@ impl PivotNode {
                 .filter_map(|f| {
                     match f.name().clone() == name_col.name || f.name().clone() == value_col.name {
                         true => None,
-                        false => Some(DFField::new(None, f.name(), f.data_type().clone(), true))
+                        false => Some(DFField::new(None, f.name(), f.data_type().clone(), true)),
                     }
                 })
                 .collect();
@@ -83,12 +88,20 @@ impl UserDefinedLogicalNode for PivotNode {
         write!(f, "Pivot")
     }
 
-    fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
-        Arc::new(PivotNode::try_new(
-            inputs[0].clone(),
-            self.name_col.clone(),
-            self.value_col.clone(),
-            self.result_cols.clone(),
-        ).map_err(|e| e.into_datafusion_plan_error()).unwrap())
+    fn from_template(
+        &self,
+        _: &[Expr],
+        inputs: &[LogicalPlan],
+    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        Arc::new(
+            PivotNode::try_new(
+                inputs[0].clone(),
+                self.name_col.clone(),
+                self.value_col.clone(),
+                self.result_cols.clone(),
+            )
+            .map_err(|e| e.into_datafusion_plan_error())
+            .unwrap(),
+        )
     }
 }

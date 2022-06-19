@@ -1,49 +1,41 @@
 #[cfg(test)]
 mod tests {
-    use std::borrow::BorrowMut;
     use query::error::Result;
+
     use std::env::temp_dir;
 
     use chrono::{DateTime, Duration, Utc};
-    use datafusion::arrow::array::{
-        Float64Array, Int32Array, Int8Array, StringArray, TimestampMicrosecondArray, UInt16Array,
-        UInt64Array,
-    };
 
-    use arrow::datatypes::{DataType as DFDataType, Field, Schema};
-    use arrow::record_batch::RecordBatch;
+    use arrow::datatypes::DataType as DFDataType;
+
     use arrow::util::pretty::print_batches;
     use datafusion::datasource::object_store::local::LocalFileSystem;
-    use datafusion::datasource::MemTable;
-    use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
-    use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
+
+    use datafusion::physical_plan::{collect, PhysicalPlanner};
     use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
 
-    use datafusion::execution::context::ExecutionContextState;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-    use datafusion::logical_plan::{LogicalPlan, LogicalPlanBuilder as DFLogicalPlanBuilder, TableScan};
+    use datafusion::logical_plan::LogicalPlan;
+    use datafusion::physical_plan::coalesce_batches::concat_batches;
+
+    use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;
     use metadata::database::{Column, Table, TableType};
     use metadata::properties::provider::Namespace;
     use metadata::properties::{CreatePropertyRequest, Property};
     use metadata::{database, events, properties, Metadata, Store};
-    use query::reports::types::{PropValueOperation, PropertyRef, QueryTime, TimeUnit, EventRef};
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-    use query::{event_fields, Context, Error};
-    use rust_decimal::Decimal;
+    use query::physical_plan::planner::QueryPlanner;
+    use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
+    use query::reports::event_segmentation::types::{
+        Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, NamedQuery, Query,
+    };
+    use query::reports::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
+    use query::{event_fields, Context};
+
     use std::ops::Sub;
     use std::sync::Arc;
-    use arrow::array::{Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray, DecimalBuilder, Float64Builder, Int16Array, Int16Builder, Int8BufferBuilder, Int8Builder, make_builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt64Builder, UInt8Builder};
-    use arrow::buffer::MutableBuffer;
-    use arrow::ipc::{TimestampBuilder, Utf8Builder};
     use uuid::Uuid;
-    use datafusion::physical_plan::coalesce_batches::concat_batches;
-    use query::physical_plan::planner::QueryPlanner;
-    use datafusion::scalar::ScalarValue as DFScalarValue;
-    use datafusion_common::ScalarValue;
-    use query::physical_plan::unpivot::unpivot;
-    use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
-    use query::reports::event_segmentation::types::{Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, NamedQuery, Query};
 
     pub async fn events_provider(
         db: Arc<database::Provider>,
@@ -61,7 +53,7 @@ mod tests {
             None,
             1,
         )
-            .await?;
+        .await?;
 
         Ok(df_input.build()?)
     }
@@ -74,14 +66,19 @@ mod tests {
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let prop = match ns {
-            Namespace::Event => md.event_properties.create(org_id, req).await?,
-            Namespace::User => md.user_properties.create(org_id, req).await?,
+            Namespace::Event => md.event_properties.create(org_id, proj_id, req).await?,
+            Namespace::User => md.user_properties.create(org_id, proj_id, req).await?,
         };
 
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable, prop.dictionary_type.clone()),
+                Column::new(
+                    prop.column_name(ns),
+                    prop.typ.clone(),
+                    prop.nullable,
+                    prop.dictionary_type.clone(),
+                ),
             )
             .await?;
 
@@ -99,7 +96,12 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(event_fields::USER_ID.to_string(), DFDataType::UInt64, false, None),
+                Column::new(
+                    event_fields::USER_ID.to_string(),
+                    DFDataType::UInt64,
+                    false,
+                    None,
+                ),
             )
             .await?;
         md.database
@@ -116,7 +118,12 @@ mod tests {
         md.database
             .add_column(
                 TableType::Events(org_id, proj_id),
-                Column::new(event_fields::EVENT.to_string(), DFDataType::UInt16, false, None),
+                Column::new(
+                    event_fields::EVENT.to_string(),
+                    DFDataType::UInt16,
+                    false,
+                    None,
+                ),
             )
             .await?;
 
@@ -129,24 +136,37 @@ mod tests {
             proj_id,
             CreatePropertyRequest {
                 created_by: 0,
-                project_id: proj_id,
                 tags: None,
                 name: "Country".to_string(),
                 description: None,
                 display_name: None,
                 typ: DFDataType::Utf8,
                 status: properties::Status::Enabled,
-                scope: properties::Scope::User,
+                is_system: false,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
                 dictionary_type: Some(DFDataType::UInt8),
             },
         )
-            .await?;
+        .await?;
 
-        md.dictionaries.get_key_or_create(org_id, proj_id, country_prop.column_name(Namespace::User).as_str(), "spain").await?;
-        md.dictionaries.get_key_or_create(org_id, proj_id, country_prop.column_name(Namespace::User).as_str(), "german").await?;
+        md.dictionaries
+            .get_key_or_create(
+                org_id,
+                proj_id,
+                country_prop.column_name(Namespace::User).as_str(),
+                "spain",
+            )
+            .await?;
+        md.dictionaries
+            .get_key_or_create(
+                org_id,
+                proj_id,
+                country_prop.column_name(Namespace::User).as_str(),
+                "german",
+            )
+            .await?;
         create_property(
             &md,
             Namespace::User,
@@ -154,21 +174,20 @@ mod tests {
             proj_id,
             CreatePropertyRequest {
                 created_by: 0,
-                project_id: proj_id,
                 tags: None,
                 name: "Device".to_string(),
                 description: None,
                 display_name: None,
                 typ: DFDataType::Utf8,
                 status: properties::Status::Enabled,
-                scope: properties::Scope::User,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
                 dictionary_type: None,
+                is_system: false,
             },
         )
-            .await?;
+        .await?;
 
         create_property(
             &md,
@@ -177,37 +196,36 @@ mod tests {
             proj_id,
             CreatePropertyRequest {
                 created_by: 0,
-                project_id: proj_id,
                 tags: None,
                 name: "Is Premium".to_string(),
                 description: None,
                 display_name: None,
                 typ: DFDataType::Boolean,
                 status: properties::Status::Enabled,
-                scope: properties::Scope::User,
+                is_system: false,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
                 dictionary_type: None,
             },
         )
-            .await?;
+        .await?;
 
         // create events
         md.events
             .create(
                 org_id,
+                proj_id,
                 events::CreateEventRequest {
                     created_by: 0,
-                    project_id: proj_id,
                     tags: None,
                     name: "View Product".to_string(),
                     display_name: None,
                     description: None,
                     status: events::Status::Enabled,
-                    scope: events::Scope::User,
                     properties: None,
                     custom_properties: None,
+                    is_system: false,
                 },
             )
             .await?;
@@ -215,17 +233,17 @@ mod tests {
         md.events
             .create(
                 org_id,
+                proj_id,
                 events::CreateEventRequest {
                     created_by: 0,
-                    project_id: proj_id,
                     tags: None,
                     name: "Buy Product".to_string(),
                     display_name: None,
                     description: None,
                     status: events::Status::Enabled,
-                    scope: events::Scope::User,
                     properties: None,
                     custom_properties: None,
+                    is_system: false,
                 },
             )
             .await?;
@@ -238,21 +256,20 @@ mod tests {
             proj_id,
             CreatePropertyRequest {
                 created_by: 0,
-                project_id: proj_id,
                 tags: None,
                 name: "Product Name".to_string(),
                 description: None,
                 display_name: None,
                 typ: DFDataType::Utf8,
                 status: properties::Status::Enabled,
-                scope: properties::Scope::User,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
                 dictionary_type: None,
+                is_system: false,
             },
         )
-            .await?;
+        .await?;
 
         create_property(
             &md,
@@ -261,21 +278,20 @@ mod tests {
             proj_id,
             CreatePropertyRequest {
                 created_by: 0,
-                project_id: proj_id,
                 tags: None,
                 name: "Revenue".to_string(),
                 description: None,
                 display_name: None,
                 typ: DFDataType::Float64,
                 status: properties::Status::Enabled,
-                scope: properties::Scope::User,
                 nullable: false,
                 is_array: false,
                 is_dictionary: false,
                 dictionary_type: None,
+                is_system: false,
             },
         )
-            .await?;
+        .await?;
 
         Ok(())
     }
@@ -293,7 +309,7 @@ mod tests {
         let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let es = EventSegmentation {
+        let _es = EventSegmentation {
             time: QueryTime::Between {
                 from: to.sub(Duration::days(10)),
                 to,
@@ -309,7 +325,7 @@ mod tests {
                     Some(vec![EventFilter::Property {
                         property: PropertyRef::User("Is Premium".to_string()),
                         operation: PropValueOperation::Eq,
-                        value: Some(vec![ScalarValue::Boolean(Some(true)).into()]),
+                        value: Some(vec![ScalarValue::Boolean(Some(true))]),
                     }]),
                     Some(vec![Breakdown::Property(PropertyRef::User(
                         "Device".to_string(),
@@ -410,14 +426,14 @@ mod tests {
         let org_id = 1;
         let proj_id = 1;
 
-        let ctx = Context {
+        let _ctx = Context {
             organization_id: org_id,
             account_id: 1,
             project_id: proj_id,
         };
 
         create_entities(md.clone(), org_id, proj_id).await?;
-        let input = Arc::new(events_provider(md.database.clone(), org_id, proj_id).await?);
+        let _input = Arc::new(events_provider(md.database.clone(), org_id, proj_id).await?);
 
         /*let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
         let df_plan = plan.to_df_plan()?;
@@ -435,10 +451,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_query() -> Result<()> {
-        let from = DateTime::parse_from_rfc3339("2020-09-08T13:42:00.000000+00:00")
+        let _from = DateTime::parse_from_rfc3339("2020-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let to = DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")
+        let _to = DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
         let es = EventSegmentation {
@@ -446,7 +462,10 @@ mod tests {
                 from,
                 to,
             },*/
-            time:QueryTime::Last { last: 30, unit: TimeUnit::Day },
+            time: QueryTime::Last {
+                last: 30,
+                unit: TimeUnit::Day,
+            },
             group: event_fields::USER_ID.to_string(),
             interval_unit: TimeUnit::Week,
             chart_type: ChartType::Line,
@@ -464,7 +483,10 @@ mod tests {
                         EventFilter::Property {
                             property: PropertyRef::User("Country".to_string()),
                             operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::Utf8(Some("spain".to_string())), ScalarValue::Utf8(Some("german".to_string()))]),
+                            value: Some(vec![
+                                ScalarValue::Utf8(Some("spain".to_string())),
+                                ScalarValue::Utf8(Some("german".to_string())),
+                            ]),
                         },
                     ]),
                     Some(vec![Breakdown::Property(PropertyRef::User(
@@ -534,8 +556,9 @@ mod tests {
             .with_timezone(&Utc);
         let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
 
-        let config =
-            ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {})).with_target_partitions(1);
+        let config = ExecutionConfig::new()
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_target_partitions(1);
 
         let ctx = ExecutionContext::with_config(config);
 
@@ -545,12 +568,11 @@ mod tests {
             physical_plan,
             Arc::new(RuntimeEnv::new(RuntimeConfig::new())?),
         )
-            .await?;
+        .await?;
 
         let concated = concat_batches(&result[0].schema(), &result, 0)?;
 
-
-        print_batches(&[concated.clone()])?;
+        print_batches(&[concated])?;
         Ok(())
     }
 }

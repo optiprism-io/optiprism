@@ -1,8 +1,8 @@
+use crate::profiles::{Profile, ProfileProvider};
 use chrono::{DateTime, Duration, Utc};
 use rand::distributions::WeightedIndex;
-use rand::rngs::ThreadRng;
 use rand::prelude::*;
-use crate::profiles::{Profile, ProfileProvider};
+use rand::rngs::ThreadRng;
 
 pub struct Generator {
     rng: ThreadRng,
@@ -45,7 +45,7 @@ impl Generator {
         }
     }
 
-    pub fn next(&mut self) -> Option<Sample> {
+    pub fn next_sample(&mut self) -> Option<Sample> {
         let hour = self.traffic_hourly_weight_idx.sample(&mut self.rng) as i64;
         let minute: i64 = self.rng.gen_range(0..=59);
         let sample = Sample {
@@ -61,7 +61,11 @@ impl Generator {
 
             self.daily_users_left = self.new_daily_users;
             self.cur_timestamp += 3600 * 24;
-            println!("generated users: {}. {} days left", self.total_users, Duration::seconds(self.to_timestamp - self.cur_timestamp).num_days())
+            println!(
+                "generated users: {}. {} days left",
+                self.total_users,
+                Duration::seconds(self.to_timestamp - self.cur_timestamp).num_days()
+            )
         }
 
         Some(sample)

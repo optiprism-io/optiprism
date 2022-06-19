@@ -879,14 +879,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "exp"
-version = "0.1.0"
-dependencies = [
- "datafusion",
- "tokio",
-]
-
-[[package]]
 name = "fastrand"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

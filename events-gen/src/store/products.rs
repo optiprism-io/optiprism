@@ -1,21 +1,19 @@
-use std::collections::{HashMap, HashSet};
-use std::env;
-use std::ops::Div;
+use crate::error::{Error, Result};
+use crate::probability;
+use common::DECIMAL_SCALE;
+use futures::executor::block_on;
+use metadata::dictionaries;
+use rand::distributions::WeightedIndex;
+use rand::prelude::*;
+use rand::rngs::ThreadRng;
+use rand::seq::SliceRandom;
+
+use rust_decimal::Decimal;
+use serde::Deserialize;
+use std::collections::HashSet;
+
 use std::path::Path;
 use std::sync::Arc;
-use futures::executor::block_on;
-use rand::distributions::WeightedIndex;
-use rand::rngs::ThreadRng;
-use rand::prelude::*;
-use serde::Deserialize;
-use crate::error::{Result, Error};
-use rand::seq::SliceRandom;
-use crate::probability;
-use rust_decimal::prelude::*;
-use rust_decimal::Decimal;
-use common::DECIMAL_SCALE;
-use metadata::{dictionaries, Metadata};
-use futures::stream::{self, StreamExt};
 
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
@@ -44,17 +42,6 @@ pub struct Product {
     pub rating_sum: f64,
 }
 
-#[derive(Debug, Clone)]
-pub struct ProductStr<'a> {
-    pub id: usize,
-    pub name: &'a str,
-    pub category: &'a str,
-    pub subcategory: Option<&'a str>,
-    pub brand: Option<&'a str>,
-    price: Decimal,
-    pub discount_price: Option<Decimal>,
-}
-
 impl Product {
     pub fn final_price(&self) -> Decimal {
         self.discount_price.unwrap_or(self.price)
@@ -78,7 +65,13 @@ pub struct ProductProvider {
 }
 
 impl ProductProvider {
-    pub async fn try_new_from_csv<P: AsRef<Path>>(org_id: u64, proj_id: u64, rng: &mut ThreadRng, dicts: Arc<dictionaries::Provider>, path: P) -> Result<Self> {
+    pub async fn try_new_from_csv<P: AsRef<Path>>(
+        org_id: u64,
+        proj_id: u64,
+        rng: &mut ThreadRng,
+        dicts: Arc<dictionaries::Provider>,
+        path: P,
+    ) -> Result<Self> {
         let mut rdr = csv::Reader::from_path(path)?;
 
         let mut products = Vec::with_capacity(1000);
@@ -93,10 +86,39 @@ impl ProductProvider {
 
             let product = Product {
                 id: id + 1,
-                name: dicts.get_key_or_create(org_id, proj_id, "event_product_name", rec.name.as_str()).await?,
-                category: dicts.get_key_or_create(org_id, proj_id, "event_product_category", rec.category.as_str()).await?,
-                subcategory: rec.subcategory.and_then(|v| Some(block_on(dicts.get_key_or_create(org_id, proj_id, "event_product_subcategory", v.as_str())))).transpose()?,
-                brand: rec.brand.and_then(|v| Some(block_on(dicts.get_key_or_create(org_id, proj_id, "event_product_brand", v.as_str())))).transpose()?,
+                name: dicts
+                    .get_key_or_create(org_id, proj_id, "event_product_name", rec.name.as_str())
+                    .await?,
+                category: dicts
+                    .get_key_or_create(
+                        org_id,
+                        proj_id,
+                        "event_product_category",
+                        rec.category.as_str(),
+                    )
+                    .await?,
+                subcategory: rec
+                    .subcategory
+                    .map(|v| {
+                        block_on(dicts.get_key_or_create(
+                            org_id,
+                            proj_id,
+                            "event_product_subcategory",
+                            v.as_str(),
+                        ))
+                    })
+                    .transpose()?,
+                brand: rec
+                    .brand
+                    .map(|v| {
+                        block_on(dicts.get_key_or_create(
+                            org_id,
+                            proj_id,
+                            "event_product_brand",
+                            v.as_str(),
+                        ))
+                    })
+                    .transpose()?,
                 price: rec.price,
                 discount_price,
                 margin: 0.,
@@ -109,27 +131,33 @@ impl ProductProvider {
 
         products.shuffle(rng);
 
-        let product_weights = probability::calc_cubic_spline(products.len(), vec![1., 0.5, 0.3, 0.1])?;
+        let product_weights =
+            probability::calc_cubic_spline(products.len(), vec![1., 0.5, 0.3, 0.1])?;
         let product_weight_idx = WeightedIndex::new(&[1., 0.5, 0.3, 0.1]).unwrap();
 
         let promoted_products = products[0..5].iter().map(|p| p.id).collect();
         let promoted_product_weight_idx = WeightedIndex::new(&[1., 0.3, 0.2, 0.1, 0.1]).unwrap();
 
-        let deal_products = products.iter().filter(|p| p.discount_price.is_some()).map(|p| p.id).collect();
+        let deal_products = products
+            .iter()
+            .filter(|p| p.discount_price.is_some())
+            .map(|p| p.id)
+            .collect();
         let deal_product_weight_idx = WeightedIndex::new(&[1., 0.3, 0.2, 0.1, 0.1]).unwrap();
 
         let mut categories = products
             .iter()
-            .map(|p| p.category.clone())
+            .map(|p| p.category)
             .collect::<HashSet<_>>()
             .into_iter()
             .collect::<Vec<u64>>();
         categories.shuffle(rng);
 
-        let category_weight_idx = WeightedIndex::new(
-            probability::calc_cubic_spline(categories.len(), vec![1., 0.5, 0.3, 0.1])?)
-            .map_err(|err| Error::External(err.to_string()))?;
-
+        let category_weight_idx = WeightedIndex::new(probability::calc_cubic_spline(
+            categories.len(),
+            vec![1., 0.5, 0.3, 0.1],
+        )?)
+        .map_err(|err| Error::External(err.to_string()))?;
 
         // make rating weights from 0 to 5 with 10 bins for each int value
         let rating_weights = probability::calc_cubic_spline(50, vec![0.01, 0.01, 0.1, 0.7, 1.])?;
@@ -171,6 +199,9 @@ impl ProductProvider {
     }
 
     pub async fn string_name(&self, key: u64) -> Result<String> {
-        Ok(self.dicts.get_value(self.org_id, self.proj_id, "event_product_name", key).await?)
+        Ok(self
+            .dicts
+            .get_value(self.org_id, self.proj_id, "event_product_name", key)
+            .await?)
     }
 }

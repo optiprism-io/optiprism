@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::metadata::{list, ListResponse};
 use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
-use crate::store::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
+use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
@@ -34,7 +34,11 @@ fn index_keys(
     name: &str,
     display_name: Option<String>,
 ) -> Vec<Option<Vec<u8>>> {
-    [index_name_key(organization_id, project_id, ns, name), index_display_name_key(organization_id, project_id, ns, display_name)].to_vec()
+    [
+        index_name_key(organization_id, project_id, ns, name),
+        index_display_name_key(organization_id, project_id, ns, display_name),
+    ]
+    .to_vec()
 }
 
 fn index_name_key(
@@ -52,7 +56,16 @@ fn index_display_name_key(
     ns: &Namespace,
     display_name: Option<String>,
 ) -> Option<Vec<u8>> {
-    display_name.map(|v| make_index_key(organization_id, project_id, ns.as_bytes(), IDX_DISPLAY_NAME, v.as_str()).to_vec()).to_owned()
+    display_name.map(|v| {
+        make_index_key(
+            organization_id,
+            project_id,
+            ns.as_bytes(),
+            IDX_DISPLAY_NAME,
+            v.as_str(),
+        )
+        .to_vec()
+    })
 }
 
 pub struct Provider {
@@ -139,12 +152,7 @@ impl Provider {
         let data = serialize(&prop)?;
         self.store
             .put(
-                make_data_value_key(
-                    organization_id,
-                    project_id,
-                    self.ns.as_bytes(),
-                    prop.id,
-                ),
+                make_data_value_key(organization_id, project_id, self.ns.as_bytes(), prop.id),
                 &data,
             )
             .await?;
@@ -227,7 +235,7 @@ impl Provider {
             project_id,
             self.ns.as_bytes(),
         )
-            .await
+        .await
     }
 
     pub async fn update(
@@ -247,19 +255,38 @@ impl Provider {
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
         if let Some(name) = req.name {
-            idx_keys.push(index_name_key(organization_id, project_id, &self.ns, name.as_str()));
-            idx_prev_keys.push(index_name_key(organization_id, project_id, &self.ns, prev_prop.name.as_str()));
-            prop.name = name.to_owned();
+            idx_keys.push(index_name_key(
+                organization_id,
+                project_id,
+                &self.ns,
+                name.as_str(),
+            ));
+            idx_prev_keys.push(index_name_key(
+                organization_id,
+                project_id,
+                &self.ns,
+                prev_prop.name.as_str(),
+            ));
+            prop.name = name;
         }
         if let Some(display_name) = req.display_name {
-            idx_keys.push(index_display_name_key(organization_id, project_id, &self.ns, display_name.clone()));
-            idx_prev_keys.push(index_display_name_key(organization_id, project_id, &self.ns, prev_prop.display_name));
-            prop.display_name = display_name.to_owned();
+            idx_keys.push(index_display_name_key(
+                organization_id,
+                project_id,
+                &self.ns,
+                display_name.clone(),
+            ));
+            idx_prev_keys.push(index_display_name_key(
+                organization_id,
+                project_id,
+                &self.ns,
+                prev_prop.display_name,
+            ));
+            prop.display_name = display_name;
         }
         self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await?;
-
 
         prop.updated_at = Some(Utc::now());
         prop.updated_by = Some(req.updated_by);
@@ -327,7 +354,7 @@ impl Provider {
                     &prop.name,
                     prop.display_name.clone(),
                 )
-                    .as_ref(),
+                .as_ref(),
             )
             .await?;
         Ok(prop)

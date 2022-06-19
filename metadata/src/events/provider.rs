@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bincode::{deserialize, serialize};
 use chrono::Utc;
-use datafusion::parquet::data_type::AsBytes;
+
 use tokio::sync::RwLock;
 
 use crate::error::Error;
@@ -10,7 +10,7 @@ use crate::events::types::{CreateEventRequest, UpdateEventRequest};
 use crate::events::Event;
 use crate::metadata::{list, ListResponse};
 use crate::store::index::hash_map::HashMap;
-use crate::store::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
+use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"events";
@@ -23,14 +23,14 @@ fn index_keys(
     name: &str,
     display_name: Option<String>,
 ) -> Vec<Option<Vec<u8>>> {
-    [index_name_key(organization_id, project_id, name), index_display_name_key(organization_id, project_id, display_name)].to_vec()
+    [
+        index_name_key(organization_id, project_id, name),
+        index_display_name_key(organization_id, project_id, display_name),
+    ]
+    .to_vec()
 }
 
-fn index_name_key(
-    organization_id: u64,
-    project_id: u64,
-    name: &str,
-) -> Option<Vec<u8>> {
+fn index_name_key(organization_id: u64, project_id: u64, name: &str) -> Option<Vec<u8>> {
     Some(make_index_key(organization_id, project_id, NAMESPACE, IDX_NAME, name).to_vec())
 }
 
@@ -39,7 +39,16 @@ fn index_display_name_key(
     project_id: u64,
     display_name: Option<String>,
 ) -> Option<Vec<u8>> {
-    display_name.map(|v| make_index_key(organization_id, project_id, NAMESPACE, IDX_DISPLAY_NAME, v.as_str()).to_vec()).to_owned()
+    display_name.map(|v| {
+        make_index_key(
+            organization_id,
+            project_id,
+            NAMESPACE,
+            IDX_DISPLAY_NAME,
+            v.as_str(),
+        )
+        .to_vec()
+    })
 }
 
 pub struct Provider {
@@ -57,12 +66,22 @@ impl Provider {
         }
     }
 
-    pub async fn create(&self, organization_id: u64, project_id: u64, req: CreateEventRequest) -> Result<Event> {
+    pub async fn create(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        req: CreateEventRequest,
+    ) -> Result<Event> {
         let _guard = self.guard.write().await;
         self._create(organization_id, project_id, req).await
     }
 
-    pub async fn _create(&self, organization_id: u64, project_id: u64, req: CreateEventRequest) -> Result<Event> {
+    pub async fn _create(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        req: CreateEventRequest,
+    ) -> Result<Event> {
         let idx_keys = index_keys(
             organization_id,
             project_id,
@@ -167,7 +186,13 @@ impl Provider {
         list(self.store.clone(), organization_id, project_id, NAMESPACE).await
     }
 
-    pub async fn update(&self, organization_id: u64, project_id: u64, event_id: u64, req: UpdateEventRequest) -> Result<Event> {
+    pub async fn update(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        event_id: u64,
+        req: UpdateEventRequest,
+    ) -> Result<Event> {
         let _guard = self.guard.write().await;
 
         let prev_event = self
@@ -179,13 +204,25 @@ impl Provider {
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
         if let Some(name) = req.name {
             idx_keys.push(index_name_key(organization_id, project_id, name.as_str()));
-            idx_prev_keys.push(index_name_key(organization_id, project_id, prev_event.name.as_str()));
-            event.name = name.to_owned();
+            idx_prev_keys.push(index_name_key(
+                organization_id,
+                project_id,
+                prev_event.name.as_str(),
+            ));
+            event.name = name;
         }
         if let Some(display_name) = req.display_name {
-            idx_keys.push(index_display_name_key(organization_id, project_id, display_name.clone()));
-            idx_prev_keys.push(index_display_name_key(organization_id, project_id, prev_event.display_name));
-            event.display_name = display_name.to_owned();
+            idx_keys.push(index_display_name_key(
+                organization_id,
+                project_id,
+                display_name.clone(),
+            ));
+            idx_prev_keys.push(index_display_name_key(
+                organization_id,
+                project_id,
+                prev_event.display_name,
+            ));
+            event.display_name = display_name;
         }
         self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
@@ -302,7 +339,7 @@ impl Provider {
                     &event.name,
                     event.display_name.clone(),
                 )
-                    .as_ref(),
+                .as_ref(),
             )
             .await?;
 

@@ -22,16 +22,18 @@ pub struct Context {
 
 impl Context {
     pub fn with_permission(organization_id: u64, permission: Permission) -> Self {
-        let mut ctx = Context::default();
-        ctx.organization_id = organization_id;
         let mut permissions = HashMap::new();
-        permissions.insert(Scope::Organization, vec![permission]);
-        ctx.permissions = Some(permissions);
-        ctx
+        let _ = permissions.insert(Scope::Organization, vec![permission]);
+
+        Context {
+            organization_id,
+            permissions: Some(permissions),
+            ..Context::default()
+        }
     }
 
     pub fn check_permission(&self, _: u64, _: u64, _: Permission) -> Result<()> {
-        return Ok(());
+        Ok(())
         /*if organization_id != self.organization_id {
             return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));
         }
@@ -93,8 +95,8 @@ impl Context {
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
-    where
-        B: Send,
+where
+    B: Send,
 {
     type Rejection = Error;
 
@@ -108,7 +110,7 @@ impl<B> FromRequest<B> for Context
             permissions: None,
         };
         if let Ok(TypedHeader(Authorization(bearer))) =
-        TypedHeader::<Authorization<Bearer>>::from_request(request).await
+            TypedHeader::<Authorization<Bearer>>::from_request(request).await
         {
             if let Some(token) = bearer.token().strip_prefix("Bearer ") {
                 if let Ok(claims) = parse_access_token(token) {

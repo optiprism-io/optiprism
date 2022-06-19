@@ -1,5 +1,5 @@
-use strum_macros::{Display};
 use enum_iterator::Sequence;
+use strum_macros::Display;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy, Display, Sequence)]
 pub enum Event {

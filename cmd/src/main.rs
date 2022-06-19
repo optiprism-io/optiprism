@@ -1,27 +1,23 @@
-#[macro_use]
 extern crate log;
 
 extern crate bytesize;
 
 mod error;
 
+use crate::error::Error;
 use axum::{Router, Server};
-use metadata::{Metadata, Store};
-use platform::{accounts::Provider as AccountProvider, auth::Provider as AuthProvider, events::Provider as EventsProvider, properties::Provider as PropertiesProvider};
-use std::{env::set_var, net::SocketAddr, sync::Arc};
-use std::env::temp_dir;
-use std::path::PathBuf;
 use bytesize::ByteSize;
 use chrono::{DateTime, Utc};
-use tower_http::add_extension::AddExtensionLayer;
-use platform::platform::Platform;
-use error::Result;
-use events_gen::generator;
-use query::QueryProvider;
-use crate::error::Error;
-use log::{info};
-use uuid::Uuid;
 use datafusion::datasource::MemTable;
+use error::Result;
+use log::info;
+use metadata::store::Store;
+use metadata::Metadata;
+use query::QueryProvider;
+use std::env::temp_dir;
+use std::path::PathBuf;
+use std::{env::set_var, net::SocketAddr, sync::Arc};
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -56,8 +52,12 @@ async fn main() -> Result<()> {
             org_id: 1,
             project_id: 1,
             md: md.clone(),
-            from: DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00").unwrap().with_timezone(&Utc),
-            to: DateTime::parse_from_rfc3339("2022-09-08T14:42:00.000000+00:00").unwrap().with_timezone(&Utc),
+            from: DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
+                .unwrap()
+                .with_timezone(&Utc),
+            to: DateTime::parse_from_rfc3339("2022-09-08T14:42:00.000000+00:00")
+                .unwrap()
+                .with_timezone(&Utc),
             products_path,
             geo_path,
             device_path,
@@ -80,7 +80,11 @@ async fn main() -> Result<()> {
             }
         }
     }
-    println!("partitions: {}, batches: {}, rows: {rows}", batches.len(), batches[0].len());
+    println!(
+        "partitions: {}, batches: {}, rows: {rows}",
+        batches.len(),
+        batches[0].len()
+    );
     println!("total size: {}", ByteSize::b(data_size_bytes as u64));
 
     let provider = Arc::new(MemTable::try_new(batches[0][0].schema(), batches)?);
@@ -93,6 +97,7 @@ async fn main() -> Result<()> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     Server::bind(&addr)
         .serve(router.into_make_service())
-        .await.map_err(|e| Error::ExternalError(e.to_string()));
+        .await
+        .map_err(|e| Error::ExternalError(e.to_string()))?;
     Ok(())
 }
