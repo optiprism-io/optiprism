@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use axum::{AddExtensionLayer, Router, Server};
+    use axum::{Router, Server};
     use metadata::{Metadata, Store};
     use platform::error::Result;
     use platform::http::event_segmentation;
-    use platform::{Context, EventSegmentationProvider};
-    use query::{event_fields, QueryProvider};
+    use platform::EventSegmentationProvider;
+    use query::QueryProvider;
     use std::env::temp_dir;
     use std::net::SocketAddr;
     use std::sync::Arc;
@@ -13,58 +13,27 @@ mod tests {
     use tokio::time::sleep;
     use uuid::Uuid;
 
-    use std::borrow::BorrowMut;
-
     use chrono::{DateTime, Utc};
-    use datafusion::arrow::array::{
-        Float64Array, Int32Array, Int8Array, StringArray, TimestampMicrosecondArray, UInt16Array,
-        UInt64Array,
-    };
 
-    use arrow::datatypes::{DataType as DFDataType, Field, Schema};
-    use arrow::record_batch::RecordBatch;
-    use arrow::util::pretty::print_batches;
+    use arrow::datatypes::DataType as DFDataType;
     use datafusion::datasource::object_store::local::LocalFileSystem;
-    use datafusion::datasource::MemTable;
-    use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
-    use datafusion::physical_plan::{aggregates, collect, PhysicalPlanner};
-    use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
+    use datafusion::prelude::CsvReadOptions;
 
-    use arrow::array::{
-        make_builder, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray,
-        DecimalBuilder, Float64Builder, Int16Array, Int16Builder, Int8BufferBuilder, Int8Builder,
-        StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt64Builder,
-        UInt8Builder,
-    };
-    use arrow::buffer::MutableBuffer;
-    use arrow::ipc::{TimestampBuilder, Utf8Builder};
     use axum::headers::{HeaderMap, HeaderValue};
     use axum::http::StatusCode;
     use datafusion::datasource::file_format::csv::CsvFormat;
     use datafusion::datasource::listing::{ListingOptions, ListingTable, ListingTableConfig};
-    use datafusion::execution::context::ExecutionContextState;
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-    use datafusion::logical_plan::{LogicalPlan, TableScan};
-    use datafusion::physical_plan::coalesce_batches::concat_batches;
-    use datafusion::scalar::{ScalarValue as DFScalarValue, ScalarValue};
     use metadata::database::{Column, Table, TableType};
     use metadata::properties::provider::Namespace;
     use metadata::properties::{CreatePropertyRequest, Property};
-    use metadata::{database, events, properties};
+    use metadata::{events, properties};
     use platform::event_segmentation::types::{
         AggregateFunction, Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation,
         EventType, PartitionedAggregateFunction, PropValueOperation, PropertyType, Query,
         QueryTime, TimeUnit,
     };
-    use query::physical_plan::expressions;
-    use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
-    use query::reports::event_segmentation::types as query_es_types;
-    use query::reports::types as query_types;
-    use query::reports::types::EventRef;
     use reqwest::Client;
-    use rust_decimal::Decimal;
     use serde_json::Value;
-    use std::ops::Sub;
 
     async fn create_property(
         md: &Arc<Metadata>,
@@ -289,18 +258,6 @@ mod tests {
             let schema = table.arrow_schema();
             let options = CsvReadOptions::new().schema(&schema);
             let path = "../tests/events.csv";
-            let input = datafusion::logical_plan::LogicalPlanBuilder::scan_csv(
-                Arc::new(LocalFileSystem {}),
-                path,
-                options,
-                None,
-                1,
-            )
-            .await
-            .unwrap()
-            .build()
-            .unwrap();
-
             let opt = ListingOptions::new(Arc::new(CsvFormat::default()));
             let config = ListingTableConfig::new(Arc::new(LocalFileSystem {}), path)
                 .with_listing_options(opt)

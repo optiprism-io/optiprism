@@ -1,4 +1,3 @@
-use crate::Error;
 use metadata::properties::Status;
 use serde::{Deserialize, Serialize};
 

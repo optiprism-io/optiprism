@@ -2,18 +2,16 @@ use crate::error::{Error, Result};
 use crate::probability;
 use common::DECIMAL_SCALE;
 use futures::executor::block_on;
-use futures::stream::{self, StreamExt};
-use metadata::{dictionaries, Metadata};
+use metadata::dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
-use rust_decimal::prelude::*;
+
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
-use std::env;
-use std::ops::Div;
+use std::collections::HashSet;
+
 use std::path::Path;
 use std::sync::Arc;
 
@@ -42,17 +40,6 @@ pub struct Product {
     pub satisfaction_ratio: f64,
     pub rating_count: usize,
     pub rating_sum: f64,
-}
-
-#[derive(Debug, Clone)]
-pub struct ProductStr<'a> {
-    pub id: usize,
-    pub name: &'a str,
-    pub category: &'a str,
-    pub subcategory: Option<&'a str>,
-    pub brand: Option<&'a str>,
-    price: Decimal,
-    pub discount_price: Option<Decimal>,
 }
 
 impl Product {
@@ -112,24 +99,24 @@ impl ProductProvider {
                     .await?,
                 subcategory: rec
                     .subcategory
-                    .and_then(|v| {
-                        Some(block_on(dicts.get_key_or_create(
+                    .map(|v| {
+                        block_on(dicts.get_key_or_create(
                             org_id,
                             proj_id,
                             "event_product_subcategory",
                             v.as_str(),
-                        )))
+                        ))
                     })
                     .transpose()?,
                 brand: rec
                     .brand
-                    .and_then(|v| {
-                        Some(block_on(dicts.get_key_or_create(
+                    .map(|v| {
+                        block_on(dicts.get_key_or_create(
                             org_id,
                             proj_id,
                             "event_product_brand",
                             v.as_str(),
-                        )))
+                        ))
                     })
                     .transpose()?,
                 price: rec.price,
@@ -160,7 +147,7 @@ impl ProductProvider {
 
         let mut categories = products
             .iter()
-            .map(|p| p.category.clone())
+            .map(|p| p.category)
             .collect::<HashSet<_>>()
             .into_iter()
             .collect::<Vec<u64>>();

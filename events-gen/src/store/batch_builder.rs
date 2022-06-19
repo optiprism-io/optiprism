@@ -66,7 +66,7 @@ impl RecordBatchBuilder {
         }
     }
 
-    pub fn to_record_batch(&mut self) -> Result<RecordBatch> {
+    pub fn build_record_batch(&mut self) -> Result<RecordBatch> {
         let cols: Vec<ArrayRef> = vec![
             Arc::new(self.user_id.finish()),
             Arc::new(self.created_at.finish()),
@@ -104,9 +104,9 @@ impl RecordBatchBuilder {
         profile: &Profile,
     ) -> Result<()> {
         // println!("event: {event}, time: {}", NaiveDateTime::from_timestamp(state.cur_timestamp, 0));
-        self.user_id.append_value(state.user_id);
-        self.created_at.append_value(state.cur_timestamp);
-        self.event.append_value(event_id);
+        self.user_id.append_value(state.user_id)?;
+        self.created_at.append_value(state.cur_timestamp)?;
+        self.event.append_value(event_id)?;
 
         match state.selected_product {
             None => {
@@ -143,7 +143,7 @@ impl RecordBatchBuilder {
             self.spent_total.append_null()?;
         }
 
-        if state.products_bought.len() > 0 {
+        if !state.products_bought.is_empty() {
             self.products_bought
                 .append_value(state.products_bought.len() as u8)?;
         } else {
@@ -151,7 +151,7 @@ impl RecordBatchBuilder {
         }
 
         let mut cart_amount: Option<Decimal> = None;
-        if state.cart.len() > 0 {
+        if !state.cart.is_empty() {
             self.cart_items_number
                 .append_value(state.cart.len() as u8)?;
             let mut _cart_amount: Decimal = state
@@ -164,7 +164,7 @@ impl RecordBatchBuilder {
             cart_amount = Some(_cart_amount);
         } else {
             self.cart_items_number.append_null()?;
-            self.cart_amount.append_null();
+            self.cart_amount.append_null()?;
         }
 
         match event {
@@ -177,15 +177,16 @@ impl RecordBatchBuilder {
         }
 
         self.country
-            .append_option(profile.geo.country.map(|v| v as u16));
-        self.city.append_option(profile.geo.city.map(|v| v as u16));
+            .append_option(profile.geo.country.map(|v| v as u16))?;
+        self.city
+            .append_option(profile.geo.city.map(|v| v as u16))?;
         self.device
-            .append_option(profile.device.device.map(|v| v as u16));
+            .append_option(profile.device.device.map(|v| v as u16))?;
         self.device_category
-            .append_option(profile.device.device_category.map(|v| v as u16));
-        self.os.append_option(profile.device.os.map(|v| v as u16));
+            .append_option(profile.device.device_category.map(|v| v as u16))?;
+        self.os.append_option(profile.device.os.map(|v| v as u16))?;
         self.os_version
-            .append_option(profile.device.os_version.map(|v| v as u16));
+            .append_option(profile.device.os_version.map(|v| v as u16))?;
 
         self.len += 1;
 

@@ -11,7 +11,6 @@ use query::reports::types as query_types;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::fmt::format;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -427,7 +426,7 @@ fn convert_property(prop_type: PropertyType, prop_name: String) -> query_types::
 
 fn try_convert_value(v: &Value) -> Result<ScalarValue> {
     match v {
-        Value::Bool(v) => Ok(ScalarValue::Boolean(Some(v.clone()))),
+        Value::Bool(v) => Ok(ScalarValue::Boolean(Some(*v))),
         Value::Number(n) => {
             let dec = Decimal::try_from(n.as_f64().unwrap())
                 .map_err(|e| Error::BadRequest(e.to_string()))?;
@@ -545,11 +544,7 @@ impl TryInto<query_es_types::EventFilter> for &EventFilter {
                 operation: operation.try_into()?,
                 value: match value {
                     None => None,
-                    Some(v) => Some(
-                        v.iter()
-                            .map(|v| try_convert_value(v))
-                            .collect::<Result<_>>()?,
-                    ),
+                    Some(v) => Some(v.iter().map(try_convert_value).collect::<Result<_>>()?),
                 },
             },
         })
@@ -713,7 +708,6 @@ impl TryInto<query_es_types::EventSegmentation> for EventSegmentation {
                         .collect::<std::result::Result<_, _>>()
                 })
                 .transpose()?,
-            segments: None,
         })
     }
 }
@@ -727,11 +721,10 @@ mod tests {
         PropertyType, Query, QueryTime, TimeUnit,
     };
     use chrono::{DateTime, Utc};
-    use common::ScalarValue;
+
     use query::event_fields;
     use query::reports::event_segmentation::types::EventSegmentation as QueryEventSegmentation;
-    use serde_json::{json, Value};
-    use std::error::Error;
+    use serde_json::json;
 
     #[test]
     fn test_serialize() -> Result<()> {
@@ -816,8 +809,8 @@ mod tests {
             segments: None,
         };
 
-        let qes: QueryEventSegmentation = es.clone().try_into()?;
-        let j = serde_json::to_string_pretty(&es).unwrap();
+        let _qes: QueryEventSegmentation = es.clone().try_into()?;
+        let _j = serde_json::to_string_pretty(&es).unwrap();
         Ok(())
     }
 }

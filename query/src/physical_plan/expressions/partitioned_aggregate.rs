@@ -21,25 +21,22 @@ use crate::error::{Error, Result};
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::fmt;
-use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
+use std::fmt::Debug;
+
 use std::sync::{Arc, Mutex};
 
 use arrow::array::{
-    Array, ArrayRef, DecimalArray, DecimalBuilder, Float64Array, Int16Array, Int32Array,
-    Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+    Array, ArrayRef, DecimalBuilder, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
+    UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
 use arrow::datatypes::DataType;
-use datafusion::error::{DataFusionError, Result as DFResult};
-use dyn_clone::DynClone;
+use datafusion::error::Result as DFResult;
 
 use crate::physical_plan::expressions::partitioned_count::PartitionedCountAccumulator;
 use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
-use datafusion::physical_plan::aggregates::return_type;
-use datafusion::physical_plan::expressions::{
-    Avg, AvgAccumulator, Count, Literal, Max, MaxAccumulator, Min, MinAccumulator, Sum,
-};
-use datafusion::physical_plan::{Accumulator, AggregateExpr};
+
+use datafusion::physical_plan::expressions::{AvgAccumulator, MaxAccumulator, MinAccumulator};
+use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
 use datafusion_expr::AggregateFunction;
 
@@ -100,7 +97,7 @@ impl Buffer {
         self._flush(&self.buffer)
     }
 
-    fn _flush(&self, buffer: &Vec<Value>) -> Result<()> {
+    fn _flush(&self, buffer: &[Value]) -> Result<()> {
         let arr = match self.data_type {
             DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => {
                 buffer_to_array_ref!(buffer, i64, Int64Array)
@@ -114,7 +111,7 @@ impl Buffer {
             DataType::Decimal(precision, scale) => {
                 let mut builder = DecimalBuilder::new(buffer.len(), precision, scale);
                 for v in buffer.iter() {
-                    builder.append_value(v.into());
+                    builder.append_value(v.into())?;
                 }
                 Arc::new(builder.finish()) as ArrayRef
             }
@@ -298,7 +295,7 @@ pub struct PartitionedAggregateAccumulator {
 fn new_partitioned_accumulator(
     agg: &PartitionedAggregateFunction,
     outer_acc: Box<dyn Accumulator>,
-    outer_agg: AggregateFunction,
+    _outer_agg: AggregateFunction,
     data_type: DataType,
 ) -> Result<Box<dyn PartitionedAccumulator>> {
     Ok(match agg {
@@ -380,7 +377,7 @@ macro_rules! make_spans {
         $self
             .acc
             .update_batch(&spans, &$values[1..])
-            .map_err(Error::into_datafusion_execution_error);
+            .map_err(Error::into_datafusion_execution_error)?
     }};
 }
 impl Accumulator for PartitionedAggregateAccumulator {

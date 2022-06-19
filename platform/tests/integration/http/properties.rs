@@ -1,6 +1,6 @@
 use arrow::datatypes::DataType;
 use axum::http::HeaderValue;
-use axum::{AddExtensionLayer, Router, Server};
+use axum::{Router, Server};
 use chrono::Utc;
 use metadata::metadata::ListResponse;
 use metadata::properties::Provider;
@@ -15,7 +15,6 @@ use std::env::temp_dir;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
-use url::Url;
 use uuid::Uuid;
 
 fn assert(l: &Property, r: &Property) {
@@ -80,18 +79,12 @@ async fn test_event_properties() -> Result<()> {
     );
     // list without props should be empty
     {
-        let resp = cl
+        let _ = cl
             .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties")
             .headers(headers.clone())
             .send()
             .await
             .unwrap();
-
-        /*assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(
-            resp.text().await.unwrap(),
-            r#"{"data":[],"meta":{"next":null}}"#
-        );*/
     }
 
     // get of unexisting event prop 1 should return 404 not found error

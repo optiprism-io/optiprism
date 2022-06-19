@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::generator;
 use crate::generator::Generator;
-use crate::profiles::{Profile, ProfileProvider};
+use crate::profiles::ProfileProvider;
 use crate::store::events::Event;
 use crate::store::products::ProductProvider;
 use crate::store::scenario::Scenario;
@@ -9,12 +9,12 @@ use crate::store::schema::create_entities;
 use arrow::record_batch::RecordBatch;
 use chrono::{DateTime, Utc};
 use enum_iterator::all;
-use futures::future::join_all;
+
 use log::info;
-use metadata::{dictionaries, Metadata};
+use metadata::Metadata;
 use rand::thread_rng;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 pub mod actions;
@@ -45,7 +45,7 @@ pub async fn gen(cfg: Config) -> Result<Vec<Vec<RecordBatch>>> {
     let mut rng = thread_rng();
 
     info!("loading profiles");
-    let mut profiles = ProfileProvider::try_new_from_csv(
+    let profiles = ProfileProvider::try_new_from_csv(
         cfg.org_id,
         cfg.project_id,
         &cfg.md.dictionaries,
@@ -53,7 +53,7 @@ pub async fn gen(cfg: Config) -> Result<Vec<Vec<RecordBatch>>> {
         cfg.device_path,
     )?;
     info!("loading products");
-    let mut products = ProductProvider::try_new_from_csv(
+    let products = ProductProvider::try_new_from_csv(
         cfg.org_id,
         cfg.project_id,
         &mut rng,

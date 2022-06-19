@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::metadata::{list, ListResponse};
 use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
-use crate::store::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
+use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
@@ -56,18 +56,16 @@ fn index_display_name_key(
     ns: &Namespace,
     display_name: Option<String>,
 ) -> Option<Vec<u8>> {
-    display_name
-        .map(|v| {
-            make_index_key(
-                organization_id,
-                project_id,
-                ns.as_bytes(),
-                IDX_DISPLAY_NAME,
-                v.as_str(),
-            )
-            .to_vec()
-        })
-        
+    display_name.map(|v| {
+        make_index_key(
+            organization_id,
+            project_id,
+            ns.as_bytes(),
+            IDX_DISPLAY_NAME,
+            v.as_str(),
+        )
+        .to_vec()
+    })
 }
 
 pub struct Provider {

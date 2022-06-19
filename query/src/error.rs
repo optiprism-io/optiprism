@@ -80,12 +80,10 @@ impl From<Error> for ArrowError {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        match self {
-            _ => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal server error".to_string(),
-            ),
-        }
-        .into_response()
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal server error".to_string(),
+        )
+            .into_response()
     }
 }

@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate log;
 
 extern crate bytesize;
@@ -11,19 +10,13 @@ use bytesize::ByteSize;
 use chrono::{DateTime, Utc};
 use datafusion::datasource::MemTable;
 use error::Result;
-use events_gen::generator;
 use log::info;
-use metadata::{Metadata, Store};
-use platform::platform::Platform;
-use platform::{
-    accounts::Provider as AccountProvider, auth::Provider as AuthProvider,
-    events::Provider as EventsProvider, properties::Provider as PropertiesProvider,
-};
+use metadata::store::Store;
+use metadata::Metadata;
 use query::QueryProvider;
 use std::env::temp_dir;
 use std::path::PathBuf;
 use std::{env::set_var, net::SocketAddr, sync::Arc};
-use tower_http::add_extension::AddExtensionLayer;
 use uuid::Uuid;
 
 #[tokio::main]
@@ -105,6 +98,6 @@ async fn main() -> Result<()> {
     Server::bind(&addr)
         .serve(router.into_make_service())
         .await
-        .map_err(|e| Error::ExternalError(e.to_string()));
+        .map_err(|e| Error::ExternalError(e.to_string()))?;
     Ok(())
 }

@@ -1,11 +1,10 @@
-use crate::error::{Error, InternalError, Result};
+use crate::error::{Error, Result};
 use arrow::array::{
-    Array, BooleanArray, DecimalArray, Float16Array, Float32Array, Float64Array, Int16Array,
-    Int32Array, Int64Array, Int8Array, StringArray, UInt16Array, UInt32Array, UInt64Array,
-    UInt8Array,
+    Array, BooleanArray, DecimalArray, Float32Array, Float64Array, Int16Array, Int32Array,
+    Int64Array, Int8Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
-use arrow::datatypes::{DataType, SchemaRef};
-use datafusion::scalar::ScalarValue;
+use arrow::datatypes::DataType;
+
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};

@@ -1,33 +1,28 @@
-use crate::{Error, Result};
-use ahash::RandomState;
 use arrow::array::{
-    Array, ArrayRef, Float64Array, StringArray, StringBuilder, UInt16Array, UInt32Array,
-    UInt64Array, UInt8Array,
+    Array, ArrayRef, StringBuilder, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
-use arrow::compute::kernels;
+
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::error::{ArrowError, Result as ArrowResult};
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::pretty_format_batches;
+
 use axum::async_trait;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
-use datafusion::physical_plan::hash_utils::create_hashes;
+
 use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 use datafusion::physical_plan::{
     DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
     Statistics,
 };
-use datafusion_common::ScalarValue;
-use fnv::FnvHashMap;
+
 use futures::executor::block_on;
 use futures::{Stream, StreamExt};
-use metadata::dictionaries;
+
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use std::any::Any;
-use std::borrow::Borrow;
-use std::collections::hash_map::Entry;
+
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;

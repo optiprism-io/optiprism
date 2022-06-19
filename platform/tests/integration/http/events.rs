@@ -1,5 +1,5 @@
 use axum::http::HeaderValue;
-use axum::{AddExtensionLayer, Router, Server};
+use axum::{Router, Server};
 use chrono::Utc;
 use metadata::events::{Event, Provider, Status};
 use metadata::metadata::ListResponse;

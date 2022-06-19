@@ -22,12 +22,6 @@ pub struct InternalError {
     status_code: StatusCode,
 }
 
-impl InternalError {
-    pub fn new(code: &'static str, status_code: StatusCode) -> Self {
-        Self { code, status_code }
-    }
-}
-
 #[derive(Debug)]
 pub enum Error {
     Internal(InternalError),
@@ -101,13 +95,9 @@ impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
             Error::Internal(err) => (err.status_code, err.code.to_string()),
-            Error::MetadataError(err) => match err {
-                metadata::Error::KeyNotFound(_) => (StatusCode::NOT_FOUND, "not found".to_string()),
-                _ => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "internal server error".to_string(),
-                ),
-            },
+            Error::MetadataError(metadata::Error::KeyNotFound(_)) => {
+                (StatusCode::NOT_FOUND, "not found".to_string())
+            }
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal server error".to_string(),

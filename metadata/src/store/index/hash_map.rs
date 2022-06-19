@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::store::store::Store;
+use crate::store::Store;
 use crate::Result;
 use std::sync::Arc;
 
@@ -13,41 +13,31 @@ impl HashMap {
         HashMap { store }
     }
 
-    pub async fn check_insert_constraints(&self, keys: &Vec<Option<Vec<u8>>>) -> Result<()> {
-        for key in keys.iter() {
-            if let Some(key) = key {
-                if let Some(_) = self.store.get(key).await? {
-                    return Err(Error::ConstraintViolation);
-                }
+    pub async fn check_insert_constraints(&self, keys: &[Option<Vec<u8>>]) -> Result<()> {
+        for key in keys.iter().flatten() {
+            if (self.store.get(key).await?).is_some() {
+                return Err(Error::ConstraintViolation);
             }
         }
         Ok(())
     }
 
-    pub async fn insert<V: AsRef<[u8]>>(
-        &self,
-        keys: &Vec<Option<Vec<u8>>>,
-        value: V,
-    ) -> Result<()> {
-        for key in keys.iter() {
-            if let Some(key) = key {
-                self.store.put(key, value.as_ref()).await?;
-            }
+    pub async fn insert<V: AsRef<[u8]>>(&self, keys: &[Option<Vec<u8>>], value: V) -> Result<()> {
+        for key in keys.iter().flatten() {
+            self.store.put(key, value.as_ref()).await?;
         }
         Ok(())
     }
 
     pub async fn check_update_constraints(
         &self,
-        keys: &Vec<Option<Vec<u8>>>,
-        prev_keys: &Vec<Option<Vec<u8>>>,
+        keys: &[Option<Vec<u8>>],
+        prev_keys: &[Option<Vec<u8>>],
     ) -> Result<()> {
         for (key, prev_key) in keys.iter().zip(prev_keys) {
             if let Some(key_v) = key {
-                if key != prev_key {
-                    if let Some(_) = self.store.get(key_v).await? {
-                        return Err(Error::ConstraintViolation);
-                    }
+                if key != prev_key && (self.store.get(key_v).await?).is_some() {
+                    return Err(Error::ConstraintViolation);
                 }
             }
         }
@@ -56,8 +46,8 @@ impl HashMap {
     }
     pub async fn update<V: AsRef<[u8]>>(
         &self,
-        keys: &Vec<Option<Vec<u8>>>,
-        prev_keys: &Vec<Option<Vec<u8>>>,
+        keys: &[Option<Vec<u8>>],
+        prev_keys: &[Option<Vec<u8>>],
         value: V,
     ) -> Result<()> {
         for (key, prev_key) in keys.iter().zip(prev_keys) {
@@ -75,11 +65,9 @@ impl HashMap {
         Ok(())
     }
 
-    pub async fn delete(&self, keys: &Vec<Option<Vec<u8>>>) -> Result<()> {
-        for key in keys.iter() {
-            if let Some(key) = key {
-                self.store.delete(key).await?;
-            }
+    pub async fn delete(&self, keys: &[Option<Vec<u8>>]) -> Result<()> {
+        for key in keys.iter().flatten() {
+            self.store.delete(key).await?;
         }
         Ok(())
     }

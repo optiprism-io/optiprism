@@ -1,8 +1,6 @@
 use crate::error::{Error, Result};
-use crate::store::store::{make_id_seq_key, make_main_key};
-use crate::Store;
+use crate::store::{make_id_seq_key, make_main_key, Store};
 use byteorder::{ByteOrder, LittleEndian};
-use datafusion::parquet::data_type::AsBytes;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -44,8 +42,7 @@ impl Provider {
         dict: &str,
         value: &str,
     ) -> Result<u64> {
-        // todo investigate hanging
-        // self.guard.write().await;
+        self.guard.write().await;
         match self
             .store
             .get(make_value_key(organization_id, project_id, dict, value))

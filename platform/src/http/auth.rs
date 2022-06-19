@@ -1,9 +1,5 @@
 use crate::{
-    auth,
-    auth::{
-        provider::Provider,
-        types::{LogInRequest, SignUpRequest, TokensResponse},
-    },
+    auth::types::{LogInRequest, SignUpRequest, TokensResponse},
     AuthProvider, Context, Result,
 };
 use axum::{extract::Extension, routing::post, AddExtensionLayer, Json, Router};

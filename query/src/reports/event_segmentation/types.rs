@@ -3,7 +3,6 @@ use crate::reports::types::{EventRef, PropValueOperation, PropertyRef, QueryTime
 use chrono::{DateTime, Utc};
 use datafusion_common::ScalarValue;
 use datafusion_expr::AggregateFunction;
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
 pub enum SegmentTime {
@@ -166,15 +165,6 @@ impl Event {
 }
 
 #[derive(Clone, Debug)]
-pub enum SegmentCondition {}
-
-#[derive(Clone, Debug)]
-pub struct Segment {
-    name: String,
-    conditions: Vec<SegmentCondition>,
-}
-
-#[derive(Clone, Debug)]
 pub struct EventSegmentation {
     pub time: QueryTime,
     pub group: String,
@@ -185,7 +175,6 @@ pub struct EventSegmentation {
     pub events: Vec<Event>,
     pub filters: Option<Vec<EventFilter>>,
     pub breakdowns: Option<Vec<Breakdown>>,
-    pub segments: Option<Vec<Segment>>,
 }
 
 #[cfg(test)]
@@ -209,7 +198,7 @@ mod tests {
         let to = DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let es = EventSegmentation {
+        let _es = EventSegmentation {
             time: QueryTime::Between { from, to },
             group: event_fields::USER_ID.to_string(),
             interval_unit: TimeUnit::Minute,
@@ -288,7 +277,6 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Country".to_string(),
             ))]),
-            segments: None,
         };
 
         /*let j = serde_json::to_string_pretty(&es).unwrap();

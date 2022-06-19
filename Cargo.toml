@@ -10,5 +10,4 @@ members = [
     "arrow-datafusion/datafusion-expr",
     "arrow-datafusion/datafusion-common",
     "events-gen",
-    "exp"
 ]

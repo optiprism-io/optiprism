@@ -1,25 +1,19 @@
-use std::convert::TryFrom;
 use std::fmt::Debug;
-use std::ops::Add;
-use std::sync::{Arc, Mutex, RwLock};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::physical_plan::expressions::partitioned_aggregate::{
-    Buffer, PartitionedAccumulator, PartitionedAggregate, Value,
+    Buffer, PartitionedAccumulator, Value,
 };
 use crate::DEFAULT_BATCH_SIZE;
 use arrow::array::{
-    Array, ArrayBuilder, ArrayRef, DecimalArray, Float32Array, Float64Array, Int16Array,
-    Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+    ArrayRef, DecimalArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array,
+    Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
-use arrow::compute;
+
 use arrow::datatypes::DataType;
-use datafusion::error::Result as DFResult;
-use datafusion::physical_plan::aggregates::return_type;
-use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, Min, Sum};
-use datafusion::physical_plan::{expressions, Accumulator, AggregateExpr, PhysicalExpr};
+
+use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
-use dyn_clone::DynClone;
 
 #[derive(Debug)]
 pub struct PartitionedSumAccumulator {
@@ -40,7 +34,7 @@ impl PartitionedSumAccumulator {
         };
         Ok(Self {
             sum: value,
-            buffer: Buffer::new(DEFAULT_BATCH_SIZE, data_type.clone(), outer_acc),
+            buffer: Buffer::new(DEFAULT_BATCH_SIZE, data_type, outer_acc),
         })
     }
 }
@@ -51,7 +45,7 @@ macro_rules! update_batch {
         let arr = $array.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
         for (idx, value) in arr.iter().enumerate() {
             if $spans[idx] {
-                $self.buffer.push(Value::$vtype(sum));
+                $self.buffer.push(Value::$vtype(sum))?;
                 sum = $type::default();
             }
 
@@ -85,7 +79,7 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
                 let arr = val_arr.as_any().downcast_ref::<DecimalArray>().unwrap();
                 for (idx, value) in arr.iter().enumerate() {
                     if spans[idx] {
-                        self.buffer.push(Value::Decimal(sum));
+                        self.buffer.push(Value::Decimal(sum))?;
                         sum = 0;
                     }
 
@@ -109,12 +103,12 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
     }
 
     fn state(&self) -> Result<Vec<ScalarValue>> {
-        self.buffer.flush_with_value(self.sum.clone())?;
+        self.buffer.flush_with_value(self.sum)?;
         Ok(self.buffer.state()?)
     }
 
     fn evaluate(&self) -> Result<ScalarValue> {
-        self.buffer.flush_with_value(self.sum.clone())?;
+        self.buffer.flush_with_value(self.sum)?;
         Ok(self.buffer.evaluate()?)
     }
 }
@@ -126,10 +120,10 @@ mod tests {
     use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
     use arrow::array::{ArrayRef, DecimalBuilder, Int8Array};
     use arrow::datatypes::DataType;
-    use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Literal};
-    use datafusion::physical_plan::AggregateExpr;
+    use datafusion::physical_plan::expressions::AvgAccumulator;
+
     use datafusion::scalar::ScalarValue as DFScalarValue;
-    use datafusion_common::ScalarValue;
+
     use datafusion_expr::Accumulator;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
@@ -148,7 +142,7 @@ mod tests {
         let arr = Arc::new(Int8Array::from(vals));
 
         sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
-        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
+        sum_acc.update_batch(&spans, &[arr as ArrayRef]);
 
         let list = vec![
             1 + 2,
@@ -186,7 +180,7 @@ mod tests {
         };
 
         sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
-        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
+        sum_acc.update_batch(&spans, &[arr as ArrayRef]);
 
         let list = vec![
             dec!(1.23) + dec!(2.31),

@@ -1,10 +1,10 @@
 use crate::{Error, Result};
 use ahash::RandomState;
-use arrow::array::{Array, ArrayRef, Float64Array, StringArray};
+use arrow::array::{Array, ArrayRef, StringArray};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-use arrow::error::{ArrowError, Result as ArrowResult};
+use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::pretty_format_batches;
+
 use axum::async_trait;
 use datafusion::error::Result as DFResult;
 use datafusion::execution::runtime_env::RuntimeEnv;
@@ -19,8 +19,7 @@ use datafusion_common::ScalarValue;
 use fnv::FnvHashMap;
 use futures::{Stream, StreamExt};
 use std::any::Any;
-use std::borrow::Borrow;
-use std::collections::hash_map::Entry;
+
 use std::fmt;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -200,7 +199,7 @@ impl PivotStream {
                     self.finished = true;
 
                     // nothing was actually processed
-                    if self.unique_groups.len() == 0 {
+                    if self.unique_groups.is_empty() {
                         return Poll::Ready(None);
                     }
 
@@ -329,7 +328,7 @@ impl Stream for PivotStream {
 #[cfg(test)]
 mod tests {
     use crate::physical_plan::pivot::PivotExec;
-    use arrow::array::{ArrayRef, Float32Array, Float64Array, Int32Array, StringArray};
+    use arrow::array::{ArrayRef, Float64Array, Int32Array, StringArray};
     use arrow::record_batch::RecordBatch;
     pub use datafusion::error::Result;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
@@ -374,7 +373,7 @@ mod tests {
                 ])?,
             ];
 
-            let schema = batches[0].schema().clone();
+            let schema = batches[0].schema();
             Arc::new(MemoryExec::try_new(&[batches], schema, None).unwrap())
         };
 

@@ -1,5 +1,5 @@
-use crate::{Error, Result};
-use arrow::datatypes::{DataType, Field};
+use crate::Result;
+use arrow::datatypes::DataType;
 use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
 use datafusion_common::{Column, DFField, DFSchema};
 use datafusion_expr::Expr;

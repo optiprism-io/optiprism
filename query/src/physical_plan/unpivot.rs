@@ -1,22 +1,20 @@
 use crate::{Error, Result};
 use arrow::array::{
-    make_builder, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray,
-    DecimalBuilder, Float32Builder, Float64Builder, Int16Array, Int16Builder, Int32Array,
-    Int32Builder, Int64Array, Int64Builder, Int8Array, Int8BufferBuilder, Int8Builder,
-    StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt16Builder,
-    UInt32Builder, UInt64Builder, UInt8Builder,
+    Array, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray, DecimalBuilder, Float32Builder,
+    Float64Builder, Int16Array, Int16Builder, Int32Array, Int32Builder, Int64Array, Int64Builder,
+    Int8Array, Int8Builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder,
+    UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
 };
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-use arrow::error::{ArrowError, Result as ArrowResult};
+use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use datafusion::arrow::array::{
-    Float32Array, Float64Array, StringArray, TimestampMicrosecondArray, UInt16Array, UInt32Array,
-    UInt64Array, UInt8Array,
+    Float32Array, Float64Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
 use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
+use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 use datafusion::physical_plan::{
     DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
@@ -73,7 +71,7 @@ impl UnpivotExec {
 
             let name_field = Field::new(name_col.as_str(), DataType::Utf8, false);
             fields.push(name_field);
-            let value_field = Field::new(value_col.as_str(), value_type.clone(), false);
+            let value_field = Field::new(value_col.as_str(), value_type, false);
             fields.push(value_field);
 
             Arc::new(Schema::new(fields))
@@ -209,12 +207,12 @@ macro_rules! build_group_arr {
             if src_arr.is_null(row_idx) {
                     // append value multiple time, one for each unpivot column
                     for _ in 0..$unpivot_cols_len {
-                        result.append_null();
+                        result.append_null().unwrap();
                     }
                 } else {
                 // populate null
                 for _ in 0..$unpivot_cols_len {
-                        result.append_value(src_arr.value(row_idx));
+                        result.append_value(src_arr.value(row_idx)).unwrap();
                     }
                 }
         }
@@ -238,7 +236,7 @@ macro_rules! build_value_arr {
             // iterate over each column to unpivot and append its value to the result
             for arr in arrs.iter() {
                 if arr.is_null(idx) {
-                    result.append_null();
+                    result.append_null()?;
                 } else {
                     result.append_value(arr.value(idx))?;
                 }
@@ -343,7 +341,7 @@ pub fn unpivot(
                 unpivot_cols_len,
                 StringBuilder
             ),
-            DataType::Timestamp(Nanosecond, None) => build_group_arr!(
+            DataType::Timestamp(_, None) => build_group_arr!(
                 batch_col_idx,
                 arr,
                 TimestampNanosecondArray,
@@ -358,11 +356,11 @@ pub fn unpivot(
                 for row_idx in 0..arr.len() {
                     if src_arr_typed.is_null(row_idx) {
                         for _ in 0..=unpivot_cols_len {
-                            result.append_null();
+                            result.append_null().unwrap();
                         }
                     } else {
                         for _ in 0..=unpivot_cols_len {
-                            result.append_value(src_arr_typed.value(row_idx));
+                            result.append_value(src_arr_typed.value(row_idx)).unwrap();
                         }
                     }
                 }
@@ -389,7 +387,7 @@ pub fn unpivot(
                 let int_arr = arrow::compute::cast(arr, &DataType::Int64).unwrap();
                 arrow::compute::cast(&int_arr, &value_type).unwrap()
             }
-            other => arrow::compute::cast(arr, &value_type).unwrap(),
+            _other => arrow::compute::cast(arr, &value_type).unwrap(),
         })
         .collect();
 
@@ -421,7 +419,7 @@ pub fn unpivot(
             for idx in 0..unpivot_arrs[0].len() {
                 for arr in arrs.iter() {
                     if arr.is_null(idx) {
-                        result.append_null();
+                        result.append_null()?;
                     } else {
                         result.append_value(arr.value(idx))?;
                     }
@@ -438,7 +436,7 @@ pub fn unpivot(
     final_arrs.push(name_arr);
     final_arrs.push(value_arr);
 
-    Ok(RecordBatch::try_new(schema, final_arrs)?)
+    RecordBatch::try_new(schema, final_arrs)
 }
 
 #[cfg(test)]
@@ -494,7 +492,7 @@ mod tests {
                 ])?,
             ];
 
-            let schema = batches[0].schema().clone();
+            let schema = batches[0].schema();
             Arc::new(MemoryExec::try_new(&[batches], schema, None).unwrap())
         };
 

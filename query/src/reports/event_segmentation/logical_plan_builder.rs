@@ -1,51 +1,36 @@
-use crate::error::{Error, Result};
-use chrono::{DateTime, Duration, DurationRound, NaiveDateTime, Utc};
-use datafusion::logical_plan::{
-    create_udaf, exprlist_to_fields, Column, DFField, DFSchema, ExprSchema, LogicalPlan, Operator,
-    Partitioning, Repartition,
-};
-use datafusion::physical_plan::aggregates::{return_type, AggregateFunction};
+use crate::error::Result;
+use chrono::{DateTime, Duration, Utc};
+use datafusion::logical_plan::{exprlist_to_fields, Column, DFSchema, LogicalPlan, Operator};
+use datafusion::physical_plan::aggregates::AggregateFunction;
 use std::collections::HashMap;
 
-use crate::logical_plan::expr::{
-    aggregate_partitioned, lit_timestamp, multi_and, sorted_distinct_count,
-};
-use crate::physical_plan::expressions::aggregate::state_types;
-use crate::physical_plan::expressions::partitioned_aggregate::{
-    PartitionedAggregate, PartitionedAggregateFunction,
-};
-use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
-use crate::reports::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
+use crate::logical_plan::expr::{aggregate_partitioned, multi_and, sorted_distinct_count};
+
+use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
+
+use crate::reports::types::{EventRef, PropertyRef, TimeUnit};
 use crate::{event_fields, Context};
-use arrow::datatypes::DataType;
-use axum::response::IntoResponse;
-use datafusion::error::Result as DFResult;
+
 use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
-use datafusion::logical_plan::ExprSchemable;
-use datafusion_expr::expr_fn::{and, binary_expr, or};
-use datafusion_expr::{
-    col, lit, AccumulatorFunctionImplementation, AggregateUDF, BuiltinScalarFunction, Expr,
-    ReturnTypeFunction, Signature, StateTypeFunction, Volatility,
-};
+
+use datafusion_expr::expr_fn::{and, binary_expr};
+use datafusion_expr::{col, lit, BuiltinScalarFunction, Expr};
 
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
-use arrow::array::TimestampSecondArray;
+
 use chrono::prelude::*;
 use chronoutil::DateRule;
-use datafusion::prelude::Partitioning::Hash;
+
 use datafusion_common::ScalarValue;
 use futures::executor;
-use futures::executor::block_on;
+
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use metadata::properties::provider::Namespace;
 use metadata::Metadata;
-use mockall::predicate::ge;
-use serde::{Deserialize, Serialize};
-use std::io::{self, Write};
-use std::ops::{Add, Sub};
+
 use std::sync::Arc;
 
 use crate::reports::event_segmentation::types::{
@@ -68,28 +53,30 @@ pub struct LogicalPlanBuilder {
 macro_rules! breakdowns_to_dicts {
     ($self:expr, $breakdowns:expr, $cols_hash:expr,$decode_cols:expr) => {{
         for breakdown in $breakdowns.iter() {
-            if let Breakdown::Property(prop) = &breakdown {
-                if $cols_hash.contains_key(prop) {
-                    continue;
-                }
-                $cols_hash.insert(prop.to_owned(), ());
+            match &breakdown {
+                Breakdown::Property(prop) => {
+                    if $cols_hash.contains_key(prop) {
+                        continue;
+                    }
+                    $cols_hash.insert(prop.to_owned(), ());
 
-                match prop {
-                    PropertyRef::User(name) => dictionary_prop_to_col!(
-                        $self,
-                        user_properties,
-                        Namespace::User,
-                        name,
-                        $decode_cols
-                    ),
-                    PropertyRef::Event(name) => dictionary_prop_to_col!(
-                        $self,
-                        event_properties,
-                        Namespace::Event,
-                        name,
-                        $decode_cols
-                    ),
-                    _ => {}
+                    match prop {
+                        PropertyRef::User(name) => dictionary_prop_to_col!(
+                            $self,
+                            user_properties,
+                            Namespace::User,
+                            name,
+                            $decode_cols
+                        ),
+                        PropertyRef::Event(name) => dictionary_prop_to_col!(
+                            $self,
+                            event_properties,
+                            Namespace::Event,
+                            name,
+                            $decode_cols
+                        ),
+                        _ => {}
+                    }
                 }
             }
         }
@@ -135,7 +122,7 @@ impl LogicalPlanBuilder {
         let events = es.events.clone();
         let builder = LogicalPlanBuilder {
             ctx: ctx.clone(),
-            cur_time: cur_time.clone(),
+            cur_time,
             metadata,
             es: es.clone(),
         };
@@ -223,7 +210,7 @@ impl LogicalPlanBuilder {
 
         // pivot date
         input = {
-            let (from_time, to_time) = self.es.time.range(self.cur_time.clone());
+            let (from_time, to_time) = self.es.time.range(self.cur_time);
             let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
             LogicalPlan::Extension(Extension {
                 node: Arc::new(PivotNode::try_new(
@@ -249,7 +236,7 @@ impl LogicalPlanBuilder {
             event_fields::CREATED_AT,
             input.schema(),
             &self.es.time,
-            self.cur_time.clone(),
+            self.cur_time,
         )?;
 
         // event expression
@@ -318,7 +305,7 @@ impl LogicalPlanBuilder {
                         distinct: false,
                     },
                     Query::CountUniqueGroups | Query::DailyActiveGroups => {
-                        let a = col(self.es.group.as_ref());
+                        let _a = col(self.es.group.as_ref());
                         sorted_distinct_count(input.schema(), col(self.es.group.as_ref()))?
                     }
                     Query::WeeklyActiveGroups => unimplemented!(),
@@ -417,7 +404,7 @@ impl LogicalPlanBuilder {
     }
 
     /// builds event filters expression
-    async fn event_filters_expression(&self, filters: &Vec<EventFilter>) -> Result<Expr> {
+    async fn event_filters_expression(&self, filters: &[EventFilter]) -> Result<Expr> {
         // iterate over filters
         let filters_exprs = filters
             .iter()
@@ -429,9 +416,7 @@ impl LogicalPlanBuilder {
                         operation,
                         value,
                     } => {
-                        let df_value: Option<Vec<ScalarValue>> = value
-                            .as_ref()
-                            .map(|x| x.iter().map(|s| s.clone()).collect());
+                        let df_value: Option<Vec<ScalarValue>> = value.as_ref().map(|x| x.to_vec());
                         executor::block_on(property_expression(
                             &self.ctx,
                             &self.metadata,
@@ -455,8 +440,8 @@ impl LogicalPlanBuilder {
     async fn breakdown_expr(&self, breakdown: &Breakdown) -> Result<Expr> {
         match breakdown {
             Breakdown::Property(prop_ref) => match prop_ref {
-                PropertyRef::User(prop_name) | PropertyRef::Event(prop_name) => {
-                    let prop_col = property_col(&self.ctx, &self.metadata, &prop_ref).await?;
+                PropertyRef::User(_prop_name) | PropertyRef::Event(_prop_name) => {
+                    let prop_col = property_col(&self.ctx, &self.metadata, prop_ref).await?;
                     Ok(prop_col)
                     // Ok(Expr::Alias(Box::new(prop_col), prop_name.clone()))
                 }

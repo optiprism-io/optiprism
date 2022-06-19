@@ -1,13 +1,13 @@
-use arrow::datatypes::{DataType, Field};
+use arrow::datatypes::DataType;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
-use datafusion_common::{Column, DFField, DFSchema};
+use datafusion_common::{DFField, DFSchema};
 use datafusion_expr::Expr;
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-use crate::{Error, Result};
+use crate::Result;
 
 pub struct UnpivotNode {
     input: LogicalPlan,
@@ -39,7 +39,7 @@ impl UnpivotNode {
 
             let name_field = DFField::new(None, name_col.as_str(), DataType::Utf8, false);
             fields.push(name_field);
-            let value_field = DFField::new(None, value_col.as_str(), value_type.clone(), false);
+            let value_field = DFField::new(None, value_col.as_str(), value_type, false);
             fields.push(value_field);
 
             Arc::new(DFSchema::new(fields)?)

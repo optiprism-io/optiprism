@@ -1,5 +1,5 @@
 use super::{LogInRequest, SignUpRequest, TokensResponse};
-use crate::{accounts::Provider as AccountProvider, Context, Result};
+use crate::{Context, Result};
 use chrono::Utc;
 use common::auth::{make_password_hash, make_salt};
 use common::{

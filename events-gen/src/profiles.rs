@@ -66,31 +66,31 @@ impl ProfileProvider {
         let geo = {
             let mut result = Vec::with_capacity(1000);
             let mut rdr = csv::Reader::from_path(geo_path)?;
-            for res in rdr.deserialize().into_iter() {
-                let mut rec: CSVGeo = res?;
+            for res in rdr.deserialize() {
+                let rec: CSVGeo = res?;
 
                 geo_weights.push(rec.weight);
                 let geo = Geo {
                     country: rec
                         .country
-                        .and_then(|v| {
-                            Some(block_on(dicts.get_key_or_create(
+                        .map(|v| {
+                            block_on(dicts.get_key_or_create(
                                 org_id,
                                 proj_id,
                                 "user_country",
                                 v.as_str(),
-                            )))
+                            ))
                         })
                         .transpose()?,
                     city: rec
                         .city
-                        .and_then(|v| {
-                            Some(block_on(dicts.get_key_or_create(
+                        .map(|v| {
+                            block_on(dicts.get_key_or_create(
                                 org_id,
                                 proj_id,
                                 "user_city",
                                 v.as_str(),
-                            )))
+                            ))
                         })
                         .transpose()?,
                 };
@@ -108,53 +108,53 @@ impl ProfileProvider {
         let device = {
             let mut result = Vec::with_capacity(1000);
             let mut rdr = csv::Reader::from_path(device_path)?;
-            for res in rdr.deserialize().into_iter() {
-                let mut rec: CSVDevice = res?;
+            for res in rdr.deserialize() {
+                let rec: CSVDevice = res?;
 
                 device_weights.push(rec.weight);
                 let device = Device {
                     device: rec
                         .device
-                        .and_then(|v| {
-                            Some(block_on(dicts.get_key_or_create(
+                        .map(|v| {
+                            block_on(dicts.get_key_or_create(
                                 org_id,
                                 proj_id,
                                 "user_device",
                                 v.as_str(),
-                            )))
+                            ))
                         })
                         .transpose()?,
                     device_category: rec
                         .device_category
-                        .and_then(|v| {
-                            Some(block_on(dicts.get_key_or_create(
+                        .map(|v| {
+                            block_on(dicts.get_key_or_create(
                                 org_id,
                                 proj_id,
                                 "user_device_category",
                                 v.as_str(),
-                            )))
+                            ))
                         })
                         .transpose()?,
                     os: rec
                         .os
-                        .and_then(|v| {
-                            Some(block_on(dicts.get_key_or_create(
+                        .map(|v| {
+                            block_on(dicts.get_key_or_create(
                                 org_id,
                                 proj_id,
                                 "user_os",
                                 v.as_str(),
-                            )))
+                            ))
                         })
                         .transpose()?,
                     os_version: rec
                         .os_version
-                        .and_then(|v| {
-                            Some(block_on(dicts.get_key_or_create(
+                        .map(|v| {
+                            block_on(dicts.get_key_or_create(
                                 org_id,
                                 proj_id,
                                 "user_os_version",
                                 v.as_str(),
-                            )))
+                            ))
                         })
                         .transpose()?,
                 };

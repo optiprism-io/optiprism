@@ -45,7 +45,7 @@ impl Generator {
         }
     }
 
-    pub fn next(&mut self) -> Option<Sample> {
+    pub fn next_sample(&mut self) -> Option<Sample> {
         let hour = self.traffic_hourly_weight_idx.sample(&mut self.rng) as i64;
         let minute: i64 = self.rng.gen_range(0..=59);
         let sample = Sample {

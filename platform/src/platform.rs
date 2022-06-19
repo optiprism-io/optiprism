@@ -1,8 +1,7 @@
 use crate::{
-    accounts, auth, events, properties, AccountsProvider, AuthProvider, EventSegmentationProvider,
-    EventsProvider, PropertiesProvider,
+    AccountsProvider, AuthProvider, EventSegmentationProvider, EventsProvider, PropertiesProvider,
 };
-use metadata::{database, organizations, projects, Metadata};
+use metadata::Metadata;
 use query::QueryProvider;
 use std::sync::Arc;
 

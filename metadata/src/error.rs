@@ -32,7 +32,6 @@ impl Display for Error {
             Error::ConstraintViolation => write!(f, "ConstraintViolation"),
             Error::FromUtf8Error(err) => write!(f, "FromUtf8Error: {}", err),
         }
-
     }
 }
 

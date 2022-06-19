@@ -1,7 +1,7 @@
 use super::{Account, CreateRequest, UpdateRequest};
 use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::store::index::hash_map::HashMap;
-use crate::store::store::Store;
+use crate::store::Store;
 use crate::{Error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
@@ -28,10 +28,7 @@ pub fn make_data_value_key(ns: &[u8], id: u64) -> Vec<u8> {
 }
 
 fn index_keys(email: &str) -> Vec<Option<Vec<u8>>> {
-    let mut idx: Vec<Option<Vec<u8>>> = vec![];
-    idx.push(Some(make_index_key(NAMESPACE, IDX_EMAIL, email).to_vec()));
-
-    idx
+    [Some(make_index_key(NAMESPACE, IDX_EMAIL, email).to_vec())].to_vec()
 }
 
 pub struct Provider {
@@ -67,7 +64,7 @@ impl Provider {
     pub async fn get_by_id(&self, id: u64) -> Result<Account> {
         match self.store.get(make_data_value_key(NAMESPACE, id)).await? {
             None => Err(Error::KeyNotFound(id.to_string())),
-            Some(value) => Ok(deserialize(&value)?),
+            Some(value) => Ok(deserialize(value.as_slice())?),
         }
     }
 

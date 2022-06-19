@@ -1,18 +1,18 @@
 use crate::logical_plan::expr::{lit_timestamp, multi_or};
 use crate::reports::types::{PropValueOperation, PropertyRef, QueryTime};
 use crate::Result;
-use crate::{event_fields, Context, Error};
-use arrow::datatypes::{DataType, Schema};
+use crate::{Context, Error};
+use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
-use chronoutil::RelativeDuration;
+
 use datafusion::logical_plan::ExprSchemable;
 use datafusion_common::{Column, ExprSchema, ScalarValue};
 use datafusion_expr::expr_fn::{and, binary_expr};
 use datafusion_expr::{col, lit, Expr, Operator};
-use futures::executor;
+
 use metadata::properties::provider::Namespace;
 use metadata::{dictionaries, Metadata};
-use std::ops::Sub;
+
 use std::sync::Arc;
 
 /// builds expression on timestamp
@@ -42,7 +42,7 @@ pub async fn values_to_dict_keys(
     dictionaries: &Arc<dictionaries::Provider>,
     dict_type: &DataType,
     col_name: &str,
-    values: &Vec<ScalarValue>,
+    values: &[ScalarValue],
 ) -> Result<Vec<ScalarValue>> {
     let mut ret: Vec<ScalarValue> = Vec::with_capacity(values.len());
     for value in values.iter() {
@@ -74,7 +74,7 @@ pub async fn values_to_dict_keys(
         }
     }
 
-    return Ok(ret);
+    Ok(ret)
 }
 
 /// builds name [property] [operation] [value] expression
@@ -100,17 +100,17 @@ pub async fn property_expression(
 
             if let Some(dict_type) = prop.dictionary_type {
                 let dict_values = values_to_dict_keys(
-                    &ctx,
+                    ctx,
                     &md.dictionaries,
                     &dict_type,
                     col_name.as_str(),
                     &values.unwrap(),
                 )
                 .await?;
-                return named_property_expression(col, operation, Some(dict_values));
+                named_property_expression(col, operation, Some(dict_values))
             } else {
-                return named_property_expression(col, operation, values);
-            };
+                named_property_expression(col, operation, values)
+            }
         }
         PropertyRef::Event(prop_name) => {
             let prop = md
@@ -126,17 +126,17 @@ pub async fn property_expression(
 
             if let Some(dict_type) = prop.dictionary_type {
                 let dict_values = values_to_dict_keys(
-                    &ctx,
+                    ctx,
                     &md.dictionaries,
                     &dict_type,
                     col_name.as_str(),
                     &values.unwrap(),
                 )
                 .await?;
-                return named_property_expression(col, operation, Some(dict_values));
+                named_property_expression(col, operation, Some(dict_values))
             } else {
-                return named_property_expression(col, operation, values);
-            };
+                named_property_expression(col, operation, values)
+            }
         }
         PropertyRef::Custom(_) => unimplemented!(),
     }
@@ -181,7 +181,7 @@ pub fn named_property_expression(
 
             Ok(match values_vec.len() {
                 1 => binary_expr(
-                    prop_col.clone(),
+                    prop_col,
                     operation.clone().into(),
                     lit(values_vec[0].clone()),
                 ),

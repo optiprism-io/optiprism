@@ -10,7 +10,7 @@ use crate::events::types::{CreateEventRequest, UpdateEventRequest};
 use crate::events::Event;
 use crate::metadata::{list, ListResponse};
 use crate::store::index::hash_map::HashMap;
-use crate::store::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
+use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"events";
@@ -39,18 +39,16 @@ fn index_display_name_key(
     project_id: u64,
     display_name: Option<String>,
 ) -> Option<Vec<u8>> {
-    display_name
-        .map(|v| {
-            make_index_key(
-                organization_id,
-                project_id,
-                NAMESPACE,
-                IDX_DISPLAY_NAME,
-                v.as_str(),
-            )
-            .to_vec()
-        })
-        
+    display_name.map(|v| {
+        make_index_key(
+            organization_id,
+            project_id,
+            NAMESPACE,
+            IDX_DISPLAY_NAME,
+            v.as_str(),
+        )
+        .to_vec()
+    })
 }
 
 pub struct Provider {

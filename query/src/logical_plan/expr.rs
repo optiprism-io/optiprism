@@ -3,23 +3,21 @@ use crate::physical_plan::expressions::partitioned_aggregate::{
     PartitionedAggregate, PartitionedAggregateFunction,
 };
 use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
-use crate::reports::types::{PropValueOperation, PropertyRef, QueryTime};
-use crate::{event_fields, Context, Error, Result};
+
+use crate::{Error, Result};
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
 use datafusion::error::Result as DFResult;
 use datafusion::logical_plan::ExprSchemable;
 use datafusion::physical_plan::aggregates::return_type;
-use datafusion_common::{Column, DFSchema, ScalarValue};
-use datafusion_expr::expr_fn::{and, binary_expr, or};
-use datafusion_expr::{
-    col, AccumulatorFunctionImplementation, AggregateFunction, AggregateUDF, Expr, Operator,
-    ReturnTypeFunction, Signature, StateTypeFunction, Volatility,
-};
+use datafusion_common::{DFSchema, ScalarValue};
+use datafusion_expr::expr_fn::{and, or};
 pub use datafusion_expr::{lit, lit_timestamp_nano, Literal};
-use metadata::properties::provider::Namespace;
-use metadata::Metadata;
-use std::ops::Sub;
+use datafusion_expr::{
+    AccumulatorFunctionImplementation, AggregateFunction, AggregateUDF, Expr, ReturnTypeFunction,
+    Signature, StateTypeFunction, Volatility,
+};
+
 use std::sync::Arc;
 
 pub fn multi_or(exprs: Vec<Expr>) -> Expr {
@@ -118,6 +116,6 @@ pub fn aggregate_partitioned(
     Ok(Expr::AggregateUDF {
         fun: Arc::new(udf),
         // join partition and function arguments into one vector
-        args: vec![vec![partition_by.clone()], args].concat(),
+        args: vec![vec![partition_by], args].concat(),
     })
 }

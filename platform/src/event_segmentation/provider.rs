@@ -17,7 +17,7 @@ impl Provider {
     pub async fn event_segmentation(
         &self,
         ctx: Context,
-        organization_id: u64,
+        _organization_id: u64,
         project_id: u64,
         req: EventSegmentation,
     ) -> Result<DataTable> {
@@ -26,6 +26,6 @@ impl Provider {
             .query
             .event_segmentation(ctx.into_query_context(project_id), lreq)
             .await?;
-        Ok(result.try_into()?)
+        result.try_into()
     }
 }

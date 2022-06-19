@@ -5,7 +5,7 @@ use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-use crate::{Error, Result};
+use crate::Result;
 
 pub struct PivotNode {
     pub input: LogicalPlan,

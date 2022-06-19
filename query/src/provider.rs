@@ -5,20 +5,19 @@ use crate::reports::results::DataTable;
 use crate::reports::{event_segmentation, results};
 use crate::Context;
 use crate::Result;
-use arrow::datatypes::{Schema, SchemaRef};
-use arrow::record_batch::RecordBatch;
+use arrow::datatypes::Schema;
+
 use arrow::util::pretty::pretty_format_batches;
 use chrono::Utc;
-use datafusion::catalog::schema::MemorySchemaProvider;
-use datafusion::datasource::object_store::local::LocalFileSystem;
-use datafusion::datasource::{MemTable, TableProvider};
+
+use datafusion::datasource::TableProvider;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-use datafusion::logical_plan::plan::Explain;
-use datafusion::logical_plan::{LogicalPlan, LogicalPlanBuilder};
+
+use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::{collect, displayable};
-use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
-use metadata::database::TableType;
+use datafusion::prelude::{ExecutionConfig, ExecutionContext};
+
 use metadata::Metadata;
 use std::sync::Arc;
 use std::time::Instant;
@@ -46,7 +45,7 @@ impl Provider {
         let start = Instant::now();
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx,
-            cur_time.clone(),
+            cur_time,
             self.metadata.clone(),
             self.input.clone(),
             es.clone(),

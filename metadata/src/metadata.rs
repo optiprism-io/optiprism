@@ -1,6 +1,6 @@
-use crate::store::store::make_data_key;
+use crate::store::{make_data_key, Store};
 use crate::{
-    accounts, database, dictionaries, events, organizations, projects, properties, Result, Store,
+    accounts, database, dictionaries, events, organizations, projects, properties, Result,
 };
 use bincode::deserialize;
 use serde::de::DeserializeOwned;

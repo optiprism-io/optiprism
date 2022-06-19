@@ -1,7 +1,8 @@
 use crate::store::actions::Action;
 use crate::store::coefficients::Coefficients;
+use crate::store::scenario::Transition;
 
-pub fn make_transitions(coef: &Coefficients) -> Vec<(Action, Vec<(Action, f64, u64)>)> {
+pub fn make_transitions(coef: &Coefficients) -> Vec<Transition> {
     vec![
         (
             Action::ViewIndex,

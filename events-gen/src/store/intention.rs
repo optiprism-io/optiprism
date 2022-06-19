@@ -28,10 +28,8 @@ pub fn select_intention<'a>(
         if rng.gen::<f64>() < 0.8 {
             return Intention::JustBrowse;
         }
-    } else {
-        if rng.gen::<f64>() < 0.05 {
-            return Intention::JustBrowse;
-        }
+    } else if rng.gen::<f64>() < 0.05 {
+        return Intention::JustBrowse;
     }
 
     if rng.gen::<f64>() < 0.2 {

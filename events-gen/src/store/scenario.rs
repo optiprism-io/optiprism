@@ -1,25 +1,18 @@
 use crate::error::Result;
-use arrow::array::{
-    ArrayBuilder, ArrayRef, DecimalArray, DecimalBuilder, Int8Array, Int8Builder,
-    TimestampSecondArray, TimestampSecondBuilder, UInt16Builder, UInt64Builder, UInt8Builder,
-};
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit, DECIMAL_MAX_PRECISION};
+use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use rand::distributions::WeightedIndex;
+use chrono::{DateTime, Duration, Utc};
+
 use rand::rngs::ThreadRng;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
-use std::pin::Pin;
-use std::string::ToString;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering};
+
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
-use std::time::Instant;
-use std::{fmt, io, thread};
-// use crate::actions::{Actions, Probability, TransitionState};
+
 use crate::generator::Generator;
-use crate::probability;
+use std::thread;
+
 use crate::store::actions::Action;
 use crate::store::batch_builder::RecordBatchBuilder;
 use crate::store::coefficients::make_coefficients;
@@ -27,13 +20,12 @@ use crate::store::events::Event;
 use crate::store::intention::{select_intention, Intention};
 use crate::store::products::{Product, ProductProvider};
 use crate::store::transitions::make_transitions;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+use common::DECIMAL_SCALE;
 use crossbeam_channel::tick;
-use log::{info, log};
-use metadata::database::TableType;
-use metadata::{events, Metadata};
+use log::info;
+
 use rand::prelude::*;
-use rust_decimal::prelude::*;
+
 use rust_decimal::Decimal;
 
 pub struct State<'a> {
@@ -120,8 +112,8 @@ impl Scenario {
 
         let mut user_id: u64 = 0;
         let mut overall_events: usize = 0;
-        let mut partition_id: usize = 0;
-        'main: while let Some(sample) = self.gen.next() {
+        let mut partition_id: usize;
+        while let Some(sample) = self.gen.next_sample() {
             users_per_sec.fetch_add(1, Ordering::SeqCst);
             user_id += 1;
             partition_id = user_id as usize % self.partitions;
@@ -166,14 +158,11 @@ impl Scenario {
                 }
 
                 let mut transitions = make_transitions(&coefficients);
-
-                let mut prev_action: Action = Action::None;
+                let mut prev_action: Option<Action> = None;
                 let mut action = Action::ViewIndex;
-                let mut wait_time = 0;
-                // println!("session: #{}, intention: {:?}", state.session_id, intention);
+                let mut wait_time: u64;
 
                 'events: loop {
-                    // println!("action: {action}");
                     events_per_sec.fetch_add(1, Ordering::SeqCst);
                     match (prev_action, action, intention) {
                         (
@@ -183,7 +172,7 @@ impl Scenario {
                             | Intention::BuyAnyProduct
                             | Intention::BuyCertainProduct(_),
                         ) => {
-                            if state.cart.len() == 0 {
+                            if state.cart.is_empty() {
                                 break 'events;
                             }
 
@@ -193,7 +182,7 @@ impl Scenario {
                         }
                         (_, Action::EndSession, _) => break 'events,
                         (
-                            Action::SearchProduct,
+                            Some(Action::SearchProduct),
                             Action::ViewProduct,
                             Intention::BuyCertainProduct(product),
                         ) => {
@@ -201,7 +190,7 @@ impl Scenario {
                                 Some(self.products.string_name(product.name).await?);
                             state.selected_product = Some(product);
                         }
-                        (Action::SearchProduct, Action::ViewProduct, _) => {
+                        (Some(Action::SearchProduct), Action::ViewProduct, _) => {
                             for (idx, product) in self.products.products.iter().enumerate() {
                                 if state.products_viewed.contains_key(&product.id) {
                                     continue;
@@ -215,16 +204,17 @@ impl Scenario {
                             }
 
                             if state.selected_product.is_none() {
-                                (prev_action, action) = (action, Action::EndSession)
+                                (prev_action, action) = (Some(action), Action::EndSession);
+                                continue;
                             }
                         }
-                        (Action::ViewIndexPromotions, Action::ViewProduct, _) => {
+                        (Some(Action::ViewIndexPromotions), Action::ViewProduct, _) => {
                             let sp = self.products.promoted_product_sample(&mut self.rng);
                             if state.products_viewed.contains_key(&sp.id) {
                                 action = Action::EndSession;
                                 continue;
                             }
-                            state.selected_product.insert(sp);
+                            let _ = state.selected_product.insert(sp);
                         }
                         (_, Action::AddProductToCart, _) => {
                             state.cart.push(state.selected_product.unwrap());
@@ -235,13 +225,13 @@ impl Scenario {
                                 state.spent_total += product.final_price();
                             }
                         }
-                        (Action::ViewDeals, Action::ViewProduct, _) => {
+                        (Some(Action::ViewDeals), Action::ViewProduct, _) => {
                             let sp = self.products.deal_product_sample(&mut self.rng);
                             if state.products_viewed.contains_key(&sp.id) {
                                 action = Action::EndSession;
                                 continue;
                             }
-                            state.selected_product.insert(sp);
+                            let _ = state.selected_product.insert(sp);
                             *state
                                 .products_viewed
                                 .entry(state.selected_product.unwrap().id)
@@ -267,7 +257,7 @@ impl Scenario {
                                 .or_insert(0) += 1;
                         }
                         (
-                            Action::ViewOrders,
+                            Some(Action::ViewOrders),
                             Action::RefundProduct,
                             Intention::MakeRefund(product),
                         ) => {
@@ -282,10 +272,10 @@ impl Scenario {
                         _ => {}
                     }
 
-                    prev_action = action;
+                    prev_action = Some(action);
                     (action, wait_time) = next_action(action, &transitions, &mut self.rng);
 
-                    if let Some(event) = prev_action.to_event() {
+                    if let Some(event) = prev_action.unwrap().to_event() {
                         overall_events += 1;
                         batch_builder.write_event(
                             event,
@@ -294,12 +284,13 @@ impl Scenario {
                             &sample.profile,
                         )?;
                         if batch_builder.len() >= self.batch_size {
-                            partition_result.push(batch_builder.to_record_batch()?);
+                            partition_result.push(batch_builder.build_record_batch()?);
                         }
                     }
 
+                    #[allow(clippy::single_match)]
                     match prev_action {
-                        Action::CompleteOrder => {
+                        Some(Action::CompleteOrder) => {
                             state.cart.clear();
                         }
                         _ => {}
@@ -328,7 +319,7 @@ impl Scenario {
         // flush the rest
         for (idx, builder) in batch_builders.iter_mut().enumerate() {
             if builder.len() > 0 {
-                result[idx].push(builder.to_record_batch()?);
+                result[idx].push(builder.build_record_batch()?);
             }
         }
 
@@ -339,11 +330,10 @@ impl Scenario {
     }
 }
 
-pub fn next_action(
-    from: Action,
-    transitions: &Vec<(Action, Vec<(Action, f64, u64)>)>,
-    rng: &mut ThreadRng,
-) -> (Action, u64) {
+/// from, to, probability, wait time in secs
+pub type Transition = (Action, Vec<(Action, f64, u64)>);
+
+pub fn next_action(from: Action, transitions: &[Transition], rng: &mut ThreadRng) -> (Action, u64) {
     for (t_from, to) in transitions.iter() {
         if *t_from != from {
             continue;

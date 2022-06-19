@@ -2,7 +2,7 @@ use datafusion::execution::context::{ExecutionContextState, QueryPlanner as DFQu
 use datafusion::physical_plan::planner::{
     DefaultPhysicalPlanner, ExtensionPlanner as DFExtensionPlanner,
 };
-use std::ops::Deref;
+
 use std::sync::Arc;
 
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
@@ -14,12 +14,9 @@ use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::unpivot::UnpivotExec;
 use axum::async_trait;
+use datafusion::error::{DataFusionError, Result};
 use datafusion::logical_plan::{LogicalPlan, UserDefinedLogicalNode};
 use datafusion::physical_plan::{expressions, ExecutionPlan, PhysicalPlanner};
-use datafusion::{
-    error::{DataFusionError, Result},
-    physical_plan::displayable,
-};
 
 pub struct QueryPlanner {}
 
@@ -51,7 +48,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
         _ctx_state: &ExecutionContextState,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
         let any = node.as_any();
-        let plan = if let Some(_) = any.downcast_ref::<MergeNode>() {
+        let plan = if any.downcast_ref::<MergeNode>().is_some() {
             let exec = MergeExec::try_new(physical_inputs.to_vec())
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)

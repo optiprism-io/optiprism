@@ -79,11 +79,11 @@ impl Provider {
     ) -> Result<Property> {
         ctx.check_permission(organization_id, project_id, Permission::UpdateEvent)?;
         let mut md_req = metadata::properties::UpdatePropertyRequest::default();
-        md_req.updated_by = ctx.account_id;
-        md_req.tags.insert(req.tags);
-        md_req.display_name.insert(req.display_name);
-        md_req.description.insert(req.description);
-        md_req.status.insert(req.status);
+        let _ = md_req.updated_by = ctx.account_id;
+        let _ = md_req.tags.insert(req.tags);
+        let _ = md_req.display_name.insert(req.display_name);
+        let _ = md_req.description.insert(req.description);
+        let _ = md_req.status.insert(req.status);
         let prop = self
             .prov
             .update(organization_id, project_id, property_id, md_req)

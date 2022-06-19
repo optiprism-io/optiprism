@@ -1,24 +1,23 @@
 use crate::Error;
 use crate::Result;
-use arrow::array::{ArrayRef, UInt64Array};
+use arrow::array::ArrayRef;
 use arrow::datatypes::{Schema, SchemaRef};
-use arrow::error::ArrowError;
+
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::pretty_format_batches;
+
 use axum::async_trait;
 use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
-use datafusion::physical_plan::cross_join::stats_cartesian_product;
+
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 use datafusion::physical_plan::{
-    collect, DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream,
-    SendableRecordBatchStream, Statistics,
+    DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
+    Statistics,
 };
 use datafusion_common::Result as DFResult;
-use datafusion_common::{DataFusionError, ScalarValue};
-use futures::executor::block_on;
+use datafusion_common::ScalarValue;
+
 use futures::{Stream, StreamExt};
 use std::any::Any;
 use std::fmt;
@@ -99,7 +98,7 @@ impl ExecutionPlan for MergeExec {
             streams.push(stream)
         }
 
-        let baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
+        let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
         Ok(Box::pin(MergeStream {
             streams,
             stream_idx: 0,
@@ -190,14 +189,14 @@ impl Stream for MergeStream {
 mod tests {
     use crate::physical_plan::merge::MergeExec;
     use arrow::array::{ArrayRef, BooleanArray, Int32Array, Int8Array, StringArray};
-    use arrow::datatypes::{DataType, Field, Schema};
+
     use arrow::record_batch::RecordBatch;
     pub use datafusion::error::Result;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
-    use futures::{Stream, StreamExt};
+
     use std::sync::Arc;
 
     #[tokio::test]
@@ -222,7 +221,7 @@ mod tests {
                 ])?,
             ];
 
-            let schema = batches[0].schema().clone();
+            let schema = batches[0].schema();
             Arc::new(MemoryExec::try_new(&[batches], schema, None).unwrap())
         };
 
@@ -236,7 +235,7 @@ mod tests {
                 ("b", Arc::new(Int8Array::from(vec![1, 2])) as ArrayRef),
             ])?];
 
-            let schema = batches[0].schema().clone();
+            let schema = batches[0].schema();
             Arc::new(MemoryExec::try_new(&[batches], schema, None).unwrap())
         };
 
@@ -268,7 +267,7 @@ mod tests {
                 ])?,
             ];
 
-            let schema = batches[0].schema().clone();
+            let schema = batches[0].schema();
             Arc::new(MemoryExec::try_new(&[batches], schema, None).unwrap())
         };
 

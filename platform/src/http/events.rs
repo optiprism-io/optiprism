@@ -1,8 +1,7 @@
-use crate::error::{Error, InternalError};
-use crate::events::{CreateEventRequest, Provider, UpdateEventRequest};
-use crate::{events, Context, EventsProvider, Result};
+use crate::events::{CreateEventRequest, UpdateEventRequest};
+use crate::{Context, EventsProvider, Result};
 use axum::extract::Path;
-use axum::http::StatusCode;
+
 use axum::{extract::Extension, routing, AddExtensionLayer, Json, Router};
 use metadata::events::Event;
 use metadata::metadata::ListResponse;

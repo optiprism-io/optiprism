@@ -1,4 +1,4 @@
-use crate::properties::{Provider, UpdatePropertyRequest};
+use crate::properties::UpdatePropertyRequest;
 use crate::{properties, Context, PropertiesProvider, Result};
 use axum::extract::Path;
 use axum::{extract::Extension, routing, AddExtensionLayer, Json, Router};

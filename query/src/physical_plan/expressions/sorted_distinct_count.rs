@@ -1,7 +1,7 @@
 use arrow::array::{
-    Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Int16Array, Int32Array,
-    Int64Array, Int8Array, StringArray, TimestampSecondArray, UInt16Array, UInt32Array,
-    UInt64Array, UInt8Array,
+    Array, ArrayRef, BooleanArray, Date32Array, Date64Array, Int16Array, Int32Array, Int64Array,
+    Int8Array, StringArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array,
+    UInt8Array,
 };
 use arrow::compute;
 use arrow::datatypes::{DataType, TimeUnit};
@@ -175,7 +175,6 @@ impl Accumulator for SortedDistinctCountAccumulator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     fn check_batch(sequences: &[Vec<i64>], expected: usize) -> datafusion::error::Result<()> {
         let mut acc = SortedDistinctCountAccumulator::try_new(&DataType::Int64)?;

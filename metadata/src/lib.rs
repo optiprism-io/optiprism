@@ -11,6 +11,5 @@ pub mod store;
 
 pub use crate::metadata::Metadata;
 pub use error::{Error, Result};
-pub use store::store::Store;
 
 type OptionalProperty<T> = Option<T>;
