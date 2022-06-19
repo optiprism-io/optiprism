@@ -43,31 +43,31 @@ export default function ({ environment = 'development' } = {}) {
                 return schema.db.events
             });
 
-            this.put(`${BASE_PATH}/v1/projects/:project_id/schema/events/:event_id`, (schema, request) => {
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id`, (schema, request) => {
                 const customEvent = JSON.parse(request.requestBody)
                 schema.db.events.update(request.params.event_id, customEvent)
 
                 return schema.db.customEvents
             })
 
-            this.get(`${BASE_PATH}/v1/projects/:project_id/schema/custom-events`, (schema) => {
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events`, (schema) => {
                 return schema.db.customEvents.map(item => ({...item, id: Number(item.id)}))
             })
 
-            this.post(`${BASE_PATH}/v1/projects/:project_id/schema/custom-events`, (schema, request) => {
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events`, (schema, request) => {
                 const customEvents = JSON.parse(request.requestBody)
 
                 return schema.db.customEvents.insert(customEvents)
             })
 
-            this.put(`${BASE_PATH}/v1/projects/:project_id/schema/custom-events/:event_id`, (schema, request) => {
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events/:event_id`, (schema, request) => {
                 const customEvent = JSON.parse(request.requestBody)
                 schema.db.customEvents.update(request.params.event_id, customEvent)
 
                 return schema.db.customEvents
             })
 
-            this.post(`${BASE_PATH}/v1/projects/:project_id/data/events-stream`, (schema, request) => {
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/data/events-stream`, (schema, request) => {
                 return liveStresmMocks
             })
 

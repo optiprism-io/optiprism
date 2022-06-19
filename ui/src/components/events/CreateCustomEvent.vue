@@ -168,9 +168,9 @@ const apply = async () => {
         }
 
         if (isEdit.value) {
-            await schemaService.updateCustomEvent(String(commonStore.projectId), String(editedEvent.value?.id), data)
+            await schemaService.updateCustomEvent(commonStore.organizationId, commonStore.projectId, String(editedEvent.value?.id), data)
         } else {
-            await schemaService.createCustomEvent(String(commonStore.projectId), data)
+            await schemaService.createCustomEvent(commonStore.organizationId, commonStore.projectId, data)
         }
 
 

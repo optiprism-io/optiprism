@@ -97,7 +97,7 @@ const onAction = (payload: Action) => {
 }
 
 const updateEvent = async (payload: ApplyPayload) => {
-    await schemaService.updateEvent(String(commonStore.projectId), String(commonStore.editEventManagementPopupId), payload)
+    await schemaService.updateEvent(commonStore.organizationId, commonStore.projectId, String(commonStore.editEventManagementPopupId), payload)
 }
 
 const eventManagementPopupCancel = () => {

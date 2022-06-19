@@ -39,11 +39,11 @@ export interface CustomEvents extends Omit<CreateCustomEventRequest, 'events'> {
 
 const schemaService = {
     events: async () => await get('/schema/events', '', null),
-    updateEvent: async(projectId: string, eventId: string, params: UpdateEventRequest) => await api.updateEvent(projectId, eventId, params),
+    updateEvent: async(organizationId: number, projectId: number, eventId: string, params: UpdateEventRequest) => await api.updateEvent(organizationId, projectId, eventId, params),
 
-    customEvents: async (projectId: string) => await api.customEventsList(projectId),
-    createCustomEvent: async (projectId: string, params: CreateCustomEventRequest) => await api.createCustomEvent(projectId, params),
-    updateCustomEvent: async(projectId: string, eventId: string, params: CreateCustomEventRequest) => await api.updateCustomEvent(projectId, eventId, params),
+    customEvents: async (organizationId: number, projectId: number) => await api.customEventsList(organizationId, projectId),
+    createCustomEvent: async (organizationId: number, projectId: number, params: CreateCustomEventRequest) => await api.createCustomEvent(organizationId, projectId, params),
+    updateCustomEvent: async(organizationId: number, projectId: number, eventId: string, params: CreateCustomEventRequest) => await api.updateCustomEvent(organizationId, projectId, eventId, params),
 
     eventProperties: async () => await get('/schema/event-properties', '', null),
     eventCustomProperties: async () => await get('/schema/event-custom-properties', '', null),

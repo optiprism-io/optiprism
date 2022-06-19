@@ -73,7 +73,7 @@ export const useLexiconStore = defineStore('lexicon', {
             try {
                 this.events = await schemaService.events()
 
-                const responseCustomEvents = await schemaService.customEvents(String(commonStore.projectId))
+                const responseCustomEvents = await schemaService.customEvents(commonStore.organizationId, commonStore.projectId)
                 this.customEvents = <CustomEvent[]>responseCustomEvents.data
             } catch (error) {
                 throw new Error('error customEvents')

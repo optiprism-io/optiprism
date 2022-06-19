@@ -3,7 +3,7 @@ import { EventsApi, EventListRequest } from '@/api'
 const api = new EventsApi()
 
 const dataService = {
-    createEventsStream: async(projectId: string, eventListRequest: EventListRequest) => await api.eventsStream(projectId, eventListRequest),
+    createEventsStream: async(organizationId: number, projectId: number, eventListRequest: EventListRequest) => await api.eventsStream(organizationId, projectId, eventListRequest),
 }
 
 export default dataService

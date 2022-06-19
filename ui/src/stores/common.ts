@@ -5,6 +5,7 @@ export type Common = {
     showEventManagementPopup: boolean
     projectId: number
     editEventManagementPopupId: number | null
+    organizationId: number
 }
 
 export const useCommonStore = defineStore('common', {
@@ -13,6 +14,7 @@ export const useCommonStore = defineStore('common', {
         showEventManagementPopup: false,
         editEventManagementPopupId: null,
         projectId: 0, // TODO integrations
+        organizationId: 0,
     }),
     actions: {
         updateEditEventManagementPopupId(paylaod: number | null) {
