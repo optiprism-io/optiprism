@@ -2,7 +2,6 @@ import { defineStore } from 'pinia';
 import schemaService from '@/api/services/schema.service';
 import {
     UserCustomProperty,
-    Event,
     EventCustomProperty,
     UserProperty,
     customEventRef,
@@ -17,7 +16,8 @@ import { Cohort } from '@/types';
 import { aggregates } from '@/types/aggregate'
 import { Group, Item } from '@/components/Select/SelectTypes';
 import { useEventsStore, Events } from '@/stores/eventSegmentation/events';
-import { PropertyType, CustomEvent, EventType, Property } from '@/api'
+import { ApplyPayload } from '@/components/events/EventManagementPopup.vue'
+import { PropertyType, CustomEvent, EventType, Property, Event } from '@/api'
 import { useCommonStore } from '@/stores/common'
 
 type Lexicon = {
@@ -66,6 +66,24 @@ export const useLexiconStore = defineStore('lexicon', {
         userCustomProperties: [],
     }),
     actions: {
+        async updateEvent(payload: ApplyPayload) {
+            const commonStore = useCommonStore()
+
+            try {
+                const res = await schemaService.updateEvent(commonStore.organizationId, commonStore.projectId, String(commonStore.editEventManagementPopupId), payload)
+
+                if (res?.data) {
+                    const newEvent: Event = res.data;
+                    const eventIndex: number = this.events.findIndex(event => Number(event.id) === commonStore.editEventManagementPopupId)
+
+                    if (~eventIndex) {
+                        this.events[eventIndex] = newEvent
+                    }
+                }
+            } catch (error) {
+                throw new Error('error update event')
+            }
+        },
         async getEvents() {
             const commonStore = useCommonStore()
             this.eventsLoading = true

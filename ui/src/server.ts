@@ -45,9 +45,8 @@ export default function ({ environment = 'development' } = {}) {
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id`, (schema, request) => {
                 const customEvent = JSON.parse(request.requestBody)
-                schema.db.events.update(request.params.event_id, customEvent)
 
-                return schema.db.customEvents
+                return schema.db.events.update(request.params.event_id, customEvent)
             })
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events`, (schema) => {

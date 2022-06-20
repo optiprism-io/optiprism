@@ -3,7 +3,7 @@
         :title="title"
         :apply-loading="props.loading"
         class="event-management-popup"
-        :apply-button="$t('common.apply')"
+        :apply-button="$t('common.save')"
         :cancel-button="$t('common.close')"
         :apply-disabled="applyDisabled"
         @apply="apply"
@@ -39,9 +39,9 @@
 
 <script lang="ts" setup>
 import { computed, inject, ref } from 'vue'
-import { Event, UserProperty } from '@/types/events'
+import { UserProperty } from '@/types/events'
 import { Row } from '@/components/uikit/UiTable/UiTable'
-import { Property } from '@/api'
+import { Property, Event } from '@/api'
 
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
 import UiTabs from '@/components/uikit/UiTabs.vue'
@@ -120,7 +120,7 @@ const eventItems = computed<Item[]>(() => {
         keys.forEach(key => {
             const config: EventValuesConfig = eventValuesConfig[key];
 
-            if (event[key]) {
+            if (key in event) {
                 const item: Item = {
                     label: i18n.$t(config.string),
                     key,
@@ -157,7 +157,6 @@ const onSelectTab = (payload: string) => {
 const apply = () => {
     if (editEvent.value) {
         emit('apply', editEvent.value)
-        editEvent.value = null
     }
 }
 

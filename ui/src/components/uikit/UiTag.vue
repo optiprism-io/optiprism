@@ -86,6 +86,9 @@ const blur = () => {
 
 <style lang="scss">
 .ui-tag {
+    min-height: 29px;
+    min-width: 40px;
+
     &__text {
         outline: none;
     }

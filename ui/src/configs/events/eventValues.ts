@@ -14,15 +14,6 @@ export type Item = {
 }
 
 export default {
-    'tags': {
-        'key': 'tags',
-        'string': 'events.event_management.popup.event_columns.tags',
-        'component': UiInputTags,
-    },
-    'name': {
-        'key': 'name',
-        'string': 'events.event_management.popup.event_columns.name'
-    },
     'displayName': {
         'key': 'displayName',
         'string': 'events.event_management.popup.event_columns.displayName',
@@ -37,5 +28,10 @@ export default {
         'key': 'status',
         'string': 'events.event_management.popup.event_columns.status',
         'component': UiSwitch
+    },
+    'tags': {
+        'key': 'tags',
+        'string': 'events.event_management.popup.event_columns.tags',
+        'component': UiInputTags,
     }
 }

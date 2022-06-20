@@ -1,7 +1,7 @@
 import { OperationId } from '@/types'
 import { AggregateId } from '@/types/aggregate'
 import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
-import { EventType, PropertyType, DataType, Value, CustomEvent, CustomEventEventEventTypeEnum } from '@/api'
+import { EventType, PropertyType, DataType, Value, CustomEvent, CustomEventEventEventTypeEnum, Event } from '@/api'
 
 export type PropertyRef = {
     type: PropertyType;
@@ -40,23 +40,6 @@ export function userPropertyRef(e: UserProperty): PropertyRef {
 
 export function userCustomPropertyRef(e: UserCustomProperty): PropertyRef {
     return <PropertyRef>{ type: PropertyType.Custom, id: e.id };
-}
-
-export interface Event {
-    id: number;
-    createdAt: Date;
-    updatedAt?: Date;
-    createdBy: number;
-    updatedBy: number;
-    projectId: number;
-    isSystyem: boolean;
-    tags: string[];
-    name: string;
-    displayName?: string;
-    description?: string;
-    status: EventStatus;
-    event_properties?: number[];
-    user_properties?: number[];
 }
 
 export interface EventProperty {

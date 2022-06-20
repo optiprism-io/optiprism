@@ -92,7 +92,7 @@ const onAction = (payload: Action) => {
 }
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .pf-c-table {
     tr > * {
         --pf-c-table--cell--MinWidth: 140px;

@@ -63,8 +63,8 @@ export const useFiltersStore = defineStore('filters', {
 
             return (id: number): EventRef | undefined => {
                 const event = lexiconStore.events.find(item => {
-                    if (item.event_properties) {
-                        return item.event_properties.includes(id);
+                    if (item.properties) {
+                        return item.properties.includes(id);
                     }
                 });
 

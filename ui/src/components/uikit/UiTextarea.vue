@@ -4,6 +4,7 @@
         :value="props.value"
         class="ui-textarea pf-c-form-control"
         :placeholder="props.placeholder"
+        :rows="props.rows"
         @input="handleInput"
     />
 </template>
@@ -17,12 +18,14 @@ interface Props {
     value: string | number | undefined
     placeholder?: string
     mountFocus?: boolean
+    rows?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
     modelValue: '',
     mountFocus: false,
     placeholder: '',
+    rows: 3
 });
 
 const textarea = ref<HTMLCanvasElement | null>(null)
@@ -44,5 +47,3 @@ const handleInput = (e: Event) => {
 
 const blur = (e: any) => emit('blur', e);
 </script>
-
-<style lang="scss"></style>

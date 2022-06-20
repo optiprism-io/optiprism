@@ -68,9 +68,6 @@ const onInput = (payload: Event | string | boolean, key: string) => {
 
 <style lang="scss">
 .ui-description-list {
-    .ui-textarea {
-        min-height: 120px;
-    }
     .pf-c-description-list {
         &__group {
             align-items: start;

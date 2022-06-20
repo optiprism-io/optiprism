@@ -30,8 +30,7 @@ import { useLexiconStore } from '@/stores/lexicon'
 import { useCommonStore } from '@/stores/common'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import { Row, Action } from '@/components/uikit/UiTable/UiTable'
-import { Event } from '@/types/events'
-import schemaService from '@/api/services/schema.service'
+import { Event } from '@/api'
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTableCells/UiTablePressedCell.vue'
 import EventManagementPopup, { ApplyPayload } from '@/components/events/EventManagementPopup.vue'
 const i18n = inject<any>('i18n')
@@ -64,6 +63,7 @@ const items = computed(() => {
             {
                 value: 'displayName',
                 title: event.displayName || '',
+                nowrap: true,
             },
             {
                 value: 'description',
@@ -82,22 +82,18 @@ const editEventManagementPopup = computed(() => {
 })
 
 const eventProperties = computed(() => {
-    return editEventManagementPopup.value && editEventManagementPopup.value?.event_properties ?
-        editEventManagementPopup.value?.event_properties.map(id => lexiconStore.findEventPropertyById(id)) : []
+    return editEventManagementPopup.value && editEventManagementPopup.value?.properties ?
+        editEventManagementPopup.value?.properties.map(id => lexiconStore.findEventPropertyById(id)) : []
 })
 
 const userProperties = computed(() => {
-    return editEventManagementPopup.value && editEventManagementPopup.value?.user_properties ?
-        editEventManagementPopup.value?.user_properties.map(id => lexiconStore.findUserPropertyById(id)) : []
+    return editEventManagementPopup.value && editEventManagementPopup.value?.properties ?
+        editEventManagementPopup.value?.properties.map(id => lexiconStore.findUserPropertyById(id)) : []
 })
 
 const onAction = (payload: Action) => {
     commonStore.updateEditEventManagementPopupId(Number(payload.type) || null)
     commonStore.toggleEventManagementPopup(true)
-}
-
-const updateEvent = async (payload: ApplyPayload) => {
-    await schemaService.updateEvent(commonStore.organizationId, commonStore.projectId, String(commonStore.editEventManagementPopupId), payload)
 }
 
 const eventManagementPopupCancel = () => {
@@ -106,11 +102,8 @@ const eventManagementPopupCancel = () => {
 
 const eventManagementPopupApply = async (payload: ApplyPayload) => {
     eventManagementPopupLoading.value = true
-    await updateEvent(payload)
+    await lexiconStore.updateEvent(payload)
     eventManagementPopupLoading.value = false
-    eventManagementPopupCancel()
+    commonStore.toggleEventManagementPopup(false)
 }
 </script>
-
-<style scoped lang="scss">
-</style>

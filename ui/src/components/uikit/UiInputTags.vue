@@ -1,9 +1,9 @@
 <template>
     <div class="ui-input-tags">
         <UiInput
-            v-if="edit"
+            v-if="edit || !props.value.length"
             :value="inputValue"
-            :mount-focus="true"
+            :mount-focus="Boolean(props.value.length)"
             @input="onInput"
             @blur="onBlur"
         />
@@ -42,12 +42,17 @@ const onInput = (payload: string) => {
 
 const onBlur = () => {
     edit.value = false
-    emit('input', inputValue.value.split(', '))
+    emit('input', inputValue.value.replace(/\s/g, '').split(',').filter(item => Boolean(item)))
 }
 </script>
 
 <style lang="scss">
 .ui-input-tags {
+    cursor: pointer;
     min-height: 37px;
+
+    .ui-tag {
+        min-height: 34px;
+    }
 }
 </style>

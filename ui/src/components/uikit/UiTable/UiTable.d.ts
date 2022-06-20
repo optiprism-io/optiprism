@@ -39,6 +39,7 @@ export type Cell = {
     action?: Action,
     component?: ReturnType<typeof defineComponent>
     style?: StyleCell | undefined
+    nowrap?: boolean
 }
 
 export type EventCell = Cell & {
