@@ -37,7 +37,10 @@
             <UiCardTitle>
                 {{ $t('funnels.filters') }}
 
-                <template #extra>
+                <template
+                    v-if="filterGroupsStore.filterGroups.length > 1"
+                    #extra
+                >
                     <div class="pf-l-flex">
                         <span class="pf-l-flex__item">match</span>
                         <UiSelectCondition
