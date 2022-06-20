@@ -1,7 +1,7 @@
 use arrow::array::{ArrayRef, Int64Array};
 use arrow::datatypes::DataType;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use datafusion::physical_plan::distinct_expressions::DistinctCount;
+use datafusion::physical_plan::expressions::DistinctCount;
 use datafusion::physical_plan::{Accumulator, AggregateExpr};
 use query::physical_plan::expressions::sorted_distinct_count::SortedDistinctCountAccumulator;
 use rand::Rng;

@@ -1,11 +1,11 @@
 user_id,created_at,event,user_country,user_device,user_is_premium,event_product_name,event_revenue,comment
-1,2021-09-08T13:42:00.000000+00:00,1,spain,iphone,true,google pixel,,view
-1,2021-09-08T13:43:00.000000+00:00,2,spain,iphone,true,google pixel,533,buy
-1,2021-09-08T13:44:00.000000+00:00,1,spain,iphone,true,samsung s9,,view
-1,2021-09-08T13:45:00.000000+00:00,2,spain,iphone,false,samsung s9,576,buy
-2,2021-09-08T13:43:00.000000+00:00,1,spain,android,false,google pixel,,view
-2,2021-09-08T13:45:00.000000+00:00,2,spain,android,false,google pixel,533.5,buy
-3,2021-09-08T13:42:00.000000+00:00,1,german,android,false,iphone 13,,view
-3,2021-09-08T13:46:00.000000+00:00,1,german,android,false,samsung s9,,view
-3,2021-09-08T13:47:00.000000+00:00,2,german,android,false,iphone 13,999.9,buy
-3,2021-09-08T13:48:00.000000+00:00,1,german,android,false,iphone case,,view
+1,2021-09-08T13:42:00.000000+00:00,1,1,iphone,true,google pixel,,view
+1,2021-09-08T13:43:00.000000+00:00,2,1,iphone,true,google pixel,533,buy
+1,2021-09-08T13:44:00.000000+00:00,1,1,iphone,true,samsung s9,,view
+1,2021-09-08T13:45:00.000000+00:00,2,1,iphone,false,samsung s9,576,buy
+2,2021-09-08T13:43:00.000000+00:00,1,1,android,false,google pixel,,view
+2,2021-09-08T13:45:00.000000+00:00,2,1,android,false,google pixel,533.5,buy
+3,2021-09-08T13:42:00.000000+00:00,1,2,android,false,iphone 13,,view
+3,2021-09-08T13:46:00.000000+00:00,1,2,android,true,samsung s9,,view
+3,2021-09-08T13:47:00.000000+00:00,2,2,android,false,iphone 13,999.9,buy
+3,2021-09-08T13:48:00.000000+00:00,1,2,android,false,iphone case,,view

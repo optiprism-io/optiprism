@@ -1,4 +1,5 @@
+pub mod dictionary_decode;
 pub mod expr;
 pub mod merge;
-pub mod unpivot;
 pub mod pivot;
+pub mod unpivot;

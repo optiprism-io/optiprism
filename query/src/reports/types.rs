@@ -1,7 +1,7 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
+use chronoutil::RelativeDuration;
+
 use datafusion_expr::Operator;
-use datafusion::physical_plan::aggregates::AggregateFunction as DFAggregateFunction;
-use crate::physical_plan::expressions::partitioned_aggregate;
 
 #[derive(Clone, Debug)]
 pub enum QueryTime {
@@ -16,6 +16,16 @@ pub enum QueryTime {
     },
 }
 
+impl QueryTime {
+    pub fn range(&self, cur_time: DateTime<Utc>) -> (DateTime<Utc>, DateTime<Utc>) {
+        match self {
+            QueryTime::Between { from, to } => (*from, *to),
+            QueryTime::From(from) => (*from, cur_time),
+            QueryTime::Last { last, unit } => (cur_time + unit.relative_duration(*last), cur_time),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum TimeUnit {
     Second,
@@ -28,20 +38,32 @@ pub enum TimeUnit {
 }
 
 impl TimeUnit {
-    pub fn duration(&self, n: i64) -> Duration {
+    pub fn relative_duration(&self, n: i64) -> RelativeDuration {
         match self {
-            TimeUnit::Second => Duration::seconds(n),
-            TimeUnit::Minute => Duration::minutes(n),
-            TimeUnit::Hour => Duration::hours(n),
-            TimeUnit::Day => Duration::days(n),
-            TimeUnit::Week => Duration::weeks(n),
-            TimeUnit::Month => Duration::days(n) * 30,
-            TimeUnit::Year => Duration::days(n) * 365,
+            TimeUnit::Second => RelativeDuration::seconds(n),
+            TimeUnit::Minute => RelativeDuration::minutes(n),
+            TimeUnit::Hour => RelativeDuration::hours(n),
+            TimeUnit::Day => RelativeDuration::days(n),
+            TimeUnit::Week => RelativeDuration::weeks(n),
+            TimeUnit::Month => RelativeDuration::months(n as i32),
+            TimeUnit::Year => RelativeDuration::years(n as i32),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            TimeUnit::Second => "second",
+            TimeUnit::Minute => "minute",
+            TimeUnit::Hour => "hour",
+            TimeUnit::Day => "day",
+            TimeUnit::Week => "week",
+            TimeUnit::Month => "month",
+            TimeUnit::Year => "year",
         }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum PropertyRef {
     User(String),
     Event(String),
@@ -65,13 +87,14 @@ pub enum EventRef {
 }
 
 impl EventRef {
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> &str {
         match self {
-            EventRef::Regular(name) => name.clone(),
-            EventRef::Custom(name) => name.clone(),
+            EventRef::Regular(name) => name.as_str(),
+            EventRef::Custom(name) => name.as_str(),
         }
     }
 }
+
 #[derive(Clone, Debug)]
 pub enum PropValueOperation {
     Eq,
@@ -90,9 +113,9 @@ pub enum PropValueOperation {
     Regex,
 }
 
-impl Into<Operator> for PropValueOperation {
-    fn into(self) -> Operator {
-        match self {
+impl From<PropValueOperation> for Operator {
+    fn from(pv: PropValueOperation) -> Self {
+        match pv {
             PropValueOperation::Eq => Operator::Eq,
             PropValueOperation::Neq => Operator::NotEq,
             _ => panic!("unreachable"),

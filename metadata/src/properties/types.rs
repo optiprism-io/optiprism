@@ -1,4 +1,5 @@
 use crate::properties::provider::Namespace;
+use crate::OptionalProperty;
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
 use convert_case::{Case, Casing};
@@ -8,12 +9,6 @@ use serde::{Deserialize, Serialize};
 pub enum Status {
     Enabled,
     Disabled,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum Scope {
-    System,
-    User,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -30,7 +25,7 @@ pub struct Property {
     pub display_name: Option<String>,
     pub typ: DataType,
     pub status: Status,
-    pub scope: Scope,
+    pub is_system: bool,
     pub nullable: bool,
     // this also defines whether property is required or not
     pub is_array: bool,
@@ -59,37 +54,31 @@ impl Property {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CreatePropertyRequest {
     pub created_by: u64,
-    pub project_id: u64,
     pub tags: Option<Vec<String>>,
     pub name: String,
     pub description: Option<String>,
     pub display_name: Option<String>,
     pub typ: DataType,
     pub status: Status,
-    pub scope: Scope,
+    pub is_system: bool,
     pub nullable: bool,
-    // this also defines whether property is required or not
     pub is_array: bool,
     pub is_dictionary: bool,
     pub dictionary_type: Option<DataType>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct UpdatePropertyRequest {
-    pub id: u64,
-    pub created_by: u64,
-    pub updated_by: Option<u64>,
-    pub project_id: u64,
-    pub scope: Scope,
-    pub tags: Option<Vec<String>>,
-    pub name: String,
-    pub description: Option<String>,
-    pub display_name: Option<String>,
-    pub typ: DataType,
-    pub status: Status,
-    pub nullable: bool,
-    // this also defines whether property is required or not
-    pub is_array: bool,
-    pub is_dictionary: bool,
-    pub dictionary_type: Option<DataType>,
+    pub updated_by: u64,
+    pub tags: OptionalProperty<Option<Vec<String>>>,
+    pub name: OptionalProperty<String>,
+    pub description: OptionalProperty<Option<String>>,
+    pub display_name: OptionalProperty<Option<String>>,
+    pub typ: OptionalProperty<DataType>,
+    pub status: OptionalProperty<Status>,
+    pub is_system: OptionalProperty<bool>,
+    pub nullable: OptionalProperty<bool>,
+    pub is_array: OptionalProperty<bool>,
+    pub is_dictionary: OptionalProperty<bool>,
+    pub dictionary_type: OptionalProperty<Option<DataType>>,
 }

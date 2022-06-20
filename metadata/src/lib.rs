@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod database;
+pub mod dictionaries;
 pub mod error;
 pub mod events;
 pub mod metadata;
@@ -10,4 +11,5 @@ pub mod store;
 
 pub use crate::metadata::Metadata;
 pub use error::{Error, Result};
-pub use store::store::Store;
+
+type OptionalProperty<T> = Option<T>;

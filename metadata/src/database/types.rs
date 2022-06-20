@@ -19,24 +19,38 @@ pub struct Column {
     pub name: String,
     pub data_type: DataType,
     pub nullable: bool,
+    pub dictionary: Option<DataType>,
 }
 
 impl Column {
-    pub fn new(name: String, data_type: DataType, is_nullable: bool) -> Column {
+    pub fn new(
+        name: String,
+        data_type: DataType,
+        nullable: bool,
+        dictionary: Option<DataType>,
+    ) -> Column {
         Column {
             name,
             data_type,
-            nullable: is_nullable,
+            nullable,
+            dictionary,
         }
     }
 }
 
 impl Table {
-    pub fn arrow_schema(&self) -> Schema {
+    pub fn arrow_schema(self) -> Schema {
         Schema::new(
             self.columns
                 .iter()
-                .map(|c| Field::new(&c.name, c.data_type.clone(), c.nullable))
+                .cloned()
+                .map(|c| {
+                    Field::new(
+                        &c.name,
+                        c.dictionary.unwrap_or_else(|| c.data_type.clone()),
+                        c.nullable,
+                    )
+                })
                 .collect(),
         )
     }

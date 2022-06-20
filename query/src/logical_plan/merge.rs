@@ -1,9 +1,9 @@
+use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
+use datafusion_common::DFSchema;
+use datafusion_expr::Expr;
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use datafusion::logical_plan::{LogicalPlan, DFSchemaRef, UserDefinedLogicalNode};
-use datafusion_common::DFSchema;
-use datafusion_expr::Expr;
 
 use crate::Result;
 
@@ -52,7 +52,15 @@ impl UserDefinedLogicalNode for MergeNode {
         write!(f, "Merge")
     }
 
-    fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
-        Arc::new(MergeNode::try_new(inputs.to_vec()).map_err(|e| e.into_datafusion_plan_error()).unwrap())
+    fn from_template(
+        &self,
+        _: &[Expr],
+        inputs: &[LogicalPlan],
+    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        Arc::new(
+            MergeNode::try_new(inputs.to_vec())
+                .map_err(|e| e.into_datafusion_plan_error())
+                .unwrap(),
+        )
     }
 }

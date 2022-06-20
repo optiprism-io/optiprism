@@ -1,8 +1,8 @@
-use super::CreateRequest;
-use crate::events::types::UpdateRequest;
+use crate::events::types::UpdateEventRequest;
+use crate::events::CreateEventRequest;
 use crate::{Context, Result};
 use common::rbac::Permission;
-use metadata::events::{CreateEventRequest, Event, Provider as EventsProvider, UpdateEventRequest};
+use metadata::events::{Event, Provider as EventsProvider};
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
 
@@ -15,28 +15,30 @@ impl Provider {
         Self { prov }
     }
 
-    pub async fn create(&self, ctx: Context, request: CreateRequest) -> Result<Event> {
-        ctx.check_permission(
-            ctx.organization_id,
-            request.project_id,
-            Permission::CreateAccount,
-        )?;
+    pub async fn create(
+        &self,
+        ctx: Context,
+        organization_id: u64,
+        project_id: u64,
+        request: CreateEventRequest,
+    ) -> Result<Event> {
+        ctx.check_permission(organization_id, project_id, Permission::CreateEvent)?;
 
         let event = self
             .prov
             .create(
-                ctx.organization_id,
-                CreateEventRequest {
+                organization_id,
+                project_id,
+                metadata::events::CreateEventRequest {
                     created_by: ctx.account_id,
-                    project_id: request.project_id,
                     tags: request.tags,
                     name: request.name,
                     display_name: request.display_name,
                     description: request.description,
                     status: request.status,
-                    scope: request.scope,
-                    properties: request.properties,
-                    custom_properties: request.custom_properties,
+                    is_system: request.is_system,
+                    properties: None,
+                    custom_properties: None,
                 },
             )
             .await?;
@@ -44,48 +46,60 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn get_by_id(&self, ctx: Context, project_id: u64, id: u64) -> Result<Event> {
-        ctx.check_permission(ctx.organization_id, project_id, Permission::GetEventById)?;
-        Ok(self
-            .prov
-            .get_by_id(ctx.organization_id, project_id, id)
-            .await?)
+    pub async fn get_by_id(
+        &self,
+        ctx: Context,
+        organization_id: u64,
+        project_id: u64,
+        id: u64,
+    ) -> Result<Event> {
+        ctx.check_permission(organization_id, project_id, Permission::GetEventById)?;
+        Ok(self.prov.get_by_id(organization_id, project_id, id).await?)
     }
 
-    pub async fn get_by_name(&self, ctx: Context, project_id: u64, name: &str) -> Result<Event> {
-        ctx.check_permission(ctx.organization_id, project_id, Permission::GetEventByName)?;
+    pub async fn get_by_name(
+        &self,
+        ctx: Context,
+        organization_id: u64,
+        project_id: u64,
+        name: &str,
+    ) -> Result<Event> {
+        ctx.check_permission(organization_id, project_id, Permission::GetEventByName)?;
         let event = self
             .prov
-            .get_by_name(ctx.organization_id, project_id, name)
+            .get_by_name(organization_id, project_id, name)
             .await?;
         Ok(event)
     }
 
-    pub async fn list(&self, ctx: Context, project_id: u64) -> Result<ListResponse<Event>> {
-        ctx.check_permission(ctx.organization_id, project_id, Permission::ListEvents)?;
-        Ok(self.prov.list(ctx.organization_id, project_id).await?)
+    pub async fn list(
+        &self,
+        ctx: Context,
+        organization_id: u64,
+        project_id: u64,
+    ) -> Result<ListResponse<Event>> {
+        ctx.check_permission(organization_id, project_id, Permission::ListEvents)?;
+        Ok(self.prov.list(organization_id, project_id).await?)
     }
 
-    pub async fn update(&self, ctx: Context, req: UpdateRequest) -> Result<Event> {
-        ctx.check_permission(ctx.organization_id, req.project_id, Permission::UpdateEvent)?;
+    pub async fn update(
+        &self,
+        ctx: Context,
+        organization_id: u64,
+        project_id: u64,
+        event_id: u64,
+        req: UpdateEventRequest,
+    ) -> Result<Event> {
+        ctx.check_permission(organization_id, project_id, Permission::UpdateEvent)?;
+        let mut md_req = metadata::events::UpdateEventRequest::default();
+        let _ = md_req.updated_by = ctx.account_id;
+        let _ = md_req.tags.insert(req.tags);
+        let _ = md_req.display_name.insert(req.display_name);
+        let _ = md_req.description.insert(req.description);
+        let _ = md_req.status.insert(req.status);
         let event = self
             .prov
-            .update(
-                ctx.organization_id,
-                UpdateEventRequest {
-                    id: req.id,
-                    updated_by: ctx.account_id,
-                    project_id: req.project_id,
-                    tags: req.tags,
-                    name: req.name,
-                    display_name: req.display_name,
-                    description: req.description,
-                    status: req.status,
-                    scope: req.scope,
-                    properties: req.properties,
-                    custom_properties: req.custom_properties,
-                },
-            )
+            .update(organization_id, project_id, event_id, md_req)
             .await?;
 
         Ok(event)
@@ -94,44 +108,49 @@ impl Provider {
     pub async fn attach_property(
         &self,
         ctx: Context,
+        organization_id: u64,
         project_id: u64,
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
         ctx.check_permission(
-            ctx.organization_id,
+            organization_id,
             project_id,
             Permission::AttachPropertyToEvent,
         )?;
         Ok(self
             .prov
-            .attach_property(ctx.organization_id, project_id, event_id, prop_id)
+            .attach_property(organization_id, project_id, event_id, prop_id)
             .await?)
     }
 
     pub async fn detach_property(
         &self,
         ctx: Context,
+        organization_id: u64,
         project_id: u64,
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
         ctx.check_permission(
-            ctx.organization_id,
+            organization_id,
             project_id,
             Permission::DetachPropertyFromEvent,
         )?;
         Ok(self
             .prov
-            .detach_property(ctx.organization_id, project_id, event_id, prop_id)
+            .detach_property(organization_id, project_id, event_id, prop_id)
             .await?)
     }
 
-    pub async fn delete(&self, ctx: Context, project_id: u64, id: u64) -> Result<Event> {
-        ctx.check_permission(ctx.organization_id, project_id, Permission::DeleteEvent)?;
-        Ok(self
-            .prov
-            .delete(ctx.organization_id, project_id, id)
-            .await?)
+    pub async fn delete(
+        &self,
+        ctx: Context,
+        organization_id: u64,
+        project_id: u64,
+        id: u64,
+    ) -> Result<Event> {
+        ctx.check_permission(organization_id, project_id, Permission::DeleteEvent)?;
+        Ok(self.prov.delete(organization_id, project_id, id).await?)
     }
 }

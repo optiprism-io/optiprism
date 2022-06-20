@@ -1,13 +1,13 @@
+use arrow::datatypes::DataType;
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
+use datafusion_common::{DFField, DFSchema};
+use datafusion_expr::Expr;
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use arrow::datatypes::{DataType, Field};
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use datafusion::logical_plan::{LogicalPlan, DFSchemaRef, UserDefinedLogicalNode};
-use datafusion_common::{Column, DFField, DFSchema};
-use datafusion_expr::Expr;
 
-use crate::{Error, Result};
+use crate::Result;
 
 pub struct UnpivotNode {
     input: LogicalPlan,
@@ -18,20 +18,28 @@ pub struct UnpivotNode {
 }
 
 impl UnpivotNode {
-    pub fn try_new(input: LogicalPlan, cols: Vec<String>, name_col: String, value_col: String) -> Result<Self> {
+    pub fn try_new(
+        input: LogicalPlan,
+        cols: Vec<String>,
+        name_col: String,
+        value_col: String,
+    ) -> Result<Self> {
         let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let schema = {
-            let mut fields:Vec<DFField> = input.schema().fields().iter().filter_map(|f| {
-                match cols.contains(f.name()) {
+            let mut fields: Vec<DFField> = input
+                .schema()
+                .fields()
+                .iter()
+                .filter_map(|f| match cols.contains(f.name()) {
                     true => None,
-                    false => Some(f.clone())
-                }
-            }).collect();
+                    false => Some(f.clone()),
+                })
+                .collect();
 
             let name_field = DFField::new(None, name_col.as_str(), DataType::Utf8, false);
             fields.push(name_field);
-            let value_field = DFField::new(None, value_col.as_str(), value_type.clone(), false);
+            let value_field = DFField::new(None, value_col.as_str(), value_type, false);
             fields.push(value_field);
 
             Arc::new(DFSchema::new(fields)?)
@@ -74,12 +82,20 @@ impl UserDefinedLogicalNode for UnpivotNode {
         write!(f, "Unpivot")
     }
 
-    fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
-        Arc::new(UnpivotNode::try_new(
-            inputs[0].clone(),
-            self.cols.clone(),
-            self.name_col.clone(),
-            self.value_col.clone(),
-        ).map_err(|e| e.into_datafusion_plan_error()).unwrap())
+    fn from_template(
+        &self,
+        _: &[Expr],
+        inputs: &[LogicalPlan],
+    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        Arc::new(
+            UnpivotNode::try_new(
+                inputs[0].clone(),
+                self.cols.clone(),
+                self.name_col.clone(),
+                self.value_col.clone(),
+            )
+            .map_err(|e| e.into_datafusion_plan_error())
+            .unwrap(),
+        )
     }
 }

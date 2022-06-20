@@ -1,32 +1,25 @@
-use std::convert::TryFrom;
 use std::fmt::Debug;
-use std::ops::Add;
-use std::sync::{Arc, Mutex, RwLock};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::physical_plan::expressions::partitioned_aggregate::{
-    Buffer, PartitionedAccumulator, PartitionedAggregate, Value,
+    Buffer, PartitionedAccumulator, Value,
 };
+use crate::DEFAULT_BATCH_SIZE;
 use arrow::array::{
-    Array, ArrayBuilder, ArrayRef, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array,
+    ArrayRef, DecimalArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array,
     Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
-use arrow::compute;
+
 use arrow::datatypes::DataType;
-use datafusion::error::Result as DFResult;
-use datafusion::physical_plan::aggregates::return_type;
-use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Count, Literal, Max, Min, Sum};
-use datafusion::physical_plan::{expressions, Accumulator, AggregateExpr, PhysicalExpr};
+
+use datafusion::physical_plan::Accumulator;
 use datafusion::scalar::ScalarValue;
-use dyn_clone::DynClone;
 
 #[derive(Debug)]
 pub struct PartitionedSumAccumulator {
     sum: Value,
     buffer: Buffer,
 }
-
-const CAP: usize = 1000;
 
 impl PartitionedSumAccumulator {
     pub fn try_new(data_type: DataType, outer_acc: Box<dyn Accumulator>) -> Result<Self> {
@@ -36,11 +29,12 @@ impl PartitionedSumAccumulator {
                 Value::UInt64(0)
             }
             DataType::Float16 | DataType::Float32 | DataType::Float64 => Value::Float64(0.0),
+            DataType::Decimal(_, _) => Value::Decimal(0),
             _ => unimplemented!(),
         };
         Ok(Self {
             sum: value,
-            buffer: Buffer::new(CAP, data_type.clone(), outer_acc),
+            buffer: Buffer::new(DEFAULT_BATCH_SIZE, data_type, outer_acc),
         })
     }
 }
@@ -51,7 +45,7 @@ macro_rules! update_batch {
         let arr = $array.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
         for (idx, value) in arr.iter().enumerate() {
             if $spans[idx] {
-                $self.buffer.push(Value::$vtype(sum));
+                $self.buffer.push(Value::$vtype(sum))?;
                 sum = $type::default();
             }
 
@@ -80,6 +74,24 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
             DataType::Int64 => update_batch!(self, val_arr, spans, i64, Int64, Int64Array),
             DataType::Float32 => update_batch!(self, val_arr, spans, f64, Float64, Float32Array),
             DataType::Float64 => update_batch!(self, val_arr, spans, f64, Float64, Float64Array),
+            DataType::Decimal(_, _) => {
+                let mut sum: i128 = self.sum.into();
+                let arr = val_arr.as_any().downcast_ref::<DecimalArray>().unwrap();
+                for (idx, value) in arr.iter().enumerate() {
+                    if spans[idx] {
+                        self.buffer.push(Value::Decimal(sum))?;
+                        sum = 0;
+                    }
+
+                    match value {
+                        None => continue,
+                        Some(value) => {
+                            sum += value;
+                        }
+                    }
+                }
+                self.sum = Value::Decimal(sum)
+            }
             _ => unimplemented!(),
         }
 
@@ -91,12 +103,12 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
     }
 
     fn state(&self) -> Result<Vec<ScalarValue>> {
-        self.buffer.flush_with_value(self.sum.clone())?;
+        self.buffer.flush_with_value(self.sum)?;
         Ok(self.buffer.state()?)
     }
 
     fn evaluate(&self) -> Result<ScalarValue> {
-        self.buffer.flush_with_value(self.sum.clone())?;
+        self.buffer.flush_with_value(self.sum)?;
         Ok(self.buffer.evaluate()?)
     }
 }
@@ -106,17 +118,19 @@ mod tests {
     use crate::error::Result;
     use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAccumulator;
     use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
-    use arrow::array::{ArrayRef, Int8Array};
+    use arrow::array::{ArrayRef, DecimalBuilder, Int8Array};
     use arrow::datatypes::DataType;
-    use datafusion::physical_plan::expressions::{Avg, AvgAccumulator, Literal};
-    use datafusion::physical_plan::AggregateExpr;
+    use datafusion::physical_plan::expressions::AvgAccumulator;
+
     use datafusion::scalar::ScalarValue as DFScalarValue;
-    use datafusion_common::ScalarValue;
+
     use datafusion_expr::Accumulator;
+    use rust_decimal::Decimal;
+    use rust_decimal_macros::dec;
     use std::sync::Arc;
 
     #[test]
-    fn test() -> Result<()> {
+    fn test_int64() -> Result<()> {
         let outer_acc: Box<dyn Accumulator> =
             Box::new(AvgAccumulator::try_new(&DataType::Float64)?);
         let mut sum_acc = PartitionedSumAccumulator::try_new(DataType::Int64, outer_acc)?;
@@ -128,7 +142,7 @@ mod tests {
         let arr = Arc::new(Int8Array::from(vals));
 
         sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
-        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
+        sum_acc.update_batch(&spans, &[arr as ArrayRef]);
 
         let list = vec![
             1 + 2,
@@ -143,6 +157,48 @@ mod tests {
         let mean = sum as f64 / (list.len() as f64);
 
         assert_eq!(sum_acc.evaluate()?, DFScalarValue::Float64(Some(mean)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_decimal() -> Result<()> {
+        let outer_acc: Box<dyn Accumulator> =
+            Box::new(AvgAccumulator::try_new(&DataType::Decimal(10, 2))?);
+        let mut sum_acc = PartitionedSumAccumulator::try_new(DataType::Decimal(10, 2), outer_acc)?;
+        let spans = vec![
+            false, false, true, false, false, true, false, false, false, true,
+        ];
+        //                                  v              v                  v
+        let vals: Vec<i128> = vec![123, 231, 314, 411, 523, 623, 713, 843, 91, 10];
+        let arr = {
+            let mut builder = DecimalBuilder::new(10, 10, 2);
+            for val in vals.iter() {
+                builder.append_value(*val);
+            }
+
+            Arc::new(builder.finish())
+        };
+
+        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
+        sum_acc.update_batch(&spans, &[arr as ArrayRef]);
+
+        let list = vec![
+            dec!(1.23) + dec!(2.31),
+            dec!(3.14) + dec!(4.11) + dec!(5.23),
+            dec!(6.23) + dec!(7.13) + dec!(8.43) + dec!(0.91),
+            dec!(0.1) + dec!(1.23) + dec!(2.31),
+            dec!(3.14) + dec!(4.11) + dec!(5.23),
+            dec!(6.23) + dec!(7.13) + dec!(8.43) + dec!(0.91),
+            dec!(0.1),
+        ];
+        let sum: Decimal = Iterator::sum(list.iter());
+        let mut mean = sum / rust_decimal::Decimal::new(list.len() as i64, 0);
+
+        mean.rescale(2);
+        assert_eq!(
+            sum_acc.evaluate()?,
+            DFScalarValue::Decimal128(Some(mean.mantissa()), 10, 2)
+        );
         Ok(())
     }
 }

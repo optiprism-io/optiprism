@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::metadata::{list, ListResponse};
 use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
-use crate::store::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
+use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::Result;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
@@ -28,28 +28,44 @@ impl Namespace {
 }
 
 fn index_keys(
-    ns: Namespace,
     organization_id: u64,
     project_id: u64,
+    ns: &Namespace,
     name: &str,
-    display_name: &Option<String>,
+    display_name: Option<String>,
 ) -> Vec<Option<Vec<u8>>> {
-    let mut idx: Vec<Option<Vec<u8>>> = vec![];
-    idx.push(Some(
-        make_index_key(organization_id, project_id, ns.as_bytes(), IDX_NAME, name).to_vec(),
-    ));
-    idx.push(display_name.as_ref().map(|display_name| {
+    [
+        index_name_key(organization_id, project_id, ns, name),
+        index_display_name_key(organization_id, project_id, ns, display_name),
+    ]
+    .to_vec()
+}
+
+fn index_name_key(
+    organization_id: u64,
+    project_id: u64,
+    ns: &Namespace,
+    name: &str,
+) -> Option<Vec<u8>> {
+    Some(make_index_key(organization_id, project_id, ns.as_bytes(), IDX_NAME, name).to_vec())
+}
+
+fn index_display_name_key(
+    organization_id: u64,
+    project_id: u64,
+    ns: &Namespace,
+    display_name: Option<String>,
+) -> Option<Vec<u8>> {
+    display_name.map(|v| {
         make_index_key(
             organization_id,
             project_id,
             ns.as_bytes(),
             IDX_DISPLAY_NAME,
-            display_name,
+            v.as_str(),
         )
         .to_vec()
-    }));
-
-    idx
+    })
 }
 
 pub struct Provider {
@@ -81,23 +97,25 @@ impl Provider {
     pub async fn create(
         &self,
         organization_id: u64,
+        project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
-        self._create(organization_id, req).await
+        self._create(organization_id, project_id, req).await
     }
 
     pub async fn _create(
         &self,
         organization_id: u64,
+        project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let idx_keys = index_keys(
-            self.ns.clone(),
             organization_id,
-            req.project_id,
+            project_id,
+            &self.ns,
             &req.name,
-            &req.display_name,
+            req.display_name.clone(),
         );
         self.idx.check_insert_constraints(idx_keys.as_ref()).await?;
 
@@ -105,7 +123,7 @@ impl Provider {
             .store
             .next_seq(make_id_seq_key(
                 organization_id,
-                req.project_id,
+                project_id,
                 self.ns.as_bytes(),
             ))
             .await?;
@@ -117,29 +135,24 @@ impl Provider {
             updated_at: None,
             created_by: req.created_by,
             updated_by: None,
-            project_id: req.project_id,
+            project_id,
             tags: req.tags,
             name: req.name,
             description: req.description,
             display_name: req.display_name,
             typ: req.typ,
             status: req.status,
-            scope: req.scope,
             nullable: req.nullable,
             is_array: req.is_array,
             is_dictionary: req.is_dictionary,
             dictionary_type: req.dictionary_type,
+            is_system: req.is_system,
         };
 
         let data = serialize(&prop)?;
         self.store
             .put(
-                make_data_value_key(
-                    organization_id,
-                    prop.project_id,
-                    self.ns.as_bytes(),
-                    prop.id,
-                ),
+                make_data_value_key(organization_id, project_id, self.ns.as_bytes(), prop.id),
                 &data,
             )
             .await?;
@@ -151,11 +164,12 @@ impl Provider {
     pub async fn get_or_create(
         &self,
         organization_id: u64,
+        project_id: u64,
         req: CreatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
         match self
-            ._get_by_name(organization_id, req.project_id, req.name.as_str())
+            ._get_by_name(organization_id, project_id, req.name.as_str())
             .await
         {
             Ok(prop) => return Ok(prop),
@@ -163,7 +177,7 @@ impl Provider {
             Err(err) => return Err(err),
         }
 
-        self._create(organization_id, req).await
+        self._create(organization_id, project_id, req).await
     }
 
     pub async fn get_by_id(
@@ -227,60 +241,87 @@ impl Provider {
     pub async fn update(
         &self,
         organization_id: u64,
+        project_id: u64,
+        property_id: u64,
         req: UpdatePropertyRequest,
     ) -> Result<Property> {
         let _guard = self.guard.write().await;
-        let idx_keys = index_keys(
-            self.ns.clone(),
-            organization_id,
-            req.project_id,
-            &req.name,
-            &req.display_name,
-        );
+
         let prev_prop = self
-            .get_by_id(organization_id, req.project_id, req.id)
+            .get_by_id(organization_id, project_id, property_id)
             .await?;
-        let idx_prev_keys = index_keys(
-            self.ns.clone(),
-            organization_id,
-            prev_prop.project_id,
-            &prev_prop.name,
-            &prev_prop.display_name,
-        );
+        let mut prop = prev_prop.clone();
+
+        let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
+        let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
+        if let Some(name) = req.name {
+            idx_keys.push(index_name_key(
+                organization_id,
+                project_id,
+                &self.ns,
+                name.as_str(),
+            ));
+            idx_prev_keys.push(index_name_key(
+                organization_id,
+                project_id,
+                &self.ns,
+                prev_prop.name.as_str(),
+            ));
+            prop.name = name;
+        }
+        if let Some(display_name) = req.display_name {
+            idx_keys.push(index_display_name_key(
+                organization_id,
+                project_id,
+                &self.ns,
+                display_name.clone(),
+            ));
+            idx_prev_keys.push(index_display_name_key(
+                organization_id,
+                project_id,
+                &self.ns,
+                prev_prop.display_name,
+            ));
+            prop.display_name = display_name;
+        }
         self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await?;
 
-        let updated_at = Utc::now();
-        let prop = Property {
-            id: req.id,
-            created_at: prev_prop.created_at,
-            updated_at: Some(updated_at),
-            created_by: req.created_by,
-            updated_by: req.updated_by,
-            project_id: req.project_id,
-            tags: req.tags,
-            name: req.name,
-            description: req.description,
-            display_name: req.display_name,
-            typ: req.typ,
-            status: req.status,
-            scope: req.scope,
-            nullable: req.nullable,
-            is_array: req.is_array,
-            is_dictionary: req.is_dictionary,
-            dictionary_type: req.dictionary_type,
-        };
-        let data = serialize(&prop)?;
+        prop.updated_at = Some(Utc::now());
+        prop.updated_by = Some(req.updated_by);
+        if let Some(tags) = req.tags {
+            prop.tags = tags;
+        }
+        if let Some(description) = req.description {
+            prop.description = description;
+        }
+        if let Some(typ) = req.typ {
+            prop.typ = typ;
+        }
+        if let Some(status) = req.status {
+            prop.status = status;
+        }
+        if let Some(is_system) = req.is_system {
+            prop.is_system = is_system;
+        }
+        if let Some(nullable) = req.nullable {
+            prop.nullable = nullable;
+        }
+        if let Some(is_array) = req.is_array {
+            prop.is_array = is_array;
+        }
+        if let Some(is_dictionary) = req.is_dictionary {
+            prop.is_dictionary = is_dictionary;
+        }
+        if let Some(dictionary_type) = req.dictionary_type {
+            prop.dictionary_type = dictionary_type;
+        }
 
+        let data = serialize(&prop)?;
         self.store
             .put(
-                make_data_value_key(
-                    organization_id,
-                    prop.project_id,
-                    self.ns.as_bytes(),
-                    prop.id,
-                ),
+                make_data_value_key(organization_id, project_id, self.ns.as_bytes(), prop.id),
                 &data,
             )
             .await?;
@@ -288,6 +329,7 @@ impl Provider {
         self.idx
             .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
             .await?;
+
         Ok(prop)
     }
 
@@ -306,11 +348,11 @@ impl Provider {
         self.idx
             .delete(
                 index_keys(
-                    self.ns.clone(),
                     organization_id,
-                    prop.project_id,
+                    project_id,
+                    &self.ns,
                     &prop.name,
-                    &prop.display_name,
+                    prop.display_name.clone(),
                 )
                 .as_ref(),
             )

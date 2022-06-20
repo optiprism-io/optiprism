@@ -1,5 +1,7 @@
-use crate::store::store::make_data_key;
-use crate::{accounts, database, events, organizations, projects, properties, Result, Store};
+use crate::store::{make_data_key, Store};
+use crate::{
+    accounts, database, dictionaries, events, organizations, projects, properties, Result,
+};
 use bincode::deserialize;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -54,6 +56,7 @@ pub struct Metadata {
     pub projects: Arc<projects::Provider>,
     pub accounts: Arc<accounts::Provider>,
     pub database: Arc<database::Provider>,
+    pub dictionaries: Arc<dictionaries::Provider>,
 }
 
 impl Metadata {
@@ -66,6 +69,7 @@ impl Metadata {
             projects: Arc::new(projects::Provider::new(store.clone())),
             accounts: Arc::new(accounts::Provider::new(store.clone())),
             database: Arc::new(database::Provider::new(store.clone())),
+            dictionaries: Arc::new(dictionaries::Provider::new(store)),
         })
     }
 }

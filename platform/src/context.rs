@@ -12,27 +12,28 @@ use common::{
 };
 use std::collections::HashMap;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Context {
     pub organization_id: u64,
     pub account_id: u64,
-    pub project_id: u64,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
 }
 
 impl Context {
     pub fn with_permission(organization_id: u64, permission: Permission) -> Self {
-        let mut ctx = Context::default();
-        ctx.organization_id = organization_id;
         let mut permissions = HashMap::new();
-        permissions.insert(Scope::Organization, vec![permission]);
-        ctx.permissions = Some(permissions);
-        ctx
+        let _ = permissions.insert(Scope::Organization, vec![permission]);
+
+        Context {
+            organization_id,
+            permissions: Some(permissions),
+            ..Context::default()
+        }
     }
 
     pub fn check_permission(&self, _: u64, _: u64, _: Permission) -> Result<()> {
-        return Ok(());
+        Ok(())
         /*if organization_id != self.organization_id {
             return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));
         }
@@ -73,6 +74,14 @@ impl Context {
 
         return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));*/
     }
+
+    pub fn into_query_context(self, project_id: u64) -> query::Context {
+        query::Context {
+            organization_id: self.organization_id,
+            account_id: self.account_id,
+            project_id,
+        }
+    }
 }
 
 /*fn check_permissions(permissions: &[Permission], permission: &Permission) -> bool {
@@ -86,17 +95,22 @@ impl Context {
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
-    where
-        B: Send,
+where
+    B: Send,
 {
     type Rejection = Error;
 
     async fn from_request(
         request: &mut RequestParts<B>,
     ) -> core::result::Result<Self, Self::Rejection> {
-        let mut ctx = Context::default();
+        let mut ctx = Context {
+            organization_id: 1,
+            account_id: 0,
+            roles: None,
+            permissions: None,
+        };
         if let Ok(TypedHeader(Authorization(bearer))) =
-        TypedHeader::<Authorization<Bearer>>::from_request(request).await
+            TypedHeader::<Authorization<Bearer>>::from_request(request).await
         {
             if let Some(token) = bearer.token().strip_prefix("Bearer ") {
                 if let Ok(claims) = parse_access_token(token) {
@@ -108,11 +122,5 @@ impl<B> FromRequest<B> for Context
             }
         }
         Ok(ctx)
-    }
-}
-
-impl Into<query::Context> for Context {
-    fn into(self) -> query::Context {
-        query::Context::new(self.organization_id, self.account_id, self.project_id)
     }
 }

@@ -1,70 +1,110 @@
-use std::sync::Arc;
+use crate::physical_plan::planner::QueryPlanner;
+use crate::reports::event_segmentation::logical_plan_builder::COL_AGG_NAME;
+use crate::reports::event_segmentation::types::EventSegmentation;
+use crate::reports::results::DataTable;
+use crate::reports::{event_segmentation, results};
+use crate::Context;
+use crate::Result;
 use arrow::datatypes::Schema;
+
+use arrow::util::pretty::pretty_format_batches;
 use chrono::Utc;
+
+use datafusion::datasource::TableProvider;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
-use datafusion::physical_plan::collect;
-use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
-use metadata::database::TableType;
+use datafusion::physical_plan::{collect, displayable};
+use datafusion::prelude::{ExecutionConfig, ExecutionContext};
+
 use metadata::Metadata;
-use crate::{Context};
-use crate::physical_plan::planner::QueryPlanner;
-use crate::reports::results::Series;
-use crate::Result;
-use datafusion::datasource::object_store::local::LocalFileSystem;
-use crate::reports::event_segmentation;
-use crate::reports::event_segmentation::types::EventSegmentation;
+use std::sync::Arc;
+use std::time::Instant;
 
 pub struct Provider {
     metadata: Arc<Metadata>,
+    input: LogicalPlan,
 }
 
 impl Provider {
-    pub fn try_new(metadata: Arc<Metadata>) -> Result<Self> {
-        Ok(Self {
-            metadata,
-        })
+    pub fn try_new(metadata: Arc<Metadata>, provider: Arc<dyn TableProvider>) -> Result<Self> {
+        let input =
+            datafusion::logical_plan::LogicalPlanBuilder::scan("table", provider, None)?.build()?;
+        Ok(Self { metadata, input })
     }
 }
 
 impl Provider {
-    pub async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<Series> {
-        let table = self.metadata.database.get_table(TableType::Events(ctx.organization_id, ctx.project_id)).await?;
-        let schema = table.arrow_schema();
-        let options = CsvReadOptions::new().schema(&schema);
-        let path = "../tests/events.csv";
-        let input = datafusion::logical_plan::LogicalPlanBuilder::scan_csv(
-            Arc::new(LocalFileSystem {}),
-            path,
-            options,
-            None,
-            1,
-        )
-            .await?
-            .build()?;
-
+    pub async fn event_segmentation(
+        &self,
+        ctx: Context,
+        es: EventSegmentation,
+    ) -> Result<DataTable> {
         let cur_time = Utc::now();
-        let plan = event_segmentation::builder::LogicalPlanBuilder::build(ctx, cur_time,self.metadata.clone(), input, es.clone()).await?;
-        let config = ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {})).with_target_partitions(1);
-        let ctx = ExecutionContext::with_config(config);
+        let start = Instant::now();
+        let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
+            ctx,
+            cur_time,
+            self.metadata.clone(),
+            self.input.clone(),
+            es.clone(),
+        )
+        .await?;
 
-        let physical_plan = ctx.create_physical_plan(&plan).await?;
-        let batches = collect(physical_plan, Arc::new(RuntimeEnv::new(RuntimeConfig::new())?)).await?;
+        // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
+
+        let config = ExecutionConfig::new()
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_target_partitions(1);
+        let exec_ctx = ExecutionContext::with_config(config);
+        println!("logical plan: {:?}", plan);
+        let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
+        let displayable_plan = displayable(physical_plan.as_ref());
+
+        println!("physical plan: {}", displayable_plan.indent());
+        let batches = collect(
+            physical_plan,
+            Arc::new(RuntimeEnv::new(RuntimeConfig::new())?),
+        )
+        .await?;
+        for batch in batches.iter() {
+            println!("{}", pretty_format_batches(&[batch.clone()])?);
+        }
+
+        let duration = start.elapsed();
+        println!("elapsed: {:?}", duration);
         let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
         let result = concat_batches(&schema, &batches, 0)?;
 
         let metric_cols = es.time_columns(cur_time);
-        let dimension_cols = plan
+        let cols = result
             .schema()
             .fields()
             .iter()
-            .filter_map(|f| match metric_cols.contains(f.name()) {
-                true => None,
-                false => Some(f.name().clone())
+            .enumerate()
+            .map(|(idx, field)| {
+                let group = match metric_cols.contains(field.name()) {
+                    true => "metric",
+                    false => {
+                        if field.name() == COL_AGG_NAME {
+                            "agg_name"
+                        } else {
+                            "dimension"
+                        }
+                    }
+                };
+
+                results::Column {
+                    name: field.name().to_owned(),
+                    group: group.to_string(),
+                    is_nullable: field.is_nullable(),
+                    data_type: field.data_type().to_owned(),
+                    data: result.column(idx).to_owned(),
+                }
             })
             .collect();
 
-        Ok(Series::try_from_batch_record(&result, dimension_cols, metric_cols)?)
+        Ok(DataTable::new(result.schema(), cols))
     }
 }

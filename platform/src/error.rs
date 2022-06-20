@@ -31,6 +31,7 @@ pub enum Error {
     Internal2(InternalError),
     BadRequest(String),
     SerdeError(serde_json::Error),
+    DecimalError(rust_decimal::Error),
     CommonError(CommonError),
     MetadataError(MetadataError),
     QueryError(QueryError),
@@ -39,8 +40,17 @@ pub enum Error {
 impl std::error::Error for Error {}
 
 impl Display for Error {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "{}", self)
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Error::Internal(err) => write!(f, "Internal error: {}", err),
+            Error::Internal2(err) => write!(f, "Internal2 error: {:?}", err),
+            Error::BadRequest(err) => write!(f, "BadRequest error: {}", err),
+            Error::SerdeError(err) => write!(f, "SerdeError error: {}", err),
+            Error::DecimalError(err) => write!(f, "DecimalError error: {}", err),
+            Error::CommonError(err) => write!(f, "CommonError error: {}", err),
+            Error::MetadataError(err) => write!(f, "MetadataError error: {}", err),
+            Error::QueryError(err) => write!(f, "QueryError error: {}", err),
+        }
     }
 }
 
@@ -74,6 +84,12 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+impl From<rust_decimal::Error> for Error {
+    fn from(err: rust_decimal::Error) -> Self {
+        Self::DecimalError(err)
+    }
+}
+
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
@@ -82,13 +98,9 @@ impl IntoResponse for Error {
                 format!("internal error: {:?}", err),
             ),
             Error::Internal2(err) => (err.status_code, err.code.to_string()),
-            Error::MetadataError(err) => match err {
-                metadata::Error::KeyNotFound(_) => (StatusCode::NOT_FOUND, "not found".to_string()),
-                _ => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "internal server error".to_string(),
-                ),
-            },
+            Error::MetadataError(metadata::Error::KeyNotFound(_)) => {
+                (StatusCode::NOT_FOUND, "not found".to_string())
+            }
             Error::QueryError(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("query error: {:?}", err),
@@ -98,6 +110,6 @@ impl IntoResponse for Error {
                 "internal server error".to_string(),
             ),
         }
-            .into_response()
+        .into_response()
     }
 }

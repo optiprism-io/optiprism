@@ -1,20 +1,19 @@
-use std::fmt::format;
+use crate::Error;
+use crate::Result;
 use chrono::{DateTime, Utc};
+use common::DECIMAL_PRECISION;
+use convert_case::{Case, Casing};
+use datafusion::scalar::ScalarValue;
+use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
+use query::reports::event_segmentation::types as query_es_types;
+use query::reports::event_segmentation::types::NamedQuery;
+use query::reports::types as query_types;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use datafusion::scalar::ScalarValue;
-use query::reports::event_segmentation::types as query_es_types;
-use query::reports::types as query_types;
-use crate::Error;
-use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
-use crate::Result;
-use rust_decimal::Decimal;
-use common::DECIMAL_PRECISION;
-use query::reports::event_segmentation::types::NamedQuery;
-use convert_case::{Case, Casing};
 
 #[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum QueryTime {
     Between {
         from: DateTime<Utc>,
@@ -34,7 +33,10 @@ impl TryInto<query_types::QueryTime> for QueryTime {
         Ok(match self {
             QueryTime::Between { from, to } => query_types::QueryTime::Between { from, to },
             QueryTime::From(v) => query_types::QueryTime::From(v),
-            QueryTime::Last { last, unit } => query_types::QueryTime::Last { last, unit: unit.try_into()? }
+            QueryTime::Last { last, unit } => query_types::QueryTime::Last {
+                last,
+                unit: unit.try_into()?,
+            },
         })
     }
 }
@@ -149,24 +151,51 @@ pub enum AggregateFunction {
 impl TryInto<datafusion::physical_plan::aggregates::AggregateFunction> for &AggregateFunction {
     type Error = Error;
 
-    fn try_into(self) -> std::result::Result<datafusion::physical_plan::aggregates::AggregateFunction, Self::Error> {
+    fn try_into(
+        self,
+    ) -> std::result::Result<datafusion::physical_plan::aggregates::AggregateFunction, Self::Error>
+    {
         Ok(match self {
-            AggregateFunction::Count => datafusion::physical_plan::aggregates::AggregateFunction::Count,
+            AggregateFunction::Count => {
+                datafusion::physical_plan::aggregates::AggregateFunction::Count
+            }
             AggregateFunction::Sum => datafusion::physical_plan::aggregates::AggregateFunction::Sum,
             AggregateFunction::Min => datafusion::physical_plan::aggregates::AggregateFunction::Min,
             AggregateFunction::Max => datafusion::physical_plan::aggregates::AggregateFunction::Max,
             AggregateFunction::Avg => datafusion::physical_plan::aggregates::AggregateFunction::Avg,
-            AggregateFunction::ApproxDistinct => datafusion::physical_plan::aggregates::AggregateFunction::ApproxDistinct,
-            AggregateFunction::ArrayAgg => datafusion::physical_plan::aggregates::AggregateFunction::ArrayAgg,
-            AggregateFunction::Variance => datafusion::physical_plan::aggregates::AggregateFunction::Variance,
-            AggregateFunction::VariancePop => datafusion::physical_plan::aggregates::AggregateFunction::VariancePop,
-            AggregateFunction::Stddev => datafusion::physical_plan::aggregates::AggregateFunction::Stddev,
-            AggregateFunction::StddevPop => datafusion::physical_plan::aggregates::AggregateFunction::StddevPop,
-            AggregateFunction::Covariance => datafusion::physical_plan::aggregates::AggregateFunction::Covariance,
-            AggregateFunction::CovariancePop => datafusion::physical_plan::aggregates::AggregateFunction::CovariancePop,
-            AggregateFunction::Correlation => datafusion::physical_plan::aggregates::AggregateFunction::Correlation,
-            AggregateFunction::ApproxPercentileCont => datafusion::physical_plan::aggregates::AggregateFunction::ApproxPercentileCont,
-            AggregateFunction::ApproxMedian => datafusion::physical_plan::aggregates::AggregateFunction::ApproxMedian,
+            AggregateFunction::ApproxDistinct => {
+                datafusion::physical_plan::aggregates::AggregateFunction::ApproxDistinct
+            }
+            AggregateFunction::ArrayAgg => {
+                datafusion::physical_plan::aggregates::AggregateFunction::ArrayAgg
+            }
+            AggregateFunction::Variance => {
+                datafusion::physical_plan::aggregates::AggregateFunction::Variance
+            }
+            AggregateFunction::VariancePop => {
+                datafusion::physical_plan::aggregates::AggregateFunction::VariancePop
+            }
+            AggregateFunction::Stddev => {
+                datafusion::physical_plan::aggregates::AggregateFunction::Stddev
+            }
+            AggregateFunction::StddevPop => {
+                datafusion::physical_plan::aggregates::AggregateFunction::StddevPop
+            }
+            AggregateFunction::Covariance => {
+                datafusion::physical_plan::aggregates::AggregateFunction::Covariance
+            }
+            AggregateFunction::CovariancePop => {
+                datafusion::physical_plan::aggregates::AggregateFunction::CovariancePop
+            }
+            AggregateFunction::Correlation => {
+                datafusion::physical_plan::aggregates::AggregateFunction::Correlation
+            }
+            AggregateFunction::ApproxPercentileCont => {
+                datafusion::physical_plan::aggregates::AggregateFunction::ApproxPercentileCont
+            }
+            AggregateFunction::ApproxMedian => {
+                datafusion::physical_plan::aggregates::AggregateFunction::ApproxMedian
+            }
         })
     }
 }
@@ -217,9 +246,19 @@ impl TryInto<query_es_types::SegmentTime> for SegmentTime {
         Ok(match self {
             SegmentTime::Between { from, to } => query_es_types::SegmentTime::Between { from, to },
             SegmentTime::From(v) => query_es_types::SegmentTime::From(v),
-            SegmentTime::Last { n, unit } => query_es_types::SegmentTime::Last { n, unit: unit.try_into()? },
-            SegmentTime::AfterFirstUse { within, unit } => query_es_types::SegmentTime::AfterFirstUse { within, unit: unit.try_into()? },
-            SegmentTime::WindowEach { unit } => query_es_types::SegmentTime::WindowEach { unit: unit.try_into()? }
+            SegmentTime::Last { n, unit } => query_es_types::SegmentTime::Last {
+                n,
+                unit: unit.try_into()?,
+            },
+            SegmentTime::AfterFirstUse { within, unit } => {
+                query_es_types::SegmentTime::AfterFirstUse {
+                    within,
+                    unit: unit.try_into()?,
+                }
+            }
+            SegmentTime::WindowEach { unit } => query_es_types::SegmentTime::WindowEach {
+                unit: unit.try_into()?,
+            },
         })
     }
 }
@@ -243,7 +282,7 @@ impl TryInto<query_es_types::ChartType> for ChartType {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum Analysis {
     Linear,
     RollingAverage { window: usize, unit: TimeUnit },
@@ -257,9 +296,15 @@ impl TryInto<query_es_types::Analysis> for Analysis {
     fn try_into(self) -> std::result::Result<query_es_types::Analysis, Self::Error> {
         Ok(match self {
             Analysis::Linear => query_es_types::Analysis::Linear,
-            Analysis::RollingAverage { window, unit } => query_es_types::Analysis::RollingAverage { window, unit: unit.try_into()? },
-            Analysis::WindowAverage { window, unit } => query_es_types::Analysis::WindowAverage { window, unit: unit.try_into()? },
-            Analysis::Cumulative => query_es_types::Analysis::Cumulative
+            Analysis::RollingAverage { window, unit } => query_es_types::Analysis::RollingAverage {
+                window,
+                unit: unit.try_into()?,
+            },
+            Analysis::WindowAverage { window, unit } => query_es_types::Analysis::WindowAverage {
+                window,
+                unit: unit.try_into()?,
+            },
+            Analysis::Cumulative => query_es_types::Analysis::Cumulative,
         })
     }
 }
@@ -286,7 +331,10 @@ impl TryInto<query_es_types::Compare> for Compare {
     type Error = Error;
 
     fn try_into(self) -> std::result::Result<query_es_types::Compare, Self::Error> {
-        Ok(query_es_types::Compare { offset: self.offset, unit: self.unit.try_into()? })
+        Ok(query_es_types::Compare {
+            offset: self.offset,
+            unit: self.unit.try_into()?,
+        })
     }
 }
 
@@ -345,7 +393,9 @@ impl TryInto<query_es_types::QueryAggregatePerGroup> for QueryAggregatePerGroup 
             QueryAggregatePerGroup::Sum => query_es_types::QueryAggregatePerGroup::Sum,
             QueryAggregatePerGroup::Avg => query_es_types::QueryAggregatePerGroup::Avg,
             QueryAggregatePerGroup::Median => query_es_types::QueryAggregatePerGroup::Median,
-            QueryAggregatePerGroup::DistinctCount => query_es_types::QueryAggregatePerGroup::DistinctCount,
+            QueryAggregatePerGroup::DistinctCount => {
+                query_es_types::QueryAggregatePerGroup::DistinctCount
+            }
         })
     }
 }
@@ -376,10 +426,15 @@ fn convert_property(prop_type: PropertyType, prop_name: String) -> query_types::
 
 fn try_convert_value(v: &Value) -> Result<ScalarValue> {
     match v {
-        Value::Bool(v) => Ok(ScalarValue::Boolean(Some(v.clone()))),
+        Value::Bool(v) => Ok(ScalarValue::Boolean(Some(*v))),
         Value::Number(n) => {
-            let dec = Decimal::try_from(n.as_f64().unwrap()).map_err(|e| Error::BadRequest(e.to_string()))?;
-            Ok(ScalarValue::Decimal128(Some(dec.mantissa()), DECIMAL_PRECISION, dec.scale() as usize))
+            let dec = Decimal::try_from(n.as_f64().unwrap())
+                .map_err(|e| Error::BadRequest(e.to_string()))?;
+            Ok(ScalarValue::Decimal128(
+                Some(dec.mantissa()),
+                DECIMAL_PRECISION,
+                dec.scale() as usize,
+            ))
         }
         Value::String(v) => Ok(ScalarValue::Utf8(Some(v.to_string()))),
         _ => Err(Error::BadRequest("unexpected value".to_string())),
@@ -425,12 +480,14 @@ impl TryInto<query_es_types::Query> for &Query {
             Query::DailyActiveGroups => query_es_types::Query::DailyActiveGroups,
             Query::WeeklyActiveGroups => query_es_types::Query::WeeklyActiveGroups,
             Query::MonthlyActiveGroups => query_es_types::Query::MonthlyActiveGroups,
-            Query::CountPerGroup { aggregate } => query_es_types::Query::CountPerGroup { aggregate: aggregate.try_into()? },
+            Query::CountPerGroup { aggregate } => query_es_types::Query::CountPerGroup {
+                aggregate: aggregate.try_into()?,
+            },
             Query::AggregatePropertyPerGroup {
                 property_name,
                 property_type,
                 aggregate_per_group,
-                aggregate
+                aggregate,
             } => query_es_types::Query::AggregatePropertyPerGroup {
                 property: convert_property(property_type.clone(), property_name.clone()),
                 aggregate_per_group: aggregate_per_group.try_into()?,
@@ -439,12 +496,14 @@ impl TryInto<query_es_types::Query> for &Query {
             Query::AggregateProperty {
                 property_name,
                 property_type,
-                aggregate
+                aggregate,
             } => query_es_types::Query::AggregateProperty {
                 property: convert_property(property_type.clone(), property_name.clone()),
                 aggregate: aggregate.try_into()?,
             },
-            Query::QueryFormula { formula } => query_es_types::Query::QueryFormula { formula: formula.clone() }
+            Query::QueryFormula { formula } => query_es_types::Query::QueryFormula {
+                formula: formula.clone(),
+            },
         })
     }
 }
@@ -479,15 +538,15 @@ impl TryInto<query_es_types::EventFilter> for &EventFilter {
                 property_name,
                 property_type,
                 operation,
-                value
+                value,
             } => query_es_types::EventFilter::Property {
                 property: convert_property(property_type.clone(), property_name.clone()),
                 operation: operation.try_into()?,
                 value: match value {
                     None => None,
-                    Some(v) => Some(v.iter().map(|v| try_convert_value(v)).collect::<Result<_>>()?)
+                    Some(v) => Some(v.iter().map(try_convert_value).collect::<Result<_>>()?),
                 },
-            }
+            },
         })
     }
 }
@@ -507,8 +566,13 @@ impl TryInto<query_es_types::Breakdown> for &Breakdown {
 
     fn try_into(self) -> std::result::Result<query_es_types::Breakdown, Self::Error> {
         Ok(match self {
-            Breakdown::Property { property_name, property_type } =>
-                query_es_types::Breakdown::Property(convert_property(property_type.clone(), property_name.clone())),
+            Breakdown::Property {
+                property_name,
+                property_type,
+            } => query_es_types::Breakdown::Property(convert_property(
+                property_type.clone(),
+                property_name.clone(),
+            )),
         })
     }
 }
@@ -541,15 +605,43 @@ impl TryInto<query_es_types::Event> for &Event {
                 EventType::Regular => query_types::EventRef::Regular(self.event_name.clone()),
                 EventType::Custom => query_types::EventRef::Custom(self.event_name.clone()),
             },
-            filters: self.filters.as_ref().map(|v| v.iter().map(|v| v.try_into()).collect::<std::result::Result<_, _>>()).transpose()?,
-            breakdowns: self.breakdowns.as_ref().map(|v| v.iter().map(|v| v.try_into()).collect::<std::result::Result<_, _>>()).transpose()?,
-            queries: self.queries
+            filters: self
+                .filters
+                .as_ref()
+                .map(|v| {
+                    v.iter()
+                        .map(|v| v.try_into())
+                        .collect::<std::result::Result<_, _>>()
+                })
+                .transpose()?,
+            breakdowns: self
+                .breakdowns
+                .as_ref()
+                .map(|v| {
+                    v.iter()
+                        .map(|v| v.try_into())
+                        .collect::<std::result::Result<_, _>>()
+                })
+                .transpose()?,
+            queries: self
+                .queries
                 .iter()
                 .map(|v| v.try_into())
                 .collect::<std::result::Result<Vec<query_es_types::Query>, _>>()?
                 .iter()
                 .enumerate()
-                .map(|(idx, v)| NamedQuery::new(v.clone(), Some(format!("{}_{:?}_{}", self.event_name.to_case(Case::Snake), self.event_type, idx)))).collect(),
+                .map(|(idx, v)| {
+                    NamedQuery::new(
+                        v.clone(),
+                        Some(format!(
+                            "{}_{:?}_{}",
+                            self.event_name.to_case(Case::Snake),
+                            self.event_type,
+                            idx
+                        )),
+                    )
+                })
+                .collect(),
         })
     }
 }
@@ -564,7 +656,6 @@ pub struct Segment {
     name: String,
     conditions: Vec<SegmentCondition>,
 }
-
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -596,24 +687,44 @@ impl TryInto<query_es_types::EventSegmentation> for EventSegmentation {
             chart_type: self.chart_type.try_into()?,
             analysis: self.analysis.try_into()?,
             compare: self.compare.map(|v| v.try_into()).transpose()?,
-            events: self.events.iter().map(|v| v.try_into()).collect::<std::result::Result<_, _>>()?,
-            filters: self.filters.map(|v| v.iter().map(|v| v.try_into()).collect::<std::result::Result<_, _>>()).transpose()?,
-            breakdowns: self.breakdowns.map(|v| v.iter().map(|v| v.try_into()).collect::<std::result::Result<_, _>>()).transpose()?,
-            segments: None,
+            events: self
+                .events
+                .iter()
+                .map(|v| v.try_into())
+                .collect::<std::result::Result<_, _>>()?,
+            filters: self
+                .filters
+                .map(|v| {
+                    v.iter()
+                        .map(|v| v.try_into())
+                        .collect::<std::result::Result<_, _>>()
+                })
+                .transpose()?,
+            breakdowns: self
+                .breakdowns
+                .map(|v| {
+                    v.iter()
+                        .map(|v| v.try_into())
+                        .collect::<std::result::Result<_, _>>()
+                })
+                .transpose()?,
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-    use chrono::{DateTime, Utc};
-    use serde_json::{json, Value};
-    use common::ScalarValue;
-    use query::event_fields;
-    use crate::event_segmentation::types::{AggregateFunction, Analysis, Breakdown, ChartType, Compare, Event, EventFilter, EventSegmentation, EventType, PartitionedAggregateFunction, PropertyType, PropValueOperation, Query, QueryTime, TimeUnit};
-    use query::reports::event_segmentation::types::EventSegmentation as QueryEventSegmentation;
     use crate::error::Result;
+    use crate::event_segmentation::types::{
+        AggregateFunction, Analysis, Breakdown, ChartType, Compare, Event, EventFilter,
+        EventSegmentation, EventType, PartitionedAggregateFunction, PropValueOperation,
+        PropertyType, Query, QueryTime, TimeUnit,
+    };
+    use chrono::{DateTime, Utc};
+
+    use query::event_fields;
+    use query::reports::event_segmentation::types::EventSegmentation as QueryEventSegmentation;
+    use serde_json::json;
 
     #[test]
     fn test_serialize() -> Result<()> {
@@ -624,90 +735,82 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
         let es = EventSegmentation {
-            time: QueryTime::Between {
-                from,
-                to,
-            },
+            time: QueryTime::Between { from, to },
             group: event_fields::USER_ID.to_string(),
             interval_unit: TimeUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
-            compare: Some(Compare { offset: 1, unit: TimeUnit::Second }),
-            events: vec![
-                Event {
-                    event_name: "e1".to_string(),
-                    event_type: EventType::Regular,
-                    filters: Some(vec![
-                        EventFilter::Property {
-                            property_name: "p1".to_string(),
-                            property_type: PropertyType::User,
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![json!(true)]),
-                        },
-                        EventFilter::Property {
-                            property_name: "p2".to_string(),
-                            property_type: PropertyType::Event,
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![json!(true)]),
-                        },
-                        EventFilter::Property {
-                            property_name: "p3".to_string(),
-                            property_type: PropertyType::Event,
-                            operation: PropValueOperation::Empty,
-                            value: None,
-                        },
-                        EventFilter::Property {
-                            property_name: "p4".to_string(),
-                            property_type: PropertyType::Event,
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![json!("s")]),
-                        },
-                    ]),
-                    breakdowns: Some(vec![
-                        Breakdown::Property {
-                            property_name: "Device".to_string(),
-                            property_type: PropertyType::User,
-                        }
-                    ]),
-                    queries: vec![
-                        Query::CountEvents,
-                        Query::CountUniqueGroups,
-                        Query::CountPerGroup {
-                            aggregate: AggregateFunction::Avg,
-                        },
-                        Query::AggregatePropertyPerGroup {
-                            property_name: "Revenue".to_string(),
-                            property_type: PropertyType::Event,
-                            aggregate_per_group: PartitionedAggregateFunction::Sum,
-                            aggregate: AggregateFunction::Avg,
-                        },
-                        Query::AggregateProperty {
-                            property_name: "Revenue".to_string(),
-                            property_type: PropertyType::Event,
-                            aggregate: AggregateFunction::Sum,
-                        },
-                    ],
-                },
-            ],
-            filters: Some(vec![
-                EventFilter::Property {
-                    property_name: "p1".to_string(),
-                    property_type: PropertyType::User,
-                    operation: PropValueOperation::Eq,
-                    value: Some(vec![json!(true)]),
-                },
-            ]),
-            breakdowns: Some(vec![
-                Breakdown::Property {
+            compare: Some(Compare {
+                offset: 1,
+                unit: TimeUnit::Second,
+            }),
+            events: vec![Event {
+                event_name: "e1".to_string(),
+                event_type: EventType::Regular,
+                filters: Some(vec![
+                    EventFilter::Property {
+                        property_name: "p1".to_string(),
+                        property_type: PropertyType::User,
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![json!(true)]),
+                    },
+                    EventFilter::Property {
+                        property_name: "p2".to_string(),
+                        property_type: PropertyType::Event,
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![json!(true)]),
+                    },
+                    EventFilter::Property {
+                        property_name: "p3".to_string(),
+                        property_type: PropertyType::Event,
+                        operation: PropValueOperation::Empty,
+                        value: None,
+                    },
+                    EventFilter::Property {
+                        property_name: "p4".to_string(),
+                        property_type: PropertyType::Event,
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![json!("s")]),
+                    },
+                ]),
+                breakdowns: Some(vec![Breakdown::Property {
                     property_name: "Device".to_string(),
                     property_type: PropertyType::User,
-                }
-            ]),
+                }]),
+                queries: vec![
+                    Query::CountEvents,
+                    Query::CountUniqueGroups,
+                    Query::CountPerGroup {
+                        aggregate: AggregateFunction::Avg,
+                    },
+                    Query::AggregatePropertyPerGroup {
+                        property_name: "Revenue".to_string(),
+                        property_type: PropertyType::Event,
+                        aggregate_per_group: PartitionedAggregateFunction::Sum,
+                        aggregate: AggregateFunction::Avg,
+                    },
+                    Query::AggregateProperty {
+                        property_name: "Revenue".to_string(),
+                        property_type: PropertyType::Event,
+                        aggregate: AggregateFunction::Sum,
+                    },
+                ],
+            }],
+            filters: Some(vec![EventFilter::Property {
+                property_name: "p1".to_string(),
+                property_type: PropertyType::User,
+                operation: PropValueOperation::Eq,
+                value: Some(vec![json!(true)]),
+            }]),
+            breakdowns: Some(vec![Breakdown::Property {
+                property_name: "Device".to_string(),
+                property_type: PropertyType::User,
+            }]),
             segments: None,
         };
 
-        let qes: QueryEventSegmentation = es.clone().try_into()?;
-        let j = serde_json::to_string_pretty(&es).unwrap();
+        let _qes: QueryEventSegmentation = es.clone().try_into()?;
+        let _j = serde_json::to_string_pretty(&es).unwrap();
         Ok(())
     }
 }

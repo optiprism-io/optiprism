@@ -1,9 +1,10 @@
 use super::{CreateRequest, ListRequest, Organization, UpdateRequest};
-use crate::{error::Error, Result, Store};
+use crate::store::Store;
+use crate::{error::Error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use futures::lock::Mutex;
-use std::{cmp::Ordering, sync::Arc};
+use std::sync::Arc;
 
 const SEQUENCE_KEY: &str = "organizations/id_seq";
 const DATA_PREFIX: &str = "organizations/data/";
@@ -53,21 +54,7 @@ impl Provider {
             .iter()
             .map(|v| deserialize(v.1.as_ref()))
             .collect::<bincode::Result<Vec<Organization>>>()?;
-        list.sort_by(|a, b| {
-            if a.id == b.id {
-                Ordering::Equal
-            } else if a.id > b.id {
-                Ordering::Greater
-            } else {
-                Ordering::Less
-            }
-        });
-        // if let Some(offset) = request.offset {
-        //     list = list[(offset as usize)..];
-        // }
-        // if let Some(limit) = request.limit {
-        //     list = list[..(limit as usize)];
-        // }
+        list.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(list)
     }
 
