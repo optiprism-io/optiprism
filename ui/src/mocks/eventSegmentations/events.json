@@ -14,14 +14,14 @@
         "displayName": "Sign Up",
         "description": "Customize session timeout length, exclude events from sessions, or define event based sessions in project settings.",
         "status": "enabled",
-        "event_properties": [
+        "properties": [
             8,
             9,
             10,
             11,
             12
         ],
-        "user_properties": [
+        "custom_properties": [
             1,
             2
         ]
@@ -40,14 +40,14 @@
         "displayName": "Search",
         "description": "Triggered when a search for an item is conducted from the search bar.",
         "status": "disabled",
-        "event_properties": [
+        "properties": [
             8,
             9,
             10,
             11,
             12
         ],
-        "user_properties": [
+        "custom_properties": [
             1,
             2
         ]
@@ -65,12 +65,12 @@
         "displayName": "View Product",
         "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Amet animi architecto aspernatur beatae blanditiis culpa cupiditate dolorem doloribus ea et eveniet explicabo, harum illo inventore laudantium modi obcaecati quibusdam ratione recusandae reiciendis reprehenderit sapiente similique totam.",
         "status": "enabled",
-        "event_properties": [
+        "properties": [
             2,
             3,
             4
         ],
-        "user_properties": [
+        "custom_properties": [
             1,
             2
         ]
@@ -88,12 +88,12 @@
         "displayName": "Add Product to Cart",
         "description": "Triggered when a user adds an item to their cart.",
         "status": "enabled",
-        "event_properties": [
+        "properties": [
             5,
             6,
             7
         ],
-        "user_properties": [
+        "custom_properties": [
             1,
             2
         ]
@@ -111,14 +111,14 @@
         "displayName": "Purchase Product",
         "description": "Triggered when a user completes their purchase in the checkout flow.",
         "status": "enabled",
-        "event_properties": [
+        "properties": [
             8,
             9,
             10,
             11,
             12
         ],
-        "user_properties": [
+        "custom_properties": [
             1,
             2
         ]
@@ -134,14 +134,14 @@
         "displayName": "Purchase Product Other 1",
         "description": "Other Test description 1",
         "status": "enabled",
-        "event_properties": [
+        "properties": [
             8,
             9,
             10,
             11,
             12
         ],
-        "user_properties": [
+        "custom_properties": [
             1,
             2
         ]
@@ -157,14 +157,14 @@
         "displayName": "Purchase Product Other 2",
         "description": "Other Test description 2",
         "status": "enabled",
-        "event_properties": [
+        "properties": [
             8,
             9,
             10,
             11,
             12
         ],
-        "user_properties": [
+        "custom_properties": [
             1,
             2
         ]

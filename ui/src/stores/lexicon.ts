@@ -145,7 +145,7 @@ export const useLexiconStore = defineStore('lexicon', {
                 if (e) {
                     return e
                 }
-                throw new Error(`undefined custon event id: ${id}`)
+                throw new Error(`undefined custom event id: ${id}`)
             }
         },
         findCustomEventByName(state: Lexicon) {
@@ -154,7 +154,7 @@ export const useLexiconStore = defineStore('lexicon', {
                 if (e) {
                     return e
                 }
-                throw new Error(`undefined custon event name: ${name}`)
+                throw new Error(`undefined custom event name: ${name}`)
             }
         },
         eventName() {

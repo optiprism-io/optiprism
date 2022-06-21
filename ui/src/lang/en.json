@@ -65,7 +65,8 @@
         "tabs": {
           "event": "Event",
           "properties": "Properties",
-          "user_properties": "User Properties"
+          "user_properties": "User Properties",
+          "custom_properties": "Custom Properties"
         }
       }
     },

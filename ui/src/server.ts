@@ -252,6 +252,19 @@ export default function ({ environment = 'development' } = {}) {
                         isArray: false,
                         nullable: false,
                         isDictionary: false
+                    },
+                    {
+                        id: 2,
+                        eventId: 1,
+                        createdAt: new Date(),
+                        createdBy: 0,
+                        updatedBy: 0,
+                        tags: [],
+                        name: 'custom prop 2',
+                        dataType: DataType.String,
+                        isArray: false,
+                        nullable: false,
+                        isDictionary: false
                     }
                 ];
             });

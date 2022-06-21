@@ -28,7 +28,7 @@
                 :columns="columnsProperties"
             />
             <UiTable
-                v-if="activeTab === 'user_properties'"
+                v-if="activeTab === 'custom_properties'"
                 :compact="true"
                 :items="itemsUserProperties"
                 :columns="columnsProperties"
@@ -39,7 +39,7 @@
 
 <script lang="ts" setup>
 import { computed, inject, ref } from 'vue'
-import { UserProperty } from '@/types/events'
+import { EventCustomProperty } from '@/types/events'
 import { Row } from '@/components/uikit/UiTable/UiTable'
 import { Property, Event } from '@/api'
 
@@ -56,7 +56,7 @@ export type EventObject = {
 }
 export type ApplyPayload = EventObject
 
-const mapTabs = ['event', 'properties', 'user_properties']
+const mapTabs = ['event', 'properties', 'custom_properties']
 
 const i18n = inject<any>('i18n')
 
@@ -65,7 +65,7 @@ type Props = {
     loading?: boolean
     event: Event | null
     properties: Property[]
-    userProperties: UserProperty[]
+    userProperties: EventCustomProperty[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -82,8 +82,8 @@ const activeTab = ref('event')
 const editEvent = ref<EventObject | null>(null)
 const applyDisabled = computed(() => !editEvent.value)
 
-const getTableRows = (properties: Property[] | UserProperty[]) => {
-    return properties.map((prop: Property | UserProperty): Row => {
+const getTableRows = (properties: Property[] | EventCustomProperty[]) => {
+    return properties.map((prop: Property | EventCustomProperty): Row => {
         const keys = (propertiesColumnsConfig.map(item => item.key) as (keyof typeof prop)[])
         const rows: Row = [];
 
