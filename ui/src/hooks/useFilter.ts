@@ -36,7 +36,7 @@ export const useFilter = (): UseFilter => {
         let valuesList: string[] = [];
 
         try {
-            const res = await schemaService.propertryValues({
+            const res = await schemaService.propertyValues({
                 event_name: eventRef ? lexiconStore.eventName(eventRef) : '',
                 event_type: eventRef ? eventRef.type : '',
                 property_name: property.name,
