@@ -7,12 +7,15 @@ import liveStresmMocks from '@/mocks/reports/liveStream.json'
 
 import eventSegmentationsMocks from '@/mocks/eventSegmentations/eventSegmentations.json';
 import eventMocks from '@/mocks/eventSegmentations/events.json';
+import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
 
 export default function ({ environment = 'development' } = {}) {
     return createServer({
         seeds(server) {
             server.db.loadData({
                 events: eventMocks,
+                eventProperties: eventPropertiesMocks,
+
                 customEvents: [{
                     id: 1,
                     name: 'Create Product',
@@ -37,7 +40,7 @@ export default function ({ environment = 'development' } = {}) {
 
         routes() {
             this.namespace = 'api'
-            this.timing = 300
+            this.timing = 110
 
             this.get('/schema/events', (schema) => {
                 return schema.db.events
@@ -70,172 +73,8 @@ export default function ({ environment = 'development' } = {}) {
                 return liveStresmMocks
             })
 
-            this.get('/schema/event-properties', () => {
-                return [
-                    {
-                        id: 1,
-                        eventId: 2,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Query',
-                        dataType: DataType.String,
-                        nullable: false,
-                        isArray: false,
-                        isDictionary: false,
-                        dictionaryType: DataType.Number
-                    },
-                    {
-                        id: 2,
-                        eventId: 3,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Product name',
-                        dataType: DataType.String,
-                        nullable: false,
-                        isArray: false,
-                        isDictionary: true,
-                        dictionaryType: DataType.Number
-                    },
-                    {
-                        id: 3,
-                        eventId: 3,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Product Category',
-                        dataType: DataType.String,
-                        nullable: false,
-                        isArray: false,
-                        isDictionary: true,
-                        dictionaryType: DataType.Number
-                    },
-                    {
-                        id: 4,
-                        eventId: 3,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Product Price',
-                        dataType: DataType.Number,
-                        isArray: false,
-                        nullable: false,
-                        isDictionary: false
-                    },
-                    {
-                        id: 5,
-                        eventId: 4,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Product name',
-                        dataType: DataType.String,
-                        isArray: false,
-                        nullable: false,
-                        isDictionary: true,
-                        dictionaryType: DataType.Number
-                    },
-                    {
-                        id: 6,
-                        eventId: 4,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Product Category',
-                        dataType: DataType.String,
-                        isArray: false,
-                        nullable: false,
-                        isDictionary: true,
-                        dictionaryType: DataType.Number
-                    },
-                    {
-                        id: 7,
-                        eventId: 4,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Product Price',
-                        dataType: DataType.Number,
-                        isArray: false,
-                        nullable: false,
-                        isDictionary: false
-                    },
-                    {
-                        id: 8,
-                        eventId: 5,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Product name',
-                        dataType: DataType.String,
-                        isArray: false,
-                        nullable: false,
-                        isDictionary: true,
-                        dictionaryType: DataType.Number
-                    },
-                    {
-                        id: 9,
-                        eventId: 5,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Product Category',
-                        dataType: DataType.String,
-                        isArray: false,
-                        nullable: false,
-                        isDictionary: true,
-                        dictionaryType: DataType.Number
-                    },
-                    {
-                        id: 10,
-                        eventId: 5,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Product Price',
-                        dataType: DataType.Number,
-                        isArray: false,
-                        nullable: false,
-                        isDictionary: false
-                    },
-                    {
-                        id: 11,
-                        eventId: 5,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Discount',
-                        type: DataType.Number,
-                        isArray: false,
-                        nullable: false,
-                        isDictionary: false
-                    },
-                    {
-                        id: 12,
-                        eventId: 5,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        tags: [],
-                        name: 'Revenue',
-                        dataType: DataType.Number,
-                        isArray: false,
-                        nullable: false,
-                        isDictionary: false
-                    }
-                ];
+            this.get('/schema/event-properties', (schema) => {
+                return schema.db.eventProperties
             });
 
             this.get('/schema/event-custom-properties', () => {

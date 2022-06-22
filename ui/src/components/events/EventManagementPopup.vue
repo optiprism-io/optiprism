@@ -180,11 +180,3 @@ const onInputEventItem = async (payload: ActionPayload) => {
     }
 }
 </script>
-
-<style lang="scss">
-.event-management-popup {
-    &__content {
-        min-height: 15rem;
-    }
-}
-</style>
