@@ -22,22 +22,8 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted } from 'vue'
-import { useLexiconStore } from '@/stores/lexicon'
-import { useLiveStreamStore } from '@/stores/reports/liveStream'
-
 import InputsEventsLiveStream from '@/components/events/LiveStream/InputsEventsLiveStream.vue'
 import TableLiveStream from '@/components/events/LiveStream/TableLiveStream.vue'
-
-const lexiconStore = useLexiconStore()
-const liveStreamStore = useLiveStreamStore()
-
-onMounted(async () => {
-    liveStreamStore.getReportLiveStream()
-    await lexiconStore.getEvents()
-    await lexiconStore.getEventProperties()
-    await lexiconStore.getUserProperties()
-})
 </script>
 
 <style scoped lang="scss">

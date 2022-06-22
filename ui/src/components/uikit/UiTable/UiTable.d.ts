@@ -1,9 +1,16 @@
 import { defineComponent } from 'vue'
 
+export type StyleCell = {
+    left?: string
+    width?: string
+    maxWidth?: string
+    minWidth?: string
+}
+
 export type Action = {
     name: string
-    icon: string
-    type?: string
+    icon?: string
+    type?: string | number
 }
 
 export type Column = {
@@ -18,6 +25,7 @@ export type Column = {
     maxWidth?: number | string
     width?: number | string
     left?: number
+    style?: StyleCell
 }
 
 export type Cell = {
@@ -28,7 +36,10 @@ export type Cell = {
     lastPinned?: boolean
     left?: number
     actions?: Action[]
+    action?: Action,
     component?: ReturnType<typeof defineComponent>
+    style?: StyleCell | undefined
+    nowrap?: boolean
 }
 
 export type EventCell = Cell & {

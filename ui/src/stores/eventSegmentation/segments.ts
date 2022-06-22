@@ -19,7 +19,6 @@ import {
     PayloadChangeValueItem,
     PayloadChangeEach,
 } from '@/components/events/Segments/Segments'
-import { EventType } from '@/api'
 
 interface Segment {
     name: string
@@ -157,7 +156,7 @@ export const useSegmentsStore = defineStore('segments', {
                     try {
                         const lexiconStore = useLexiconStore()
 
-                        const res = await schemaService.propertryValues({
+                        const res = await schemaService.propertyValues({
                             event_name: lexiconStore.eventName(eventRef),
                             event_type: eventRef.type,
                             property_name: lexiconStore.propertyName(payload.propRef),
@@ -270,7 +269,7 @@ export const useSegmentsStore = defineStore('segments', {
                     const lexiconStore = useLexiconStore()
 
                     try {
-                        const res = await schemaService.propertryValues({
+                        const res = await schemaService.propertyValues({
                             // TODO integration with backand
                             // check condition type
                             property_name: lexiconStore.propertyName(ref),

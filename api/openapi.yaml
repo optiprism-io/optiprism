@@ -446,9 +446,32 @@ paths:
         content:
           application/json:
             schema:
-              allOf:
-                - $ref: '#/components/schemas/EventRef'
-                - $ref: '#/components/schemas/PropertyRef'
+              type: object
+              properties:
+                eventName:
+                   type: string
+                   description: use event name only with eventType=event|user
+                eventId:
+                   type: number
+                   description: use event id only with eventType=custom
+                eventType:
+                  type: string
+                  enum:
+                    - event
+                    - user
+                    - custom
+                propertyName:
+                   type: string
+                   description: use property name only with propertyType=event|user
+                propertyId:
+                   type: number
+                   description: use property id only with propertyType=custom
+                propertyType:
+                  type: string
+                  enum:
+                    - event
+                    - user
+                    - custom
 
       responses:
         '200':

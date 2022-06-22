@@ -2,22 +2,32 @@
     <div class="ui-table">
         <table
             class="pf-c-table"
+            :class="{
+                'pf-m-compact': props.compact
+            }"
             role="grid"
-            aria-label=""
         >
             <thead>
                 <tr role="row">
-                    <UiTableHeadCell
+                    <th
                         v-for="column in columns"
                         :key="column.value"
-                        :value="column.value"
-                        :title="column.title"
-                        :sorted="column.sorted"
-                        :pinned="column.pinned"
-                        :truncate="column.truncate"
-                        :left="column.left"
-                        :last-pinned="column.lastPinned"
-                    />
+                        :class="{
+                            'pf-c-table__sort': column.sorted,
+                            'pf-c-table__sticky-column': column.pinned,
+                            'pf-m-truncate': column.truncate,
+                            'pf-m-border-right': column.lastPinned,
+                        }"
+                        role="columnheader"
+                        scope="col"
+                        :style="column.style"
+                    >
+                        <UiTableHeadCell
+                            :value="column.value"
+                            :title="column.title"
+                            :sorted="column.sorted"
+                        />
+                    </th>
                 </tr>
             </thead>
             <tbody role="rowgroup">
@@ -26,13 +36,23 @@
                     :key="i"
                     role="row"
                 >
-                    <component
-                        :is="cell.component || UiTableCell"
+                    <td
                         v-for="cell in row"
                         :key="cell.value"
-                        v-bind="cell"
-                        @on-action="onAction"
-                    />
+                        :class="{
+                            'pf-c-table__sticky-column': cell.pinned,
+                            'pf-m-truncate': cell.truncate,
+                            'pf-m-border-right': cell.lastPinned,
+                        }"
+                        :style="cell.style"
+                    >
+                        <component
+                            :is="cell.component || UiTableCell"
+                            v-bind="cell"
+                            :style="null"
+                            @on-action="onAction"
+                        />
+                    </td>
                 </tr>
             </tbody>
         </table>
@@ -46,8 +66,9 @@ import UiTableHeadCell from '@/components/uikit/UiTable/UiTableHeadCell.vue'
 import UiTableCell from '@/components/uikit/UiTable/UiTableCell.vue'
 
 type Props = {
-    items?: Row[];
-    columns: Column[],
+    compact?: boolean
+    items?: Row[]
+    columns: Column[]
     stickyColumnMinWidth?: number
     stickyColumnWidth?: number
 }
@@ -56,6 +77,7 @@ const props = withDefaults(defineProps<Props>(), {
     stickyColumnMinWidth: 170,
     stickyColumnWidth: 170,
     items: () => [],
+    compact: true,
 })
 
 const emit = defineEmits<{
@@ -70,7 +92,7 @@ const onAction = (payload: Action) => {
 }
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .pf-c-table {
     tr > * {
         --pf-c-table--cell--MinWidth: 140px;

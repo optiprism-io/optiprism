@@ -1,0 +1,12 @@
+[
+    {
+        "key": "name",
+        "type": "string",
+        "string": "events.event_management.popup.properties_columns.name"
+    },
+    {
+        "key": "dataType",
+        "type": "string",
+        "string": "events.event_management.popup.properties_columns.dataType"
+    }
+]

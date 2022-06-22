@@ -2,6 +2,7 @@
   "common": {
     "apply": "Apply",
     "cancel": "Cancel",
+    "close": "Close",
     "select_period": "Select period",
     "select_aggregate": "Select aggregate",
     "add_filter": "Add Filter",
@@ -9,6 +10,7 @@
     "enter_value": "Enter a value",
     "create": "Create",
     "edit": "Edit",
+    "save": "Save",
     "castom": "Castom",
     "columns": "columns",
     "no_data": "No data",
@@ -41,6 +43,33 @@
   },
 
   "events": {
+    "event_management": {
+      "event": "Event",
+      "columns": {
+        "name": "Name",
+        "displayName": "Display name",
+        "description": "Description"
+      },
+      "popup": {
+        "properties_columns": {
+            "name": "Name",
+            "dataType": "Data Type"
+        },
+        "event_columns": {
+          "tags": "Tags",
+          "name": "Name",
+          "displayName": "Display name",
+          "description": "Description",
+          "status": "Status"
+        },
+        "tabs": {
+          "event": "Event",
+          "properties": "Properties",
+          "user_properties": "User Properties",
+          "custom_properties": "Custom Properties"
+        }
+      }
+    },
     "live_stream": {
       "title": "Live stream",
       "columns": {
