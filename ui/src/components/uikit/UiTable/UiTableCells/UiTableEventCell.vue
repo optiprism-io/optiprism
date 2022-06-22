@@ -1,16 +1,5 @@
 <template>
-    <td
-        :class="{
-            'pf-c-table__sticky-column': pinned,
-            'pf-m-truncate': truncate,
-            'pf-m-border-right': lastPinned,
-        }"
-        class="ui-table-event-cell"
-        role="columnheader"
-        :data-label="title"
-        scope="col"
-        :style="style"
-    >
+    <div class="ui-table-event-cell">
         <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
             <div class="pf-l-flex__item">
                 <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
@@ -61,7 +50,7 @@
                 </div>
             </div>
         </div>
-    </td>
+    </div>
 </template>
 
 <script lang="ts" setup>
@@ -70,19 +59,14 @@ import { Action } from '../UiTable'
 
 type Props = {
     title: string | number
-    pinned?: boolean
-    truncate?: boolean
-    left?: number
-    lastPinned?: boolean
     actions?: Action[]
     customEvents?: {
         name: string,
         value: number
-    }[]
+    }[],
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    left: 0,
 })
 
 const emit = defineEmits<{
@@ -90,16 +74,6 @@ const emit = defineEmits<{
 }>()
 
 const hasAction = computed(() => props.actions && props.actions.length)
-
-const style = computed(() => {
-    if (props.pinned) {
-        return {
-            left: props.left ? `${props.left}px` : undefined,
-        }
-    } else {
-        return {}
-    }
-})
 
 const customEventsMargin = computed(() => {
     return props.customEvents && props.customEvents.length >= 3

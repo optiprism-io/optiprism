@@ -1,18 +1,7 @@
 <template>
-    <th
+    <div
         :key="value"
         class="ui-table-th"
-        :class="{
-            'pf-c-table__sort': sorted,
-            'pf-c-table__sticky-column': pinned,
-            'pf-m-truncate': truncate,
-            'pf-m-border-right': lastPinned,
-        }"
-        role="columnheader"
-        aria-sort="none"
-        :data-label="title"
-        scope="col"
-        :style="style"
     >
         <button
             v-if="sorted"
@@ -29,35 +18,18 @@
             v-else
             class="pf-c-table__text"
         >{{ title }}</span>
-    </th>
+    </div>
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue'
 
 type Props = {
     value: string | number
     title: string | number
     sorted?: boolean
-    pinned?: boolean
-    truncate?: boolean
-    left?: number
-    lastPinned?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
-    left: 0,
-})
-
-const style = computed(() => {
-    if (props.pinned) {
-        return {
-            left: props.left ? `${props.left}px` : undefined,
-        }
-    } else {
-        return {};
-    }
-})
+defineProps<Props>()
 </script>
 
 <style lang="scss" scoped></style>

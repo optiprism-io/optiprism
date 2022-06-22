@@ -43,7 +43,7 @@
                         {{ props.description }}
                     </div>
                 </header>
-                <div class="pf-c-modal-box__body">
+                <div class="pf-c-modal-box__body pf-u-mb-md pf-u-pb-md">
                     <slot />
                 </div>
                 <footer
@@ -85,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 import getScrollbarWidth from '@/helpers/getScrollbarWidth'
 
@@ -105,6 +105,7 @@ interface Props {
     fullWidth?: boolean
 
     size?: 'pf-m-md' | 'pf-m-sm' | 'pf-m-lg' | null
+    centered?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -117,6 +118,7 @@ const props = withDefaults(defineProps<Props>(), {
     size: 'pf-m-sm',
     closable: true,
     fullWidth: true,
+    centered: false,
 })
 
 const emit = defineEmits<{
@@ -187,12 +189,16 @@ onUnmounted(() => {
     }
 })
 
+const boxMargin = computed(() => props.centered ? 'auto' : '50px auto auto')
+
 </script>
 <style lang="scss">
 $text-color: #171B24;
 $text-color-title: #171717;
 
 .ui-popup-window {
+    --margin-box: v-bind(boxMargin);
+
     &__wrapper {
         width: 100%;
         height: 100%;
@@ -209,7 +215,7 @@ $text-color-title: #171717;
     }
 
     &__box {
-        margin: auto;
+        margin: var(--margin-box);
 
         &_full-width {
             max-height: initial;

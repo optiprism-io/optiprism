@@ -275,7 +275,7 @@ const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => 
     let valuesList: string[] = []
 
     try {
-        const res = await schemaService.propertryValues({
+        const res = await schemaService.propertyValues({
             event_name: lexiconStore.eventName(props.event.ref),
             event_type: props.event.ref.type,
             property_name: lexiconStore.propertyName(propRef),

@@ -60,8 +60,8 @@ export const useLiveStreamStore = defineStore('liveStream', {
                     event.filters.forEach(filter => {
                         if (filter.propRef) {
                             filters.push({
-                                filterType: 'property',
-                                propertyType: filter.propRef.type,
+                                type: 'property',
+                                propertyType: 'custom',
                                 propertyId: filter.propRef.id,
                                 operation: filter.opId,
                                 value: filter.values,
@@ -155,7 +155,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
             const commonStore = useCommonStore()
 
             try {
-                const res = await dataService.createEventsStream(String(commonStore.projectId), {
+                const res = await dataService.createEventsStream(commonStore.organizationId, commonStore.projectId, {
                     time: this.timeRequest,
                     events: this.eventsRequest,
                     filters: this.filtersRequest,
