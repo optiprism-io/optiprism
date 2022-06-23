@@ -16,12 +16,12 @@ on:
           - nikolai-kushner
           - evgeniy-kozlov
       build:
-        description: 'prod - static files, dev - node server'
+        description: 'release - static files, debug - node server'
         required: true
         type: choice
         options:
-          - prod
-          - dev
+          - release
+          - debug
 
 jobs:
   docker:
