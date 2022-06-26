@@ -8,14 +8,14 @@
         </span>
 
         <UiSelectProperty
-            v-for="(item, index) in holdingProperties"
+            v-for="(props, index) in holdingProperties"
             :key="index"
             :items="propertiesItems"
             class="pf-l-flex__item"
             @update:model-value="editHoldingProperty(index, $event)"
         >
             <UiButton class="pf-m-main pf-m-secondary">
-                {{ item.name }}
+                {{ props.name }}
 
                 <span class="pf-c-button__icon pf-m-end">
                     <UiIcon
