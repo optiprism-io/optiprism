@@ -71,6 +71,7 @@
             :filter="filter"
             :event-ref="item.event"
             :index="filterIndex"
+            class="exclude-step-filter"
             @remove-filter="removeFilterForEvent(index, filterIndex)"
             @change-filter-property="(...args) => changeFilterPropertyForEvent(index, ...args)"
             @change-filter-operation="(...args) => changeFilterOperationForEvent(index, ...args)"
@@ -250,3 +251,9 @@ const excludeStepsToString = (steps: ExcludedEventSteps): string => {
     }
 }
 </script>
+
+<style lang="scss" scoped>
+.exclude-step-filter {
+  margin-left: 20px;
+}
+</style>

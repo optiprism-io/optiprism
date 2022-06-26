@@ -46,6 +46,7 @@
                         <UiSelectCondition
                             v-model="condition"
                             :items="conditionsItems"
+                            :show-search="false"
                         >
                             <UiButton
                                 class="pf-m-main pf-m-secondary pf-l-flex__item"

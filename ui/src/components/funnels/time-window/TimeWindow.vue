@@ -65,12 +65,25 @@ const i18n = inject<I18N>('i18n')
 
 const dynamicSize = ref<number| null>(null)
 
-const defaultSizes = Array.from({length: 10}).map((_, i) => {
-    return 10 * (i + 1)
+const sizeRanges: Record<StepUnit, [number, number]> = {
+    seconds: [2, 100],
+    minutes: [1, 60],
+    hours: [1, 100],
+    days: [1, 100],
+    weeks: [1, 10],
+    months: [1, 12],
+    years: [1, 10],
+}
+
+const defaultSizes = computed(() => {
+    const sizeRange = sizeRanges[stepsStore.unit]
+    const [start, end] = sizeRange
+    const length = end - start + 1
+    return Array.from({length}, (_, i) => start + i)
 })
 
 const sizeItems = computed<UiSelectItemInterface<number>[]>(() => {
-    const sizes = dynamicSize.value ? [dynamicSize.value, ...defaultSizes] : defaultSizes
+    const sizes = dynamicSize.value ? [dynamicSize.value, ...defaultSizes.value] : defaultSizes.value
 
     return sizes.map(item => {
         return {
@@ -132,6 +145,10 @@ const handleSizeSearch = (value: string, items: UiSelectItemInterface<number>[])
 
     const parsedSize = Number(value)
     if (isNaN(parsedSize)) {
+        return
+    }
+
+    if (defaultSizes.value.includes(parsedSize)) {
         return
     }
 

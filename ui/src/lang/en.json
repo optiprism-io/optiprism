@@ -159,7 +159,7 @@
       "steps": "steps",
       "and": "and",
       "all": "All",
-      "remove": "Remove step"
+      "remove": "Remove exclude"
     },
     "holdingConstant": {
       "add": "Holding constant",

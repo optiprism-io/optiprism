@@ -1,4 +1,4 @@
-import {computed, DefineComponent, defineComponent, PropType, Ref, ref} from 'vue';
+import {computed, DefineComponent, defineComponent, PropType, Ref, ref, watch} from 'vue';
 import UiSelectItem from '@/components/uikit/UiSelect/UiSelectItem.vue'
 import {UiSelectItemInterface} from './types';
 import UiSelectGroup from '@/components/uikit/UiSelect/UiSelectGroup.vue'
@@ -124,14 +124,16 @@ export function UiSelectGeneric<T>() {
                                         </div>
                                     </div>
                                     {
-                                        slots.description && hovered && (
+                                        slots.description && hovered.value && (
                                             <div class="ui-select__description">
                                                 <div class="pf-c-card__body pf-u-pt-lg pf-u-p-sm pf-u-color-200">
-                                                    <div class="select__description-icon">
-                                                        <UiIcon icon="fas fa-info-circle"/>
-                                                    </div>
-                                                    <div class="select__description-text">
-                                                        { slots.description?.({ item: hovered }) }
+                                                    <div class="pf-l-flex">
+                                                        <div class="select__description-icon pf-l-flex__item">
+                                                            <UiIcon icon="fas fa-info-circle"/>
+                                                        </div>
+                                                        <div class="select__description-text pf-l-flex__item">
+                                                            {slots.description?.({item: hovered})}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
