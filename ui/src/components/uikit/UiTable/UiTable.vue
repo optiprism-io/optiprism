@@ -37,8 +37,8 @@
                     role="row"
                 >
                     <td
-                        v-for="cell in row"
-                        :key="cell.value"
+                        v-for="(cell, j) in row"
+                        :key="j"
                         :class="{
                             'pf-c-table__sticky-column': cell.pinned,
                             'pf-m-truncate': cell.truncate,
