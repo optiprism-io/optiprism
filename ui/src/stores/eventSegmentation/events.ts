@@ -9,7 +9,7 @@ import queriesService, { EventSegmentation } from '@/api/services/queries.servic
 import { getYYYYMMDD, getStringDateByFormat } from '@/helpers/getStringDates';
 import { getLastNDaysRange } from '@/helpers/calendarHelper';
 import {Column, Row} from '@/components/uikit/UiTable/UiTable';
-import { PropertyType, TimeUnit, EventType } from '@/api'
+import { PropertyType, TimeUnit, EventType, DataTableResponse, DataTableResponseColumns } from '@/api'
 
 import { useLexiconStore } from '@/stores/lexicon';
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments';
@@ -65,9 +65,9 @@ export type Events = {
     },
     compareTo: TimeUnit | string
     compareOffset: number,
-    chartType: ChartType | string,
+    chartType: ChartType | string
 
-    eventSegmentation: any // TODO integrations backend
+    eventSegmentation: DataTableResponse
     eventSegmentationLoading: boolean
 
     editCustomEvent: number | null
@@ -110,7 +110,7 @@ export const useEventsStore = defineStore('events', {
         chartType: 'line',
 
         eventSegmentation: {
-            series: [],
+            columns: [],
         },
         eventSegmentationLoading: false,
 
@@ -121,33 +121,64 @@ export const useEventsStore = defineStore('events', {
             return Array.isArray(this.events) && Boolean(this.events.length)
         },
         hasDataEvent(): boolean {
-            return this.eventSegmentation && Array.isArray(this.eventSegmentation.series) && this.eventSegmentation.series.length;
+            return this.eventSegmentation && Array.isArray(this.eventSegmentation.columns) && Boolean(this.eventSegmentation.columns.length);
+        },
+        dimensionColumns(): DataTableResponseColumns[] {
+            return this.eventSegmentation?.columns ? this.eventSegmentation.columns.filter(column => column.type === 'dimension') : [];
+        },
+        metricColumns(): DataTableResponseColumns[] {
+            return this.eventSegmentation?.columns ? this.eventSegmentation.columns.filter(column => column.type === 'metric') : [];
+        },
+        metricValueColumns(): DataTableResponseColumns[] {
+            return this.eventSegmentation?.columns ? this.eventSegmentation.columns.filter(column => column.type === 'metricValue') : [];
+        },
+        totalColumn(): DataTableResponseColumns | undefined {
+            return this.metricValueColumns.find(item => item.name === 'total')
+        },
+        sortedColumns(): DataTableResponseColumns[] {
+            return [
+                ...this.dimensionColumns,
+                ...this.metricValueColumns,
+                ...this.metricColumns,
+            ]
         },
         tableColumns(): ColumnMap {
-            if (this.hasDataEvent) {
+            if (this.eventSegmentation?.columns) {
                 return {
-                    ...this.eventSegmentation.dimensionHeaders.reduce((acc: any, key: string, i: number) => {
-                        acc[key] = {
-                            pinned: true,
-                            value: key,
-                            title: key,
-                            truncate: true,
-                            lastPinned: this.eventSegmentation.dimensionHeaders.length - 1 === i,
-                            style: {
-                                left: i ? `${i * COLUMN_WIDTH}px` : '',
-                                width: 'auto',
-                                minWidth: i === 0 ? `${COLUMN_WIDTH}x` : '',
-                            },
+                    ...this.dimensionColumns.reduce((acc: any, column: DataTableResponseColumns, i: number) => {
+                        if (column.name) {
+                            acc[column.name] = {
+                                pinned: true,
+                                value: column.name,
+                                title: column.name,
+                                truncate: true,
+                                lastPinned: this.dimensionColumns.length - 1 === i,
+                                style: {
+                                    left: i ? `${i * COLUMN_WIDTH}px` : '',
+                                    width: 'auto',
+                                    minWidth: i === 0 ? `${COLUMN_WIDTH}x` : '',
+                                },
+                            }
                         }
 
                         return acc
                     }, {}),
-                    ...this.eventSegmentation.metricHeaders.reduce((acc: any, key: string) => {
-                        acc[key] = {
-                            value: key,
-                            title: getStringDateByFormat(key, '%d %b, %Y'),
+                    ...this.metricValueColumns.reduce((acc: any, column: DataTableResponseColumns) => {
+                        if (column.name) {
+                            acc[column.name] = {
+                                value: column.name,
+                                title: getStringDateByFormat(column.name, '%d %b, %Y'),
+                            }
                         }
-
+                        return acc
+                    }, {}),
+                    ...this.metricColumns.reduce((acc: any, column: DataTableResponseColumns) => {
+                        if (column.name) {
+                            acc[column.name] = {
+                                value: column.name,
+                                title: column.name,
+                            }
+                        }
                         return acc
                     }, {})
                 }
@@ -156,32 +187,41 @@ export const useEventsStore = defineStore('events', {
             }
         },
         tableData(): Row[] {
-            if (this.hasDataEvent) {
-                return this.eventSegmentation.series.map((values: number[], indexSeries: number) => {
-                    const items = this.eventSegmentation.dimensions[indexSeries];
+            if (this.eventSegmentation?.columns) {
+                return this.sortedColumns.reduce((tableRows: Row[], column: DataTableResponseColumns, indexColumn: number) => {
+                    const left = indexColumn ? `${indexColumn * COLUMN_WIDTH}px` : '';
+                    const minWidth = indexColumn === 0 ? `${COLUMN_WIDTH}px` : '';
 
-                    return [
-                        ...items.map((dimension: string, i: number) => {
-                            return {
-                                value: dimension,
-                                title: dimension,
-                                pinned: true,
-                                lastPinned: i === items.length - 1,
-                                style: {
-                                    left: i ? `${i * COLUMN_WIDTH}px` : '',
-                                    width: 'auto',
-                                    minWidth: i === 0 ? `${COLUMN_WIDTH}x` : '',
-                                },
-                            };
-                        }),
-                        ...values.map((value: number | undefined) => {
-                            return {
-                                value,
-                                title: value || '-',
-                            };
+                    if (column.values) {
+                        column.values.forEach((item, i) => {
+
+                            if (!tableRows[i]) {
+                                tableRows[i] = [];
+                            }
+
+                            if (column.type === 'dimension') {
+                                tableRows[i].push({
+                                    value: item || '',
+                                    title: item || '-',
+                                    pinned: true,
+                                    lastPinned: indexColumn === this.dimensionColumns.length - 1,
+                                    style: {
+                                        left,
+                                        width: 'auto',
+                                        minWidth,
+                                    },
+                                })
+                            } else {
+                                tableRows[i].push({
+                                    value: item,
+                                    title: item || '-',
+                                });
+                            }
                         })
-                    ];
-                });
+                    }
+
+                    return tableRows
+                }, []);
             } else {
                 return [];
             }
@@ -191,14 +231,19 @@ export const useEventsStore = defineStore('events', {
         },
         lineChart(): any[] {
             if (this.hasDataEvent) {
-                return this.eventSegmentation.series.reduce((acc: any[], item: number[], indexSeries: number) => {
-                    item.forEach((value: number, indexValue: number) => {
-                        acc.push({
-                            date: new Date(this.eventSegmentation.metricHeaders[indexValue]),
-                            value,
-                            category: this.eventSegmentation.dimensions[indexSeries].filter((item: string) => item !== '-').join(', '),
+                return this.metricValueColumns.reduce((acc: any[], item: DataTableResponseColumns) => {
+                    if (item.values && item.name !== 'total') {
+                        item.values.forEach((value, indexValue: number) => {
+
+                            acc.push({
+                                date: item.name ? new Date(item.name) : '',
+                                value,
+                                category: this.dimensionColumns.map((column: DataTableResponseColumns) => {
+                                    return column.values ? column.values[indexValue] : ''
+                                }).filter(item => Boolean(item)).join(', '),
+                            });
                         });
-                    });
+                    }
                     return acc;
                 }, []);
             } else {
@@ -206,10 +251,12 @@ export const useEventsStore = defineStore('events', {
             }
         },
         pieChart(): any[] {
-            if (this.hasDataEvent) {
-                return this.eventSegmentation.singles.map((item: number, index: number) => {
+            if (this.hasDataEvent && this.totalColumn?.values) {
+                return this.totalColumn.values.map((item, index: number) => {
                     return {
-                        type: this.eventSegmentation.dimensions[index].filter((item: string) => item !== '-').join(', '),
+                        type: this.dimensionColumns.map((column: DataTableResponseColumns) => {
+                            return column.values ? column.values[index] : ''
+                        }).filter(item => Boolean(item)).join(', '),
                         value: item,
                     };
                 });
@@ -310,7 +357,7 @@ export const useEventsStore = defineStore('events', {
         },
         isNoData(): boolean {
             return !this.eventSegmentationLoading &&
-                (!this.eventSegmentation || (this.eventSegmentation && Array.isArray(this.eventSegmentation.series) && !this.eventSegmentation.series.length))
+                (!this.eventSegmentation || (this.eventSegmentation && Array.isArray(this.eventSegmentation.columns) && !this.eventSegmentation.columns.length))
         },
     },
     actions: {
@@ -332,7 +379,7 @@ export const useEventsStore = defineStore('events', {
         async fetchEventSegmentationResult() {
             this.eventSegmentationLoading = true;
             try {
-                const res = await queriesService.eventSegmentation(this.propsForEventSegmentationResult);
+                const res: DataTableResponse = await queriesService.eventSegmentation(this.propsForEventSegmentationResult);
                 if (res) {
                     this.eventSegmentation = res;
                 }

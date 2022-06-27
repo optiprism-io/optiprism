@@ -235,7 +235,7 @@ export default function ({ environment = 'development' } = {}) {
                     return eventSegmentationsMocks;
                 } else {
                     return {
-                        series: []
+                        columns: []
                     };
                 }
             });

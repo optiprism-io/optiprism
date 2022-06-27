@@ -29,8 +29,8 @@ export type Column = {
 }
 
 export type Cell = {
-    value: string | number
-    title: string | number
+    value: string | number | boolean
+    title: string | number | boolean
     pinned?: boolean
     truncate?: boolean
     lastPinned?: boolean

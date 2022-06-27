@@ -1,122 +1,125 @@
 {
-    "dimensionHeaders": [
-        "Event Name",
-        "Country",
-        "Age"
-    ],
-    "metricHeaders": [
-        "2021.10.10",
-        "2021.10.11",
-        "2021.10.12",
-        "2021.10.13",
-        "2021.10.14",
-        "2021.10.15",
-        "2021.10.16",
-        "2021.10.17",
-        "2021.10.18",
-        "2021.10.19",
-        "2021.10.20",
-        "2021.10.22"
-    ],
-    "dimensions": [
-        [
-            "Buy Product",
-            "Spain",
-            "-"
-        ],
-        [
-            "Buy Product",
-            "United Kingdom",
-            "-"
-        ],
-        [
-            "View Product",
-            "Spain",
-            "-"
-        ],
-        [
-            "Search",
-            "-",
-            "Young"
-        ]
-    ],
-    "singles": [
-        2123,
-        232,
-        3323,
-        523
-    ],
-    "series": [
-        [
-            1123,
-            9126,
-            5122,
-            4122,
-            1123,
-            1123,
-            1090,
-            9092,
-            12300,
-            30,
-            20001,
-            13452
-        ],
-        [
-            2123,
-            2126,
-            3122,
-            1122,
-            2123,
-            4123,
-            2090,
-            2092,
-            2134,
-            8012,
-            13450,
-            304
-        ],
-        [
-            8123,
-            7126,
-            2122,
-            9122,
-            10123,
-            2123,
-            2090,
-            92,
-            10000,
-            4000,
-            15603,
-            12
-        ],
-        [
-            123,
-            326,
-            32,
-            402,
-            223,
-            373,
-            290,
-            12,
-            100,
-            800,
-            103,
-            2
-        ]
-    ],
-    "compare": {
-        "dimensions": [
-            [
-                "string"
+    "columns": [
+        {
+            "type": "dimension",
+            "dataType": "string",
+            "name": "Event Name",
+            "values": [
+                "Buy Product",
+                "Buy Product",
+                "View Product",
+                "Search"
             ]
-        ],
-        "singles": [
-            0
-        ],
-        "series": [
-            [
-                0
+        },
+        {
+            "type": "dimension",
+            "dataType": "string",
+            "name": "Country",
+            "values": [
+                "Spain",
+                "United Kingdom",
+                "Spain",
+                null
             ]
-        ]
-    }
+        },
+        {
+            "type": "dimension",
+            "dataType": "number",
+            "name": "Age",
+            "values": [
+                null,
+                null,
+                null,
+                19
+            ]
+        },
+        {
+            "type": "metric",
+            "dataType": "string",
+            "name": "Metric",
+            "values": [
+                "count",
+                "count",
+                "count",
+                "count"
+            ]
+        },
+        {
+            "type": "metricValue",
+            "dataType": "number",
+            "name": "2021.11.10",
+            "values": [
+                1123,
+                2123,
+                8123,
+                123
+            ]
+        },
+        {
+            "type": "metricValue",
+            "dataType": "number",
+            "name": "2021.11.12",
+            "values": [
+                126,
+                14126,
+                20126,
+                4526
+            ]
+        },
+        {
+            "type": "metricValue",
+            "dataType": "number",
+            "name": "2021.11.13",
+            "values": [
+                5126,
+                2126,
+                3126,
+                226
+            ]
+        },
+        {
+            "type": "metricValue",
+            "dataType": "number",
+            "name": "2021.11.14",
+            "values": [
+                9126,
+                2126,
+                7126,
+                4026
+            ]
+        },
+        {
+            "type": "metricValue",
+            "dataType": "number",
+            "name": "2021.11.15",
+            "values": [
+                19126,
+                126,
+                7126,
+                3262
+            ]
+        },
+        {
+            "type": "metricValue",
+            "dataType": "number",
+            "name": "2021.11.16",
+            "values": [
+                3126,
+                2126,
+                3126,
+                6262
+            ]
+        },
+        {
+            "type": "metricValue",
+            "dataType": "number",
+            "name": "total",
+            "values": [
+                9126,
+                2126,
+                7126,
+                326
+            ]
+        }
+    ]
 }

@@ -231,18 +231,18 @@ const chartTypeItems = computed(() => {
     })
 })
 
-const perios = computed(() => {
+const period = computed(() => {
     return eventsStore.period;
 });
 
 const lastCount = computed(() => {
-    return perios.value.last;
+    return period.value.last;
 });
 
 const calendarValue = computed(() => {
     return {
-        from: perios.value.from,
-        to: perios.value.to,
+        from: period.value.from,
+        to: period.value.to,
         multiple: false,
         dates: [],
     };
