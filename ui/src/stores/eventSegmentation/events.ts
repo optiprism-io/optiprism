@@ -17,6 +17,8 @@ import { useSegmentsStore } from '@/stores/eventSegmentation/segments';
 const COLUMN_WIDTH = 170;
 export type ChartType = 'line' | 'pie' | 'column';
 
+const FIXED_COLUMNS_TYPES = ['dimension', 'metric']
+
 type ColumnMap = {
     [key: string]: Column;
 }
@@ -138,49 +140,41 @@ export const useEventsStore = defineStore('events', {
         sortedColumns(): DataTableResponseColumns[] {
             return [
                 ...this.dimensionColumns,
-                ...this.metricValueColumns,
                 ...this.metricColumns,
+                ...this.metricValueColumns,
             ]
+        },
+        fixedColumnLength() {
+            return this.dimensionColumns.length + this.metricColumns.length - 1;
         },
         tableColumns(): ColumnMap {
             if (this.eventSegmentation?.columns) {
                 return {
-                    ...this.dimensionColumns.reduce((acc: any, column: DataTableResponseColumns, i: number) => {
-                        if (column.name) {
-                            acc[column.name] = {
-                                pinned: true,
-                                value: column.name,
-                                title: column.name,
-                                truncate: true,
-                                lastPinned: this.dimensionColumns.length - 1 === i,
-                                style: {
-                                    left: i ? `${i * COLUMN_WIDTH}px` : '',
-                                    width: 'auto',
-                                    minWidth: i === 0 ? `${COLUMN_WIDTH}x` : '',
-                                },
+                    ...this.eventSegmentation?.columns.reduce((acc: any, column: DataTableResponseColumns, i: number) => {
+                        if (column.name && column.type) {
+                            if (FIXED_COLUMNS_TYPES.includes(column.type)) {
+                                acc[column.name] = {
+                                    pinned: true,
+                                    value: column.name,
+                                    title: column.name,
+                                    truncate: true,
+                                    lastPinned: this.fixedColumnLength === i,
+                                    style: {
+                                        left: i ? `${i * COLUMN_WIDTH}px` : '',
+                                        width: 'auto',
+                                        minWidth: i === 0 ? `${COLUMN_WIDTH}x` : '',
+                                    },
+                                }
+                            } else {
+                                acc[column.name] = {
+                                    value: column.name,
+                                    title: getStringDateByFormat(column.name, '%d %b, %Y'),
+                                }
                             }
                         }
 
                         return acc
                     }, {}),
-                    ...this.metricValueColumns.reduce((acc: any, column: DataTableResponseColumns) => {
-                        if (column.name) {
-                            acc[column.name] = {
-                                value: column.name,
-                                title: getStringDateByFormat(column.name, '%d %b, %Y'),
-                            }
-                        }
-                        return acc
-                    }, {}),
-                    ...this.metricColumns.reduce((acc: any, column: DataTableResponseColumns) => {
-                        if (column.name) {
-                            acc[column.name] = {
-                                value: column.name,
-                                title: column.name,
-                            }
-                        }
-                        return acc
-                    }, {})
                 }
             } else {
                 return {};
@@ -199,12 +193,12 @@ export const useEventsStore = defineStore('events', {
                                 tableRows[i] = [];
                             }
 
-                            if (column.type === 'dimension') {
+                            if (column?.type && FIXED_COLUMNS_TYPES.includes(column.type)) {
                                 tableRows[i].push({
                                     value: item || '',
                                     title: item || '-',
                                     pinned: true,
-                                    lastPinned: indexColumn === this.dimensionColumns.length - 1,
+                                    lastPinned: indexColumn === this.fixedColumnLength,
                                     style: {
                                         left,
                                         width: 'auto',
