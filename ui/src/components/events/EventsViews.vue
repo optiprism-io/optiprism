@@ -70,7 +70,7 @@
         </div>
         <div class="pf-c-scroll-inner-wrapper pf-u-p-md">
             <div
-                v-if="eventsStore.isNoData"
+                v-if="isNoData"
                 class="content-info"
             >
                 <div class="pf-u-display-flex content-info__icons pf-u-color-400">
@@ -88,13 +88,13 @@
                 v-else
                 :options="chartEventsOptions"
                 :type="eventsStore.chartType"
-                :loading="eventsStore.eventSegmentationLoading"
+                :loading="props.loading"
             />
         </div>
     </div>
 
     <div
-        v-if="!eventsStore.isNoData"
+        v-if="!isNoData"
         class="pf-c-card"
     >
         <div class="pf-c-toolbar">
@@ -106,7 +106,7 @@
         </div>
         <div class="pf-c-scroll-inner-wrapper">
             <div
-                v-if="eventsStore.eventSegmentationLoading"
+                v-if="props.loading"
                 class="pf-u-min-height pf-u-display-flex pf-u-justify-content-center pf-u-align-items-center"
                 style="--pf-u-min-height--MinHeight: 24ch;"
             >
@@ -114,8 +114,8 @@
             </div>
             <UiTable
                 v-else
-                :items="eventsStore.tableData"
-                :columns="eventsStore.tableColumnsValues"
+                :items="dataTable.tableData"
+                :columns="dataTable.tableColumnsValues"
             />
         </div>
     </div>
@@ -128,6 +128,8 @@ import { groupByMap, periodMap } from '@/configs/events/controls';
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 
 import { getStringDateByFormat } from '@/helpers/getStringDates';
+import { DataTableResponse } from '@/api'
+import useDataTable from '@/hooks/useDataTable'
 
 import UiSelect from '@/components/uikit/UiSelect.vue';
 import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue';
@@ -158,11 +160,29 @@ const chartTypeMap = [
 
 const eventsStore = useEventsStore();
 
+type Props = {
+    eventSegmentation: DataTableResponse | undefined
+    loading: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    eventSegmentation: undefined,
+    loading: false,
+})
+
+const dataTable = computed(() => useDataTable(props.eventSegmentation))
+
+const emit = defineEmits<{
+    (e: 'get-event-segmentation'): void
+}>()
+
+const isNoData = computed(() => !props.loading && !dataTable.value.hasData)
+
 const chartEventsOptions = computed(() => {
     switch(eventsStore.chartType) {
         case 'line':
             return {
-                data: eventsStore.lineChart,
+                data: dataTable.value.lineChart,
                 component: ChartLine,
                 xField: 'date',
                 yField: 'value',
@@ -178,7 +198,7 @@ const chartEventsOptions = computed(() => {
             };
         case 'pie':
             return {
-                data: eventsStore.pieChart,
+                data: dataTable.value.pieChart,
                 component: ChartPie,
                 appendPadding: 10,
                 angleField: 'value',
@@ -192,7 +212,7 @@ const chartEventsOptions = computed(() => {
             };
         case 'column':
             return {
-                data: eventsStore.pieChart,
+                data: dataTable.value.pieChart,
                 component: ChartColumn,
                 xField: 'type',
                 yField: 'value',
@@ -330,7 +350,7 @@ const onSelectChartType = (payload: string): void => {
 
 const updateEventSegmentationData = async () => {
     if (eventsStore.hasSelectedEvents) {
-        await eventsStore.fetchEventSegmentationResult()
+        emit('get-event-segmentation')
     }
 }
 </script>

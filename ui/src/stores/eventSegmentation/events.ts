@@ -5,23 +5,16 @@ import {
     EventQueryRef,
 } from '@/types/events';
 import { OperationId, Value, Group } from '@/types'
-import queriesService, { EventSegmentation } from '@/api/services/queries.service';
-import { getYYYYMMDD, getStringDateByFormat } from '@/helpers/getStringDates';
+import { EventSegmentation } from '@/api/services/queries.service';
+import { getYYYYMMDD } from '@/helpers/getStringDates';
 import { getLastNDaysRange } from '@/helpers/calendarHelper';
-import {Column, Row} from '@/components/uikit/UiTable/UiTable';
-import { PropertyType, TimeUnit, EventType, DataTableResponse, DataTableResponseColumns } from '@/api'
+import { PropertyType, TimeUnit, EventType } from '@/api'
 
 import { useLexiconStore } from '@/stores/lexicon';
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments';
 
-const COLUMN_WIDTH = 170;
 export type ChartType = 'line' | 'pie' | 'column';
 
-const FIXED_COLUMNS_TYPES = ['dimension', 'metric']
-
-type ColumnMap = {
-    [key: string]: Column;
-}
 
 export interface EventFilter {
     propRef?: PropertyRef;
@@ -69,9 +62,6 @@ export type Events = {
     compareOffset: number,
     chartType: ChartType | string
 
-    eventSegmentation: DataTableResponse
-    eventSegmentationLoading: boolean
-
     editCustomEvent: number | null
 };
 
@@ -111,155 +101,11 @@ export const useEventsStore = defineStore('events', {
         compareOffset: 1,
         chartType: 'line',
 
-        eventSegmentation: {
-            columns: [],
-        },
-        eventSegmentationLoading: false,
-
         editCustomEvent: null,
     }),
     getters: {
         hasSelectedEvents(): boolean {
             return Array.isArray(this.events) && Boolean(this.events.length)
-        },
-        hasDataEvent(): boolean {
-            return this.eventSegmentation && Array.isArray(this.eventSegmentation.columns) && Boolean(this.eventSegmentation.columns.length);
-        },
-        dimensionColumns(): DataTableResponseColumns[] {
-            return this.eventSegmentation?.columns ? this.eventSegmentation.columns.filter(column => column.type === 'dimension') : [];
-        },
-        metricColumns(): DataTableResponseColumns[] {
-            return this.eventSegmentation?.columns ? this.eventSegmentation.columns.filter(column => column.type === 'metric') : [];
-        },
-        metricValueColumns(): DataTableResponseColumns[] {
-            return this.eventSegmentation?.columns ? this.eventSegmentation.columns.filter(column => column.type === 'metricValue') : [];
-        },
-        totalColumn(): DataTableResponseColumns | undefined {
-            return this.metricValueColumns.find(item => item.name === 'total')
-        },
-        sortedColumns(): DataTableResponseColumns[] {
-            return [
-                ...this.dimensionColumns,
-                ...this.metricColumns,
-                ...this.metricValueColumns,
-            ]
-        },
-        fixedColumnLength() {
-            return this.dimensionColumns.length + this.metricColumns.length - 1;
-        },
-        tableColumns(): ColumnMap {
-            if (this.eventSegmentation?.columns) {
-                return {
-                    ...this.eventSegmentation?.columns.reduce((acc: any, column: DataTableResponseColumns, i: number) => {
-                        if (column.name && column.type) {
-                            if (FIXED_COLUMNS_TYPES.includes(column.type)) {
-                                acc[column.name] = {
-                                    pinned: true,
-                                    value: column.name,
-                                    title: column.name,
-                                    truncate: true,
-                                    lastPinned: this.fixedColumnLength === i,
-                                    style: {
-                                        left: i ? `${i * COLUMN_WIDTH}px` : '',
-                                        width: 'auto',
-                                        minWidth: i === 0 ? `${COLUMN_WIDTH}x` : '',
-                                    },
-                                }
-                            } else {
-                                acc[column.name] = {
-                                    value: column.name,
-                                    title: getStringDateByFormat(column.name, '%d %b, %Y'),
-                                }
-                            }
-                        }
-
-                        return acc
-                    }, {}),
-                }
-            } else {
-                return {};
-            }
-        },
-        tableData(): Row[] {
-            if (this.eventSegmentation?.columns) {
-                return this.sortedColumns.reduce((tableRows: Row[], column: DataTableResponseColumns, indexColumn: number) => {
-                    const left = indexColumn ? `${indexColumn * COLUMN_WIDTH}px` : '';
-                    const minWidth = indexColumn === 0 ? `${COLUMN_WIDTH}px` : '';
-
-                    if (column.values) {
-                        column.values.forEach((item, i) => {
-
-                            if (!tableRows[i]) {
-                                tableRows[i] = [];
-                            }
-
-                            if (column?.type && FIXED_COLUMNS_TYPES.includes(column.type)) {
-                                tableRows[i].push({
-                                    value: item || '',
-                                    title: item || '-',
-                                    pinned: true,
-                                    lastPinned: indexColumn === this.fixedColumnLength,
-                                    style: {
-                                        left,
-                                        width: 'auto',
-                                        minWidth,
-                                    },
-                                })
-                            } else {
-                                tableRows[i].push({
-                                    value: item,
-                                    title: item || '-',
-                                });
-                            }
-                        })
-                    }
-
-                    return tableRows
-                }, []);
-            } else {
-                return [];
-            }
-        },
-        tableColumnsValues(): Column[] {
-            return Object.values(this.tableColumns);
-        },
-        lineChart(): any[] {
-            if (this.hasDataEvent) {
-                return this.metricValueColumns.reduce((acc: any[], item: DataTableResponseColumns) => {
-                    if (item.values && item.name !== 'total') {
-                        item.values.forEach((value, indexValue: number) => {
-
-                            acc.push({
-                                date: item.name ? new Date(item.name) : '',
-                                value,
-                                category: this.dimensionColumns.map((column: DataTableResponseColumns) => {
-                                    return column.values ? column.values[indexValue] : ''
-                                }).filter(item => Boolean(item)).join(', '),
-                            });
-                        });
-                    }
-                    return acc;
-                }, []);
-            } else {
-                return [];
-            }
-        },
-        pieChart(): any[] {
-            if (this.hasDataEvent && this.totalColumn?.values) {
-                return this.totalColumn.values.map((item, index: number) => {
-                    return {
-                        type: this.dimensionColumns.map((column: DataTableResponseColumns) => {
-                            return column.values ? column.values[index] : ''
-                        }).filter(item => Boolean(item)).join(', '),
-                        value: item,
-                    };
-                });
-            } else {
-                return [];
-            }
-        },
-        noDataLineChart() {
-            return !this.lineChart.length
         },
         allSelectedEventPropertyRefs() {
             const lexiconStore = useLexiconStore();
@@ -349,10 +195,6 @@ export const useEventsStore = defineStore('events', {
 
             return props;
         },
-        isNoData(): boolean {
-            return !this.eventSegmentationLoading &&
-                (!this.eventSegmentation || (this.eventSegmentation && Array.isArray(this.eventSegmentation.columns) && !this.eventSegmentation.columns.length))
-        },
     },
     actions: {
         setEditCustomEvent(payload: number | null) {
@@ -370,19 +212,6 @@ export const useEventsStore = defineStore('events', {
                 last: 20,
             };
         },
-        async fetchEventSegmentationResult() {
-            this.eventSegmentationLoading = true;
-            try {
-                const res: DataTableResponse = await queriesService.eventSegmentation(this.propsForEventSegmentationResult);
-                if (res) {
-                    this.eventSegmentation = res;
-                }
-            } catch (error) {
-                throw new Error('error getEventsValues');
-            }
-            this.eventSegmentationLoading = false;
-        },
-
         addEventByRef(ref: EventRef): void {
             switch (ref.type) {
                 case EventType.Regular:
