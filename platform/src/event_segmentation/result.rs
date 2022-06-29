@@ -37,11 +37,11 @@ macro_rules! arr_to_json_values {
         Ok(arr.iter().map(|value| json!(value)).collect())
     }};
 }
-impl TryFrom<query::reports::results::DataTable> for DataTable {
+impl TryFrom<query::data_table::DataTable> for DataTable {
     type Error = Error;
 
     fn try_from(
-        value: query::reports::results::DataTable,
+        value: query::data_table::DataTable,
     ) -> std::result::Result<Self, Self::Error> {
         let cols = value
             .columns

@@ -8,7 +8,7 @@ use crate::logical_plan::expr::{aggregate_partitioned, multi_and, sorted_distinc
 
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 
-use crate::reports::types::{EventRef, PropertyRef, TimeUnit};
+use crate::queries::types::{EventRef, PropertyRef, TimeUnit};
 use crate::{event_fields, Context};
 
 use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
@@ -33,10 +33,10 @@ use metadata::Metadata;
 
 use std::sync::Arc;
 
-use crate::reports::event_segmentation::types::{
+use crate::queries::event_segmentation::types::{
     Breakdown, Event, EventFilter, EventSegmentation, Query,
 };
-use crate::reports::expr::{property_col, property_expression, time_expression};
+use crate::expr::{event_expression, property_col, property_expression, time_expression};
 
 pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
@@ -141,7 +141,7 @@ impl LogicalPlanBuilder {
                 // merge multiple results into one schema
                 LogicalPlan::Extension(Extension {
                     node: Arc::new(
-                        MergeNode::try_new(inputs).map_err(|e| e.into_datafusion_plan_error())?,
+                        MergeNode::try_new(inputs)?,
                     ),
                 })
             }
@@ -172,8 +172,7 @@ impl LogicalPlanBuilder {
 
         Ok(LogicalPlan::Extension(Extension {
             node: Arc::new(
-                DictionaryDecodeNode::try_new(input, decode_cols)
-                    .map_err(|e| e.into_datafusion_plan_error())?,
+                DictionaryDecodeNode::try_new(input, decode_cols)?,
             ),
         }))
     }
@@ -240,7 +239,11 @@ impl LogicalPlanBuilder {
         )?;
 
         // event expression
-        expr = and(expr, self.event_expression(event).await?);
+        expr = and(expr, event_expression(&self.ctx, &self.metadata, &event.event).await?);
+        // apply event filters
+        if let Some(filters) = &event.filters {
+            expr = and(expr.clone(), self.event_filters_expression(filters).await?)
+        }
 
         // global event filters
         if let Some(filters) = &self.es.filters {
@@ -369,40 +372,6 @@ impl LogicalPlanBuilder {
         Ok(expr)
     }
 
-    /// builds expression for event
-    async fn event_expression(&self, event: &Event) -> Result<Expr> {
-        // match event type
-        match &event.event {
-            // regular event
-            EventRef::Regular(_) => {
-                let e = self
-                    .metadata
-                    .events
-                    .get_by_name(
-                        self.ctx.organization_id,
-                        self.ctx.project_id,
-                        event.event.name(),
-                    )
-                    .await?;
-                // add event name condition
-                let mut expr = binary_expr(
-                    col(event_fields::EVENT),
-                    Operator::Eq,
-                    lit(ScalarValue::from(e.id)),
-                );
-
-                // apply filters
-                if let Some(filters) = &event.filters {
-                    expr = and(expr.clone(), self.event_filters_expression(filters).await?)
-                }
-
-                Ok(expr)
-            }
-
-            EventRef::Custom(_event_name) => unimplemented!(),
-        }
-    }
-
     /// builds event filters expression
     async fn event_filters_expression(&self, filters: &[EventFilter]) -> Result<Expr> {
         // iterate over filters
@@ -416,13 +385,12 @@ impl LogicalPlanBuilder {
                         operation,
                         value,
                     } => {
-                        let df_value: Option<Vec<ScalarValue>> = value.as_ref().map(|x| x.to_vec());
                         executor::block_on(property_expression(
                             &self.ctx,
                             &self.metadata,
                             property,
                             operation,
-                            df_value,
+                            value.to_owned(),
                         ))
                     }
                 }

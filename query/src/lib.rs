@@ -3,7 +3,10 @@ pub mod error;
 pub mod logical_plan;
 pub mod physical_plan;
 pub mod provider;
-pub mod reports;
+pub mod queries;
+pub mod data_table;
+pub mod expr;
+pub mod test_util;
 
 pub use context::Context;
 pub use error::{Error, Result};

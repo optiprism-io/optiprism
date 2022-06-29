@@ -5,9 +5,9 @@ use common::DECIMAL_PRECISION;
 use convert_case::{Case, Casing};
 use datafusion::scalar::ScalarValue;
 use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
-use query::reports::event_segmentation::types as query_es_types;
-use query::reports::event_segmentation::types::NamedQuery;
-use query::reports::types as query_types;
+use query::queries::event_segmentation::types as query_es_types;
+use query::queries::event_segmentation::types::NamedQuery;
+use query::queries::types as query_types;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -723,7 +723,7 @@ mod tests {
     use chrono::{DateTime, Utc};
 
     use query::event_fields;
-    use query::reports::event_segmentation::types::EventSegmentation as QueryEventSegmentation;
+    use query::queries::event_segmentation::types::EventSegmentation as QueryEventSegmentation;
     use serde_json::json;
 
     #[test]
