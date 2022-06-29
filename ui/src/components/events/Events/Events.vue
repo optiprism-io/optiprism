@@ -80,14 +80,14 @@ const commonStore = useCommonStore()
 
 const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()
 
+const emit = defineEmits<{
+    (e: 'get-event-segmentation'): void
+}>()
+
 const events = computed(() => eventsStore.events);
 
 const setEvent = (payload: EventPayload) => {
     eventsStore.setEvent(payload)
-}
-
-const updateEventSegmentationResult = (): void => {
-    eventsStore.fetchEventSegmentationResult()
 }
 
 const addEvent = (ref: EventRef) => {
@@ -134,5 +134,5 @@ const editEvent = (payload: number) => {
     commonStore.togglePopupCreateCustomEvent(true)
 }
 
-watch(eventsStore.events, updateEventSegmentationResult)
+watch(eventsStore.events, () => emit('get-event-segmentation'))
 </script>

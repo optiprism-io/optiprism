@@ -55,7 +55,14 @@
 
 <script lang="ts" setup>
 import { computed } from 'vue'
-import { Action } from '../UiTable'
+import { Action, Cell } from '@/components/uikit/UiTable/UiTable'
+
+export type EventCell = Cell & {
+    customEvents: {
+        name: string,
+        value: number
+    }[]
+}
 
 type Props = {
     title: string | number
