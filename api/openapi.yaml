@@ -548,7 +548,6 @@ components:
       required: true
       schema:
         type: number
-
   schemas:
     DataTableResponse:
       type: object
@@ -591,67 +590,6 @@ components:
                     items:
                       type: boolean
 
-components:
-  schemas:
-    DataTableResponse:
-      type: object
-      properties:
-        columns:
-          type: array
-          items:
-            type: object
-            properties:
-              type:
-                type: string
-                enum:
-                  - dimension
-                  - metric
-                  - metricValue
-              dataType:
-                $ref: '#/components/schemas/DataType'
-              name:
-                type: string
-              rawName:
-                oneOf:
-                  - type: string
-                  - type: number
-                  - type: boolean
-              values:
-                oneOf:
-                  - type: array
-                    items:
-                      type: string
-                  - type: array
-                    items:
-                      type: integer
-                  series:
-                    type: array
-                    items:
-                      type: array
-                      items:
-                        type: number
-                  compare:
-                    type: object
-                    properties:
-                      dimensions:
-                        type: array
-                        items:
-                          type: array
-                          items:
-                            type: string
-                      singles:
-                        type: array
-                        items:
-                          type: number
-                      series:
-                        type: array
-                        items:
-                          type: array
-                          items:
-                            type: number
-
-components:
-  schemas:
     ListResponseMetadata:
       description: list response metadata
       type: object
