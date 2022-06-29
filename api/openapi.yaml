@@ -496,7 +496,7 @@ paths:
   /organizations/{organization_id}/projects/{project_id}/reports/event-segmentation:
     post:
       summary: Event segmentation query
-      operationId: createEventSegmentation
+      operationId: eventSegmentationQuery
       tags:
         - reports
       parameters:
@@ -510,6 +510,25 @@ paths:
       responses:
         '200':
           description: event segmentation query response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataTableResponse'
+
+  /organizations/{organization_id}/projects/{project_id}/reports/funnel:
+    post:
+      summary: Funnel query
+      operationId: funnelQuery
+      tags:
+        - query
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FunnelQuery'
+      responses:
+        '200':
+          description: funnel query response
           content:
             application/json:
               schema:
@@ -529,7 +548,6 @@ components:
       required: true
       schema:
         type: number
-
   schemas:
     DataTableResponse:
       type: object
@@ -571,6 +589,7 @@ components:
                   - type: array
                     items:
                       type: boolean
+
     ListResponseMetadata:
       description: list response metadata
       type: object
@@ -1125,6 +1144,215 @@ components:
               - $ref: '#/components/schemas/EventFilterByProperty'
               - $ref: '#/components/schemas/EventFilterByCohort'
 
+    FunnelQuery:
+      type: object
+      properties:
+        time:
+          type: object
+          description: select time
+          oneOf:
+            - $ref: '#/components/schemas/TimeBetween'
+            - $ref: '#/components/schemas/TimeFrom'
+            - $ref: '#/components/schemas/TimeLast'
+        group:
+          type: string
+          description: group that is used in aggregations by group. For instance, group by user or group by organizartion.
+          example: user
+
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              events:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FunnelEvent'
+              order:
+                type: string
+                enum:
+                  - any
+                  - exact
+
+        timeWindow:
+          type: object
+          properties:
+            n:
+              type: integer
+              description: N days/weeks
+            unit:
+              $ref: '#/components/schemas/TimeUnitWithSession'
+            from:
+              type: string
+              enum:
+                - anyDay
+                - firstDay
+        chartType:
+          type: object
+          anyOf:
+            - $ref: '#/components/schemas/FunnelConversionStepsChartType'
+            - $ref: '#/components/schemas/FunnelConversionOverTimeChartType'
+            - $ref: '#/components/schemas/FunnelTimeToConvertChartType'
+            - $ref: '#/components/schemas/FunnelFrequencyChartType'
+
+        count:
+          type: string
+          enum:
+            - uniques
+            - totals
+
+        stepOrder:
+          type: string
+          enum:
+            - any
+            - exactSequence
+            - exactOrder
+        attribution:
+          type: object
+          oneOf:
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - firstTouch
+                    - lastTouch
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - step
+                step:
+                  type: integer
+
+
+        holdingConstants:
+          type: array
+          items:
+            $ref: '#/components/schemas/PropertyRef'
+        exclude:
+          type: array
+          items:
+            type: object
+            allOf:
+             - $ref: '#/components/schemas/FunnelEvent'
+             - $ref: '#/components/schemas/FunnelExcludeSteps'
+        breakdowns:
+          type: array
+          description: array of breakdowns
+          items:
+            $ref: '#/components/schemas/BreakdownByProperty'
+
+    FunnelConversionStepsChartType:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - conversionSteps
+
+    FunnelConversionStepsChartTypeResponse:
+      type: object
+      properties:
+        dimensionHeaders:
+          type: array
+          items:
+            type: string
+        dimensions:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        metrics:
+          type: array
+          items:
+            type: string
+            enum:
+              - avgTimeToConvert
+        singles:
+          type: array
+          items:
+            type: integer
+        series:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+
+
+    FunnelConversionOverTimeChartType:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - conversionOverTime
+        intervalUnit:
+          $ref: '#/components/schemas/TimeUnit'
+
+    FunnelTimeToConvertChartType:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - timeToConvert
+        intervalUnit:
+          $ref: '#/components/schemas/TimeUnit'
+        minInterval:
+          type: integer
+        maxInterval:
+          type: integer
+
+    FunnelFrequencyChartType:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - frequency
+
+    FunnelExcludeSteps:
+      type: object
+      properties:
+        steps:
+          type: object
+          oneOf:
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - all
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - between
+                from:
+                  type: integer
+                to:
+                  type: integer
+
+    FunnelEvent:
+      description: event object
+      required: [ "eventType","queries" ]
+      allOf:
+        - $ref: '#/components/schemas/EventRef'
+        - type: object
+          properties:
+            filters:
+              type: array
+              description: array of event filters
+              items:
+                type: object
+                oneOf:
+                  - $ref: '#/components/schemas/EventFilterByProperty'
+
     AnalysisLinear:
       type: object
       properties:
@@ -1282,7 +1510,7 @@ components:
           type: object
           allOf:
             - description: chart type
-            - $ref: '#/components/schemas/ChartType'
+            - $ref: '#/components/schemas/EventChartType'
         analysis:
           type: object
           description: analysis type
@@ -1580,12 +1808,26 @@ components:
         - "month"
         - "year"
 
-    ChartType:
+    TimeUnitWithSession:
+      type: string
+      description: time unit with session
+      enum:
+        - "second"
+        - "minute"
+        - "hour"
+        - "day"
+        - "week"
+        - "month"
+        - "year"
+        - "session"
+
+    EventChartType:
       type: string
       description: chart type
       enum:
         - "line"
         - "bar"
+        - "singleValue"
 
     SegmentConditionHasPropertyValue:
       type: object
