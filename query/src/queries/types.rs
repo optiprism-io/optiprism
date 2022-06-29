@@ -67,7 +67,7 @@ impl TimeUnit {
 pub enum PropertyRef {
     User(String),
     Event(String),
-    Custom(String),
+    Custom(u64),
 }
 
 impl PropertyRef {
@@ -75,7 +75,7 @@ impl PropertyRef {
         match self {
             PropertyRef::User(name) => name.clone(),
             PropertyRef::Event(name) => name.clone(),
-            PropertyRef::Custom(name) => name.clone(),
+            PropertyRef::Custom(id) => unimplemented!(),
         }
     }
 }
@@ -83,14 +83,14 @@ impl PropertyRef {
 #[derive(Clone, Debug)]
 pub enum EventRef {
     Regular(String),
-    Custom(String),
+    Custom(u64),
 }
 
 impl EventRef {
     pub fn name(&self) -> &str {
         match self {
             EventRef::Regular(name) => name.as_str(),
-            EventRef::Custom(name) => name.as_str(),
+            EventRef::Custom(id) => unimplemented!(),
         }
     }
 }
@@ -110,7 +110,10 @@ pub enum PropValueOperation {
     ArrAll,
     ArrAny,
     ArrNone,
+    Like,
+    NotLike,
     Regex,
+    NotRegex,
 }
 
 impl From<PropValueOperation> for Operator {
@@ -118,6 +121,7 @@ impl From<PropValueOperation> for Operator {
         match pv {
             PropValueOperation::Eq => Operator::Eq,
             PropValueOperation::Neq => Operator::NotEq,
+            PropValueOperation::Like => Operator::Like,
             _ => panic!("unreachable"),
         }
     }
