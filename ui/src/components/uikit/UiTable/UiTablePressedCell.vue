@@ -18,39 +18,23 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, defineComponent } from 'vue'
-import { Action } from '../UiTable'
-import UiButtom from '../../UiButton.vue'
+import { defineComponent } from 'vue'
+import { Action } from './UiTable'
+import UiButtom from '../UiButton.vue'
 
 type Props = {
     value: string | number
     title: string | number
-    pinned?: boolean
-    truncate?: boolean
-    lastPinned?: boolean
-    left?: number
     actions?: Action[]
     action?: Action,
     component?: ReturnType<typeof defineComponent>
 }
 
-const props = withDefaults(defineProps<Props>(), {
-    left: 0,
-})
+const props = withDefaults(defineProps<Props>(), {})
 
 const emit = defineEmits<{
     (e: 'on-action', payload: Action): void
 }>()
-
-const style = computed(() => {
-    if (props.pinned) {
-        return {
-            left: props.left ? `${props.left}px` : undefined,
-        }
-    } else {
-        return {}
-    }
-})
 
 const onAction = (payload: Action) => {
     emit('on-action', payload)

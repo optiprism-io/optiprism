@@ -1,6 +1,6 @@
 import { DataTableResponse, DataTableResponseColumns } from '@/api'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
-import { Column, Row } from '@/components/uikit/UiTable/UiTable'
+import { Column, Row, Cell } from '@/components/uikit/UiTable/UiTable'
 
 const FIXED_COLUMNS_TYPES = ['dimension', 'metric']
 
@@ -37,16 +37,11 @@ export default function useDataTable(payload: DataTableResponse): ResponseUseDat
                 if (column.name && column.type) {
                     if (FIXED_COLUMNS_TYPES.includes(column.type)) {
                         acc[column.name] = {
-                            pinned: true,
                             value: column.name,
                             title: column.name,
                             truncate: true,
-                            lastPinned: fixedColumnLength === i,
-                            style: {
-                                left: i ? `${i * 170}px` : '',
-                                width: 'auto',
-                                minWidth: i === 0 ? `${170}x` : '',
-                            },
+                            lastFixed: fixedColumnLength === i,
+                            fixed: true,
                         }
                     } else {
                         acc[column.name] = {
@@ -61,33 +56,24 @@ export default function useDataTable(payload: DataTableResponse): ResponseUseDat
         }
 
         tableData = payload?.columns.reduce((tableRows: Row[], column: DataTableResponseColumns, indexColumn: number) => {
-            const left = indexColumn ? `${indexColumn * 170}px` : ''
-            const minWidth = indexColumn === 0 ? `${170}px` : ''
-
             if (column.values) {
                 column.values.forEach((item, i) => {
-
                     if (!tableRows[i]) {
                         tableRows[i] = []
                     }
 
-                    if (column?.type && FIXED_COLUMNS_TYPES.includes(column.type)) {
-                        tableRows[i].push({
-                            value: item || '',
-                            title: item || '-',
-                            pinned: true,
-                            lastPinned: indexColumn === fixedColumnLength,
-                            style: {
-                                left,
-                                width: 'auto',
-                                minWidth,
-                            },
-                        })
-                    } else {
-                        tableRows[i].push({
+                    if (column?.type) {
+                        const cell: Cell = {
                             value: item,
                             title: item || '-',
-                        })
+                        }
+
+                        if (FIXED_COLUMNS_TYPES.includes(column.type)) {
+                            cell.lastFixed = indexColumn === fixedColumnLength
+                            cell.fixed = true
+                        }
+
+                        tableRows[i].push(cell)
                     }
                 })
             }

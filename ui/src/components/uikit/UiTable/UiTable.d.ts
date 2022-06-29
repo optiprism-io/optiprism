@@ -18,35 +18,28 @@ export type Column = {
     title: string
     sorted?: boolean
     sort?: boolean
-    pinned?: boolean
     truncate?: boolean
-    lastPinned?: boolean
     minWidth?: boolean
     maxWidth?: number | string
     width?: number | string
     left?: number
     style?: StyleCell
+    lastFixed?: boolean
+    fixed?: boolean,
 }
 
 export type Cell = {
     value: string | number | boolean
     title: string | number | boolean
-    pinned?: boolean
     truncate?: boolean
-    lastPinned?: boolean
     left?: number
     actions?: Action[]
     action?: Action,
     component?: ReturnType<typeof defineComponent>
     style?: StyleCell | undefined
     nowrap?: boolean
-}
-
-export type EventCell = Cell & {
-    customEvents: {
-        name: string,
-        value: number
-    }[]
+    lastFixed?: boolean
+    fixed?: boolean,
 }
 
 export type ColumnMap = {
