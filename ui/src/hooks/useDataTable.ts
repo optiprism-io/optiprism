@@ -64,6 +64,7 @@ export default function useDataTable(payload: DataTableResponse): ResponseUseDat
 
                     if (column?.type) {
                         const cell: Cell = {
+                            key: column.type,
                             value: item,
                             title: item || '-',
                         }

@@ -21,7 +21,6 @@ interface Props {
     value?: string[]
 }
 
-
 const props = defineProps<Props>()
 </script>
 

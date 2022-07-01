@@ -30,6 +30,11 @@ const routes = [
                 component: () => import('@/pages/events/EventManagement.vue'),
             },
             {
+                path: 'custom_events',
+                name: 'events_custom_events',
+                component: () => import('@/pages/events/CustomEvents.vue'),
+            },
+            {
                 path: 'event_properties',
                 name: 'events_event_properties',
                 component: () => import('@/pages/events/EventProperties.vue'),

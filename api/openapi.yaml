@@ -2181,6 +2181,8 @@ components:
               type: string
               enum:
                 - custom
+                - event
+                - user
 
     EventRef:
       type: object

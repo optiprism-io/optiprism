@@ -40,6 +40,7 @@ const items = computed(() => {
     return lexiconStore.events.map((event: Event): Row => {
         return [
             {
+                key: 'name',
                 value: 'name',
                 title: event.name,
                 component: UiTablePressedCell,
@@ -49,12 +50,12 @@ const items = computed(() => {
                 }
             },
             {
-                value: 'displayName',
+                key: 'displayName',
                 title: event.displayName || '',
                 nowrap: true,
             },
             {
-                value: 'description',
+                key: 'description',
                 title: event.description || '',
             }
         ]

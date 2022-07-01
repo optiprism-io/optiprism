@@ -134,8 +134,9 @@ const itemsEvents = computed(() => {
         return props.events.map((event: Event): Row => {
             return [
                 {
-                    value: 'name',
+                    key: 'name',
                     title: event.name,
+                    value: event.name,
                     component: UiTablePressedCell,
                     action: {
                         type: event.id,
@@ -143,12 +144,12 @@ const itemsEvents = computed(() => {
                     }
                 },
                 {
-                    value: 'displayName',
+                    key: 'displayName',
                     title: event.displayName || '',
                     nowrap: true,
                 },
                 {
-                    value: 'isSystem',
+                    key: 'isSystem',
                     title: String(event.isSystem),
                 }
             ]

@@ -94,7 +94,7 @@ const getTableRows = (properties: Property[] | EventCustomProperty[]) => {
             if (prop[key]) {
                 rows.push(key === 'name' ?
                     {
-                        value: 'name',
+                        key: 'name',
                         title: String(prop[key]) || '',
                         component: UiTablePressedCell,
                         action: {
@@ -103,7 +103,7 @@ const getTableRows = (properties: Property[] | EventCustomProperty[]) => {
                         }
                     } :
                     {
-                        value: key,
+                        key,
                         title: String(prop[key]) || '',
                     })
             }

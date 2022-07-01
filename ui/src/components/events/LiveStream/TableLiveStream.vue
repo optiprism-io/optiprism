@@ -150,7 +150,7 @@ const tableData = computed(() => {
                 const value = column.value === 'eventName' ? data.name : getStringDateByFormat(String(data.properties[column.value]), '%d %b, %Y')
 
                 return {
-                    value: value,
+                    key: column.value,
                     title: value,
                     fixed: true,
                     lastFixed: column.lastFixed,
@@ -172,7 +172,7 @@ const tableData = computed(() => {
                 const value = column.value in data.properties ? data.properties[column.value] : data.userProperties && column.value in data.userProperties ? data.userProperties[column.value] : ''
 
                 return {
-                    value: value,
+                    key: column.value,
                     title: value || '-'
                 }
             }
