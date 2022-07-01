@@ -87,6 +87,7 @@
         "eventName": "Event Name"
       }
     },
+    "event_properties": "Event properties",
     "create_custom": "Create Custom Event",
     "edit_custom": "Edit Custom Event",
     "create_custom_description": "Enter information for create Custom Event.",

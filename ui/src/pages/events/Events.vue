@@ -37,9 +37,18 @@ const items = computed(() => {
             },
             icon: 'pf-icon pf-icon-filter'
         },
+        {
+            name: i18n.$t('events.event_properties'),
+            value: 'events_event_properties',
+            link: {
+                name: 'events_event_properties',
+            },
+            icon: 'fas fa-bars'
+        },
     ];
 
     return mapTabs.map(item => {
+        console.log(route.name)
         return {
             ...item,
             active: route.name === item.value,
