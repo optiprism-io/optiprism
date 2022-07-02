@@ -38,6 +38,7 @@ const props = defineProps<{
     isOpenMount?: boolean;
     updateOpen?: boolean;
     disabledItems?: any[];
+    forceProps?: Property[];
 }>();
 
 const checkDisable = (propRef: PropertyRef): boolean => {
@@ -96,6 +97,24 @@ const getEventProperties = (eventRef: EventRef) => {
 
 const items = computed(() => {
     let ret: Group<Item<PropertyRef, null>[]>[] = [];
+
+    if (props.forceProps?.length && lexiconStore.eventProperties.length) {
+        let items: Item<PropertyRef, null>[] = [];
+        lexiconStore.eventProperties.forEach((prop: Property): void => {
+            const propertyRef: PropertyRef = {
+                type: PropertyType.User,
+                id: prop.id
+            };
+
+            items.push({
+                item: propertyRef,
+                name: prop.name,
+                disabled: checkDisable(propertyRef),
+                description: prop?.description
+            });
+        });
+        ret.push({ name: 'Event Properties', items: items });
+    }
 
     if (lexiconStore.userProperties.length) {
         let items: Item<PropertyRef, null>[] = [];

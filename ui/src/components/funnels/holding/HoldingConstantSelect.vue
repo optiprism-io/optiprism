@@ -1,7 +1,7 @@
 <template>
-    <UiSelectProperty
-        :items="propertiesItems"
-        @update:model-value="addHoldingConstant"
+    <PropertySelect
+        :force-props="lexiconStore.eventProperties"
+        @select="addHoldingConstant"
     >
         <UiButton
             class="pf-m-main"
@@ -10,44 +10,27 @@
         >
             {{ $t('funnels.holdingConstant.add') }}
         </UiButton>
-
-        <template #description="{ item }">
-            {{ item.value?.label }}
-        </template>
-    </UiSelectProperty>
+    </PropertySelect>
 </template>
 
 <script lang="ts" setup>
 import {useLexiconStore} from '@/stores/lexicon';
-import {HoldingProperty, useStepsStore} from '@/stores/funnels/steps';
-import {computed} from 'vue';
+import {useStepsStore} from '@/stores/funnels/steps';
 import {useEventsStore} from '@/stores/eventSegmentation/events';
-import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
-import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
-
-const UiSelectProperty = UiSelectGeneric<HoldingProperty>();
+import PropertySelect from '@/components/events/PropertySelect.vue';
+import {PropertyRef} from '@/types/events';
 
 const lexiconStore = useLexiconStore();
 const stepsStore = useStepsStore();
 const eventsStore = useEventsStore();
 
-const propertiesItems = computed<UiSelectItemInterface<HoldingProperty>[]>(() => {
-    return [...lexiconStore.eventProperties, ...lexiconStore.eventCustomProperties]
-        .filter(item => !stepsStore.holdingProperties.map(p => p.id).includes(item.id))
-        .map(item => {
-            return {
-                __type: 'item',
-                id: item.id,
-                value: {
-                    id: item.id,
-                    name: item.name,
-                },
-                label: item.name,
-            }
-        })
-})
+const addHoldingConstant = (property: PropertyRef): void => {
+    const { id, name } = property.type === 'user'
+        ? lexiconStore.findUserPropertyById(Number(property.id))
+        : property.type === 'custom'
+            ? lexiconStore.findEventCustomPropertyById(Number(property.id))
+            : lexiconStore.findEventPropertyById(Number(property.id));
 
-const addHoldingConstant = (value: HoldingProperty): void => {
-    stepsStore.addHoldingProperty(value);
+    stepsStore.addHoldingProperty({id, name});
 }
 </script>

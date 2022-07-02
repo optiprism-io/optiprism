@@ -7,12 +7,12 @@
             {{ $t('funnels.holdingConstant.holding') }}
         </span>
 
-        <UiSelectProperty
+        <PropertySelect
             v-for="(props, index) in holdingProperties"
             :key="index"
-            :items="propertiesItems"
             class="pf-l-flex__item"
-            @update:model-value="editHoldingProperty(index, $event)"
+            :force-props="lexiconStore.eventProperties"
+            @select="editHoldingProperty(index, $event)"
         >
             <UiButton class="pf-m-main pf-m-secondary">
                 {{ props.name }}
@@ -24,48 +24,37 @@
                     />
                 </span>
             </UiButton>
-
-            <template #description="{ item }">
-                {{ item.value?.label }}
-            </template>
-        </UiSelectProperty>
+        </PropertySelect>
     </div>
 </template>
 
 <script lang="ts" setup>
-import {HoldingProperty, useStepsStore} from '@/stores/funnels/steps';
+import {useStepsStore} from '@/stores/funnels/steps';
 import {computed} from 'vue';
-import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
-import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
-import UiActionList from '@/components/uikit/UiActionList/UiActionList.vue';
-import UiActionListItem from '@/components/uikit/UiActionList/UiActionListItem.vue';
 import {useLexiconStore} from '@/stores/lexicon';
+import PropertySelect from '@/components/events/PropertySelect.vue';
+import {PropertyRef} from '@/types/events';
 
-const UiSelectProperty = UiSelectGeneric<HoldingProperty>()
 
 const lexiconStore = useLexiconStore();
 const stepsStore = useStepsStore();
 
 const holdingProperties = computed(() => stepsStore.holdingProperties)
 
-const propertiesItems = computed<UiSelectItemInterface<HoldingProperty>[]>(() => {
-    return [...lexiconStore.eventProperties, ...lexiconStore.eventCustomProperties]
-        .filter(item => !stepsStore.holdingProperties.map(p => p.id).includes(item.id))
-        .map(item => {
-            return {
-                __type: 'item',
-                id: item.id,
-                value: {
-                    id: item.id,
-                    name: item.name,
-                },
-                label: item.name,
-            }
-        })
-})
+const editHoldingProperty = (index: number, property: PropertyRef) => {
+    const { id, name } = property.type === 'user'
+        ? lexiconStore.findUserPropertyById(Number(property.id))
+        : property.type === 'custom'
+            ? lexiconStore.findEventCustomPropertyById(Number(property.id))
+            : lexiconStore.findEventPropertyById(Number(property.id));
 
-const editHoldingProperty = (index: number, property: HoldingProperty) => {
-    stepsStore.editHoldingProperty({index, property})
+    stepsStore.editHoldingProperty({
+        index,
+        property: {
+            id,
+            name
+        }
+    })
 }
 
 const deleteHoldingProperty = (index: number) : void => {
