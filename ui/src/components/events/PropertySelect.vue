@@ -102,7 +102,7 @@ const items = computed(() => {
         let items: Item<PropertyRef, null>[] = [];
         lexiconStore.eventProperties.forEach((prop: Property): void => {
             const propertyRef: PropertyRef = {
-                type: PropertyType.User,
+                type: PropertyType.Event,
                 id: prop.id
             };
 
