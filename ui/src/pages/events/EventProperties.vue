@@ -16,13 +16,13 @@
 </template>
 
 <script setup lang="ts">
-import {computed, inject} from 'vue'
+import { computed, inject } from 'vue'
 import { useLexiconStore } from '@/stores/lexicon'
 import { Property } from '@/api'
 import { Action, Row }  from '@/components/uikit/UiTable/UiTable'
-const i18n = inject<any>('i18n')
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
 
+const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
 
 const columns = computed(() => {
