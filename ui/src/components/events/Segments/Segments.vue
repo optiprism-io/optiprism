@@ -55,6 +55,10 @@ const eventsStore = useEventsStore()
 const lexiconStore = useLexiconStore()
 const commonStore = useCommonStore()
 
+const emit = defineEmits<{
+    (e: 'get-event-segmentation'): void
+}>()
+
 const conditionAggregateItems = computed(() => {
     return aggregates.map(item => {
         const name = i18n.$t(`events.aggregates.${item.key}`)
@@ -156,10 +160,5 @@ provide('editEvent', (payload: number) => {
     commonStore.togglePopupCreateCustomEvent(true)
 })
 
-watch(
-    segmentsStore.segments,
-    () => {
-        eventsStore.fetchEventSegmentationResult()
-    }
-)
+watch(segmentsStore.segments, () => emit('get-event-segmentation'))
 </script>

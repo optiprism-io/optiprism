@@ -31,7 +31,7 @@ import { useCommonStore } from '@/stores/common'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import { Row, Action } from '@/components/uikit/UiTable/UiTable'
 import { Event } from '@/api'
-import UiTablePressedCell from '@/components/uikit/UiTable/UiTableCells/UiTablePressedCell.vue'
+import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
 import EventManagementPopup, { ApplyPayload } from '@/components/events/EventManagementPopup.vue'
 const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()

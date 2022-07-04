@@ -95,8 +95,8 @@ import { useLexiconStore } from '@/stores/lexicon'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
-import { Column, Cell, Action, EventCell } from '@/components/uikit/UiTable/UiTable'
-import UiTableEventCell from '@/components/uikit/UiTable/UiTableCells/UiTableEventCell.vue'
+import { Column, Cell, Action,  } from '@/components/uikit/UiTable/UiTable'
+import EventCell, { EventCell as EventCellType } from '@/components/events/EventCell.vue'
 
 import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue'
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
@@ -109,7 +109,6 @@ const liveStreamStore = useLiveStreamStore()
 const commonStore = useCommonStore()
 const lexiconStore = useLexiconStore()
 const eventsStore = useEventsStore()
-const COLUMN_WIDTH = 170;
 
 const itemsPeriod = computed(() => {
     return ['7', '30', '90'].map((key, i): UiToggleGroupItem => ({
@@ -127,19 +126,12 @@ const updateReport = () => {
 const tableColumnsValues = computed(() => {
     return [
         ...liveStreamStore.defaultColumns.map((key, i) => {
-            const left = i === 1 ? 380 : i * COLUMN_WIDTH
-
             return {
-                pinned: true,
+                fixed: true,
                 value: key,
                 title: i18n.$t(`events.live_stream.columns.${key}`),
                 truncate: true,
-                lastPinned: liveStreamStore.defaultColumns.length - 1 === i,
-                style: {
-                    left: `${left}px`,
-                    width: 'auto',
-                    minWidth: i === 0 ? '380px' : '',
-                },
+                lastFixed: liveStreamStore.defaultColumns.length - 1 === i,
             }
         }),
         ...liveStreamStore.activeColumns.map(key => {
@@ -153,16 +145,15 @@ const tableColumnsValues = computed(() => {
 
 const tableData = computed(() => {
     return liveStreamStore.reports.map((data: Report) => {
-        return tableColumnsValues.value.map((column: Column): Cell | EventCell => {
+        return tableColumnsValues.value.map((column: Column): Cell | EventCellType => {
             if (liveStreamStore.defaultColumns.includes(column.value)) {
                 const value = column.value === 'eventName' ? data.name : getStringDateByFormat(String(data.properties[column.value]), '%d %b, %Y')
 
                 return {
                     value: value,
                     title: value,
-                    pinned: true,
-                    lastPinned: column.lastPinned,
-                    style: column.style || undefined,
+                    fixed: true,
+                    lastFixed: column.lastFixed,
                     actions: column.value === 'eventName' ? [{
                         name: 'create',
                         icon: 'fas fa-plus-circle'
@@ -175,7 +166,7 @@ const tableData = computed(() => {
                             value: Number(event.id)
                         }
                     }) : [],
-                    component: column.value === 'eventName' ? UiTableEventCell : null,
+                    component: column.value === 'eventName' ? EventCell : null,
                 }
             } else {
                 const value = column.value in data.properties ? data.properties[column.value] : data.userProperties && column.value in data.userProperties ? data.userProperties[column.value] : ''

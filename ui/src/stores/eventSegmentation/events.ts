@@ -5,21 +5,16 @@ import {
     EventQueryRef,
 } from '@/types/events';
 import { OperationId, Value, Group } from '@/types'
-import queriesService, { EventSegmentation } from '@/api/services/queries.service';
-import { getYYYYMMDD, getStringDateByFormat } from '@/helpers/getStringDates';
+import { EventSegmentation } from '@/api/services/queries.service';
+import { getYYYYMMDD } from '@/helpers/getStringDates';
 import { getLastNDaysRange } from '@/helpers/calendarHelper';
-import {Column, Row} from '@/components/uikit/UiTable/UiTable';
 import { PropertyType, TimeUnit, EventType } from '@/api'
 
 import { useLexiconStore } from '@/stores/lexicon';
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments';
 
-const COLUMN_WIDTH = 170;
 export type ChartType = 'line' | 'pie' | 'column';
 
-type ColumnMap = {
-    [key: string]: Column;
-}
 
 export interface EventFilter {
     propRef?: PropertyRef;
@@ -65,10 +60,7 @@ export type Events = {
     },
     compareTo: TimeUnit | string
     compareOffset: number,
-    chartType: ChartType | string,
-
-    eventSegmentation: any // TODO integrations backend
-    eventSegmentationLoading: boolean
+    chartType: ChartType | string
 
     editCustomEvent: number | null
 };
@@ -109,116 +101,11 @@ export const useEventsStore = defineStore('events', {
         compareOffset: 1,
         chartType: 'line',
 
-        eventSegmentation: {
-            series: [],
-        },
-        eventSegmentationLoading: false,
-
         editCustomEvent: null,
     }),
     getters: {
         hasSelectedEvents(): boolean {
             return Array.isArray(this.events) && Boolean(this.events.length)
-        },
-        hasDataEvent(): boolean {
-            return this.eventSegmentation && Array.isArray(this.eventSegmentation.series) && this.eventSegmentation.series.length;
-        },
-        tableColumns(): ColumnMap {
-            if (this.hasDataEvent) {
-                return {
-                    ...this.eventSegmentation.dimensionHeaders.reduce((acc: any, key: string, i: number) => {
-                        acc[key] = {
-                            pinned: true,
-                            value: key,
-                            title: key,
-                            truncate: true,
-                            lastPinned: this.eventSegmentation.dimensionHeaders.length - 1 === i,
-                            style: {
-                                left: i ? `${i * COLUMN_WIDTH}px` : '',
-                                width: 'auto',
-                                minWidth: i === 0 ? `${COLUMN_WIDTH}x` : '',
-                            },
-                        }
-
-                        return acc
-                    }, {}),
-                    ...this.eventSegmentation.metricHeaders.reduce((acc: any, key: string) => {
-                        acc[key] = {
-                            value: key,
-                            title: getStringDateByFormat(key, '%d %b, %Y'),
-                        }
-
-                        return acc
-                    }, {})
-                }
-            } else {
-                return {};
-            }
-        },
-        tableData(): Row[] {
-            if (this.hasDataEvent) {
-                return this.eventSegmentation.series.map((values: number[], indexSeries: number) => {
-                    const items = this.eventSegmentation.dimensions[indexSeries];
-
-                    return [
-                        ...items.map((dimension: string, i: number) => {
-                            return {
-                                value: dimension,
-                                title: dimension,
-                                pinned: true,
-                                lastPinned: i === items.length - 1,
-                                style: {
-                                    left: i ? `${i * COLUMN_WIDTH}px` : '',
-                                    width: 'auto',
-                                    minWidth: i === 0 ? `${COLUMN_WIDTH}x` : '',
-                                },
-                            };
-                        }),
-                        ...values.map((value: number | undefined) => {
-                            return {
-                                value,
-                                title: value || '-',
-                            };
-                        })
-                    ];
-                });
-            } else {
-                return [];
-            }
-        },
-        tableColumnsValues(): Column[] {
-            return Object.values(this.tableColumns);
-        },
-        lineChart(): any[] {
-            if (this.hasDataEvent) {
-                return this.eventSegmentation.series.reduce((acc: any[], item: number[], indexSeries: number) => {
-                    item.forEach((value: number, indexValue: number) => {
-                        acc.push({
-                            date: new Date(this.eventSegmentation.metricHeaders[indexValue]),
-                            value,
-                            category: this.eventSegmentation.dimensions[indexSeries].filter((item: string) => item !== '-').join(', '),
-                        });
-                    });
-                    return acc;
-                }, []);
-            } else {
-                return [];
-            }
-        },
-        pieChart(): any[] {
-            if (this.hasDataEvent) {
-                return this.eventSegmentation.singles.map((item: number, index: number) => {
-                    return {
-                        type: this.eventSegmentation.dimensions[index].filter((item: string) => item !== '-').join(', '),
-                        value: item,
-                    };
-                });
-            } else {
-                return [];
-            }
-        },
-        noDataLineChart() {
-            return !this.lineChart.length
         },
         allSelectedEventPropertyRefs() {
             const lexiconStore = useLexiconStore();
@@ -307,10 +194,6 @@ export const useEventsStore = defineStore('events', {
             }
 
             return props;
-        },
-        isNoData(): boolean {
-            return !this.eventSegmentationLoading &&
-                (!this.eventSegmentation || (this.eventSegmentation && Array.isArray(this.eventSegmentation.series) && !this.eventSegmentation.series.length))
         },
     },
     actions: {
