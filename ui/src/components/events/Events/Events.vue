@@ -38,6 +38,7 @@ import { useEventsStore, EventPayload } from '@/stores/eventSegmentation/events'
 import { useLexiconStore } from '@/stores/lexicon';
 import { useCommonStore } from '@/stores/common'
 import EventSelector from '@/components/events/Events/EventSelector.vue';
+import useCustomEvent from '@/components/events/Events/CustomEventHooks';
 const SelectedEvent = defineAsyncComponent(() => import('@/components/events/Events/SelectedEvent.vue'))
 
 const props = defineProps({

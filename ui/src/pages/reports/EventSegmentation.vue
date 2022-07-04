@@ -45,8 +45,10 @@ import queriesService from '@/api/services/queries.service'
 import { useEventsStore } from '@/stores/eventSegmentation/events';
 import { useCommonStore } from '@/stores/common'
 import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
+import {useLexiconStore} from '@/stores/lexicon';
 
 const eventsStore = useEventsStore();
+const lexiconStore = useLexiconStore();
 
 const eventSegmentationLoading = ref(false)
 const eventSegmentation = ref<DataTableResponse>()
