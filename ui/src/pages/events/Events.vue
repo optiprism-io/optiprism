@@ -48,7 +48,6 @@ const items = computed(() => {
     ];
 
     return mapTabs.map(item => {
-        console.log(route.name)
         return {
             ...item,
             active: route.name === item.value,

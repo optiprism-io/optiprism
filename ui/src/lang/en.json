@@ -58,7 +58,8 @@
       "columns": {
         "name": "Name",
         "displayName": "Display name",
-        "description": "Description"
+        "description": "Description",
+        "status": "status"
       },
       "popup": {
         "properties_columns": {

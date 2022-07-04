@@ -6,12 +6,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Query",
+    "name": "query",
+    "displayName": "Query",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Sunt, veniam.",
     "dataType": "string",
     "nullable": false,
     "isArray": false,
     "isDictionary": false,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 2,
@@ -20,12 +23,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product name",
+    "name": "product_name",
+    "displayName": "Product name",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "nullable": false,
     "isArray": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 3,
@@ -34,12 +40,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Category",
+    "name": "product_category",
+    "displayName": "Product Category",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "nullable": false,
     "isArray": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 4,
@@ -48,11 +57,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Price",
+    "name": "product_price",
+    "displayName": "Product Price",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 5,
@@ -61,12 +73,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product name",
+    "name": "product_name",
+    "displayName": "Product name",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "isArray": false,
     "nullable": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 6,
@@ -75,12 +90,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Category",
+    "name": "product_category",
+    "displayName": "Product Category",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "isArray": false,
     "nullable": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 7,
@@ -89,11 +107,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Price",
+    "name": "product_price",
+    "displayName": "Product Price",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 8,
@@ -102,12 +123,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product name",
+    "name": "product_name",
+    "displayName": "Product name",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "isArray": false,
     "nullable": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 9,
@@ -116,12 +140,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Category",
+    "name": "product_category",
+    "displayName": "Product Category",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
     "dataType": "string",
     "isArray": false,
     "nullable": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 10,
@@ -130,11 +157,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Price",
+    "name": "product_price",
+    "displayName": "Product Price",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 11,
@@ -143,11 +173,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Discount",
+    "name": "discount",
+    "displayName": "Discount",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 12,
@@ -156,11 +189,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Revenue",
+    "name": "revenue",
+    "displayName": "Revenue",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 13,
@@ -169,11 +205,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Browser",
+    "name": "browser",
+    "displayName": "Browser",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 14,
@@ -182,11 +221,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "App Version",
+    "name": "app_version",
+    "displayName": "App Version",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 15,
@@ -195,11 +237,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "App Version",
+    "name": "app_version",
+    "displayName": "App Version",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 16,
@@ -208,12 +253,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Query",
+    "name": "query",
+    "displayName": "Query",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "nullable": false,
     "isArray": false,
     "isDictionary": false,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 17,
@@ -222,12 +270,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product name",
+    "name": "product_name",
+    "displayName": "Product name",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "nullable": false,
     "isArray": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 18,
@@ -236,12 +287,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Category",
+    "name": "product_category",
+    "displayName": "Product Category",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "nullable": false,
     "isArray": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 19,
@@ -250,11 +304,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Price",
+    "name": "product_price",
+    "displayName": "Product Price",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 20,
@@ -263,12 +320,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product name",
+    "name": "product_name",
+    "displayName": "Product name",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "isArray": false,
     "nullable": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 21,
@@ -277,12 +337,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Category",
+    "name": "product_category",
+    "displayName": "Product Category",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "isArray": false,
     "nullable": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 22,
@@ -291,11 +354,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Price",
+    "name": "product_price",
+    "displayName": "Product Price",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 23,
@@ -304,12 +370,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product name",
+    "name": "",
+    "displayName": "Product name",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "isArray": false,
     "nullable": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 24,
@@ -318,12 +387,15 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Category",
+    "name": "product_category",
+    "displayName": "Product Category",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",
     "isArray": false,
     "nullable": false,
     "isDictionary": true,
-    "dictionaryType": "number"
+    "dictionaryType": "number",
+    "status": "enabled"
   },
   {
     "id": 25,
@@ -332,11 +404,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Product Price",
+    "name": "product_price",
+    "displayName": "Product Price",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 26,
@@ -345,11 +420,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Discount",
+    "name": "discount",
+    "displayName": "Discount",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 27,
@@ -358,11 +436,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Revenue",
+    "name": "revenue",
+    "displayName": "Revenue",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 28,
@@ -371,11 +452,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "Browser",
+    "name": "browser",
+    "displayName": "Browser",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 29,
@@ -384,11 +468,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "App Version",
+    "name": "app_version",
+    "displayName": "App Version",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   },
   {
     "id": 30,
@@ -397,11 +484,14 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "App Version",
+    "name": "app_version",
+    "displayName": "App Version",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "number",
     "isArray": false,
     "nullable": false,
-    "isDictionary": false
+    "isDictionary": false,
+    "status": "enabled"
   }
 ]
 
