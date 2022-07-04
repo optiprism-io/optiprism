@@ -37,13 +37,11 @@ import Breakdowns from '@/components/events/Breakdowns.vue';
 import Filters from '@/components/events/Filters.vue';
 import Segments from '@/components/events/Segments/Segments.vue';
 import EventsViews from '@/components/events/EventsViews.vue';
-import CreateCustomEvent from '@/components/events/CreateCustomEvent.vue'
 import UiCard from '@/components/uikit/UiCard/UiCard.vue';
 import { DataTableResponse } from '@/api'
 import queriesService from '@/api/services/queries.service'
 
 import { useEventsStore } from '@/stores/eventSegmentation/events';
-import { useCommonStore } from '@/stores/common'
 import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
 import {useLexiconStore} from '@/stores/lexicon';
 

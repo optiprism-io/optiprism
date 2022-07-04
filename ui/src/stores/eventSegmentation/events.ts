@@ -212,19 +212,6 @@ export const useEventsStore = defineStore('events', {
                 last: 20,
             };
         },
-        async fetchEventSegmentationResult() {
-            this.eventSegmentationLoading = true;
-            try {
-                const res = await queriesService.eventSegmentation(this.propsForEventSegmentationResult);
-                if (res) {
-                    this.eventSegmentation = res;
-                }
-            } catch (error) {
-                throw new Error('error getEventsValues');
-            }
-            this.eventSegmentationLoading = false;
-        },
-
         addEventByRef(ref: EventRef, initQuery?: boolean): void {
             switch (ref.type) {
                 case EventType.Regular:
