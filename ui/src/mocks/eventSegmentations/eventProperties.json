@@ -14,7 +14,8 @@
     "isArray": false,
     "isDictionary": false,
     "dictionaryType": "number",
-    "status": "enabled"
+    "status": "enabled",
+    "type": "event"
   },
   {
     "id": 2,
@@ -145,6 +146,7 @@
     "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
     "dataType": "string",
     "isArray": false,
+    "type": "event",
     "nullable": false,
     "isDictionary": true,
     "dictionaryType": "number",
@@ -164,7 +166,8 @@
     "isArray": false,
     "nullable": false,
     "isDictionary": false,
-    "status": "enabled"
+    "status": "enabled",
+    "type": "event"
   },
   {
     "id": 11,
@@ -180,7 +183,8 @@
     "isArray": false,
     "nullable": false,
     "isDictionary": false,
-    "status": "enabled"
+    "status": "enabled",
+    "type": "event"
   },
   {
     "id": 12,

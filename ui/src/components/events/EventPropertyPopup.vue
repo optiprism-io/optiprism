@@ -1,0 +1,133 @@
+<template>
+    <UiPopupWindow
+        :title="title"
+        :apply-loading="props.loading"
+        class="event-management-popup"
+        :apply-button="$t('common.save')"
+        :cancel-button="$t('common.close')"
+        :apply-disabled="applyDisabled"
+        @apply="apply"
+        @cancel="cancel"
+    >
+        <UiTabs
+            class="pf-u-mb-md"
+            :items="itemsTabs"
+            @on-select="onSelectTab"
+        />
+        <div class="event-management-popup__content">
+            <UiDescriptionList
+                v-if="activeTab === 'property'"
+                :items="propertyItems"
+                :horizontal="true"
+                @on-input="onInputPropertyItem"
+            />
+        </div>
+    </UiPopupWindow>
+</template>
+
+<script lang="ts" setup>
+import { computed, inject, ref } from 'vue'
+import { Property } from '@/api'
+
+import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
+import UiTabs from '@/components/uikit/UiTabs.vue'
+import UiDescriptionList, { Item, ActionPayload } from '@/components/uikit/UiDescriptionList.vue'
+import { propertyValuesConfig, Item as PropertyValueConfig } from '@/configs/events/eventValues'
+
+export type EventObject = {
+    [key: string]: string | string[] | boolean
+}
+export type ApplyPayload = EventObject
+
+const mapTabs = ['property', 'events']
+
+const i18n = inject<any>('i18n')
+
+type Props = {
+    name?: string
+    loading?: boolean
+    property: Property | null
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    name: '',
+})
+
+const emit = defineEmits<{
+    (e: 'cancel'): void
+    (e: 'apply', payload: ApplyPayload): void
+}>()
+
+const activeTab = ref('property')
+
+const editProperty = ref<EventObject | null>(null)
+const applyDisabled = computed(() => !editProperty.value)
+
+const itemsTabs = computed(() => {
+    return mapTabs.map(key => {
+        return {
+            name: i18n.$t(`events.event_management.popup.tabs.${key}`),
+            active: activeTab.value === key,
+            value: key,
+        }
+    })
+})
+
+const title = computed(() => props.property ? `${i18n.$t('events.event_management.popup.tabs.property')}: ${props.property.name}` : '')
+
+const propertyItems = computed<Item[]>(() => {
+    const items: Item[] = [];
+    const property = props.property;
+    if (property) {
+        const keys = (Object.keys(propertyValuesConfig) as (keyof typeof props.property)[])
+
+        keys.forEach(key => {
+            const config: PropertyValueConfig = propertyValuesConfig[key];
+
+            if (key in property) {
+                const item: Item = {
+                    label: i18n.$t(config.string),
+                    key,
+                    value: key === 'status' ? property[key] === 'enabled' : editProperty.value && key in editProperty.value ? editProperty.value[key] : property[key] ||property[key],
+                    component: config.component || 'p'
+                }
+
+                items.push(item)
+            }
+        })
+    }
+
+    return items
+})
+
+
+const onSelectTab = (payload: string) => {
+    activeTab.value = payload
+}
+
+const apply = () => {
+    if (editProperty.value) {
+        emit('apply', editProperty.value)
+    }
+}
+
+const cancel = () => {
+    emit('cancel')
+}
+
+const onInputPropertyItem = async (payload: ActionPayload) => {
+    let value = payload.value
+
+    if (payload.key === 'status') {
+        value = payload.value ? 'enabled' : 'disabled'
+    }
+
+    if (editProperty.value) {
+        editProperty.value[payload.key] = value
+    } else {
+        editProperty.value = {
+            [payload.key]: value
+        }
+    }
+}
+</script>

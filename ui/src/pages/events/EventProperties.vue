@@ -13,17 +13,29 @@
             </div>
         </div>
     </div>
+    <EventPropertyPopup
+        v-if="commonStore.showEventPropertyPopup"
+        :loading="propertyPopupLoading"
+        :property="editPropertyPopup"
+        @apply="propertyPopupApply"
+        @cancel="propertyPopupCancel"
+    />
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import {computed, inject, ref} from 'vue'
 import { useLexiconStore } from '@/stores/lexicon'
+import { useCommonStore } from '@/stores/common'
 import { Property } from '@/api'
 import { Action, Row }  from '@/components/uikit/UiTable/UiTable'
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
+import EventPropertyPopup, { ApplyPayload } from '@/components/events/EventPropertyPopup.vue'
 
 const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
+const commonStore = useCommonStore()
+
+const propertyPopupLoading = ref(false)
 
 const columns = computed(() => {
     return ['name', 'displayName', 'description', 'status'].map(key => {
@@ -63,7 +75,27 @@ const items = computed(() => {
     })
 })
 
+const editPropertyPopup = computed(() => {
+    if (commonStore.editEventPropertyPopupId) {
+        return lexiconStore.findEventPropertyById(commonStore.editEventPropertyPopupId)
+    } else {
+        return null
+    }
+})
+
 const onAction = (payload: Action) => {
-    // TODO open window
+    commonStore.editEventPropertyPopupId = Number(payload.type) || null
+    commonStore.showEventPropertyPopup = true
+}
+
+const propertyPopupApply = async (payload: ApplyPayload) => {
+    propertyPopupLoading.value = true
+    // TODO edit property save to store and send backend
+    propertyPopupLoading.value = false
+    commonStore.showEventPropertyPopup = false
+}
+
+const propertyPopupCancel = () => {
+    commonStore.showEventPropertyPopup = false
 }
 </script>

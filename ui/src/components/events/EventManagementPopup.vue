@@ -49,7 +49,7 @@ import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import UiDescriptionList, { Item, ActionPayload } from '@/components/uikit/UiDescriptionList.vue'
 
 import propertiesColumnsConfig from '@/configs/events/propertiesTable.json'
-import eventValuesConfig, { Item as EventValuesConfig } from '@/configs/events/eventValues'
+import { eventValuesConfig, Item as EventValuesConfig } from '@/configs/events/eventValues'
 
 export type EventObject = {
     [key: string]: string | string[] | boolean

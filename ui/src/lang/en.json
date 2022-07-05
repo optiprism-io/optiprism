@@ -71,10 +71,13 @@
           "name": "Name",
           "displayName": "Display name",
           "description": "Description",
-          "status": "Status"
+          "status": "Status",
+          "type": "Type"
         },
         "tabs": {
           "event": "Event",
+          "events": "Events",
+          "property": "Property",
           "properties": "Properties",
           "user_properties": "User Properties",
           "custom_properties": "Custom Properties"
