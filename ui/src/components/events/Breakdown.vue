@@ -72,7 +72,7 @@ import { useLexiconStore } from '@/stores/lexicon';
 import PropertySelect from '@/components/events/PropertySelect.vue';
 import { EventRef, PropertyRef } from '@/types/events';
 import UiButton from '@/components/uikit/UiButton.vue';
-import AlphabetIdentifier from '@/components/common/AlphabetIdentifier.vue';
+import AlphabetIdentifier from '@/components/common/identifier/AlphabetIdentifier.vue';
 import { PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();

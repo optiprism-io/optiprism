@@ -1,0 +1,28 @@
+@use 'sass:math';
+
+/* Opacity */
+$opacityStep: 5;
+@for $i from 0 through math.div(100, $opacityStep) {
+  $value: $i * 5;
+
+  .opacity-#{$value} {
+    opacity: #{$value};
+  }
+
+  .hover\:opacity-#{$value}:hover {
+    opacity: #{$value};
+  }
+
+  .parent:hover {
+    .parent-hover\:opacity-#{$value} {
+      opacity: #{$value};
+    }
+  }
+}
+
+/* Cursor */
+@each $cursor in (default, auto, none, pointer) {
+  .cursor-#{$cursor} {
+    cursor: #{$cursor};
+  }
+}

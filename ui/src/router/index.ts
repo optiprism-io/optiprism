@@ -41,6 +41,11 @@ const routes = [
                 name: 'reports_event_segmentation',
                 component: () => import('@/pages/reports/EventSegmentation.vue'),
             },
+            {
+                path: 'funnels',
+                name: 'reports_funnels',
+                component: () => import('@/pages/reports/Funnels.vue'),
+            }
         ]
     },
     {

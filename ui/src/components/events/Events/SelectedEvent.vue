@@ -6,9 +6,10 @@
         }"
     >
         <div class="pf-l-flex">
-            <AlphabetIdentifier
+            <CommonIdentifier
                 class="pf-l-flex__item"
                 :index="index"
+                :type="props.identifier"
             />
             <div class="pf-c-action-list">
                 <div class="pf-c-action-list__item">
@@ -146,60 +147,69 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { EventRef, PropertyRef, EventQueryRef } from '@/types/events'
-import { OperationId, Value } from '@/types';
-import { useLexiconStore } from '@/stores/lexicon';
-import { EventBreakdown, EventFilter, EventQuery, Event, initialQuery, EventPayload } from '@/stores/eventSegmentation/events'
+import {ref, computed} from 'vue'
+import {EventRef, PropertyRef, EventQueryRef} from '@/types/events'
+import {OperationId, Value} from '@/types';
+import {useLexiconStore} from '@/stores/lexicon';
+import {
+    EventBreakdown,
+    EventFilter,
+    EventQuery,
+    Event,
+    initialQuery,
+    EventPayload
+} from '@/stores/eventSegmentation/events'
 import Select from '@/components/Select/Select.vue';
 import Filter from '@/components/events/Filter.vue';
 import Breakdown from '@/components/events/Breakdown.vue';
 import Query from '@/components/events/Events/Query.vue';
-import { Group, Item } from '@/components/Select/SelectTypes';
-import AlphabetIdentifier from '@/components/common/AlphabetIdentifier.vue';
+import {Group, Item} from '@/components/Select/SelectTypes';
 import schemaService from '@/api/services/schema.service'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
-import { EventType } from '@/api'
+import {EventType} from '@/api'
+import CommonIdentifier from '@/components/common/identifier/CommonIdentifier.vue';
 
 type Props = {
-    eventRef: EventRef
-    event: Event
-    filters: EventFilter[]
-    breakdowns?: EventBreakdown[]
-    eventItems?: Group<Item<EventRef, null>[]>[]
-    index: number
-    queries?: EventQuery[]
-    showBreakdowns?: boolean
-    showQuery?: boolean
-    popperContainer?: string
-    autoHide?: boolean
-    forPreview?: boolean
+  eventRef: EventRef
+  event: Event
+  filters: EventFilter[]
+  breakdowns?: EventBreakdown[]
+  eventItems?: Group<Item<EventRef, null>[]>[]
+  index: number
+  queries?: EventQuery[]
+  showBreakdowns?: boolean
+  showQuery?: boolean
+  popperContainer?: string
+  autoHide?: boolean
+  forPreview?: boolean,
+  identifier?: 'numeric' | 'alphabet'
 }
 
 const props = withDefaults(defineProps<Props>(), {
     eventItems: () => [],
     showBreakdowns: true,
     showQuery: true,
-    autoHide: true
+    autoHide: true,
+    identifier: 'alphabet'
 })
 
 const emit = defineEmits<{
-    (e: 'changeEvent', index: number, ref: EventRef): void;
-    (e: 'removeEvent', index: number): void;
-    (e: 'handleSelectProperty'): void;
-    (e: 'addBreakdown', index: number): void;
-    (e: 'changeBreakdownProperty', eventIdx: number, breakdownIdx: number, propRef: PropertyRef): void;
-    (e: 'removeBreakdown', eventIdx: number, breakdownIdx: number): void;
-    (e: 'removeQuery', eventIdx: number, queryInx: number): void;
-    (e: 'addQuery', index: number): void;
-    (e: 'changeQuery', eventIdx: number, queryIdx: number, queryRef: EventQueryRef): void;
+  (e: 'changeEvent', index: number, ref: EventRef): void;
+  (e: 'removeEvent', index: number): void;
+  (e: 'handleSelectProperty'): void;
+  (e: 'addBreakdown', index: number): void;
+  (e: 'changeBreakdownProperty', eventIdx: number, breakdownIdx: number, propRef: PropertyRef): void;
+  (e: 'removeBreakdown', eventIdx: number, breakdownIdx: number): void;
+  (e: 'removeQuery', eventIdx: number, queryInx: number): void;
+  (e: 'addQuery', index: number): void;
+  (e: 'changeQuery', eventIdx: number, queryIdx: number, queryRef: EventQueryRef): void;
 
-    (e: 'setEvent', payload: EventPayload): void
-    (e: 'action', payload: string): void
-    (e: 'edit', payload: number): void
+  (e: 'setEvent', payload: EventPayload): void
+  (e: 'action', payload: string): void
+  (e: 'edit', payload: number): void
 }>();
 
-const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()
+const {hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent} = useCustomEvent()
 const lexiconStore = useLexiconStore();
 
 const updateOpenBreakdown = ref(false);
@@ -302,7 +312,7 @@ const addFilterValue = (filterIdx: number, value: Value): void => {
 const removeFilterValue = (filterIdx: number, value: Value): void => {
     let event = props.event
 
-    event.filters[filterIdx].values = props.event.filters[filterIdx].values.filter(v =>  v !== value)
+    event.filters[filterIdx].values = props.event.filters[filterIdx].values.filter(v => v !== value)
 };
 
 const addBreakdown = async (): Promise<void> => {
@@ -356,27 +366,27 @@ const changeQuery = (idx: number, ref: EventQueryRef) => {
 
 <style scoped lang="scss">
 .selected-event {
-    &_preview {
-        pointer-events: none;
-    }
+  &_preview {
+    pointer-events: none;
+  }
 
-    &__control {
-        padding: 5px;
-        opacity: 0;
-        cursor: pointer;
-        color: var(--op-base-color-text);
-
-        &:hover {
-            color: var(--pf-global--palette--black-800);
-        }
-    }
+  &__control {
+    padding: 5px;
+    opacity: 0;
+    cursor: pointer;
+    color: var(--op-base-color-text);
 
     &:hover {
-        .selected-event {
-            &__control {
-                opacity: 1;
-            }
-        }
+      color: var(--pf-global--palette--black-800);
     }
+  }
+
+  &:hover {
+    .selected-event {
+      &__control {
+        opacity: 1;
+      }
+    }
+  }
 }
 </style>

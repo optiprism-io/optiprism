@@ -215,7 +215,7 @@ export default function ({ environment = 'development' } = {}) {
             });
 
             this.get('/data/property-values', (_, request): string[] => {
-                const propertyName = request.queryParams.property_name
+                const propertyName = request.queryParams?.property_name
 
                 if (propertyName === 'Country') {
                     return ['Spain', 'USA', 'United Kingdom', 'Poland']

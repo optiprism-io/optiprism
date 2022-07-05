@@ -9,7 +9,12 @@
                 v-else
                 class="pf-c-action-list__item min-w-50 pf-u-text-align-right"
             >
-                with
+                <slot
+                    v-if="!hidePrefix"
+                    name="prefix"
+                >
+                    with
+                </slot>
             </div>
             <div class="pf-c-action-list__item">
                 <PropertySelect
@@ -148,7 +153,7 @@ import OperationSelect from '@/components/events/OperationSelect.vue';
 import ValueSelect from '@/components/events/ValueSelect.vue';
 import { EventRef, PropertyRef } from '@/types/events';
 import { operationById, OperationId, Value } from '@/types';
-import AlphabetIdentifier from '@/components/common/AlphabetIdentifier.vue';
+import AlphabetIdentifier from '@/components/common/identifier/AlphabetIdentifier.vue';
 import { PropertyType } from '@/api'
 
 const lexiconStore = useLexiconStore();
@@ -160,8 +165,9 @@ const props = defineProps<{
     index: number;
     updateOpen?: boolean;
     showIdentifier?: boolean;
-    popperContainer?: string
-    forPreview?: boolean
+    popperContainer?: string;
+    forPreview?: boolean;
+    hidePrefix?: boolean;
 }>();
 
 const emit = defineEmits<{

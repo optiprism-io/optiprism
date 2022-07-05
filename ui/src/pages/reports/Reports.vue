@@ -9,8 +9,11 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, inject } from 'vue'
+import {computed, inject, onMounted} from 'vue'
 import { useRoute } from 'vue-router'
+import {useLexiconStore} from '@/stores/lexicon';
+import {useEventsStore} from '@/stores/eventSegmentation/events';
+import {useCommonStore} from '@/stores/common';
 const i18n = inject<any>('i18n')
 const route = useRoute()
 
@@ -24,6 +27,14 @@ const items = computed(() => {
             },
             icon: 'pf-icon pf-icon-filter'
         },
+        {
+            name: i18n.$t('funnels.funnels'),
+            value: 'reports_funnels',
+            link: {
+                name: 'reports_funnels'
+            },
+            icon: 'pf-icon pf-icon-filter'
+        }
     ];
 
     return mapTabs.map(item => {
@@ -33,4 +44,15 @@ const items = computed(() => {
         }
     })
 })
+
+const lexiconStore = useLexiconStore();
+const eventsStore = useEventsStore();
+
+onMounted(async () => {
+    await lexiconStore.getEvents();
+    await lexiconStore.getEventProperties();
+    await lexiconStore.getUserProperties();
+
+    await eventsStore.initPeriod();
+});
 </script>

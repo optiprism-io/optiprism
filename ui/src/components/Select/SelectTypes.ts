@@ -5,7 +5,7 @@ export interface Action {
     text: string
 }
 
-export interface Item<T, K>{
+export interface Item<T, K = undefined>{
     item: T;
     name: string;
     description?: string;

@@ -212,17 +212,17 @@ export const useEventsStore = defineStore('events', {
                 last: 20,
             };
         },
-        addEventByRef(ref: EventRef): void {
+        addEventByRef(ref: EventRef, initQuery?: boolean): void {
             switch (ref.type) {
                 case EventType.Regular:
-                    this.addEvent(ref.id);
+                    this.addEvent(ref.id, initQuery);
                     break;
                 case EventType.Custom:
                     this.addCustomEvent(ref.id);
                     break;
             }
         },
-        addEvent(payload: number): void {
+        addEvent(payload: number, initQuery = true): void {
             this.events.push(<Event>{
                 ref: <EventRef>{
                     type: EventType.Regular,
@@ -230,7 +230,7 @@ export const useEventsStore = defineStore('events', {
                 },
                 filters: [],
                 breakdowns: [],
-                queries: initialQuery,
+                queries: initQuery ? initialQuery : [],
             });
         },
         addCustomEvent(payload: number): void {

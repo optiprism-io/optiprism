@@ -11,6 +11,7 @@
             :breakdowns="event.breakdowns"
             :queries="event.queries"
             :auto-hide="!commonStore.showCreateCustomEvent"
+            :identifier="identifier"
             @action="selectAction"
             @edit="editEvent"
             @set-event="setEvent"
@@ -23,56 +24,33 @@
             @change-query="changeQuery"
         />
         <div class="pf-l-flex">
-            <Select
-                grouped
-                :items="lexiconStore.eventsList"
-                :width-auto="true"
-                :auto-hide="!commonStore.showCreateCustomEvent"
-                @action="selectAction"
-                @select="addEvent"
-                @edit="editEvent"
-                @on-hover="onHoverEvent"
-            >
-                <UiButton
-                    class="pf-m-main"
-                    :is-link="true"
-                    :before-icon="'fas fa-plus'"
-                >
-                    {{ $t('common.add_event') }}
-                </UiButton>
-                <template
-                    v-if="hoveredCustomEventId"
-                    #description
-                >
-                    <div class="pf-l-flex pf-m-column">
-                        <SelectedEvent
-                            v-for="(event, index) in hoveredCustomEventDescription"
-                            :key="index"
-                            :event="event"
-                            :event-ref="event.ref"
-                            :filters="event.filters"
-                            :index="index"
-                            :show-breakdowns="false"
-                            :show-query="false"
-                            :for-preview="true"
-                        />
-                    </div>
-                </template>
-            </Select>
+            <EventSelector @select="addEvent">
+                <slot name="new" />
+            </EventSelector>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, watch, defineAsyncComponent } from 'vue';
+import {computed, watch, defineAsyncComponent, PropType} from 'vue';
 import { EventQueryRef, EventRef, PropertyRef } from '@/types/events';
 import { useEventsStore, EventPayload } from '@/stores/eventSegmentation/events';
 import { useLexiconStore } from '@/stores/lexicon';
 import { useCommonStore } from '@/stores/common'
-import useCustomEvent from '@/components/events/Events/CustomEventHooks'
-
-import Select from '@/components/Select/Select.vue'
+import EventSelector from '@/components/events/Events/EventSelector.vue';
+import useCustomEvent from '@/components/events/Events/CustomEventHooks';
 const SelectedEvent = defineAsyncComponent(() => import('@/components/events/Events/SelectedEvent.vue'))
+
+const props = defineProps({
+    identifier: {
+        type: String as PropType<'numeric' | 'alphabet'>,
+        default: 'alphabet',
+    },
+    createWithQuery: {
+        type: Boolean,
+        default: true,
+    },
+})
 
 const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
@@ -87,11 +65,11 @@ const emit = defineEmits<{
 const events = computed(() => eventsStore.events);
 
 const setEvent = (payload: EventPayload) => {
-    eventsStore.setEvent(payload)
+    eventsStore.setEvent(payload);
 }
 
 const addEvent = (ref: EventRef) => {
-    eventsStore.addEventByRef(ref);
+    eventsStore.addEventByRef(ref, props.createWithQuery);
 };
 
 const removeEvent = (idx: number): void => {
