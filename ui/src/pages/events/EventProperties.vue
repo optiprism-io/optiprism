@@ -90,7 +90,7 @@ const onAction = (payload: Action) => {
 
 const propertyPopupApply = async (payload: ApplyPayload) => {
     propertyPopupLoading.value = true
-    // TODO edit property save to store and send backend
+    await lexiconStore.updateProperty(payload)
     propertyPopupLoading.value = false
     commonStore.showEventPropertyPopup = false
 }

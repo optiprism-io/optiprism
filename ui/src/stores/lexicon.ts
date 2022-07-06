@@ -66,6 +66,23 @@ export const useLexiconStore = defineStore('lexicon', {
         userCustomProperties: [],
     }),
     actions: {
+        async updateProperty(payload: ApplyPayload) {
+            const commonStore = useCommonStore()
+            try {
+                const res = await schemaService.updateEventProperty(commonStore.organizationId, commonStore.projectId, String(commonStore.editEventPropertyPopupId), payload)
+
+                if (res?.data) {
+                    const newProperty: Property = res.data;
+                    const index: number = this.eventProperties.findIndex(property => Number(property.id) === commonStore.editEventPropertyPopupId)
+
+                    if (~index) {
+                        this.eventProperties[index] = newProperty
+                    }
+                }
+            } catch (error) {
+                throw new Error('error update property')
+            }
+        },
         async updateEvent(payload: ApplyPayload) {
             const commonStore = useCommonStore()
 
@@ -340,7 +357,7 @@ export const useLexiconStore = defineStore('lexicon', {
                 name: aggregate.name || '',
             }));
         },
-        eventsQueries(state: Lexicon) {
+        eventsQueries() {
             const eventsStore: Events = useEventsStore();
 
             return eventsQueries.map((item) => {
