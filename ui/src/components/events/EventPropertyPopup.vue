@@ -21,17 +21,25 @@
                 :horizontal="true"
                 @on-input="onInputPropertyItem"
             />
+            <UiTable
+                v-if="activeTab === 'events'"
+                :items="itemsEvents"
+                :columns="itemsEventsColumns"
+            />
         </div>
     </UiPopupWindow>
 </template>
 
 <script lang="ts" setup>
 import { computed, inject, ref } from 'vue'
-import { Property } from '@/api'
+import { Property, Event } from '@/api'
 
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
 import UiTabs from '@/components/uikit/UiTabs.vue'
+import UiTable from '@/components/uikit/UiTable/UiTable.vue'
+import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
 import UiDescriptionList, { Item, ActionPayload } from '@/components/uikit/UiDescriptionList.vue'
+import { Row } from '@/components/uikit/UiTable/UiTable'
 import { propertyValuesConfig, Item as PropertyValueConfig } from '@/configs/events/eventValues'
 
 export type EventObject = {
@@ -46,6 +54,7 @@ const i18n = inject<any>('i18n')
 type Props = {
     name?: string
     loading?: boolean
+    events?: Event[] | null
     property: Property | null
 }
 
@@ -100,6 +109,43 @@ const propertyItems = computed<Item[]>(() => {
     return items
 })
 
+const itemsEventsColumns = computed(() => {
+    return ['name', 'displayName', 'isSystem'].map(key => {
+        return {
+            value: key,
+            title: i18n.$t(`events.event_management.columns.${key}`),
+        }
+    })
+})
+
+const itemsEvents = computed(() => {
+    if (props.events) {
+        return props.events.map((event: Event): Row => {
+            return [
+                {
+                    value: 'name',
+                    title: event.name,
+                    component: UiTablePressedCell,
+                    action: {
+                        type: event.id,
+                        name: event.name,
+                    }
+                },
+                {
+                    value: 'displayName',
+                    title: event.displayName || '',
+                    nowrap: true,
+                },
+                {
+                    value: 'isSystem',
+                    title: String(event.isSystem),
+                }
+            ]
+        })
+    } else {
+        return []
+    }
+})
 
 const onSelectTab = (payload: string) => {
     activeTab.value = payload

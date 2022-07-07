@@ -521,6 +521,9 @@ paths:
       operationId: funnelQuery
       tags:
         - query
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
       requestBody:
         content:
           application/json:
@@ -741,7 +744,7 @@ components:
           type: integer
           format: int64
           description: project id
-        isSystyem:
+        isSystem:
           type: boolean
           description: the event is a system-wide, shown in any project and can't be modified by a regular user
         tags:

@@ -17,6 +17,7 @@
         v-if="commonStore.showEventPropertyPopup"
         :loading="propertyPopupLoading"
         :property="editPropertyPopup"
+        :events="editPropertyEventsPopup"
         @apply="propertyPopupApply"
         @cancel="propertyPopupCancel"
     />
@@ -80,6 +81,21 @@ const editPropertyPopup = computed(() => {
         return lexiconStore.findEventPropertyById(commonStore.editEventPropertyPopupId)
     } else {
         return null
+    }
+})
+
+const editPropertyEventsPopup = computed(() => {
+    if (commonStore.editEventPropertyPopupId) {
+        const property = lexiconStore.findEventPropertyById(commonStore.editEventPropertyPopupId)
+        if (property.events?.length) {
+            return property.events.map(id => {
+                return lexiconStore.findEventById(id)
+            })
+        } else {
+            return []
+        }
+    } else {
+        return []
     }
 })
 

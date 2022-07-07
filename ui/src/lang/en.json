@@ -59,7 +59,8 @@
         "name": "Name",
         "displayName": "Display name",
         "description": "Description",
-        "status": "status"
+        "status": "status",
+        "isSystem": "Is system"
       },
       "popup": {
         "properties_columns": {

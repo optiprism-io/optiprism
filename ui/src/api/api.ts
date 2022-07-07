@@ -157,20 +157,6 @@ export const BreakdownByPropertyPropertyTypeEnum = {
 export type BreakdownByPropertyPropertyTypeEnum = typeof BreakdownByPropertyPropertyTypeEnum[keyof typeof BreakdownByPropertyPropertyTypeEnum];
 
 /**
- * chart type
- * @export
- * @enum {string}
- */
-
-export const ChartType = {
-    Line: 'line',
-    Bar: 'bar'
-} as const;
-
-export type ChartType = typeof ChartType[keyof typeof ChartType];
-
-
-/**
  * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
  * @export
  * @interface CreateCustomEventRequest
@@ -809,7 +795,7 @@ export interface Event {
      * @type {boolean}
      * @memberof Event
      */
-    'isSystyem'?: boolean;
+    'isSystem': boolean;
     /**
      * 
      * @type {Array<string>}
@@ -860,6 +846,21 @@ export const EventStatusEnum = {
 } as const;
 
 export type EventStatusEnum = typeof EventStatusEnum[keyof typeof EventStatusEnum];
+
+/**
+ * chart type
+ * @export
+ * @enum {string}
+ */
+
+export const EventChartType = {
+    Line: 'line',
+    Bar: 'bar',
+    SingleValue: 'singleValue'
+} as const;
+
+export type EventChartType = typeof EventChartType[keyof typeof EventChartType];
+
 
 /**
  * event filter
@@ -1221,10 +1222,10 @@ export interface EventSegmentation {
     'intervalUnit': TimeUnit;
     /**
      * 
-     * @type {ChartType}
+     * @type {EventChartType}
      * @memberof EventSegmentation
      */
-    'chartType': ChartType;
+    'chartType': EventChartType;
     /**
      * analysis type
      * @type {AnalysisLinear | AnalysisRollingAverage | AnalysisRollingWindow | AnalysisCumulative}
@@ -1388,6 +1389,366 @@ export const EventType = {
 
 export type EventType = typeof EventType[keyof typeof EventType];
 
+
+/**
+ * 
+ * @export
+ * @interface FunnelConversionOverTimeChartType
+ */
+export interface FunnelConversionOverTimeChartType {
+    /**
+     * 
+     * @type {string}
+     * @memberof FunnelConversionOverTimeChartType
+     */
+    'type'?: FunnelConversionOverTimeChartTypeTypeEnum;
+    /**
+     * 
+     * @type {TimeUnit}
+     * @memberof FunnelConversionOverTimeChartType
+     */
+    'intervalUnit'?: TimeUnit;
+}
+
+export const FunnelConversionOverTimeChartTypeTypeEnum = {
+    ConversionOverTime: 'conversionOverTime'
+} as const;
+
+export type FunnelConversionOverTimeChartTypeTypeEnum = typeof FunnelConversionOverTimeChartTypeTypeEnum[keyof typeof FunnelConversionOverTimeChartTypeTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface FunnelConversionStepsChartType
+ */
+export interface FunnelConversionStepsChartType {
+    /**
+     * 
+     * @type {string}
+     * @memberof FunnelConversionStepsChartType
+     */
+    'type'?: FunnelConversionStepsChartTypeTypeEnum;
+}
+
+export const FunnelConversionStepsChartTypeTypeEnum = {
+    ConversionSteps: 'conversionSteps'
+} as const;
+
+export type FunnelConversionStepsChartTypeTypeEnum = typeof FunnelConversionStepsChartTypeTypeEnum[keyof typeof FunnelConversionStepsChartTypeTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface FunnelConversionStepsChartTypeResponse
+ */
+export interface FunnelConversionStepsChartTypeResponse {
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof FunnelConversionStepsChartTypeResponse
+     */
+    'dimensionHeaders'?: Array<string>;
+    /**
+     * 
+     * @type {Array<Array<string>>}
+     * @memberof FunnelConversionStepsChartTypeResponse
+     */
+    'dimensions'?: Array<Array<string>>;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof FunnelConversionStepsChartTypeResponse
+     */
+    'metrics'?: Array<FunnelConversionStepsChartTypeResponseMetricsEnum>;
+    /**
+     * 
+     * @type {Array<number>}
+     * @memberof FunnelConversionStepsChartTypeResponse
+     */
+    'singles'?: Array<number>;
+    /**
+     * 
+     * @type {Array<Array<number>>}
+     * @memberof FunnelConversionStepsChartTypeResponse
+     */
+    'series'?: Array<Array<number>>;
+}
+
+export const FunnelConversionStepsChartTypeResponseMetricsEnum = {
+    AvgTimeToConvert: 'avgTimeToConvert'
+} as const;
+
+export type FunnelConversionStepsChartTypeResponseMetricsEnum = typeof FunnelConversionStepsChartTypeResponseMetricsEnum[keyof typeof FunnelConversionStepsChartTypeResponseMetricsEnum];
+
+/**
+ * event object
+ * @export
+ * @interface FunnelEvent
+ */
+export interface FunnelEvent {
+    /**
+     * 
+     * @type {string}
+     * @memberof FunnelEvent
+     */
+    'eventName'?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof FunnelEvent
+     */
+    'eventType': FunnelEventEventTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof FunnelEvent
+     */
+    'eventId'?: number;
+    /**
+     * array of event filters
+     * @type {Array<EventFilterByProperty>}
+     * @memberof FunnelEvent
+     */
+    'filters'?: Array<EventFilterByProperty>;
+}
+
+export const FunnelEventEventTypeEnum = {
+    Custom: 'custom'
+} as const;
+
+export type FunnelEventEventTypeEnum = typeof FunnelEventEventTypeEnum[keyof typeof FunnelEventEventTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface FunnelEventAllOf
+ */
+export interface FunnelEventAllOf {
+    /**
+     * array of event filters
+     * @type {Array<EventFilterByProperty>}
+     * @memberof FunnelEventAllOf
+     */
+    'filters'?: Array<EventFilterByProperty>;
+}
+/**
+ * 
+ * @export
+ * @interface FunnelExcludeSteps
+ */
+export interface FunnelExcludeSteps {
+    /**
+     * 
+     * @type {object}
+     * @memberof FunnelExcludeSteps
+     */
+    'steps'?: object;
+}
+/**
+ * 
+ * @export
+ * @interface FunnelFrequencyChartType
+ */
+export interface FunnelFrequencyChartType {
+    /**
+     * 
+     * @type {string}
+     * @memberof FunnelFrequencyChartType
+     */
+    'type'?: FunnelFrequencyChartTypeTypeEnum;
+}
+
+export const FunnelFrequencyChartTypeTypeEnum = {
+    Frequency: 'frequency'
+} as const;
+
+export type FunnelFrequencyChartTypeTypeEnum = typeof FunnelFrequencyChartTypeTypeEnum[keyof typeof FunnelFrequencyChartTypeTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface FunnelQuery
+ */
+export interface FunnelQuery {
+    /**
+     * select time
+     * @type {TimeBetween | TimeFrom | TimeLast}
+     * @memberof FunnelQuery
+     */
+    'time'?: TimeBetween | TimeFrom | TimeLast;
+    /**
+     * group that is used in aggregations by group. For instance, group by user or group by organizartion.
+     * @type {string}
+     * @memberof FunnelQuery
+     */
+    'group'?: string;
+    /**
+     * 
+     * @type {Array<FunnelQuerySteps>}
+     * @memberof FunnelQuery
+     */
+    'steps'?: Array<FunnelQuerySteps>;
+    /**
+     * 
+     * @type {FunnelQueryTimeWindow}
+     * @memberof FunnelQuery
+     */
+    'timeWindow'?: FunnelQueryTimeWindow;
+    /**
+     * 
+     * @type {FunnelConversionStepsChartType | FunnelConversionOverTimeChartType | FunnelTimeToConvertChartType | FunnelFrequencyChartType}
+     * @memberof FunnelQuery
+     */
+    'chartType'?: FunnelConversionStepsChartType | FunnelConversionOverTimeChartType | FunnelTimeToConvertChartType | FunnelFrequencyChartType;
+    /**
+     * 
+     * @type {string}
+     * @memberof FunnelQuery
+     */
+    'count'?: FunnelQueryCountEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof FunnelQuery
+     */
+    'stepOrder'?: FunnelQueryStepOrderEnum;
+    /**
+     * 
+     * @type {object}
+     * @memberof FunnelQuery
+     */
+    'attribution'?: object;
+    /**
+     * 
+     * @type {Array<PropertyRef>}
+     * @memberof FunnelQuery
+     */
+    'holdingConstants'?: Array<PropertyRef>;
+    /**
+     * 
+     * @type {Array<FunnelEvent & FunnelExcludeSteps>}
+     * @memberof FunnelQuery
+     */
+    'exclude'?: Array<FunnelEvent & FunnelExcludeSteps>;
+    /**
+     * array of breakdowns
+     * @type {Array<BreakdownByProperty>}
+     * @memberof FunnelQuery
+     */
+    'breakdowns'?: Array<BreakdownByProperty>;
+}
+
+export const FunnelQueryCountEnum = {
+    Uniques: 'uniques',
+    Totals: 'totals'
+} as const;
+
+export type FunnelQueryCountEnum = typeof FunnelQueryCountEnum[keyof typeof FunnelQueryCountEnum];
+export const FunnelQueryStepOrderEnum = {
+    Any: 'any',
+    ExactSequence: 'exactSequence',
+    ExactOrder: 'exactOrder'
+} as const;
+
+export type FunnelQueryStepOrderEnum = typeof FunnelQueryStepOrderEnum[keyof typeof FunnelQueryStepOrderEnum];
+
+/**
+ * 
+ * @export
+ * @interface FunnelQuerySteps
+ */
+export interface FunnelQuerySteps {
+    /**
+     * 
+     * @type {Array<FunnelEvent>}
+     * @memberof FunnelQuerySteps
+     */
+    'events'?: Array<FunnelEvent>;
+    /**
+     * 
+     * @type {string}
+     * @memberof FunnelQuerySteps
+     */
+    'order'?: FunnelQueryStepsOrderEnum;
+}
+
+export const FunnelQueryStepsOrderEnum = {
+    Any: 'any',
+    Exact: 'exact'
+} as const;
+
+export type FunnelQueryStepsOrderEnum = typeof FunnelQueryStepsOrderEnum[keyof typeof FunnelQueryStepsOrderEnum];
+
+/**
+ * 
+ * @export
+ * @interface FunnelQueryTimeWindow
+ */
+export interface FunnelQueryTimeWindow {
+    /**
+     * N days/weeks
+     * @type {number}
+     * @memberof FunnelQueryTimeWindow
+     */
+    'n'?: number;
+    /**
+     * 
+     * @type {TimeUnitWithSession}
+     * @memberof FunnelQueryTimeWindow
+     */
+    'unit'?: TimeUnitWithSession;
+    /**
+     * 
+     * @type {string}
+     * @memberof FunnelQueryTimeWindow
+     */
+    'from'?: FunnelQueryTimeWindowFromEnum;
+}
+
+export const FunnelQueryTimeWindowFromEnum = {
+    AnyDay: 'anyDay',
+    FirstDay: 'firstDay'
+} as const;
+
+export type FunnelQueryTimeWindowFromEnum = typeof FunnelQueryTimeWindowFromEnum[keyof typeof FunnelQueryTimeWindowFromEnum];
+
+/**
+ * 
+ * @export
+ * @interface FunnelTimeToConvertChartType
+ */
+export interface FunnelTimeToConvertChartType {
+    /**
+     * 
+     * @type {string}
+     * @memberof FunnelTimeToConvertChartType
+     */
+    'type'?: FunnelTimeToConvertChartTypeTypeEnum;
+    /**
+     * 
+     * @type {TimeUnit}
+     * @memberof FunnelTimeToConvertChartType
+     */
+    'intervalUnit'?: TimeUnit;
+    /**
+     * 
+     * @type {number}
+     * @memberof FunnelTimeToConvertChartType
+     */
+    'minInterval'?: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof FunnelTimeToConvertChartType
+     */
+    'maxInterval'?: number;
+}
+
+export const FunnelTimeToConvertChartTypeTypeEnum = {
+    TimeToConvert: 'timeToConvert'
+} as const;
+
+export type FunnelTimeToConvertChartTypeTypeEnum = typeof FunnelTimeToConvertChartTypeTypeEnum[keyof typeof FunnelTimeToConvertChartTypeTypeEnum];
 
 /**
  * 
@@ -2432,6 +2793,26 @@ export const TimeUnit = {
 } as const;
 
 export type TimeUnit = typeof TimeUnit[keyof typeof TimeUnit];
+
+
+/**
+ * time unit with session
+ * @export
+ * @enum {string}
+ */
+
+export const TimeUnitWithSession = {
+    Second: 'second',
+    Minute: 'minute',
+    Hour: 'hour',
+    Day: 'day',
+    Week: 'week',
+    Month: 'month',
+    Year: 'year',
+    Session: 'session'
+} as const;
+
+export type TimeUnitWithSession = typeof TimeUnitWithSession[keyof typeof TimeUnitWithSession];
 
 
 /**
@@ -4069,6 +4450,125 @@ export class PropertiesApi extends BaseAPI {
 
 
 /**
+ * QueryApi - axios parameter creator
+ * @export
+ */
+export const QueryApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Funnel query
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {FunnelQuery} [funnelQuery] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        funnelQuery: async (organizationId: number, projectId: number, funnelQuery?: FunnelQuery, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('funnelQuery', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('funnelQuery', 'projectId', projectId)
+            const localVarPath = `/organizations/{organization_id}/projects/{project_id}/reports/funnel`
+                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(funnelQuery, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * QueryApi - functional programming interface
+ * @export
+ */
+export const QueryApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = QueryApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Funnel query
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {FunnelQuery} [funnelQuery] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async funnelQuery(organizationId: number, projectId: number, funnelQuery?: FunnelQuery, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DataTableResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.funnelQuery(organizationId, projectId, funnelQuery, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+    }
+};
+
+/**
+ * QueryApi - factory interface
+ * @export
+ */
+export const QueryApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = QueryApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Funnel query
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {FunnelQuery} [funnelQuery] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        funnelQuery(organizationId: number, projectId: number, funnelQuery?: FunnelQuery, options?: any): AxiosPromise<DataTableResponse> {
+            return localVarFp.funnelQuery(organizationId, projectId, funnelQuery, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * QueryApi - object-oriented interface
+ * @export
+ * @class QueryApi
+ * @extends {BaseAPI}
+ */
+export class QueryApi extends BaseAPI {
+    /**
+     * 
+     * @summary Funnel query
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {FunnelQuery} [funnelQuery] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof QueryApi
+     */
+    public funnelQuery(organizationId: number, projectId: number, funnelQuery?: FunnelQuery, options?: AxiosRequestConfig) {
+        return QueryApiFp(this.configuration).funnelQuery(organizationId, projectId, funnelQuery, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+/**
  * ReportsApi - axios parameter creator
  * @export
  */
@@ -4083,11 +4583,11 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createEventSegmentation: async (organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        eventSegmentationQuery: async (organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('createEventSegmentation', 'organizationId', organizationId)
+            assertParamExists('eventSegmentationQuery', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('createEventSegmentation', 'projectId', projectId)
+            assertParamExists('eventSegmentationQuery', 'projectId', projectId)
             const localVarPath = `/organizations/{organization_id}/projects/{project_id}/reports/event-segmentation`
                 .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
@@ -4135,8 +4635,8 @@ export const ReportsApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async createEventSegmentation(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DataTableResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.createEventSegmentation(organizationId, projectId, eventSegmentation, options);
+        async eventSegmentationQuery(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DataTableResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.eventSegmentationQuery(organizationId, projectId, eventSegmentation, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
     }
@@ -4158,8 +4658,8 @@ export const ReportsApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createEventSegmentation(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: any): AxiosPromise<DataTableResponse> {
-            return localVarFp.createEventSegmentation(organizationId, projectId, eventSegmentation, options).then((request) => request(axios, basePath));
+        eventSegmentationQuery(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: any): AxiosPromise<DataTableResponse> {
+            return localVarFp.eventSegmentationQuery(organizationId, projectId, eventSegmentation, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -4181,8 +4681,8 @@ export class ReportsApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof ReportsApi
      */
-    public createEventSegmentation(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: AxiosRequestConfig) {
-        return ReportsApiFp(this.configuration).createEventSegmentation(organizationId, projectId, eventSegmentation, options).then((request) => request(this.axios, this.basePath));
+    public eventSegmentationQuery(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: AxiosRequestConfig) {
+        return ReportsApiFp(this.configuration).eventSegmentationQuery(organizationId, projectId, eventSegmentation, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
