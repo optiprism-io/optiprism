@@ -15,7 +15,7 @@
     "isDictionary": false,
     "dictionaryType": "number",
     "status": "enabled",
-    "type": "string",
+    "type": "event",
     "events": [1, 2, 3, 4]
   },
   {
@@ -35,7 +35,7 @@
     "dictionaryType": "number",
     "status": "enabled",
     "events": [1, 2, 3],
-    "type": "string"
+    "type": "event"
   },
   {
     "id": 3,
@@ -54,7 +54,7 @@
     "dictionaryType": "number",
     "status": "enabled",
     "events": [1, 2, 3],
-    "type": "string"
+    "type": "event"
   },
   {
     "id": 4,
@@ -72,7 +72,7 @@
     "isDictionary": false,
     "status": "enabled",
     "events": [1, 2, 3],
-    "type": "string"
+    "type": "event"
   },
   {
     "id": 5,
@@ -91,7 +91,7 @@
     "dictionaryType": "number",
     "status": "enabled",
     "events": [1, 2, 3],
-    "type": "number"
+    "type": "event"
   },
   {
     "id": 6,
@@ -110,7 +110,7 @@
     "dictionaryType": "number",
     "status": "enabled",
     "events": [1, 2, 3],
-    "type": "number"
+    "type": "event"
   },
   {
     "id": 7,
@@ -128,7 +128,7 @@
     "isDictionary": false,
     "status": "enabled",
     "events": [1, 3],
-    "type": "number"
+    "type": "event"
   },
   {
     "id": 8,
@@ -146,7 +146,7 @@
     "isDictionary": true,
     "dictionaryType": "number",
     "status": "enabled",
-    "type": "number"
+    "type": "event"
   },
   {
     "id": 9,
@@ -160,7 +160,7 @@
     "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
     "dataType": "string",
     "isArray": false,
-    "type": "string",
+    "type": "event",
     "nullable": false,
     "isDictionary": true,
     "dictionaryType": "number",
@@ -181,7 +181,7 @@
     "nullable": false,
     "isDictionary": false,
     "status": "enabled",
-    "type": "string"
+    "type": "event"
   },
   {
     "id": 11,
@@ -198,7 +198,7 @@
     "nullable": false,
     "isDictionary": false,
     "status": "enabled",
-    "type": "string"
+    "type": "event"
   },
   {
     "id": 12,
@@ -388,7 +388,7 @@
     "createdBy": 0,
     "updatedBy": 0,
     "tags": [],
-    "name": "",
+    "name": "product_name",
     "displayName": "Product name",
     "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Accusamus, culpa esse ex iure molestias provident quasi ratione vel? Nemo, tempora.",
     "dataType": "string",

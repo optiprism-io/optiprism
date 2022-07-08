@@ -99,10 +99,10 @@ const propertyItems = computed<Item[]>(() => {
             }
 
             if (key === 'type') {
-                value = property.isArray ? i18n.$t('common.list_of', { type: i18n.$t(`common.types.${value}`) }) : i18n.$t(`common.types.${value}`)
+                value = property.isArray ? i18n.$t('common.list_of', { type: i18n.$t(`common.types.${property.dataType}`) }) : i18n.$t(`common.types.${property.dataType}`)
             }
 
-            if (key in property) {
+            if (config.key in property) {
                 const item: Item = {
                     label: i18n.$t(config.string),
                     key,

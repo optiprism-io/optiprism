@@ -2,7 +2,8 @@
   "common": {
     "types": {
       "string": "String",
-      "number": "Number"
+      "number": "Number",
+      "boolean": "Boolean"
     },
     "apply": "Apply",
     "cancel": "Cancel",

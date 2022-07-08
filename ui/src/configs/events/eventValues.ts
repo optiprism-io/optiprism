@@ -48,7 +48,7 @@ export const propertyValuesConfig = {
         'component': UiTextarea,
     },
     'type': {
-        'key': 'type',
+        'key': 'dataType',
         'type': 'text',
         'string': 'events.event_management.popup.event_columns.type',
     },
