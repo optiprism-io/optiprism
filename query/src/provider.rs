@@ -25,20 +25,27 @@ use arrow::array::ArrayRef;
 use arrow::record_batch::RecordBatch;
 use crate::queries::property_values::PropertyValues;
 
-pub struct Provider {
+pub struct QueryProvider {
     metadata: Arc<Metadata>,
     input: LogicalPlan,
 }
 
-impl Provider {
-    pub fn try_new(metadata: Arc<Metadata>, provider: Arc<dyn TableProvider>) -> Result<Self> {
+impl QueryProvider {
+    pub fn try_new_from_provider(metadata: Arc<Metadata>, table_provider: Arc<dyn TableProvider>) -> Result<Self> {
         let input =
-            datafusion::logical_plan::LogicalPlanBuilder::scan("table", provider, None)?.build()?;
+            datafusion::logical_plan::LogicalPlanBuilder::scan("table", table_provider, None)?.build()?;
         Ok(Self { metadata, input })
+    }
+
+    pub fn new_from_logical_plan(metadata: Arc<Metadata>, input: LogicalPlan) -> Self {
+        Self {
+            metadata,
+            input,
+        }
     }
 }
 
-impl Provider {
+impl QueryProvider {
     pub async fn property_values(
         &self,
         ctx: Context,

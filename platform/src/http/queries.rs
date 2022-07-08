@@ -2,14 +2,15 @@ use axum::extract::{Extension, Path};
 use axum::{routing, AddExtensionLayer, Json, Router};
 use std::sync::Arc;
 
-use crate::event_segmentation::result::DataTable;
-use crate::event_segmentation::types::EventSegmentation;
+use crate::data_table::DataTable;
+use crate::queries::event_segmentation::EventSegmentation;
 use crate::Result;
-use crate::{Context, EventSegmentationProvider};
+use crate::{Context};
+use crate::queries::provider::QueryProvider;
 
 async fn event_segmentation(
     ctx: Context,
-    Extension(provider): Extension<Arc<EventSegmentationProvider>>,
+    Extension(provider): Extension<Arc<QueryProvider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<EventSegmentation>,
 ) -> Result<Json<DataTable>> {
@@ -20,7 +21,7 @@ async fn event_segmentation(
     ))
 }
 
-pub fn attach_routes(router: Router, prov: Arc<EventSegmentationProvider>) -> Router {
+pub fn attach_routes(router: Router, prov: Arc<QueryProvider>) -> Router {
     router
         .route(
             "/v1/organizations/:organization_id/projects/:project_id/queries/event-segmentation",

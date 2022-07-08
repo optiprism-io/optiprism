@@ -10,7 +10,7 @@ pub mod test_util;
 
 pub use context::Context;
 pub use error::{Error, Result};
-pub use provider::Provider as QueryProvider;
+pub use provider::QueryProvider as QueryProvider;
 
 pub mod event_fields {
     pub const EVENT: &str = "event_event";
