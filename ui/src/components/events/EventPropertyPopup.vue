@@ -92,12 +92,21 @@ const propertyItems = computed<Item[]>(() => {
 
         keys.forEach(key => {
             const config: PropertyValueConfig = propertyValuesConfig[key];
+            let value = editProperty.value && key in editProperty.value ? editProperty.value[key] : property[key] ||property[key];
+
+            if (key === 'status') {
+                value = property[key] === 'enabled'
+            }
+
+            if (key === 'type') {
+                value = property.isArray ? i18n.$t('common.list_of', { type: i18n.$t(`common.types.${value}`) }) : i18n.$t(`common.types.${value}`)
+            }
 
             if (key in property) {
                 const item: Item = {
                     label: i18n.$t(config.string),
                     key,
-                    value: key === 'status' ? property[key] === 'enabled' : editProperty.value && key in editProperty.value ? editProperty.value[key] : property[key] ||property[key],
+                    value,
                     component: config.component || 'p'
                 }
 

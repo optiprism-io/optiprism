@@ -1,5 +1,9 @@
 {
   "common": {
+    "types": {
+      "string": "String",
+      "number": "Number"
+    },
     "apply": "Apply",
     "cancel": "Cancel",
     "close": "Close",
@@ -13,6 +17,7 @@
     "edit": "Edit",
     "save": "Save",
     "castom": "Castom",
+    "list_of": "List of :types",
     "columns": "columns",
     "no_data": "No data",
     "calendar": {
