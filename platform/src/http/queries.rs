@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use crate::data_table::DataTable;
 use crate::queries::event_segmentation::EventSegmentation;
-use crate::Result;
-use crate::{Context};
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
 use crate::queries::provider::QueryProvider;
+use crate::Context;
+use crate::Result;
 
 async fn event_segmentation(
     ctx: Context,

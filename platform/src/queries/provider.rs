@@ -1,10 +1,10 @@
-use crate::Context;
-use crate::Result;
-use std::sync::Arc;
 use crate::data_table::DataTable;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
+use crate::Context;
+use crate::Result;
+use std::sync::Arc;
 
 pub struct QueryProvider {
     query: Arc<query::QueryProvider>,
@@ -27,7 +27,8 @@ impl QueryProvider {
             .query
             .event_segmentation(ctx.into_query_context(project_id), lreq)
             .await?;
-        Ok(result.try_into()?)
+
+        result.try_into()
     }
 
     pub async fn property_values(
@@ -42,6 +43,7 @@ impl QueryProvider {
             .query
             .property_values(ctx.into_query_context(project_id), lreq)
             .await?;
-        Ok(result.try_into()?)
+
+        result.try_into()
     }
 }

@@ -5,6 +5,7 @@ use chrono::Utc;
 use metadata::metadata::ListResponse;
 use metadata::properties::Provider;
 use metadata::properties::{CreatePropertyRequest, Property, Status};
+use metadata::store::Store;
 use platform::error::Result;
 use platform::http::properties;
 use platform::properties::{Provider as PropertiesProvider, UpdatePropertyRequest};
@@ -15,7 +16,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
-use metadata::store::Store;
 
 fn assert(l: &Property, r: &Property) {
     assert_eq!(l.id, r.id);

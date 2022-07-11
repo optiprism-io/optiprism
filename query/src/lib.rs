@@ -1,16 +1,16 @@
 pub mod context;
+pub mod data_table;
 pub mod error;
+pub mod expr;
 pub mod logical_plan;
 pub mod physical_plan;
 pub mod provider;
 pub mod queries;
-pub mod data_table;
-pub mod expr;
 pub mod test_util;
 
 pub use context::Context;
 pub use error::{Error, Result};
-pub use provider::QueryProvider as QueryProvider;
+pub use provider::QueryProvider;
 
 pub mod event_fields {
     pub const EVENT: &str = "event_event";

@@ -1,9 +1,7 @@
-use crate::{
-    AccountsProvider, AuthProvider, EventsProvider, PropertiesProvider,
-};
+use crate::queries::provider::QueryProvider;
+use crate::{AccountsProvider, AuthProvider, EventsProvider, PropertiesProvider};
 use metadata::Metadata;
 use std::sync::Arc;
-use crate::queries::provider::QueryProvider;
 
 pub struct PlatformProvider {
     pub events: Arc<EventsProvider>,

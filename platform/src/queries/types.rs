@@ -5,13 +5,10 @@ use common::DECIMAL_PRECISION;
 use convert_case::{Case, Casing};
 use datafusion::scalar::ScalarValue;
 use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
-use query::queries::event_segmentation::types as query_es_types;
-use query::queries::event_segmentation::types::NamedQuery;
 use query::queries::types as query_types;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::queries::event_segmentation::PropertyType;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,11 +51,10 @@ impl TryInto<query_types::PropValueOperation> for PropValueOperation {
             PropValueOperation::ArrNone => query_types::PropValueOperation::ArrNone,
             PropValueOperation::Regex => query_types::PropValueOperation::Regex,
             PropValueOperation::Like => query_types::PropValueOperation::Like,
-            PropValueOperation::NotLike => query_types::PropValueOperation::NotLike
+            PropValueOperation::NotLike => query_types::PropValueOperation::NotLike,
         })
     }
 }
-
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -253,7 +249,9 @@ pub enum EventRef {
 impl EventRef {
     pub fn name(&self, idx: usize) -> String {
         match self {
-            EventRef::Regular { event_name } => format!("{}_regular_{}", event_name.to_case(Case::Snake), idx),
+            EventRef::Regular { event_name } => {
+                format!("{}_regular_{}", event_name.to_case(Case::Snake), idx)
+            }
             EventRef::Custom { event_id } => format!("{}_custom_{}", event_id, idx),
         }
     }

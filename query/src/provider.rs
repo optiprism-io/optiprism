@@ -1,10 +1,10 @@
+use crate::data_table::DataTable;
 use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::queries::event_segmentation::types::EventSegmentation;
-use crate::data_table::DataTable;
 use crate::queries::{event_segmentation, property_values};
-use crate::{Context, data_table};
 use crate::Result;
+use crate::{data_table, Context};
 use arrow::datatypes::Schema;
 
 use arrow::util::pretty::pretty_format_batches;
@@ -18,12 +18,12 @@ use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::{collect, displayable};
 use datafusion::prelude::{ExecutionConfig, ExecutionContext};
 
+use crate::queries::property_values::PropertyValues;
+use arrow::array::ArrayRef;
+use arrow::record_batch::RecordBatch;
 use metadata::Metadata;
 use std::sync::Arc;
 use std::time::Instant;
-use arrow::array::ArrayRef;
-use arrow::record_batch::RecordBatch;
-use crate::queries::property_values::PropertyValues;
 
 pub struct QueryProvider {
     metadata: Arc<Metadata>,
@@ -31,33 +31,30 @@ pub struct QueryProvider {
 }
 
 impl QueryProvider {
-    pub fn try_new_from_provider(metadata: Arc<Metadata>, table_provider: Arc<dyn TableProvider>) -> Result<Self> {
+    pub fn try_new_from_provider(
+        metadata: Arc<Metadata>,
+        table_provider: Arc<dyn TableProvider>,
+    ) -> Result<Self> {
         let input =
-            datafusion::logical_plan::LogicalPlanBuilder::scan("table", table_provider, None)?.build()?;
+            datafusion::logical_plan::LogicalPlanBuilder::scan("table", table_provider, None)?
+                .build()?;
         Ok(Self { metadata, input })
     }
 
     pub fn new_from_logical_plan(metadata: Arc<Metadata>, input: LogicalPlan) -> Self {
-        Self {
-            metadata,
-            input,
-        }
+        Self { metadata, input }
     }
 }
 
 impl QueryProvider {
-    pub async fn property_values(
-        &self,
-        ctx: Context,
-        req: PropertyValues,
-    ) -> Result<ArrayRef> {
+    pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
         let plan = property_values::LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),
             self.input.clone(),
             req.clone(),
         )
-            .await?;
+        .await?;
 
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 
@@ -79,7 +76,7 @@ impl QueryProvider {
             self.input.clone(),
             es.clone(),
         )
-            .await?;
+        .await?;
 
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 
@@ -120,8 +117,7 @@ impl QueryProvider {
 async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let start = Instant::now();
 
-    let config = ExecutionConfig::new()
-        .with_query_planner(Arc::new(QueryPlanner {}));
+    let config = ExecutionConfig::new().with_query_planner(Arc::new(QueryPlanner {}));
     let exec_ctx = ExecutionContext::with_config(config);
     println!("logical plan: {:?}", plan);
     let physical_plan = exec_ctx.create_physical_plan(plan).await?;
@@ -132,7 +128,7 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
         physical_plan,
         Arc::new(RuntimeEnv::new(RuntimeConfig::new())?),
     )
-        .await?;
+    .await?;
     for batch in batches.iter() {
         println!("{}", pretty_format_batches(&[batch.clone()])?);
     }

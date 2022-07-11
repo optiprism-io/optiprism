@@ -1,6 +1,6 @@
 use crate::error::Result;
 use chrono::{DateTime, Duration, Utc};
-use datafusion::logical_plan::{exprlist_to_fields, Column, DFSchema, LogicalPlan, Operator};
+use datafusion::logical_plan::{exprlist_to_fields, Column, DFSchema, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use std::collections::HashMap;
 
@@ -13,7 +13,7 @@ use crate::{event_fields, Context};
 
 use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
 
-use datafusion_expr::expr_fn::{and, binary_expr};
+use datafusion_expr::expr_fn::and;
 use datafusion_expr::{col, lit, BuiltinScalarFunction, Expr};
 
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
@@ -24,7 +24,6 @@ use crate::logical_plan::unpivot::UnpivotNode;
 use chrono::prelude::*;
 use chronoutil::DateRule;
 
-use datafusion_common::ScalarValue;
 use futures::executor;
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;
@@ -33,10 +32,10 @@ use metadata::Metadata;
 
 use std::sync::Arc;
 
+use crate::expr::{event_expression, property_col, property_expression, time_expression};
 use crate::queries::event_segmentation::types::{
     Breakdown, Event, EventFilter, EventSegmentation, Query,
 };
-use crate::expr::{event_expression, property_col, property_expression, time_expression};
 
 pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
@@ -140,9 +139,7 @@ impl LogicalPlanBuilder {
 
                 // merge multiple results into one schema
                 LogicalPlan::Extension(Extension {
-                    node: Arc::new(
-                        MergeNode::try_new(inputs)?,
-                    ),
+                    node: Arc::new(MergeNode::try_new(inputs)?),
                 })
             }
         };
@@ -171,9 +168,7 @@ impl LogicalPlanBuilder {
         }
 
         Ok(LogicalPlan::Extension(Extension {
-            node: Arc::new(
-                DictionaryDecodeNode::try_new(input, decode_cols)?,
-            ),
+            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols)?),
         }))
     }
 
@@ -239,7 +234,10 @@ impl LogicalPlanBuilder {
         )?;
 
         // event expression
-        expr = and(expr, event_expression(&self.ctx, &self.metadata, &event.event).await?);
+        expr = and(
+            expr,
+            event_expression(&self.ctx, &self.metadata, &event.event).await?,
+        );
         // apply event filters
         if let Some(filters) = &event.filters {
             expr = and(expr.clone(), self.event_filters_expression(filters).await?)
@@ -384,15 +382,13 @@ impl LogicalPlanBuilder {
                         property,
                         operation,
                         value,
-                    } => {
-                        executor::block_on(property_expression(
-                            &self.ctx,
-                            &self.metadata,
-                            property,
-                            operation,
-                            value.to_owned(),
-                        ))
-                    }
+                    } => executor::block_on(property_expression(
+                        &self.ctx,
+                        &self.metadata,
+                        property,
+                        operation,
+                        value.to_owned(),
+                    )),
                 }
             })
             .collect::<Result<Vec<Expr>>>()?;

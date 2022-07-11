@@ -1,16 +1,14 @@
+use crate::queries::types::{
+    json_value_to_scalar, AggregateFunction, EventRef, PartitionedAggregateFunction,
+    PropValueOperation, PropertyRef, QueryTime, TimeUnit,
+};
 use crate::Error;
 use crate::Result;
 use chrono::{DateTime, Utc};
-use common::DECIMAL_PRECISION;
-use datafusion::scalar::ScalarValue;
-use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
 use query::queries::event_segmentation::types as query_es_types;
 use query::queries::event_segmentation::types::NamedQuery;
-use query::queries::types as query_types;
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::queries::types::{AggregateFunction, EventRef, PartitionedAggregateFunction, PropertyRef, PropValueOperation, QueryTime, TimeUnit, json_value_to_scalar};
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -322,7 +320,7 @@ impl TryInto<query_es_types::EventFilter> for &EventFilter {
 pub enum Breakdown {
     Property {
         #[serde(flatten)]
-        property: PropertyRef
+        property: PropertyRef,
     },
 }
 
@@ -331,9 +329,9 @@ impl TryInto<query_es_types::Breakdown> for &Breakdown {
 
     fn try_into(self) -> std::result::Result<query_es_types::Breakdown, Self::Error> {
         Ok(match self {
-            Breakdown::Property {
-                property,
-            } => query_es_types::Breakdown::Property(property.to_owned().try_into()?),
+            Breakdown::Property { property } => {
+                query_es_types::Breakdown::Property(property.to_owned().try_into()?)
+            }
         })
     }
 }
@@ -388,12 +386,7 @@ impl TryInto<query_es_types::Event> for &Event {
                 .collect::<std::result::Result<Vec<query_es_types::Query>, _>>()?
                 .iter()
                 .enumerate()
-                .map(|(idx, v)| {
-                    NamedQuery::new(
-                        v.clone(),
-                        Some(self.event.name(idx)),
-                    )
-                })
+                .map(|(idx, v)| NamedQuery::new(v.clone(), Some(self.event.name(idx))))
                 .collect(),
         })
     }
@@ -475,10 +468,10 @@ mod tests {
     };
     use chrono::{DateTime, Utc};
 
+    use crate::queries::types::{EventRef, PropertyRef};
     use query::event_fields;
     use query::queries::event_segmentation::types::EventSegmentation as QueryEventSegmentation;
     use serde_json::json;
-    use crate::queries::types::{EventRef, PropertyRef};
 
     #[test]
     fn test_serialize() -> Result<()> {
@@ -499,31 +492,43 @@ mod tests {
                 unit: TimeUnit::Second,
             }),
             events: vec![Event {
-                event: EventRef::Regular { event_name: "e1".to_string() },
+                event: EventRef::Regular {
+                    event_name: "e1".to_string(),
+                },
                 filters: Some(vec![
                     EventFilter::Property {
-                        property: PropertyRef::User { property_name: "p1".to_string() },
+                        property: PropertyRef::User {
+                            property_name: "p1".to_string(),
+                        },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![json!(true)]),
                     },
                     EventFilter::Property {
-                        property: PropertyRef::Event { property_name: "p2".to_string() },
+                        property: PropertyRef::Event {
+                            property_name: "p2".to_string(),
+                        },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![json!(true)]),
                     },
                     EventFilter::Property {
-                        property: PropertyRef::Event { property_name: "p3".to_string() },
+                        property: PropertyRef::Event {
+                            property_name: "p3".to_string(),
+                        },
                         operation: PropValueOperation::Empty,
                         value: None,
                     },
                     EventFilter::Property {
-                        property: PropertyRef::Event { property_name: "p4".to_string() },
+                        property: PropertyRef::Event {
+                            property_name: "p4".to_string(),
+                        },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![json!("s")]),
                     },
                 ]),
                 breakdowns: Some(vec![Breakdown::Property {
-                    property: PropertyRef::User { property_name: "Device".to_string() },
+                    property: PropertyRef::User {
+                        property_name: "Device".to_string(),
+                    },
                 }]),
                 queries: vec![
                     Query::CountEvents,
@@ -532,23 +537,31 @@ mod tests {
                         aggregate: AggregateFunction::Avg,
                     },
                     Query::AggregatePropertyPerGroup {
-                        property: PropertyRef::Event { property_name: "Revenue".to_string() },
+                        property: PropertyRef::Event {
+                            property_name: "Revenue".to_string(),
+                        },
                         aggregate_per_group: PartitionedAggregateFunction::Sum,
                         aggregate: AggregateFunction::Avg,
                     },
                     Query::AggregateProperty {
-                        property: PropertyRef::Event { property_name: "Revenue".to_string() },
+                        property: PropertyRef::Event {
+                            property_name: "Revenue".to_string(),
+                        },
                         aggregate: AggregateFunction::Sum,
                     },
                 ],
             }],
             filters: Some(vec![EventFilter::Property {
-                property: PropertyRef::User { property_name: "p1".to_string() },
+                property: PropertyRef::User {
+                    property_name: "p1".to_string(),
+                },
                 operation: PropValueOperation::Eq,
                 value: Some(vec![json!(true)]),
             }]),
             breakdowns: Some(vec![Breakdown::Property {
-                property: PropertyRef::User { property_name: "Device".to_string() },
+                property: PropertyRef::User {
+                    property_name: "Device".to_string(),
+                },
             }]),
             segments: None,
         };

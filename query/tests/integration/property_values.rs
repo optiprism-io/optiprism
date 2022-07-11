@@ -1,18 +1,18 @@
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use arrow::util::pretty::print_batches;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use datafusion::physical_plan::{collect, displayable};
     use datafusion::prelude::{ExecutionConfig, ExecutionContext};
     use datafusion_common::ScalarValue;
-    use query::Context;
     use query::error::Result;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::property_values::{Filter, LogicalPlanBuilder, PropertyValues};
-    use query::queries::types::{EventRef, PropertyRef, PropValueOperation};
+    use query::queries::types::{EventRef, PropValueOperation, PropertyRef};
     use query::test_util::{create_entities, create_md, events_provider};
+    use query::Context;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {
@@ -54,7 +54,7 @@ mod tests {
             physical_plan,
             Arc::new(RuntimeEnv::new(RuntimeConfig::new())?),
         )
-            .await?;
+        .await?;
         let concatenated = concat_batches(&result[0].schema(), &result, 0)?;
 
         print_batches(&[concatenated])?;

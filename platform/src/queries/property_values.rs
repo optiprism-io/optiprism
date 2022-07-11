@@ -1,9 +1,8 @@
+use crate::queries::types::{json_value_to_scalar, EventRef, PropValueOperation, PropertyRef};
+use crate::{array_ref_to_json_values, Error, Result};
 use arrow::array::ArrayRef;
-use serde_json::Value;
-use datafusion::scalar::ScalarValue;
-use crate::queries::types::{EventRef, json_value_to_scalar, PropertyRef, PropValueOperation};
-use crate::{arr_to_json_values, array_ref_to_json_values, Error, Result};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Filter {
@@ -28,17 +27,13 @@ pub struct ListResponse {
 impl TryInto<query::queries::property_values::PropertyValues> for PropertyValues {
     type Error = Error;
 
-    fn try_into(self) -> std::result::Result<query::queries::property_values::PropertyValues, Self::Error> {
+    fn try_into(
+        self,
+    ) -> std::result::Result<query::queries::property_values::PropertyValues, Self::Error> {
         Ok(query::queries::property_values::PropertyValues {
             property: self.property.try_into()?,
-            event: self
-                .event
-                .map(|event| event.try_into())
-                .transpose()?,
-            filter: self
-                .filter
-                .map(|filter| filter.try_into())
-                .transpose()?,
+            event: self.event.map(|event| event.try_into()).transpose()?,
+            filter: self.filter.map(|filter| filter.try_into()).transpose()?,
         })
     }
 }
@@ -51,10 +46,12 @@ impl TryInto<query::queries::property_values::Filter> for Filter {
             operation: self.operation.try_into()?,
             value: self
                 .value
-                .map(|values| values
-                    .iter()
-                    .map(|value| json_value_to_scalar(value))
-                    .collect::<Result<_>>())
+                .map(|values| {
+                    values
+                        .iter()
+                        .map(json_value_to_scalar)
+                        .collect::<Result<_>>()
+                })
                 .transpose()?,
         })
     }
@@ -64,6 +61,8 @@ impl TryInto<ListResponse> for ArrayRef {
     type Error = Error;
 
     fn try_into(self) -> std::result::Result<ListResponse, Self::Error> {
-        Ok(ListResponse{ values: array_ref_to_json_values(&self)? })
+        Ok(ListResponse {
+            values: array_ref_to_json_values(&self)?,
+        })
     }
 }

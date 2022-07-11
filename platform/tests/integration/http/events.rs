@@ -3,6 +3,7 @@ use axum::{Router, Server};
 use chrono::Utc;
 use metadata::events::{Event, Provider, Status};
 use metadata::metadata::ListResponse;
+use metadata::store::Store;
 use platform::error::Result;
 use platform::events::Provider as EventsProvider;
 use platform::events::{CreateEventRequest, UpdateEventRequest};
@@ -14,7 +15,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
-use metadata::store::Store;
 
 fn assert(l: &Event, r: &Event) {
     assert_eq!(l.id, 1);

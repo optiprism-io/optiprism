@@ -75,7 +75,7 @@ impl PropertyRef {
         match self {
             PropertyRef::User(name) => name.clone(),
             PropertyRef::Event(name) => name.clone(),
-            PropertyRef::Custom(id) => unimplemented!(),
+            PropertyRef::Custom(_id) => unimplemented!(),
         }
     }
 }
@@ -90,7 +90,7 @@ impl EventRef {
     pub fn name(&self) -> &str {
         match self {
             EventRef::Regular(name) => name.as_str(),
-            EventRef::Custom(id) => unimplemented!(),
+            EventRef::Custom(_id) => unimplemented!(),
         }
     }
 }

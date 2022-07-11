@@ -33,10 +33,10 @@ mod tests {
     use query::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
     use query::{event_fields, Context};
 
+    use query::test_util::{create_entities, create_md, events_provider};
     use std::ops::Sub;
     use std::sync::Arc;
     use uuid::Uuid;
-    use query::test_util::{create_entities, create_md, events_provider};
 
     #[tokio::test]
     async fn test_filters() -> Result<()> {

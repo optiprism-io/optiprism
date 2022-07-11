@@ -1,5 +1,5 @@
 use crate::logical_plan::expr::{lit_timestamp, multi_or};
-use crate::queries::types::{PropValueOperation, PropertyRef, QueryTime, EventRef};
+use crate::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime};
 use crate::{event_fields, Result};
 use crate::{Context, Error};
 use arrow::datatypes::DataType;
@@ -38,17 +38,17 @@ pub fn time_expression<S: ExprSchema>(
 }
 
 /// builds expression for event
-pub async fn event_expression(ctx: &Context, metadata: &Arc<Metadata>, event: &EventRef) -> Result<Expr> {
+pub async fn event_expression(
+    ctx: &Context,
+    metadata: &Arc<Metadata>,
+    event: &EventRef,
+) -> Result<Expr> {
     Ok(match &event {
         // regular event
         EventRef::Regular(name) => {
             let e = metadata
                 .events
-                .get_by_name(
-                    ctx.organization_id,
-                    ctx.project_id,
-                    name,
-                )
+                .get_by_name(ctx.organization_id, ctx.project_id, name)
                 .await?;
 
             binary_expr(
@@ -131,7 +131,7 @@ pub async fn property_expression(
                     col_name.as_str(),
                     &values.unwrap(),
                 )
-                    .await?;
+                .await?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)
@@ -157,7 +157,7 @@ pub async fn property_expression(
                     col_name.as_str(),
                     &values.unwrap(),
                 )
-                    .await?;
+                .await?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)

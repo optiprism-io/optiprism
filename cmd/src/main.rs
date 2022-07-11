@@ -89,7 +89,10 @@ async fn main() -> Result<()> {
 
     let provider = Arc::new(MemTable::try_new(batches[0][0].schema(), batches)?);
     let query_provider = Arc::new(QueryProvider::try_new_from_provider(md.clone(), provider)?);
-    let platform = platform::PlatformProvider::new(md.clone(), query_provider);
+    let platform_query_provider = Arc::new(platform::queries::provider::QueryProvider::new(
+        query_provider,
+    ));
+    let platform = platform::PlatformProvider::new(md.clone(), platform_query_provider);
 
     let mut router = Router::new();
     router = platform::http::attach_routes(router, platform);

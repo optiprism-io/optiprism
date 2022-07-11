@@ -1,31 +1,31 @@
 pub mod accounts;
 pub mod auth;
 pub mod context;
+pub mod data_table;
 pub mod error;
 pub mod events;
 pub mod http;
-pub mod provider;
 pub mod properties;
-pub mod data_table;
+pub mod provider;
 pub mod queries;
 
 use rust_decimal::prelude::ToPrimitive;
 
+pub use accounts::Provider as AccountsProvider;
 use arrow::array::{
-    Array, BooleanArray,  Float32Array, Float64Array, Int16Array, Int32Array,
-    Int64Array, Int8Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+    Array, BooleanArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
+    StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
 use arrow::array::{ArrayRef, DecimalArray};
 use arrow::datatypes::DataType;
-use rust_decimal::Decimal;
-use serde_json::{json, Number, Value};
-pub use accounts::Provider as AccountsProvider;
 pub use auth::Provider as AuthProvider;
 pub use context::Context;
 pub use error::{Error, Result};
 pub use events::Provider as EventsProvider;
-pub use provider::PlatformProvider;
 pub use properties::Provider as PropertiesProvider;
+pub use provider::PlatformProvider;
+use rust_decimal::Decimal;
+use serde_json::{json, Number, Value};
 
 #[macro_export]
 macro_rules! arr_to_json_values {
@@ -50,10 +50,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
         DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
         DataType::Utf8 => arr_to_json_values!(arr, StringArray),
         DataType::Decimal(_, s) => {
-            let arr = arr
-                .as_any()
-                .downcast_ref::<DecimalArray>()
-                .unwrap();
+            let arr = arr.as_any().downcast_ref::<DecimalArray>().unwrap();
             arr.iter()
                 .map(|value| match value {
                     None => Ok(Value::Null),
