@@ -25,6 +25,7 @@
                 v-if="activeTab === 'events'"
                 :items="itemsEvents"
                 :columns="itemsEventsColumns"
+                @on-action="onActionEvent"
             />
         </div>
     </UiPopupWindow>
@@ -39,7 +40,7 @@ import UiTabs from '@/components/uikit/UiTabs.vue'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
 import UiDescriptionList, { Item, ActionPayload } from '@/components/uikit/UiDescriptionList.vue'
-import { Row } from '@/components/uikit/UiTable/UiTable'
+import { Action, Row } from '@/components/uikit/UiTable/UiTable'
 import { propertyValuesConfig, Item as PropertyValueConfig } from '@/configs/events/eventValues'
 
 export type EventObject = {
@@ -65,6 +66,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     (e: 'cancel'): void
     (e: 'apply', payload: ApplyPayload): void
+    (e: 'on-action-event', payload: Action): void
 }>()
 
 const activeTab = ref('property')
@@ -184,5 +186,9 @@ const onInputPropertyItem = async (payload: ActionPayload) => {
             [payload.key]: value
         }
     }
+}
+
+const onActionEvent = (payload: Action) => {
+    emit('on-action-event', payload)
 }
 </script>

@@ -13,30 +13,20 @@
             </div>
         </div>
     </div>
-    <EventPropertyPopup
-        v-if="commonStore.showEventPropertyPopup"
-        :loading="propertyPopupLoading"
-        :property="editPropertyPopup"
-        :events="editPropertyEventsPopup"
-        @apply="propertyPopupApply"
-        @cancel="propertyPopupCancel"
-    />
 </template>
 
 <script setup lang="ts">
-import {computed, inject, ref} from 'vue'
+import { computed, inject } from 'vue'
 import { useLexiconStore } from '@/stores/lexicon'
 import { useCommonStore } from '@/stores/common'
 import { Property } from '@/api'
 import { Action, Row }  from '@/components/uikit/UiTable/UiTable'
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
-import EventPropertyPopup, { ApplyPayload } from '@/components/events/EventPropertyPopup.vue'
 
 const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
 const commonStore = useCommonStore()
 
-const propertyPopupLoading = ref(false)
 
 const columns = computed(() => {
     return ['name', 'displayName', 'description', 'status'].map(key => {
@@ -76,42 +66,9 @@ const items = computed(() => {
     })
 })
 
-const editPropertyPopup = computed(() => {
-    if (commonStore.editEventPropertyPopupId) {
-        return lexiconStore.findEventPropertyById(commonStore.editEventPropertyPopupId)
-    } else {
-        return null
-    }
-})
-
-const editPropertyEventsPopup = computed(() => {
-    if (commonStore.editEventPropertyPopupId) {
-        const property = lexiconStore.findEventPropertyById(commonStore.editEventPropertyPopupId)
-        if (property.events?.length) {
-            return property.events.map(id => {
-                return lexiconStore.findEventById(id)
-            })
-        } else {
-            return []
-        }
-    } else {
-        return []
-    }
-})
 
 const onAction = (payload: Action) => {
     commonStore.editEventPropertyPopupId = Number(payload.type) || null
     commonStore.showEventPropertyPopup = true
-}
-
-const propertyPopupApply = async (payload: ApplyPayload) => {
-    propertyPopupLoading.value = true
-    await lexiconStore.updateProperty(payload)
-    propertyPopupLoading.value = false
-    commonStore.showEventPropertyPopup = false
-}
-
-const propertyPopupCancel = () => {
-    commonStore.showEventPropertyPopup = false
 }
 </script>
