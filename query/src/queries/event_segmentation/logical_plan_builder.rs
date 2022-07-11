@@ -1,6 +1,6 @@
 use crate::error::Result;
 use chrono::{DateTime, Duration, Utc};
-use datafusion::logical_plan::{exprlist_to_fields, Column, DFSchema, LogicalPlan, Operator};
+use datafusion::logical_plan::{exprlist_to_fields, Column, DFSchema, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use std::collections::HashMap;
 
@@ -8,12 +8,12 @@ use crate::logical_plan::expr::{aggregate_partitioned, multi_and, sorted_distinc
 
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 
-use crate::reports::types::{EventRef, PropertyRef, TimeUnit};
+use crate::queries::types::{EventRef, PropertyRef, TimeUnit};
 use crate::{event_fields, Context};
 
 use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
 
-use datafusion_expr::expr_fn::{and, binary_expr};
+use datafusion_expr::expr_fn::and;
 use datafusion_expr::{col, lit, BuiltinScalarFunction, Expr};
 
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
@@ -24,7 +24,6 @@ use crate::logical_plan::unpivot::UnpivotNode;
 use chrono::prelude::*;
 use chronoutil::DateRule;
 
-use datafusion_common::ScalarValue;
 use futures::executor;
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;
@@ -33,10 +32,10 @@ use metadata::Metadata;
 
 use std::sync::Arc;
 
-use crate::reports::event_segmentation::types::{
+use crate::expr::{event_expression, property_col, property_expression, time_expression};
+use crate::queries::event_segmentation::types::{
     Breakdown, Event, EventFilter, EventSegmentation, Query,
 };
-use crate::reports::expr::{property_col, property_expression, time_expression};
 
 pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
@@ -140,9 +139,7 @@ impl LogicalPlanBuilder {
 
                 // merge multiple results into one schema
                 LogicalPlan::Extension(Extension {
-                    node: Arc::new(
-                        MergeNode::try_new(inputs).map_err(|e| e.into_datafusion_plan_error())?,
-                    ),
+                    node: Arc::new(MergeNode::try_new(inputs)?),
                 })
             }
         };
@@ -171,10 +168,7 @@ impl LogicalPlanBuilder {
         }
 
         Ok(LogicalPlan::Extension(Extension {
-            node: Arc::new(
-                DictionaryDecodeNode::try_new(input, decode_cols)
-                    .map_err(|e| e.into_datafusion_plan_error())?,
-            ),
+            node: Arc::new(DictionaryDecodeNode::try_new(input, decode_cols)?),
         }))
     }
 
@@ -240,7 +234,14 @@ impl LogicalPlanBuilder {
         )?;
 
         // event expression
-        expr = and(expr, self.event_expression(event).await?);
+        expr = and(
+            expr,
+            event_expression(&self.ctx, &self.metadata, &event.event).await?,
+        );
+        // apply event filters
+        if let Some(filters) = &event.filters {
+            expr = and(expr.clone(), self.event_filters_expression(filters).await?)
+        }
 
         // global event filters
         if let Some(filters) = &self.es.filters {
@@ -369,40 +370,6 @@ impl LogicalPlanBuilder {
         Ok(expr)
     }
 
-    /// builds expression for event
-    async fn event_expression(&self, event: &Event) -> Result<Expr> {
-        // match event type
-        match &event.event {
-            // regular event
-            EventRef::Regular(_) => {
-                let e = self
-                    .metadata
-                    .events
-                    .get_by_name(
-                        self.ctx.organization_id,
-                        self.ctx.project_id,
-                        event.event.name(),
-                    )
-                    .await?;
-                // add event name condition
-                let mut expr = binary_expr(
-                    col(event_fields::EVENT),
-                    Operator::Eq,
-                    lit(ScalarValue::from(e.id)),
-                );
-
-                // apply filters
-                if let Some(filters) = &event.filters {
-                    expr = and(expr.clone(), self.event_filters_expression(filters).await?)
-                }
-
-                Ok(expr)
-            }
-
-            EventRef::Custom(_event_name) => unimplemented!(),
-        }
-    }
-
     /// builds event filters expression
     async fn event_filters_expression(&self, filters: &[EventFilter]) -> Result<Expr> {
         // iterate over filters
@@ -415,16 +382,13 @@ impl LogicalPlanBuilder {
                         property,
                         operation,
                         value,
-                    } => {
-                        let df_value: Option<Vec<ScalarValue>> = value.as_ref().map(|x| x.to_vec());
-                        executor::block_on(property_expression(
-                            &self.ctx,
-                            &self.metadata,
-                            property,
-                            operation,
-                            df_value,
-                        ))
-                    }
+                    } => executor::block_on(property_expression(
+                        &self.ctx,
+                        &self.metadata,
+                        property,
+                        operation,
+                        value.to_owned(),
+                    )),
                 }
             })
             .collect::<Result<Vec<Expr>>>()?;

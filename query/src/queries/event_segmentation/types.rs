@@ -1,5 +1,5 @@
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-use crate::reports::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
+use crate::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
 use chrono::{DateTime, Utc};
 use datafusion_common::ScalarValue;
 use datafusion_expr::AggregateFunction;
@@ -181,11 +181,11 @@ pub struct EventSegmentation {
 mod tests {
     use crate::event_fields;
     use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-    use crate::reports::event_segmentation::types::{
+    use crate::queries::event_segmentation::types::{
         Analysis, Breakdown, ChartType, Compare, Event, EventFilter, EventSegmentation, NamedQuery,
         Query,
     };
-    use crate::reports::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
+    use crate::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
     use chrono::{DateTime, Utc};
     use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;

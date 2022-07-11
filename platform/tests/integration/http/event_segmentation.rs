@@ -1,11 +1,10 @@
 #[cfg(test)]
 mod tests {
     use axum::{Router, Server};
-    use metadata::{Metadata, Store};
+    use metadata::Metadata;
     use platform::error::Result;
-    use platform::http::event_segmentation;
-    use platform::EventSegmentationProvider;
-    use query::QueryProvider;
+    use platform::http::queries;
+    use query::{Context, QueryProvider};
     use std::env::temp_dir;
     use std::net::SocketAddr;
     use std::sync::Arc;
@@ -27,246 +26,43 @@ mod tests {
     use metadata::properties::provider::Namespace;
     use metadata::properties::{CreatePropertyRequest, Property};
     use metadata::{events, properties};
-    use platform::event_segmentation::types::{
-        AggregateFunction, Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation,
-        EventType, PartitionedAggregateFunction, PropValueOperation, PropertyType, Query,
+    use platform::queries::event_segmentation::{
+        Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, EventType,
+        PropertyType, Query,
+    };
+    use platform::queries::types::{
+        AggregateFunction, EventRef, PartitionedAggregateFunction, PropValueOperation, PropertyRef,
         QueryTime, TimeUnit,
     };
+    use query::test_util::{create_entities, create_md, events_provider};
     use reqwest::Client;
     use serde_json::Value;
 
-    async fn create_property(
-        md: &Arc<Metadata>,
-        ns: Namespace,
-        org_id: u64,
-        proj_id: u64,
-        req: CreatePropertyRequest,
-    ) -> Result<Property> {
-        let prop = match ns {
-            Namespace::Event => md.event_properties.create(org_id, proj_id, req).await?,
-            Namespace::User => md.user_properties.create(org_id, proj_id, req).await?,
-        };
-
-        md.database
-            .add_column(
-                TableType::Events(org_id, proj_id),
-                Column::new(prop.column_name(ns), prop.typ.clone(), prop.nullable, None),
-            )
-            .await?;
-
-        Ok(prop)
-    }
-
-    async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Result<()> {
-        md.database
-            .create_table(Table {
-                typ: TableType::Events(org_id, proj_id),
-                columns: vec![],
-            })
-            .await?;
-
-        md.database
-            .add_column(
-                TableType::Events(org_id, proj_id),
-                Column::new("user_id".to_string(), DFDataType::UInt64, false, None),
-            )
-            .await?;
-        md.database
-            .add_column(
-                TableType::Events(org_id, proj_id),
-                Column::new(
-                    "event_created_at".to_string(),
-                    DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
-                    false,
-                    None,
-                ),
-            )
-            .await?;
-        md.database
-            .add_column(
-                TableType::Events(org_id, proj_id),
-                Column::new("event_event".to_string(), DFDataType::UInt16, false, None),
-            )
-            .await?;
-
-        // create user props
-        create_property(
-            &md,
-            Namespace::User,
-            org_id,
-            proj_id,
-            CreatePropertyRequest {
-                created_by: 0,
-                tags: None,
-                name: "Country".to_string(),
-                description: None,
-                display_name: None,
-                typ: DFDataType::Utf8,
-                status: properties::Status::Enabled,
-                is_system: false,
-                nullable: false,
-                is_array: false,
-                is_dictionary: false,
-                dictionary_type: None,
-            },
-        )
-        .await?;
-
-        create_property(
-            &md,
-            Namespace::User,
-            org_id,
-            proj_id,
-            CreatePropertyRequest {
-                created_by: 0,
-                tags: None,
-                name: "Device".to_string(),
-                description: None,
-                display_name: None,
-                typ: DFDataType::Utf8,
-                status: properties::Status::Enabled,
-                is_system: false,
-                nullable: false,
-                is_array: false,
-                is_dictionary: false,
-                dictionary_type: None,
-            },
-        )
-        .await?;
-
-        create_property(
-            &md,
-            Namespace::User,
-            org_id,
-            proj_id,
-            CreatePropertyRequest {
-                created_by: 0,
-                tags: None,
-                name: "Is Premium".to_string(),
-                description: None,
-                display_name: None,
-                typ: DFDataType::Boolean,
-                status: properties::Status::Enabled,
-                is_system: false,
-                nullable: false,
-                is_array: false,
-                is_dictionary: false,
-                dictionary_type: None,
-            },
-        )
-        .await?;
-
-        // create events
-        md.events
-            .create(
-                org_id,
-                proj_id,
-                events::CreateEventRequest {
-                    created_by: 0,
-                    tags: None,
-                    name: "View Product".to_string(),
-                    display_name: None,
-                    description: None,
-                    status: events::Status::Enabled,
-                    is_system: false,
-                    properties: None,
-                    custom_properties: None,
-                },
-            )
-            .await?;
-
-        md.events
-            .create(
-                org_id,
-                proj_id,
-                events::CreateEventRequest {
-                    created_by: 0,
-                    tags: None,
-                    name: "Buy Product".to_string(),
-                    display_name: None,
-                    description: None,
-                    status: events::Status::Enabled,
-                    is_system: false,
-                    properties: None,
-                    custom_properties: None,
-                },
-            )
-            .await?;
-
-        // create event props
-        create_property(
-            &md,
-            Namespace::Event,
-            org_id,
-            proj_id,
-            CreatePropertyRequest {
-                created_by: 0,
-                tags: None,
-                name: "Product Name".to_string(),
-                description: None,
-                display_name: None,
-                typ: DFDataType::Utf8,
-                status: properties::Status::Enabled,
-                nullable: false,
-                is_array: false,
-                is_dictionary: false,
-                dictionary_type: None,
-                is_system: false,
-            },
-        )
-        .await?;
-
-        create_property(
-            &md,
-            Namespace::Event,
-            org_id,
-            proj_id,
-            CreatePropertyRequest {
-                created_by: 0,
-                tags: None,
-                name: "Revenue".to_string(),
-                description: None,
-                display_name: None,
-                typ: DFDataType::Float64,
-                status: properties::Status::Enabled,
-                is_system: false,
-                nullable: false,
-                is_array: false,
-                is_dictionary: false,
-                dictionary_type: None,
-            },
-        )
-        .await?;
-
-        Ok(())
-    }
-
     #[tokio::test]
-    async fn test_events() -> Result<()> {
+    async fn test_event_segmentation() -> Result<()> {
         tokio::spawn(async {
-            let mut path = temp_dir();
-            path.push(format!("{}.db", Uuid::new_v4()));
-            let store = Arc::new(Store::new(path));
-            let md = Arc::new(Metadata::try_new(store).unwrap());
-            create_entities(md.clone(), 1, 1).await.unwrap();
+            let md = create_md().unwrap();
 
-            let table = md
-                .database
-                .get_table(TableType::Events(1, 1))
+            let org_id = 1;
+            let proj_id = 1;
+
+            let ctx = Context {
+                organization_id: org_id,
+                account_id: 1,
+                project_id: proj_id,
+            };
+
+            create_entities(md.clone(), org_id, proj_id).await.unwrap();
+            let input = events_provider(md.database.clone(), org_id, proj_id)
                 .await
                 .unwrap();
-            let schema = table.arrow_schema();
-            let options = CsvReadOptions::new().schema(&schema);
-            let path = "../tests/events.csv";
-            let opt = ListingOptions::new(Arc::new(CsvFormat::default()));
-            let config = ListingTableConfig::new(Arc::new(LocalFileSystem {}), path)
-                .with_listing_options(opt)
-                .with_schema(Arc::new(schema));
-
-            let provider = ListingTable::try_new(config).unwrap();
-            let query = QueryProvider::try_new(md, Arc::new(provider)).unwrap();
-            let es_provider = Arc::new(EventSegmentationProvider::new(Arc::new(query)));
-            let app = event_segmentation::attach_routes(Router::new(), es_provider);
+            let query = QueryProvider::new_from_logical_plan(md, input);
+            let app = queries::attach_routes(
+                Router::new(),
+                Arc::new(platform::queries::provider::QueryProvider::new(Arc::new(
+                    query,
+                ))),
+            );
 
             let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
             Server::bind(&addr)
@@ -286,30 +82,34 @@ mod tests {
 
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
-            group: "user_id".to_string(),
+            group: "event_user_id".to_string(),
             interval_unit: TimeUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
             events: vec![
                 Event {
-                    event_name: "View Product".to_string(),
-                    event_type: EventType::Regular,
+                    event: EventRef::Regular {
+                        event_name: "View Product".to_string(),
+                    },
                     filters: Some(vec![EventFilter::Property {
-                        property_name: "Is Premium".to_string(),
-                        property_type: PropertyType::User,
+                        property: PropertyRef::User {
+                            property_name: "Is Premium".to_string(),
+                        },
                         operation: PropValueOperation::Eq,
                         value: Some(vec![Value::Bool(true)]),
                     }]),
                     breakdowns: Some(vec![Breakdown::Property {
-                        property_name: "Device".to_string(),
-                        property_type: PropertyType::User,
+                        property: PropertyRef::User {
+                            property_name: "Device".to_string(),
+                        },
                     }]),
                     queries: vec![Query::CountEvents],
                 },
                 Event {
-                    event_name: "Buy Product".to_string(),
-                    event_type: EventType::Regular,
+                    event: EventRef::Regular {
+                        event_name: "Buy Product".to_string(),
+                    },
                     filters: None,
                     breakdowns: None,
                     queries: vec![
@@ -319,14 +119,16 @@ mod tests {
                             aggregate: AggregateFunction::Avg,
                         },
                         Query::AggregatePropertyPerGroup {
-                            property_name: "Revenue".to_string(),
-                            property_type: PropertyType::Event,
+                            property: PropertyRef::Event {
+                                property_name: "Revenue".to_string(),
+                            },
                             aggregate_per_group: PartitionedAggregateFunction::Sum,
                             aggregate: AggregateFunction::Avg,
                         },
                         Query::AggregateProperty {
-                            property_name: "Revenue".to_string(),
-                            property_type: PropertyType::Event,
+                            property: PropertyRef::Event {
+                                property_name: "Revenue".to_string(),
+                            },
                             aggregate: AggregateFunction::Sum,
                         },
                     ],
@@ -334,8 +136,9 @@ mod tests {
             ],
             filters: None,
             breakdowns: Some(vec![Breakdown::Property {
-                property_name: "Country".to_string(),
-                property_type: PropertyType::User,
+                property: PropertyRef::User {
+                    property_name: "Country".to_string(),
+                },
             }]),
             segments: None,
         };
