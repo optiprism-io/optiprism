@@ -1,10 +1,9 @@
 #[cfg(test)]
 mod tests {
     use axum::{Router, Server};
-    use metadata::{Metadata, Store};
+    use metadata::{Metadata};
     use platform::error::Result;
     use platform::http::queries;
-    use platform::EventSegmentationProvider;
     use query::{Context, QueryProvider};
     use std::env::temp_dir;
     use std::net::SocketAddr;
@@ -28,20 +27,19 @@ mod tests {
     use metadata::properties::{CreatePropertyRequest, Property};
     use metadata::{events, properties};
     use platform::queries::event_segmentation::{
-        AggregateFunction, Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation,
-        EventType, PartitionedAggregateFunction, PropValueOperation, PropertyType, Query,
-        QueryTime, TimeUnit,
-    };
+        Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation,
+        EventType, PropertyType, Query,
+            };
     use reqwest::Client;
     use serde_json::Value;
-    use platform::queries::types::{EventRef, PropertyRef};
+    use platform::queries::types::{AggregateFunction, EventRef, PartitionedAggregateFunction, PropertyRef, PropValueOperation, QueryTime, TimeUnit};
     use query::test_util::{create_entities, create_md, events_provider};
 
 
     #[tokio::test]
     async fn test_event_segmentation() -> Result<()> {
         tokio::spawn(async {
-            let md = create_md()?;
+            let md = create_md().unwrap();
 
             let org_id = 1;
             let proj_id = 1;
@@ -52,11 +50,10 @@ mod tests {
                 project_id: proj_id,
             };
 
-            create_entities(md.clone(), org_id, proj_id).await?;
-            let input = events_provider(md.database.clone(), org_id, proj_id).await?;
-            let query = QueryProvider::new_from_logical_plan(md, input).unwrap();
-            let es_provider = Arc::new(EventSegmentationProvider::new(Arc::new(query)));
-            let app = queries::attach_routes(Router::new(), es_provider);
+            create_entities(md.clone(), org_id, proj_id).await.unwrap();
+            let input = events_provider(md.database.clone(), org_id, proj_id).await.unwrap();
+            let query = QueryProvider::new_from_logical_plan(md, input);
+            let app = queries::attach_routes(Router::new(), Arc::new(platform::queries::provider::QueryProvider::new(Arc::new(query))));
 
             let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
             Server::bind(&addr)
@@ -76,7 +73,7 @@ mod tests {
 
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
-            group: "user_id".to_string(),
+            group: "event_user_id".to_string(),
             interval_unit: TimeUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
@@ -105,14 +102,12 @@ mod tests {
                             aggregate: AggregateFunction::Avg,
                         },
                         Query::AggregatePropertyPerGroup {
-                            property_name: "Revenue".to_string(),
-                            property_type: PropertyType::Event,
+                            property: PropertyRef::Event { property_name: "Revenue".to_string() },
                             aggregate_per_group: PartitionedAggregateFunction::Sum,
                             aggregate: AggregateFunction::Avg,
                         },
                         Query::AggregateProperty {
-                            property_name: "Revenue".to_string(),
-                            property_type: PropertyType::Event,
+                            property: PropertyRef::Event { property_name: "Revenue".to_string() },
                             aggregate: AggregateFunction::Sum,
                         },
                     ],

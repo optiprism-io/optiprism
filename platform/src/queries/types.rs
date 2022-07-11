@@ -30,6 +30,8 @@ pub enum PropValueOperation {
     ArrAny,
     ArrNone,
     Regex,
+    Like,
+    NotLike,
 }
 
 impl TryInto<query_types::PropValueOperation> for PropValueOperation {
@@ -51,6 +53,8 @@ impl TryInto<query_types::PropValueOperation> for PropValueOperation {
             PropValueOperation::ArrAny => query_types::PropValueOperation::ArrAny,
             PropValueOperation::ArrNone => query_types::PropValueOperation::ArrNone,
             PropValueOperation::Regex => query_types::PropValueOperation::Regex,
+            PropValueOperation::Like => query_types::PropValueOperation::Like,
+            PropValueOperation::NotLike => query_types::PropValueOperation::NotLike
         })
     }
 }
@@ -240,23 +244,29 @@ pub fn json_value_to_scalar(v: &Value) -> Result<ScalarValue> {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "eventType", rename_all = "camelCase")]
 pub enum EventRef {
+    #[serde(rename_all = "camelCase")]
     Regular { event_name: String },
+    #[serde(rename_all = "camelCase")]
     Custom { event_id: u64 },
 }
 
 impl EventRef {
-    pub fn name(&self, idx:usize) -> String {
+    pub fn name(&self, idx: usize) -> String {
         match self {
-            EventRef::Regular { event_name } => format!("{}_regular_{}",event_name.to_case(Case::Snake),idx),
-            EventRef::Custom { event_id } => format!("{}_custom_{}",event_id,idx),
+            EventRef::Regular { event_name } => format!("{}_regular_{}", event_name.to_case(Case::Snake), idx),
+            EventRef::Custom { event_id } => format!("{}_custom_{}", event_id, idx),
         }
     }
 }
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "propertyType", rename_all = "camelCase")]
 pub enum PropertyRef {
+    #[serde(rename_all = "camelCase")]
     User { property_name: String },
+    #[serde(rename_all = "camelCase")]
     Event { property_name: String },
+    #[serde(rename_all = "camelCase")]
     Custom { property_id: u64 },
 }
 

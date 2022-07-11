@@ -320,8 +320,8 @@ impl TryInto<query_es_types::EventFilter> for &EventFilter {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Breakdown {
-    #[serde(rename_all = "camelCase")]
     Property {
+        #[serde(flatten)]
         property: PropertyRef
     },
 }
@@ -555,7 +555,8 @@ mod tests {
 
         let _qes: QueryEventSegmentation = es.clone().try_into()?;
         let j = serde_json::to_string_pretty(&es).unwrap();
-        println!("{j}");
+        print!("1 {}", j);
+
         Ok(())
     }
 }
