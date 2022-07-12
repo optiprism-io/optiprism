@@ -76,6 +76,52 @@ pub enum PropertyError {
 }
 
 #[derive(Error, Debug)]
+pub enum DictionaryError {
+    #[error("key not found: {0:?}")]
+    KeyNotFound(DictionaryKey),
+    #[error("value not found: {0:?}")]
+    ValueNotFound(DictionaryValue),
+}
+
+#[derive(Debug)]
+pub struct DictionaryKey {
+    organization_id: u64,
+    project_id: u64,
+    dict: String,
+    key: u64,
+}
+
+impl DictionaryKey {
+    pub fn new(organization_id: u64, project_id: u64, dict: String, key: u64) -> Self {
+        Self {
+            organization_id,
+            project_id,
+            dict,
+            key,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct DictionaryValue {
+    organization_id: u64,
+    project_id: u64,
+    dict: String,
+    value: String,
+}
+
+impl DictionaryValue {
+    pub fn new(organization_id: u64, project_id: u64, dict: String, value: String) -> Self {
+        Self {
+            organization_id,
+            project_id,
+            dict,
+            value,
+        }
+    }
+}
+
+#[derive(Error, Debug)]
 pub enum StoreError {
     #[error("key already exist: {0:?}")]
     KeyAlreadyExists(String),
@@ -91,6 +137,8 @@ pub enum Error {
     Event(#[from] EventError),
     #[error("property {0:?}")]
     Property(#[from] PropertyError),
+    #[error("dictionary {0:?}")]
+    Dictionary(#[from] DictionaryError),
     #[error("store {0:?}")]
     Store(#[from] StoreError),
     #[error("c {0:?}")]
