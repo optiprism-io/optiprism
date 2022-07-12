@@ -51,7 +51,7 @@ impl Provider {
         let table = tables
             .iter_mut()
             .find(|t| t.typ == table_type)
-            .ok_or_else(|| Err(Error::Database(DatabaseError::TableNotFound(table_type))))?;
+            .ok_or_else(|| Error::Database(DatabaseError::TableNotFound(table_type)))?;
 
         if table.columns.iter().any(|c| c.name == col.name) {
             return Err(Error::Database(DatabaseError::ColumnAlreadyExists(col)).into());
