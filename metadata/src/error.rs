@@ -1,60 +1,102 @@
 use std::string::FromUtf8Error;
-use std::{
-    fmt::{self, Display, Formatter},
-    result,
-};
+use std::{error, error::Error as StdError, fmt::{self, Display, Formatter}, result};
+use std::str::Utf8Error;
+use thiserror::Error;
+use crate::database::{Column, Table, TableRef};
 
 pub type Result<T> = result::Result<T, Error>;
 
-#[derive(Debug)]
-pub enum Error {
-    Internal(String),
-    Plan(String),
-    BincodeError(bincode::Error),
-    RocksDbError(rocksdb::Error),
-    KeyAlreadyExists,
-    KeyNotFound(String),
-    ConstraintViolation,
-    FromUtf8Error(FromUtf8Error),
+#[derive(Error, Debug)]
+pub enum DatabaseError {
+    #[error("column already exist: {0:?}")]
+    ColumnAlreadyExists(Column),
+    #[error("table not found: {0:?}")]
+    TableNotFound(Table),
+    #[error("table already exist: {0:?}")]
+    TableAlreadyExists(Table),
 }
 
-impl std::error::Error for Error {}
+#[derive(Error, Debug)]
+pub enum EventError {
+    #[error("event not found: {0:?}")]
+    EventNotFound(Event),
+    #[error("event already exist: {0:?}")]
+    EventAlreadyExist(Event),
+    #[error("property not found: {0:?}")]
+    PropertyNotFound(Property),
+    #[error("property already exist: {0:?}")]
+    PropertyAlreadyExist(Property),
+}
 
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Error::Internal(err) => write!(f, "Internal error: {}", err),
-            Error::Plan(err) => write!(f, "Plan error: {}", err),
-            Error::BincodeError(err) => write!(f, "BincodeError error: {}", err),
-            Error::RocksDbError(err) => write!(f, "RocksDbError error: {}", err),
-            Error::KeyAlreadyExists => write!(f, "KeyAlreadyExists"),
-            Error::KeyNotFound(err) => write!(f, "KeyNotFound: {}", err),
-            Error::ConstraintViolation => write!(f, "ConstraintViolation"),
-            Error::FromUtf8Error(err) => write!(f, "FromUtf8Error: {}", err),
+#[derive(Debug)]
+pub struct Event {
+    organization_id: u64,
+    project_id: u64,
+    event_id: Option<u64>,
+    event_name: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct Property {
+    pub organization_id: u64,
+    pub project_id: u64,
+    pub event_id: Option<u64>,
+    pub property_id: Option<u64>,
+    pub property_name: Option<String>,
+}
+
+impl Event {
+    pub fn new_with_name(organization_id: u64, project_id: u64, event_name: String) -> Self {
+        Self {
+            organization_id,
+            project_id,
+            event_id: None,
+            event_name: Some(event_name),
+        }
+    }
+
+    pub fn new_with_id(organization_id: u64, project_id: u64, event_id: u64) -> Self {
+        Self {
+            organization_id,
+            project_id,
+            event_id: Some(event_id),
+            event_name: None,
         }
     }
 }
 
-impl From<Vec<u8>> for Error {
-    fn from(err: Vec<u8>) -> Self {
-        Self::Internal(unsafe { String::from_utf8_unchecked(err) })
-    }
+#[derive(Error, Debug)]
+pub enum StoreError {
+    #[error("key already exist: {0:?}")]
+    KeyAlreadyExists(String),
+    #[error("key not found: {0:?}")]
+    KeyNotFound(String),
 }
 
-impl From<rocksdb::Error> for Error {
-    fn from(err: rocksdb::Error) -> Self {
-        Self::RocksDbError(err)
-    }
-}
-
-impl From<bincode::Error> for Error {
-    fn from(err: bincode::Error) -> Self {
-        Self::BincodeError(err)
-    }
-}
-
-impl From<FromUtf8Error> for Error {
-    fn from(err: FromUtf8Error) -> Self {
-        Self::FromUtf8Error(err)
-    }
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("database {0:?}")]
+    Database(#[from] DatabaseError),
+    #[error("event {0:?}")]
+    Event(#[from] EventError),
+    #[error("store {0:?}")]
+    Store(#[from] StoreError),
+    #[error("c {0:?}")]
+    ColumnAlreadyExists(String),
+    #[error("a {0:?}")]
+    TableNotFound(String),
+    #[error("a {0:?}")]
+    TableAlreadyExists(String),
+    #[error("a {0:?}")]
+    KeyNotFound(String),
+    #[error("rocksdb {0:?}")]
+    RocksDbError(#[from] rocksdb::Error),
+    #[error("from utf {0:?}")]
+    FromUtf8(#[from] FromUtf8Error),
+    #[error("bincode {0:?}")]
+    Bincode(#[from] bincode::Error),
+    #[error("io {0}")]
+    Io(#[from] std::io::Error),
+    #[error("{0:?}")]
+    Other(#[from] Box<dyn error::Error + Sync + Send>),
 }

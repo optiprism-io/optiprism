@@ -1,9 +1,9 @@
 use metadata::dictionaries::Provider;
 use metadata::error::Result;
-use metadata::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 use uuid::Uuid;
+use metadata::store::Store;
 
 #[tokio::test]
 async fn test_properties() -> Result<()> {

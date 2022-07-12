@@ -20,7 +20,7 @@ mod tests {
 
     use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;
-    use metadata::database::{Column, Table, TableType};
+    use metadata::database::{Column, Table, TableRef};
     use metadata::properties::provider::Namespace;
     use metadata::properties::{CreatePropertyRequest, Property};
     use metadata::{database, events, properties, Metadata};

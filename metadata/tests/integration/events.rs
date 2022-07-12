@@ -1,5 +1,5 @@
 use metadata::error::Result;
-use metadata::store::store::Store;
+use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 
@@ -48,6 +48,7 @@ async fn test_events() -> Result<()> {
         .is_err());
     // assert_eq!(events.list_events().await?, vec![]);
     // create two events
+
     let mut create_event1 = create_event_req.clone();
     create_event1.name = "event1".to_string();
     let res = events.get_or_create(1, 1, create_event1.clone()).await?;
@@ -58,6 +59,7 @@ async fn test_events() -> Result<()> {
     create_event2.name = "event2".to_string();
     let res = events.create(1, 1, create_event2.clone()).await?;
     assert_eq!(res.id, 2);
+
     events.attach_property(1, 1, 1, 1).await?;
     assert!(events.attach_property(1, 1, 1, 1).await.is_err());
     events.attach_property(1, 1, 1, 2).await?;

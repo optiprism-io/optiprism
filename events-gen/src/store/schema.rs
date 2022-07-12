@@ -3,7 +3,7 @@ use crate::store::events::Event;
 use arrow::datatypes::{DataType, Schema, TimeUnit};
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use enum_iterator::all;
-use metadata::database::{Column, Table, TableType};
+use metadata::database::{Column, Table, TableRef};
 use metadata::events::Event as MDEvent;
 use metadata::properties::provider::Namespace;
 use metadata::properties::{CreatePropertyRequest, Property};
@@ -399,11 +399,12 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
     }
 
     let table = Table {
-        typ: TableType::Events(org_id, proj_id),
+        typ: TableRef::Events(org_id, proj_id),
         columns: cols,
     };
+
     match md.database.create_table(table.clone()).await {
-        Ok(_) | Err(metadata::error::Error::KeyAlreadyExists) => {}
+        Ok(_) | Err(metadata::error::Error::TableAlreadyExists(_)) => {}
         Err(err) => return Err(err.into()),
     };
 

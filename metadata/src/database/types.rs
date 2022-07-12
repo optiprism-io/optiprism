@@ -2,7 +2,7 @@ use arrow::datatypes::{DataType, Field, Schema};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum TableType {
+pub enum TableRef {
     Events(u64, u64),
     Users(u64, u64),
     System(String),
@@ -10,7 +10,7 @@ pub enum TableType {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Table {
-    pub typ: TableType,
+    pub typ: TableRef,
     pub columns: Vec<Column>,
 }
 
@@ -53,5 +53,19 @@ impl Table {
                 })
                 .collect(),
         )
+    }
+
+    pub fn qualified_name(&self) -> String {
+        self.typ.qualified_name()
+    }
+}
+
+impl TableRef {
+    pub fn qualified_name(&self) -> String {
+        match &self {
+            TableRef::Events(organization_id, project_id) => format!("events({},{})", organization_id, project_id),
+            TableRef::Users(organization_id, project_id) => format!("users({},{})", organization_id, project_id),
+            TableRef::System(name) => format!("system({})", name),
+        }
     }
 }
