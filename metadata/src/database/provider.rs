@@ -5,7 +5,7 @@ use bincode::serialize;
 
 use tokio::sync::RwLock;
 
-use crate::error::Error;
+use crate::error::{DatabaseError, Error};
 
 use crate::store::Store;
 use crate::Result;
@@ -28,7 +28,7 @@ impl Provider {
     pub async fn create_table(&self, table: Table) -> Result<()> {
         let mut tables = self.tables.write().await;
         if tables.iter().any(|t| t.typ == table.typ) {
-            return Err(Error::TableAlreadyExists(table.qualified_name()));
+            return Err(Error::Database(DatabaseError::TableAlreadyExists(table.typ)).into());
         }
 
         tables.push(table.clone());
@@ -41,7 +41,7 @@ impl Provider {
         let table = tables.iter().find(|t| t.typ == table_type);
 
         match table {
-            None => Err(Error::KeyNotFound("table".to_string())),
+            None => Err(Error::Database(DatabaseError::TableNotFound(table_type)).into()),
             Some(table) => Ok(table.clone()),
         }
     }
@@ -51,10 +51,10 @@ impl Provider {
         let table = tables
             .iter_mut()
             .find(|t| t.typ == table_type)
-            .ok_or_else(|| Error::TableNotFound(table_type.qualified_name()))?;
+            .ok_or_else(|| Err(Error::Database(DatabaseError::TableNotFound(table_type))))?;
 
         if table.columns.iter().any(|c| c.name == col.name) {
-            return Err(Error::ColumnAlreadyExists(col.name));
+            return Err(Error::Database(DatabaseError::ColumnAlreadyExists(col)).into());
         }
 
         table.columns.push(col.clone());

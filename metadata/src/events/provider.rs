@@ -13,6 +13,7 @@ use crate::metadata::{list, ListResponse};
 use crate::store::index::hash_map::HashMap;
 use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::{error, Result};
+use crate::properties::provider::Namespace;
 
 const NAMESPACE: &[u8] = b"events";
 const IDX_NAME: &[u8] = b"name";
@@ -153,7 +154,7 @@ impl Provider {
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let key = make_data_value_key(organization_id, project_id, NAMESPACE, id);
 
-        match self.store.get(key.clone()).await? {
+        match self.store.get(key).await? {
             None => Err(EventError::EventNotFound(error::Event::new_with_id(organization_id, project_id, id)).into()),
             Some(value) => Ok(deserialize(&value)?),
         }
@@ -294,6 +295,7 @@ impl Provider {
                 Some(_) => return Err(EventError::PropertyAlreadyExist(error::Property {
                     organization_id,
                     project_id,
+                    namespace: Namespace::Event,
                     event_id: Some(event_id),
                     property_id: Some(prop_id),
                     property_name: None,
@@ -325,6 +327,7 @@ impl Provider {
             None => return Err(EventError::PropertyNotFound(error::Property {
                 organization_id,
                 project_id,
+                namespace: Namespace::Event,
                 event_id: Some(event_id),
                 property_id: Some(prop_id),
                 property_name: None,
@@ -333,6 +336,7 @@ impl Provider {
                 None => return Err(EventError::PropertyAlreadyExist(error::Property {
                     organization_id,
                     project_id,
+                    namespace: Namespace::Event,
                     event_id: Some(event_id),
                     property_id: Some(prop_id),
                     property_name: None,
