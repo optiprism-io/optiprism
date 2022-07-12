@@ -6,7 +6,7 @@ use uuid::Uuid;
 use metadata::store::Store;
 
 #[tokio::test]
-async fn test_properties() -> Result<()> {
+async fn test_dictionaries() -> Result<()> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
 
