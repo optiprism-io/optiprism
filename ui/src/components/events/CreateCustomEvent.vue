@@ -196,7 +196,7 @@ onBeforeMount(async () => {
             events.value = JSON.parse(JSON.stringify(await Promise.all(editedEvent.value.events.map(async item => {
                 return {
                     ref: {
-                        type: item.eventType,
+                        type: 'regular',
                         id: item.eventId
                     },
                     filters: item.filters ? await Promise.all(item.filters.map(async filter => {
