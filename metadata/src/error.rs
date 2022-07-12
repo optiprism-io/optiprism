@@ -3,6 +3,7 @@ use std::{error, error::Error as StdError, fmt::{self, Display, Formatter}, resu
 use std::str::Utf8Error;
 use thiserror::Error;
 use crate::database::{Column, Table, TableRef};
+use crate::properties;
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -11,9 +12,9 @@ pub enum DatabaseError {
     #[error("column already exist: {0:?}")]
     ColumnAlreadyExists(Column),
     #[error("table not found: {0:?}")]
-    TableNotFound(Table),
+    TableNotFound(TableRef),
     #[error("table already exist: {0:?}")]
-    TableAlreadyExists(Table),
+    TableAlreadyExists(TableRef),
 }
 
 #[derive(Error, Debug)]
@@ -40,6 +41,7 @@ pub struct Event {
 pub struct Property {
     pub organization_id: u64,
     pub project_id: u64,
+    pub namespace: properties::provider::Namespace,
     pub event_id: Option<u64>,
     pub property_id: Option<u64>,
     pub property_name: Option<String>,
@@ -66,6 +68,14 @@ impl Event {
 }
 
 #[derive(Error, Debug)]
+pub enum PropertyError {
+    #[error("property not found: {0:?}")]
+    PropertyNotFound(Property),
+    #[error("property already exist: {0:?}")]
+    PropertyAlreadyExist(Property),
+}
+
+#[derive(Error, Debug)]
 pub enum StoreError {
     #[error("key already exist: {0:?}")]
     KeyAlreadyExists(String),
@@ -79,6 +89,8 @@ pub enum Error {
     Database(#[from] DatabaseError),
     #[error("event {0:?}")]
     Event(#[from] EventError),
+    #[error("property {0:?}")]
+    Property(#[from] PropertyError),
     #[error("store {0:?}")]
     Store(#[from] StoreError),
     #[error("c {0:?}")]
