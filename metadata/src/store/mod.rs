@@ -1,6 +1,6 @@
 pub mod index;
 
-use crate::{Result};
+use crate::{Error, Result};
 use rocksdb::{ColumnFamilyDescriptor, Options, SliceTransform, WriteBatch, DB};
 use std::path::Path;
 

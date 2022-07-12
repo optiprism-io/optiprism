@@ -6,14 +6,13 @@ use chrono::Utc;
 use tokio::sync::RwLock;
 use datafusion::logical_plan::or;
 
-use crate::error::{EventError, MetadataError, StoreError};
+use crate::error::{Error, EventError, StoreError};
 use crate::events::types::{CreateEventRequest, UpdateEventRequest};
 use crate::events::Event;
 use crate::metadata::{list, ListResponse};
 use crate::store::index::hash_map::HashMap;
 use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::{error, Result};
-use crate::properties::provider::Namespace;
 
 const NAMESPACE: &[u8] = b"events";
 const IDX_NAME: &[u8] = b"name";
@@ -92,7 +91,7 @@ impl Provider {
         );
 
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_name(organization_id, project_id, req.name)).into()),
+            Err(Error::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_name(organization_id, project_id, req.name)).into()),
             Err(other) => return Err(other),
             Ok(_) => {}
         }
@@ -144,7 +143,7 @@ impl Provider {
             .await
         {
             Ok(event) => return Ok(event),
-            Err(MetadataError::Event(EventError::EventNotFound(_))) => {}
+            Err(Error::Event(EventError::EventNotFound(_))) => {}
             other => return other,
         }
 
@@ -154,7 +153,7 @@ impl Provider {
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let key = make_data_value_key(organization_id, project_id, NAMESPACE, id);
 
-        match self.store.get(key).await? {
+        match self.store.get(key.clone()).await? {
             None => Err(EventError::EventNotFound(error::Event::new_with_id(organization_id, project_id, id)).into()),
             Some(value) => Ok(deserialize(&value)?),
         }
@@ -186,7 +185,7 @@ impl Provider {
                 name,
             ))
             .await {
-            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(EventError::EventNotFound(error::Event::new_with_name(organization_id, project_id, name.to_string())).into()),
+            Err(Error::Store(StoreError::KeyNotFound(_))) => Err(EventError::EventNotFound(error::Event::new_with_name(organization_id, project_id, name.to_string())).into()),
             Err(other) => Err(other),
             Ok(data) => Ok(deserialize(&data)?)
         }
@@ -237,7 +236,7 @@ impl Provider {
         match self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_id(organization_id, project_id, event_id)).into()),
+            Err(Error::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_id(organization_id, project_id, event_id)).into()),
             Err(other) => return Err(other),
             Ok(_) => {}
         }
@@ -295,7 +294,6 @@ impl Provider {
                 Some(_) => return Err(EventError::PropertyAlreadyExist(error::Property {
                     organization_id,
                     project_id,
-                    namespace: Namespace::Event,
                     event_id: Some(event_id),
                     property_id: Some(prop_id),
                     property_name: None,
@@ -327,7 +325,6 @@ impl Provider {
             None => return Err(EventError::PropertyNotFound(error::Property {
                 organization_id,
                 project_id,
-                namespace: Namespace::Event,
                 event_id: Some(event_id),
                 property_id: Some(prop_id),
                 property_name: None,
@@ -336,7 +333,6 @@ impl Provider {
                 None => return Err(EventError::PropertyAlreadyExist(error::Property {
                     organization_id,
                     project_id,
-                    namespace: Namespace::Event,
                     event_id: Some(event_id),
                     property_id: Some(prop_id),
                     property_name: None,

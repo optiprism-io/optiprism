@@ -10,7 +10,6 @@ use metadata::properties::{CreatePropertyRequest, Property};
 use metadata::{events, properties, Metadata};
 
 use std::sync::Arc;
-use metadata::error::DatabaseError;
 
 async fn create_event(
     md: &Arc<Metadata>,
@@ -405,7 +404,7 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
     };
 
     match md.database.create_table(table.clone()).await {
-        Ok(_) | Err(metadata::error::MetadataError::Database(DatabaseError::TableAlreadyExists(_))) => {}
+        Ok(_) | Err(metadata::error::Error::TableAlreadyExists(_)) => {}
         Err(err) => return Err(err.into()),
     };
 
