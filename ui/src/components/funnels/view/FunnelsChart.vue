@@ -1,30 +1,49 @@
 <template>
-    <div class="pf-l-flex">
+    <div
+        ref="container"
+        class="pf-l-flex pf-u-m-lg"
+    >
         <div
-            v-for="(item, i) in stepNumbers"
+            v-for="(_, i) in iterator"
             :key="i"
-            class="pf-l-flex__item pf-m-flex-1"
+            class="pf-m-flex-1 pf-m-spacer-none"
         >
             <ChartStacked
-                :x-val="'dimension'"
-                :y-vals="{
-                    'conversionCount': 'Conversion Count',
-                    'dropOffCount': 'Drop Off Count',
-                }"
                 :data="data[i]"
-                reverse-y
+                :x-key="'dimension'"
+                :y-keys="[
+                    ['conversionCount', 'conversionRatio'],
+                    ['dropOffCount', 'dropOffRatio']
+                ]"
+                :labels="{
+                    'conversionCount': $t('funnels.chart.conversionCount'),
+                    'dropOffCount': $t('funnels.chart.dropOffCount'),
+                    'conversionRatio': $t('funnels.chart.conversionRatio'),
+                    'dropOffRatio': $t('funnels.chart.dropOffRatio'),
+                }"
+                :width="stepWidth"
             >
-                {{ item }}
+                <div class="pf-l-flex pf-m-nowrap">
+                    <div class="pf-l-flex__item pf-u-color-400">
+                        {{ stepNumbers[i] }}
+                    </div>
+                    <div class="pf-l-flex__item">
+                        {{ stepNames[i] }}
+                    </div>
+                </div>
             </ChartStacked>
         </div>
     </div>
 </template>
 
 <script lang="ts" setup>
-import {computed, ref} from 'vue'
+import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import ChartStacked from '@/components/charts/stacked/ChartStacked.vue';
+import {useStepsStore} from '@/stores/funnels/steps';
+import {useEventName} from '@/helpers/useEventName';
 
 const container = ref<HTMLDivElement | null>(null)
+const containerWidth = ref(0)
 
 const json = {
     'columns': [
@@ -268,6 +287,26 @@ const json = {
     ]
 }
 
+const eventName = useEventName()
+const stepsStore = useStepsStore()
+
+const stepWidth = computed(() => {
+    return containerWidth.value / iterator.value.length
+})
+
+const iterator = computed(() => {
+    return Array.from({
+        length: Math.min(stepNames.value.length, stepNumbers.value.length)
+    })
+})
+
+const stepNames = computed<string[]>(() => {
+    const events = stepsStore.steps.map(step => step.events.map(event => event.event))
+    return events.map(items => {
+        return items.map(eventName).join(' or ')
+    })
+})
+
 const stepNumbers = computed<number[]>(() => {
     const metricValueColumns = json.columns.filter(col => col.type === 'funnelMetricValue')
     const stepNumbers = metricValueColumns.map(col => col.step) as number[]
@@ -289,9 +328,8 @@ const dimensions = computed(() => {
     return result
 })
 
-const conversionCount = computed(() => {
+const convertColumn = (columns: typeof json.columns) => {
     const result: number[][] = []
-    const columns = json.columns.filter(col => col.name === 'conversionCount')
 
     for (let i = 0; i < stepNumbers.value.length; i++) {
         const column = columns.find(col => col.step === stepNumbers.value[i])
@@ -303,22 +341,27 @@ const conversionCount = computed(() => {
     }
 
     return result
+}
+
+const conversionCount = computed(() => {
+    const columns = json.columns.filter(col => col.name === 'conversionCount')
+    return convertColumn(columns)
+})
+
+
+const conversionRatio = computed(() => {
+    const columns = json.columns.filter(col => col.name === 'conversionRatio')
+    return convertColumn(columns)
 })
 
 const dropOffCount = computed(() => {
-    const result: number[][] = []
     const columns = json.columns.filter(col => col.name === 'dropOffCount')
+    return convertColumn(columns)
+})
 
-    for (let i = 0; i < stepNumbers.value.length; i++) {
-        const column = columns.find(col => col.step === stepNumbers.value[i])
-        if (column) {
-            result.push(column.values as number[])
-        } else {
-            result.push([])
-        }
-    }
-
-    return result
+const dropOffRatio = computed(() => {
+    const columns = json.columns.filter(col => col.name === 'dropOffRatio')
+    return convertColumn(columns)
 })
 
 const data = computed(() => {
@@ -327,9 +370,27 @@ const data = computed(() => {
             return {
                 dimension: dimensions.value[j],
                 conversionCount: conversionCount.value[i]?.[j] ?? 0,
+                conversionRatio: conversionRatio.value[i]?.[j] ?? 0,
                 dropOffCount: dropOffCount.value[i]?.[j] ?? 0,
+                dropOffRatio: dropOffRatio.value[i]?.[j] ?? 0,
             }
         })
     })
+})
+
+const onResize = () => {
+    if (container.value) {
+        containerWidth.value = container.value.clientWidth - 1
+    }
+}
+
+watch(container, onResize)
+
+onMounted(() => {
+    window.addEventListener('resize', onResize)
+})
+
+onBeforeUnmount(() => {
+    window.removeEventListener('resize', onResize)
 })
 </script>

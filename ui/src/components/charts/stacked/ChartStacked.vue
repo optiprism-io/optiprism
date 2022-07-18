@@ -1,10 +1,10 @@
 <template>
-    <div class="pf-l-flex pf-m-column pf-u-m-lg">
+    <div class="pf-l-flex pf-m-column">
         <div
             ref="container"
             class="pf-l-flex__item"
         />
-        <div class="pf-u-font-size-xl pf-u-font-weight-bold pf-u-text-align-center pf-l-flex__item">
+        <div class="pf-u-font-size-lg pf-u-font-weight-bold pf-l-flex__item pf-u-px-lg">
             <slot />
         </div>
     </div>
@@ -15,49 +15,57 @@ import {computed, PropType, ref, watch} from 'vue';
 import {Chart} from '@antv/g2';
 import { lighten } from '@/helpers/colorHelper';
 
-const colors = ['#00b894', '#00cec9', '#0984e3', '#6c5ce7', '#e17055', '#fdcb6e']
 const container = ref<HTMLDivElement | null>(null)
+const chart = ref<Chart | null>(null)
 
 const props = defineProps({
     data: {
         type: Array as PropType<Record<string, string | number>[]>,
         default: () => []
     },
-    xVal: {
+    xKey: {
         type: String,
         required: true
     },
-    yVals: {
-        type: Object as PropType<Record<string, string>>,
+    yKeys: {
+        type: Array as PropType<string[][]>,
         required: true
     },
     labels: {
-        type: Array as PropType<string[]>,
-        default: () => []
+        type: Object as PropType<Record<string, string>>,
+        default: () => ({})
     },
-    reverseY: {
-        type: Boolean,
-        default: false
-    }
+    colors: {
+        type: Array as PropType<string[]>,
+        default: () => ['#ee5253', '#2e86de', '#ff9f43', '#5f27cd', '#10ac84', '#f368e0', '#0abde3']
+    },
+    width: {
+        type: Number,
+        default: 400
+    },
 })
 
-const yAxisVals = computed(() => {
-    return Object.keys(props.yVals)
-})
+const primaryKeys = computed(() => props.yKeys.map(keys => keys[0]))
+const secondaryKeys = computed(() => props.yKeys.map(keys => keys[1]))
 
 const dataView = computed(() => {
-    const reservedColors = colors.slice(0, props.data.length)
-    const values = props.reverseY ? [...yAxisVals.value].reverse() : yAxisVals.value
+    const colors = props.colors.slice(0, props.data.length)
 
     return props.data
         .map((item, i) => {
-            return values.map((key, j) => {
-                const iterator = props.reverseY ? values.length - j - 1 : j
+            return Array.from({ length: primaryKeys.value.length }).map((_, j) => {
+                const iterator = primaryKeys.value.length - 1 - j
+
+                const primaryKey = primaryKeys.value[iterator]
+                const secondaryKey = secondaryKeys.value[iterator]
+
                 return {
-                    key,
-                    [props.xVal]: item[props.xVal],
-                    total: item[key],
-                    color: lighten(reservedColors[i], iterator * 50)
+                    [props.xKey]: item[props.xKey],
+                    primaryKey,
+                    secondaryKey,
+                    primaryValue: item[primaryKey],
+                    secondaryValue: item[secondaryKey],
+                    color: lighten(colors[i], iterator * 80),
                 }
             })
         })
@@ -69,29 +77,58 @@ watch(() => [container.value, dataView.value], () => {
         return
     }
 
-    const chart = new Chart({
+    if (chart.value) {
+        chart.value.destroy()
+    }
+
+    chart.value = new Chart({
         container: container.value,
-        autoFit: true,
         height: 500,
+        width: props.width,
+        autoFit: false,
+        padding: 20,
     });
 
-    chart
+    chart.value
+        .animate(false)
         .legend(false)
+        .tooltip({
+            customItems: originalItems => {
+                const [item] = originalItems
+                const { primaryKey, secondaryKey, primaryValue, secondaryValue } = item.data as Record<string, string>
+
+                const secondaryBlock = secondaryKey && secondaryValue
+                    ? [{
+                        ...item,
+                        name: props.labels[secondaryKey] ?? secondaryKey,
+                        value: secondaryValue
+                    }]
+                    : []
+
+                return [
+                    {
+                        ...item,
+                        name: props.labels[primaryKey] ?? primaryKey,
+                        value: primaryValue,
+                    },
+                    ...secondaryBlock
+                ]
+            }
+        })
         .data(dataView.value)
-        .scale('total', { nice: true })
         .axis('dimension', false)
-        .axis('total', false)
+        .axis('primaryValue', false)
         .interval({ intervalPadding: 20 })
         .adjust('stack')
-        .position('dimension*total')
+        .position('dimension*primaryValue')
         .color('color', color => color)
-        .tooltip('key*total', (key, total) => {
-            return {
-                name: props.yVals[key],
-                value: total
-            }
-        });
 
-    chart.render();
+    chart.value.render();
 })
+
+watch(() => props.width, (width) => {
+    if (chart.value) {
+        chart.value.changeSize(width, 500)
+    }
+}, {immediate: true})
 </script>

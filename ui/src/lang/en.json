@@ -165,6 +165,13 @@
       "add": "Holding constant",
       "holding": "holding",
       "clear": "Clear holding constant"
+    },
+    "chart": {
+      "funnelSteps": "Funnel Steps",
+      "conversionCount": "Conversion count",
+      "conversionRatio": "Conversion ratio",
+      "dropOffCount": "Drop off count",
+      "dropOffRatio": "Drop off ratio"
     }
   },
 

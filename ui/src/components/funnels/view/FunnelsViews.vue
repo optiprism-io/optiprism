@@ -36,18 +36,11 @@
                     </div>
 
                     <div class="pf-c-toolbar__item pf-u-ml-auto">
-                        <SelectComponent
-                            v-model="stepItem"
-                            :items="stepsItems"
-                            :show-search="false"
-                        >
-                            <UiButton
-                                class="pf-m-main pf-m-secondary pf-l-flex__item"
-                                :is-link="true"
-                            >
-                                {{ stepItem }}
-                            </UiButton>
-                        </SelectComponent>
+                        <UiDropdown
+                            :items="items"
+                            :text-button="items[item].nameDisplay"
+                            @select="item = $event.key"
+                        />
                     </div>
                 </div>
             </div>
@@ -59,28 +52,25 @@
 
 <script lang="ts" setup>
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue';
-import {computed, ref} from 'vue';
-import { periodMap } from '@/configs/events/controls';
+import {computed, inject, ref} from 'vue';
+import {periodMap} from '@/configs/events/controls';
 import {UiToggleGroupItem} from '@/components/uikit/UiToggleGroup.vue';
 import {useFunnelsStore} from '@/stores/funnels/funnels';
 import {getStringDateByFormat} from '@/helpers/getStringDates';
 import {ApplyPayload} from '@/components/uikit/UiCalendar/UiCalendar';
-import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
-import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
 import FunnelsChart from '@/components/funnels/view/FunnelsChart.vue';
+import {I18N} from '@/plugins/i18n';
 
-const SelectComponent = UiSelectGeneric<string>()
+const { $t } = inject('i18n') as I18N
 
-const stepItem = ref('funnels-steps');
-
-const stepsItems = computed<UiSelectItemInterface<string>[]>(() => {
-    return [{
-        __type: 'item',
-        id: 'funnel-steps',
-        label: 'Funnel Steps',
-        value: 'funnel-steps',
-    }]
-})
+const items = [
+    {
+        key: 0,
+        value: 0,
+        nameDisplay: $t('funnels.chart.funnelSteps')
+    },
+];
+const item = ref(0)
 
 const funnelsStore = useFunnelsStore()
 
