@@ -1,7 +1,7 @@
 <template>
     <div class="pf-l-flex">
         <div
-            v-for="(item, i) in dat"
+            v-for="(item, i) in stepNumbers"
             :key="i"
             class="pf-l-flex__item pf-m-flex-1"
         >
@@ -11,9 +11,11 @@
                     'conversionCount': 'Conversion Count',
                     'dropOffCount': 'Drop Off Count',
                 }"
-                :data="item"
+                :data="data[i]"
                 reverse-y
-            />
+            >
+                {{ item }}
+            </ChartStacked>
         </div>
     </div>
 </template>
@@ -319,7 +321,7 @@ const dropOffCount = computed(() => {
     return result
 })
 
-const dat = computed(() => {
+const data = computed(() => {
     return Array.from({length: stepNumbers.value.length}).map((_, i) => {
         return Array.from({length: dimensions.value.length}).map((_, j) => {
             return {

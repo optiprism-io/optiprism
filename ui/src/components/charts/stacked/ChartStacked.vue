@@ -1,17 +1,20 @@
 <template>
-    <div
-        ref="container"
-        class="pf-u-m-lg"
-    />
+    <div class="pf-l-flex pf-m-column pf-u-m-lg">
+        <div
+            ref="container"
+            class="pf-l-flex__item"
+        />
+        <div class="pf-u-font-size-xl pf-u-font-weight-bold pf-u-text-align-center pf-l-flex__item">
+            <slot />
+        </div>
+    </div>
 </template>
 
 <script lang="ts" setup>
 import {computed, PropType, ref, watch} from 'vue';
-import DataSet from '@antv/data-set';
 import {Chart} from '@antv/g2';
 import { lighten } from '@/helpers/colorHelper';
 
-const ds = new DataSet()
 const colors = ['#00b894', '#00cec9', '#0984e3', '#6c5ce7', '#e17055', '#fdcb6e']
 const container = ref<HTMLDivElement | null>(null)
 
