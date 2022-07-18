@@ -68,6 +68,10 @@
         <UiCard :title="$t('funnels.breakdowns')">
             <Breakdowns />
         </UiCard>
+
+        <template #main>
+            <FunnelsViews />
+        </template>
     </ToolsLayout>
 </template>
 
@@ -92,6 +96,7 @@ import {FilterCondition, filterConditions, useFilterGroupsStore} from '@/stores/
 import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
 import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
 import {I18N} from '@/plugins/i18n';
+import FunnelsViews from '@/components/funnels/view/FunnelsViews.vue';
 
 const eventsStore = useEventsStore();
 const filterGroupsStore = useFilterGroupsStore()

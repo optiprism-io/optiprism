@@ -8,6 +8,7 @@
         "serve": "vite preview"
     },
     "dependencies": {
+        "@antv/g2": "^4.2.5",
         "@antv/g2plot": "^2.4.9",
         "@patternfly/patternfly": "^4.183.1",
         "axios": "^0.26.0",
