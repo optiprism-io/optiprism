@@ -2,12 +2,12 @@ use super::{Account, CreateRequest, UpdateRequest};
 use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::store::index::hash_map::HashMap;
 use crate::store::Store;
-use crate::{error, Result};
+use crate::{Error, error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::error::{AccountError, MetadataError, StoreError};
+use crate::error::{AccountError, StoreError};
 
 const NAMESPACE: &[u8] = b"accounts";
 const IDX_EMAIL: &[u8] = b"email";
@@ -51,7 +51,7 @@ impl Provider {
         let _guard = self.guard.write().await;
         let idx_keys = index_keys(req.email.as_str());
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(AccountError::AccountAlreadyExist(error::Account::new_with_email(req.email)).into()),
+            Err(Error::Store(StoreError::KeyAlreadyExists(_))) => return Err(AccountError::AccountAlreadyExist(error::Account::new_with_email(req.email)).into()),
             Err(other) => return Err(other),
             Ok(_) => {}
         }
@@ -79,7 +79,7 @@ impl Provider {
             .idx
             .get(make_index_key(NAMESPACE, IDX_EMAIL, email))
             .await {
-            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(AccountError::AccountNotFound(error::Account::new_with_email(email.to_string())).into()),
+            Err(Error::Store(StoreError::KeyNotFound(_))) => Err(AccountError::AccountNotFound(error::Account::new_with_email(email.to_string())).into()),
             Err(other) => Err(other),
             Ok(data) => Ok(deserialize(&data)?)
         }
@@ -117,7 +117,7 @@ impl Provider {
         match self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(AccountError::AccountAlreadyExist(error::Account::new_with_id(req.id)).into()),
+            Err(Error::Store(StoreError::KeyAlreadyExists(_))) => return Err(AccountError::AccountAlreadyExist(error::Account::new_with_id(req.id)).into()),
             Err(other) => return Err(other),
             Ok(_) => {}
         }

@@ -37,6 +37,80 @@ pub struct Event {
     event_name: Option<String>,
 }
 
+#[derive(Error, Debug)]
+pub enum AccountError {
+    #[error("account not found: {0:?}")]
+    AccountNotFound(Account),
+    #[error("account already exist: {0:?}")]
+    AccountAlreadyExist(Account),
+}
+
+#[derive(Debug)]
+pub struct Account {
+    account_id: Option<u64>,
+    email: Option<String>,
+}
+
+impl Account {
+    pub fn new_with_email(email: String) -> Self {
+        Self {
+            account_id: None,
+            email: Some(email),
+        }
+    }
+
+    pub fn new_with_id(account_id: u64) -> Self {
+        Self {
+            account_id: Some(account_id),
+            email: None,
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum OrganizationError {
+    #[error("organization not found: {0:?}")]
+    OrganizationNotFound(Organization),
+    #[error("organization already exist: {0:?}")]
+    OrganizationAlreadyExist(Organization),
+}
+
+#[derive(Debug)]
+pub struct Organization {
+    id: u64,
+}
+
+impl Organization {
+    pub fn new(id: u64) -> Self {
+        Self {
+            id,
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ProjectError {
+    #[error("project not found: {0:?}")]
+    ProjectNotFound(Project),
+    #[error("project already exist: {0:?}")]
+    ProjectAlreadyExist(Project),
+}
+
+#[derive(Debug)]
+pub struct Project {
+    organization_id: u64,
+    project_id: u64,
+}
+
+impl Project {
+    pub fn new(organization_id: u64, project_id: u64) -> Self {
+        Self {
+            organization_id,
+            project_id,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Property {
     pub organization_id: u64,
@@ -133,6 +207,12 @@ pub enum StoreError {
 pub enum Error {
     #[error("database {0:?}")]
     Database(#[from] DatabaseError),
+    #[error("account {0:?}")]
+    Account(#[from] AccountError),
+    #[error("organization {0:?}")]
+    Organization(#[from] OrganizationError),
+    #[error("project {0:?}")]
+    Project(#[from] ProjectError),
     #[error("event {0:?}")]
     Event(#[from] EventError),
     #[error("property {0:?}")]
@@ -141,16 +221,8 @@ pub enum Error {
     Dictionary(#[from] DictionaryError),
     #[error("store {0:?}")]
     Store(#[from] StoreError),
-    #[error("c {0:?}")]
-    ColumnAlreadyExists(String),
-    #[error("a {0:?}")]
-    TableNotFound(String),
-    #[error("a {0:?}")]
-    TableAlreadyExists(String),
-    #[error("a {0:?}")]
-    KeyNotFound(String),
     #[error("rocksdb {0:?}")]
-    RocksDbError(#[from] rocksdb::Error),
+    RocksDb(#[from] rocksdb::Error),
     #[error("from utf {0:?}")]
     FromUtf8(#[from] FromUtf8Error),
     #[error("bincode {0:?}")]
