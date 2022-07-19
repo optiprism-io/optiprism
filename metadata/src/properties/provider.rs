@@ -1,4 +1,4 @@
-use crate::error::{Error, PropertyError, StoreError};
+use crate::error::{ MetadataError, PropertyError, StoreError};
 use crate::metadata::{list, ListResponse};
 use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
@@ -118,7 +118,7 @@ impl Provider {
             req.display_name.clone(),
         );
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
-            Err(Error::Store(StoreError::KeyAlreadyExists(_))) => return Err(PropertyError::PropertyAlreadyExist(error::Property {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(PropertyError::PropertyAlreadyExist(error::Property {
                 organization_id,
                 project_id,
                 namespace: self.ns.clone(),
@@ -184,7 +184,7 @@ impl Provider {
             .await
         {
             Ok(event) => return Ok(event),
-            Err(Error::Property(PropertyError::PropertyNotFound(_))) => {}
+            Err(MetadataError::Property(PropertyError::PropertyNotFound(_))) => {}
             other => return other,
         }
 
@@ -238,7 +238,7 @@ impl Provider {
                 name,
             ))
             .await {
-            Err(Error::Store(StoreError::KeyNotFound(_))) => Err(PropertyError::PropertyNotFound(error::Property {
+            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(PropertyError::PropertyNotFound(error::Property {
                 organization_id,
                 project_id,
                 namespace: self.ns.clone(),
@@ -314,7 +314,7 @@ impl Provider {
         match self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await {
-            Err(Error::Store(StoreError::KeyAlreadyExists(_))) => return Err(PropertyError::PropertyAlreadyExist(error::Property {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(PropertyError::PropertyAlreadyExist(error::Property {
                 organization_id,
                 project_id,
                 namespace: self.ns.clone(),

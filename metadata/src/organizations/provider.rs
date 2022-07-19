@@ -1,6 +1,6 @@
 use super::{CreateRequest, ListRequest, Organization, UpdateRequest};
 use crate::store::Store;
-use crate::{error, error::Error, Result};
+use crate::{error,Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use futures::lock::Mutex;

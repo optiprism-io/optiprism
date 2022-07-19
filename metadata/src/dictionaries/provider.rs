@@ -1,4 +1,4 @@
-use crate::error::{DictionaryError, DictionaryKey, DictionaryValue, Error, Result};
+use crate::error::{DictionaryError, DictionaryKey, DictionaryValue, Result};
 use crate::store::{make_id_seq_key, make_main_key, Store};
 use byteorder::{ByteOrder, LittleEndian};
 use std::sync::Arc;

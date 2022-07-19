@@ -405,7 +405,7 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
     };
 
     match md.database.create_table(table.clone()).await {
-        Ok(_) | Err(metadata::error::Error::Database(DatabaseError::TableAlreadyExists(_))) => {}
+        Ok(_) | Err(metadata::error::MetadataError::Database(DatabaseError::TableAlreadyExists(_))) => {}
         Err(err) => return Err(err.into()),
     };
 
