@@ -38,8 +38,8 @@
                     <div class="pf-c-toolbar__item pf-u-ml-auto">
                         <UiDropdown
                             :items="items"
-                            :text-button="items[item].nameDisplay"
-                            @select="item = $event.key"
+                            :text-button="itemText"
+                            @select-value="selectItem"
                         />
                     </div>
                 </div>
@@ -60,6 +60,7 @@ import {getStringDateByFormat} from '@/helpers/getStringDates';
 import {ApplyPayload} from '@/components/uikit/UiCalendar/UiCalendar';
 import FunnelsChart from '@/components/funnels/view/FunnelsChart.vue';
 import {I18N} from '@/plugins/i18n';
+import {UiDropdownItem} from '@/components/uikit/UiDropdown.vue';
 
 const { $t } = inject('i18n') as I18N
 
@@ -68,9 +69,14 @@ const items = [
         key: 0,
         value: 0,
         nameDisplay: $t('funnels.chart.funnelSteps')
-    },
+    }
 ];
-const item = ref(0)
+const item = ref<string | number>(0)
+const itemText = computed(() => items.find(c => c.key === item.value)?.nameDisplay ?? '')
+
+const selectItem = (value: UiDropdownItem<string>) => {
+    item.value = value.key;
+}
 
 const funnelsStore = useFunnelsStore()
 
