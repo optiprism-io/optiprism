@@ -137,10 +137,10 @@ const userProperties = computed(() => {
 })
 
 onMounted(async () => {
-    await liveStreamStore.getReportLiveStream()
-    await lexiconStore.getEvents()
-    await lexiconStore.getEventProperties()
-    await lexiconStore.getUserProperties()
+    liveStreamStore.getReportLiveStream()
+    lexiconStore.getEvents()
+    lexiconStore.getEventProperties()
+    lexiconStore.getUserProperties()
 })
 
 const propertyPopupApply = async (payload: ApplyPayload) => {

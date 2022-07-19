@@ -72,7 +72,7 @@ import UiFormLabel from '@/components//uikit/UiFormLabel.vue'
 import Select from '@/components/Select/Select.vue'
 import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
 import schemaService from '@/api/services/schema.service'
-import { CreateCustomEventRequest, CustomEventEvent } from '@/api'
+import { CreateCustomEventRequest, CustomEventEvent, EventType } from '@/api'
 const i18n = inject<any>('i18n')
 
 const lexiconStore = useLexiconStore()
@@ -109,7 +109,7 @@ const title = computed(() => {
 })
 
 const eventItems = computed(() => {
-    return lexiconStore.eventsList.filter((group) => !group.type && group.type !== 'custom')
+    return lexiconStore.eventsList.filter((group) => !group.type && group.type !== EventType.Custom)
 })
 
 const addEvent = (ref: EventRef) => {
@@ -196,7 +196,7 @@ onBeforeMount(async () => {
             events.value = JSON.parse(JSON.stringify(await Promise.all(editedEvent.value.events.map(async item => {
                 return {
                     ref: {
-                        type: 'regular',
+                        type: EventType.Regular,
                         id: item.eventId
                     },
                     filters: item.filters ? await Promise.all(item.filters.map(async filter => {

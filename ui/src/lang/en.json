@@ -86,8 +86,8 @@
           "events": "Events",
           "property": "Property",
           "properties": "Properties",
-          "user_properties": "User Properties",
-          "custom_properties": "Custom Properties"
+          "userProperties": "User Properties",
+          "customProperties": "Custom Properties"
         }
       }
     },
