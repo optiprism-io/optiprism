@@ -1,4 +1,4 @@
-use crate::{Error, Result};
+use crate::{ Result};
 use arrow::array::{
     Array, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray, DecimalBuilder, Float32Builder,
     Float64Builder, Int16Array, Int16Builder, Int32Array, Int32Builder, Int64Array, Int64Builder,
@@ -27,6 +27,7 @@ use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use crate::error::QueryError;
 
 /// `UNPIVOT` execution plan operator. Unpivot transforms columns into rows. E.g.
 pub struct UnpivotExec {
@@ -51,7 +52,7 @@ impl UnpivotExec {
         uniq_cols.sort();
         uniq_cols.dedup();
         if cols.len() != uniq_cols.len() {
-            return Err(Error::QueryError("non-unique column".to_string()));
+            return Err(QueryError::Plan("non-unique column".to_string()));
         }
 
         for col in &cols {
@@ -131,7 +132,7 @@ impl ExecutionPlan for UnpivotExec {
                 self.name_col.clone(),
                 self.value_col.clone(),
             )
-            .map_err(Error::into_datafusion_execution_error)?,
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 

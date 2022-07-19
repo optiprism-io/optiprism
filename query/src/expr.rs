@@ -1,7 +1,7 @@
 use crate::logical_plan::expr::{lit_timestamp, multi_or};
 use crate::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime};
 use crate::{event_fields, Result};
-use crate::{Context, Error};
+use crate::{Context};
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
 
@@ -14,6 +14,7 @@ use metadata::properties::provider::Namespace;
 use metadata::{dictionaries, Metadata};
 
 use std::sync::Arc;
+use crate::error::QueryError;
 
 /// builds expression on timestamp
 pub fn time_expression<S: ExprSchema>(
@@ -62,7 +63,7 @@ pub async fn event_expression(
     })
 }
 
-pub async fn decode_property_dict_values(
+pub async fn encode_property_dict_values(
     ctx: &Context,
     dictionaries: &Arc<dictionaries::Provider>,
     dict_type: &DataType,
@@ -87,7 +88,7 @@ pub async fn decode_property_dict_values(
                     DataType::UInt16 => ScalarValue::UInt16(Some(key as u16)),
                     DataType::UInt32 => ScalarValue::UInt32(Some(key as u32)),
                     DataType::UInt64 => ScalarValue::UInt64(Some(key as u64)),
-                    _ => return Err(Error::QueryError("value type should be string".to_owned())),
+                    _ => return Err(QueryError::Plan(format!("unsupported dictionary type \"{:?}\"", dict_type)))
                 };
 
                 ret.push(scalar_value);
@@ -95,7 +96,7 @@ pub async fn decode_property_dict_values(
                 ret.push(ScalarValue::try_from(dict_type)?);
             }
         } else {
-            return Err(Error::QueryError("value type should be string".to_owned()));
+            return Err(QueryError::Plan(format!("value type should be Utf8, but \"{:?}\" was given", value.get_datatype())));
         }
     }
 
@@ -124,14 +125,14 @@ pub async fn property_expression(
             }
 
             if let Some(dict_type) = prop.dictionary_type {
-                let dict_values = decode_property_dict_values(
+                let dict_values = encode_property_dict_values(
                     ctx,
                     &md.dictionaries,
                     &dict_type,
                     col_name.as_str(),
                     &values.unwrap(),
                 )
-                .await?;
+                    .await?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)
@@ -150,14 +151,14 @@ pub async fn property_expression(
             }
 
             if let Some(dict_type) = prop.dictionary_type {
-                let dict_values = decode_property_dict_values(
+                let dict_values = encode_property_dict_values(
                     ctx,
                     &md.dictionaries,
                     &dict_type,
                     col_name.as_str(),
                     &values.unwrap(),
                 )
-                .await?;
+                    .await?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)
@@ -201,7 +202,7 @@ pub fn named_property_expression(
         PropValueOperation::Eq | PropValueOperation::Neq | PropValueOperation::Like => {
             // expressions for OR
             let values_vec = values.ok_or_else(|| {
-                Error::QueryError("value should be defined for this kind of operation".to_owned())
+                QueryError::Plan(format!("value should be defined for \"{:?}\" operation", operation))
             })?;
 
             Ok(match values_vec.len() {

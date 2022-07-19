@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::database::{Column, Table, TableRef};
 use crate::properties;
 
-pub type Result<T> = result::Result<T, Error>;
+pub type Result<T> = result::Result<T, MetadataError>;
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {
@@ -204,7 +204,7 @@ pub enum StoreError {
 }
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum MetadataError {
     #[error("database {0:?}")]
     Database(#[from] DatabaseError),
     #[error("account {0:?}")]

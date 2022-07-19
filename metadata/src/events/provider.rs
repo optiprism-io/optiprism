@@ -6,7 +6,7 @@ use chrono::Utc;
 use tokio::sync::RwLock;
 use datafusion::logical_plan::or;
 
-use crate::error::{Error, EventError, StoreError};
+use crate::error::{EventError, MetadataError, StoreError};
 use crate::events::types::{CreateEventRequest, UpdateEventRequest};
 use crate::events::Event;
 use crate::metadata::{list, ListResponse};
@@ -92,7 +92,7 @@ impl Provider {
         );
 
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
-            Err(Error::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_name(organization_id, project_id, req.name)).into()),
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_name(organization_id, project_id, req.name)).into()),
             Err(other) => return Err(other),
             Ok(_) => {}
         }
@@ -144,7 +144,7 @@ impl Provider {
             .await
         {
             Ok(event) => return Ok(event),
-            Err(Error::Event(EventError::EventNotFound(_))) => {}
+            Err(MetadataError::Event(EventError::EventNotFound(_))) => {}
             other => return other,
         }
 
@@ -186,7 +186,7 @@ impl Provider {
                 name,
             ))
             .await {
-            Err(Error::Store(StoreError::KeyNotFound(_))) => Err(EventError::EventNotFound(error::Event::new_with_name(organization_id, project_id, name.to_string())).into()),
+            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(EventError::EventNotFound(error::Event::new_with_name(organization_id, project_id, name.to_string())).into()),
             Err(other) => Err(other),
             Ok(data) => Ok(deserialize(&data)?)
         }
@@ -237,7 +237,7 @@ impl Provider {
         match self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
             .await {
-            Err(Error::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_id(organization_id, project_id, event_id)).into()),
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_id(organization_id, project_id, event_id)).into()),
             Err(other) => return Err(other),
             Ok(_) => {}
         }

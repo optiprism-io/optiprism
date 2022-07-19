@@ -1,4 +1,4 @@
-use crate::error::{Error, StoreError};
+use crate::error::{ StoreError};
 use crate::store::Store;
 use crate::Result;
 use std::sync::Arc;

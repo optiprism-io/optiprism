@@ -4,6 +4,7 @@ use datafusion_expr::Expr;
 use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
+use crate::error::QueryError;
 
 use crate::Result;
 
@@ -100,7 +101,7 @@ impl UserDefinedLogicalNode for PivotNode {
                 self.value_col.clone(),
                 self.result_cols.clone(),
             )
-            .map_err(|e| e.into_datafusion_plan_error())
+            .map_err(QueryError::into_datafusion_plan_error)
             .unwrap(),
         )
     }

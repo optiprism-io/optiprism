@@ -2282,6 +2282,7 @@ dependencies = [
  "serde",
  "serde_json",
  "store",
+ "thiserror",
  "tokio",
  "uuid",
 ]
