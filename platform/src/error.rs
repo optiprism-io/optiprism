@@ -98,9 +98,7 @@ impl IntoResponse for Error {
                 format!("internal error: {:?}", err),
             ),
             Error::Internal2(err) => (err.status_code, err.code.to_string()),
-            Error::MetadataError(metadata::Error::KeyNotFound(_)) => {
-                (StatusCode::NOT_FOUND, "not found".to_string())
-            }
+
             Error::QueryError(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("query error: {:?}", err),
