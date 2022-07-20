@@ -77,6 +77,11 @@ export default function ({ environment = 'development' } = {}) {
                 return schema.db.eventProperties
             });
 
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/event_properties/:property_id`, (schema, request) => {
+                const property = JSON.parse(request.requestBody)
+                return schema.db.eventProperties.update(request.params.property_id, property)
+            })
+
             this.get('/schema/event-custom-properties', () => {
                 return [
                     {

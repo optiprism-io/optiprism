@@ -1,6 +1,6 @@
 <template>
     <h1 class="pf-u-font-size-2xl pf-u-mb-md">
-        {{ $t('events.events') }}
+        {{ $t('events.event_properties') }}
     </h1>
     <div class="pf-l-grid pf-m-gutter">
         <div class="pf-l-grid__item">
@@ -19,16 +19,17 @@
 import { computed, inject } from 'vue'
 import { useLexiconStore } from '@/stores/lexicon'
 import { useCommonStore } from '@/stores/common'
-import UiTable from '@/components/uikit/UiTable/UiTable.vue'
-import { Row, Action } from '@/components/uikit/UiTable/UiTable'
-import { Event } from '@/api'
+import { Property } from '@/api'
+import { Action, Row }  from '@/components/uikit/UiTable/UiTable'
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
+
 const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
 const commonStore = useCommonStore()
 
+
 const columns = computed(() => {
-    return ['name', 'displayName', 'description'].map(key => {
+    return ['name', 'displayName', 'description', 'status'].map(key => {
         return {
             value: key,
             title: i18n.$t(`events.event_management.columns.${key}`),
@@ -37,32 +38,37 @@ const columns = computed(() => {
 })
 
 const items = computed(() => {
-    return lexiconStore.events.map((event: Event): Row => {
+    return lexiconStore.eventProperties.map((property: Property): Row => {
         return [
             {
                 value: 'name',
-                title: event.name,
+                title: property.name,
                 component: UiTablePressedCell,
                 action: {
-                    type: event.id,
-                    name: event.name,
+                    type: property.id,
+                    name: property.name,
                 }
             },
             {
                 value: 'displayName',
-                title: event.displayName || '',
+                title: property.displayName || '',
                 nowrap: true,
             },
             {
                 value: 'description',
-                title: event.description || '',
+                title: property.description || '',
+            },
+            {
+                value: 'status',
+                title: property.status,
             }
         ]
     })
 })
 
+
 const onAction = (payload: Action) => {
-    commonStore.updateEditEventManagementPopupId(Number(payload.type) || null)
-    commonStore.toggleEventManagementPopup(true)
+    commonStore.editEventPropertyPopupId = Number(payload.type) || null
+    commonStore.showEventPropertyPopup = true
 }
 </script>

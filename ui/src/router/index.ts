@@ -25,10 +25,16 @@ const routes = [
                 component: () => import('@/pages/events/LiveStream.vue'),
             },
             {
-                path: 'event_anagement',
+                path: 'event_management',
                 name: 'events_event_management',
                 component: () => import('@/pages/events/EventManagement.vue'),
             },
+            {
+                path: 'event_properties',
+                name: 'events_event_properties',
+                component: () => import('@/pages/events/EventProperties.vue'),
+            },
+
         ]
     },
     {
