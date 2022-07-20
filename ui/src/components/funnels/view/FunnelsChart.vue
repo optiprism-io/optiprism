@@ -1,37 +1,40 @@
 <template>
-    <div
-        ref="container"
-        class="pf-l-flex pf-u-m-lg"
-    >
+    <div class="pf-c-scroll-inner-wrapper">
         <div
-            v-for="(_, i) in stepIterator"
-            :key="i"
-            class="pf-m-flex-1 pf-m-spacer-none"
+            ref="container"
+            class="pf-l-flex pf-u-flex-nowrap pf-u-m-lg"
         >
-            <ChartStacked
-                :data="data[i]"
-                :x-key="'dimension'"
-                :y-keys="[
-                    ['conversionCount', 'conversionRatio'],
-                    ['dropOffCount', 'dropOffRatio']
-                ]"
-                :labels="{
-                    'conversionCount': $t('funnels.view.conversionCount'),
-                    'dropOffCount': $t('funnels.view.dropOffCount'),
-                    'conversionRatio': $t('funnels.view.conversionRatio'),
-                    'dropOffRatio': $t('funnels.view.dropOffRatio'),
-                }"
-                :width="stepWidth"
+            <div
+                v-for="(_, i) in stepIterator"
+                :key="i"
+                class="pf-m-flex-1 pf-m-spacer-none"
             >
-                <div class="pf-l-flex pf-m-nowrap">
-                    <div class="pf-l-flex__item pf-u-color-400">
-                        {{ funnelsStore.stepNumbers[i] }}
+                <ChartStacked
+                    :data="data[i]"
+                    :x-key="'dimension'"
+                    :y-keys="[
+                        ['conversionCount', 'conversionRatio'],
+                        ['dropOffCount', 'dropOffRatio']
+                    ]"
+                    :main-keys="['conversionCount', 'conversionRatio']"
+                    :labels="{
+                        'conversionCount': $t('funnels.view.conversionCount'),
+                        'dropOffCount': $t('funnels.view.dropOffCount'),
+                        'conversionRatio': $t('funnels.view.conversionRatio'),
+                        'dropOffRatio': $t('funnels.view.dropOffRatio'),
+                    }"
+                    :width="stepWidth"
+                >
+                    <div class="pf-l-flex pf-m-nowrap">
+                        <div class="pf-l-flex__item pf-u-color-400">
+                            {{ funnelsStore.stepNumbers[i] }}
+                        </div>
+                        <div class="pf-l-flex__item">
+                            {{ stepNames[i] }}
+                        </div>
                     </div>
-                    <div class="pf-l-flex__item">
-                        {{ stepNames[i] }}
-                    </div>
-                </div>
-            </ChartStacked>
+                </ChartStacked>
+            </div>
         </div>
     </div>
 </template>
@@ -51,7 +54,7 @@ const eventName = useEventName()
 const stepsStore = useStepsStore()
 
 const stepWidth = computed(() => {
-    return containerWidth.value / stepIterator.value.length
+    return Math.max(containerWidth.value / stepIterator.value.length, 400)
 })
 
 const stepIterator = computed(() => {
