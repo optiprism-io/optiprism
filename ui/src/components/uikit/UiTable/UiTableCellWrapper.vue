@@ -7,6 +7,7 @@
             'pf-m-border-right': props.lastFixed,
             'pf-c-table__sort': props.sorted,
         }"
+        :colspan="colspan"
         :style="{
             left: left,
         }"
@@ -23,6 +24,7 @@ type Props = {
    lastFixed?: boolean
    truncate?: boolean
    sorted?: boolean
+   colspan?: number
 }
 
 const props = defineProps<Props>()

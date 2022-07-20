@@ -46,13 +46,20 @@
             </div>
         </div>
 
-        <FunnelsChart />
+        <DataEmptyPlaceholder v-if="funnelsStore.reports.length === 0">
+            {{ $t('funnels.view.selectToStart') }}
+        </DataEmptyPlaceholder>
+        <DataLoader v-else-if="funnelsStore.loading" />
+        <template v-else>
+            <FunnelsChart />
+            <FunnelsTable />
+        </template>
     </div>
 </template>
 
 <script lang="ts" setup>
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue';
-import {computed, inject, ref} from 'vue';
+import {computed, inject, ref, watch} from 'vue';
 import {periodMap} from '@/configs/events/controls';
 import {UiToggleGroupItem} from '@/components/uikit/UiToggleGroup.vue';
 import {useFunnelsStore} from '@/stores/funnels/funnels';
@@ -61,6 +68,10 @@ import {ApplyPayload} from '@/components/uikit/UiCalendar/UiCalendar';
 import FunnelsChart from '@/components/funnels/view/FunnelsChart.vue';
 import {I18N} from '@/plugins/i18n';
 import {UiDropdownItem} from '@/components/uikit/UiDropdown.vue';
+import FunnelsTable from '@/components/funnels/view/FunnelsTable.vue';
+import {useStepsStore} from '@/stores/funnels/steps';
+import DataEmptyPlaceholder from '@/components/common/data/DataEmptyPlaceholder.vue';
+import DataLoader from '@/components/common/data/DataLoader.vue';
 
 const { $t } = inject('i18n') as I18N
 
@@ -68,9 +79,10 @@ const items = [
     {
         key: 0,
         value: 0,
-        nameDisplay: $t('funnels.chart.funnelSteps')
+        nameDisplay: $t('funnels.view.funnelSteps')
     }
 ];
+
 const item = ref<string | number>(0)
 const itemText = computed(() => items.find(c => c.key === item.value)?.nameDisplay ?? '')
 
@@ -79,6 +91,8 @@ const selectItem = (value: UiDropdownItem<string>) => {
 }
 
 const funnelsStore = useFunnelsStore()
+const stepsStore = useStepsStore()
+const loading = ref(false)
 
 const itemsPeriod = computed(() => {
     const config = periodMap.find(item => item.type === 'day');
@@ -140,4 +154,6 @@ const applyPeriod = (payload: ApplyPayload): void => {
         last: payload.last,
     })
 };
+
+watch(() => stepsStore.steps.length, funnelsStore.getReports)
 </script>

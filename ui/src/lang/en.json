@@ -166,12 +166,18 @@
       "holding": "holding",
       "clear": "Clear holding constant"
     },
-    "chart": {
+    "view": {
       "funnelSteps": "Funnel Steps",
       "conversionCount": "Conversion count",
       "conversionRatio": "Conversion ratio",
       "dropOffCount": "Drop off count",
-      "dropOffRatio": "Drop off ratio"
+      "dropOffRatio": "Drop off ratio",
+      "dropOffRatioFromFirstStep": "Drop off ratio from first step",
+      "avgTimeFromPrevStep": "Avg time from prev step",
+      "avgTimeFromFirstStep": "Avg time from first step",
+      "conversionRatioFromFirstStep": "Conv. ratio from first step",
+      "totalConversionRatio": "Total conv.",
+      "selectToStart": "Set the funnel condition to start"
     }
   },
 

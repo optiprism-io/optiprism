@@ -53,28 +53,10 @@
             class="pf-u-min-height"
             style="--pf-u-min-height--MinHeight: 24ch;"
         >
-            <div
-                v-if="liveStreamStore.isNoData"
-                class="pf-u-display-flex pf-u-justify-content-center pf-u-align-items-center pf-u-h-100"
-            >
-                <div>
-                    <div class="pf-u-m-auto pf-u-w-25 pf-u-color-400 pf-u-text-align-center">
-                        <UiIcon
-                            class="pf-u-font-size-4xl"
-                            :icon="'fas fa-search'"
-                        />
-                    </div>
-                    <div class="pf-c-card__title pf-u-text-align-center pf-u-font-size-lg pf-u-color-400">
-                        {{ $t('events.select_to_start') }}
-                    </div>
-                </div>
-            </div>
-            <div
-                v-else-if="liveStreamStore.loading"
-                class="pf-u-display-flex pf-u-justify-content-center pf-u-align-items-center pf-u-h-100"
-            >
-                <UiSpinner :size="'xl'" />
-            </div>
+            <DataEmptyPlaceholder v-if="liveStreamStore.isNoData">
+                {{ $t('events.select_to_start') }}
+            </DataEmptyPlaceholder>
+            <DataLoader v-else-if="liveStreamStore.loading" />
             <UiTable
                 v-else
                 :items="tableData"
@@ -103,6 +85,8 @@ import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
 import UiSelect from '@/components/uikit/UiSelect.vue'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import UiSpinner from '@/components/uikit/UiSpinner.vue'
+import DataEmptyPlaceholder from '@/components/common/data/DataEmptyPlaceholder.vue';
+import DataLoader from '@/components/common/data/DataLoader.vue';
 
 const i18n = inject<any>('i18n')
 const liveStreamStore = useLiveStreamStore()

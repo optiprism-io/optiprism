@@ -13,6 +13,14 @@ export type Action = {
     type?: string | number
 }
 
+export type ColumnGroup = {
+    title: string;
+    value: string;
+    span: number;
+    lastFixed?: boolean;
+    fixed?: boolean;
+}
+
 export type Column = {
     value: string
     title: string
