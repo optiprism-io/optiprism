@@ -12,12 +12,26 @@
                 <FunnelChartStacked
                     :data="data[i]"
                     :width="stepWidth"
+                    :colors="barsColors"
                 >
                     <div class="pf-u-text-align-center">
                         {{ stepNames[i] }}
                     </div>
                 </FunnelChartStacked>
             </div>
+        </div>
+    </div>
+    <div class="pf-l-flex pf-u-justify-content-center pf-u-flex-nowrap">
+        <div
+            v-for="(item, i) in funnelsStore.dimensions"
+            :key="i"
+            class="pf-l-flex pf-l-flex__item pf-m-align-items-center"
+        >
+            <span
+                class="pf-l-flex__item legend-marker"
+                :style="{ background: barsColors[i] }"
+            />
+            <span>{{ item }}</span>
         </div>
     </div>
 </template>
@@ -35,6 +49,11 @@ const containerWidth = ref(0)
 const funnelsStore = useFunnelsStore();
 const eventName = useEventName()
 const stepsStore = useStepsStore()
+
+const colors = ['#ee5253', '#2e86de', '#ff9f43', '#5f27cd', '#10ac84', '#f368e0', '#0abde3']
+const barsColors = computed(() => {
+    return colors.slice(0, funnelsStore.dimensions.length)
+})
 
 const stepWidth = computed(() => {
     return Math.max(containerWidth.value / stepIterator.value.length, 550)
@@ -83,3 +102,11 @@ onBeforeUnmount(() => {
     window.removeEventListener('resize', onResize)
 })
 </script>
+
+<style lang="scss" scoped>
+.legend-marker {
+    width: 1rem;
+    height: 1rem;
+    border-radius: .125rem;
+}
+</style>

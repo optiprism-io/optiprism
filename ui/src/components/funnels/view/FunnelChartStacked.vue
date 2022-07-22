@@ -30,17 +30,18 @@ const props = defineProps({
         type: Number,
         default: 400
     },
+    colors: {
+        type: Array as PropType<string[]>,
+        default: () => []
+    }
 })
 
-const colors = ['#ee5253', '#2e86de', '#ff9f43', '#5f27cd', '#10ac84', '#f368e0', '#0abde3']
 const xKey = 'dimension'
 const primaryKeys = ['conversionCount', 'dropOffCount']
 const secondaryKeys = ['conversionRatio', 'dropOffRatio']
 const labelKey = 'dropOffCount'
 
 const dataView = computed(() => {
-    const slicedColors = colors.slice(0, props.data.length)
-
     return props.data
         .map((item, i) => {
             return Array.from({ length: primaryKeys.length }).map((_, j) => {
@@ -56,7 +57,7 @@ const dataView = computed(() => {
                     secondaryKey,
                     primaryValue: item[primaryKey],
                     secondaryValue: item[secondaryKey],
-                    color: lighten(slicedColors[i], iterator * 80),
+                    color: lighten(props.colors[i], iterator * 80),
                 }
             })
         })
@@ -122,14 +123,7 @@ watch(() => [container.value, dataView.value], () => {
             showMarkers: false
         })
         .data(dataView.value)
-        .axis(xKey, {
-            label: {
-                autoHide: false,
-                style: {
-                    fontSize: 14
-                }
-            }
-        })
+        .axis(xKey, false)
         .axis('primaryValue', false)
         .interval({ intervalPadding: 20 })
         .adjust('stack')

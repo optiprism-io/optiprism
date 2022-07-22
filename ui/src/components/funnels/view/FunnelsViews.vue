@@ -52,7 +52,7 @@
         <DataLoader v-else-if="funnelsStore.loading" />
         <template v-else>
             <FunnelsChart />
-            <FunnelsTable />
+            <FunnelsTable class="pf-u-mt-xl" />
         </template>
     </div>
 </template>
