@@ -9,31 +9,14 @@
                 :key="i"
                 class="pf-m-flex-1 pf-m-spacer-none"
             >
-                <ChartStacked
+                <FunnelChartStacked
                     :data="data[i]"
-                    :x-key="'dimension'"
-                    :y-keys="[
-                        ['conversionCount', 'conversionRatio'],
-                        ['dropOffCount', 'dropOffRatio']
-                    ]"
-                    :main-keys="['conversionCount', 'conversionRatio']"
-                    :labels="{
-                        'conversionCount': $t('funnels.view.conversionCount'),
-                        'dropOffCount': $t('funnels.view.dropOffCount'),
-                        'conversionRatio': $t('funnels.view.conversionRatio'),
-                        'dropOffRatio': $t('funnels.view.dropOffRatio'),
-                    }"
                     :width="stepWidth"
                 >
-                    <div class="pf-l-flex pf-m-nowrap">
-                        <div class="pf-l-flex__item pf-u-color-400">
-                            {{ funnelsStore.stepNumbers[i] }}
-                        </div>
-                        <div class="pf-l-flex__item">
-                            {{ stepNames[i] }}
-                        </div>
+                    <div class="pf-u-text-align-center">
+                        {{ stepNames[i] }}
                     </div>
-                </ChartStacked>
+                </FunnelChartStacked>
             </div>
         </div>
     </div>
@@ -41,7 +24,7 @@
 
 <script lang="ts" setup>
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
-import ChartStacked from '@/components/charts/stacked/ChartStacked.vue';
+import FunnelChartStacked from '@/components/funnels/view/FunnelChartStacked.vue';
 import {useStepsStore} from '@/stores/funnels/steps';
 import {useEventName} from '@/helpers/useEventName';
 import {useFunnelsStore} from '@/stores/funnels/funnels';
@@ -54,7 +37,7 @@ const eventName = useEventName()
 const stepsStore = useStepsStore()
 
 const stepWidth = computed(() => {
-    return Math.max(containerWidth.value / stepIterator.value.length, 400)
+    return Math.max(containerWidth.value / stepIterator.value.length, 550)
 })
 
 const stepIterator = computed(() => {

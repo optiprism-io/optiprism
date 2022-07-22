@@ -47,7 +47,7 @@ const columnGroups = computed<ColumnGroup[]>(() => {
         },
         ...stepIterator.value.map((item, i) => {
             return {
-                title: `${i + 1} ${stepNames.value[i]}`,
+                title: stepNames.value[i],
                 value: `step${i + 1}`,
                 span: funnelMetricValues.value[i].length,
                 lastFixed: true
