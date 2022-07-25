@@ -4465,12 +4465,20 @@ export const QueryApiAxiosParamCreator = function (configuration?: Configuration
         /**
          * 
          * @summary Funnel query
+         * @param {number} organizationId 
+         * @param {number} projectId 
          * @param {FunnelQuery} [funnelQuery] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        funnelQuery: async (funnelQuery?: FunnelQuery, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/organizations/{organization_id}/projects/{project_id}/reports/funnel`;
+        funnelQuery: async (organizationId: number, projectId: number, funnelQuery?: FunnelQuery, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('funnelQuery', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('funnelQuery', 'projectId', projectId)
+            const localVarPath = `/organizations/{organization_id}/projects/{project_id}/reports/funnel`
+                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -4509,12 +4517,14 @@ export const QueryApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary Funnel query
+         * @param {number} organizationId 
+         * @param {number} projectId 
          * @param {FunnelQuery} [funnelQuery] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async funnelQuery(funnelQuery?: FunnelQuery, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DataTableResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.funnelQuery(funnelQuery, options);
+        async funnelQuery(organizationId: number, projectId: number, funnelQuery?: FunnelQuery, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DataTableResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.funnelQuery(organizationId, projectId, funnelQuery, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
     }
@@ -4530,12 +4540,14 @@ export const QueryApiFactory = function (configuration?: Configuration, basePath
         /**
          * 
          * @summary Funnel query
+         * @param {number} organizationId 
+         * @param {number} projectId 
          * @param {FunnelQuery} [funnelQuery] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        funnelQuery(funnelQuery?: FunnelQuery, options?: any): AxiosPromise<DataTableResponse> {
-            return localVarFp.funnelQuery(funnelQuery, options).then((request) => request(axios, basePath));
+        funnelQuery(organizationId: number, projectId: number, funnelQuery?: FunnelQuery, options?: any): AxiosPromise<DataTableResponse> {
+            return localVarFp.funnelQuery(organizationId, projectId, funnelQuery, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -4550,13 +4562,15 @@ export class QueryApi extends BaseAPI {
     /**
      * 
      * @summary Funnel query
+     * @param {number} organizationId 
+     * @param {number} projectId 
      * @param {FunnelQuery} [funnelQuery] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof QueryApi
      */
-    public funnelQuery(funnelQuery?: FunnelQuery, options?: AxiosRequestConfig) {
-        return QueryApiFp(this.configuration).funnelQuery(funnelQuery, options).then((request) => request(this.axios, this.basePath));
+    public funnelQuery(organizationId: number, projectId: number, funnelQuery?: FunnelQuery, options?: AxiosRequestConfig) {
+        return QueryApiFp(this.configuration).funnelQuery(organizationId, projectId, funnelQuery, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

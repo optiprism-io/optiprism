@@ -521,6 +521,9 @@ paths:
       operationId: funnelQuery
       tags:
         - query
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
       requestBody:
         content:
           application/json:
