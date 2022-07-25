@@ -1,4 +1,17 @@
 <template>
+    <div class="pf-l-flex pf-u-justify-content-center pf-u-flex-nowrap">
+        <div
+            v-for="(item, i) in funnelsStore.dimensions"
+            :key="i"
+            class="pf-l-flex pf-l-flex__item pf-m-align-items-center"
+        >
+            <span
+                class="pf-l-flex__item legend-marker"
+                :style="{ background: barsColors[i] }"
+            />
+            <span>{{ item }}</span>
+        </div>
+    </div>
     <div class="pf-c-scroll-inner-wrapper">
         <div
             ref="container"
@@ -19,19 +32,6 @@
                     </div>
                 </FunnelChartStacked>
             </div>
-        </div>
-    </div>
-    <div class="pf-l-flex pf-u-justify-content-center pf-u-flex-nowrap">
-        <div
-            v-for="(item, i) in funnelsStore.dimensions"
-            :key="i"
-            class="pf-l-flex pf-l-flex__item pf-m-align-items-center"
-        >
-            <span
-                class="pf-l-flex__item legend-marker"
-                :style="{ background: barsColors[i] }"
-            />
-            <span>{{ item }}</span>
         </div>
     </div>
 </template>
