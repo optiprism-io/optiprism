@@ -124,13 +124,7 @@ watch(() => [container.value, dataView.value], () => {
         })
         .data(dataView.value)
         .axis(xKey, false)
-        .axis('primaryValue', {
-            label: {
-                style: {
-                    fontSize: 12
-                }
-            }
-        })
+        .axis('primaryValue', false)
         .interval({ intervalPadding: 20 })
         .adjust('stack')
         .color('color', color => color)
