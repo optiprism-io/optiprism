@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::PlatformError;
 use crate::Result;
 use chrono::{DateTime, Utc};
 use common::DECIMAL_PRECISION;
@@ -32,7 +32,7 @@ pub enum PropValueOperation {
 }
 
 impl TryInto<query_types::PropValueOperation> for PropValueOperation {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_types::PropValueOperation, Self::Error> {
         Ok(match self {
@@ -71,7 +71,7 @@ pub enum QueryTime {
 }
 
 impl TryInto<query_types::QueryTime> for QueryTime {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_types::QueryTime, Self::Error> {
         Ok(match self {
@@ -98,7 +98,7 @@ pub enum TimeUnit {
 }
 
 impl TryInto<query_types::TimeUnit> for TimeUnit {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_types::TimeUnit, Self::Error> {
         Ok(match self {
@@ -151,7 +151,7 @@ pub enum AggregateFunction {
 }
 
 impl TryInto<datafusion::physical_plan::aggregates::AggregateFunction> for &AggregateFunction {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(
         self,
@@ -210,7 +210,7 @@ pub enum PartitionedAggregateFunction {
 }
 
 impl TryInto<QueryPartitionedAggregateFunction> for &PartitionedAggregateFunction {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<QueryPartitionedAggregateFunction, Self::Error> {
         Ok(match self {
@@ -225,7 +225,7 @@ pub fn json_value_to_scalar(v: &Value) -> Result<ScalarValue> {
         Value::Bool(v) => Ok(ScalarValue::Boolean(Some(*v))),
         Value::Number(n) => {
             let dec = Decimal::try_from(n.as_f64().unwrap())
-                .map_err(|e| Error::BadRequest(e.to_string()))?;
+                .map_err(|e| PlatformError::BadRequest(e.to_string()))?;
             Ok(ScalarValue::Decimal128(
                 Some(dec.mantissa()),
                 DECIMAL_PRECISION,
@@ -233,7 +233,7 @@ pub fn json_value_to_scalar(v: &Value) -> Result<ScalarValue> {
             ))
         }
         Value::String(v) => Ok(ScalarValue::Utf8(Some(v.to_string()))),
-        _ => Err(Error::BadRequest("unexpected value".to_string())),
+        _ => Err(PlatformError::BadRequest("unexpected value".to_string())),
     }
 }
 
@@ -269,7 +269,7 @@ pub enum PropertyRef {
 }
 
 impl TryInto<query_types::EventRef> for EventRef {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_types::EventRef, Self::Error> {
         Ok(match self {
@@ -280,7 +280,7 @@ impl TryInto<query_types::EventRef> for EventRef {
 }
 
 impl TryInto<query_types::PropertyRef> for PropertyRef {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_types::PropertyRef, Self::Error> {
         Ok(match self {

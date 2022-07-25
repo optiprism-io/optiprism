@@ -20,7 +20,7 @@ use arrow::array::{ArrayRef, DecimalArray};
 use arrow::datatypes::DataType;
 pub use auth::Provider as AuthProvider;
 pub use context::Context;
-pub use error::{Error, Result};
+pub use error::{PlatformError, Result};
 pub use events::Provider as EventsProvider;
 pub use properties::Provider as PropertiesProvider;
 pub use provider::PlatformProvider;
@@ -61,7 +61,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
                         };
                         let d_f = match d.to_f64() {
                             None => {
-                                return Err(Error::Internal(
+                                return Err(PlatformError::Internal(
                                     "can't convert decimal to f64".to_string(),
                                 ));
                             }
@@ -69,7 +69,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
                         };
                         let n = match Number::from_f64(d_f) {
                             None => {
-                                return Err(Error::Internal(
+                                return Err(PlatformError::Internal(
                                     "can't make json number from f64".to_string(),
                                 ));
                             }

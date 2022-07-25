@@ -5,7 +5,7 @@ use axum::{
 use common::Error as CommonError;
 use events_gen::error::Error as EventsGenError;
 use metadata::Error as MetadataError;
-use platform::Error as PlatformError;
+use platform::PlatformError as PlatformError;
 use query::Error as QueryError;
 
 use datafusion::error::DataFusionError;

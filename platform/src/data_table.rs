@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{PlatformError, Result};
 use arrow::datatypes::DataType;
 
 use crate::array_ref_to_json_values;
@@ -28,7 +28,7 @@ impl DataTable {
 }
 
 impl TryFrom<query::data_table::DataTable> for DataTable {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_from(value: query::data_table::DataTable) -> std::result::Result<Self, Self::Error> {
         let cols = value
