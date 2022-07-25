@@ -168,6 +168,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomEvent'
+    delete:
+      summary: Delete custom event
+      operationId: deleteCustomEvent
+      tags:
+        - events
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: event_id
+          in: path
+          description: Event ID
+          required: true
+          schema:
+            type: number
+      responses:
+        204:
+          description: deleted successfully
 
     put:
       summary: Update custom event
