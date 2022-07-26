@@ -7,7 +7,7 @@ COPY ui/tsconfig.json .
 COPY ui/vite.config.ts .
 COPY ui/yarn.lock .
 COPY ui/index.html .
-COPY ui/public .
+COPY ui/public public/
 RUN yarn install
 RUN yarn build
 
