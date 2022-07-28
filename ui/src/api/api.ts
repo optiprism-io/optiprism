@@ -321,7 +321,8 @@ export interface CustomEventEvent {
 }
 
 export const CustomEventEventEventTypeEnum = {
-    Custom: 'custom'
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
 export type CustomEventEventEventTypeEnum = typeof CustomEventEventEventTypeEnum[keyof typeof CustomEventEventEventTypeEnum];
@@ -1206,7 +1207,8 @@ export interface EventRefOneOf1 {
 }
 
 export const EventRefOneOf1EventTypeEnum = {
-    Custom: 'custom'
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
 export type EventRefOneOf1EventTypeEnum = typeof EventRefOneOf1EventTypeEnum[keyof typeof EventRefOneOf1EventTypeEnum];
@@ -1342,7 +1344,8 @@ export interface EventSegmentationEvent {
 }
 
 export const EventSegmentationEventEventTypeEnum = {
-    Custom: 'custom'
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
 export type EventSegmentationEventEventTypeEnum = typeof EventSegmentationEventEventTypeEnum[keyof typeof EventSegmentationEventEventTypeEnum];
@@ -1528,7 +1531,8 @@ export interface FunnelEvent {
 }
 
 export const FunnelEventEventTypeEnum = {
-    Custom: 'custom'
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
 export type FunnelEventEventTypeEnum = typeof FunnelEventEventTypeEnum[keyof typeof FunnelEventEventTypeEnum];
@@ -2517,7 +2521,8 @@ export const SegmentConditionDidEventTypeEnum = {
 
 export type SegmentConditionDidEventTypeEnum = typeof SegmentConditionDidEventTypeEnum[keyof typeof SegmentConditionDidEventTypeEnum];
 export const SegmentConditionDidEventEventTypeEnum = {
-    Custom: 'custom'
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
 export type SegmentConditionDidEventEventTypeEnum = typeof SegmentConditionDidEventEventTypeEnum[keyof typeof SegmentConditionDidEventEventTypeEnum];

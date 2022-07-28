@@ -2649,6 +2649,7 @@ components:
               type: string
               enum:
                 - custom
+                - regular
 
     EventType:
       type: string
