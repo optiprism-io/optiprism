@@ -37,25 +37,88 @@ paths:
         content:
           application/json:
             schema:
+              required: ['email','password']
               properties:
                 email:
                   type: string
                   format: email
-                  required: true
                 password:
                   type: string
                   format: password
-                  required: true
-
       responses:
         200:
-          description: access token
+          description: tokens
           content:
             application/json:
               schema:
                 properties:
                   accessToken:
                     type: string
+                  refreshToken:
+                    type: string
+                  csrfToken:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/auth/access:
+    post:
+      summary: Refresh access token
+      operationId: authAccess
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required: [ 'refreshToken']
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        200:
+          description: tokens
+          content:
+            application/json:
+              schema:
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  csrfToken:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/auth/logout:
+    post:
+      summary: Log out
+      operationId: logout
+      tags:
+        - auth
+      responses:
+        '204':
+          description: logout
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /v1/organizations/{organization_id}/projects/{project_id}/schema/events:
     get:
@@ -82,6 +145,18 @@ paths:
                         items:
                           $ref: '#/components/schemas/Event'
                   - $ref: '#/components/schemas/ListResponseMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /v1/organizations/{organization_id}/projects/{project_id}/schema/events/{event_id}:
     get:
@@ -101,12 +176,24 @@ paths:
           schema:
             type: number
       responses:
-        201:
+        200:
           description: event
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Event'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
     put:
       summary: Update event
@@ -131,12 +218,24 @@ paths:
             schema:
               $ref: '#/components/schemas/UpdateEventRequest'
       responses:
-        201:
+        200:
           description: event
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Event'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events:
     get:
@@ -163,6 +262,19 @@ paths:
                         items:
                           $ref: '#/components/schemas/CustomEvent'
                   - $ref: '#/components/schemas/ListResponseMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
     post:
       summary: Create custom event
       operationId: createCustomEvent
@@ -186,6 +298,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomEvent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events/{event_id}:
     get:
@@ -205,12 +329,25 @@ paths:
           schema:
             type: number
       responses:
-        201:
+        200:
           description: custom event
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomEvent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
     delete:
       summary: Delete custom event
       operationId: deleteCustomEvent
@@ -230,6 +367,18 @@ paths:
       responses:
         204:
           description: deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
     put:
       summary: Update custom event
@@ -260,6 +409,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomEvent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties:
     get:
@@ -286,6 +447,18 @@ paths:
                         items:
                           $ref: '#/components/schemas/Property'
                   - $ref: '#/components/schemas/ListResponseMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties:
     get:
@@ -312,6 +485,18 @@ paths:
                         items:
                           $ref: '#/components/schemas/Property'
                   - $ref: '#/components/schemas/ListResponseMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties/{property_id}:
     get:
@@ -337,6 +522,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Property'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
     put:
       summary: Update user property
@@ -367,6 +564,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Property'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties/{property_id}:
     get:
@@ -392,6 +601,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Property'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
     put:
       summary: Update event property
@@ -422,6 +643,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Property'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
   /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-properties:
     get:
       summary: Event custom properties list
@@ -447,6 +681,18 @@ paths:
                         items:
                           $ref: '#/components/schemas/CustomProperty'
                   - $ref: '#/components/schemas/ListResponseMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /v1/organizations/{organization_id}/projects/{project_id}/data/events-stream:
     post:
@@ -510,6 +756,18 @@ paths:
                                     type: integer
 
                   - $ref: '#/components/schemas/ListResponseMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /v1/organizations/{organization_id}/projects/{project_id}/data/property-values:
     post:
@@ -531,11 +789,11 @@ paths:
               type: object
               properties:
                 eventName:
-                   type: string
-                   description: use event name only with eventType=event|user
+                  type: string
+                  description: use event name only with eventType=event|user
                 eventId:
-                   type: number
-                   description: use event id only with eventType=custom
+                  type: number
+                  description: use event id only with eventType=custom
                 eventType:
                   type: string
                   enum:
@@ -543,11 +801,11 @@ paths:
                     - user
                     - custom
                 propertyName:
-                   type: string
-                   description: use property name only with propertyType=event|user
+                  type: string
+                  description: use property name only with propertyType=event|user
                 propertyId:
-                   type: number
-                   description: use property id only with propertyType=custom
+                  type: number
+                  description: use property id only with propertyType=custom
                 propertyType:
                   type: string
                   enum:
@@ -574,6 +832,18 @@ paths:
                       - type: array
                         items:
                           type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /organizations/{organization_id}/projects/{project_id}/reports/event-segmentation:
     post:
@@ -598,6 +868,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DataTableResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /organizations/{organization_id}/projects/{project_id}/reports/funnel:
     post:
@@ -622,6 +904,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DataTableResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
 components:
   securitySchemes:
@@ -643,7 +937,94 @@ components:
       required: true
       schema:
         type: number
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Internal:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
   schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int64
+        httpCode:
+          type: integer
+          format: int64
+        message:
+          type: string
+        fields:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+    JWTToken:
+      type: object
+      required: [ 'accountId','organizationId','iss','exp','nbf','iat','jti' ]
+      description: see  https://datatracker.ietf.org/doc/html/rfc7519
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        organizationId:
+          type: integer
+          format: int64
+        projectId:
+          type: integer
+          format: int64
+        iss:
+          type: string
+          enum:
+            - optiprism
+        exp:
+          type: integer
+          format: int64
+        nbf:
+          type: integer
+          format: int64
+        iat:
+          type: integer
+          format: int64
+        jti:
+          type: integer
+          format: string
+
     DataTableResponse:
       type: object
       properties:
@@ -1331,8 +1712,8 @@ components:
           items:
             type: object
             allOf:
-             - $ref: '#/components/schemas/FunnelEvent'
-             - $ref: '#/components/schemas/FunnelExcludeSteps'
+              - $ref: '#/components/schemas/FunnelEvent'
+              - $ref: '#/components/schemas/FunnelExcludeSteps'
         breakdowns:
           type: array
           description: array of breakdowns
