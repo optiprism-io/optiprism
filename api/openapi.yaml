@@ -981,11 +981,9 @@ components:
       type: object
       properties:
         code:
-          type: integer
-          format: int64
-        httpCode:
-          type: integer
-          format: int64
+          type: string
+          enum:
+            - 1000_invalid_token
         message:
           type: string
         fields:
