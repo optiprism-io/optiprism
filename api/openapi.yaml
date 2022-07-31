@@ -784,18 +784,18 @@ components:
             - enabled
             - disabled
           description: event status
-        properties:
+        eventProperties:
           type: array
           items:
             type: integer
             format: i64
           description: array of id of attached to event properties
-        custom_properties:
+        userProperties:
           type: array
           items:
             type: integer
             format: i64
-          description: array of id of attached to event custom properties
+          description: array of id of attached to user properties
 
     UpdateEventRequest:
       description: Update event request
@@ -859,18 +859,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CustomEventEvent'
-        properties:
-          type: array
-          items:
-            type: integer
-            format: i64
-          description: array of id of properties contained in expression events
-        custom_properties:
-          type: array
-          items:
-            type: integer
-            format: i64
-          description: array of id of custom properties contained in expression events
 
     CreateCustomEventRequest:
       required: [ "name","events" ]
