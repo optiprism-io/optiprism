@@ -102,13 +102,13 @@ const editEventManagementPopup = computed(() => {
 })
 
 const eventProperties = computed(() => {
-    return editEventManagementPopup.value && editEventManagementPopup.value?.properties ?
-        editEventManagementPopup.value.properties.map(id => lexiconStore.findEventPropertyById(id)) : []
+    return editEventManagementPopup.value && editEventManagementPopup.value?.eventProperties ?
+        editEventManagementPopup.value.eventProperties.map(id => lexiconStore.findEventPropertyById(id)) : []
 })
 
 const userProperties = computed(() => {
-    return editEventManagementPopup.value && editEventManagementPopup.value?.custom_properties ?
-        editEventManagementPopup.value.custom_properties.map(id => lexiconStore.findEventCustomPropertyById(id)) : []
+    return editEventManagementPopup.value && editEventManagementPopup.value?.userProperties ?
+        editEventManagementPopup.value?.userProperties.map(id => lexiconStore.findEventCustomPropertyById(id)) : []
 })
 
 onMounted(async () => {

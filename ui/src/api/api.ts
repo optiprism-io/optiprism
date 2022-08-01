@@ -267,18 +267,6 @@ export interface CustomEvent {
      * @memberof CustomEvent
      */
     'events'?: Array<CustomEventEvent>;
-    /**
-     * array of id of properties contained in expression events
-     * @type {Array<number>}
-     * @memberof CustomEvent
-     */
-    'properties'?: Array<number>;
-    /**
-     * array of id of custom properties contained in expression events
-     * @type {Array<number>}
-     * @memberof CustomEvent
-     */
-    'custom_properties'?: Array<number>;
 }
 
 export const CustomEventStatusEnum = {
@@ -761,6 +749,38 @@ export const DidEventRelativeCountTypeEnum = {
 export type DidEventRelativeCountTypeEnum = typeof DidEventRelativeCountTypeEnum[keyof typeof DidEventRelativeCountTypeEnum];
 
 /**
+ * 
+ * @export
+ * @interface ErrorResponse
+ */
+export interface ErrorResponse {
+    /**
+     * 
+     * @type {string}
+     * @memberof ErrorResponse
+     */
+    'code'?: ErrorResponseCodeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof ErrorResponse
+     */
+    'message'?: string;
+    /**
+     * 
+     * @type {Array<{ [key: string]: string; }>}
+     * @memberof ErrorResponse
+     */
+    'fields'?: Array<{ [key: string]: string; }>;
+}
+
+export const ErrorResponseCodeEnum = {
+    _1000InvalidToken: '1000_invalid_token'
+} as const;
+
+export type ErrorResponseCodeEnum = typeof ErrorResponseCodeEnum[keyof typeof ErrorResponseCodeEnum];
+
+/**
  * Event describes user event. User event is an action which user (client) might do on a product site/app. For instance, user might do a signup and it might be a \"Sign up\" event. Event Also has a properties. <br/><br/> Name must be unique among project events, including custom ones. E.g. you can\'t have multiple \"Sign up\" events. <br/><br/> Normally events are created and updated by admin in a project scope, but there are also system events, which can\'t be deleted or modified.
  * @export
  * @interface Event
@@ -843,13 +863,13 @@ export interface Event {
      * @type {Array<number>}
      * @memberof Event
      */
-    'properties'?: Array<number>;
+    'eventProperties'?: Array<number>;
     /**
-     * array of id of attached to event custom properties
+     * array of id of attached to user properties
      * @type {Array<number>}
      * @memberof Event
      */
-    'custom_properties'?: Array<number>;
+    'userProperties'?: Array<number>;
 }
 
 export const EventStatusEnum = {
@@ -1776,57 +1796,89 @@ export type FunnelTimeToConvertChartTypeTypeEnum = typeof FunnelTimeToConvertCha
  */
 export interface InlineObject {
     /**
-     * use event name only with eventType=event|user
+     * 
      * @type {string}
      * @memberof InlineObject
+     */
+    'email': string;
+    /**
+     * 
+     * @type {string}
+     * @memberof InlineObject
+     */
+    'password': string;
+}
+/**
+ * 
+ * @export
+ * @interface InlineObject1
+ */
+export interface InlineObject1 {
+    /**
+     * 
+     * @type {string}
+     * @memberof InlineObject1
+     */
+    'refreshToken': string;
+}
+/**
+ * 
+ * @export
+ * @interface InlineObject2
+ */
+export interface InlineObject2 {
+    /**
+     * use event name only with eventType=event|user
+     * @type {string}
+     * @memberof InlineObject2
      */
     'eventName'?: string;
     /**
      * use event id only with eventType=custom
      * @type {number}
-     * @memberof InlineObject
+     * @memberof InlineObject2
      */
     'eventId'?: number;
     /**
      * 
      * @type {string}
-     * @memberof InlineObject
+     * @memberof InlineObject2
      */
-    'eventType'?: InlineObjectEventTypeEnum;
+    'eventType'?: InlineObject2EventTypeEnum;
     /**
      * use property name only with propertyType=event|user
      * @type {string}
-     * @memberof InlineObject
+     * @memberof InlineObject2
      */
     'propertyName'?: string;
     /**
      * use property id only with propertyType=custom
      * @type {number}
-     * @memberof InlineObject
+     * @memberof InlineObject2
      */
     'propertyId'?: number;
     /**
      * 
      * @type {string}
-     * @memberof InlineObject
+     * @memberof InlineObject2
      */
-    'propertyType'?: InlineObjectPropertyTypeEnum;
+    'propertyType'?: InlineObject2PropertyTypeEnum;
 }
 
-export const InlineObjectEventTypeEnum = {
+export const InlineObject2EventTypeEnum = {
     Event: 'event',
     User: 'user',
     Custom: 'custom'
 } as const;
 
-export type InlineObjectEventTypeEnum = typeof InlineObjectEventTypeEnum[keyof typeof InlineObjectEventTypeEnum];
-export const InlineObjectPropertyTypeEnum = {
+export type InlineObject2EventTypeEnum = typeof InlineObject2EventTypeEnum[keyof typeof InlineObject2EventTypeEnum];
+export const InlineObject2PropertyTypeEnum = {
     Event: 'event',
     User: 'user',
     Custom: 'custom'
 } as const;
 
-export type InlineObjectPropertyTypeEnum = typeof InlineObjectPropertyTypeEnum[keyof typeof InlineObjectPropertyTypeEnum];
+export type InlineObject2PropertyTypeEnum = typeof InlineObject2PropertyTypeEnum[keyof typeof InlineObject2PropertyTypeEnum];
 
 /**
  * 
@@ -1836,11 +1888,98 @@ export type InlineObjectPropertyTypeEnum = typeof InlineObjectPropertyTypeEnum[k
 export interface InlineResponse200 {
     /**
      * 
-     * @type {Array<string> | Array<number> | Array<boolean>}
+     * @type {string}
      * @memberof InlineResponse200
+     */
+    'accessToken'?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof InlineResponse200
+     */
+    'refreshToken'?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof InlineResponse200
+     */
+    'csrfToken'?: string;
+}
+/**
+ * 
+ * @export
+ * @interface InlineResponse2001
+ */
+export interface InlineResponse2001 {
+    /**
+     * 
+     * @type {Array<string> | Array<number> | Array<boolean>}
+     * @memberof InlineResponse2001
      */
     'values'?: Array<string> | Array<number> | Array<boolean>;
 }
+/**
+ * see  https://datatracker.ietf.org/doc/html/rfc7519
+ * @export
+ * @interface JWTToken
+ */
+export interface JWTToken {
+    /**
+     * 
+     * @type {number}
+     * @memberof JWTToken
+     */
+    'accountId': number;
+    /**
+     * 
+     * @type {number}
+     * @memberof JWTToken
+     */
+    'organizationId': number;
+    /**
+     * 
+     * @type {number}
+     * @memberof JWTToken
+     */
+    'projectId'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof JWTToken
+     */
+    'iss': JWTTokenIssEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof JWTToken
+     */
+    'exp': number;
+    /**
+     * 
+     * @type {number}
+     * @memberof JWTToken
+     */
+    'nbf': number;
+    /**
+     * 
+     * @type {number}
+     * @memberof JWTToken
+     */
+    'iat': number;
+    /**
+     * 
+     * @type {number}
+     * @memberof JWTToken
+     */
+    'jti': number;
+}
+
+export const JWTTokenIssEnum = {
+    Optiprism: 'optiprism'
+} as const;
+
+export type JWTTokenIssEnum = typeof JWTTokenIssEnum[keyof typeof JWTTokenIssEnum];
+
 /**
  * list response metadata
  * @export
@@ -3097,6 +3236,242 @@ export type Value = boolean | number | string;
 
 
 /**
+ * AuthApi - axios parameter creator
+ * @export
+ */
+export const AuthApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Refresh access token
+         * @param {InlineObject1} inlineObject1 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        authAccess: async (inlineObject1: InlineObject1, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'inlineObject1' is not null or undefined
+            assertParamExists('authAccess', 'inlineObject1', inlineObject1)
+            const localVarPath = `/v1/auth/access`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(inlineObject1, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Basic login
+         * @param {InlineObject} inlineObject 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        basicLogin: async (inlineObject: InlineObject, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'inlineObject' is not null or undefined
+            assertParamExists('basicLogin', 'inlineObject', inlineObject)
+            const localVarPath = `/v1/auth/basic/login`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(inlineObject, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Log out
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        logout: async (options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/v1/auth/logout`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * AuthApi - functional programming interface
+ * @export
+ */
+export const AuthApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = AuthApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Refresh access token
+         * @param {InlineObject1} inlineObject1 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async authAccess(inlineObject1: InlineObject1, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<object>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.authAccess(inlineObject1, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Basic login
+         * @param {InlineObject} inlineObject 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async basicLogin(inlineObject: InlineObject, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InlineResponse200>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.basicLogin(inlineObject, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Log out
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async logout(options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.logout(options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+    }
+};
+
+/**
+ * AuthApi - factory interface
+ * @export
+ */
+export const AuthApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = AuthApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Refresh access token
+         * @param {InlineObject1} inlineObject1 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        authAccess(inlineObject1: InlineObject1, options?: any): AxiosPromise<object> {
+            return localVarFp.authAccess(inlineObject1, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Basic login
+         * @param {InlineObject} inlineObject 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        basicLogin(inlineObject: InlineObject, options?: any): AxiosPromise<InlineResponse200> {
+            return localVarFp.basicLogin(inlineObject, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Log out
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        logout(options?: any): AxiosPromise<void> {
+            return localVarFp.logout(options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * AuthApi - object-oriented interface
+ * @export
+ * @class AuthApi
+ * @extends {BaseAPI}
+ */
+export class AuthApi extends BaseAPI {
+    /**
+     * 
+     * @summary Refresh access token
+     * @param {InlineObject1} inlineObject1 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof AuthApi
+     */
+    public authAccess(inlineObject1: InlineObject1, options?: AxiosRequestConfig) {
+        return AuthApiFp(this.configuration).authAccess(inlineObject1, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Basic login
+     * @param {InlineObject} inlineObject 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof AuthApi
+     */
+    public basicLogin(inlineObject: InlineObject, options?: AxiosRequestConfig) {
+        return AuthApiFp(this.configuration).basicLogin(inlineObject, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Log out
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof AuthApi
+     */
+    public logout(options?: AxiosRequestConfig) {
+        return AuthApiFp(this.configuration).logout(options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+/**
  * EventsApi - axios parameter creator
  * @export
  */
@@ -3131,6 +3506,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -3172,6 +3551,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -3215,6 +3598,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
 
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -3252,6 +3639,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -3293,6 +3684,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -3339,6 +3734,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
 
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -3380,6 +3779,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -3423,6 +3826,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
 
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -3464,6 +3871,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -3509,6 +3920,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -3557,6 +3972,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -4066,6 +4485,10 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
 
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -4104,6 +4527,10 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
 
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -4120,17 +4547,17 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {InlineObject} inlineObject 
+         * @param {InlineObject2} inlineObject2 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        propertyValuesList: async (organizationId: number, projectId: number, inlineObject: InlineObject, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        propertyValuesList: async (organizationId: number, projectId: number, inlineObject2: InlineObject2, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'organizationId' is not null or undefined
             assertParamExists('propertyValuesList', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
             assertParamExists('propertyValuesList', 'projectId', projectId)
-            // verify required parameter 'inlineObject' is not null or undefined
-            assertParamExists('propertyValuesList', 'inlineObject', inlineObject)
+            // verify required parameter 'inlineObject2' is not null or undefined
+            assertParamExists('propertyValuesList', 'inlineObject2', inlineObject2)
             const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/data/property-values`
                 .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
                 .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
@@ -4145,6 +4572,10 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
 
     
             localVarHeaderParameter['Content-Type'] = 'application/json';
@@ -4152,7 +4583,7 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(inlineObject, localVarRequestOptions, configuration)
+            localVarRequestOptions.data = serializeDataIfNeeded(inlineObject2, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -4192,6 +4623,10 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -4241,6 +4676,10 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
 
     
             localVarHeaderParameter['Content-Type'] = 'application/json';
@@ -4281,6 +4720,10 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -4332,12 +4775,12 @@ export const PropertiesApiFp = function(configuration?: Configuration) {
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {InlineObject} inlineObject 
+         * @param {InlineObject2} inlineObject2 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async propertyValuesList(organizationId: number, projectId: number, inlineObject: InlineObject, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InlineResponse200>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.propertyValuesList(organizationId, projectId, inlineObject, options);
+        async propertyValuesList(organizationId: number, projectId: number, inlineObject2: InlineObject2, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InlineResponse2001>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.propertyValuesList(organizationId, projectId, inlineObject2, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -4417,12 +4860,12 @@ export const PropertiesApiFactory = function (configuration?: Configuration, bas
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {InlineObject} inlineObject 
+         * @param {InlineObject2} inlineObject2 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        propertyValuesList(organizationId: number, projectId: number, inlineObject: InlineObject, options?: any): AxiosPromise<InlineResponse200> {
-            return localVarFp.propertyValuesList(organizationId, projectId, inlineObject, options).then((request) => request(axios, basePath));
+        propertyValuesList(organizationId: number, projectId: number, inlineObject2: InlineObject2, options?: any): AxiosPromise<InlineResponse2001> {
+            return localVarFp.propertyValuesList(organizationId, projectId, inlineObject2, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -4502,13 +4945,13 @@ export class PropertiesApi extends BaseAPI {
      * @summary List of property values
      * @param {number} organizationId 
      * @param {number} projectId 
-     * @param {InlineObject} inlineObject 
+     * @param {InlineObject2} inlineObject2 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof PropertiesApi
      */
-    public propertyValuesList(organizationId: number, projectId: number, inlineObject: InlineObject, options?: AxiosRequestConfig) {
-        return PropertiesApiFp(this.configuration).propertyValuesList(organizationId, projectId, inlineObject, options).then((request) => request(this.axios, this.basePath));
+    public propertyValuesList(organizationId: number, projectId: number, inlineObject2: InlineObject2, options?: AxiosRequestConfig) {
+        return PropertiesApiFp(this.configuration).propertyValuesList(organizationId, projectId, inlineObject2, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -4589,6 +5032,10 @@ export const QueryApiAxiosParamCreator = function (configuration?: Configuration
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     
@@ -4708,6 +5155,10 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
     

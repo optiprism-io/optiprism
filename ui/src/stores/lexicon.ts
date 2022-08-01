@@ -201,13 +201,13 @@ export const useLexiconStore = defineStore('lexicon', {
         findEventProperties(state: Lexicon) {
             return (id: number): Property[] => {
                 const event = this.findEventById(id);
-                return state.eventProperties.filter((prop): boolean => !!event.properties && event.properties.includes(Number(prop.id)))
+                return state.eventProperties.filter((prop): boolean => !!event.eventProperties && event.eventProperties.includes(Number(prop.id)))
             };
         },
         findEventCustomProperties(state: Lexicon) {
             return (id: number): EventCustomProperty[] => {
                 const event = this.findEventById(id);
-                return state.eventCustomProperties.filter((prop): boolean => !!event.custom_properties?.includes(Number(prop.id)))
+                return state.eventCustomProperties.filter((prop): boolean => !!event.userProperties?.includes(Number(prop.id)))
             };
         },
         findEventPropertyByName(state: Lexicon) {

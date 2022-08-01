@@ -37,6 +37,7 @@ paths:
         content:
           application/json:
             schema:
+              type: object
               required: ['email','password']
               properties:
                 email:
@@ -51,6 +52,7 @@ paths:
           content:
             application/json:
               schema:
+                type: object
                 properties:
                   accessToken:
                     type: string
@@ -77,6 +79,7 @@ paths:
         content:
           application/json:
             schema:
+              type: object
               required: [ 'refreshToken']
               properties:
                 refreshToken:
