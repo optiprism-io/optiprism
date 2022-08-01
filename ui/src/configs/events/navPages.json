@@ -4,31 +4,27 @@
     "value": "events_live_stream",
     "link": {
         "name": "events_live_stream"
-    },
-    "icon": "fas fa-chart-pie"
+    }
   },
   {
     "name": "events.events",
     "value": "events_event_management",
     "link": {
       "name": "events_event_management"
-    },
-    "icon": "pf-icon pf-icon-filter"
+    }
   },
   {
     "name": "events.customEvents.title",
     "value": "events_custom_events",
     "link": {
       "name": "events_custom_events"
-    },
-    "icon": "pf-icon pf-icon-filter"
+    }
   },
   {
     "name": "events.event_properties",
     "value": "events_event_properties",
     "link": {
       "name": "events_event_properties"
-    },
-    "icon": "fas fa-bars"
+    }
   }
 ]
