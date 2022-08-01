@@ -87,12 +87,16 @@ import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import UiSpinner from '@/components/uikit/UiSpinner.vue'
 import DataEmptyPlaceholder from '@/components/common/data/DataEmptyPlaceholder.vue';
 import DataLoader from '@/components/common/data/DataLoader.vue';
+import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue'
 
 const i18n = inject<any>('i18n')
 const liveStreamStore = useLiveStreamStore()
 const commonStore = useCommonStore()
 const lexiconStore = useLexiconStore()
 const eventsStore = useEventsStore()
+
+const actionTable = 'action'
+const createCustomEvent = 'create'
 
 const itemsPeriod = computed(() => {
     return ['7', '30', '90'].map((key, i): UiToggleGroupItem => ({
@@ -123,7 +127,13 @@ const tableColumnsValues = computed(() => {
                 value: key,
                 title: key.charAt(0).toUpperCase() + key.slice(1),
             }
-        })
+        }),
+        {
+            value: actionTable,
+            title: '',
+            default: true,
+            type: actionTable,
+        }
     ]
 })
 
@@ -138,11 +148,7 @@ const tableData = computed(() => {
                     title: value,
                     fixed: true,
                     lastFixed: column.lastFixed,
-                    actions: column.value === 'eventName' ? [{
-                        name: 'create',
-                        icon: 'fas fa-plus-circle'
-                    }] : [],
-                    customEvents: column.value === 'eventName' && lexiconStore.customEvents?.length && Array.isArray(data.matchedCustomEvents) ? data.matchedCustomEvents.map(event => {
+                    customEvents: column.value === 'customEvents' && lexiconStore.customEvents?.length && Array.isArray(data.matchedCustomEvents) ? data.matchedCustomEvents.map(event => {
                         const customEvent = lexiconStore.findCustomEventById(Number(event.id))
 
                         return {
@@ -150,7 +156,21 @@ const tableData = computed(() => {
                             value: Number(event.id)
                         }
                     }) : [],
-                    component: column.value === 'eventName' ? EventCell : null,
+                    component: column.value === 'customEvents' ? EventCell : null,
+                }
+            } else if (column.value === actionTable) {
+                return {
+                    title: actionTable,
+                    key: actionTable,
+                    value: actionTable,
+                    component: UiCellToolMenu,
+                    items: [
+                        {
+                            label: i18n.$t('events.create_custom'),
+                            value: createCustomEvent,
+                        },
+                    ],
+                    type: actionTable
                 }
             } else {
                 const value = column.value in data.properties ? data.properties[column.value] : data.userProperties && column.value in data.userProperties ? data.userProperties[column.value] : ''
@@ -233,7 +253,7 @@ const onApplyPeriod = (payload: ApplyPayload): void => {
 }
 
 const onAction = (payload: Action) => {
-    if (payload.name === 'create') {
+    if (payload.name === createCustomEvent) {
         eventsStore.setEditCustomEvent(null)
         commonStore.togglePopupCreateCustomEvent(true)
     }

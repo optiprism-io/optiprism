@@ -45,7 +45,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
         },
         reports: [],
         activeColumns: [],
-        defaultColumns: ['eventName', 'createdAt'],
+        defaultColumns: ['eventName', 'customEvents', 'createdAt'],
         loading: false,
     }),
     getters: {

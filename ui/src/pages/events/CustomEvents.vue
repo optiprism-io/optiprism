@@ -80,7 +80,7 @@ const confirmPopupDeleteInfo = computed(() => {
 })
 
 const columns = computed(() => {
-    return ['name', 'description', 'tags', 'events', 'status', 'action'].map(key => {
+    return ['name', 'description', 'tags', 'status', 'action'].map(key => {
         const isAction = key === 'action'
 
         return {
@@ -115,10 +115,6 @@ const items = computed(() => {
                 value: event.tags || [],
                 nowrap: Boolean(event.tags?.length || 0 <= 5),
                 component: UiCellTags,
-            },
-            {
-                title: event?.events?.map((item: CustomEventEvent) => item.eventName).join(', ') || '',
-                key: 'events'
             },
             {
                 title: event.status || '',

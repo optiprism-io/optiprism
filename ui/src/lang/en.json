@@ -99,7 +99,8 @@
       "title": "Live stream",
       "columns": {
         "createdAt": "Date",
-        "eventName": "Event Name"
+        "eventName": "Event Name",
+        "customEvents": "Custom events"
       }
     },
     "customEvents": {
