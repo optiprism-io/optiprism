@@ -97,6 +97,7 @@ const eventsStore = useEventsStore()
 
 const actionTable = 'action'
 const createCustomEvent = 'create'
+const customEvents = 'customEvents'
 
 const itemsPeriod = computed(() => {
     return ['7', '30', '90'].map((key, i): UiToggleGroupItem => ({
@@ -148,7 +149,11 @@ const tableData = computed(() => {
                     title: value,
                     fixed: true,
                     lastFixed: column.lastFixed,
-                    customEvents: column.value === 'customEvents' && lexiconStore.customEvents?.length && Array.isArray(data.matchedCustomEvents) ? data.matchedCustomEvents.map(event => {
+                    actions: column.value === customEvents ? [{
+                        name: 'create',
+                        icon: 'fas fa-plus-circle'
+                    }] : [],
+                    customEvents: column.value === customEvents && lexiconStore.customEvents?.length && Array.isArray(data.matchedCustomEvents) ? data.matchedCustomEvents.map(event => {
                         const customEvent = lexiconStore.findCustomEventById(Number(event.id))
 
                         return {
@@ -156,7 +161,7 @@ const tableData = computed(() => {
                             value: Number(event.id)
                         }
                     }) : [],
-                    component: column.value === 'customEvents' ? EventCell : null,
+                    component: column.value === customEvents ? EventCell : null,
                 }
             } else if (column.value === actionTable) {
                 return {

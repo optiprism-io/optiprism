@@ -39,9 +39,11 @@
                     >
                         <UiButton
                             class="pf-m-link"
-                            :before-icon="action.icon"
+                            :after-icon="action.icon"
                             @click="onAction(action)"
-                        />
+                        >
+                            {{ $t('events.live_stream.customEvent') }}
+                        </UiButton>
                     </div>
                 </div>
             </div>
@@ -88,4 +90,21 @@ const onAction = (payload: Action) => {
 }
 </script>
 
-<style lang="scss"></style>
+<style lang="scss">
+.ui-table-event-cell {
+    max-width: 25rem;
+
+    &__action-list {
+        opacity: 0;
+        cursor: pointer;
+    }
+}
+
+.pf-c-table {
+    tr:hover {
+        .ui-table-event-cell__action-list {
+            opacity: 1;
+        }
+    }
+}
+</style>

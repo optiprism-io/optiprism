@@ -97,6 +97,7 @@
     },
     "live_stream": {
       "title": "Live stream",
+      "customEvent": "Custom event",
       "columns": {
         "createdAt": "Date",
         "eventName": "Event Name",

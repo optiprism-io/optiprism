@@ -36,17 +36,19 @@ const cell = ref<HTMLElement | null>(null)
 const left = ref('')
 
 onMounted(() => {
-    if (props.fixed) {
-        const cellEl = cell.value;
-        if (cellEl) {
-            const parentEl = cellEl.parentElement;
+    setTimeout(() => {
+        if (props.fixed) {
+            const cellEl = cell.value;
+            if (cellEl) {
+                const parentEl = cellEl.parentElement;
 
-            if (parentEl) {
-                const boundingClientRectParent = parentEl.getBoundingClientRect()
-                left.value = `${cellEl.offsetLeft - boundingClientRectParent.left}px`
+                if (parentEl) {
+                    const boundingClientRectParent = parentEl.getBoundingClientRect()
+                    left.value = `${cellEl.offsetLeft - boundingClientRectParent.left}px`
+                }
             }
         }
-    }
+    }, 100)
 })
 </script>
 

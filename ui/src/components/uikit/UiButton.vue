@@ -26,6 +26,12 @@
             :icon="icon"
         />
         <slot />
+        <span
+            v-if="afterIcon"
+            class="pf-c-button__icon pf-u-ml-sm"
+        >
+            <UiIcon :icon="afterIcon" />
+        </span>
     </button>
 </template>
 
@@ -41,6 +47,7 @@ interface Props {
     ariaLabel?: string;
     beforeIcon?: string;
     isLink?: boolean;
+    afterIcon?: string
 }
 
 withDefaults(defineProps<Props>(), {
