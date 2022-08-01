@@ -27,7 +27,6 @@ const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
 const commonStore = useCommonStore()
 
-
 const columns = computed(() => {
     return ['name', 'displayName', 'description', 'status'].map(key => {
         return {
@@ -41,7 +40,7 @@ const items = computed(() => {
     return lexiconStore.eventProperties.map((property: Property): Row => {
         return [
             {
-                value: 'name',
+                key: 'name',
                 title: property.name,
                 component: UiTablePressedCell,
                 action: {
@@ -50,22 +49,21 @@ const items = computed(() => {
                 }
             },
             {
-                value: 'displayName',
+                key: 'displayName',
                 title: property.displayName || '',
                 nowrap: true,
             },
             {
-                value: 'description',
+                key: 'description',
                 title: property.description || '',
             },
             {
-                value: 'status',
+                key: 'status',
                 title: property.status,
             }
         ]
     })
 })
-
 
 const onAction = (payload: Action) => {
     commonStore.editEventPropertyPopupId = Number(payload.type) || null

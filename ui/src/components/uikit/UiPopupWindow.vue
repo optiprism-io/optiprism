@@ -57,6 +57,7 @@
                         >
                             <UiButton
                                 class="pf-m-primary"
+                                :class="props.applyButtonClass || 'pf-m-primary'"
                                 type="button"
                                 :disabled="props.applyLoading || props.applyDisabled"
                                 :progress="props.applyLoading"
@@ -95,6 +96,7 @@ interface Props {
     title?: string
     description?: string
     applyButton?: string
+    applyButtonClass?: string
     cancelButton?: string
 
     closable?: boolean

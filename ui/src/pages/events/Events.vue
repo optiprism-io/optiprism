@@ -33,10 +33,11 @@ import { computed, inject, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useLexiconStore } from '@/stores/lexicon'
 import { useLiveStreamStore } from '@/stores/reports/liveStream'
+import { useCommonStore } from '@/stores/common'
 import EventPropertyPopup, { ApplyPayload } from '@/components/events/EventPropertyPopup.vue'
 import EventManagementPopup, { ApplyPayload as ApplyPayloadEvent } from '@/components/events/EventManagementPopup.vue'
 import { Action } from '@/components/uikit/UiTable/UiTable'
-import { useCommonStore } from '@/stores/common'
+import navPagesConfig from '@/configs/events/navPages.json'
 
 const i18n = inject<any>('i18n')
 const route = useRoute()
@@ -48,36 +49,10 @@ const propertyPopupLoading = ref(false)
 const eventManagementPopupLoading = ref(false)
 
 const items = computed(() => {
-    const mapTabs = [
-        {
-            name: i18n.$t('events.live_stream.title'),
-            value: 'events_live_stream',
-            link: {
-                name: 'events_live_stream',
-            },
-            icon: 'fas fa-chart-pie'
-        },
-        {
-            name: i18n.$t('events.events'),
-            value: 'events_event_management',
-            link: {
-                name: 'events_event_management',
-            },
-            icon: 'pf-icon pf-icon-filter'
-        },
-        {
-            name: i18n.$t('events.event_properties'),
-            value: 'events_event_properties',
-            link: {
-                name: 'events_event_properties',
-            },
-            icon: 'fas fa-bars'
-        },
-    ];
-
-    return mapTabs.map(item => {
+    return navPagesConfig.map(item => {
         return {
             ...item,
+            name: i18n.$t(item.name),
             active: route.name === item.value,
         }
     })

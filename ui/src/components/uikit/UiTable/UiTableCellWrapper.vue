@@ -6,6 +6,8 @@
             'pf-m-truncate': props.truncate,
             'pf-m-border-right': props.lastFixed,
             'pf-c-table__sort': props.sorted,
+            'pf-c-table__action': props.type === 'action',
+            'pf-u-text-nowrap': props.noWrap,
         }"
         :style="{
             left: left,
@@ -19,10 +21,12 @@
 import { onMounted, ref } from 'vue'
 
 type Props = {
-   fixed?: boolean
-   lastFixed?: boolean
-   truncate?: boolean
-   sorted?: boolean
+    fixed?: boolean
+    lastFixed?: boolean
+    truncate?: boolean
+    sorted?: boolean
+    noWrap?: boolean
+    type?: string
 }
 
 const props = defineProps<Props>()

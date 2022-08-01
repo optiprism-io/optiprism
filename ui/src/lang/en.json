@@ -1,5 +1,6 @@
 {
   "common": {
+    "ok": "Ok",
     "types": {
       "string": "String",
       "number": "Number",
@@ -15,6 +16,7 @@
     "add_step": "Add Step",
     "enter_value": "Enter a value",
     "create": "Create",
+    "delete": "Delete",
     "edit": "Edit",
     "save": "Save",
     "castom": "Castom",
@@ -65,8 +67,10 @@
         "name": "Name",
         "displayName": "Display name",
         "description": "Description",
-        "status": "status",
-        "isSystem": "Is system"
+        "status": "Status",
+        "isSystem": "Is system",
+        "tags": "Tags",
+        "events": "Events"
       },
       "popup": {
         "properties_columns": {
@@ -98,6 +102,12 @@
         "eventName": "Event Name"
       }
     },
+    "customEvents": {
+      "title": "Custom events",
+      "deleteTitle": "Delete Custom Event",
+      "deleteContent": "Do you sure you want to delete :name?"
+    },
+    "add_custom_event": "Add custom event",
     "event_properties": "Event properties",
     "create_custom": "Create Custom Event",
     "edit_custom": "Edit Custom Event",

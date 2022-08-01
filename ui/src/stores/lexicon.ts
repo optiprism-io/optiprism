@@ -66,6 +66,10 @@ export const useLexiconStore = defineStore('lexicon', {
         userCustomProperties: [],
     }),
     actions: {
+        deleteCustomEvent(payload: number) {
+            const indexEvent = this.customEvents.findIndex(event => event.id === payload)
+            this.customEvents.splice(indexEvent, 1)
+        },
         async updateProperty(payload: ApplyPayload) {
             const commonStore = useCommonStore()
             try {
@@ -217,7 +221,7 @@ export const useLexiconStore = defineStore('lexicon', {
         },
         findEventPropertyById(state: Lexicon) {
             return (id: number): Property => {
-                const e = state.eventProperties.find((prop): boolean => Number(prop.id) === id);
+                const e = state.eventProperties.find((prop): boolean => Number(prop.id) === Number(id));
                 if (e) {
                     return e;
                 }
