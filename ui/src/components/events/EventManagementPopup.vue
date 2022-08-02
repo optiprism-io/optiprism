@@ -26,9 +26,10 @@
                 :compact="true"
                 :items="itemsProperties"
                 :columns="columnsProperties"
+                @on-action="onActionProperty"
             />
             <UiTable
-                v-if="activeTab === 'custom_properties'"
+                v-if="activeTab === 'customProperties'"
                 :compact="true"
                 :items="itemsUserProperties"
                 :columns="columnsProperties"
@@ -40,23 +41,24 @@
 <script lang="ts" setup>
 import { computed, inject, ref } from 'vue'
 import { EventCustomProperty } from '@/types/events'
-import { Row } from '@/components/uikit/UiTable/UiTable'
+import { Action, Row } from '@/components/uikit/UiTable/UiTable'
 import { Property, Event } from '@/api'
 
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
 import UiTabs from '@/components/uikit/UiTabs.vue'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import UiDescriptionList, { Item, ActionPayload } from '@/components/uikit/UiDescriptionList.vue'
+import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
 
 import propertiesColumnsConfig from '@/configs/events/propertiesTable.json'
-import eventValuesConfig, { Item as EventValuesConfig } from '@/configs/events/eventValues'
+import { eventValuesConfig, Item as EventValuesConfig } from '@/configs/events/eventValues'
 
 export type EventObject = {
     [key: string]: string | string[] | boolean
 }
 export type ApplyPayload = EventObject
 
-const mapTabs = ['event', 'properties', 'custom_properties']
+const mapTabs = ['event', 'properties', 'customProperties']
 
 const i18n = inject<any>('i18n')
 
@@ -75,6 +77,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     (e: 'cancel'): void
     (e: 'apply', payload: ApplyPayload): void
+    (e: 'on-action-property', payload: Action): void
 }>()
 
 const activeTab = ref('event')
@@ -89,10 +92,20 @@ const getTableRows = (properties: Property[] | EventCustomProperty[]) => {
 
         keys.forEach((key) => {
             if (prop[key]) {
-                rows.push({
-                    value: key,
-                    title: String(prop[key]) || '',
-                })
+                rows.push(key === 'name' ?
+                    {
+                        key: 'name',
+                        title: String(prop[key]) || '',
+                        component: UiTablePressedCell,
+                        action: {
+                            type: prop.id,
+                            name: prop.name,
+                        }
+                    } :
+                    {
+                        key,
+                        title: String(prop[key]) || '',
+                    })
             }
         })
 
@@ -178,5 +191,9 @@ const onInputEventItem = async (payload: ActionPayload) => {
             [payload.key]: value
         }
     }
+}
+
+const onActionProperty = (payload: Action) => {
+    emit('on-action-property', payload)
 }
 </script>

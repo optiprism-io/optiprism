@@ -7,6 +7,11 @@ export type StyleCell = {
     minWidth?: string
 }
 
+export type ToolMenuItem = {
+    value: string | number
+    label: string
+}
+
 export type Action = {
     name: string
     icon?: string
@@ -33,11 +38,15 @@ export type Column = {
     left?: number
     style?: StyleCell
     lastFixed?: boolean
-    fixed?: boolean,
+    fixed?: boolean
+    enabled?: boolean
+    default?: boolean
+    type?: string
 }
 
 export type Cell = {
-    value: string | number | boolean
+    key: string,
+    value?: string | number | boolean | string[]
     title: string | number | boolean
     truncate?: boolean
     left?: number
@@ -47,7 +56,9 @@ export type Cell = {
     style?: StyleCell | undefined
     nowrap?: boolean
     lastFixed?: boolean
-    fixed?: boolean,
+    fixed?: boolean
+    type?: string
+    items?: ToolMenuItem[]
 }
 
 export type ColumnMap = {

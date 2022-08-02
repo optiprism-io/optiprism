@@ -2,15 +2,19 @@ import { get } from '../apiClient'
 import { Value, OperationId } from '@/types'
 import { PropertyRef } from '@/types/events'
 import {
+    PropertiesApi,
     EventsApi,
     CreateCustomEventRequest,
     PropertyType,
     CustomEventEvent,
     EventType,
-    UpdateEventRequest
+    UpdateEventRequest,
+    UpdatePropertyRequest,
+    UpdateCustomEventRequest,
 } from '@/api'
 
 const api = new EventsApi()
+const propertiesApi = new PropertiesApi()
 
 type PropertiesValues = {
     event_name?: string;
@@ -43,9 +47,11 @@ const schemaService = {
 
     customEvents: async (organizationId: number, projectId: number) => await api.customEventsList(organizationId, projectId),
     createCustomEvent: async (organizationId: number, projectId: number, params: CreateCustomEventRequest) => await api.createCustomEvent(organizationId, projectId, params),
-    updateCustomEvent: async(organizationId: number, projectId: number, eventId: string, params: CreateCustomEventRequest) => await api.updateCustomEvent(organizationId, projectId, eventId, params),
+    updateCustomEvent: async(organizationId: number, projectId: number, eventId: string, params: UpdateCustomEventRequest) => await api.updateCustomEvent(organizationId, projectId, eventId, params),
+    deleteCustomEvents: async (organizationId: number, projectId: number, eventId: number) => await api.deleteCustomEvent(organizationId, projectId, eventId),
 
     eventProperties: async () => await get('/schema/event-properties', '', null),
+    updateEventProperty: async(organizationId: number, projectId: number, propertyId: string, params: UpdatePropertyRequest) => await propertiesApi.updateEventProperty(organizationId, projectId, propertyId, params),
     eventCustomProperties: async () => await get('/schema/event-custom-properties', '', null),
 
     userProperties: async () => await get('/schema/user-properties', '', null),

@@ -5,7 +5,7 @@ use chrono::Utc;
 use metadata::metadata::ListResponse;
 use metadata::properties::Provider;
 use metadata::properties::{CreatePropertyRequest, Property, Status};
-use metadata::Store;
+use metadata::store::Store;
 use platform::error::Result;
 use platform::http::properties;
 use platform::properties::{Provider as PropertiesProvider, UpdatePropertyRequest};

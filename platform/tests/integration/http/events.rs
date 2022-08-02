@@ -3,7 +3,7 @@ use axum::{Router, Server};
 use chrono::Utc;
 use metadata::events::{Event, Provider, Status};
 use metadata::metadata::ListResponse;
-use metadata::Store;
+use metadata::store::Store;
 use platform::error::Result;
 use platform::events::Provider as EventsProvider;
 use platform::events::{CreateEventRequest, UpdateEventRequest};

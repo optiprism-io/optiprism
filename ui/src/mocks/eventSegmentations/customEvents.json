@@ -1,0 +1,73 @@
+[
+  {
+    "id": 1,
+    "name": "Create Product",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Amet animi architecto aspernatur beatae blanditiis culpa cupiditate dolorem doloribus ea et eveniet explicabo, harum illo inventore laudantium modi obcaecati quibusdam ratione recusandae reiciendis reprehenderit sapiente similique totam.",
+    "tags": [
+      "ok",
+      "product",
+      "my tag"
+    ],
+    "status": "enabled",
+    "events": [
+      {
+        "eventName": "view_product",
+        "eventType": "custom",
+        "eventId": "3",
+        "filters": [
+          {
+            "type": "property",
+            "propertyType": "event",
+            "propertyId": "2",
+            "operation": "eq",
+            "value": []
+          }
+        ]
+      },
+      {
+        "eventName": "search",
+        "eventType": "custom",
+        "eventId": "2",
+        "filters": [
+          {
+            "type": "property",
+            "propertyType": "custom",
+            "propertyId": 1,
+            "operation": "neq",
+            "value": [
+              "Tables",
+              "Lamp"
+            ]
+          },
+          {
+            "type": "property",
+            "propertyType": "user",
+            "propertyId": 3,
+            "operation": "arr_none",
+            "value": [
+              "USA"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Find Product",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Amet animi architecto aspernatur beatae blanditiis culpa cupiditate dolorem doloribus ea et eveniet explicabo.",
+    "tags": [
+      "ok",
+      "\uD83D\uDE0E"
+    ],
+    "status": "disabled",
+    "events": [
+      {
+        "eventId": 2,
+        "eventName": "search",
+        "eventType": "regular",
+        "filters": []
+      }
+    ]
+  }
+]

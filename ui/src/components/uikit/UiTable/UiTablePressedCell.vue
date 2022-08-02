@@ -1,17 +1,13 @@
 <template>
-    <div
-        class="ui-table-event-cell"
-    >
-        <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
-            <div class="pf-l-flex__item">
-                <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
-                    <UiButtom
-                        class="pf-u-text-nowrap pf-m-link pf-m-inline"
-                        @click="props.action && onAction(props.action)"
-                    >
-                        {{ title }}
-                    </UiButtom>
-                </div>
+    <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
+        <div class="pf-l-flex__item">
+            <div class="pf-u-display-flex pf-u-flex-direction-row pf-u-align-items-center">
+                <UiButton
+                    class="pf-u-text-nowrap pf-m-link pf-m-inline"
+                    @click="props.action && onAction(props.action)"
+                >
+                    {{ title }}
+                </UiButton>
             </div>
         </div>
     </div>
@@ -20,10 +16,10 @@
 <script lang="ts" setup>
 import { defineComponent } from 'vue'
 import { Action } from './UiTable'
-import UiButtom from '../UiButton.vue'
+import UiButton from '../UiButton.vue'
 
 type Props = {
-    value: string | number
+    value?: string | number
     title: string | number
     actions?: Action[]
     action?: Action,

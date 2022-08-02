@@ -1,5 +1,11 @@
 {
   "common": {
+    "ok": "Ok",
+    "types": {
+      "string": "String",
+      "number": "Number",
+      "boolean": "Boolean"
+    },
     "apply": "Apply",
     "cancel": "Cancel",
     "close": "Close",
@@ -10,9 +16,11 @@
     "add_step": "Add Step",
     "enter_value": "Enter a value",
     "create": "Create",
+    "delete": "Delete",
     "edit": "Edit",
     "save": "Save",
     "castom": "Castom",
+    "list_of": "List of :types",
     "columns": "columns",
     "no_data": "No data",
     "calendar": {
@@ -58,7 +66,11 @@
       "columns": {
         "name": "Name",
         "displayName": "Display name",
-        "description": "Description"
+        "description": "Description",
+        "status": "Status",
+        "isSystem": "Is system",
+        "tags": "Tags",
+        "events": "Events"
       },
       "popup": {
         "properties_columns": {
@@ -70,13 +82,16 @@
           "name": "Name",
           "displayName": "Display name",
           "description": "Description",
-          "status": "Status"
+          "status": "Status",
+          "type": "Type"
         },
         "tabs": {
           "event": "Event",
+          "events": "Events",
+          "property": "Property",
           "properties": "Properties",
-          "user_properties": "User Properties",
-          "custom_properties": "Custom Properties"
+          "userProperties": "User Properties",
+          "customProperties": "Custom Properties"
         }
       }
     },
@@ -87,6 +102,13 @@
         "eventName": "Event Name"
       }
     },
+    "customEvents": {
+      "title": "Custom events",
+      "deleteTitle": "Delete Custom Event",
+      "deleteContent": "Do you sure you want to delete :name?"
+    },
+    "add_custom_event": "Add custom event",
+    "event_properties": "Event properties",
     "create_custom": "Create Custom Event",
     "edit_custom": "Edit Custom Event",
     "create_custom_description": "Enter information for create Custom Event.",

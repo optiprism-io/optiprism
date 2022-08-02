@@ -23,286 +23,20 @@ mod tests {
     use metadata::database::{Column, Table, TableType};
     use metadata::properties::provider::Namespace;
     use metadata::properties::{CreatePropertyRequest, Property};
-    use metadata::{database, events, properties, Metadata, Store};
+    use metadata::{database, events, properties, Metadata};
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
     use query::physical_plan::planner::QueryPlanner;
-    use query::reports::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
-    use query::reports::event_segmentation::types::{
+    use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
+    use query::queries::event_segmentation::types::{
         Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, NamedQuery, Query,
     };
-    use query::reports::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
+    use query::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
     use query::{event_fields, Context};
 
+    use query::test_util::{create_entities, create_md, events_provider};
     use std::ops::Sub;
     use std::sync::Arc;
     use uuid::Uuid;
-
-    pub async fn events_provider(
-        db: Arc<database::Provider>,
-        org_id: u64,
-        proj_id: u64,
-    ) -> Result<LogicalPlan> {
-        let table = db.get_table(TableType::Events(org_id, proj_id)).await?;
-        let schema = table.arrow_schema();
-        let options = CsvReadOptions::new().schema(&schema);
-        let path = "../tests/events.csv";
-        let df_input = datafusion::logical_plan::LogicalPlanBuilder::scan_csv(
-            Arc::new(LocalFileSystem {}),
-            path,
-            options,
-            None,
-            1,
-        )
-        .await?;
-
-        Ok(df_input.build()?)
-    }
-
-    async fn create_property(
-        md: &Arc<Metadata>,
-        ns: Namespace,
-        org_id: u64,
-        proj_id: u64,
-        req: CreatePropertyRequest,
-    ) -> Result<Property> {
-        let prop = match ns {
-            Namespace::Event => md.event_properties.create(org_id, proj_id, req).await?,
-            Namespace::User => md.user_properties.create(org_id, proj_id, req).await?,
-        };
-
-        md.database
-            .add_column(
-                TableType::Events(org_id, proj_id),
-                Column::new(
-                    prop.column_name(ns),
-                    prop.typ.clone(),
-                    prop.nullable,
-                    prop.dictionary_type.clone(),
-                ),
-            )
-            .await?;
-
-        Ok(prop)
-    }
-
-    async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Result<()> {
-        md.database
-            .create_table(Table {
-                typ: TableType::Events(org_id, proj_id),
-                columns: vec![],
-            })
-            .await?;
-
-        md.database
-            .add_column(
-                TableType::Events(org_id, proj_id),
-                Column::new(
-                    event_fields::USER_ID.to_string(),
-                    DFDataType::UInt64,
-                    false,
-                    None,
-                ),
-            )
-            .await?;
-        md.database
-            .add_column(
-                TableType::Events(org_id, proj_id),
-                Column::new(
-                    event_fields::CREATED_AT.to_string(),
-                    DFDataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
-                    false,
-                    None,
-                ),
-            )
-            .await?;
-        md.database
-            .add_column(
-                TableType::Events(org_id, proj_id),
-                Column::new(
-                    event_fields::EVENT.to_string(),
-                    DFDataType::UInt16,
-                    false,
-                    None,
-                ),
-            )
-            .await?;
-
-        // create user props
-
-        let country_prop = create_property(
-            &md,
-            Namespace::User,
-            org_id,
-            proj_id,
-            CreatePropertyRequest {
-                created_by: 0,
-                tags: None,
-                name: "Country".to_string(),
-                description: None,
-                display_name: None,
-                typ: DFDataType::Utf8,
-                status: properties::Status::Enabled,
-                is_system: false,
-                nullable: false,
-                is_array: false,
-                is_dictionary: false,
-                dictionary_type: Some(DFDataType::UInt8),
-            },
-        )
-        .await?;
-
-        md.dictionaries
-            .get_key_or_create(
-                org_id,
-                proj_id,
-                country_prop.column_name(Namespace::User).as_str(),
-                "spain",
-            )
-            .await?;
-        md.dictionaries
-            .get_key_or_create(
-                org_id,
-                proj_id,
-                country_prop.column_name(Namespace::User).as_str(),
-                "german",
-            )
-            .await?;
-        create_property(
-            &md,
-            Namespace::User,
-            org_id,
-            proj_id,
-            CreatePropertyRequest {
-                created_by: 0,
-                tags: None,
-                name: "Device".to_string(),
-                description: None,
-                display_name: None,
-                typ: DFDataType::Utf8,
-                status: properties::Status::Enabled,
-                nullable: false,
-                is_array: false,
-                is_dictionary: false,
-                dictionary_type: None,
-                is_system: false,
-            },
-        )
-        .await?;
-
-        create_property(
-            &md,
-            Namespace::User,
-            org_id,
-            proj_id,
-            CreatePropertyRequest {
-                created_by: 0,
-                tags: None,
-                name: "Is Premium".to_string(),
-                description: None,
-                display_name: None,
-                typ: DFDataType::Boolean,
-                status: properties::Status::Enabled,
-                is_system: false,
-                nullable: false,
-                is_array: false,
-                is_dictionary: false,
-                dictionary_type: None,
-            },
-        )
-        .await?;
-
-        // create events
-        md.events
-            .create(
-                org_id,
-                proj_id,
-                events::CreateEventRequest {
-                    created_by: 0,
-                    tags: None,
-                    name: "View Product".to_string(),
-                    display_name: None,
-                    description: None,
-                    status: events::Status::Enabled,
-                    properties: None,
-                    custom_properties: None,
-                    is_system: false,
-                },
-            )
-            .await?;
-
-        md.events
-            .create(
-                org_id,
-                proj_id,
-                events::CreateEventRequest {
-                    created_by: 0,
-                    tags: None,
-                    name: "Buy Product".to_string(),
-                    display_name: None,
-                    description: None,
-                    status: events::Status::Enabled,
-                    properties: None,
-                    custom_properties: None,
-                    is_system: false,
-                },
-            )
-            .await?;
-
-        // create event props
-        create_property(
-            &md,
-            Namespace::Event,
-            org_id,
-            proj_id,
-            CreatePropertyRequest {
-                created_by: 0,
-                tags: None,
-                name: "Product Name".to_string(),
-                description: None,
-                display_name: None,
-                typ: DFDataType::Utf8,
-                status: properties::Status::Enabled,
-                nullable: false,
-                is_array: false,
-                is_dictionary: false,
-                dictionary_type: None,
-                is_system: false,
-            },
-        )
-        .await?;
-
-        create_property(
-            &md,
-            Namespace::Event,
-            org_id,
-            proj_id,
-            CreatePropertyRequest {
-                created_by: 0,
-                tags: None,
-                name: "Revenue".to_string(),
-                description: None,
-                display_name: None,
-                typ: DFDataType::Float64,
-                status: properties::Status::Enabled,
-                nullable: false,
-                is_array: false,
-                is_dictionary: false,
-                dictionary_type: None,
-                is_system: false,
-            },
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    fn create_md() -> Result<Arc<Metadata>> {
-        let mut path = temp_dir();
-        path.push(format!("{}.db", Uuid::new_v4()));
-
-        let store = Arc::new(Store::new(path));
-        Ok(Arc::new(Metadata::try_new(store)?))
-    }
 
     #[tokio::test]
     async fn test_filters() -> Result<()> {
@@ -414,14 +148,12 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Device".to_string(),
             ))]),
-            segments: None,
         };
 
         let mut path = temp_dir();
         path.push(format!("{}.db", Uuid::new_v4()));
 
-        let store = Arc::new(Store::new(path));
-        let md = Arc::new(Metadata::try_new(store)?);
+        let md = create_md()?;
 
         let org_id = 1;
         let proj_id = 1;
@@ -535,7 +267,6 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Country".to_string(),
             ))]),
-            segments: None,
         };
 
         let md = create_md()?;

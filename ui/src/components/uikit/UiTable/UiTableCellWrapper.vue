@@ -6,6 +6,8 @@
             'pf-m-truncate': props.truncate,
             'pf-m-border-right': props.lastFixed,
             'pf-c-table__sort': props.sorted,
+            'pf-c-table__action': props.type === 'action',
+            'pf-u-text-nowrap': props.noWrap,
         }"
         :colspan="colspan"
         :style="{
@@ -25,6 +27,8 @@ type Props = {
    truncate?: boolean
    sorted?: boolean
    colspan?: number
+   noWrap?: boolean
+   type?: string
 }
 
 const props = defineProps<Props>()

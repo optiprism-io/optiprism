@@ -9,6 +9,7 @@ import funnelsMocks from '@/mocks/reports/funnels.json'
 import eventSegmentationsMocks from '@/mocks/eventSegmentations/eventSegmentations.json';
 import eventMocks from '@/mocks/eventSegmentations/events.json';
 import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
+import customEventsMocks from '@/mocks/eventSegmentations/customEvents.json';
 
 export default function ({ environment = 'development' } = {}) {
     return createServer({
@@ -16,26 +17,7 @@ export default function ({ environment = 'development' } = {}) {
             server.db.loadData({
                 events: eventMocks,
                 eventProperties: eventPropertiesMocks,
-
-                customEvents: [{
-                    id: 1,
-                    name: 'Create Product',
-                    events: [{
-                        eventId: 3,
-                        eventName: 'view_product',
-                        eventType: 'regular',
-                        filters: []
-                    }]
-                }, {
-                    id: 2,
-                    name: 'Find Product',
-                    events: [{
-                        eventId: 2,
-                        eventName: 'search',
-                        eventType: 'regular',
-                        filters: []
-                    }]
-                }],
+                customEvents: customEventsMocks,
             })
         },
 
@@ -55,6 +37,10 @@ export default function ({ environment = 'development' } = {}) {
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events`, (schema) => {
                 return schema.db.customEvents.map(item => ({...item, id: Number(item.id)}))
+            })
+
+            this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events/:event_id`, (schema, request) => {
+                return 'done';
             })
 
             this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events`, (schema, request) => {
@@ -81,6 +67,11 @@ export default function ({ environment = 'development' } = {}) {
             this.get('/schema/event-properties', (schema) => {
                 return schema.db.eventProperties
             });
+
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/event_properties/:property_id`, (schema, request) => {
+                const property = JSON.parse(request.requestBody)
+                return schema.db.eventProperties.update(request.params.property_id, property)
+            })
 
             this.get('/schema/event-custom-properties', () => {
                 return [

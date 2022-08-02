@@ -1,6 +1,6 @@
 use crate::logical_plan::expr::{lit_timestamp, multi_or};
-use crate::reports::types::{PropValueOperation, PropertyRef, QueryTime};
-use crate::Result;
+use crate::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime};
+use crate::{event_fields, Result};
 use crate::{Context, Error};
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
@@ -37,7 +37,32 @@ pub fn time_expression<S: ExprSchema>(
     Ok(and(from_expr, to_expr))
 }
 
-pub async fn values_to_dict_keys(
+/// builds expression for event
+pub async fn event_expression(
+    ctx: &Context,
+    metadata: &Arc<Metadata>,
+    event: &EventRef,
+) -> Result<Expr> {
+    Ok(match &event {
+        // regular event
+        EventRef::Regular(name) => {
+            let e = metadata
+                .events
+                .get_by_name(ctx.organization_id, ctx.project_id, name)
+                .await?;
+
+            binary_expr(
+                col(event_fields::EVENT),
+                Operator::Eq,
+                lit(ScalarValue::from(e.id)),
+            )
+        }
+
+        EventRef::Custom(_event_name) => unimplemented!(),
+    })
+}
+
+pub async fn decode_property_dict_values(
     ctx: &Context,
     dictionaries: &Arc<dictionaries::Provider>,
     dict_type: &DataType,
@@ -99,7 +124,7 @@ pub async fn property_expression(
             }
 
             if let Some(dict_type) = prop.dictionary_type {
-                let dict_values = values_to_dict_keys(
+                let dict_values = decode_property_dict_values(
                     ctx,
                     &md.dictionaries,
                     &dict_type,
@@ -125,7 +150,7 @@ pub async fn property_expression(
             }
 
             if let Some(dict_type) = prop.dictionary_type {
-                let dict_values = values_to_dict_keys(
+                let dict_values = decode_property_dict_values(
                     ctx,
                     &md.dictionaries,
                     &dict_type,
@@ -173,7 +198,7 @@ pub fn named_property_expression(
     values: Option<Vec<ScalarValue>>,
 ) -> Result<Expr> {
     match operation {
-        PropValueOperation::Eq | PropValueOperation::Neq => {
+        PropValueOperation::Eq | PropValueOperation::Neq | PropValueOperation::Like => {
             // expressions for OR
             let values_vec = values.ok_or_else(|| {
                 Error::QueryError("value should be defined for this kind of operation".to_owned())

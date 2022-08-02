@@ -1,20 +1,18 @@
-use crate::{
-    AccountsProvider, AuthProvider, EventSegmentationProvider, EventsProvider, PropertiesProvider,
-};
+use crate::queries::provider::QueryProvider;
+use crate::{AccountsProvider, AuthProvider, EventsProvider, PropertiesProvider};
 use metadata::Metadata;
-use query::QueryProvider;
 use std::sync::Arc;
 
-pub struct Platform {
+pub struct PlatformProvider {
     pub events: Arc<EventsProvider>,
     pub event_properties: Arc<PropertiesProvider>,
     pub user_properties: Arc<PropertiesProvider>,
     pub accounts: Arc<AccountsProvider>,
     pub auth: Arc<AuthProvider>,
-    pub event_segmentation: Arc<EventSegmentationProvider>,
+    pub query: Arc<QueryProvider>,
 }
 
-impl Platform {
+impl PlatformProvider {
     pub fn new(md: Arc<Metadata>, query: Arc<QueryProvider>) -> Self {
         Self {
             events: Arc::new(EventsProvider::new(md.events.clone())),
@@ -22,7 +20,7 @@ impl Platform {
             user_properties: Arc::new(PropertiesProvider::new_user(md.user_properties.clone())),
             accounts: Arc::new(AccountsProvider::new(md.accounts.clone())),
             auth: Arc::new(AuthProvider::new(md.clone())),
-            event_segmentation: Arc::new(EventSegmentationProvider::new(query)),
+            query,
         }
     }
 }

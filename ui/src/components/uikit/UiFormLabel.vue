@@ -12,6 +12,7 @@
                     aria-hidden="true"
                 >&#42;</span>
                 <button
+                    v-if="props.info"
                     class="pf-c-form__group-label-help"
                     aria-label="More info"
                 >
@@ -33,6 +34,7 @@ interface Props {
     required?: boolean
     text: string
     for?: string
+    info?: string
 }
 
 const props = defineProps<Props>()

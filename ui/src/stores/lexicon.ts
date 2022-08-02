@@ -66,6 +66,27 @@ export const useLexiconStore = defineStore('lexicon', {
         userCustomProperties: [],
     }),
     actions: {
+        deleteCustomEvent(payload: number) {
+            const indexEvent = this.customEvents.findIndex(event => event.id === payload)
+            this.customEvents.splice(indexEvent, 1)
+        },
+        async updateProperty(payload: ApplyPayload) {
+            const commonStore = useCommonStore()
+            try {
+                const res = await schemaService.updateEventProperty(commonStore.organizationId, commonStore.projectId, String(commonStore.editEventPropertyPopupId), payload)
+
+                if (res?.data) {
+                    const newProperty: Property = res.data;
+                    const index: number = this.eventProperties.findIndex(property => Number(property.id) === commonStore.editEventPropertyPopupId)
+
+                    if (~index) {
+                        this.eventProperties[index] = newProperty
+                    }
+                }
+            } catch (error) {
+                throw new Error('error update property')
+            }
+        },
         async updateEvent(payload: ApplyPayload) {
             const commonStore = useCommonStore()
 
@@ -200,7 +221,7 @@ export const useLexiconStore = defineStore('lexicon', {
         },
         findEventPropertyById(state: Lexicon) {
             return (id: number): Property => {
-                const e = state.eventProperties.find((prop): boolean => Number(prop.id) === id);
+                const e = state.eventProperties.find((prop): boolean => Number(prop.id) === Number(id));
                 if (e) {
                     return e;
                 }
@@ -340,7 +361,7 @@ export const useLexiconStore = defineStore('lexicon', {
                 name: aggregate.name || '',
             }));
         },
-        eventsQueries(state: Lexicon) {
+        eventsQueries() {
             const eventsStore: Events = useEventsStore();
 
             return eventsQueries.map((item) => {
