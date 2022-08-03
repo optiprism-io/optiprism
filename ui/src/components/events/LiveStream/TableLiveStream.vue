@@ -63,14 +63,18 @@
                 :columns="tableColumnsValues"
                 @on-action="onAction"
             />
+            <LiveStreamEventPopup
+                v-if="liveStreamStore.eventPopup"
+                :name="eventPopupName"
+            />
         </div>
     </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
-
+import { componentsMaps } from '@/configs/events/liveStreamTableDefault'
 import { useLiveStreamStore, Report } from '@/stores/reports/liveStream'
 import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
@@ -79,7 +83,6 @@ import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 import { Column, Cell, Action,  } from '@/components/uikit/UiTable/UiTable'
 import EventCell, { EventCell as EventCellType } from '@/components/events/EventCell.vue'
-
 import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue'
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
 import UiSelect from '@/components/uikit/UiSelect.vue'
@@ -88,6 +91,7 @@ import UiSpinner from '@/components/uikit/UiSpinner.vue'
 import DataEmptyPlaceholder from '@/components/common/data/DataEmptyPlaceholder.vue';
 import DataLoader from '@/components/common/data/DataLoader.vue';
 import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue'
+import LiveStreamEventPopup from '@/components/events/LiveStreamEventPopup.vue'
 
 const i18n = inject<any>('i18n')
 const liveStreamStore = useLiveStreamStore()
@@ -98,6 +102,9 @@ const eventsStore = useEventsStore()
 const actionTable = 'action'
 const createCustomEvent = 'create'
 const customEvents = 'customEvents'
+const eventName = 'eventName'
+
+const eventPopupName = ref('')
 
 const itemsPeriod = computed(() => {
     return ['7', '30', '90'].map((key, i): UiToggleGroupItem => ({
@@ -107,10 +114,6 @@ const itemsPeriod = computed(() => {
         selected: liveStreamStore.controlsPeriod === key,
     }))
 })
-
-const updateReport = () => {
-    liveStreamStore.getReportLiveStream()
-}
 
 const tableColumnsValues = computed(() => {
     return [
@@ -144,7 +147,7 @@ const tableData = computed(() => {
             if (liveStreamStore.defaultColumns.includes(column.value)) {
                 const value = column.value === 'eventName' ? data.name : getStringDateByFormat(String(data.properties[column.value]), '%d %b, %Y')
 
-                return {
+                const cell: Cell | EventCellType = {
                     key: column.value,
                     title: value,
                     fixed: true,
@@ -161,8 +164,17 @@ const tableData = computed(() => {
                             value: Number(event.id)
                         }
                     }) : [],
-                    component: column.value === customEvents ? EventCell : null,
+                    component: componentsMaps[column.value] || null,
                 }
+
+                if (column.value === eventName) {
+                    cell.action = {
+                        type: eventName,
+                        name: data.name,
+                    }
+                }
+
+                return cell
             } else if (column.value === actionTable) {
                 return {
                     title: actionTable,
@@ -237,6 +249,9 @@ const calendarValueString = computed(() => {
     }
 })
 
+const updateReport = () => {
+    liveStreamStore.getReportLiveStream()
+}
 
 const onSelectPerion = (payload: string) => {
     liveStreamStore.controlsPeriod = payload
@@ -266,6 +281,11 @@ const onAction = (payload: Action) => {
     if (payload.type === 'event') {
         eventsStore.setEditCustomEvent(Number(payload.name))
         commonStore.togglePopupCreateCustomEvent(true)
+    }
+
+    if (payload.type === eventName) {
+        eventPopupName.value = payload.name
+        liveStreamStore.eventPopup = true
     }
 }
 </script>

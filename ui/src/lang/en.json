@@ -70,7 +70,8 @@
         "status": "Status",
         "isSystem": "Is system",
         "tags": "Tags",
-        "events": "Events"
+        "events": "Events",
+        "value": "Value"
       },
       "popup": {
         "properties_columns": {
@@ -102,6 +103,13 @@
         "createdAt": "Date",
         "eventName": "Event Name",
         "customEvents": "Custom events"
+      },
+      "properties": {
+
+      },
+      "popupTabs": {
+        "properties": "Event Properties",
+        "userProperties": "User Properties"
       }
     },
     "customEvents": {

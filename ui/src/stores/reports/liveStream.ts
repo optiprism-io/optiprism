@@ -31,6 +31,7 @@ type LiveStream = {
     activeColumns: string[]
     defaultColumns: string[]
     loading: boolean
+    eventPopup: boolean
 }
 
 export const useLiveStreamStore = defineStore('liveStream', {
@@ -47,6 +48,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
         activeColumns: [],
         defaultColumns: ['eventName', 'customEvents', 'createdAt'],
         loading: false,
+        eventPopup: false
     }),
     getters: {
         isPeriodActive(): boolean {
