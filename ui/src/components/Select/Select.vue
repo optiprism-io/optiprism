@@ -32,7 +32,13 @@
                             :grouped="grouped"
                             :selected="selectedItem"
                             :show-search="showSearch"
-                            @select="($event: any) => {hide(); select($event)}"
+                            :multiple="props.multiple"
+                            @select="($event) => {
+                                if (!props.multiple) {
+                                    hide()
+                                }
+                                select($event)
+                            }"
                             @hover="hover"
                             @on-search="onSearch"
                             @action="emit('action', $event)"
@@ -91,6 +97,7 @@ const props = withDefaults(
         popperClass?: string
         popperContainer?: string
         autoHide?: boolean
+        multiple?: boolean
     }>(),
     {
         showSearch: true,
@@ -100,7 +107,8 @@ const props = withDefaults(
         updateOpen: false,
         popperClass: undefined,
         autoHide: true,
-        popperContainer: 'body'
+        popperContainer: 'body',
+        multiple: false,
     }
 );
 

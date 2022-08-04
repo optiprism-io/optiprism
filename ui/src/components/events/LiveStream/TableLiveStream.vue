@@ -37,13 +37,30 @@
                     v-if="liveStreamStore.columnsMap.length"
                     class="pf-c-toolbar__item pf-u-ml-auto"
                 >
-                    <UiSelect
-                        :items="columns"
-                        :variant="'multiple'"
+                    <Select
+                        :items="selectColumns"
                         :text-button="columnsButtonText"
-                        :selections="liveStreamStore.activeColumns"
-                        @on-select="liveStreamStore.toggleColumns"
-                    />
+                        :multiple="true"
+                        :show-search="false"
+                        :grouped="true"
+                        class="pf-c-select"
+                        @select="liveStreamStore.toggleColumns"
+                    >
+                        <UiButton
+                            class="pf-c-select__toggle"
+                            type="button"
+                        >
+                            {{ columnsButtonText }}
+                            <span
+                                class="pf-c-select__toggle-arrow"
+                            >
+                                <i
+                                    class="fas fa-caret-down"
+                                    aria-hidden="true"
+                                />
+                            </span>
+                        </UiButton>
+                    </Select>
                 </div>
             </div>
         </div>
@@ -82,16 +99,17 @@ import { useEventsStore } from '@/stores/eventSegmentation/events'
 
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 import { Column, Cell, Action,  } from '@/components/uikit/UiTable/UiTable'
-import EventCell, { EventCell as EventCellType } from '@/components/events/EventCell.vue'
+import { EventCell as EventCellType } from '@/components/events/EventCell.vue'
 import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue'
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
-import UiSelect from '@/components/uikit/UiSelect.vue'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import UiSpinner from '@/components/uikit/UiSpinner.vue'
 import DataEmptyPlaceholder from '@/components/common/data/DataEmptyPlaceholder.vue';
 import DataLoader from '@/components/common/data/DataLoader.vue';
 import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue'
 import LiveStreamEventPopup from '@/components/events/LiveStreamEventPopup.vue'
+import Select from '@/components/Select/Select.vue'
+import { Group, Item } from '@/components/Select/SelectTypes'
 
 const i18n = inject<any>('i18n')
 const liveStreamStore = useLiveStreamStore()
@@ -103,6 +121,8 @@ const actionTable = 'action'
 const createCustomEvent = 'create'
 const customEvents = 'customEvents'
 const eventName = 'eventName'
+const properties = 'properties'
+const userProperties = 'userProperties'
 
 const eventPopupName = ref('')
 
@@ -126,7 +146,7 @@ const tableColumnsValues = computed(() => {
                 lastFixed: liveStreamStore.defaultColumns.length - 1 === i,
             }
         }),
-        ...liveStreamStore.activeColumns.map(key => {
+        ...liveStreamStore.columnsMap.filter(key => liveStreamStore.activeColumns.includes(key)).map(key => {
             return {
                 value: key,
                 title: key.charAt(0).toUpperCase() + key.slice(1),
@@ -220,6 +240,31 @@ const calendarValue = computed(() => {
 
 const columnsButtonText = computed(() => {
     return `${liveStreamStore.columnsMap.length} ${i18n.$t('common.columns')}`
+})
+
+const selectColumns = computed((): Group<Item<string, null>[]>[] => {
+    return [
+        {
+            name: i18n.$t(`events.live_stream.popupTabs.${properties}`),
+            items: liveStreamStore.columnsMapObject.properties.map(item => {
+                return {
+                    item: item,
+                    name: item.charAt(0).toUpperCase() + item.slice(1),
+                    selected: liveStreamStore.activeColumns.includes(item)
+                }
+            })
+        },
+        {
+            name: i18n.$t(`events.live_stream.popupTabs.${userProperties}`),
+            items: liveStreamStore.columnsMapObject.userProperties.map(item => {
+                return {
+                    name: item.charAt(0).toUpperCase() + item.slice(1),
+                    item: item,
+                    selected: liveStreamStore.activeColumns.includes(item)
+                }
+            })
+        }
+    ]
 })
 
 const columns = computed(() => {

@@ -104,9 +104,6 @@
         "eventName": "Event Name",
         "customEvents": "Custom events"
       },
-      "properties": {
-
-      },
       "popupTabs": {
         "properties": "Event Properties",
         "userProperties": "User Properties"

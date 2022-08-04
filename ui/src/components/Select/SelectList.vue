@@ -15,7 +15,12 @@
                 >
             </div>
         </div>
-        <div class="pf-c-menu__content">
+        <div
+            class="pf-c-menu__content"
+            :class="{
+                'pf-c-select': props.multiple
+            }"
+        >
             <template v-if="grouped">
                 <template
                     v-for="(group, index) in groupedItems"
@@ -56,6 +61,8 @@
                                     :selected="selected"
                                     :is-disabled="item.disabled"
                                     :editable="item.editable"
+                                    :multiple="props.multiple"
+                                    :active="item.selected"
                                     @mouseenter="hover(item)"
                                     @click="select"
                                     @edit="emit('edit', $event)"
@@ -69,10 +76,12 @@
                     >
                         <SelectListItem
                             v-for="item in group.items"
-                            :key="item.item.id"
+                            :key="item.item?.id || item.item"
                             :item="item.item"
                             :text="item.name"
                             :selected="selected"
+                            :multiple="props.multiple"
+                            :active="item.selected"
                             @mouseenter="hover(item)"
                             @click="select"
                         />
@@ -88,6 +97,8 @@
                         :items="item.items || undefined"
                         :text="item.name"
                         :selected="selected"
+                        :multiple="props.multiple"
+                        :active="item.selected"
                         @mouseenter="hover(item)"
                         @click="select"
                     />
@@ -115,6 +126,7 @@ const props = defineProps<{
     grouped: boolean;
     selected?: any;
     showSearch?: boolean;
+    multiple?: boolean
 }>();
 
 const search = ref('');

@@ -122,6 +122,28 @@ export const useLiveStreamStore = defineStore('liveStream', {
                     }
             }
         },
+        columnsMapObject() {
+            const properties: string[] = []
+            const userProperties: string[] = []
+
+            this.reports.forEach((item: Report) => {
+                Object.keys(item.properties).forEach((key: string) => {
+                    if (key !== 'createdAt') {
+                        properties.push(key)
+                    }
+                })
+                if (item.userProperties) {
+                    Object.keys(item.userProperties).forEach((key: string) => {
+                        userProperties.push(key)
+                    })
+                }
+            })
+
+            return {
+                properties: [...new Set(properties)],
+                userProperties: [...new  Set(userProperties)]
+            }
+        },
         columnsMap(): string[] {
             const items: string[] = []
 

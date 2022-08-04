@@ -12,6 +12,7 @@ export interface Item<T, K = undefined>{
     disabled?: boolean | undefined;
     items?: K | undefined;
     editable?: boolean
+    selected?: boolean
 }
 
 export interface Group<T>{
