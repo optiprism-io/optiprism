@@ -90,7 +90,7 @@
           "event": "Event",
           "events": "Events",
           "property": "Property",
-          "properties": "Properties",
+          "properties": "Event Properties",
           "userProperties": "User Properties",
           "customProperties": "Custom Properties"
         }

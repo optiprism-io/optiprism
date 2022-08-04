@@ -29,7 +29,7 @@
                 @on-action="onActionProperty"
             />
             <UiTable
-                v-if="activeTab === 'customProperties'"
+                v-if="activeTab === 'userProperties'"
                 :compact="true"
                 :items="itemsUserProperties"
                 :columns="columnsProperties"
@@ -58,7 +58,7 @@ export type EventObject = {
 }
 export type ApplyPayload = EventObject
 
-const mapTabs = ['event', 'properties', 'customProperties']
+const mapTabs = ['event', 'properties', 'userProperties']
 
 const i18n = inject<any>('i18n')
 

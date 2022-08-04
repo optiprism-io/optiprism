@@ -23,12 +23,13 @@ import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import { Row, Action } from '@/components/uikit/UiTable/UiTable'
 import { Event } from '@/api'
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
+import UiCellTags from '@/components/uikit/cells/UiCellTags.vue'
 const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
 const commonStore = useCommonStore()
 
 const columns = computed(() => {
-    return ['name', 'displayName', 'description'].map(key => {
+    return ['name', 'displayName', 'description', 'tags', 'status'].map(key => {
         return {
             value: key,
             title: i18n.$t(`events.event_management.columns.${key}`),
@@ -57,7 +58,18 @@ const items = computed(() => {
             {
                 key: 'description',
                 title: event.description || '',
-            }
+            },
+            {
+                key: 'tags',
+                title: 'tags',
+                value: event.tags || [],
+                nowrap: Boolean(event.tags?.length || 0 <= 5),
+                component: UiCellTags,
+            },
+            {
+                key: 'status',
+                title: event.status || '',
+            },
         ]
     })
 })
