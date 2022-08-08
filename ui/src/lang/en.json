@@ -127,6 +127,8 @@
     "select_to_start": "Select an Event to get started",
     "select_property": "Select property",
     "select_value": "Select value",
+    "editEvent": "Edit event",
+    "editProperty": "Edit property",
     "segments": {
       "segment": "Segment",
       "label": "Segments",

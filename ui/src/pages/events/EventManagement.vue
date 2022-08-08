@@ -24,15 +24,20 @@ import { Row, Action } from '@/components/uikit/UiTable/UiTable'
 import { Event } from '@/api'
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
 import UiCellTags from '@/components/uikit/cells/UiCellTags.vue'
+import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue'
 const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
 const commonStore = useCommonStore()
 
 const columns = computed(() => {
-    return ['name', 'displayName', 'description', 'tags', 'status'].map(key => {
+    return ['name', 'displayName', 'description', 'tags', 'status', 'action'].map(key => {
+        const isAction = key === 'action'
+
         return {
             value: key,
-            title: i18n.$t(`events.event_management.columns.${key}`),
+            title: isAction ? '' : i18n.$t(`events.event_management.columns.${key}`),
+            default: isAction,
+            type: isAction? 'action' : '',
         }
     })
 })
@@ -70,6 +75,19 @@ const items = computed(() => {
                 key: 'status',
                 title: event.status || '',
             },
+            {
+                title: 'action',
+                key: 'action',
+                value: event.id,
+                component: UiCellToolMenu,
+                items: [
+                    {
+                        label: i18n.$t('events.editEvent'),
+                        value: 'edit',
+                    },
+                ],
+                type: 'action'
+            }
         ]
     })
 })
