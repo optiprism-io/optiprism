@@ -3,7 +3,7 @@ import {Step} from '@/types/steps';
 import {EventProperty, EventRef} from '@/types/events';
 import {EventFilter} from '@/stores/eventSegmentation/events';
 
-export const stepUnits = ['seconds', 'minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const;
+export const stepUnits = ['second', 'minute', 'hour', 'day', 'week', 'month', 'year'] as const;
 export type StepUnit = typeof stepUnits[number];
 
 export const stepOrders = ['exact', 'any'] as const;
@@ -88,7 +88,7 @@ export const useStepsStore = defineStore('steps', {
     state: (): StepsStore => ({
         steps: [],
         size: 10,
-        unit: 'hours',
+        unit: 'hour',
         order: 'any',
         excludedEvents: [],
         holdingProperties: [],

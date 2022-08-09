@@ -1037,6 +1037,9 @@ components:
                   - dimension
                   - metric
                   - metricValue
+                  - funnelMetricValue
+              step:
+                type: number
               dataType:
                 $ref: '#/components/schemas/DataType'
               name:

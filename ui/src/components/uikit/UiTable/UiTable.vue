@@ -30,6 +30,26 @@
             role="grid"
         >
             <thead>
+                <tr
+                    v-if="groups.length > 0"
+                    role="row"
+                >
+                    <template
+                        v-for="group in groups"
+                        :key="group.value"
+                    >
+                        <UiTableCellWrapper
+                            :fixed="group.fixed"
+                            :last-fixed="group.lastFixed"
+                            :colspan="group.span"
+                        >
+                            <UiTableHeadCell
+                                :value="group.value"
+                                :title="group.title"
+                            />
+                        </UiTableCellWrapper>
+                    </template>
+                </tr>
                 <tr role="row">
                     <template
                         v-for="column in visibleColumns"
@@ -83,8 +103,8 @@
 </template>
 
 <script lang="ts" setup>
+import {Row, Column, Action, ColumnGroup} from '@/components/uikit/UiTable/UiTable'
 import { computed, inject, onMounted, ref } from 'vue'
-import { Row, Column, Action } from '@/components/uikit/UiTable/UiTable'
 import UiTableHeadCell from '@/components/uikit/UiTable/UiTableHeadCell.vue'
 import UiTableCell from '@/components/uikit/UiTable/UiTableCell.vue'
 import UiTableCellWrapper from '@/components/uikit/UiTable/UiTableCellWrapper.vue'
@@ -97,10 +117,12 @@ type Props = {
     compact?: boolean
     items?: Row[]
     columns: Column[]
+    groups?: ColumnGroup[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
     items: () => [],
+    groups: () => [],
     compact: true,
     showSelectColumns: false,
 })

@@ -471,6 +471,12 @@ export interface DataTableResponseColumns {
     'type'?: DataTableResponseColumnsTypeEnum;
     /**
      * 
+     * @type {number}
+     * @memberof DataTableResponseColumns
+     */
+    'step'?: number;
+    /**
+     * 
      * @type {DataType}
      * @memberof DataTableResponseColumns
      */
@@ -498,7 +504,8 @@ export interface DataTableResponseColumns {
 export const DataTableResponseColumnsTypeEnum = {
     Dimension: 'dimension',
     Metric: 'metric',
-    MetricValue: 'metricValue'
+    MetricValue: 'metricValue',
+    FunnelMetricValue: 'funnelMetricValue'
 } as const;
 
 export type DataTableResponseColumnsTypeEnum = typeof DataTableResponseColumnsTypeEnum[keyof typeof DataTableResponseColumnsTypeEnum];

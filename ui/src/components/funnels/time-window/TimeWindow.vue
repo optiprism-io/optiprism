@@ -66,13 +66,13 @@ const i18n = inject<I18N>('i18n')
 const dynamicSize = ref<number| null>(null)
 
 const sizeRanges: Record<StepUnit, [number, number]> = {
-    seconds: [2, 100],
-    minutes: [1, 60],
-    hours: [1, 100],
-    days: [1, 100],
-    weeks: [1, 10],
-    months: [1, 12],
-    years: [1, 10],
+    second: [2, 100],
+    minute: [1, 60],
+    hour: [1, 100],
+    day: [1, 100],
+    week: [1, 10],
+    month: [1, 12],
+    year: [1, 10],
 }
 
 const defaultSizes = computed(() => {

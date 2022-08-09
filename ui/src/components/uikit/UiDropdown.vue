@@ -114,8 +114,8 @@ class UiDropdownFactory<T = unknown> {
                 transparent: Boolean as PropType<boolean>,
             },
             emits: {
-                deselect: (payload: UiDropdownItem<T>) => payload,
-                select: (payload: UiDropdownItem<T>) => payload
+                deselectValue: (payload: UiDropdownItem<T>) => payload,
+                selectValue: (payload: UiDropdownItem<T>) => payload
             },
             setup(props, { emit }) {
 
@@ -125,7 +125,7 @@ class UiDropdownFactory<T = unknown> {
                 })
 
                 const onClick = (item: UiDropdownItem<T>) => {
-                    emit('select', item);
+                    emit('selectValue', item);
                 };
 
                 const onToggle = () => {

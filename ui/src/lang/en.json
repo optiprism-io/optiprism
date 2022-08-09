@@ -42,13 +42,13 @@
       "day_short": "d"
     },
     "timeUnits": {
-      "seconds": "seconds",
-      "minutes": "minutes",
-      "hours": "hours",
-      "days": "days",
-      "weeks": "weeks",
-      "months": "months",
-      "years": "years"
+      "second": "seconds",
+      "minute": "minutes",
+      "hour": "hours",
+      "day": "days",
+      "week": "weeks",
+      "month": "months",
+      "year": "years"
     }
   },
 
@@ -187,6 +187,19 @@
       "add": "Holding constant",
       "holding": "holding",
       "clear": "Clear holding constant"
+    },
+    "view": {
+      "funnelSteps": "Funnel Steps",
+      "conversionCount": "Conversion count",
+      "conversionRatio": "Conversion ratio",
+      "dropOffCount": "Drop off count",
+      "dropOffRatio": "Drop off ratio",
+      "dropOffRatioFromFirstStep": "Drop off ratio from first step",
+      "avgTimeFromPrevStep": "Avg time from prev step",
+      "avgTimeFromFirstStep": "Avg time from first step",
+      "conversionRatioFromFirstStep": "Conv. ratio from first step",
+      "totalConversionRatio": "Total conv.",
+      "selectToStart": "Set the funnel condition to start"
     }
   },
 

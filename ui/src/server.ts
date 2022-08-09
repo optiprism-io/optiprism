@@ -4,6 +4,7 @@ import { BASE_PATH } from '@/api/base'
 import { EventStatus, UserProperty, UserCustomProperty } from '@/types/events';
 import splineChartMocks from '@/mocks/splineChart.json';
 import liveStresmMocks from '@/mocks/reports/liveStream.json'
+import funnelsMocks from '@/mocks/reports/funnels.json'
 
 import eventSegmentationsMocks from '@/mocks/eventSegmentations/eventSegmentations.json';
 import eventMocks from '@/mocks/eventSegmentations/events.json';
@@ -57,6 +58,10 @@ export default function ({ environment = 'development' } = {}) {
 
             this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/data/events-stream`, (schema, request) => {
                 return liveStresmMocks
+            })
+
+            this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/reports/funnel`, (schema, request) => {
+                return funnelsMocks
             })
 
             this.get('/schema/event-properties', (schema) => {
