@@ -8,6 +8,7 @@
                 <UiTable
                     :items="items"
                     :columns="columns"
+                    :show-select-columns="true"
                     @on-action="onAction"
                 />
             </div>

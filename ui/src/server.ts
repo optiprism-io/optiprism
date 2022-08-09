@@ -1,11 +1,11 @@
 import { createServer } from 'miragejs'
 import { DataType } from '@/api'
 import { BASE_PATH } from '@/api/base'
-import { EventStatus, UserProperty, UserCustomProperty } from '@/types/events';
+import { EventStatus, UserCustomProperty } from '@/types/events';
 import splineChartMocks from '@/mocks/splineChart.json';
-import liveStresmMocks from '@/mocks/reports/liveStream.json'
+import liveStreamMocks from '@/mocks/reports/liveStream.json'
 import funnelsMocks from '@/mocks/reports/funnels.json'
-
+import userPropertiesMocks from '@/mocks/eventSegmentations/userProperties.json';
 import eventSegmentationsMocks from '@/mocks/eventSegmentations/eventSegmentations.json';
 import eventMocks from '@/mocks/eventSegmentations/events.json';
 import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
@@ -16,8 +16,9 @@ export default function ({ environment = 'development' } = {}) {
         seeds(server) {
             server.db.loadData({
                 events: eventMocks,
-                eventProperties: eventPropertiesMocks,
                 customEvents: customEventsMocks,
+                eventProperties: eventPropertiesMocks,
+                userProperties: userPropertiesMocks,
             })
         },
 
@@ -57,7 +58,7 @@ export default function ({ environment = 'development' } = {}) {
             })
 
             this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/data/events-stream`, (schema, request) => {
-                return liveStresmMocks
+                return liveStreamMocks
             })
 
             this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/reports/funnel`, (schema, request) => {
@@ -71,6 +72,15 @@ export default function ({ environment = 'development' } = {}) {
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/event_properties/:property_id`, (schema, request) => {
                 const property = JSON.parse(request.requestBody)
                 return schema.db.eventProperties.update(request.params.property_id, property)
+            })
+
+            this.get('/schema/user-properties', (schema) => {
+                return schema.db.userProperties
+            })
+
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user_properties/:property_id`, (schema, request) => {
+                const property = JSON.parse(request.requestBody)
+                return schema.db.userProperties.update(request.params.property_id, property)
             })
 
             this.get('/schema/event-custom-properties', () => {
@@ -100,84 +110,6 @@ export default function ({ environment = 'development' } = {}) {
                         isArray: false,
                         nullable: false,
                         isDictionary: false
-                    }
-                ];
-            });
-
-            this.get('/schema/user-properties', (): UserProperty[] => {
-                return [
-                    {
-                        id: 1,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 1,
-                        isSystem: true,
-                        tags: [],
-                        name: 'Name',
-                        displayName: 'Name',
-                        description: 'Name description',
-                        status: EventStatus.Enabled,
-                        dataType: DataType.String,
-                        nullable: false,
-                        isArray: false,
-                        isDictionary: true,
-                        dictionaryType: DataType.Number
-                    },
-                    {
-                        id: 2,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 1,
-                        isSystem: true,
-                        tags: [],
-                        name: 'Age',
-                        displayName: 'Age',
-                        description:
-                            'Lorem, ipsum dolor sit amet consectetur adipisicing elit. Architecto, temporibus.',
-                        status: EventStatus.Enabled,
-                        dataType: DataType.Number,
-                        nullable: false,
-                        isArray: false,
-                        isDictionary: true,
-                        dictionaryType: DataType.Number
-                    },
-                    {
-                        id: 3,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 1,
-                        isSystem: true,
-                        tags: [],
-                        name: 'Country',
-                        displayName: 'Country',
-                        description: 'Country description',
-                        status: EventStatus.Enabled,
-                        dataType: DataType.String,
-                        nullable: true,
-                        isArray: true,
-                        isDictionary: true,
-                        dictionaryType: DataType.Number
-                    },
-                    {
-                        id: 4,
-                        createdAt: new Date(),
-                        createdBy: 0,
-                        updatedBy: 0,
-                        projectId: 1,
-                        isSystem: true,
-                        tags: [],
-                        name: 'Device',
-                        displayName: 'Device',
-                        description: 'Device description',
-                        status: EventStatus.Enabled,
-                        dataType: DataType.String,
-                        nullable: false,
-                        isArray: false,
-                        isDictionary: true,
-                        dictionaryType: DataType.Number
                     }
                 ];
             });

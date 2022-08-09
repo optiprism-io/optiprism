@@ -18,7 +18,6 @@ import {
     EventCustomProperty,
     EventRef,
     PropertyRef,
-    UserProperty,
 } from '@/types/events';
 import Select from '@/components/Select/Select.vue';
 import { Group, Item } from '@/components/Select/SelectTypes';
@@ -118,7 +117,7 @@ const items = computed(() => {
 
     if (lexiconStore.userProperties.length) {
         let items: Item<PropertyRef, null>[] = [];
-        lexiconStore.userProperties.forEach((prop: UserProperty): void => {
+        lexiconStore.userProperties.forEach((prop: Property): void => {
             const propertyRef: PropertyRef = {
                 type: PropertyType.User,
                 id: prop.id

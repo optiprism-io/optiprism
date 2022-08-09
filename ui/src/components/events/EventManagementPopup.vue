@@ -67,7 +67,7 @@ type Props = {
     loading?: boolean
     event: Event | null
     properties: Property[]
-    userProperties: EventCustomProperty[]
+    userProperties: Property[]
 }
 
 const props = withDefaults(defineProps<Props>(), {

@@ -1,5 +1,12 @@
 import { defineStore } from 'pinia'
 
+export const PropertyTypeEnum = {
+    UserProperty: 'userProperty',
+    EventProperty: 'eventProperty',
+} as const;
+
+export type PropertyTypeEnum = typeof PropertyTypeEnum[keyof typeof PropertyTypeEnum];
+
 export type Common = {
     showCreateCustomEvent: boolean
     showEventManagementPopup: boolean
@@ -8,6 +15,7 @@ export type Common = {
     organizationId: number
     showEventPropertyPopup: boolean
     editEventPropertyPopupId: number | null
+    editEventPropertyPopupType: PropertyTypeEnum
 }
 
 export const useCommonStore = defineStore('common', {
@@ -17,6 +25,7 @@ export const useCommonStore = defineStore('common', {
         editEventManagementPopupId: null,
         showEventPropertyPopup: false,
         editEventPropertyPopupId: null,
+        editEventPropertyPopupType: PropertyTypeEnum.EventProperty,
 
         projectId: 0, // TODO integrations
         organizationId: 0,

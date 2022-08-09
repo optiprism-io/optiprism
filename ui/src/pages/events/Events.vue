@@ -33,7 +33,7 @@ import { computed, inject, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useLexiconStore } from '@/stores/lexicon'
 import { useLiveStreamStore } from '@/stores/reports/liveStream'
-import { useCommonStore } from '@/stores/common'
+import { useCommonStore, PropertyTypeEnum } from '@/stores/common'
 import EventPropertyPopup, { ApplyPayload } from '@/components/events/EventPropertyPopup.vue'
 import EventManagementPopup, { ApplyPayload as ApplyPayloadEvent } from '@/components/events/EventManagementPopup.vue'
 import { Action } from '@/components/uikit/UiTable/UiTable'
@@ -60,7 +60,11 @@ const items = computed(() => {
 
 const editPropertyPopup = computed(() => {
     if (commonStore.editEventPropertyPopupId) {
-        return lexiconStore.findEventPropertyById(commonStore.editEventPropertyPopupId)
+        if (commonStore.editEventPropertyPopupType === PropertyTypeEnum.EventProperty) {
+            return lexiconStore.findEventPropertyById(commonStore.editEventPropertyPopupId)
+        } else {
+            return lexiconStore.findUserPropertyById(commonStore.editEventPropertyPopupId)
+        }
     } else {
         return null
     }
@@ -108,7 +112,7 @@ const eventProperties = computed(() => {
 
 const userProperties = computed(() => {
     return editEventManagementPopup.value && editEventManagementPopup.value?.userProperties ?
-        editEventManagementPopup.value?.userProperties.map(id => lexiconStore.findEventCustomPropertyById(id)) : []
+        editEventManagementPopup.value?.userProperties.map(id => lexiconStore.findUserPropertyById(id)) : []
 })
 
 onMounted(async () => {
@@ -123,6 +127,10 @@ const propertyPopupApply = async (payload: ApplyPayload) => {
     await lexiconStore.updateProperty(payload)
     propertyPopupLoading.value = false
     commonStore.showEventPropertyPopup = false
+
+    if (route.name === 'events_live_stream') {
+        liveStreamStore.getReportLiveStream()
+    }
 }
 
 const propertyPopupCancel = () => {

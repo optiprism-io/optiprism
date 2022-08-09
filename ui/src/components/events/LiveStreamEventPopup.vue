@@ -16,6 +16,7 @@
                 :compact="true"
                 :items="items"
                 :columns="columns"
+                @on-action="onActionProperty"
             />
         </div>
     </UiPopupWindow>
@@ -24,13 +25,18 @@
 <script lang="ts" setup>
 import { computed, inject, ref } from 'vue'
 import { useLiveStreamStore, Report } from '@/stores/reports/liveStream'
-
+import { useCommonStore, PropertyTypeEnum } from '@/stores/common'
+import { useLexiconStore } from '@/stores/lexicon'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
-import { Row } from '@/components/uikit/UiTable/UiTable'
+import {Action, Row} from '@/components/uikit/UiTable/UiTable'
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue'
+import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
+
 const i18n = inject<any>('i18n')
 const liveStreamStore = useLiveStreamStore()
+const commonStore = useCommonStore()
+const lexiconStore = useLexiconStore()
 
 type Props = {
     name: string
@@ -38,9 +44,10 @@ type Props = {
 }
 
 const properties = 'properties'
+const userProperties = 'userProperties'
 const createdAt = 'createdAt'
 
-const mapTabs = [properties, 'userProperties']
+const mapTabs = [properties, userProperties]
 
 const props = defineProps<Props>()
 
@@ -63,7 +70,12 @@ const items = computed(() => {
             return [
                 {
                     key: 'name',
-                    title: key === createdAt ? i18n.$t('events.live_stream.columns.createdAt') : activeTab.value === properties ? key.charAt(0).toUpperCase() + key.slice(1) : key
+                    title: key === createdAt ? i18n.$t('events.live_stream.columns.createdAt') : activeTab.value === properties ? key.charAt(0).toUpperCase() + key.slice(1) : key,
+                    component: UiTablePressedCell,
+                    action: {
+                        type: activeTab.value === userProperties ? PropertyTypeEnum.UserProperty : PropertyTypeEnum.EventProperty,
+                        name: key,
+                    }
                 },
                 {
                     key: 'value',
@@ -112,4 +124,17 @@ const cancel = () => {
     liveStreamStore.eventPopup = false
 }
 
+const onActionProperty = (payload: Action) => {
+    let property = null
+    if (payload.type === PropertyTypeEnum.UserProperty) {
+        commonStore.editEventPropertyPopupType = payload.type
+        property = lexiconStore.findUserPropertyByName(payload.name);
+    } else {
+        commonStore.editEventPropertyPopupType = PropertyTypeEnum.EventProperty
+        property = lexiconStore.findEventPropertyByName(payload.name);
+    }
+    commonStore.editEventPropertyPopupId = property?.id || null
+    liveStreamStore.eventPopup = false
+    commonStore.showEventPropertyPopup = true
+}
 </script>

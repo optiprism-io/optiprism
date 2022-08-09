@@ -55,6 +55,7 @@ const schemaService = {
     eventCustomProperties: async () => await get('/schema/event-custom-properties', '', null),
 
     userProperties: async () => await get('/schema/user-properties', '', null),
+    updateUserProperty: async(organizationId: number, projectId: number, propertyId: number, params: UpdatePropertyRequest) => await propertiesApi.updateUserProperty(organizationId, projectId, propertyId, params),
     userCustomProperties: async () => await get('/schema/user-custom-properties', '', null),
 
     propertyValues: async (params: PropertiesValues) => await get('/data/property-values', '', params),
