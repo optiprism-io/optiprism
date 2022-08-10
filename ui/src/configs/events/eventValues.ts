@@ -16,7 +16,7 @@ export type Item = {
 export const DisplayName = 'displayName'
 
 export const eventValuesConfig = {
-    DisplayName: {
+    [DisplayName]: {
         'key': DisplayName,
         'string': 'events.event_management.popup.event_columns.displayName',
         'component': UiInput,
