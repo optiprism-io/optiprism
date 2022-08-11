@@ -107,7 +107,14 @@ import UiFormLabel from '@/components//uikit/UiFormLabel.vue'
 import Select from '@/components/Select/Select.vue'
 import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
 import schemaService from '@/api/services/schema.service'
-import { CreateCustomEventRequest, CustomEventEvent, EventType, CustomEventStatusEnum, UpdateCustomEventRequest } from '@/api'
+import {
+    CreateCustomEventRequest,
+    CustomEventEventEventTypeEnum,
+    CustomEventEvent,
+    EventType,
+    CustomEventStatusEnum,
+    UpdateCustomEventRequest
+} from '@/api'
 const i18n = inject<any>('i18n')
 
 const lexiconStore = useLexiconStore()
@@ -192,7 +199,7 @@ const resultEvent = computed(() => {
 
             const eventProps: CustomEventEvent = {
                 eventName: event.name,
-                eventType: item.ref.type,
+                eventType: item.ref.type as CustomEventEventEventTypeEnum,
                 eventId: event.id,
                 filters: [],
             }
