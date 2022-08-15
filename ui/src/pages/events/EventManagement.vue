@@ -1,31 +1,35 @@
 <template>
-    <h1 class="pf-u-font-size-2xl pf-u-mb-md">
-        {{ $t('events.events') }}
-    </h1>
-    <div class="pf-l-grid pf-m-gutter">
-        <div class="pf-l-grid__item">
-            <div class="pf-c-card pf-m-compact pf-u-h-100">
+    <ToolsLayout>
+        <template #title>
+            {{ $t('events.events') }}
+        </template>
+        <template #main>
+            <UiCardContainer class="pf-u-h-100">
                 <UiTable
                     :items="items"
                     :columns="columns"
                     :show-select-columns="true"
                     @on-action="onAction"
                 />
-            </div>
-        </div>
-    </div>
+            </UiCardContainer>
+        </template>
+    </ToolsLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import { useLexiconStore } from '@/stores/lexicon'
 import { useCommonStore } from '@/stores/common'
-import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import { Row, Action } from '@/components/uikit/UiTable/UiTable'
 import { Event } from '@/api'
+
+import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
 import UiCellTags from '@/components/uikit/cells/UiCellTags.vue'
 import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue'
+import ToolsLayout from '@/layout/tools/ToolsLayout.vue'
+import UiCardContainer from '@/components/uikit/UiCard/UiCardContainer.vue'
+
 const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
 const commonStore = useCommonStore()

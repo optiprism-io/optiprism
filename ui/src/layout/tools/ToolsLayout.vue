@@ -8,9 +8,15 @@ export default defineComponent({
         GridContainer,
         GridItem,
     },
+    props: {
+        colLg: {
+            type: [String, Number],
+            default: 6,
+        },
+    },
     setup(props, { slots }) {
         const children = slots.default?.() ?? [];
-        const renderGridItem = (child: VNode) => h(GridItem, {}, () => child);
+        const renderGridItem = (child: VNode) => h(GridItem, { colLg: props.colLg }, () => child);
 
         return () => [
             h('div', { class: 'pf-u-font-size-2xl pf-u-mb-md' }, slots.title?.() ?? ''),
