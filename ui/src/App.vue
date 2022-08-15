@@ -1,32 +1,32 @@
 <template>
-    <div class="pf-c-page">
-        <Header />
-        <main class="pf-c-page__main">
-            <router-view />
-        </main>
-
-        <CreateCustomEvent
-            v-if="commonStore.showCreateCustomEvent"
-            @apply="applyCreateCustomEvent"
-            @cancel="togglePopupCreateCustomEvent(false)"
-        />
-    </div>
+    <router-view />
 </template>
 
-<script setup lang="ts">
-import Header from '@/components/common/Header.vue'
-import CreateCustomEvent from '@/components/events/CreateCustomEvent.vue'
-import { useCommonStore } from '@/stores/common'
+<script lang="ts" setup>
+import axios from 'axios';
+import {useAuthStore} from '@/stores/auth/auth';
 
-const commonStore = useCommonStore()
+const authStore = useAuthStore()
 
-const togglePopupCreateCustomEvent = (payload: boolean) => {
-    commonStore.togglePopupCreateCustomEvent(payload)
-}
+axios.interceptors.response.use(res => res, async err => {
+    const originalConfig = err.config;
+    if (err.response) {
+        if (err.response.status === 401 && !originalConfig._retry) {
+            /* To prevent infinite loop */
+            originalConfig._retry = true;
 
-const applyCreateCustomEvent = () => {
-    togglePopupCreateCustomEvent(false)
-}
+            try {
+                // TODO
+            } catch (_error) {
+                // TODO
+            }
+        }
+        if (err.response.status === 403 && err.response.data) {
+            return Promise.reject(err.response.data);
+        }
+    }
+    return Promise.reject(err);
+})
 </script>
 
 <style lang="scss">
