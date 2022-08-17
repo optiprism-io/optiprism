@@ -697,10 +697,10 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
-  /v1/organizations/{organization_id}/projects/{project_id}/data/events-stream:
+  /v1/organizations/{organization_id}/projects/{project_id}/data/event-records:
     post:
-      summary: Get ingested events
-      operationId: eventsStream
+      summary: Get events
+      operationId: eventRecords
       security:
         - bearerAuth: [ ]
       tags:
@@ -713,7 +713,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EventListRequest'
+              $ref: '#/components/schemas/EventRecordsListRequest'
 
       responses:
         '200':
@@ -727,36 +727,53 @@ paths:
                       events:
                         type: array
                         items:
-                          type: object
-                          example: >
-                            {
-                              "name": "Buy Product",
-                              "properties": {
-                                createdAt: "2017-07-21T17:32:28Z",
-                                "Product Name": "TV",
-                              },
-                              "userProperties": {
-                                "country": "UK"
-                              },
-                              "matchedCustomEvents": [
-                                {
-                                  "id": 1
-                                }
-                              ]
-                            }
-                          properties:
-                            name:
-                              type: string
-                            properties:
-                              type: object
-                              description: map of property name and property value pairs
-                            matchedCustomEvents:
-                              type: array
-                              items:
-                                type: object
-                                properties:
-                                  id:
-                                    type: integer
+                          $ref: '#/components/schemas/EventRecord'
+
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/organizations/{organization_id}/projects/{project_id}/data/group-records:
+    post:
+      summary: Get group records
+      operationId: groupEvents
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - groups
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupRecordsListRequest'
+
+      responses:
+        '200':
+          description: events list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EventRecord'
 
                   - $ref: '#/components/schemas/ListResponseMetadata'
         '400':
@@ -1084,7 +1101,7 @@ components:
             total:
               type: integer
 
-    User:
+    Account:
       type: object
       properties:
         id:
@@ -1171,15 +1188,37 @@ components:
           items:
             type: integer
 
+    GroupRecord:
+      type: object
+      example: >
+        {
+          "properties": {
+            "createdAt": "2017-07-21T17:32:28Z",
+            "Product Name": "TV"
+          }
+        }
+      properties:
+        properties:
+          type: object
+          description: map of property name and property value pairs
+
     EventRecord:
       type: object
       example: >
         {
           "name": "Buy Product",
           "properties": {
-            "country": "UK",
+            "createdAt": "2017-07-21T17:32:28Z",
             "Product Name": "TV"
-          }
+          },
+          "userProperties": {
+            "country": "UK"
+          },
+          "matchedCustomEvents": [
+            {
+              "id": 1
+            }
+          ]
         }
       properties:
         name:
@@ -1187,6 +1226,13 @@ components:
         properties:
           type: object
           description: map of property name and property value pairs
+        matchedCustomEvents:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
 
     Event:
       type: object
@@ -1523,10 +1569,10 @@ components:
           items:
             type: string
 
-    EventListRequest:
+    EventRecordsListRequest:
       type: object
-      description: request events sorted by time of creation
-      required: [ "time", "events" ]
+      description: request event records sorted by time of creation
+      required: [ "time" ]
       example: >
         {
           "time": {
@@ -1617,20 +1663,29 @@ components:
             - $ref: '#/components/schemas/TimeBetween'
             - $ref: '#/components/schemas/TimeFrom'
             - $ref: '#/components/schemas/TimeLast'
+        group:
+          type: string
+          description: group that is used in aggregations by group. For instance, group by user or group by organization.
+          example: user
         search:
           type: object
           description: search in results
           properties:
             term:
               type: string
-            eventProperties:
+            inEventProperties:
               type: array
               items:
-                type: string
-            userProperties:
+                oneOf:
+                  - type: string
+                  - type: integer
+            inUserProperties:
               type: array
               items:
-                type: string
+                oneOf:
+                  - type: string
+                  - type: integer
+
         events:
           type: array
           description: array of events to query
@@ -1645,7 +1700,84 @@ components:
                     type: array
                     description: array of event filters
                     items:
-                      $ref: '#/components/schemas/EventFilterByProperty'
+                      type: object
+                      oneOf:
+                        - $ref: '#/components/schemas/EventFilterByProperty'
+        filters:
+          $ref: '#/components/schemas/EventFilters'
+
+    GroupRecordsListRequest:
+      type: object
+      description: request group records sorted by time of creation
+      required: [ "time" ]
+      example: >
+        {
+          "time": {
+            "type": "between",
+            "from": "2017-07-21T17:32:28Z",
+            "to": "2017-08-21T17:32:28Z"
+          },
+          "events": [
+            {
+              "eventName": "Buy Product",
+              "eventType": "regular",
+              "filters": [
+                {
+                  "filterType": "property",
+                  "propertyName": "Device",
+                  "propertyType": "user",
+                  "operation": "exists"
+                },
+                {
+                  "filterType": "property",
+                  "propertyName": "Product Name",
+                  "propertyType": "event",
+                  "operation": "=",
+                  "value": [
+                    "tv"
+                  ]
+                }
+              ]
+            }
+          ],
+          "filters": [
+            {
+              "filterType": "property",
+              "propertyName": "Region",
+              "propertyType": "user",
+              "operation": "exists"
+            }
+          ]
+        }
+      properties:
+        time:
+          type: object
+          description: select time
+          oneOf:
+            - $ref: '#/components/schemas/TimeBetween'
+            - $ref: '#/components/schemas/TimeFrom'
+            - $ref: '#/components/schemas/TimeLast'
+        group:
+          type: string
+          description: group that is used in aggregations by group. For instance, group by user or group by organization.
+          example: user
+        search:
+          type: object
+          description: search in results
+          properties:
+            term:
+              type: string
+            inUserProperties:
+              type: array
+              items:
+                oneOf:
+                  - type: string
+                  - type: integer
+        segments:
+          description: array of segments
+          type: array
+          items:
+            $ref: '#/components/schemas/EventSegmentationSegment'
         filters:
           $ref: '#/components/schemas/EventFilters'
 
@@ -2152,6 +2284,7 @@ components:
                 anyOf:
                   - $ref: '#/components/schemas/EventFilterByCohort'
                   - $ref: '#/components/schemas/EventFilterByProperty'
+                  - $ref: '#/components/schemas/EventFilterByGroup'
 
     EventFilterByCohort:
       type: object
@@ -2163,6 +2296,18 @@ components:
         cohortId:
           type: integer
           format: int64
+
+    EventFilterByGroup:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - group
+        groupId:
+          oneOf:
+            - type: string
+            - type: integer
 
     EventFilterByProperty:
       type: object
