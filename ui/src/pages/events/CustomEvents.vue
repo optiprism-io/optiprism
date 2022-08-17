@@ -1,10 +1,10 @@
 <template>
-    <h1 class="pf-u-font-size-2xl pf-u-mb-md">
-        {{ $t('events.customEvents.title') }}
-    </h1>
-    <div class="pf-l-grid pf-m-gutter">
-        <div class="pf-l-grid__item">
-            <div class="pf-c-card pf-m-compact pf-u-h-100">
+    <ToolsLayout>
+        <template #title>
+            {{ $t('events.customEvents.title') }}
+        </template>
+        <template #main>
+            <UiCardContainer class="pf-u-h-100">
                 <UiTable
                     :items="items"
                     :columns="columns"
@@ -20,9 +20,9 @@
                         </UiButton>
                     </template>
                 </UiTable>
-            </div>
-        </div>
-    </div>
+            </UiCardContainer>
+        </template>
+    </ToolsLayout>
     <ConfirmPopup
         v-if="openConfirmPopup && actionEventId"
         :title="confirmPopupDeleteInfo.title"
@@ -40,7 +40,7 @@ import { useLexiconStore } from '@/stores/lexicon'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useCommonStore } from '@/stores/common'
 import { Row, Action } from '@/components/uikit/UiTable/UiTable'
-import { CustomEvent, CustomEventEvent } from '@/api'
+import { CustomEvent } from '@/api'
 import schemaService from '@/api/services/schema.service'
 
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
@@ -48,6 +48,8 @@ import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vu
 import UiCellTags from '@/components/uikit/cells/UiCellTags.vue'
 import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue'
 import ConfirmPopup from '@/components/common/ConfirmPopup.vue'
+import ToolsLayout from '@/layout/tools/ToolsLayout.vue'
+import UiCardContainer from '@/components/uikit/UiCard/UiCardContainer.vue'
 
 const i18n = inject<any>('i18n')
 const lexiconStore = useLexiconStore()
@@ -80,7 +82,7 @@ const confirmPopupDeleteInfo = computed(() => {
 })
 
 const columns = computed(() => {
-    return ['name', 'description', 'tags', 'events', 'status', 'action'].map(key => {
+    return ['name', 'description', 'tags', 'status', 'action'].map(key => {
         const isAction = key === 'action'
 
         return {
@@ -115,10 +117,6 @@ const items = computed(() => {
                 value: event.tags || [],
                 nowrap: Boolean(event.tags?.length || 0 <= 5),
                 component: UiCellTags,
-            },
-            {
-                title: event?.events?.map((item: CustomEventEvent) => item.eventName).join(', ') || '',
-                key: 'events'
             },
             {
                 title: event.status || '',

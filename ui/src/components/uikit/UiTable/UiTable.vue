@@ -180,8 +180,6 @@ onMounted(() => {
 .pf-c-table {
     tr > * {
         --pf-c-table--cell--MinWidth: 140px;
-        --pf-c-table--cell--MaxWidth: auto;
-        --pf-c-table--cell--Width: auto;
     }
 }
 </style>

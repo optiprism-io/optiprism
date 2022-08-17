@@ -46,10 +46,19 @@
         <div
             v-else
             class="pf-c-menu__item"
+            :class="{
+                'pf-m-selected': isActive,
+            }"
             @click="$emit('click', item)"
         >
             <span class="select-list-item__content">
                 <span class="pf-c-menu__item-text">{{ text }}</span>
+                <span
+                    v-if="isActive"
+                    class="pf-c-select__menu-item-icon"
+                >
+                    <UiIcon :icon="'fas fa-check'" />
+                </span>
                 <div
                     v-if="editable"
                     class="select-list-item__content-edit"
@@ -80,6 +89,8 @@ const props = defineProps<{
     text: string;
     isDisabled?: boolean;
     editable?: boolean
+    multiple?: boolean
+    active?: boolean
 }>();
 
 const emit = defineEmits<{
@@ -87,8 +98,12 @@ const emit = defineEmits<{
     (e: 'edit', payload: number): void
 }>();
 
+const isActive = computed(() => {
+    return props.multiple && props.active
+})
+
 const isSelected = computed(() => {
-    if (!props.selected) {
+    if (!props.selected || props.multiple) {
         return false;
     }
 

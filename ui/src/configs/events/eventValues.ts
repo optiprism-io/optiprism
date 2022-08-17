@@ -13,9 +13,11 @@ export type Item = {
     component?: ReturnType<typeof defineComponent>
 }
 
+export const DisplayName = 'displayName'
+
 export const eventValuesConfig = {
-    'displayName': {
-        'key': 'displayName',
+    [DisplayName]: {
+        'key': DisplayName,
         'string': 'events.event_management.popup.event_columns.displayName',
         'component': UiInput,
     },

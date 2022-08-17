@@ -70,7 +70,8 @@
         "status": "Status",
         "isSystem": "Is system",
         "tags": "Tags",
-        "events": "Events"
+        "events": "Events",
+        "value": "Value"
       },
       "popup": {
         "properties_columns": {
@@ -89,7 +90,7 @@
           "event": "Event",
           "events": "Events",
           "property": "Property",
-          "properties": "Properties",
+          "properties": "Event Properties",
           "userProperties": "User Properties",
           "customProperties": "Custom Properties"
         }
@@ -97,9 +98,15 @@
     },
     "live_stream": {
       "title": "Live stream",
+      "customEvent": "Custom event",
       "columns": {
         "createdAt": "Date",
-        "eventName": "Event Name"
+        "eventName": "Event Name",
+        "customEvents": "Custom events"
+      },
+      "popupTabs": {
+        "properties": "Event Properties",
+        "userProperties": "User Properties"
       }
     },
     "customEvents": {
@@ -120,6 +127,8 @@
     "select_to_start": "Select an Event to get started",
     "select_property": "Select property",
     "select_value": "Select value",
+    "editEvent": "Edit event",
+    "editProperty": "Edit property",
     "segments": {
       "segment": "Segment",
       "label": "Segments",

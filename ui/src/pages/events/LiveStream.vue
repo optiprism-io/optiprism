@@ -1,29 +1,28 @@
 <template>
-    <h1 class="pf-u-font-size-2xl pf-u-mb-md">
-        {{ $t('events.live_stream.title') }}
-    </h1>
-    <div class="pf-l-grid pf-m-gutter">
-        <div class="pf-l-grid__item">
-            <div class="pf-c-card pf-m-compact pf-u-h-100">
-                <div class="pf-c-card__title">
-                    <p>{{ $t('events.events') }}</p>
-                </div>
-                <div class="pf-c-card__body">
-                    <InputsEventsLiveStream />
-                </div>
-            </div>
-        </div>
-        <div class="pf-l-grid__item">
-            <div class="pf-c-card pf-m-compact pf-u-h-100">
+    <ToolsLayout :col-lg="12">
+        <template #title>
+            {{ $t('events.live_stream.title') }}
+        </template>
+        <UiCard
+            class="pf-c-card pf-m-compact pf-u-h-100"
+            :title="$t('events.events')"
+        >
+            <InputsEventsLiveStream />
+        </UiCard>
+        <template #main>
+            <UiCardContainer class="pf-u-h-100">
                 <TableLiveStream />
-            </div>
-        </div>
-    </div>
+            </UiCardContainer>
+        </template>
+    </ToolsLayout>
 </template>
 
 <script lang="ts" setup>
 import InputsEventsLiveStream from '@/components/events/LiveStream/InputsEventsLiveStream.vue'
 import TableLiveStream from '@/components/events/LiveStream/TableLiveStream.vue'
+import ToolsLayout from '@/layout/tools/ToolsLayout.vue'
+import UiCard from '@/components/uikit/UiCard/UiCard.vue'
+import UiCardContainer from '@/components/uikit/UiCard/UiCardContainer.vue'
 </script>
 
 <style scoped lang="scss">

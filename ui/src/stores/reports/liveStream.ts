@@ -31,6 +31,7 @@ type LiveStream = {
     activeColumns: string[]
     defaultColumns: string[]
     loading: boolean
+    eventPopup: boolean
 }
 
 export const useLiveStreamStore = defineStore('liveStream', {
@@ -45,8 +46,9 @@ export const useLiveStreamStore = defineStore('liveStream', {
         },
         reports: [],
         activeColumns: [],
-        defaultColumns: ['eventName', 'createdAt'],
+        defaultColumns: ['eventName', 'customEvents', 'createdAt'],
         loading: false,
+        eventPopup: false
     }),
     getters: {
         isPeriodActive(): boolean {
@@ -118,6 +120,28 @@ export const useLiveStreamStore = defineStore('liveStream', {
                         n: Number(this.controlsPeriod),
                         unit: 'day'
                     }
+            }
+        },
+        columnsMapObject() {
+            const properties: string[] = []
+            const userProperties: string[] = []
+
+            this.reports.forEach((item: Report) => {
+                Object.keys(item.properties).forEach((key: string) => {
+                    if (key !== 'createdAt') {
+                        properties.push(key)
+                    }
+                })
+                if (item.userProperties) {
+                    Object.keys(item.userProperties).forEach((key: string) => {
+                        userProperties.push(key)
+                    })
+                }
+            })
+
+            return {
+                properties: [...new Set(properties)],
+                userProperties: [...new  Set(userProperties)]
             }
         },
         columnsMap(): string[] {

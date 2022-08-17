@@ -1,7 +1,16 @@
 import { OperationId } from '@/types'
 import { AggregateId } from '@/types/aggregate'
 import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
-import { EventType, PropertyType, DataType, Value, CustomEvent, CustomEventEventEventTypeEnum, Event } from '@/api'
+import {
+    EventType,
+    PropertyType,
+    DataType,
+    Value,
+    CustomEvent,
+    CustomEventEventEventTypeEnum,
+    Event,
+    EventRefOneOfEventTypeEnum,
+} from '@/api'
 
 export type PropertyRef = {
     type: PropertyType;
@@ -14,7 +23,7 @@ export enum EventStatus {
 }
 
 export type EventRef = {
-    type: EventType | CustomEventEventEventTypeEnum
+    type: EventType | CustomEventEventEventTypeEnum | EventRefOneOfEventTypeEnum
     id: number
 }
 

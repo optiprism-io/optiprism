@@ -1,6 +1,6 @@
 <template>
     <div
-        class="selected-event pf-l-flex pf-m-column"
+        class="selected-event pf-l-flex pf-m-column pf-u-mb-md"
         :class="{
             'selected-event_preview': props.forPreview
         }"
@@ -25,8 +25,8 @@
                         @edit="emit('edit', $event)"
                     >
                         <UiButton
-                            class="pf-m-main"
-                            :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                            :class="[props.forPreview ? 'pf-m-control pf-m-small' : 'pf-m-secondary']"
+                            :disabled="props.forPreview"
                         >
                             {{ eventName(eventRef) }}
                         </UiButton>

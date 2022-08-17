@@ -12,8 +12,8 @@ export const useFilter = (): UseFilter => {
 
     const getEventRef = (id: number): EventRef | undefined => {
         const event = lexiconStore.events.find(item => {
-            if (item.properties) {
-                return item.properties.includes(id);
+            if (item.eventProperties) {
+                return item.eventProperties.includes(id);
             }
         });
 

@@ -18,7 +18,7 @@ import { Group, Item } from '@/components/Select/SelectTypes';
 import { useEventsStore, Events } from '@/stores/eventSegmentation/events';
 import { ApplyPayload } from '@/components/events/EventManagementPopup.vue'
 import { PropertyType, CustomEvent, EventType, Property, Event } from '@/api'
-import { useCommonStore } from '@/stores/common'
+import { useCommonStore, PropertyTypeEnum } from '@/stores/common'
 
 type Lexicon = {
     cohorts: Cohort[];
@@ -31,7 +31,7 @@ type Lexicon = {
     eventCustomProperties: EventCustomProperty[];
     eventPropertiesLoading: boolean;
 
-    userProperties: UserProperty[];
+    userProperties: Property[];
     userCustomProperties: UserCustomProperty[];
     userPropertiesLoading: boolean;
 };
@@ -70,11 +70,10 @@ export const useLexiconStore = defineStore('lexicon', {
             const indexEvent = this.customEvents.findIndex(event => event.id === payload)
             this.customEvents.splice(indexEvent, 1)
         },
-        async updateProperty(payload: ApplyPayload) {
+        async updateEventProperty(payload: ApplyPayload) {
             const commonStore = useCommonStore()
             try {
                 const res = await schemaService.updateEventProperty(commonStore.organizationId, commonStore.projectId, String(commonStore.editEventPropertyPopupId), payload)
-
                 if (res?.data) {
                     const newProperty: Property = res.data;
                     const index: number = this.eventProperties.findIndex(property => Number(property.id) === commonStore.editEventPropertyPopupId)
@@ -83,8 +82,32 @@ export const useLexiconStore = defineStore('lexicon', {
                         this.eventProperties[index] = newProperty
                     }
                 }
-            } catch (error) {
-                throw new Error('error update property')
+            } catch (e) {
+                throw new Error('error update event property')
+            }
+        },
+        async updateUserProperty(payload: ApplyPayload) {
+            const commonStore = useCommonStore()
+            try {
+                const res = await schemaService.updateUserProperty(commonStore.organizationId, commonStore.projectId, Number(commonStore.editEventPropertyPopupId), payload)
+                if (res?.data) {
+                    const newProperty: Property = res.data;
+                    const index: number = this.userProperties.findIndex(property => Number(property.id) === Number(commonStore.editEventPropertyPopupId))
+
+                    if (~index) {
+                        this.userProperties[index] = newProperty
+                    }
+                }
+            } catch (e) {
+                throw new Error('error update user property')
+            }
+        },
+        async updateProperty(payload: ApplyPayload) {
+            const commonStore = useCommonStore()
+            if (commonStore.editEventPropertyPopupType === PropertyTypeEnum.EventProperty) {
+                await this.updateEventProperty(payload)
+            } else {
+                await this.updateUserProperty(payload)
             }
         },
         async updateEvent(payload: ApplyPayload) {
@@ -201,13 +224,13 @@ export const useLexiconStore = defineStore('lexicon', {
         findEventProperties(state: Lexicon) {
             return (id: number): Property[] => {
                 const event = this.findEventById(id);
-                return state.eventProperties.filter((prop): boolean => !!event.properties && event.properties.includes(Number(prop.id)))
+                return state.eventProperties.filter((prop): boolean => !!event.eventProperties && event.eventProperties.includes(Number(prop.id)))
             };
         },
         findEventCustomProperties(state: Lexicon) {
             return (id: number): EventCustomProperty[] => {
                 const event = this.findEventById(id);
-                return state.eventCustomProperties.filter((prop): boolean => !!event.custom_properties?.includes(Number(prop.id)))
+                return state.eventCustomProperties.filter((prop): boolean => !!event.userProperties?.includes(Number(prop.id)))
             };
         },
         findEventPropertyByName(state: Lexicon) {
@@ -247,7 +270,7 @@ export const useLexiconStore = defineStore('lexicon', {
             };
         },
         findUserPropertyByName(state: Lexicon) {
-            return (name: string): UserProperty => {
+            return (name: string): Property => {
                 const e = state.userProperties.find((prop): boolean => prop.name === name)
                 if (e) {
                     return e
@@ -256,8 +279,8 @@ export const useLexiconStore = defineStore('lexicon', {
             }
         },
         findUserPropertyById(state: Lexicon) {
-            return (id: number): UserProperty => {
-                const e = state.userProperties.find((prop): boolean => prop.id === id);
+            return (id: number): Property => {
+                const e = state.userProperties.find((prop): boolean => Number(prop.id) === Number(id));
                 if (e) {
                     return e;
                 }
@@ -265,7 +288,7 @@ export const useLexiconStore = defineStore('lexicon', {
             };
         },
         property() {
-            return (ref: PropertyRef): Property | EventCustomProperty | UserProperty | UserCustomProperty => {
+            return (ref: PropertyRef): Property | EventCustomProperty | UserCustomProperty => {
                 switch (ref.type) {
                     case PropertyType.Event:
                         return this.findEventPropertyById(ref.id);

@@ -26,8 +26,8 @@
                     @select="changeProperty"
                 >
                     <UiButton
-                        class="pf-m-main"
-                        :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                        :class="[props.forPreview ? 'pf-m-control pf-m-small' : 'pf-m-secondary']"
+                        :disabled="props.forPreview"
                     >
                         {{ propertyName(filter.propRef) }}
                     </UiButton>
@@ -62,8 +62,8 @@
                     @select="changeOperation"
                 >
                     <UiButton
-                        class="pf-m-main"
-                        :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                        :class="[props.forPreview ? 'pf-m-control pf-m-small' : 'pf-m-secondary']"
+                        :disabled="props.forPreview"
                     >
                         {{ operationButtonText }}
                     </UiButton>
@@ -90,8 +90,8 @@
                                 class="pf-c-action-list__item"
                             >
                                 <UiButton
-                                    class="pf-m-main"
-                                    :class="[props.forPreview ? 'pf-m-link pf-m-small' : 'pf-m-secondary']"
+                                    :class="[props.forPreview ? 'pf-m-control pf-m-small' : 'pf-m-secondary']"
+                                    :disabled="props.forPreview"
                                 >
                                     {{ value }}
 

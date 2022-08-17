@@ -13,6 +13,7 @@
 import { computed } from 'vue';
 import Select from '@/components/Select/Select.vue';
 import { Group, Item } from '@/components/Select/SelectTypes';
+import { Property } from '@/api'
 import {
     Breakdown,
     newBreakdownCohort,
@@ -50,7 +51,7 @@ const items = computed(() => {
 
     if (lexiconStore.userProperties.length > 0) {
         let items: Item<BreakdownUserProperty, null>[] = [];
-        lexiconStore.userProperties.forEach((prop: UserProperty): void => {
+        lexiconStore.userProperties.forEach((prop: Property): void => {
             items.push({
                 item: newBreakdownUserProperty(prop.id),
                 name: prop.name

@@ -2,7 +2,7 @@
     {
         "name": "Search",
         "properties": {
-            "Product Name": "TV",
+            "productName": "TV",
             "createdAt": "2017-07-21T17:32:28Z"
         },
         "matchedCustomEvents": [

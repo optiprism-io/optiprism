@@ -41,13 +41,15 @@ import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
 import UiDescriptionList, { Item, ActionPayload } from '@/components/uikit/UiDescriptionList.vue'
 import { Action, Row } from '@/components/uikit/UiTable/UiTable'
-import { propertyValuesConfig, Item as PropertyValueConfig } from '@/configs/events/eventValues'
+import { propertyValuesConfig, Item as PropertyValueConfig, DisplayName } from '@/configs/events/eventValues'
+import { useCommonStore, PropertyTypeEnum } from '@/stores/common'
 
 export type EventObject = {
     [key: string]: string | string[] | boolean
 }
 export type ApplyPayload = EventObject
 
+const commonStore = useCommonStore()
 const mapTabs = ['property', 'events']
 
 const i18n = inject<any>('i18n')
@@ -95,6 +97,14 @@ const propertyItems = computed<Item[]>(() => {
         keys.forEach(key => {
             const config: PropertyValueConfig = propertyValuesConfig[key];
             let value = editProperty.value && key in editProperty.value ? editProperty.value[key] : property[key] ||property[key];
+            let label: string = i18n.$t(config.string)
+            let name: string = key
+
+            if (commonStore.editEventPropertyPopupType === PropertyTypeEnum.UserProperty && key === DisplayName) {
+                value = property.name
+                label = i18n.$t('events.event_management.columns.name')
+                name = 'name'
+            }
 
             if (key === 'status') {
                 value = property[key] === 'enabled'
@@ -104,16 +114,14 @@ const propertyItems = computed<Item[]>(() => {
                 value = property.isArray ? i18n.$t('common.list_of', { type: i18n.$t(`common.types.${property.dataType}`) }) : i18n.$t(`common.types.${property.dataType}`)
             }
 
-            if (config.key in property) {
-                const item: Item = {
-                    label: i18n.$t(config.string),
-                    key,
-                    value,
-                    component: config.component || 'p'
-                }
-
-                items.push(item)
+            const item: Item = {
+                label,
+                key: name,
+                value,
+                component: config.component || 'p'
             }
+
+            items.push(item)
         })
     }
 

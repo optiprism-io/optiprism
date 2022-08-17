@@ -12,30 +12,34 @@
     "events": [
       {
         "eventName": "view_product",
-        "eventType": "custom",
+        "eventType": "regular",
         "eventId": "3",
         "filters": [
           {
             "type": "property",
-            "propertyType": "event",
-            "propertyId": "2",
+            "propertyType": "user",
+            "propertyId": 3,
             "operation": "eq",
-            "value": []
+            "value": [
+              "USA",
+              "United Kingdom"
+            ]
           }
         ]
       },
       {
-        "eventName": "search",
-        "eventType": "custom",
-        "eventId": "2",
+        "eventName": "purchase_product",
+        "eventType": "regular",
+        "eventId": "5",
         "filters": [
           {
             "type": "property",
-            "propertyType": "custom",
-            "propertyId": 1,
-            "operation": "neq",
+            "propertyType": "user",
+            "propertyId": 4,
+            "operation": "eq",
             "value": [
-              "Tables",
+              "Furniture",
+              "Doors",
               "Lamp"
             ]
           },
@@ -43,9 +47,9 @@
             "type": "property",
             "propertyType": "user",
             "propertyId": 3,
-            "operation": "arr_none",
+            "operation": "eq",
             "value": [
-              "USA"
+              "Spain"
             ]
           }
         ]
@@ -58,7 +62,7 @@
     "description": "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Amet animi architecto aspernatur beatae blanditiis culpa cupiditate dolorem doloribus ea et eveniet explicabo.",
     "tags": [
       "ok",
-      "\uD83D\uDE0E"
+      "😎"
     ],
     "status": "disabled",
     "events": [
