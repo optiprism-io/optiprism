@@ -773,7 +773,7 @@ paths:
                       events:
                         type: array
                         items:
-                          $ref: '#/components/schemas/EventRecord'
+                          $ref: '#/components/schemas/GroupRecord'
 
                   - $ref: '#/components/schemas/ListResponseMetadata'
         '400':
@@ -1192,20 +1192,25 @@ components:
       type: object
       example: >
         {
+          "id": 213,
           "properties": {
             "createdAt": "2017-07-21T17:32:28Z",
-            "Product Name": "TV"
+            "Name": "Sam",
+            "Age": 36
           }
         }
       properties:
+        id:
+          type: integer
         properties:
           type: object
-          description: map of property name and property value pairs
+          description: map of group property name and property value pairs
 
     EventRecord:
       type: object
       example: >
         {
+          "id": 213,
           "name": "Buy Product",
           "properties": {
             "createdAt": "2017-07-21T17:32:28Z",
@@ -1221,6 +1226,8 @@ components:
           ]
         }
       properties:
+        id:
+          type: integer
         name:
           type: string
         properties:
