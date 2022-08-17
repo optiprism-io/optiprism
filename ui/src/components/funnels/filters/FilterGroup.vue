@@ -79,22 +79,20 @@
 
 <script lang="ts" setup>
 import {computed, inject} from 'vue';
-import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
-import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
 import UiActionList from '@/components/uikit/UiActionList/UiActionList.vue';
 import UiActionListItem from '@/components/uikit/UiActionList/UiActionListItem.vue';
-import {FilterCondition, filterConditions, FilterGroup, useFilterGroupsStore} from '@/stores/funnels/filters';
 import Filter from '@/components/events/Filter.vue';
+import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
+import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
 import {OperationId, Value} from '@/types';
-import {useStepsStore} from '@/stores/funnels/steps';
 import {PropertyRef} from '@/types/events';
-import {useLexiconStore} from '@/stores/lexicon';
+import {useStepsStore} from '@/stores/funnels/steps';
+import { FilterCondition, filterConditions, FilterGroup, useFilterGroupsStore } from '@/stores/reports/filters'
 import {useFilter} from '@/hooks/useFilter';
 import {I18N} from '@/plugins/i18n';
 
 const UiSelectMatch = UiSelectGeneric<FilterCondition>();
 
-const lexiconStore = useLexiconStore();
 const filterGroupsStore = useFilterGroupsStore()
 const stepsStore = useStepsStore()
 const filterHelpers = useFilter()

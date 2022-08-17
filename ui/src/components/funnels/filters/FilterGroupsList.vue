@@ -23,8 +23,8 @@
 </template>
 
 <script lang="ts" setup>
-import FilterGroup from '@/components/funnels/filters/FilterGroup.vue';
-import {useFilterGroupsStore} from '@/stores/funnels/filters';
+import FilterGroup from '@/components/funnels/filters/FilterGroup.vue'
+import { useFilterGroupsStore } from '@/stores/reports/filters'
 
 const filterGroups = useFilterGroupsStore()
 </script>

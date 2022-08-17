@@ -12,9 +12,9 @@
             <Segments />
         </UiCard>
 
-        <UiCard :title="$t('events.filters')">
-            <Filters />
-        </UiCard>
+        <UiCardContainer>
+            <FilterReports />
+        </UiCardContainer>
 
         <UiCard :title="$t('events.breakdowns')">
             <Breakdowns />
@@ -34,19 +34,22 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import Events from '@/components/events/Events/Events.vue';
 import Breakdowns from '@/components/events/Breakdowns.vue';
-import Filters from '@/components/events/Filters.vue';
 import Segments from '@/components/events/Segments/Segments.vue';
 import EventsViews from '@/components/events/EventsViews.vue';
 import UiCard from '@/components/uikit/UiCard/UiCard.vue';
-import { DataTableResponse } from '@/api'
-import queriesService from '@/api/services/queries.service'
-
-import { useEventsStore } from '@/stores/eventSegmentation/events';
 import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
-import {useLexiconStore} from '@/stores/lexicon';
+import UiCardContainer from '@/components/uikit/UiCard/UiCardContainer.vue'
+import FilterReports from '@/components/events/FiltersReports.vue'
+import queriesService from '@/api/services/queries.service'
+import { DataTableResponse } from '@/api'
+
+import { useEventsStore } from '@/stores/eventSegmentation/events'
+import { useLexiconStore } from '@/stores/lexicon'
+import { useFilterGroupsStore } from '@/stores/reports/filters'
 
 const eventsStore = useEventsStore();
 const lexiconStore = useLexiconStore();
+const filterGroupsStore = useFilterGroupsStore()
 
 const eventSegmentationLoading = ref(false)
 const eventSegmentation = ref<DataTableResponse>()
@@ -60,7 +63,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-    eventsStore.$reset();
+    eventsStore.$reset()
+    filterGroupsStore.$reset()
 });
 
 const getEventSegmentation = async () => {
