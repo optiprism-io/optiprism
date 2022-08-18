@@ -697,10 +697,48 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /v1/organizations/{organization_id}/projects/{project_id}/data/event-records/{id}:
+    get:
+      summary: Get event record
+      operationId: getEventRecord
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - events
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: id
+          in: path
+          description: Event Record ID
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        200:
+          description: event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
   /v1/organizations/{organization_id}/projects/{project_id}/data/event-records:
     post:
       summary: Get events
-      operationId: eventRecords
+      operationId: eventRecordsList
       security:
         - bearerAuth: [ ]
       tags:
@@ -743,10 +781,95 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /v1/organizations/{organization_id}/projects/{project_id}/data/group-records/{id}:
+    get:
+      summary: Get group record
+      operationId: getGroupRecord
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - groups
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: id
+          in: path
+          description: Group Record ID
+          required: true
+          schema:
+            type: integer
+            format: i64
+      responses:
+        200:
+          description: event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    put:
+      summary: Update group record
+      operationId: updateGroupRecord
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - groups
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: id
+          in: path
+          description: Group Record ID
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                properties:
+                  type: object
+                  description: map of group property name and property value pairs
+      responses:
+        200:
+          description: event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
   /v1/organizations/{organization_id}/projects/{project_id}/data/group-records:
     post:
       summary: Get group records
-      operationId: groupEvents
+      operationId: groupEventsList
       security:
         - bearerAuth: [ ]
       tags:
@@ -2312,9 +2435,7 @@ components:
           enum:
             - group
         groupId:
-          oneOf:
-            - type: string
-            - type: integer
+          type: integer
 
     EventFilterByProperty:
       type: object
