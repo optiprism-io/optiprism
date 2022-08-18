@@ -1356,6 +1356,10 @@ components:
         properties:
           type: object
           description: map of property name and property value pairs
+        userProperties:
+          type: object
+          description: map of user name and property value pairs
+
         matchedCustomEvents:
           type: array
           items:
