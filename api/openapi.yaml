@@ -1812,13 +1812,13 @@ components:
               items:
                 oneOf:
                   - type: string
-                  - type: integer
+                  - type: number
             inUserProperties:
               type: array
               items:
                 oneOf:
                   - type: string
-                  - type: integer
+                  - type: number
 
         events:
           type: array
@@ -1867,7 +1867,7 @@ components:
               items:
                 oneOf:
                   - type: string
-                  - type: integer
+                  - type: number
         segments:
           description: array of segments
           type: array
