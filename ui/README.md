@@ -45,6 +45,7 @@ $ npm run build
 ### For generate API client
 
 - [Doc](https://openapi-generator.tech/docs/generators/typescript-axios/)
+- [Install Doc](https://openapi-generator.tech/docs/installation/) `(min version 6.0.1)`
 
 ```
 openapi-generator generate -i ../api/openapi.yaml -g typescript-axios -o ./src/api

@@ -3,11 +3,13 @@ import {getLastNDaysRange} from '@/helpers/calendarHelper';
 import {getYYYYMMDD} from '@/helpers/getStringDates';
 import {
     BreakdownByProperty,
-    DataTableResponseColumns,
+    DataTableResponseColumnsInner,
     EventFilterByProperty,
     FunnelEvent,
     FunnelEventEventTypeEnum,
-    PropertyRef, TimeBetween, TimeFrom, TimeLast
+    TimeBetween,
+    TimeFrom,
+    TimeLast
 } from '@/api';
 import dataService from '@/api/services/datas.service';
 import {useCommonStore} from '@/stores/common';
@@ -16,7 +18,7 @@ import {useEventName} from '@/helpers/useEventName';
 import {useBreakdownsStore} from '@/stores/eventSegmentation/breakdowns';
 import {useLexiconStore} from '@/stores/lexicon';
 
-const convertColumns = (columns: DataTableResponseColumns[], stepNumbers: number[]): number[][] => {
+const convertColumns = (columns: DataTableResponseColumnsInner[], stepNumbers: number[]): number[][] => {
     const result: number[][] = []
 
     for (let i = 0; i < stepNumbers.length; i++) {
@@ -39,7 +41,7 @@ type FunnelsStore = {
     last: number,
     type: string,
   };
-  reports: DataTableResponseColumns[];
+  reports: DataTableResponseColumnsInner[];
   loading: boolean;
 }
 

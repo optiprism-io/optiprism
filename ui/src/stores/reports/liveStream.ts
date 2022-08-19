@@ -1,5 +1,13 @@
 import { defineStore } from 'pinia'
-import { EventType, EventFilterByProperty, TimeBetween, TimeFrom, TimeLast, EventRef } from '@/api'
+import {
+    EventType,
+    EventFilterByProperty,
+    TimeBetween,
+    TimeFrom,
+    TimeLast,
+    EventListRequestEventsInner,
+    EventListRequestEventsInnerEventTypeEnum,
+} from '@/api'
 import { Event } from '@/stores/eventSegmentation/events'
 import dataService from '@/api/services/datas.service'
 import { useCommonStore } from '@/stores/common'
@@ -75,7 +83,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
 
             return filters
         },
-        eventsRequest(): Array<EventRef & object> {
+        eventsRequest(): Array<EventListRequestEventsInner> {
             const lexiconStore = useLexiconStore()
 
             return this.events.map(event => {
@@ -85,12 +93,14 @@ export const useLiveStreamStore = defineStore('liveStream', {
                     case EventType.Regular:
                         return {
                             eventName: eventStore.name,
-                            eventType: event.ref.type
+                            eventType: event.ref.type as EventListRequestEventsInnerEventTypeEnum,
+                            filters: this.filtersRequest,
                         }
                     case EventType.Custom:
                         return {
                             eventId: eventStore.id,
-                            eventType: event.ref.type
+                            eventType: event.ref.type,
+                            filters: this.filtersRequest,
                         }
                 }
             })
@@ -182,7 +192,6 @@ export const useLiveStreamStore = defineStore('liveStream', {
                 const res = await dataService.createEventsStream(commonStore.organizationId, commonStore.projectId, {
                     time: this.timeRequest,
                     events: this.eventsRequest,
-                    filters: this.filtersRequest,
                 })
 
                 if (res?.data) {
