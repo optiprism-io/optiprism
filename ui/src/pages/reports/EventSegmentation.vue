@@ -5,7 +5,7 @@
         </template>
 
         <UiCard :title="$t('events.events')">
-            <Events />
+            <Events @get-event-segmentation="getEventSegmentation" />
         </UiCard>
 
         <UiCard :title="$t('events.segments.label')">
