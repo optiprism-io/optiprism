@@ -755,7 +755,7 @@ paths:
 
       responses:
         '200':
-          description: events list
+          description: event records list
           content:
             application/json:
               schema:
@@ -1837,6 +1837,7 @@ components:
                       type: object
                       oneOf:
                         - $ref: '#/components/schemas/EventFilterByProperty'
+                        - $ref: '#/components/schemas/EventFilterByGroup'
         filters:
           $ref: '#/components/schemas/EventFilters'
 
