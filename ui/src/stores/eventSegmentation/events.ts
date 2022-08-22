@@ -1,3 +1,4 @@
+import { QueryAggregatePropertyPerGroup } from './../../api/api';
 import { defineStore } from 'pinia';
 import {
     EventRef,
@@ -5,13 +6,34 @@ import {
     EventQueryRef,
 } from '@/types/events';
 import { OperationId, Value, Group } from '@/types'
-import { EventSegmentation } from '@/api/services/queries.service';
 import { getYYYYMMDD } from '@/helpers/getStringDates';
 import { getLastNDaysRange } from '@/helpers/calendarHelper';
-import { PropertyType, TimeUnit, EventType } from '@/api'
+import {
+    PropertyType,
+    TimeUnit,
+    EventSegmentation,
+    EventListRequestTime,
+    EventChartType,
+    EventSegmentationEvent,
+    EventQuery as EventQuerySegmentation,
+    QueryAggregatePropertyTypeEnum,
+    QueryAggregatePropertyPerGroupTypeEnum,
+    QueryAggregateProperty,
+    QueryCountPerGroupTypeEnum,
+    QueryFormulaTypeEnum,
+    QuerySimpleTypeEnum,
+
+    EventFilters,
+    EventFilterByProperty,
+    EventFiltersGroupsFiltersInner,
+    EventFiltersGroupsFiltersInnerTypeEnum,
+    EventListRequestEventsInnerEventTypeEnum,
+    EventType,
+} from '@/api'
 
 import { useLexiconStore } from '@/stores/lexicon';
 import { useSegmentsStore } from '@/stores/eventSegmentation/segments';
+import { useFilterGroupsStore } from '../reports/filters'
 
 export type ChartType = 'line' | 'pie' | 'column';
 
@@ -50,7 +72,7 @@ export type Events = {
     events: Event[]
     group: Group;
 
-    controlsGroupBy: string;
+    controlsGroupBy: TimeUnit;
     controlsPeriod: string | number;
     period: {
         from: string,
@@ -104,6 +126,33 @@ export const useEventsStore = defineStore('events', {
         editCustomEvent: null,
     }),
     getters: {
+        timeRequest(): EventListRequestTime {
+            switch (this.period.type) {
+                case 'last':
+                    return {
+                        type: this.period.type,
+                        n: this.period.last,
+                        unit: 'day'
+                    }
+                case 'since':
+                    return {
+                        type: 'from',
+                        from: this.period.from,
+                    }
+                case 'between':
+                    return {
+                        type: this.period.type,
+                        from: this.period.from,
+                        to: this.period.to,
+                    }
+                default:
+                    return {
+                        type: 'last',
+                        n: Number(this.controlsPeriod),
+                        unit: 'day'
+                    }
+            }
+        },
         hasSelectedEvents(): boolean {
             return Array.isArray(this.events) && Boolean(this.events.length)
         },
@@ -124,76 +173,116 @@ export const useEventsStore = defineStore('events', {
         },
         propsForEventSegmentationResult(): EventSegmentation {
             const lexiconStore = useLexiconStore();
-            const segmentsStore = useSegmentsStore()
-
-            let time = {
-                from: new Date(this.period.from),
-                to: new Date(this.period.to),
-                type: this.period.type,
-            };
-
-            if (this.controlsPeriod !== 'calendar') {
-                switch(this.controlsGroupBy) {
-                    case 'day':
-                        time = {
-                            ...getLastNDaysRange(Number(this.controlsPeriod) + 1),
-                            type: 'last',
-                        };
-                        break;
-                    case 'month':
-                        time = {
-                            ...getLastNDaysRange(Number(this.controlsPeriod) * 30),
-                            type: 'last',
-                        };
-                        break;
-                    case 'week':
-                        time = {
-                            ...getLastNDaysRange(Number(this.controlsPeriod) * 7),
-                            type: 'last',
-                        };
-                        break;
-                    case 'hour':
-                        // TODO
-                        break;
-                    case 'minuts':
-                        // TODO
-                        break;
-                }
-            }
+            const filterGroupsStore = useFilterGroupsStore()
 
             const props: EventSegmentation = {
-                time,
+                time: this.timeRequest,
                 group: this.group,
                 intervalUnit: this.controlsGroupBy,
-                chartType: this.chartType,
-                events: this.events.map(item => {
+                chartType: this.chartType as EventChartType,
+                analysis: {
+                    type: 'linear',
+                },
+                events: this.events.map((item): EventSegmentationEvent => {
                     const eventLexicon = lexiconStore.findEvent(item.ref)
 
                     const event = {
                         eventName: eventLexicon.name,
-                        eventType: item.ref.type,
-                        queries: item.queries.map(query => {
-                            const queryLexicon = lexiconStore.findQuery(query.queryRef)
+                        queries: item.queries.filter(query => query.queryRef).map((query) => {
+                            const type = query.queryRef?.type;
 
+                            if (query?.queryRef?.propRef) {
+                                const prop = {
+                                    type: type,
+                                    propertyType: query.queryRef.propRef.type,
+                                    propertyId: query.queryRef.propRef.id,
+                                    aggregate: query.queryRef.typeAggregate,
+                                }
+
+                                if (type === QueryAggregatePropertyTypeEnum.AggregateProperty) {
+                                    return {
+                                        name: query.queryRef.name,
+                                        query: prop as QueryAggregateProperty,
+                                    }
+                                }
+
+                                if (type === QueryAggregatePropertyPerGroupTypeEnum.AggregatePropertyPerGroup && query.queryRef.typeGroupAggregate) {
+                                    return {
+                                        name: query.queryRef.name,
+                                        query: {
+                                            ...prop,
+                                            aggregatePerGroup: query.queryRef.typeGroupAggregate
+                                        } as QueryAggregatePropertyPerGroup
+                                    }
+                                }
+                            }
+
+                            if (query?.queryRef?.type === QueryCountPerGroupTypeEnum.CountPerGroup) {
+                                return {
+                                    name: query.queryRef.name,
+                                    query: {
+                                        type: QueryCountPerGroupTypeEnum.CountPerGroup,
+                                        aggregate: query.queryRef.typeAggregate
+                                    }
+                                }
+                            }
+
+                            if (query.queryRef?.type === QueryFormulaTypeEnum.Formula) {
+                                return {
+                                    name: query.queryRef.name,
+                                    query: {
+                                        type: QueryFormulaTypeEnum.Formula,
+                                        formula: query.queryRef.value
+                                    }
+                                }
+                            }
+
+                            if (query.queryRef?.type === QuerySimpleTypeEnum.Simple) {
+                                return {
+                                    name: query.queryRef.name,
+                                    query: {
+                                        type: QueryFormulaTypeEnum.Formula,
+                                        query: query.queryRef.name
+                                    }
+                                }
+                            }
+                        }).filter(item => item as EventQuerySegmentation),
+                        eventType: item.ref.type as EventListRequestEventsInnerEventTypeEnum,
+                        eventId: item.ref.id,
+                        filters: item.filters.map((filter): EventFilterByProperty => {
                             return {
-                                queryType: queryLexicon ? queryLexicon.type : '',
+                                type: 'property',
+                                propertyType: filter.propRef?.type || 'event',
+                                operation: filter.opId,
+                                value: filter.values,
                             }
                         }),
                     }
 
-                    return event;
+                    return event as EventSegmentationEvent;
                 }),
-                segments: segmentsStore.segments.length ? segmentsStore.segments : null,
+                filters: {
+                    groupsCondition: filterGroupsStore.condition,
+                    groups: filterGroupsStore.filterGroups.map(group => {
+                        return {
+                            filtersCondition: group.condition,
+                            filters: group.filters.map((filter): EventFiltersGroupsFiltersInner => {
+                                const property = {
+                                    type: 'property' as EventFiltersGroupsFiltersInnerTypeEnum,
+                                    propertyType: filter.propRef?.type || 'event',
+                                    operation: filter.opId,
+                                    value: filter.values,
+                                    propertyId: filter.propRef?.id,
+                                }
+
+                                return property
+                            }),
+                        }
+                    }),
+                } as EventFilters
             };
 
-            if (this.compareTo) {
-                props.compare = {
-                    offset: 1,
-                    unit: this.compareTo,
-                }
-            }
-
-            return props;
+            return props
         },
     },
     actions: {

@@ -156,7 +156,7 @@ export default function ({ environment = 'development' } = {}) {
                 return splineChartMocks;
             });
 
-            this.post('/queries/event-segmentation', (_, request) => {
+            this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/reports/event-segmentation`, (_, request) => {
                 const body = JSON.parse(request.requestBody);
 
                 if (body.events.length || body.segments) {

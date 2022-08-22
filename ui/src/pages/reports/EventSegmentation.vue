@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onUnmounted, ref } from 'vue';
 import Events from '@/components/events/Events/Events.vue';
 import Breakdowns from '@/components/events/Breakdowns.vue';
 import Segments from '@/components/events/Segments/Segments.vue';
@@ -40,27 +40,19 @@ import UiCard from '@/components/uikit/UiCard/UiCard.vue';
 import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
 import UiCardContainer from '@/components/uikit/UiCard/UiCardContainer.vue'
 import FilterReports from '@/components/events/FiltersReports.vue'
-import queriesService from '@/api/services/queries.service'
+import reportsService from '@/api/services/reports.service'
 import { DataTableResponse } from '@/api'
 
 import { useEventsStore } from '@/stores/eventSegmentation/events'
-import { useLexiconStore } from '@/stores/lexicon'
 import { useFilterGroupsStore } from '@/stores/reports/filters'
+import { useCommonStore } from '@/stores/common'
 
 const eventsStore = useEventsStore();
-const lexiconStore = useLexiconStore();
 const filterGroupsStore = useFilterGroupsStore()
+const commonStore = useCommonStore()
 
 const eventSegmentationLoading = ref(false)
 const eventSegmentation = ref<DataTableResponse>()
-
-onMounted(async () => {
-    await lexiconStore.getEvents();
-    await lexiconStore.getEventProperties();
-    await lexiconStore.getUserProperties();
-
-    await eventsStore.initPeriod();
-});
 
 onUnmounted(() => {
     eventsStore.$reset()
@@ -70,9 +62,10 @@ onUnmounted(() => {
 const getEventSegmentation = async () => {
     eventSegmentationLoading.value = true
     try {
-        const res: DataTableResponse = await queriesService.eventSegmentation(eventsStore.propsForEventSegmentationResult)
+        const res = await reportsService.eventSegmentation(commonStore.organizationId, commonStore.projectId,  eventsStore.propsForEventSegmentationResult)
+
         if (res) {
-            eventSegmentation.value = res
+            eventSegmentation.value = res.data as DataTableResponse
         }
     } catch (error) {
         throw new Error('error Get Event Segmentation')
