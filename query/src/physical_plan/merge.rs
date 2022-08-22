@@ -1,4 +1,3 @@
-use crate::Error;
 use crate::Result;
 use arrow::array::ArrayRef;
 use arrow::datatypes::{Schema, SchemaRef};
@@ -26,6 +25,7 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use crate::error::QueryError;
 
 pub struct MergeExec {
     inputs: Vec<Arc<dyn ExecutionPlan>>,
@@ -83,7 +83,7 @@ impl ExecutionPlan for MergeExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
-            MergeExec::try_new(children).map_err(Error::into_datafusion_execution_error)?,
+            MergeExec::try_new(children).map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 

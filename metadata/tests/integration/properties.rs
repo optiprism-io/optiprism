@@ -2,7 +2,7 @@ use arrow::datatypes::DataType;
 use metadata::error::Result;
 use metadata::properties::provider::Namespace;
 use metadata::properties::{CreatePropertyRequest, Provider, Status, UpdatePropertyRequest};
-use metadata::store::store::Store;
+use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 use uuid::Uuid;

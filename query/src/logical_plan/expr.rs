@@ -4,7 +4,7 @@ use crate::physical_plan::expressions::partitioned_aggregate::{
 };
 use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
 
-use crate::{Error, Result};
+use crate::{ Result};
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
 use datafusion::error::Result as DFResult;
@@ -19,6 +19,7 @@ use datafusion_expr::{
 };
 
 use std::sync::Arc;
+use crate::error::QueryError;
 
 pub fn multi_or(exprs: Vec<Expr>) -> Expr {
     // combine multiple values with OR
@@ -53,7 +54,7 @@ pub fn lit_timestamp(data_type: DataType, date_time: &DateTime<Utc>) -> Result<E
         DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, tz) => {
             ScalarValue::TimestampMicrosecond(Some(date_time.timestamp_nanos() / 1000), tz)
         }
-        _ => return Err(Error::QueryError("unsupported data type".to_owned())),
+        _ => return Err(QueryError::Plan(format!("unsupported \"{:?}\" timestamp data type",data_type))),
     }))
 }
 
@@ -99,7 +100,7 @@ pub fn aggregate_partitioned(
     // factory closure
     let acc_fn: AccumulatorFunctionImplementation = Arc::new(move || {
         pagg.create_accumulator()
-            .map_err(Error::into_datafusion_plan_error)
+            .map_err(QueryError::into_datafusion_plan_error)
     });
 
     let return_type_fn: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(rtype.clone())));

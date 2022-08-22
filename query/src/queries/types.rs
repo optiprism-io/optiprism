@@ -21,7 +21,7 @@ impl QueryTime {
         match self {
             QueryTime::Between { from, to } => (*from, *to),
             QueryTime::From(from) => (*from, cur_time),
-            QueryTime::Last { last, unit } => (cur_time + unit.relative_duration(*last), cur_time),
+            QueryTime::Last { last, unit } => (cur_time + unit.relative_duration(-*last), cur_time),
         }
     }
 }

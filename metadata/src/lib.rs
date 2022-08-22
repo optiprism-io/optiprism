@@ -10,6 +10,6 @@ pub mod properties;
 pub mod store;
 
 pub use crate::metadata::Metadata;
-pub use error::{Error, Result};
+pub use error::{ Result};
 
 type OptionalProperty<T> = Option<T>;

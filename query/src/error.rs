@@ -2,23 +2,31 @@ use arrow::error::ArrowError;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use datafusion::error::DataFusionError;
-use metadata::error::Error as MetadataError;
+use metadata::error::MetadataError;
 use std::fmt::{Display, Formatter};
 use std::{fmt, result};
 use store::error::StoreError;
-pub type Result<T> = result::Result<T, Error>;
+use thiserror::Error;
 
-#[derive(Debug)]
-pub enum Error {
+pub type Result<T> = result::Result<T, QueryError>;
+
+#[derive(Error, Debug)]
+pub enum QueryError {
+    #[error("internal {0:?}")]
     Internal(String),
-    QueryError(String),
-    DataFusionError(DataFusionError),
-    ArrowError(ArrowError),
-    StoreError(StoreError),
-    MetadataError(MetadataError),
+    #[error("plan {0:?}")]
+    Plan(String),
+    #[error("execution {0:?}")]
+    Execution(String),
+    #[error("datafusion {0:?}")]
+    DataFusion(#[from] DataFusionError),
+    #[error("arrow {0:?}")]
+    Arrow(#[from] ArrowError),
+    #[error("metadata {0:?}")]
+    Metadata(#[from] MetadataError),
 }
 
-impl Error {
+impl QueryError {
     /// Wraps this [Error] as an [datafusion::error::DataFusionError::Execution].
     pub fn into_datafusion_execution_error(self) -> DataFusionError {
         DataFusionError::Execution(self.to_string())
@@ -30,60 +38,8 @@ impl Error {
     }
 }
 
-impl std::error::Error for Error {}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Error::Internal(desc) => write!(f, "Internal error: {}", desc),
-            Error::QueryError(desc) => write!(f, "Query error: {}", desc),
-            Error::DataFusionError(err) => write!(f, "DataFusion error: {}", err),
-            Error::ArrowError(err) => write!(f, "ArrowError error: {}", err),
-            Error::StoreError(err) => write!(f, "Store error: {}", err),
-            Error::MetadataError(err) => write!(f, "Metadata error: {}", err),
-        }
-    }
-}
-
-impl From<DataFusionError> for Error {
-    fn from(err: DataFusionError) -> Self {
-        Self::DataFusionError(err)
-    }
-}
-
-impl From<ArrowError> for Error {
-    fn from(err: ArrowError) -> Self {
-        Self::ArrowError(err)
-    }
-}
-
-impl From<StoreError> for Error {
-    fn from(err: StoreError) -> Self {
-        Self::StoreError(err)
-    }
-}
-
-impl From<MetadataError> for Error {
-    fn from(err: MetadataError) -> Self {
-        Self::MetadataError(err)
-    }
-}
-
-impl From<Error> for ArrowError {
-    fn from(e: Error) -> Self {
-        match e {
-            Error::ArrowError(e) => e,
-            other => ArrowError::ExternalError(Box::new(other)),
-        }
-    }
-}
-
-impl IntoResponse for Error {
-    fn into_response(self) -> Response {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "internal server error".to_string(),
-        )
-            .into_response()
+impl From<QueryError> for ArrowError {
+    fn from(e: QueryError) -> Self {
+        ArrowError::ExternalError(Box::new(e))
     }
 }

@@ -22,7 +22,7 @@ mod tests {
     use axum::http::StatusCode;
     use datafusion::datasource::file_format::csv::CsvFormat;
     use datafusion::datasource::listing::{ListingOptions, ListingTable, ListingTableConfig};
-    use metadata::database::{Column, Table, TableType};
+    use metadata::database::{Column, Table, TableRef};
     use metadata::properties::provider::Namespace;
     use metadata::properties::{CreatePropertyRequest, Property};
     use metadata::{events, properties};

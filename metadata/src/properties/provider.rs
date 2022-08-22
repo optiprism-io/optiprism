@@ -1,15 +1,15 @@
-use crate::error::Error;
+use crate::error::{ MetadataError, PropertyError, StoreError};
 use crate::metadata::{list, ListResponse};
 use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
 use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
-use crate::Result;
+use crate::{error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Namespace {
     Event,
     User,
@@ -38,7 +38,7 @@ fn index_keys(
         index_name_key(organization_id, project_id, ns, name),
         index_display_name_key(organization_id, project_id, ns, display_name),
     ]
-    .to_vec()
+        .to_vec()
 }
 
 fn index_name_key(
@@ -64,7 +64,7 @@ fn index_display_name_key(
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-        .to_vec()
+            .to_vec()
     })
 }
 
@@ -117,7 +117,18 @@ impl Provider {
             &req.name,
             req.display_name.clone(),
         );
-        self.idx.check_insert_constraints(idx_keys.as_ref()).await?;
+        match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(PropertyError::PropertyAlreadyExist(error::Property {
+                organization_id,
+                project_id,
+                namespace: self.ns.clone(),
+                event_id: None,
+                property_id: None,
+                property_name: Some(req.name),
+            }).into()),
+            Err(other) => return Err(other),
+            Ok(_) => {}
+        }
 
         let id = self
             .store
@@ -172,9 +183,9 @@ impl Provider {
             ._get_by_name(organization_id, project_id, req.name.as_str())
             .await
         {
-            Ok(prop) => return Ok(prop),
-            Err(Error::KeyNotFound(_)) => {}
-            Err(err) => return Err(err),
+            Ok(event) => return Ok(event),
+            Err(MetadataError::Property(PropertyError::PropertyNotFound(_))) => {}
+            other => return other,
         }
 
         self._create(organization_id, project_id, req).await
@@ -189,7 +200,14 @@ impl Provider {
         let key = make_data_value_key(organization_id, project_id, self.ns.as_bytes(), id);
 
         match self.store.get(&key).await? {
-            None => Err(Error::KeyNotFound(String::from_utf8(key)?)),
+            None => Err(PropertyError::PropertyNotFound(error::Property {
+                organization_id,
+                project_id,
+                namespace: self.ns.clone(),
+                event_id: None,
+                property_id: Some(id),
+                property_name: None,
+            }).into()),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -210,7 +228,7 @@ impl Provider {
         project_id: u64,
         name: &str,
     ) -> Result<Property> {
-        let data = self
+        match self
             .idx
             .get(make_index_key(
                 organization_id,
@@ -219,9 +237,18 @@ impl Provider {
                 IDX_NAME,
                 name,
             ))
-            .await?;
-
-        Ok(deserialize(&data)?)
+            .await {
+            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(PropertyError::PropertyNotFound(error::Property {
+                organization_id,
+                project_id,
+                namespace: self.ns.clone(),
+                event_id: None,
+                property_id: None,
+                property_name: Some(name.to_string()),
+            }).into()),
+            Err(other) => Err(other),
+            Ok(data) => Ok(deserialize(&data)?)
+        }
     }
 
     pub async fn list(
@@ -235,7 +262,7 @@ impl Provider {
             project_id,
             self.ns.as_bytes(),
         )
-        .await
+            .await
     }
 
     pub async fn update(
@@ -254,7 +281,7 @@ impl Provider {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let Some(name) = req.name {
+        if let Some(name) = &req.name {
             idx_keys.push(index_name_key(
                 organization_id,
                 project_id,
@@ -267,9 +294,9 @@ impl Provider {
                 &self.ns,
                 prev_prop.name.as_str(),
             ));
-            prop.name = name;
+            prop.name = name.to_owned();
         }
-        if let Some(display_name) = req.display_name {
+        if let Some(display_name) = &req.display_name {
             idx_keys.push(index_display_name_key(
                 organization_id,
                 project_id,
@@ -282,11 +309,22 @@ impl Provider {
                 &self.ns,
                 prev_prop.display_name,
             ));
-            prop.display_name = display_name;
+            prop.display_name = display_name.to_owned();
         }
-        self.idx
+        match self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await?;
+            .await {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(PropertyError::PropertyAlreadyExist(error::Property {
+                organization_id,
+                project_id,
+                namespace: self.ns.clone(),
+                event_id: None,
+                property_id: Some(property_id),
+                property_name: None,
+            }).into()),
+            Err(other) => return Err(other),
+            Ok(_) => {}
+        }
 
         prop.updated_at = Some(Utc::now());
         prop.updated_by = Some(req.updated_by);
@@ -354,7 +392,7 @@ impl Provider {
                     &prop.name,
                     prop.display_name.clone(),
                 )
-                .as_ref(),
+                    .as_ref(),
             )
             .await?;
         Ok(prop)

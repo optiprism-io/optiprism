@@ -17,7 +17,7 @@
 
 //! Defines physical expressions that can evaluated at runtime during query execution
 
-use crate::error::{Error, Result};
+use crate::error::{ QueryError, Result};
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::fmt;
@@ -327,8 +327,8 @@ impl PartitionedAggregateAccumulator {
             AggregateFunction::Max => {
                 Ok(Box::new(MaxAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>)
             }
-            _ => Err(Error::Internal(format!(
-                "{:?} doesn't supported",
+            _ => Err(QueryError::Plan(format!(
+                "outer aggregate function \"{:?}\" doesn't supported",
                 outer_agg
             ))),
         }?;
@@ -377,14 +377,14 @@ macro_rules! make_spans {
         $self
             .acc
             .update_batch(&spans, &$values[1..])
-            .map_err(Error::into_datafusion_execution_error)?
+            .map_err(QueryError::into_datafusion_execution_error)?
     }};
 }
 impl Accumulator for PartitionedAggregateAccumulator {
     fn state(&self) -> DFResult<Vec<ScalarValue>> {
         self.acc
             .state()
-            .map_err(Error::into_datafusion_execution_error)
+            .map_err(QueryError::into_datafusion_execution_error)
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> DFResult<()> {
@@ -405,12 +405,12 @@ impl Accumulator for PartitionedAggregateAccumulator {
     fn merge_batch(&mut self, states: &[ArrayRef]) -> DFResult<()> {
         self.acc
             .merge_batch(states)
-            .map_err(Error::into_datafusion_execution_error)
+            .map_err(QueryError::into_datafusion_execution_error)
     }
 
     fn evaluate(&self) -> DFResult<ScalarValue> {
         self.acc
             .evaluate()
-            .map_err(Error::into_datafusion_execution_error)
+            .map_err(QueryError::into_datafusion_execution_error)
     }
 }

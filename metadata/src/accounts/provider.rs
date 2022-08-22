@@ -2,11 +2,12 @@ use super::{Account, CreateRequest, UpdateRequest};
 use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::store::index::hash_map::HashMap;
 use crate::store::Store;
-use crate::{Error, Result};
+use crate::{error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use crate::error::{AccountError, MetadataError, StoreError};
 
 const NAMESPACE: &[u8] = b"accounts";
 const IDX_EMAIL: &[u8] = b"email";
@@ -49,7 +50,11 @@ impl Provider {
     pub async fn create(&self, req: CreateRequest) -> Result<Account> {
         let _guard = self.guard.write().await;
         let idx_keys = index_keys(req.email.as_str());
-        self.idx.check_insert_constraints(idx_keys.as_ref()).await?;
+        match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(AccountError::AccountAlreadyExist(error::Account::new_with_email(req.email)).into()),
+            Err(other) => return Err(other),
+            Ok(_) => {}
+        }
         let created_at = Utc::now();
         let id = self.store.next_seq(make_id_seq_key(NAMESPACE)).await?;
         let account = req.into_account(id, created_at);
@@ -63,19 +68,21 @@ impl Provider {
 
     pub async fn get_by_id(&self, id: u64) -> Result<Account> {
         match self.store.get(make_data_value_key(NAMESPACE, id)).await? {
-            None => Err(Error::KeyNotFound(id.to_string())),
+            None => Err(AccountError::AccountNotFound(error::Account::new_with_id(id)).into()),
             Some(value) => Ok(deserialize(value.as_slice())?),
         }
     }
 
     pub async fn get_by_email(&self, email: &str) -> Result<Account> {
         let _guard = self.guard.read().await;
-        let data = self
+        match self
             .idx
             .get(make_index_key(NAMESPACE, IDX_EMAIL, email))
-            .await?;
-
-        Ok(deserialize(&data)?)
+            .await {
+            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(AccountError::AccountNotFound(error::Account::new_with_email(email.to_string())).into()),
+            Err(other) => Err(other),
+            Ok(data) => Ok(deserialize(&data)?)
+        }
     }
 
     pub async fn list(&self) -> Result<ListResponse<Account>> {
@@ -107,9 +114,13 @@ impl Provider {
         let prev_account = self.get_by_id(req.id).await?;
         let idx_keys = index_keys(req.email.as_str());
         let idx_prev_keys = index_keys(prev_account.email.as_str());
-        self.idx
+        match self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await?;
+            .await {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(AccountError::AccountAlreadyExist(error::Account::new_with_id(req.id)).into()),
+            Err(other) => return Err(other),
+            Ok(_) => {}
+        }
         let updated_at = Utc::now(); // TODO add updated_by
         let account = req.into_account(prev_account, updated_at, None);
         let data = serialize(&account)?;
@@ -119,6 +130,7 @@ impl Provider {
         self.idx
             .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
             .await?;
+
         Ok(account)
     }
 
@@ -131,6 +143,7 @@ impl Provider {
         self.idx
             .delete(index_keys(account.email.as_str()).as_ref())
             .await?;
+
         Ok(account)
     }
 }

@@ -4,14 +4,16 @@ use bincode::{deserialize, serialize};
 use chrono::Utc;
 
 use tokio::sync::RwLock;
+use datafusion::logical_plan::or;
 
-use crate::error::Error;
+use crate::error::{EventError, MetadataError, StoreError};
 use crate::events::types::{CreateEventRequest, UpdateEventRequest};
 use crate::events::Event;
 use crate::metadata::{list, ListResponse};
 use crate::store::index::hash_map::HashMap;
 use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
-use crate::Result;
+use crate::{error, Result};
+use crate::properties::provider::Namespace;
 
 const NAMESPACE: &[u8] = b"events";
 const IDX_NAME: &[u8] = b"name";
@@ -27,7 +29,7 @@ fn index_keys(
         index_name_key(organization_id, project_id, name),
         index_display_name_key(organization_id, project_id, display_name),
     ]
-    .to_vec()
+        .to_vec()
 }
 
 fn index_name_key(organization_id: u64, project_id: u64, name: &str) -> Option<Vec<u8>> {
@@ -47,7 +49,7 @@ fn index_display_name_key(
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-        .to_vec()
+            .to_vec()
     })
 }
 
@@ -88,7 +90,12 @@ impl Provider {
             &req.name,
             req.display_name.clone(),
         );
-        self.idx.check_insert_constraints(idx_keys.as_ref()).await?;
+
+        match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_name(organization_id, project_id, req.name)).into()),
+            Err(other) => return Err(other),
+            Ok(_) => {}
+        }
 
         let created_at = Utc::now();
         let id = self
@@ -121,6 +128,7 @@ impl Provider {
             .await?;
 
         self.idx.insert(idx_keys.as_ref(), &data).await?;
+
         Ok(event)
     }
 
@@ -136,8 +144,8 @@ impl Provider {
             .await
         {
             Ok(event) => return Ok(event),
-            Err(Error::KeyNotFound(_)) => {}
-            Err(err) => return Err(err),
+            Err(MetadataError::Event(EventError::EventNotFound(_))) => {}
+            other => return other,
         }
 
         self._create(organization_id, project_id, req).await
@@ -146,8 +154,8 @@ impl Provider {
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let key = make_data_value_key(organization_id, project_id, NAMESPACE, id);
 
-        match self.store.get(key.clone()).await? {
-            None => Err(Error::KeyNotFound(String::from_utf8(key.clone())?)),
+        match self.store.get(key).await? {
+            None => Err(EventError::EventNotFound(error::Event::new_with_id(organization_id, project_id, id)).into()),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -168,7 +176,7 @@ impl Provider {
         project_id: u64,
         name: &str,
     ) -> Result<Event> {
-        let data = self
+        match self
             .idx
             .get(make_index_key(
                 organization_id,
@@ -177,9 +185,11 @@ impl Provider {
                 IDX_NAME,
                 name,
             ))
-            .await?;
-
-        Ok(deserialize(&data)?)
+            .await {
+            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(EventError::EventNotFound(error::Event::new_with_name(organization_id, project_id, name.to_string())).into()),
+            Err(other) => Err(other),
+            Ok(data) => Ok(deserialize(&data)?)
+        }
     }
 
     pub async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
@@ -202,16 +212,16 @@ impl Provider {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let Some(name) = req.name {
+        if let Some(name) = &req.name {
             idx_keys.push(index_name_key(organization_id, project_id, name.as_str()));
             idx_prev_keys.push(index_name_key(
                 organization_id,
                 project_id,
                 prev_event.name.as_str(),
             ));
-            event.name = name;
+            event.name = name.to_owned();
         }
-        if let Some(display_name) = req.display_name {
+        if let Some(display_name) = &req.display_name {
             idx_keys.push(index_display_name_key(
                 organization_id,
                 project_id,
@@ -222,11 +232,15 @@ impl Provider {
                 project_id,
                 prev_event.display_name,
             ));
-            event.display_name = display_name;
+            event.display_name = display_name.to_owned();
         }
-        self.idx
+        match self.idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await?;
+            .await {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_id(organization_id, project_id, event_id)).into()),
+            Err(other) => return Err(other),
+            Ok(_) => {}
+        }
 
         event.updated_at = Some(Utc::now());
         event.updated_by = Some(req.updated_by);
@@ -278,7 +292,14 @@ impl Provider {
             None => Some(vec![prop_id]),
             Some(props) => match props.iter().find(|x| prop_id == **x) {
                 None => Some([props, vec![prop_id]].concat()),
-                Some(_) => return Err(Error::ConstraintViolation),
+                Some(_) => return Err(EventError::PropertyAlreadyExist(error::Property {
+                    organization_id,
+                    project_id,
+                    namespace: Namespace::Event,
+                    event_id: Some(event_id),
+                    property_id: Some(prop_id),
+                    property_name: None,
+                }).into()),
             },
         };
 
@@ -303,9 +324,23 @@ impl Provider {
             .get_by_id(organization_id, project_id, event_id)
             .await?;
         event.properties = match event.properties {
-            None => return Err(Error::ConstraintViolation),
+            None => return Err(EventError::PropertyNotFound(error::Property {
+                organization_id,
+                project_id,
+                namespace: Namespace::Event,
+                event_id: Some(event_id),
+                property_id: Some(prop_id),
+                property_name: None,
+            }).into()),
             Some(props) => match props.iter().find(|x| prop_id == **x) {
-                None => return Err(Error::ConstraintViolation),
+                None => return Err(EventError::PropertyAlreadyExist(error::Property {
+                    organization_id,
+                    project_id,
+                    namespace: Namespace::Event,
+                    event_id: Some(event_id),
+                    property_id: Some(prop_id),
+                    property_name: None,
+                }).into()),
                 Some(_) => Some(props.into_iter().filter(|x| prop_id != *x).collect()),
             },
         };
@@ -339,7 +374,7 @@ impl Provider {
                     &event.name,
                     event.display_name.clone(),
                 )
-                .as_ref(),
+                    .as_ref(),
             )
             .await?;
 

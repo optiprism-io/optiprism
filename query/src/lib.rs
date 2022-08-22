@@ -9,7 +9,7 @@ pub mod queries;
 pub mod test_util;
 
 pub use context::Context;
-pub use error::{Error, Result};
+pub use error::{ Result};
 pub use provider::QueryProvider;
 
 pub mod event_fields {

@@ -4,7 +4,7 @@ use arrow::datatypes::DataType;
 use datafusion::datasource::object_store::local::LocalFileSystem;
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::prelude::CsvReadOptions;
-use metadata::database::{Column, Table, TableType};
+use metadata::database::{Column, Table, TableRef};
 use metadata::properties::provider::Namespace;
 use metadata::properties::{CreatePropertyRequest, Property};
 use metadata::store::Store;
@@ -17,7 +17,7 @@ pub async fn events_provider(
     org_id: u64,
     proj_id: u64,
 ) -> Result<LogicalPlan> {
-    let table = db.get_table(TableType::Events(org_id, proj_id)).await?;
+    let table = db.get_table(TableRef::Events(org_id, proj_id)).await?;
     let schema = table.arrow_schema();
     let options = CsvReadOptions::new().schema(&schema);
     let path = "../tests/events.csv";
@@ -47,7 +47,7 @@ pub async fn create_property(
 
     md.database
         .add_column(
-            TableType::Events(org_id, proj_id),
+            TableRef::Events(org_id, proj_id),
             Column::new(
                 prop.column_name(ns),
                 prop.typ.clone(),
@@ -63,14 +63,14 @@ pub async fn create_property(
 pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Result<()> {
     md.database
         .create_table(Table {
-            typ: TableType::Events(org_id, proj_id),
+            typ: TableRef::Events(org_id, proj_id),
             columns: vec![],
         })
         .await?;
 
     md.database
         .add_column(
-            TableType::Events(org_id, proj_id),
+            TableRef::Events(org_id, proj_id),
             Column::new(
                 event_fields::USER_ID.to_string(),
                 DataType::UInt64,
@@ -81,7 +81,7 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
         .await?;
     md.database
         .add_column(
-            TableType::Events(org_id, proj_id),
+            TableRef::Events(org_id, proj_id),
             Column::new(
                 event_fields::CREATED_AT.to_string(),
                 DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
@@ -92,7 +92,7 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
         .await?;
     md.database
         .add_column(
-            TableType::Events(org_id, proj_id),
+            TableRef::Events(org_id, proj_id),
             Column::new(
                 event_fields::EVENT.to_string(),
                 DataType::UInt16,

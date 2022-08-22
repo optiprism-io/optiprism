@@ -1,6 +1,6 @@
 pub mod index;
 
-use crate::Result;
+use crate::{Result};
 use rocksdb::{ColumnFamilyDescriptor, Options, SliceTransform, WriteBatch, DB};
 use std::path::Path;
 
@@ -192,7 +192,7 @@ impl Store {
     pub async fn next_seq<K: AsRef<[u8]>>(&self, key: K) -> Result<u64> {
         let id = self.db.get(key.as_ref())?;
         let result: u64 = match id {
-            Some(v) => u64::from_le_bytes(v.try_into()?) + 1,
+            Some(v) => u64::from_le_bytes(v.try_into().unwrap()) + 1,
             None => 1,
         };
         self.db.put(key, result.to_le_bytes())?;
