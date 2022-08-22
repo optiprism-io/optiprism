@@ -57,7 +57,7 @@ export default function ({ environment = 'development' } = {}) {
                 return schema.db.customEvents
             })
 
-            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/data/events-stream`, (schema, request) => {
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/data/event-records`, (schema, request) => {
                 return liveStreamMocks
             })
 

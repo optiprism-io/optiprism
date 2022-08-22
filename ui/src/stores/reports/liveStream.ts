@@ -5,8 +5,8 @@ import {
     TimeBetween,
     TimeFrom,
     TimeLast,
-    EventListRequestEventsInner,
-    EventListRequestEventsInnerEventTypeEnum,
+    EventRecordsListRequestEventsInner,
+    EventRecordsListRequestEventsInnerEventTypeEnum,
 } from '@/api'
 import { Event } from '@/stores/eventSegmentation/events'
 import dataService from '@/api/services/datas.service'
@@ -83,7 +83,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
 
             return filters
         },
-        eventsRequest(): Array<EventListRequestEventsInner> {
+        eventsRequest(): Array<EventRecordsListRequestEventsInner> {
             const lexiconStore = useLexiconStore()
 
             return this.events.map(event => {
@@ -93,7 +93,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
                     case EventType.Regular:
                         return {
                             eventName: eventStore.name,
-                            eventType: event.ref.type as EventListRequestEventsInnerEventTypeEnum,
+                            eventType: event.ref.type as EventRecordsListRequestEventsInnerEventTypeEnum,
                             filters: this.filtersRequest,
                         }
                     case EventType.Custom:

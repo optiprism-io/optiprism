@@ -12,7 +12,7 @@ import {
     PropertyType,
     TimeUnit,
     EventSegmentation,
-    EventListRequestTime,
+    EventRecordsListRequestTime,
     EventChartType,
     EventSegmentationEvent,
     EventQuery as EventQuerySegmentation,
@@ -27,7 +27,7 @@ import {
     EventFilterByProperty,
     EventFiltersGroupsFiltersInner,
     EventFiltersGroupsFiltersInnerTypeEnum,
-    EventListRequestEventsInnerEventTypeEnum,
+    EventRecordsListRequestEventsInnerEventTypeEnum,
     EventType,
 } from '@/api'
 
@@ -126,7 +126,7 @@ export const useEventsStore = defineStore('events', {
         editCustomEvent: null,
     }),
     getters: {
-        timeRequest(): EventListRequestTime {
+        timeRequest(): EventRecordsListRequestTime {
             switch (this.period.type) {
                 case 'last':
                     return {
@@ -247,7 +247,7 @@ export const useEventsStore = defineStore('events', {
                                 }
                             }
                         }).filter(item => item as EventQuerySegmentation),
-                        eventType: item.ref.type as EventListRequestEventsInnerEventTypeEnum,
+                        eventType: item.ref.type as EventRecordsListRequestEventsInnerEventTypeEnum,
                         eventId: item.ref.id,
                         filters: item.filters.map((filter): EventFilterByProperty => {
                             return {
