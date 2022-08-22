@@ -1,6 +1,6 @@
 use arrow::datatypes::DataType as ArrowDataType;
 use arrow::datatypes::TimeUnit::Second;
-use datafusion::scalar::ScalarValue as DFScalarValue;
+use datafusion_common::ScalarValue as DFScalarValue;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +19,7 @@ pub enum DataType {
 impl DataType {
     pub fn to_arrow(self) -> ArrowDataType {
         match self {
-            DataType::Number => ArrowDataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            DataType::Number => ArrowDataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
             DataType::String => ArrowDataType::Utf8,
             DataType::Boolean => ArrowDataType::Boolean,
             DataType::Timestamp => ArrowDataType::Timestamp(Second, None),

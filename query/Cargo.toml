@@ -11,12 +11,10 @@ metadata = { path = "../metadata" }
 chrono = "0.4"
 chronoutil = "0.2.3"
 dyn-clone = "1.0.5"
-#datafusion = "7.0.0"
-datafusion = { path = "../arrow-datafusion/datafusion" }
-datafusion-expr = { path = "../arrow-datafusion/datafusion-expr" }
-datafusion-common = { path = "../arrow-datafusion/datafusion-common" }
-#datafusion-expr = "7.0.0"
-arrow = { version = "9.0.0", features = ["prettyprint"] }
+datafusion = { path = "../arrow-datafusion/datafusion/core" }
+datafusion-expr = { path = "../arrow-datafusion/datafusion/expr" }
+datafusion-common = { path = "../arrow-datafusion/datafusion/common" }
+arrow = { version = "20.0.0", features = ["prettyprint"] }
 store = { path = "../store" }
 mockall = "0.10.1"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }

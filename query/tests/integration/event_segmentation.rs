@@ -18,7 +18,7 @@ mod tests {
     use datafusion::logical_plan::LogicalPlan;
     use datafusion::physical_plan::coalesce_batches::concat_batches;
 
-    use datafusion_common::ScalarValue;
+    use datafusion_commonValue;
     use datafusion_expr::AggregateFunction;
     use metadata::database::{Column, Table, TableRef};
     use metadata::properties::provider::Namespace;

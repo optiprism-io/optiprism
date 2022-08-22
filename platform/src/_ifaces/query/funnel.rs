@@ -3,7 +3,7 @@ use super::Event;
 use super::Operator;
 use crate::ifaces::query::{Property, PropertyOpValue, TimeRange};
 use chrono::{Date, Duration, Utc};
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 
 pub enum Filter {
     DropOffOnAnyStep,

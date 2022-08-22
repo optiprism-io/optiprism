@@ -7,7 +7,7 @@ use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCoun
 use crate::{ Result};
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
-use datafusion::error::Result as DFResult;
+use datafusion_common::error::Result as DFResult;
 use datafusion::logical_plan::ExprSchemable;
 use datafusion::physical_plan::aggregates::return_type;
 use datafusion_common::{DFSchema, ScalarValue};

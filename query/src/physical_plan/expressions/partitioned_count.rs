@@ -8,7 +8,7 @@ use arrow::array::ArrayRef;
 use arrow::datatypes::DataType;
 
 use datafusion::physical_plan::Accumulator;
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 
 #[derive(Debug)]
 pub struct PartitionedCountAccumulator {
@@ -62,7 +62,7 @@ mod tests {
     use arrow::datatypes::DataType;
     use datafusion::physical_plan::expressions::AvgAccumulator;
 
-    use datafusion::scalar::ScalarValue as DFScalarValue;
+    use datafusion_common::ScalarValue as DFScalarValue;
 
     use datafusion_expr::Accumulator;
 

@@ -2,7 +2,7 @@ use super::user_segment::UserSegment;
 use super::{Event, Operator, TimeGroup, TimeRange};
 use crate::ifaces::query::Property;
 use chrono::{Date, Utc};
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 
 pub enum Expr {
     Count(Property),

@@ -25,7 +25,7 @@ impl UnpivotNode {
         name_col: String,
         value_col: String,
     ) -> Result<Self> {
-        let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
+        let value_type = DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let schema = {
             let mut fields: Vec<DFField> = input

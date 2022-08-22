@@ -30,14 +30,14 @@ use arrow::array::{
     UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
 use arrow::datatypes::DataType;
-use datafusion::error::Result as DFResult;
+use datafusion_common::error::Result as DFResult;
 
 use crate::physical_plan::expressions::partitioned_count::PartitionedCountAccumulator;
 use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
 
 use datafusion::physical_plan::expressions::{AvgAccumulator, MaxAccumulator, MinAccumulator};
 use datafusion::physical_plan::Accumulator;
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use datafusion_expr::AggregateFunction;
 
 // PartitionedAccumulator extends Accumulator trait with reset
@@ -108,7 +108,7 @@ impl Buffer {
             DataType::Float32 | DataType::Float64 => {
                 buffer_to_array_ref!(buffer, f64, Float64Array)
             }
-            DataType::Decimal(precision, scale) => {
+            DataType::Decimal128(precision, scale) => {
                 let mut builder = DecimalBuilder::new(buffer.len(), precision, scale);
                 for v in buffer.iter() {
                     builder.append_value(v.into())?;
@@ -189,7 +189,7 @@ impl From<&Value> for i64 {
 impl From<Value> for i128 {
     fn from(v: Value) -> Self {
         match v {
-            Value::Decimal(v) => v,
+            Value::Decimal128(v) => v,
             _ => unreachable!(),
         }
     }
@@ -198,7 +198,7 @@ impl From<Value> for i128 {
 impl From<&Value> for i128 {
     fn from(v: &Value) -> Self {
         match v {
-            Value::Decimal(v) => *v,
+            Value::Decimal128(v) => *v,
             _ => unreachable!(),
         }
     }

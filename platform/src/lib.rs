@@ -49,7 +49,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
         DataType::Float64 => arr_to_json_values!(arr, Float64Array),
         DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
         DataType::Utf8 => arr_to_json_values!(arr, StringArray),
-        DataType::Decimal(_, s) => {
+        DataType::Decimal128(_, s) => {
             let arr = arr.as_any().downcast_ref::<DecimalArray>().unwrap();
             arr.iter()
                 .map(|value| match value {

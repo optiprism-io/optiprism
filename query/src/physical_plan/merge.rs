@@ -15,7 +15,7 @@ use datafusion::physical_plan::{
     Statistics,
 };
 use datafusion_common::Result as DFResult;
-use datafusion_common::ScalarValue;
+use datafusion_commonValue;
 
 use futures::{Stream, StreamExt};
 use std::any::Any;
@@ -191,7 +191,7 @@ mod tests {
     use arrow::array::{ArrayRef, BooleanArray, Int32Array, Int8Array, StringArray};
 
     use arrow::record_batch::RecordBatch;
-    pub use datafusion::error::Result;
+    pub use datafusion_common::error::Result;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;

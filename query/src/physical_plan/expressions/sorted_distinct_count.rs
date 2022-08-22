@@ -5,11 +5,11 @@ use arrow::array::{
 };
 use arrow::compute;
 use arrow::datatypes::{DataType, TimeUnit};
-use datafusion::error::{DataFusionError, Result};
+use datafusion_common::error::{DataFusionError, Result};
 use datafusion::physical_plan::functions::{Signature, TypeSignature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::Accumulator;
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use datafusion_expr::{AccumulatorFunctionImplementation, ReturnTypeFunction, StateTypeFunction};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -137,9 +137,9 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
             distinct_count_array!(array, TimestampSecondArray, state)
         }
 
-        // "the trait `From<i128>` is not implemented for `datafusion::scalar::ScalarValue`"
+        // "the trait `From<i128>` is not implemented for `datafusion_common::ScalarValue`"
         // TODO Enable once https://github.com/apache/arrow-datafusion/pull/1394 is released
-        // DataType::Decimal(_, _) => distinct_count_array!(array, DecimalArray, state),
+        // DataType::Decimal128(_, _) => distinct_count_array!(array, DecimalArray, state),
         other => {
             let message = format!(
                 "Ordered distinct count over array of type \"{:?}\" is not supported",
@@ -176,7 +176,7 @@ impl Accumulator for SortedDistinctCountAccumulator {
 mod tests {
     use super::*;
 
-    fn check_batch(sequences: &[Vec<i64>], expected: usize) -> datafusion::error::Result<()> {
+    fn check_batch(sequences: &[Vec<i64>], expected: usize) -> datafusion_common::error::Result<()> {
         let mut acc = SortedDistinctCountAccumulator::try_new(&DataType::Int64)?;
         for seq in sequences {
             let array = Int64Array::from(seq.to_owned());

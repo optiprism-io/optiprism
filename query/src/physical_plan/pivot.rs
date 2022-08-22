@@ -6,7 +6,7 @@ use arrow::error::{ArrowError, Result as ArrowResult};
 use arrow::record_batch::RecordBatch;
 
 use axum::async_trait;
-use datafusion::error::Result as DFResult;
+use datafusion_common::error::Result as DFResult;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::hash_utils::create_hashes;
@@ -15,7 +15,7 @@ use datafusion::physical_plan::{
     DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
     Statistics,
 };
-use datafusion_common::ScalarValue;
+use datafusion_commonValue;
 use fnv::FnvHashMap;
 use futures::{Stream, StreamExt};
 use std::any::Any;
@@ -331,7 +331,7 @@ mod tests {
     use crate::physical_plan::pivot::PivotExec;
     use arrow::array::{ArrayRef, Float64Array, Int32Array, StringArray};
     use arrow::record_batch::RecordBatch;
-    pub use datafusion::error::Result;
+    pub use datafusion_common::error::Result;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::expressions::Column;

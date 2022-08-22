@@ -10,7 +10,7 @@ use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, Operator, UserDef
 use datafusion::optimizer::optimizer::OptimizerRule;
 use datafusion::physical_plan::planner::{DefaultPhysicalPlanner, ExtensionPlanner};
 use datafusion::physical_plan::{ExecutionPlan, PhysicalPlanner};
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};

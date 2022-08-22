@@ -207,7 +207,7 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         CreatePropertyMainRequest {
             name: "Product Price".to_string(),
-            data_type: DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            data_type: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
             nullable: true,
             dict: None,
         },
@@ -222,7 +222,7 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         CreatePropertyMainRequest {
             name: "Product Discount Price".to_string(),
-            data_type: DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            data_type: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
             nullable: true,
             dict: None,
         },
@@ -237,7 +237,7 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         CreatePropertyMainRequest {
             name: "Spent Total".to_string(),
-            data_type: DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            data_type: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
             nullable: true,
             dict: None,
         },
@@ -282,7 +282,7 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         CreatePropertyMainRequest {
             name: "Cart Amount".to_string(),
-            data_type: DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            data_type: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
             nullable: true,
             dict: None,
         },
@@ -297,7 +297,7 @@ pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> R
         proj_id,
         CreatePropertyMainRequest {
             name: "Revenue".to_string(),
-            data_type: DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE),
+            data_type: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
             nullable: true,
             dict: None,
         },

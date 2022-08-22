@@ -1,6 +1,6 @@
 use crate::user_storage::memory::{Memory};
 use arrow::datatypes::{Schema, SchemaRef, DataType, Field, UInt64Type};
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use super::error::Result;
 use core::mem;
 use std::sync::mpsc::{channel, Sender, Receiver};
@@ -936,7 +936,7 @@ impl Storage {
 #[cfg(test)]
 mod tests {
     use crate::user_storage::storage::{OpsBucket, Op};
-    use datafusion::scalar::ScalarValue;
+    use datafusion_common::ScalarValue;
     use arrow::datatypes::{Schema, Field, DataType};
     use std::sync::Arc;
     use arrow::record_batch::RecordBatch;

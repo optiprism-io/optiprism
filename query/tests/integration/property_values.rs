@@ -5,7 +5,7 @@ mod tests {
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use datafusion::physical_plan::{collect, displayable};
     use datafusion::prelude::{ExecutionConfig, ExecutionContext};
-    use datafusion_common::ScalarValue;
+    use datafusion_commonValue;
     use query::error::Result;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::property_values::{Filter, LogicalPlanBuilder, PropertyValues};

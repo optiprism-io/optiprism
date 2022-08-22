@@ -7,7 +7,7 @@ use arrow::error::{ArrowError, Result as ArrowResult};
 use arrow::record_batch::RecordBatch;
 
 use axum::async_trait;
-use datafusion::error::Result as DFResult;
+use datafusion_common::error::Result as DFResult;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 

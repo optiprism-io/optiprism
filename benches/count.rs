@@ -5,7 +5,7 @@ use std::sync::Arc;
 use arrow::datatypes::{Schema, Field, DataType};
 use arrow::array::{ArrayRef, Int8Array, Int64Array};
 use datafusion::physical_plan::expressions::{Column, Literal, BinaryExpr};
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use datafusion::logical_plan::Operator;
 use exprtree::expression_tree::count::Count;
 use exprtree::expression_tree::expr::Expr;

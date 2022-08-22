@@ -46,7 +46,7 @@ impl UnpivotExec {
         name_col: String,
         value_col: String,
     ) -> Result<Self> {
-        let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
+        let value_type = DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let mut uniq_cols = cols.clone();
         uniq_cols.sort();
@@ -349,7 +349,7 @@ pub fn unpivot(
                 unpivot_cols_len,
                 TimestampNanosecondBuilder
             ),
-            DataType::Decimal(precision, scale) => {
+            DataType::Decimal128(precision, scale) => {
                 // build group array realisation for decimal type
                 let src_arr_typed = arr.as_any().downcast_ref::<DecimalArray>().unwrap();
                 let mut result = DecimalBuilder::new(builder_cap, *precision, *scale);
@@ -373,7 +373,7 @@ pub fn unpivot(
         .collect();
 
     // define value type
-    let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
+    let value_type = DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE);
 
     // cast unpivot cols to value type
     let unpivot_arrs: Vec<ArrayRef> = batch
@@ -382,7 +382,7 @@ pub fn unpivot(
         .enumerate()
         .filter(|(idx, _)| cols.contains(batch.schema().field(*idx).name()))
         .map(|(_, arr)| match arr.data_type() {
-            DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE) => arr.clone(),
+            DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE) => arr.clone(),
             DataType::UInt64 => {
                 // first cast uint to int because Arrow 9.1.0 doesn't support casting from uint to decimal
                 let int_arr = arrow::compute::cast(arr, &DataType::Int64).unwrap();
@@ -410,7 +410,7 @@ pub fn unpivot(
         DataType::Float64 => {
             build_value_arr!(Float64Array, Float64Builder, builder_cap, unpivot_arrs)
         }
-        DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE) => {
+        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE) => {
             let arrs: Vec<&DecimalArray> = unpivot_arrs
                 .iter()
                 .map(|x| x.as_any().downcast_ref::<DecimalArray>().unwrap())
@@ -445,7 +445,7 @@ mod tests {
     use crate::physical_plan::unpivot::UnpivotExec;
     use arrow::array::{ArrayRef, Float32Array, Float64Array, Int32Array, StringArray};
     use arrow::record_batch::RecordBatch;
-    pub use datafusion::error::Result;
+    pub use datafusion_common::error::Result;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;

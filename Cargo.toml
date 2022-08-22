@@ -6,8 +6,8 @@ members = [
     "store",
     "platform",
     "cmd",
-    "arrow-datafusion/datafusion",
-    "arrow-datafusion/datafusion-expr",
-    "arrow-datafusion/datafusion-common",
+    "arrow-datafusion/datafusion/core",
+#    "arrow-datafusion/datafusion-expr",
+#    "arrow-datafusion/datafusion-common",
     "events-gen",
 ]

@@ -81,7 +81,7 @@ mod tests {
     use datafusion::error::Result;
     use datafusion::logical_plan::Operator;
     use datafusion::physical_plan::expressions::{BinaryExpr, Column, Literal};
-    use datafusion::scalar::ScalarValue;
+    use datafusion_common::ScalarValue;
     use std::sync::Arc;
 
     #[test]

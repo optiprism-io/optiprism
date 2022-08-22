@@ -1,7 +1,7 @@
 use arrow::array::{Array, ArrayRef, Int8Array};
 use arrow::datatypes::{DataType, SchemaRef};
 use datafusion::error::Result;
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use std::marker::PhantomData;
 
 use crate::exprtree::segment::expressions::boolean_op::BooleanOp;

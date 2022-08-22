@@ -1,7 +1,7 @@
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 use crate::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
 use chrono::{DateTime, Utc};
-use datafusion_common::ScalarValue;
+use datafusion_commonValue;
 use datafusion_expr::AggregateFunction;
 
 #[derive(Clone, Debug)]
@@ -187,7 +187,7 @@ mod tests {
     };
     use crate::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
     use chrono::{DateTime, Utc};
-    use datafusion_common::ScalarValue;
+    use datafusion_commonValue;
     use datafusion_expr::AggregateFunction;
 
     #[test]
