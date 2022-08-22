@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { Filter } from '@/stores/eventSegmentation/filters';
+import { Filter } from '@/types/filters';
 
 export const filterConditions = ['and', 'or'] as const;
 export type FilterCondition = typeof filterConditions[number];
