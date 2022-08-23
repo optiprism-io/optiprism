@@ -14,7 +14,7 @@ on:
         type: choice
         options:
           - nikolai-kushner
-          - evgeniy-kozlov
+          - vadim-razuhanov
       build:
         description: 'release - static files, debug - node server'
         required: true
