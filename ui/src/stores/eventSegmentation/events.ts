@@ -23,10 +23,7 @@ import {
     QueryFormulaTypeEnum,
     QuerySimpleTypeEnum,
 
-    EventFilters,
     EventFilterByProperty,
-    EventFiltersGroupsFiltersInner,
-    EventFiltersGroupsFiltersInnerTypeEnum,
     EventRecordsListRequestEventsInnerEventTypeEnum,
     EventType,
 } from '@/api'
@@ -261,26 +258,8 @@ export const useEventsStore = defineStore('events', {
 
                     return event as EventSegmentationEvent;
                 }),
-                filters: {
-                    groupsCondition: filterGroupsStore.condition,
-                    groups: filterGroupsStore.filterGroups.map(group => {
-                        return {
-                            filtersCondition: group.condition,
-                            filters: group.filters.map((filter): EventFiltersGroupsFiltersInner => {
-                                const property = {
-                                    type: 'property' as EventFiltersGroupsFiltersInnerTypeEnum,
-                                    propertyType: filter.propRef?.type || 'event',
-                                    operation: filter.opId,
-                                    value: filter.values,
-                                    propertyId: filter.propRef?.id,
-                                }
-
-                                return property
-                            }),
-                        }
-                    }),
-                } as EventFilters
-            };
+                filters: filterGroupsStore.filters,
+            }
 
             return props
         },

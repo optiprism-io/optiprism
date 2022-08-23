@@ -1312,10 +1312,10 @@ export interface EventFilters {
     'groupsCondition'?: EventFiltersGroupsConditionEnum;
     /**
      * 
-     * @type {EventFiltersGroups}
+     * @type {Array<EventFiltersGroupsInner>}
      * @memberof EventFilters
      */
-    'groups'?: EventFiltersGroups;
+    'groups'?: Array<EventFiltersGroupsInner>;
 }
 
 export const EventFiltersGroupsConditionEnum = {
@@ -1328,98 +1328,98 @@ export type EventFiltersGroupsConditionEnum = typeof EventFiltersGroupsCondition
 /**
  * 
  * @export
- * @interface EventFiltersGroups
+ * @interface EventFiltersGroupsInner
  */
-export interface EventFiltersGroups {
+export interface EventFiltersGroupsInner {
     /**
      * 
      * @type {string}
-     * @memberof EventFiltersGroups
+     * @memberof EventFiltersGroupsInner
      */
-    'filtersCondition'?: EventFiltersGroupsFiltersConditionEnum;
+    'filtersCondition'?: EventFiltersGroupsInnerFiltersConditionEnum;
     /**
      * 
-     * @type {Array<EventFiltersGroupsFiltersInner>}
-     * @memberof EventFiltersGroups
+     * @type {Array<EventFiltersGroupsInnerFiltersInner>}
+     * @memberof EventFiltersGroupsInner
      */
-    'filters'?: Array<EventFiltersGroupsFiltersInner>;
+    'filters'?: Array<EventFiltersGroupsInnerFiltersInner>;
 }
 
-export const EventFiltersGroupsFiltersConditionEnum = {
+export const EventFiltersGroupsInnerFiltersConditionEnum = {
     And: 'and',
     Or: 'or'
 } as const;
 
-export type EventFiltersGroupsFiltersConditionEnum = typeof EventFiltersGroupsFiltersConditionEnum[keyof typeof EventFiltersGroupsFiltersConditionEnum];
+export type EventFiltersGroupsInnerFiltersConditionEnum = typeof EventFiltersGroupsInnerFiltersConditionEnum[keyof typeof EventFiltersGroupsInnerFiltersConditionEnum];
 
 /**
  * 
  * @export
- * @interface EventFiltersGroupsFiltersInner
+ * @interface EventFiltersGroupsInnerFiltersInner
  */
-export interface EventFiltersGroupsFiltersInner {
+export interface EventFiltersGroupsInnerFiltersInner {
     /**
      * 
      * @type {string}
-     * @memberof EventFiltersGroupsFiltersInner
+     * @memberof EventFiltersGroupsInnerFiltersInner
      */
-    'type'?: EventFiltersGroupsFiltersInnerTypeEnum;
+    'type'?: EventFiltersGroupsInnerFiltersInnerTypeEnum;
     /**
      * 
      * @type {number}
-     * @memberof EventFiltersGroupsFiltersInner
+     * @memberof EventFiltersGroupsInnerFiltersInner
      */
     'cohortId'?: number;
     /**
      * 
      * @type {string}
-     * @memberof EventFiltersGroupsFiltersInner
+     * @memberof EventFiltersGroupsInnerFiltersInner
      */
     'propertyName'?: string;
     /**
      * 
      * @type {string}
-     * @memberof EventFiltersGroupsFiltersInner
+     * @memberof EventFiltersGroupsInnerFiltersInner
      */
-    'propertyType': EventFiltersGroupsFiltersInnerPropertyTypeEnum;
+    'propertyType': EventFiltersGroupsInnerFiltersInnerPropertyTypeEnum;
     /**
      * 
      * @type {number}
-     * @memberof EventFiltersGroupsFiltersInner
+     * @memberof EventFiltersGroupsInnerFiltersInner
      */
     'propertyId'?: number;
     /**
      * 
      * @type {PropertyFilterOperation}
-     * @memberof EventFiltersGroupsFiltersInner
+     * @memberof EventFiltersGroupsInnerFiltersInner
      */
     'operation': PropertyFilterOperation;
     /**
      * one or several property values. May be not set if operation is \"empty\" or \"exist\"
      * @type {Array<Value>}
-     * @memberof EventFiltersGroupsFiltersInner
+     * @memberof EventFiltersGroupsInnerFiltersInner
      */
     'value'?: Array<Value>;
     /**
      * 
      * @type {number}
-     * @memberof EventFiltersGroupsFiltersInner
+     * @memberof EventFiltersGroupsInnerFiltersInner
      */
     'groupId'?: number;
 }
 
-export const EventFiltersGroupsFiltersInnerTypeEnum = {
+export const EventFiltersGroupsInnerFiltersInnerTypeEnum = {
     Group: 'group'
 } as const;
 
-export type EventFiltersGroupsFiltersInnerTypeEnum = typeof EventFiltersGroupsFiltersInnerTypeEnum[keyof typeof EventFiltersGroupsFiltersInnerTypeEnum];
-export const EventFiltersGroupsFiltersInnerPropertyTypeEnum = {
+export type EventFiltersGroupsInnerFiltersInnerTypeEnum = typeof EventFiltersGroupsInnerFiltersInnerTypeEnum[keyof typeof EventFiltersGroupsInnerFiltersInnerTypeEnum];
+export const EventFiltersGroupsInnerFiltersInnerPropertyTypeEnum = {
     Custom: 'custom',
     Event: 'event',
     User: 'user'
 } as const;
 
-export type EventFiltersGroupsFiltersInnerPropertyTypeEnum = typeof EventFiltersGroupsFiltersInnerPropertyTypeEnum[keyof typeof EventFiltersGroupsFiltersInnerPropertyTypeEnum];
+export type EventFiltersGroupsInnerFiltersInnerPropertyTypeEnum = typeof EventFiltersGroupsInnerFiltersInnerPropertyTypeEnum[keyof typeof EventFiltersGroupsInnerFiltersInnerPropertyTypeEnum];
 
 /**
  * event query
@@ -2256,6 +2256,18 @@ export interface FunnelQuery {
      * @memberof FunnelQuery
      */
     'breakdowns'?: Array<BreakdownByProperty>;
+    /**
+     * array of segments
+     * @type {Array<EventSegmentationSegment>}
+     * @memberof FunnelQuery
+     */
+    'segments'?: Array<EventSegmentationSegment>;
+    /**
+     * 
+     * @type {EventFilters}
+     * @memberof FunnelQuery
+     */
+    'filters'?: EventFilters;
 }
 
 export const FunnelQueryCountEnum = {

@@ -1,5 +1,10 @@
 import { defineStore } from 'pinia';
 import { Filter } from '@/types/filters';
+import {
+    EventFilters,
+    EventFiltersGroupsInnerFiltersInner,
+    EventFiltersGroupsInnerFiltersInnerTypeEnum,
+} from '@/api'
 
 export const filterConditions = ['and', 'or'] as const;
 export type FilterCondition = typeof filterConditions[number];
@@ -76,6 +81,27 @@ export const useFilterGroupsStore = defineStore('filter-groups', {
             this.filterGroups[payload.index].filters[payload.filterIndex] = {
                 ...this.filterGroups[payload.index].filters[payload.filterIndex],
                 ...payload.filter
+            }
+        }
+    },
+    getters: {
+        filters(): EventFilters {
+            return {
+                groupsCondition: this.condition,
+                groups: this.filterGroups.map(group => {
+                    return {
+                        filtersCondition: group.condition,
+                        filters: group.filters.map((filter): EventFiltersGroupsInnerFiltersInner => {
+                            return {
+                                type: 'property' as EventFiltersGroupsInnerFiltersInnerTypeEnum,
+                                propertyType: filter.propRef?.type || 'event',
+                                operation: filter.opId,
+                                value: filter.values,
+                                propertyId: filter.propRef?.id,
+                            }
+                        })
+                    }
+                }),
             }
         }
     }
