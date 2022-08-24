@@ -83,7 +83,6 @@ import {
     BreakdownCohort,
     BreakdownEventCommonCustomProperty,
     BreakdownEventCommonProperty,
-    BreakdownUserCustomProperty,
     BreakdownUserProperty,
     isBreakdownCohort,
     isBreakdownEventCommonCustomProperty,
@@ -91,7 +90,7 @@ import {
     isBreakdownUserCustomProperty,
     isBreakdownUserProperty,
     newBreakdownCohort
-} from '@/stores/eventSegmentation/breakdowns';
+} from '@/stores/reports/breakdowns'
 
 const props = defineProps<{
     breakdown: Breakdown;

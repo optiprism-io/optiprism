@@ -24,8 +24,8 @@ import {
     BreakdownUserCustomProperty,
     BreakdownCohort,
     BreakdownEventCommonProperty,
-} from '@/stores/eventSegmentation/breakdowns';
-import { UserCustomProperty, UserProperty } from '@/types/events';
+} from '@/stores/reports/breakdowns'
+import { UserCustomProperty } from '@/types/events'
 import { useLexiconStore } from '@/stores/lexicon';
 import { useEventsStore } from '@/stores/eventSegmentation/events';
 
