@@ -462,6 +462,7 @@ dependencies = [
  "num_cpus",
  "platform",
  "query",
+ "thiserror",
  "tokio",
  "tower",
  "tower-http",
@@ -494,6 +495,7 @@ dependencies = [
  "rust_decimal",
  "serde",
  "sha3",
+ "thiserror",
 ]
 
 [[package]]
@@ -875,6 +877,7 @@ dependencies = [
  "splines",
  "strum 0.24.0",
  "strum_macros 0.24.0",
+ "thiserror",
  "tokio",
 ]
 

@@ -18,3 +18,4 @@ rand = "0.8.4"
 sha3 = "0.10.0"
 hex = "0.4.3"
 rust_decimal = { version = "1.22.0", features = ["serde-with-float"] }
+thiserror = "1.0.31"

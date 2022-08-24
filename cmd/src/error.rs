@@ -2,91 +2,34 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use common::Error as CommonError;
-use events_gen::error::Error as EventsGenError;
-use metadata::Error as MetadataError;
-use platform::PlatformError as PlatformError;
-use query::Error as QueryError;
+use common::error::CommonError;
+use events_gen::error::EventsGenError;
+use metadata::error::MetadataError;
+use platform::PlatformError;
 
 use datafusion::error::DataFusionError;
 use std::{
     fmt::{self, Display, Formatter},
     result,
 };
-
+use query::error::QueryError;
+use thiserror::Error;
 pub type Result<T> = result::Result<T, Error>;
 
-#[derive(Debug, Clone)]
-pub struct InternalError {
-    code: &'static str,
-    status_code: StatusCode,
-}
-
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
-    Internal(InternalError),
-    PlatformError(PlatformError),
-    QueryError(QueryError),
-    CommonError(CommonError),
-    MetadataError(MetadataError),
+    #[error("PlatformError: {0:?}")]
+    PlatformError(#[from] PlatformError),
+    #[error("QueryError: {0:?}")]
+    QueryError(#[from] QueryError),
+    #[error("CommonError: {0:?}")]
+    CommonError(#[from] CommonError),
+    #[error("MetadataError: {0:?}")]
+    MetadataError(#[from] MetadataError),
+    #[error("EventsGenError: {0:?}")]
+    EventsGenError(#[from] EventsGenError),
+    #[error("DataFusionError: {0:?}")]
+    DataFusionError(#[from] DataFusionError),
+    #[error("ExternalError: {0:?}")]
     ExternalError(String),
-    EventsGenError(EventsGenError),
-    DataFusionError(DataFusionError),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Error::Internal(err) => write!(f, "Internal error: {:?}", err),
-            Error::PlatformError(err) => write!(f, "PlatformError error: {}", err),
-            Error::QueryError(err) => write!(f, "QueryError error: {}", err),
-            Error::CommonError(err) => write!(f, "CommonError error: {}", err),
-            Error::MetadataError(err) => write!(f, "MetadataError error: {}", err),
-            Error::ExternalError(err) => write!(f, "ExternalError error: {}", err),
-            Error::EventsGenError(err) => write!(f, "EventsGenError error: {}", err),
-            Error::DataFusionError(err) => write!(f, "DataFusionError error: {}", err),
-        }
-    }
-}
-
-impl From<DataFusionError> for Error {
-    fn from(err: DataFusionError) -> Self {
-        Self::DataFusionError(err)
-    }
-}
-
-impl From<InternalError> for Error {
-    fn from(err: InternalError) -> Self {
-        Self::Internal(err)
-    }
-}
-
-impl From<PlatformError> for Error {
-    fn from(err: PlatformError) -> Self {
-        Self::PlatformError(err)
-    }
-}
-
-impl From<QueryError> for Error {
-    fn from(err: QueryError) -> Self {
-        Self::QueryError(err)
-    }
-}
-
-impl From<CommonError> for Error {
-    fn from(err: CommonError) -> Self {
-        Self::CommonError(err)
-    }
-}
-
-impl From<MetadataError> for Error {
-    fn from(err: MetadataError) -> Self {
-        Self::MetadataError(err)
-    }
-}
-
-impl From<EventsGenError> for Error {
-    fn from(err: EventsGenError) -> Self {
-        Self::EventsGenError(err)
-    }
 }

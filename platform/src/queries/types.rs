@@ -224,8 +224,7 @@ pub fn json_value_to_scalar(v: &Value) -> Result<ScalarValue> {
     match v {
         Value::Bool(v) => Ok(ScalarValue::Boolean(Some(*v))),
         Value::Number(n) => {
-            let dec = Decimal::try_from(n.as_f64().unwrap())
-                .map_err(|e| PlatformError::BadRequest(e.to_string()))?;
+            let dec = Decimal::try_from(n.as_f64().unwrap())?;
             Ok(ScalarValue::Decimal128(
                 Some(dec.mantissa()),
                 DECIMAL_PRECISION,

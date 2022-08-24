@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{ EventsGenError, Result};
 use cubic_spline::{Points, SplineOpts};
 
 pub fn calc_cubic_spline(total_points: usize, key_points: Vec<f64>) -> Result<Vec<f64>> {
@@ -15,7 +15,7 @@ pub fn calc_cubic_spline(total_points: usize, key_points: Vec<f64>) -> Result<Ve
 
     let result = Points::from(&source)
         .calc_spline(&opts)
-        .map_err(|e| Error::External(e.to_string()))?
+        .map_err(|e| EventsGenError::Internal(e.to_string()))?
         .into_inner()
         .iter()
         .map(|v| v.y)
