@@ -4,8 +4,7 @@ mod tests {
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use datafusion::physical_plan::{collect, displayable};
-    use datafusion::prelude::{ExecutionConfig, ExecutionContext};
-    use datafusion_commonValue;
+    use datafusion_common::ScalarValue;
     use query::error::Result;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::property_values::{Filter, LogicalPlanBuilder, PropertyValues};
@@ -13,6 +12,8 @@ mod tests {
     use query::test_util::{create_entities, create_md, events_provider};
     use query::Context;
     use std::sync::Arc;
+    use datafusion::execution::context::SessionState;
+    use datafusion::prelude::{SessionConfig, SessionContext};
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {
@@ -41,20 +42,19 @@ mod tests {
 
         let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, req).await?;
         println!("logical plan: {:?}", plan);
-        let config = ExecutionConfig::new()
-            .with_query_planner(Arc::new(QueryPlanner {}))
-            .with_target_partitions(1);
+        let runtime = Arc::new(RuntimeEnv::default());
+        let config = SessionConfig::new().with_target_partitions(1);
+        let session_state = SessionState::with_config_rt(config, runtime)
+            .with_query_planner(Arc::new(QueryPlanner {}));
 
-        let ctx = ExecutionContext::with_config(config);
-        let physical_plan = ctx.create_physical_plan(&plan).await?;
-        let displayable_plan = displayable(physical_plan.as_ref());
+        let exec_ctx = SessionContext::with_state(session_state);
+        let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
 
-        println!("physical plan: {}", displayable_plan.indent());
         let result = collect(
             physical_plan,
-            Arc::new(RuntimeEnv::new(RuntimeConfig::new())?),
+            exec_ctx.task_ctx(),
         )
-        .await?;
+            .await?;
         let concatenated = concat_batches(&result[0].schema(), &result, 0)?;
 
         print_batches(&[concatenated])?;

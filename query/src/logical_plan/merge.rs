@@ -57,7 +57,7 @@ impl UserDefinedLogicalNode for MergeNode {
         &self,
         _: &[Expr],
         inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+    ) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
             MergeNode::try_new(inputs.to_vec())
                 .map_err(QueryError::into_datafusion_plan_error)

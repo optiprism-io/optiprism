@@ -80,7 +80,7 @@ impl UserDefinedLogicalNode for DictionaryDecodeNode {
         &self,
         _exprs: &[Expr],
         inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+    ) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
             DictionaryDecodeNode::try_new(inputs[0].clone(), self.decode_cols.clone()).unwrap(),
         )

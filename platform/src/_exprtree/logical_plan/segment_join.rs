@@ -222,7 +222,7 @@ impl UserDefinedLogicalNode for JoinPlanNode {
         &self,
         exprs: &[Expr],
         inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+    ) -> Arc<dyn UserDefinedLogicalNode> {
         panic!("unimplemented");
     }
 }

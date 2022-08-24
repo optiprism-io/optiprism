@@ -15,7 +15,7 @@ use datafusion::physical_plan::{
     Statistics,
 };
 use datafusion_common::Result as DFResult;
-use datafusion_commonValue;
+use datafusion_common::ScalarValue;
 
 use futures::{Stream, StreamExt};
 use std::any::Any;
@@ -25,6 +25,7 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use datafusion::execution::context::TaskContext;
 use crate::error::QueryError;
 
 pub struct MergeExec {
@@ -79,7 +80,7 @@ impl ExecutionPlan for MergeExec {
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
@@ -87,14 +88,14 @@ impl ExecutionPlan for MergeExec {
         ))
     }
 
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
-        runtime: Arc<RuntimeEnv>,
-    ) -> datafusion_common::Result<SendableRecordBatchStream> {
+        context: Arc<TaskContext>,
+    ) -> DFResult<SendableRecordBatchStream> {
         let mut streams: Vec<SendableRecordBatchStream> = vec![];
         for input in self.inputs.iter() {
-            let stream = input.execute(partition, runtime.clone()).await?;
+            let stream = input.execute(partition, context.clone())?;
             streams.push(stream)
         }
 
@@ -191,13 +192,15 @@ mod tests {
     use arrow::array::{ArrayRef, BooleanArray, Int32Array, Int8Array, StringArray};
 
     use arrow::record_batch::RecordBatch;
-    pub use datafusion_common::error::Result;
+    pub use datafusion_common::Result;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
 
     use std::sync::Arc;
+    use datafusion::execution::context;
+    use datafusion::prelude::SessionContext;
 
     #[tokio::test]
     async fn test() -> Result<()> {
@@ -272,8 +275,9 @@ mod tests {
         };
 
         let mux = MergeExec::try_new(vec![input1, input2, input3]).unwrap();
-        let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
-        let stream = mux.execute(0, runtime).await?;
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = mux.execute(0, task_ctx)?;
         let result = collect(stream).await?;
 
         print!("{}", arrow::util::pretty::pretty_format_batches(&result)?);

@@ -5,8 +5,8 @@ use arrow::array::{
 };
 use arrow::compute;
 use arrow::datatypes::{DataType, TimeUnit};
-use datafusion_common::error::{DataFusionError, Result};
-use datafusion::physical_plan::functions::{Signature, TypeSignature, Volatility};
+use datafusion_common::{DataFusionError, Result};
+use datafusion_expr::{AggregateState, Signature, TypeSignature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::Accumulator;
 use datafusion_common::ScalarValue;
@@ -151,8 +151,8 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
 }
 
 impl Accumulator for SortedDistinctCountAccumulator {
-    fn state(&self) -> Result<Vec<ScalarValue>> {
-        Ok(vec![ScalarValue::UInt64(Some(self.count))])
+    fn state(&self) -> Result<Vec<AggregateState>> {
+        Ok(vec![AggregateState::Scalar(ScalarValue::UInt64(Some(self.count)))])
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
@@ -175,16 +175,16 @@ impl Accumulator for SortedDistinctCountAccumulator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use datafusion_expr::{AggregateState};
 
-    fn check_batch(sequences: &[Vec<i64>], expected: usize) -> datafusion_common::error::Result<()> {
+    fn check_batch(sequences: &[Vec<i64>], expected: usize) -> datafusion_common::Result<()> {
         let mut acc = SortedDistinctCountAccumulator::try_new(&DataType::Int64)?;
         for seq in sequences {
             let array = Int64Array::from(seq.to_owned());
             let array_ref = Arc::new(array);
             acc.update_batch(&[array_ref])?;
         }
-        let state = acc.state()?[0].clone();
-        assert_eq!(state, ScalarValue::UInt64(Some(expected as u64)));
+        assert_eq!(acc.state()?[0].as_scalar()?.to_owned(), ScalarValue::UInt64(Some(expected as u64)));
         Ok(())
     }
 
@@ -198,7 +198,7 @@ mod tests {
             ],
             9,
         )
-        .unwrap();
+            .unwrap();
     }
 
     #[test]
@@ -211,6 +211,6 @@ mod tests {
             ],
             9,
         )
-        .unwrap();
+            .unwrap();
     }
 }

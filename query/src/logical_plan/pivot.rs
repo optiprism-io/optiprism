@@ -93,7 +93,7 @@ impl UserDefinedLogicalNode for PivotNode {
         &self,
         _: &[Expr],
         inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+    ) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
             PivotNode::try_new(
                 inputs[0].clone(),

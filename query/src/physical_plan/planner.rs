@@ -1,5 +1,5 @@
-use datafusion_core::execution::context::{ExecutionContextState, QueryPlanner as DFQueryPlanner};
-use datafusion_core::physical_plan::planner::{
+use datafusion::execution::context::{SessionState, QueryPlanner as DFQueryPlanner};
+use datafusion::physical_plan::planner::{
     DefaultPhysicalPlanner, ExtensionPlanner as DFExtensionPlanner,
 };
 
@@ -14,9 +14,9 @@ use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::unpivot::UnpivotExec;
 use axum::async_trait;
-use datafusion_common::error::{DataFusionError, Result};
-use datafusion_core::logical_plan::{LogicalPlan, UserDefinedLogicalNode};
-use datafusion_core::physical_plan::{expressions, ExecutionPlan, PhysicalPlanner};
+use datafusion_common::{DataFusionError, Result};
+use datafusion::logical_plan::{LogicalPlan, UserDefinedLogicalNode};
+use datafusion::physical_plan::{expressions, ExecutionPlan, PhysicalPlanner};
 
 pub struct QueryPlanner {}
 
@@ -25,7 +25,7 @@ impl DFQueryPlanner for QueryPlanner {
     async fn create_physical_plan(
         &self,
         logical_plan: &LogicalPlan,
-        ctx_state: &ExecutionContextState,
+        ctx_state: &SessionState,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let physical_planner =
             DefaultPhysicalPlanner::with_extension_planners(vec![Arc::new(ExtensionPlanner {})]);
@@ -38,14 +38,15 @@ impl DFQueryPlanner for QueryPlanner {
 
 pub struct ExtensionPlanner {}
 
+#[async_trait]
 impl DFExtensionPlanner for ExtensionPlanner {
-    fn plan_extension(
+    async fn plan_extension(
         &self,
         _planner: &dyn PhysicalPlanner,
         node: &dyn UserDefinedLogicalNode,
         _logical_inputs: &[&LogicalPlan],
         physical_inputs: &[Arc<dyn ExecutionPlan>],
-        _ctx_state: &ExecutionContextState,
+        _ctx_state: &SessionState,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
         let any = node.as_any();
         let plan = if any.downcast_ref::<MergeNode>().is_some() {

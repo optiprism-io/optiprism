@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::event_fields;
 use arrow::datatypes::DataType;
-use datafusion::datasource::object_store::local::LocalFileSystem;
+use object_store::local::LocalFileSystem;
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::prelude::CsvReadOptions;
 use metadata::database::{Column, Table, TableRef};
@@ -12,6 +12,8 @@ use metadata::{database, events, properties, Metadata};
 use std::env::temp_dir;
 use std::sync::Arc;
 use uuid::Uuid;
+use datafusion_expr::logical_plan::table_scan;
+
 pub async fn events_provider(
     db: Arc<database::Provider>,
     org_id: u64,
@@ -21,14 +23,7 @@ pub async fn events_provider(
     let schema = table.arrow_schema();
     let options = CsvReadOptions::new().schema(&schema);
     let path = "../tests/events.csv";
-    let df_input = datafusion::logical_plan::LogicalPlanBuilder::scan_csv(
-        Arc::new(LocalFileSystem {}),
-        path,
-        options,
-        None,
-        1,
-    )
-    .await?;
+    let df_input = table_scan(Some("events_csv"), &schema, None)?;
 
     Ok(df_input.build()?)
 }
@@ -124,7 +119,7 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
             dictionary_type: Some(DataType::UInt8),
         },
     )
-    .await?;
+        .await?;
 
     md.dictionaries
         .get_key_or_create(
@@ -162,7 +157,7 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
             is_system: false,
         },
     )
-    .await?;
+        .await?;
 
     create_property(
         &md,
@@ -184,7 +179,7 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
             dictionary_type: None,
         },
     )
-    .await?;
+        .await?;
 
     // create events
     md.events
@@ -244,7 +239,7 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
             is_system: false,
         },
     )
-    .await?;
+        .await?;
 
     create_property(
         &md,
@@ -266,7 +261,7 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
             is_system: false,
         },
     )
-    .await?;
+        .await?;
 
     Ok(())
 }

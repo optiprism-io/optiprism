@@ -1,6 +1,7 @@
 use crate::error::Result;
 use chrono::{DateTime, Duration, Utc};
-use datafusion::logical_plan::{exprlist_to_fields, Column, DFSchema, LogicalPlan};
+use datafusion::logical_plan::{Column, DFSchema, LogicalPlan};
+use datafusion_expr::utils::exprlist_to_fields;
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use std::collections::HashMap;
 
@@ -358,7 +359,7 @@ impl LogicalPlanBuilder {
         // todo check for duplicates
         let all_expr = group_expr.iter().chain(aggr_expr.iter());
 
-        let aggr_schema = DFSchema::new(exprlist_to_fields(all_expr, input.schema())?)?;
+        let aggr_schema = DFSchema::new(exprlist_to_fields(all_expr, &input)?)?;
 
         let expr = LogicalPlan::Aggregate(Aggregate {
             input: Arc::new(input),

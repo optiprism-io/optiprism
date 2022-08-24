@@ -5,7 +5,8 @@ use crate::queries::types::{EventRef, PropValueOperation, PropertyRef};
 use crate::Context;
 use datafusion::logical_plan::plan::{Aggregate, Extension, Filter as PlanFilter, Sort};
 use datafusion::logical_plan::LogicalPlan;
-use datafusion::logical_plan::{exprlist_to_fields, DFSchema};
+use datafusion::logical_plan::DFSchema;
+use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_common::{Column, ScalarValue};
 use datafusion_expr::{col, Expr};
 use metadata::dictionaries::provider::SingleDictionaryProvider;
@@ -24,7 +25,7 @@ macro_rules! property_col {
         let col_name = prop.column_name($namespace);
         let expr = col(col_name.as_str());
 
-        let aggr_schema = DFSchema::new(exprlist_to_fields(vec![&expr], $input.schema())?)?;
+        let aggr_schema = DFSchema::new(exprlist_to_fields(vec![&expr], &$input)?)?;
         let expr = LogicalPlan::Aggregate(Aggregate {
             input: Arc::new($input.clone()),
             group_expr: vec![expr],

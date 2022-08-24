@@ -5,15 +5,13 @@ use crate::physical_plan::expressions::partitioned_aggregate::{
     Buffer, PartitionedAccumulator, Value,
 };
 use crate::DEFAULT_BATCH_SIZE;
-use arrow::array::{
-    ArrayRef, DecimalArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array,
-    Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
-};
+use arrow::array::{ArrayRef, Decimal128Array, DecimalArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
 
 use arrow::datatypes::DataType;
 
 use datafusion::physical_plan::Accumulator;
 use datafusion_common::ScalarValue;
+use datafusion_expr::AggregateState;
 
 #[derive(Debug)]
 pub struct PartitionedSumAccumulator {
@@ -76,7 +74,7 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
             DataType::Float64 => update_batch!(self, val_arr, spans, f64, Float64, Float64Array),
             DataType::Decimal128(_, _) => {
                 let mut sum: i128 = self.sum.into();
-                let arr = val_arr.as_any().downcast_ref::<DecimalArray>().unwrap();
+                let arr = val_arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
                 for (idx, value) in arr.iter().enumerate() {
                     if spans[idx] {
                         self.buffer.push(Value::Decimal128(sum))?;
@@ -86,7 +84,7 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
                     match value {
                         None => continue,
                         Some(value) => {
-                            sum += value;
+                            sum += value.as_i128();
                         }
                     }
                 }
@@ -102,7 +100,7 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
         Ok(self.buffer.merge_batch(states)?)
     }
 
-    fn state(&self) -> Result<Vec<ScalarValue>> {
+    fn state(&self) -> Result<Vec<AggregateState>> {
         self.buffer.flush_with_value(self.sum)?;
         Ok(self.buffer.state()?)
     }

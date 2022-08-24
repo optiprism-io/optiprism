@@ -87,7 +87,7 @@ impl UserDefinedLogicalNode for UnpivotNode {
         &self,
         _: &[Expr],
         inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+    ) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
             UnpivotNode::try_new(
                 inputs[0].clone(),

@@ -6,7 +6,7 @@ use arrow::error::{ArrowError, Result as ArrowResult};
 use arrow::record_batch::RecordBatch;
 
 use axum::async_trait;
-use datafusion_common::error::Result as DFResult;
+use datafusion_common::Result as DFResult;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::hash_utils::create_hashes;
@@ -15,7 +15,7 @@ use datafusion::physical_plan::{
     DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
     Statistics,
 };
-use datafusion_commonValue;
+use datafusion_common::ScalarValue;
 use fnv::FnvHashMap;
 use futures::{Stream, StreamExt};
 use std::any::Any;
@@ -24,6 +24,7 @@ use std::fmt;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use datafusion::execution::context::TaskContext;
 use crate::error::QueryError;
 
 #[derive(Debug)]
@@ -113,7 +114,7 @@ impl ExecutionPlan for PivotExec {
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
@@ -127,12 +128,12 @@ impl ExecutionPlan for PivotExec {
         ))
     }
 
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
-        runtime: Arc<RuntimeEnv>,
-    ) -> datafusion_common::Result<SendableRecordBatchStream> {
-        let stream = self.input.execute(partition, runtime.clone()).await?;
+        context: Arc<TaskContext>,
+    ) -> DFResult<SendableRecordBatchStream> {
+        let stream = self.input.execute(partition, context)?;
 
         let mut result_map: FnvHashMap<String, Vec<ScalarValue>> = FnvHashMap::default();
         for result_col in self.result_cols.clone() {
@@ -331,13 +332,14 @@ mod tests {
     use crate::physical_plan::pivot::PivotExec;
     use arrow::array::{ArrayRef, Float64Array, Int32Array, StringArray};
     use arrow::record_batch::RecordBatch;
-    pub use datafusion_common::error::Result;
+    pub use datafusion_common::Result;
     use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::expressions::Column;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use std::sync::Arc;
+    use datafusion::prelude::SessionContext;
 
     #[tokio::test]
     async fn test() -> Result<()> {
@@ -385,8 +387,9 @@ mod tests {
             vec!["2".to_string(), "1".to_string(), "3".to_string()],
         )
             .unwrap();
-        let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
-        let stream = exec.execute(0, runtime).await?;
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = exec.execute(0, task_ctx)?;
         let result = collect(stream).await?;
 
         print!("{}", arrow::util::pretty::pretty_format_batches(&result)?);
