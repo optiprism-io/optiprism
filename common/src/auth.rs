@@ -1,7 +1,8 @@
 use crate::{
     rbac::{Permission, Role, Scope},
-    Result,
 };
+use crate::error::Result;
+
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};

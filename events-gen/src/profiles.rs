@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{EventsGenError, Result};
 use futures::executor::block_on;
 use log::info;
 use metadata::dictionaries;
@@ -170,10 +170,10 @@ impl ProfileProvider {
         Ok(Self {
             geo,
             geo_weight_idx: WeightedIndex::new(geo_weights)
-                .map_err(|err| Error::Internal(err.to_string()))?,
+                .map_err(|err| EventsGenError::Internal(err.to_string()))?,
             device,
             device_weight_idx: WeightedIndex::new(device_weights)
-                .map_err(|err| Error::Internal(err.to_string()))?,
+                .map_err(|err| EventsGenError::Internal(err.to_string()))?,
         })
     }
 

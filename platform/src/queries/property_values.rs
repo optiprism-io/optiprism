@@ -1,5 +1,5 @@
 use crate::queries::types::{json_value_to_scalar, EventRef, PropValueOperation, PropertyRef};
-use crate::{array_ref_to_json_values, Error, Result};
+use crate::{array_ref_to_json_values, PlatformError, Result};
 use arrow::array::ArrayRef;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -25,7 +25,7 @@ pub struct ListResponse {
 }
 
 impl TryInto<query::queries::property_values::PropertyValues> for PropertyValues {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(
         self,
@@ -39,7 +39,7 @@ impl TryInto<query::queries::property_values::PropertyValues> for PropertyValues
 }
 
 impl TryInto<query::queries::property_values::Filter> for Filter {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query::queries::property_values::Filter, Self::Error> {
         Ok(query::queries::property_values::Filter {
@@ -58,7 +58,7 @@ impl TryInto<query::queries::property_values::Filter> for Filter {
 }
 
 impl TryInto<ListResponse> for ArrayRef {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<ListResponse, Self::Error> {
         Ok(ListResponse {

@@ -4,31 +4,14 @@ use std::{
     fmt::{self, Display, Formatter},
     result,
 };
+use thiserror::Error;
 
-pub type Result<T> = result::Result<T, Error>;
+pub type Result<T> = result::Result<T, CommonError>;
 
-#[derive(Debug)]
-pub enum Error {
-    DataFusionError(DataFusionError),
-    JWTError(JWTError),
-}
-
-impl From<JWTError> for Error {
-    fn from(err: JWTError) -> Self {
-        Self::JWTError(err)
-    }
-}
-
-impl From<DataFusionError> for Error {
-    fn from(err: DataFusionError) -> Self {
-        Self::DataFusionError(err)
-    }
-}
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Error::JWTError(err) => write!(f, "JWT error: {}", err),
-            Error::DataFusionError(err) => write!(f, "DataFusion error: {}", err),
-        }
-    }
+#[derive(Error, Debug)]
+pub enum CommonError {
+    #[error("DataFusionError: {0:?}")]
+    DataFusionError(#[from] DataFusionError),
+    #[error("JWTError: {0:?}")]
+    JWTError(#[from] JWTError),
 }

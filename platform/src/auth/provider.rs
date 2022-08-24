@@ -92,7 +92,7 @@ fn make_token_response(
                 permissions,
             },
             ACCESS_TOKEN_KEY.as_bytes(),
-        )?,
+        ).expect("error"),
         refresh_token: make_token(
             RefreshClaims {
                 organization_id,
@@ -100,6 +100,6 @@ fn make_token_response(
                 exp: Utc::now().add(*REFRESH_TOKEN_DURATION).timestamp(),
             },
             REFRESH_TOKEN_KEY.as_bytes(),
-        )?,
+        ).expect("error"),
     })
 }

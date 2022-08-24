@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::PlatformError;
 use crate::Result;
 use axum::{
     async_trait,
@@ -98,7 +98,7 @@ impl<B> FromRequest<B> for Context
 where
     B: Send,
 {
-    type Rejection = Error;
+    type Rejection = PlatformError;
 
     async fn from_request(
         request: &mut RequestParts<B>,

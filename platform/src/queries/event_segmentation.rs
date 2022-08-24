@@ -2,7 +2,7 @@ use crate::queries::types::{
     json_value_to_scalar, AggregateFunction, EventRef, PartitionedAggregateFunction,
     PropValueOperation, PropertyRef, QueryTime, TimeUnit,
 };
-use crate::Error;
+use crate::PlatformError;
 use crate::Result;
 use chrono::{DateTime, Utc};
 use query::queries::event_segmentation::types as query_es_types;
@@ -32,7 +32,7 @@ pub enum SegmentTime {
 }
 
 impl TryInto<query_es_types::SegmentTime> for SegmentTime {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::SegmentTime, Self::Error> {
         Ok(match self {
@@ -63,7 +63,7 @@ pub enum ChartType {
 }
 
 impl TryInto<query_es_types::ChartType> for ChartType {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::ChartType, Self::Error> {
         Ok(match self {
@@ -83,7 +83,7 @@ pub enum Analysis {
 }
 
 impl TryInto<query_es_types::Analysis> for Analysis {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::Analysis, Self::Error> {
         Ok(match self {
@@ -120,7 +120,7 @@ pub struct Compare {
 }
 */
 impl TryInto<query_es_types::Compare> for Compare {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::Compare, Self::Error> {
         Ok(query_es_types::Compare {
@@ -146,7 +146,7 @@ pub enum QueryAggregate {
 }
 
 impl TryInto<query_es_types::QueryAggregate> for QueryAggregate {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::QueryAggregate, Self::Error> {
         Ok(match self {
@@ -176,7 +176,7 @@ pub enum QueryAggregatePerGroup {
 }
 
 impl TryInto<query_es_types::QueryAggregatePerGroup> for QueryAggregatePerGroup {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::QueryAggregatePerGroup, Self::Error> {
         Ok(match self {
@@ -199,7 +199,7 @@ pub enum QueryPerGroup {
 }
 
 impl TryInto<query_es_types::QueryPerGroup> for QueryPerGroup {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::QueryPerGroup, Self::Error> {
         Ok(match self {
@@ -238,7 +238,7 @@ pub enum Query {
 }
 
 impl TryInto<query_es_types::Query> for &Query {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::Query, Self::Error> {
         Ok(match self {
@@ -295,7 +295,7 @@ pub enum EventFilter {
 }
 
 impl TryInto<query_es_types::EventFilter> for &EventFilter {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::EventFilter, Self::Error> {
         Ok(match self {
@@ -325,7 +325,7 @@ pub enum Breakdown {
 }
 
 impl TryInto<query_es_types::Breakdown> for &Breakdown {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::Breakdown, Self::Error> {
         Ok(match self {
@@ -356,7 +356,7 @@ pub struct Event {
 }
 
 impl TryInto<query_es_types::Event> for &Event {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::Event, Self::Error> {
         Ok(query_es_types::Event {
@@ -423,7 +423,7 @@ pub struct EventSegmentation {
 }
 
 impl TryInto<query_es_types::EventSegmentation> for EventSegmentation {
-    type Error = Error;
+    type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<query_es_types::EventSegmentation, Self::Error> {
         Ok(query_es_types::EventSegmentation {
