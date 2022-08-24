@@ -97,7 +97,7 @@ const getEventProperties = (eventRef: EventRef) => {
 const items = computed(() => {
     let ret: Group<Item<PropertyRef, null>[]>[] = [];
 
-    if (props.forceProps?.length && lexiconStore.eventProperties.length) {
+    if (lexiconStore.eventProperties.length) {
         let items: Item<PropertyRef, null>[] = [];
         lexiconStore.eventProperties.forEach((prop: Property): void => {
             const propertyRef: PropertyRef = {

@@ -128,7 +128,7 @@ import { groupByMap, periodMap } from '@/configs/events/controls';
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 
 import { getStringDateByFormat } from '@/helpers/getStringDates';
-import { DataTableResponse } from '@/api'
+import { DataTableResponse, TimeUnit } from '@/api'
 import useDataTable from '@/hooks/useDataTable'
 
 import UiSelect from '@/components/uikit/UiSelect.vue';
@@ -317,7 +317,7 @@ const selectedGroupByString = computed(() => {
 
 const onSelectGroupBy = (payload: string) => {
     eventsStore.initPeriod();
-    eventsStore.controlsGroupBy = payload;
+    eventsStore.controlsGroupBy = payload as TimeUnit;
     eventsStore.controlsPeriod = itemsPeriod.value[itemsPeriod.value.length - 1].value;
     updateEventSegmentationData();
 };

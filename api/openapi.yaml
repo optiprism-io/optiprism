@@ -1970,6 +1970,13 @@ components:
           description: array of breakdowns
           items:
             $ref: '#/components/schemas/BreakdownByProperty'
+        segments:
+          description: array of segments
+          type: array
+          items:
+            $ref: '#/components/schemas/EventSegmentationSegment'
+        filters:
+          $ref: '#/components/schemas/EventFilters'
 
     FunnelConversionStepsChartType:
       type: object
@@ -2361,20 +2368,22 @@ components:
             - and
             - or
         groups:
-          type: object
-          properties:
-            filtersCondition:
-              type: string
-              enum:
-                - and
-                - or
-            filters:
-              type: array
-              items:
-                anyOf:
-                  - $ref: '#/components/schemas/EventFilterByCohort'
-                  - $ref: '#/components/schemas/EventFilterByProperty'
-                  - $ref: '#/components/schemas/EventFilterByGroup'
+          type: array
+          items:
+            type: object
+            properties:
+              filtersCondition:
+                type: string
+                enum:
+                  - and
+                  - or
+              filters:
+                type: array
+                items:
+                  anyOf:
+                    - $ref: '#/components/schemas/EventFilterByCohort'
+                    - $ref: '#/components/schemas/EventFilterByProperty'
+                    - $ref: '#/components/schemas/EventFilterByGroup'
 
     EventFilterByCohort:
       type: object

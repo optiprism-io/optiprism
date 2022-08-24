@@ -1,9 +1,9 @@
-import {Filter} from '@/stores/eventSegmentation/filters';
-import {EventRef} from '@/types/events';
+import { Filter } from '@/types/filters'
+import { EventRef } from '@/types/events'
 
 export interface Step {
     events: {
-        event: EventRef;
-        filters: Filter[];
-    }[];
+        event: EventRef
+        filters: Filter[]
+    }[]
 }

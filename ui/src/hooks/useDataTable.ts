@@ -1,4 +1,4 @@
-import { DataTableResponse, DataTableResponseColumns } from '@/api'
+import { DataTableResponse, DataTableResponseColumnsInner } from '@/api'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
 import { Column, Row, Cell } from '@/components/uikit/UiTable/UiTable'
 
@@ -33,7 +33,7 @@ export default function useDataTable(payload: DataTableResponse): ResponseUseDat
 
     if (payload?.columns) {
         tableColumns = {
-            ...payload?.columns.reduce((acc: any, column: DataTableResponseColumns, i: number) => {
+            ...payload?.columns.reduce((acc: any, column: DataTableResponseColumnsInner, i: number) => {
                 if (column.name && column.type) {
                     if (FIXED_COLUMNS_TYPES.includes(column.type)) {
                         acc[column.name] = {
@@ -55,7 +55,7 @@ export default function useDataTable(payload: DataTableResponse): ResponseUseDat
             }, {}),
         }
 
-        tableData = payload?.columns.reduce((tableRows: Row[], column: DataTableResponseColumns, indexColumn: number) => {
+        tableData = payload?.columns.reduce((tableRows: Row[], column: DataTableResponseColumnsInner, indexColumn: number) => {
             if (column.values) {
                 column.values.forEach((item, i) => {
                     if (!tableRows[i]) {
@@ -86,14 +86,14 @@ export default function useDataTable(payload: DataTableResponse): ResponseUseDat
     const tableColumnsValues: Column[] = Object.values(tableColumns)
 
     if (hasData) {
-        lineChart = metricValueColumns.reduce((acc: any[], item: DataTableResponseColumns) => {
+        lineChart = metricValueColumns.reduce((acc: any[], item: DataTableResponseColumnsInner) => {
             if (item.values && item.name !== 'total') {
                 item.values.forEach((value, indexValue: number) => {
 
                     acc.push({
                         date: item.name ? new Date(item.name) : '',
                         value,
-                        category: dimensionColumns.map((column: DataTableResponseColumns) => {
+                        category: dimensionColumns.map((column: DataTableResponseColumnsInner) => {
                             return column.values ? column.values[indexValue] : ''
                         }).filter(item => Boolean(item)).join(', '),
                     });
@@ -107,7 +107,7 @@ export default function useDataTable(payload: DataTableResponse): ResponseUseDat
     if (hasData && totalColumn?.values) {
         pieChart = totalColumn.values.map((item, index: number) => {
             return {
-                type: dimensionColumns.map((column: DataTableResponseColumns) => {
+                type: dimensionColumns.map((column: DataTableResponseColumnsInner) => {
                     return column.values ? column.values[index] : ''
                 }).filter(item => Boolean(item)).join(', '),
                 value: item,

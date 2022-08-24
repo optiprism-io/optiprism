@@ -250,14 +250,14 @@ const changeProperty = (payload: PropertyRef) => {
     }
 };
 
-const changeFormula = (e: any) => {
+const changeFormula = (value: string) => {
     if (props.item.queryRef) {
         emit('changeQuery', props.index, {
             ...props.item.queryRef,
-            value: e.target.value
-        });
+            value,
+        })
     }
-};
+}
 </script>
 
 <style scoped lang="scss">

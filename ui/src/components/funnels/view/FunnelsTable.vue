@@ -14,7 +14,7 @@ import {Column, ColumnGroup, Row} from '@/components/uikit/UiTable/UiTable';
 import {I18N} from '@/plugins/i18n';
 import {useEventName} from '@/helpers/useEventName';
 import {useStepsStore} from '@/stores/funnels/steps';
-import {DataTableResponseColumns} from '@/api';
+import { DataTableResponseColumnsInner } from '@/api';
 import {useFunnelsStore} from '@/stores/funnels/funnels';
 
 const { $t } = inject('i18n') as I18N
@@ -77,9 +77,9 @@ const funnelMetricValues = computed(() => {
             }
 
             return result
-        }, {} as Record<string | number, DataTableResponseColumns[]>)
+        }, {} as Record<string | number, DataTableResponseColumnsInner[]>)
 
-    const columns: DataTableResponseColumns[][] = []
+    const columns: DataTableResponseColumnsInner[][] = []
 
     Object.keys(res).sort().forEach(key => {
         columns.push(res[key])

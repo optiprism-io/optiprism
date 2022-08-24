@@ -3,11 +3,13 @@ import {getLastNDaysRange} from '@/helpers/calendarHelper';
 import {getYYYYMMDD} from '@/helpers/getStringDates';
 import {
     BreakdownByProperty,
-    DataTableResponseColumns,
+    DataTableResponseColumnsInner,
     EventFilterByProperty,
     FunnelEvent,
     FunnelEventEventTypeEnum,
-    PropertyRef, TimeBetween, TimeFrom, TimeLast
+    TimeBetween,
+    TimeFrom,
+    TimeLast
 } from '@/api';
 import dataService from '@/api/services/datas.service';
 import {useCommonStore} from '@/stores/common';
@@ -15,8 +17,9 @@ import {useStepsStore} from '@/stores/funnels/steps';
 import {useEventName} from '@/helpers/useEventName';
 import {useBreakdownsStore} from '@/stores/eventSegmentation/breakdowns';
 import {useLexiconStore} from '@/stores/lexicon';
+import { useFilterGroupsStore } from '../reports/filters'
 
-const convertColumns = (columns: DataTableResponseColumns[], stepNumbers: number[]): number[][] => {
+const convertColumns = (columns: DataTableResponseColumnsInner[], stepNumbers: number[]): number[][] => {
     const result: number[][] = []
 
     for (let i = 0; i < stepNumbers.length; i++) {
@@ -39,7 +42,7 @@ type FunnelsStore = {
     last: number,
     type: string,
   };
-  reports: DataTableResponseColumns[];
+  reports: DataTableResponseColumnsInner[];
   loading: boolean;
 }
 
@@ -141,6 +144,7 @@ export const useFunnelsStore = defineStore('funnels', {
             const eventName = useEventName()
             const breakdownsStore = useBreakdownsStore()
             const lexiconStore = useLexiconStore()
+            const filterGroupsStore = useFilterGroupsStore()
             this.loading = true
 
             try {
@@ -201,6 +205,7 @@ export const useFunnelsStore = defineStore('funnels', {
                         }
                     }),
                     time: this.timeRequest,
+                    filters: filterGroupsStore.filters,
                 })
 
                 if (res?.data?.columns) {
