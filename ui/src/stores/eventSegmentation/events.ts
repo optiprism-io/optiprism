@@ -29,7 +29,7 @@ import {
 } from '@/api'
 
 import { useLexiconStore } from '@/stores/lexicon'
-import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
+import { useSegmentsStore } from '@/stores/reports/segments'
 import { useFilterGroupsStore } from '../reports/filters'
 import { useBreakdownsStore } from '../reports/breakdowns'
 
@@ -173,6 +173,7 @@ export const useEventsStore = defineStore('events', {
             const lexiconStore = useLexiconStore()
             const filterGroupsStore = useFilterGroupsStore()
             const breakdownsStore = useBreakdownsStore()
+            const segmentsStore = useSegmentsStore()
 
             const props: EventSegmentation = {
                 time: this.timeRequest,
@@ -261,6 +262,7 @@ export const useEventsStore = defineStore('events', {
                     return event as EventSegmentationEvent;
                 }),
                 filters: filterGroupsStore.filters,
+                segments: segmentsStore.segmentationItems,
                 breakdowns: breakdownsStore.breakdownsItems
             }
 

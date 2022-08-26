@@ -67,12 +67,14 @@ import FilterReports from '@/components/events/FiltersReports.vue'
 
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useFilterGroupsStore } from '@/stores/reports/filters'
-
+import { useSegmentsStore } from '@/stores/reports/segments'
 const eventsStore = useEventsStore();
 const filterGroupsStore = useFilterGroupsStore()
+const segmentsStore = useSegmentsStore()
 
 onUnmounted(() => {
     eventsStore.$reset()
     filterGroupsStore.$reset()
+    segmentsStore.$reset()
 })
 </script>

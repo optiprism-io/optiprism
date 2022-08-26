@@ -39,7 +39,7 @@ import {
     PayloadChangeValueItem,
     PayloadChangeEach,
 } from '@/components/events/Segments/Segments'
-import { useSegmentsStore } from '@/stores/eventSegmentation/segments'
+import { useSegmentsStore } from '@/stores/reports/segments'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useLexiconStore } from '@/stores/lexicon'
 import { useCommonStore } from '@/stores/common'

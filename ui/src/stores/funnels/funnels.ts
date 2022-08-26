@@ -17,6 +17,7 @@ import {useStepsStore} from '@/stores/funnels/steps';
 import {useEventName} from '@/helpers/useEventName';
 import { useFilterGroupsStore } from '@/stores/reports/filters'
 import { useBreakdownsStore } from '@/stores/reports/breakdowns'
+import { useSegmentsStore } from '@/stores/reports/segments'
 
 const convertColumns = (columns: DataTableResponseColumnsInner[], stepNumbers: number[]): number[][] => {
     const result: number[][] = []
@@ -143,6 +144,8 @@ export const useFunnelsStore = defineStore('funnels', {
             const eventName = useEventName()
             const breakdownsStore = useBreakdownsStore()
             const filterGroupsStore = useFilterGroupsStore()
+            const segmentsStore = useSegmentsStore()
+
             this.loading = true
 
             try {
@@ -197,6 +200,7 @@ export const useFunnelsStore = defineStore('funnels', {
                     }),
                     filters: filterGroupsStore.filters,
                     breakdowns: breakdownsStore.breakdownsItems,
+                    segments: segmentsStore.segmentationItems,
                 })
 
                 if (res?.data?.columns) {

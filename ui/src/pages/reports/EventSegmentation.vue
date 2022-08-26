@@ -46,10 +46,12 @@ import { DataTableResponse } from '@/api'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useFilterGroupsStore } from '@/stores/reports/filters'
 import { useCommonStore } from '@/stores/common'
+import { useSegmentsStore } from '@/stores/reports/segments'
 
 const eventsStore = useEventsStore();
 const filterGroupsStore = useFilterGroupsStore()
 const commonStore = useCommonStore()
+const segmentsStore = useSegmentsStore()
 
 const eventSegmentationLoading = ref(false)
 const eventSegmentation = ref<DataTableResponse>()
@@ -57,6 +59,7 @@ const eventSegmentation = ref<DataTableResponse>()
 onUnmounted(() => {
     eventsStore.$reset()
     filterGroupsStore.$reset()
+    segmentsStore.$reset()
 });
 
 const getEventSegmentation = async () => {
