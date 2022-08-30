@@ -57,7 +57,8 @@
   },
 
   "reports": {
-    "title": "Reports"
+    "title": "Reports",
+    "sync": "Sync the query data between reports"
   },
 
   "events": {
