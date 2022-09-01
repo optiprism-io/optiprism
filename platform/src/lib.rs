@@ -55,7 +55,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
                 .map(|value| match value {
                     None => Ok(Value::Null),
                     Some(v) => {
-                        let d = match Decimal::try_new(v as i64, *s as u32) {
+                        let d = match Decimal::try_new(v.as_i128() as i64, *s as u32) {
                             Ok(v) => v,
                             Err(err) => return Err(err.into()),
                         };

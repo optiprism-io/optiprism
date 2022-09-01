@@ -3,7 +3,7 @@ use crate::event_fields;
 use arrow::datatypes::DataType;
 use object_store::local::LocalFileSystem;
 use datafusion::logical_plan::LogicalPlan;
-use datafusion::prelude::CsvReadOptions;
+use datafusion::prelude::{CsvReadOptions, SessionContext};
 use metadata::database::{Column, Table, TableRef};
 use metadata::properties::provider::Namespace;
 use metadata::properties::{CreatePropertyRequest, Property};
@@ -12,7 +12,9 @@ use metadata::{database, events, properties, Metadata};
 use std::env::temp_dir;
 use std::sync::Arc;
 use uuid::Uuid;
-use datafusion_expr::logical_plan::table_scan;
+use datafusion::datasource::object_store::ObjectStoreUrl;
+use datafusion::test::object_store::local_unpartitioned_file;
+use datafusion_expr::logical_plan::{table_scan, TableScan};
 
 pub async fn events_provider(
     db: Arc<database::Provider>,
@@ -21,8 +23,21 @@ pub async fn events_provider(
 ) -> Result<LogicalPlan> {
     let table = db.get_table(TableRef::Events(org_id, proj_id)).await?;
     let schema = table.arrow_schema();
-    let options = CsvReadOptions::new().schema(&schema);
-    let path = "../tests/events.csv";
+
+    let filename = "../tests/events.csv";
+    let object_store = Arc::new(LocalFileSystem::new()) as _;
+    let object_store_url = ObjectStoreUrl::local_filesystem();
+    let meta = local_unpartitioned_file(filename);
+
+    let in = LogicalPlan::TableScan(TableScan{
+        table_name: "".to_string(),
+        source: Arc::new(()),
+        projection: None,
+        projected_schema: Arc::new(()),
+        filters: vec![],
+        fetch: None
+    });
+
     let df_input = table_scan(Some("events_csv"), &schema, None)?;
 
     Ok(df_input.build()?)

@@ -170,6 +170,7 @@ impl MergeStream {
         }
     }
 }
+
 impl RecordBatchStream for MergeStream {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
@@ -229,13 +230,10 @@ mod tests {
         };
 
         let input2 = {
-            let batches = vec![RecordBatch::try_from_iter(vec![
-                (
-                    "name",
-                    Arc::new(StringArray::from(vec!["b".to_string(), "b".to_string()])) as ArrayRef,
-                ),
-                ("a", Arc::new(Int32Array::from(vec![5, 6])) as ArrayRef),
-                ("b", Arc::new(Int8Array::from(vec![1, 2])) as ArrayRef),
+            let batches = vec![RecordBatch::try_from_iter_with_nullable(vec![
+                ("name", Arc::new(StringArray::from(vec!["b".to_string(), "b".to_string()])) as ArrayRef, true),
+                ("a", Arc::new(Int32Array::from(vec![5, 6])) as ArrayRef, true),
+                ("b", Arc::new(Int8Array::from(vec![1, 2])) as ArrayRef, true),
             ])?];
 
             let schema = batches[0].schema();
@@ -244,29 +242,15 @@ mod tests {
 
         let input3 = {
             let batches = vec![
-                RecordBatch::try_from_iter(vec![
-                    (
-                        "name",
-                        Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()]))
-                            as ArrayRef,
-                    ),
-                    ("a", Arc::new(Int32Array::from(vec![7, 8])) as ArrayRef),
-                    (
-                        "c",
-                        Arc::new(BooleanArray::from(vec![true, true])) as ArrayRef,
-                    ),
+                RecordBatch::try_from_iter_with_nullable(vec![
+                    ("name", Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()])) as ArrayRef, true),
+                    ("a", Arc::new(Int32Array::from(vec![7, 8])) as ArrayRef, true),
+                    ("c", Arc::new(BooleanArray::from(vec![true, true])) as ArrayRef, true),
                 ])?,
-                RecordBatch::try_from_iter(vec![
-                    (
-                        "name",
-                        Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()]))
-                            as ArrayRef,
-                    ),
-                    ("a", Arc::new(Int32Array::from(vec![9, 10])) as ArrayRef),
-                    (
-                        "c",
-                        Arc::new(BooleanArray::from(vec![false, false])) as ArrayRef,
-                    ),
+                RecordBatch::try_from_iter_with_nullable(vec![
+                    ("name", Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()])) as ArrayRef, true),
+                    ("a", Arc::new(Int32Array::from(vec![9, 10])) as ArrayRef, true),
+                    ("c", Arc::new(BooleanArray::from(vec![false, false])) as ArrayRef, true),
                 ])?,
             ];
 

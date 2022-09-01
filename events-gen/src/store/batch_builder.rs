@@ -104,31 +104,31 @@ impl RecordBatchBuilder {
         profile: &Profile,
     ) -> Result<()> {
         // println!("event: {event}, time: {}", NaiveDateTime::from_timestamp(state.cur_timestamp, 0));
-        self.user_id.append_value(state.user_id)?;
-        self.created_at.append_value(state.cur_timestamp)?;
-        self.event.append_value(event_id)?;
+        self.user_id.append_value(state.user_id);
+        self.created_at.append_value(state.cur_timestamp);
+        self.event.append_value(event_id);
 
         match state.selected_product {
             None => {
-                self.product_name.append_null()?;
-                self.product_category.append_null()?;
-                self.product_subcategory.append_null()?;
-                self.product_brand.append_null()?;
-                self.product_price.append_null()?;
-                self.product_discount_price.append_null()?;
+                self.product_name.append_null();
+                self.product_category.append_null();
+                self.product_subcategory.append_null();
+                self.product_brand.append_null();
+                self.product_price.append_null();
+                self.product_discount_price.append_null();
             }
             Some(product) => {
-                self.product_name.append_value(product.name as u16)?;
+                self.product_name.append_value(product.name as u16);
                 self.product_category
-                    .append_value(product.category as u16)?;
+                    .append_value(product.category as u16);
                 self.product_subcategory
-                    .append_option(product.subcategory.map(|v| v as u16))?;
+                    .append_option(product.subcategory.map(|v| v as u16));
                 self.product_brand
-                    .append_option(product.brand.map(|v| v as u16))?;
+                    .append_option(product.brand.map(|v| v as u16));
                 self.product_price.append_value(product.price.mantissa())?;
 
                 match product.discount_price {
-                    None => self.product_discount_price.append_null()?,
+                    None => self.product_discount_price.append_null(),
                     Some(price) => {
                         self.product_discount_price.append_value(price.mantissa())?;
                     }
@@ -140,20 +140,20 @@ impl RecordBatchBuilder {
             self.spent_total
                 .append_value(state.spent_total.mantissa())?;
         } else {
-            self.spent_total.append_null()?;
+            self.spent_total.append_null();
         }
 
         if !state.products_bought.is_empty() {
             self.products_bought
-                .append_value(state.products_bought.len() as u8)?;
+                .append_value(state.products_bought.len() as u8);
         } else {
-            self.products_bought.append_null()?;
+            self.products_bought.append_null();
         }
 
         let mut cart_amount: Option<Decimal> = None;
         if !state.cart.is_empty() {
             self.cart_items_number
-                .append_value(state.cart.len() as u8)?;
+                .append_value(state.cart.len() as u8);
             let mut _cart_amount: Decimal = state
                 .cart
                 .iter()
@@ -163,8 +163,8 @@ impl RecordBatchBuilder {
             self.cart_amount.append_value(_cart_amount.mantissa())?;
             cart_amount = Some(_cart_amount);
         } else {
-            self.cart_items_number.append_null()?;
-            self.cart_amount.append_null()?;
+            self.cart_items_number.append_null();
+            self.cart_amount.append_null();
         }
 
         match event {
@@ -172,21 +172,21 @@ impl RecordBatchBuilder {
                 self.revenue.append_value(cart_amount.unwrap().mantissa())?;
             }
             _ => {
-                self.revenue.append_null()?;
+                self.revenue.append_null();
             }
         }
 
         self.country
-            .append_option(profile.geo.country.map(|v| v as u16))?;
+            .append_option(profile.geo.country.map(|v| v as u16));
         self.city
-            .append_option(profile.geo.city.map(|v| v as u16))?;
+            .append_option(profile.geo.city.map(|v| v as u16));
         self.device
-            .append_option(profile.device.device.map(|v| v as u16))?;
+            .append_option(profile.device.device.map(|v| v as u16));
         self.device_category
-            .append_option(profile.device.device_category.map(|v| v as u16))?;
-        self.os.append_option(profile.device.os.map(|v| v as u16))?;
+            .append_option(profile.device.device_category.map(|v| v as u16));
+        self.os.append_option(profile.device.os.map(|v| v as u16));
         self.os_version
-            .append_option(profile.device.os_version.map(|v| v as u16))?;
+            .append_option(profile.device.os_version.map(|v| v as u16));
 
         self.len += 1;
 
