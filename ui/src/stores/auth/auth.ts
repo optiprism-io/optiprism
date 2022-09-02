@@ -1,11 +1,11 @@
-import {defineStore} from 'pinia';
-import {LoginRequest, TokenResponse} from '@/api';
-import {authService} from '@/api/services/auth.service';
-import {LocalStorageAccessor} from '@/utils/localStorageAccessor';
+import { defineStore } from 'pinia'
+import { BasicLoginRequest, BasicLogin200Response } from '@/api'
+import { authService } from '@/api/services/auth.service'
+import { LocalStorageAccessor } from '@/utils/localStorageAccessor'
 
 export interface AuthState {
-  accessToken: string | null;
-  refreshToken: LocalStorageAccessor;
+  accessToken: string | null
+  refreshToken: LocalStorageAccessor
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -15,14 +15,14 @@ export const useAuthStore = defineStore('auth', {
     }),
     getters: {
         isAuthenticated(): boolean {
-            return !!this.accessToken && !!this.refreshToken;
+            return !!this.accessToken && !!this.refreshToken
         },
     },
     actions: {
-        async login(args: LoginRequest): Promise<void> {
+        async login(args: BasicLoginRequest): Promise<void> {
             try {
-                const res = await authService.login(args.email, args.password);
-                this.setToken(res.data);
+                const res = await authService.login(args.email, args.password)
+                this.setToken(res.data)
             } catch (e) {
                 console.log(e)
             }
@@ -33,19 +33,19 @@ export const useAuthStore = defineStore('auth', {
             }
 
             try {
-                const res = await authService.refreshToken(this.refreshToken.value);
-                this.setToken(res.data);
+                const res = await authService.refreshToken(this.refreshToken.value)
+                this.setToken(res.data)
             } catch (e) {
                 console.log(e)
             }
         },
-        setToken(token: TokenResponse): void {
-            this.accessToken = token.accessToken ?? '';
-            this.refreshToken.value = token.refreshToken ?? '';
+        setToken(token: BasicLogin200Response): void {
+            this.accessToken = token.accessToken ?? ''
+            this.refreshToken.value = token.refreshToken ?? ''
         },
         reset(): void {
-            this.accessToken = null;
-            this.refreshToken.value = null;
+            this.accessToken = null
+            this.refreshToken.value = null
         }
     }
 })

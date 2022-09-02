@@ -1,5 +1,5 @@
 import { createServer } from 'miragejs'
-import { DataType, LoginResponse } from '@/api'
+import { DataType, BasicLogin200Response } from '@/api'
 import { BASE_PATH } from '@/api/base'
 import { EventStatus, UserCustomProperty } from '@/types/events';
 import splineChartMocks from '@/mocks/splineChart.json';
@@ -168,7 +168,15 @@ export default function ({ environment = 'development' } = {}) {
                 }
             });
 
-            this.post(`${BASE_PATH}/v1/auth/basic/login`, (): LoginResponse => {
+            this.post(`${BASE_PATH}/v1/auth/basic/login`, (): BasicLogin200Response => {
+                return {
+                    accessToken: '',
+                    refreshToken: '',
+                    csrfToken: ''
+                }
+            })
+
+            this.post(`${BASE_PATH}/v1/auth/access`, (): BasicLogin200Response => {
                 return {
                     accessToken: '',
                     refreshToken: '',
