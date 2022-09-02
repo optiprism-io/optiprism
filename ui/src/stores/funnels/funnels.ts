@@ -15,9 +15,9 @@ import dataService from '@/api/services/datas.service';
 import {useCommonStore} from '@/stores/common';
 import {useStepsStore} from '@/stores/funnels/steps';
 import {useEventName} from '@/helpers/useEventName';
-import {useBreakdownsStore} from '@/stores/eventSegmentation/breakdowns';
-import {useLexiconStore} from '@/stores/lexicon';
-import { useFilterGroupsStore } from '../reports/filters'
+import { useFilterGroupsStore } from '@/stores/reports/filters'
+import { useBreakdownsStore } from '@/stores/reports/breakdowns'
+import { useSegmentsStore } from '@/stores/reports/segments'
 
 const convertColumns = (columns: DataTableResponseColumnsInner[], stepNumbers: number[]): number[][] => {
     const result: number[][] = []
@@ -143,12 +143,14 @@ export const useFunnelsStore = defineStore('funnels', {
             const stepsStore = useStepsStore()
             const eventName = useEventName()
             const breakdownsStore = useBreakdownsStore()
-            const lexiconStore = useLexiconStore()
             const filterGroupsStore = useFilterGroupsStore()
+            const segmentsStore = useSegmentsStore()
+
             this.loading = true
 
             try {
                 const res = await dataService.funnelQuery(commonStore.organizationId, commonStore.projectId, {
+                    time: this.timeRequest,
                     timeWindow: {
                         n: stepsStore.size,
                         unit: stepsStore.unit,
@@ -196,16 +198,9 @@ export const useFunnelsStore = defineStore('funnels', {
                             }) as EventFilterByProperty[],
                         }
                     }),
-                    breakdowns: breakdownsStore.breakdowns.map(item => {
-                        return {
-                            type: 'property',
-                            propertyType: item.propRef?.type as BreakdownByProperty['propertyType'],
-                            propertyId: item.propRef?.id,
-                            propertyName: item.propRef ? lexiconStore.propertyName(item.propRef) : undefined,
-                        }
-                    }),
-                    time: this.timeRequest,
                     filters: filterGroupsStore.filters,
+                    breakdowns: breakdownsStore.breakdownsItems,
+                    segments: segmentsStore.segmentationItems,
                 })
 
                 if (res?.data?.columns) {

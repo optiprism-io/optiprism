@@ -1,10 +1,18 @@
 <template>
     <ToolsLayout>
         <template #title>
-            {{ $t('funnels.untitledFunnel') }}
+            <div class="pf-u-display-flex pf-u-justify-content-space-between pf-u-align-items-center">
+                <span>{{ $t('funnels.untitledFunnel') }}</span>
+                <UiSwitch
+                    class="pf-u-ml-auto"
+                    :value="commonStore.syncReports"
+                    :label="$t('reports.sync')"
+                    @input="(value: boolean) => commonStore.syncReports = value"
+                />
+            </div>
         </template>
 
-        <UiCardContainer :title="$t('funnels.steps')">
+        <UiCardContainer :title="$t('funnels.steps.title')">
             <UiCardTitle>
                 {{ $t('funnels.steps.title') }}
             </UiCardTitle>
@@ -60,19 +68,30 @@ import ExcludeStepsList from '@/components/funnels/exclude/ExcludeStepsList.vue'
 import HoldingConstantSelect from '@/components/funnels/holding/HoldingConstantSelect.vue';
 import ExcludeStepSelect from '@/components/funnels/exclude/ExcludeStepSelect.vue';
 import HoldingConstantList from '@/components/funnels/holding/HoldingConstantList.vue';
+import UiSwitch from '@/components/uikit/UiSwitch.vue'
 import StepsList from '@/components/funnels/steps/StepsList.vue';
 import Segments from '@/components/events/Segments/Segments.vue';
 import FunnelsViews from '@/components/funnels/view/FunnelsViews.vue';
 import FilterReports from '@/components/events/FiltersReports.vue'
+import { funnelsToEvents } from '@/utils/reportsMappings'
 
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useFilterGroupsStore } from '@/stores/reports/filters'
+import { useSegmentsStore } from '@/stores/reports/segments'
+import { useCommonStore } from '@/stores/common'
 
-const eventsStore = useEventsStore();
+const eventsStore = useEventsStore()
 const filterGroupsStore = useFilterGroupsStore()
+const segmentsStore = useSegmentsStore()
+const commonStore = useCommonStore()
 
 onUnmounted(() => {
-    eventsStore.$reset()
-    filterGroupsStore.$reset()
+    if (commonStore.syncReports) {
+        funnelsToEvents()
+    } else {
+        eventsStore.$reset()
+        filterGroupsStore.$reset()
+        segmentsStore.$reset()
+    }
 })
 </script>

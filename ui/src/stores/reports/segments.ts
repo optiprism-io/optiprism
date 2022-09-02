@@ -19,6 +19,46 @@ import {
     PayloadChangeValueItem,
     PayloadChangeEach,
 } from '@/components/events/Segments/Segments'
+import {
+    Event,
+    EventType,
+    Property,
+    PropertyTypeEnum,
+    PropertyFilterOperation,
+
+    EventSegmentationSegment,
+    SegmentCondition,
+    SegmentConditionHasPropertyValue,
+    SegmentConditionHasPropertyValueTypeEnum,
+    SegmentConditionDidEvent,
+    SegmentConditionDidEventTypeEnum,
+    SegmentConditionDidEventEventTypeEnum,
+    SegmentConditionHadPropertyValue,
+    SegmentConditionHadPropertyValueTypeEnum,
+    SegmentConditionHadPropertyValueTime,
+
+    TimeBetweenTypeEnum,
+    TimeWindowEachTypeEnum,
+    TimeUnit,
+    TimeLastTypeEnum,
+
+    DidEventCount,
+    DidEventRelativeCount,
+    DidEventAggregateProperty,
+    DidEventHistoricalCount,
+
+    DidEventCountTypeEnum,
+    DidEventRelativeCountTypeEnum,
+
+    EventRefOneOf1EventTypeEnum,
+    EventRefOneOfEventTypeEnum,
+    DidEventAggregatePropertyTypeEnum,
+    DidEventAggregatePropertyPropertyTypeEnum,
+    QueryAggregatePropertyTypeEnum,
+    QueryAggregate,
+    EventFilterByProperty,
+    EventFilterByPropertyTypeEnum,
+} from '@/api'
 
 interface Segment {
     name: string
@@ -29,11 +69,162 @@ type SegmentsStore = {
     segments: Segment[]
 }
 
+const computedValueTime = (item: Condition): SegmentConditionHadPropertyValueTime => {
+    if (item.period?.type === TimeBetweenTypeEnum.Between) {
+        return {
+            type: TimeBetweenTypeEnum.Between,
+            from: String(item.period.from),
+            to: String(item.period.to)
+        }
+    }
+
+    if (item.period?.type === TimeLastTypeEnum.Last) {
+        return {
+            type: TimeLastTypeEnum.Last,
+            n: Number(item.period.last),
+            unit: 'day'
+        }
+    }
+
+    return {
+        type: TimeWindowEachTypeEnum.WindowEach,
+        unit: item.each as TimeUnit
+    }
+}
+
+const computedValueAggregate = (item: Condition): DidEventCount | DidEventRelativeCount | DidEventAggregateProperty | DidEventHistoricalCount => {
+    const lexiconStore = useLexiconStore()
+    const time = computedValueTime(item)
+    const operation = item.opId as PropertyFilterOperation
+
+    if (item.aggregate?.id === 'aggregateProperty' && item.propRef) {
+        const property: Property = item.propRef.type === PropertyTypeEnum.Event ? lexiconStore.findEventPropertyById(item.propRef.id) : lexiconStore.findUserPropertyById(item.propRef.id)
+
+        return {
+            type: DidEventAggregatePropertyTypeEnum.AggregateProperty,
+            time,
+            operation,
+            value: Number(item.valueItem),
+            propertyName: property.name,
+            propertyType: property.type as DidEventAggregatePropertyPropertyTypeEnum,
+            propertyId: property.id,
+            aggregate: {
+                type: QueryAggregatePropertyTypeEnum.AggregateProperty,
+                propertyName: property.name,
+                propertyType: property.type as DidEventAggregatePropertyPropertyTypeEnum,
+                propertyId: property.id,
+                aggregate: item.aggregate.typeAggregate as QueryAggregate,
+            }
+        }
+    }
+
+    if (item.aggregate?.id === 'relativeCount' && item.compareEvent) {
+        const eventItem: Event = item.compareEvent.ref.type === EventType.Regular ? lexiconStore.findEventById(item.compareEvent.ref.id) : lexiconStore.findCustomEventById(item.compareEvent.ref.id)
+
+        return {
+            type: DidEventRelativeCountTypeEnum.DidEventRelativeCount,
+            operation,
+            time,
+            rightEvent: {
+                eventName: eventItem.name,
+                eventType: item.compareEvent.ref.type === EventRefOneOfEventTypeEnum.Regular ? EventRefOneOf1EventTypeEnum.Custom : EventRefOneOfEventTypeEnum.Regular,
+            },
+        }
+    }
+
+    return {
+        type: DidEventCountTypeEnum.DidEventCount,
+        value: Number(item.valueItem),
+        operation,
+        time,
+    }
+}
+
 export const useSegmentsStore = defineStore('segments', {
     state: (): SegmentsStore => ({
         segments: [],
     }),
-    getters: {},
+    getters: {
+        segmentationItems(): EventSegmentationSegment[] {
+            const lexiconStore = useLexiconStore()
+
+            return this.segments.map(segment => {
+                return {
+                    name: segment.name,
+                    conditions: segment.conditions ? segment.conditions.reduce((items: SegmentCondition[], item) => {
+                        if (item.action?.id === SegmentConditionDidEventTypeEnum.DidEvent && item.event) {
+                            if (item?.aggregate?.id === 'relativeCount' && !item.compareEvent) {
+                                return items
+                            }
+
+                            if (item?.aggregate?.id === 'aggregateProperty' && !item.propRef) {
+                                return items
+                            }
+
+                            const eventItem: Event = item.event.ref.type === EventType.Regular ? lexiconStore.findEventById(item.event.ref.id) : lexiconStore.findCustomEventById(item.event.ref.id)
+
+                            const condition: SegmentConditionDidEvent = {
+                                type: SegmentConditionDidEventTypeEnum.DidEvent,
+                                eventName: eventItem.name,
+                                eventType: item.event.ref.type === EventType.Custom ? SegmentConditionDidEventEventTypeEnum.Custom : undefined,
+                                filters: item.filters.filter(item => item.propRef).reduce((items: EventFilterByProperty[], filterRef) => {
+                                    if (filterRef.propRef) {
+                                        const property: Property = filterRef?.propRef.type === PropertyTypeEnum.Event ? lexiconStore.findEventPropertyById(filterRef.propRef.id) : lexiconStore.findUserPropertyById(filterRef.propRef.id)
+
+                                        items.push({
+                                            type: EventFilterByPropertyTypeEnum.Property,
+                                            propertyName: property.name,
+                                            propertyType: property.type as PropertyTypeEnum,
+                                            propertyId: filterRef.propRef.id,
+                                            operation: filterRef.opId as PropertyFilterOperation,
+                                            value: filterRef.values,
+                                        })
+                                    }
+
+                                    return items
+                                }, []),
+                                aggregate: computedValueAggregate(item),
+                            }
+
+                            items.push(condition)
+                        }
+
+                        if (item.propRef && item.action?.id) {
+                            const property: Property = item.propRef.type === PropertyTypeEnum.Event ? lexiconStore.findEventPropertyById(item.propRef.id) : lexiconStore.findUserPropertyById(item.propRef.id)
+
+                            if (property) {
+                                if (item.action?.id === SegmentConditionHasPropertyValueTypeEnum.HasPropertyValue) {
+                                    const condition: SegmentConditionHasPropertyValue = {
+                                        type: SegmentConditionHasPropertyValueTypeEnum.HasPropertyValue,
+                                        propertyName: property.name,
+                                        operation: item.opId as PropertyFilterOperation,
+                                        values: item.values,
+                                    }
+
+                                    items.push(condition)
+                                }
+
+
+                                if (item.action?.id === SegmentConditionHadPropertyValueTypeEnum.HadPropertyValue) {
+                                    const condition: SegmentConditionHadPropertyValue = {
+                                        type: SegmentConditionHadPropertyValueTypeEnum.HadPropertyValue,
+                                        propertyName: property.name,
+                                        operation: item.opId as PropertyFilterOperation,
+                                        values: item.values,
+                                        time: computedValueTime(item),
+                                    }
+
+                                    items.push(condition)
+                                }
+                            }
+                        }
+
+                        return items
+                    }, []) : [],
+                }
+            })
+        },
+    },
     actions: {
         inputCalendarEach(payload: PayloadChangeEach) {
             const segment = this.segments[payload.idxParent]

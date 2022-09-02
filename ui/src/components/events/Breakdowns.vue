@@ -34,7 +34,7 @@ import { PropertyRef } from '@/types/events';
 import Breakdown from '@/components/events/Breakdown.vue';
 import PropertySelect from '@/components/events/PropertySelect.vue';
 import { useEventsStore } from '@/stores/eventSegmentation/events';
-import { useBreakdownsStore } from '@/stores/eventSegmentation/breakdowns';
+import { useBreakdownsStore } from '@/stores/reports/breakdowns'
 const eventsStore = useEventsStore();
 const breakdownsStore = useBreakdownsStore();
 

@@ -1,7 +1,15 @@
 <template>
     <ToolsLayout>
         <template #title>
-            {{ $t('events.event_segmentation') }}
+            <div class="pf-u-display-flex pf-u-justify-content-space-between pf-u-align-items-center">
+                <span>{{ $t('events.event_segmentation') }}</span>
+                <UiSwitch
+                    class="pf-u-ml-auto"
+                    :value="commonStore.syncReports"
+                    :label="$t('reports.sync')"
+                    @input="(value: boolean) => commonStore.syncReports = value"
+                />
+            </div>
         </template>
 
         <UiCard :title="$t('events.events')">
@@ -40,24 +48,33 @@ import UiCard from '@/components/uikit/UiCard/UiCard.vue';
 import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
 import UiCardContainer from '@/components/uikit/UiCard/UiCardContainer.vue'
 import FilterReports from '@/components/events/FiltersReports.vue'
+import UiSwitch from '@/components/uikit/UiSwitch.vue'
 import reportsService from '@/api/services/reports.service'
 import { DataTableResponse } from '@/api'
+import { eventsToFunnels } from '@/utils/reportsMappings'
 
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useFilterGroupsStore } from '@/stores/reports/filters'
 import { useCommonStore } from '@/stores/common'
+import { useSegmentsStore } from '@/stores/reports/segments'
 
 const eventsStore = useEventsStore();
 const filterGroupsStore = useFilterGroupsStore()
 const commonStore = useCommonStore()
+const segmentsStore = useSegmentsStore()
 
 const eventSegmentationLoading = ref(false)
 const eventSegmentation = ref<DataTableResponse>()
 
 onUnmounted(() => {
-    eventsStore.$reset()
-    filterGroupsStore.$reset()
-});
+    if (commonStore.syncReports) {
+        eventsToFunnels()
+    } else {
+        eventsStore.$reset()
+        filterGroupsStore.$reset()
+        segmentsStore.$reset()
+    }
+})
 
 const getEventSegmentation = async () => {
     eventSegmentationLoading.value = true

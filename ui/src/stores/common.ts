@@ -16,6 +16,7 @@ export type Common = {
     showEventPropertyPopup: boolean
     editEventPropertyPopupId: number | null
     editEventPropertyPopupType: PropertyTypeEnum
+    syncReports: boolean
 }
 
 export const useCommonStore = defineStore('common', {
@@ -26,6 +27,7 @@ export const useCommonStore = defineStore('common', {
         showEventPropertyPopup: false,
         editEventPropertyPopupId: null,
         editEventPropertyPopupType: PropertyTypeEnum.EventProperty,
+        syncReports: true,
 
         projectId: 0, // TODO integrations
         organizationId: 0,

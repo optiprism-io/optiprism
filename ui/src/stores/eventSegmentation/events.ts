@@ -28,9 +28,10 @@ import {
     EventType,
 } from '@/api'
 
-import { useLexiconStore } from '@/stores/lexicon';
-import { useSegmentsStore } from '@/stores/eventSegmentation/segments';
+import { useLexiconStore } from '@/stores/lexicon'
+import { useSegmentsStore } from '@/stores/reports/segments'
 import { useFilterGroupsStore } from '../reports/filters'
+import { useBreakdownsStore } from '../reports/breakdowns'
 
 export type ChartType = 'line' | 'pie' | 'column';
 
@@ -169,8 +170,10 @@ export const useEventsStore = defineStore('events', {
             ];
         },
         propsForEventSegmentationResult(): EventSegmentation {
-            const lexiconStore = useLexiconStore();
+            const lexiconStore = useLexiconStore()
             const filterGroupsStore = useFilterGroupsStore()
+            const breakdownsStore = useBreakdownsStore()
+            const segmentsStore = useSegmentsStore()
 
             const props: EventSegmentation = {
                 time: this.timeRequest,
@@ -259,6 +262,8 @@ export const useEventsStore = defineStore('events', {
                     return event as EventSegmentationEvent;
                 }),
                 filters: filterGroupsStore.filters,
+                segments: segmentsStore.segmentationItems,
+                breakdowns: breakdownsStore.breakdownsItems
             }
 
             return props
