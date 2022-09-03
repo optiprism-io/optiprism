@@ -286,11 +286,12 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
         let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
+        println!("logical plan: {:?}", plan);
 
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
         let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {}));
+            .with_query_planner(Arc::new(QueryPlanner {})).with_optimizer_rules(vec![]);
 
         let exec_ctx = SessionContext::with_state(session_state);
         let physical_plan = exec_ctx.create_physical_plan(&plan).await?;

@@ -4,6 +4,7 @@ use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode}
 use datafusion_common::{DFField, DFSchema};
 use datafusion_expr::Expr;
 use std::any::Any;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use crate::error::QueryError;
@@ -43,7 +44,7 @@ impl UnpivotNode {
             let value_field = DFField::new(None, value_col.as_str(), value_type, false);
             fields.push(value_field);
 
-            Arc::new(DFSchema::new(fields)?)
+            Arc::new(DFSchema::new_with_metadata(fields,HashMap::new())?)
         };
 
         Ok(Self {

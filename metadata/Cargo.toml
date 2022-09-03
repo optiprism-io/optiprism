@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-datafusion = { path = "../arrow-datafusion/datafusion/core" }
+datafusion = "11.0.0"
 common = { path = "../common" }
 async-mutex = "1.4.0"
 axum = { version = "0.4.3" }

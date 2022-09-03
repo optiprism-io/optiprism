@@ -11,10 +11,16 @@ use metadata::store::Store;
 use metadata::{database, events, properties, Metadata};
 use std::env::temp_dir;
 use std::sync::Arc;
+use datafusion::datasource::file_format::csv::CsvFormat;
+use datafusion::datasource::file_format::FileFormat;
+use datafusion::datasource::listing::{ListingTable, ListingTableConfig, ListingTableUrl, PartitionedFile};
 use uuid::Uuid;
 use datafusion::datasource::object_store::ObjectStoreUrl;
-use datafusion::test::object_store::local_unpartitioned_file;
+use datafusion::datasource::provider_as_source;
 use datafusion_expr::logical_plan::{table_scan, TableScan};
+use datafusion_expr::logical_plan::builder::UNNAMED_TABLE;
+use datafusion_expr::LogicalPlanBuilder;
+use object_store::ObjectMeta;
 
 pub async fn events_provider(
     db: Arc<database::Provider>,
@@ -24,23 +30,18 @@ pub async fn events_provider(
     let table = db.get_table(TableRef::Events(org_id, proj_id)).await?;
     let schema = table.arrow_schema();
 
-    let filename = "../tests/events.csv";
-    let object_store = Arc::new(LocalFileSystem::new()) as _;
-    let object_store_url = ObjectStoreUrl::local_filesystem();
-    let meta = local_unpartitioned_file(filename);
 
-    let in = LogicalPlan::TableScan(TableScan{
-        table_name: "".to_string(),
-        source: Arc::new(()),
-        projection: None,
-        projected_schema: Arc::new(()),
-        filters: vec![],
-        fetch: None
-    });
+    let options = CsvReadOptions::new();
+    let table_path = ListingTableUrl::parse("../tests/events.csv")?;
+    let target_partitions = 1;
+    let listing_options = options.to_listing_options(target_partitions);
 
-    let df_input = table_scan(Some("events_csv"), &schema, None)?;
-
-    Ok(df_input.build()?)
+    let config = ListingTableConfig::new(table_path.clone())
+        .with_listing_options(listing_options)
+        .with_schema(Arc::new(schema));
+    let provider = ListingTable::try_new(config)?;
+    Ok(LogicalPlanBuilder::scan(UNNAMED_TABLE, provider_as_source(Arc::new(provider)), None)?
+        .build()?)
 }
 
 pub async fn create_property(
@@ -269,7 +270,7 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
             display_name: None,
             typ: DataType::Float64,
             status: properties::Status::Enabled,
-            nullable: false,
+            nullable: true,
             is_array: false,
             is_dictionary: false,
             dictionary_type: None,

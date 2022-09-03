@@ -11,10 +11,10 @@ metadata = { path = "../metadata" }
 chrono = "0.4"
 chronoutil = "0.2.3"
 dyn-clone = "1.0.5"
-datafusion = { path = "../arrow-datafusion/datafusion/core" }
+datafusion = "11.0.0"
+datafusion-common = "11.0.0"
+datafusion-expr = "11.0.0"
 object_store = "0.4.0"
-datafusion-expr = { path = "../arrow-datafusion/datafusion/expr" }
-datafusion-common = { path = "../arrow-datafusion/datafusion/common" }
 arrow = { version = "20.0.0", features = ["prettyprint"] }
 store = { path = "../store" }
 mockall = "0.10.1"

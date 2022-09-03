@@ -29,7 +29,6 @@ impl DFQueryPlanner for QueryPlanner {
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let physical_planner =
             DefaultPhysicalPlanner::with_extension_planners(vec![Arc::new(ExtensionPlanner {})]);
-        // Delegate most work of physical planning to the default physical planner
         physical_planner
             .create_physical_plan(logical_plan, ctx_state)
             .await
