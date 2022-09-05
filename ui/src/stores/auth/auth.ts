@@ -15,7 +15,7 @@ export const useAuthStore = defineStore('auth', {
     }),
     getters: {
         isAuthenticated(): boolean {
-            return !!this.accessToken && !!this.refreshToken
+            return !!this.accessToken && !!this.refreshToken?.value
         },
     },
     actions: {
@@ -27,7 +27,7 @@ export const useAuthStore = defineStore('auth', {
                 console.log(e)
             }
         },
-        async refreshToken(): Promise<void> {
+        async authAccess(): Promise<void> {
             if (!this.refreshToken.value) {
                 return
             }
@@ -40,8 +40,8 @@ export const useAuthStore = defineStore('auth', {
             }
         },
         setToken(token: BasicLogin200Response): void {
-            this.accessToken = token.accessToken ?? ''
-            this.refreshToken.value = token.refreshToken ?? ''
+            this.accessToken = token.accessToken ?? '';
+            this.refreshToken.value = token.refreshToken ?? '';
         },
         reset(): void {
             this.accessToken = null

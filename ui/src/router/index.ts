@@ -1,9 +1,24 @@
 import {createRouter, createWebHistory} from 'vue-router'
 
-const routes = [
-    {
+export const pagesMap = {
+    login: {
         path: '/login',
         name: 'login',
+    },
+    eventsLiveStream: {
+        path: '/events',
+        name: 'eventsLiveStream'
+    },
+    reportsEventSegmentation: {
+        path: '/reports',
+        name: 'reportsEventSegmentation',
+    }
+}
+
+const routes = [
+    {
+        path: pagesMap.login.path,
+        name: pagesMap.login.name,
         component: () => import('@/pages/auth/Login.vue'),
     },
     {
@@ -15,7 +30,7 @@ const routes = [
                 name: 'main',
                 component: () => import('@/pages/Index.vue'),
                 redirect: () => {
-                    return { name: 'events_live_stream' }
+                    return { name: pagesMap.reportsEventSegmentation.name }
                 },
             },
             {
@@ -30,7 +45,7 @@ const routes = [
                 children: [
                     {
                         path: '',
-                        name: 'events_live_stream',
+                        name: pagesMap.eventsLiveStream.name,
                         component: () => import('@/pages/events/LiveStream.vue'),
                     },
                     {
@@ -58,7 +73,7 @@ const routes = [
                 children: [
                     {
                         path: '',
-                        name: 'reports_event_segmentation',
+                        name: pagesMap.reportsEventSegmentation.name,
                         component: () => import('@/pages/reports/EventSegmentation.vue'),
                     },
                     {

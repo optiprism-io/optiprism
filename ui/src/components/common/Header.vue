@@ -34,9 +34,10 @@
                     <div class="pf-c-page__header-tools-group">
                         <div class="pf-c-page__header-tools-item">
                             <UiDropdown
-                                :items="items"
+                                :items="userMenu"
                                 :text-button="'User'"
                                 :transparent="true"
+                                @select-value="selectUserMenu"
                             />
                         </div>
                     </div>
@@ -47,22 +48,48 @@
 </template>
 
 <script setup lang="ts">
-import UiDropdown from '@/components/uikit/UiDropdown.vue'
+import { inject } from 'vue'
+import { GenericUiDropdown, UiDropdownItem } from '@/components/uikit/UiDropdown.vue'
 import Nav from '@/components/common/Nav.vue'
+import { useAuthStore } from '@/stores/auth/auth'
+import { useRouter } from 'vue-router'
+
+const authStore = useAuthStore()
+const router = useRouter()
+const i18n = inject<any>('i18n')
+const UiDropdown = GenericUiDropdown<string>()
 
 const items = [
     {
         key: 1,
-        value: 1,
+        value: '1',
         nameDisplay: 'Menu Item 1'
     },
     {
         key: 2,
-        value: 2,
+        value: '2',
         nameDisplay: 'Menu Item 2'
     }
 ];
 
+const userMenuMap = {
+    LOGOUT: 'logout'
+}
+
+const userMenu: UiDropdownItem<string>[] = [
+    {
+        key: 1,
+        value: userMenuMap.LOGOUT,
+        nameDisplay: i18n.$t(`userMenu.${userMenuMap.LOGOUT}`)
+    }
+]
+
+const selectUserMenu = (item: UiDropdownItem<string>) => {
+    if (item.value === userMenuMap.LOGOUT) {
+        authStore.reset()
+        router.replace({ name: 'login' })
+    }
+}
 </script>
 
 <style scoped lang="scss">

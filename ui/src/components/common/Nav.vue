@@ -27,6 +27,8 @@
 <script lang="ts" setup>
 import { computed, inject } from 'vue'
 import { useRoute } from 'vue-router'
+import { pagesMap } from '@/router'
+
 const i18n = inject<any>('i18n')
 const route = useRoute()
 
@@ -35,14 +37,14 @@ const items = computed(() => {
         {
             name: i18n.$t('reports.title'),
             to: {
-                name: 'reports_event_segmentation',
+                name: pagesMap.reportsEventSegmentation.name,
             },
             active: typeof route.name === 'string' && route.name.includes('reports'),
         },
         {
             name: i18n.$t('events.events'),
             to: {
-                name: 'events_live_stream',
+                name: pagesMap.eventsLiveStream.name,
             },
             active: typeof route.name === 'string' && route.name.includes('events'),
         },

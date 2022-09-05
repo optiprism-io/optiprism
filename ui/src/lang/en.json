@@ -1,4 +1,8 @@
 {
+  "userMenu": {
+    "logout": "Logout"
+  },
+
   "common": {
     "ok": "Ok",
     "types": {

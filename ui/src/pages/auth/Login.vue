@@ -146,9 +146,10 @@
 </template>
 
 <script lang="ts" setup>
-import {useRoute, useRouter} from 'vue-router';
-import {computed, ref} from 'vue';
-import {useAuthStore} from '@/stores/auth/auth';
+import { useRoute, useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useAuthStore } from '@/stores/auth/auth'
+import { pagesMap } from '@/router'
 
 const route = useRoute()
 const router = useRouter()
@@ -159,7 +160,7 @@ const password = ref('')
 
 const nextPath = computed(() => {
     const next = route.query.next
-    return next && typeof next === 'string' ? next : ''
+    return next && typeof next === 'string' ? next : pagesMap.reportsEventSegmentation.path
 })
 
 const login = async (): Promise<void> => {
@@ -168,6 +169,10 @@ const login = async (): Promise<void> => {
             email: email.value,
             password: password.value,
         })
+
+        if (authStore.accessToken) {
+            router.push({ path: nextPath.value })
+        }
     } catch (e) {
         console.log(e)
     }

@@ -20,9 +20,10 @@
 import Header from '@/components/common/Header.vue'
 import CreateCustomEvent from '@/components/events/CreateCustomEvent.vue'
 import { useCommonStore } from '@/stores/common'
-import {onMounted, ref, watch} from 'vue';
-import {useRoute, useRouter} from 'vue-router';
-import {useAuthStore} from '@/stores/auth/auth';
+import { onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth/auth'
+import { pagesMap } from '@/router'
 
 const state = ref<'pending' | 'ok' | 'error'>('pending')
 
@@ -40,15 +41,26 @@ const applyCreateCustomEvent = () => {
 }
 
 const init = async (): Promise<void> => {
-    await router.replace({ name: 'login', query: { next: route.path } })
-    return Promise.resolve()
+    await authStore.authAccess()
+
+    if (!authStore.isAuthenticated) {
+        await router.replace({
+            name: pagesMap.login.name,
+            query: { next: route.path }
+        })
+        return Promise.resolve()
+    } else {
+        state.value = 'ok'
+    }
 }
 
 onMounted(init)
 
-watch(() => authStore.isAuthenticated, state => {
-    if (!state) {
-        router.replace({ name: 'login' })
+watch(() => authStore.isAuthenticated, isAuthenticated => {
+    if (!isAuthenticated) {
+        router.replace({ name: pagesMap.login.name })
+    } else {
+        state.value = 'ok'
     }
 })
 </script>

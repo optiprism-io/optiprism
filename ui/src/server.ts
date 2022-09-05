@@ -170,17 +170,17 @@ export default function ({ environment = 'development' } = {}) {
 
             this.post(`${BASE_PATH}/v1/auth/basic/login`, (): BasicLogin200Response => {
                 return {
-                    accessToken: '',
-                    refreshToken: '',
-                    csrfToken: ''
+                    accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+                    refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Im5pa28ga3VzaCIsImlhdCI6MTUxNjIzOTAyMn0.FzpmXmStgiYEO15ZbwwPafVRQSOCO_xidYjrjRvVIbQ',
+                    csrfToken: 'CIwNZNlR4XbisJF39I8yWnWX9wX4WFoz'
                 }
             })
 
             this.post(`${BASE_PATH}/v1/auth/access`, (): BasicLogin200Response => {
                 return {
-                    accessToken: '',
-                    refreshToken: '',
-                    csrfToken: ''
+                    accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+                    refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Im5pa28ga3VzaCIsImlhdCI6MTUxNjIzOTAyMn0.FzpmXmStgiYEO15ZbwwPafVRQSOCO_xidYjrjRvVIbQ',
+                    csrfToken: 'CIwNZNlR4XbisJF39I8yWnWX9wX4WFoz'
                 }
             })
         }
