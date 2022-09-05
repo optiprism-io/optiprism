@@ -1,4 +1,4 @@
-import { App as Application } from 'vue';
+import {App as Application} from 'vue';
 import UiButton from '@/components/uikit/UiButton.vue';
 import UiIcon from '@/components/uikit/UiIcon.vue';
 import UiSpinner from '@/components/uikit/UiSpinner.vue';

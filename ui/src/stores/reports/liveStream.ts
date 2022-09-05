@@ -1,17 +1,17 @@
-import { defineStore } from 'pinia'
+import {defineStore} from 'pinia'
 import {
-    EventType,
     EventFilterByProperty,
+    EventRecordsListRequestEventsInner,
+    EventRecordsListRequestEventsInnerEventTypeEnum,
+    EventType,
     TimeBetween,
     TimeFrom,
     TimeLast,
-    EventRecordsListRequestEventsInner,
-    EventRecordsListRequestEventsInnerEventTypeEnum,
 } from '@/api'
-import { Event } from '@/stores/eventSegmentation/events'
+import {Event} from '@/stores/eventSegmentation/events'
 import dataService from '@/api/services/datas.service'
-import { useCommonStore } from '@/stores/common'
-import { useLexiconStore } from '@/stores/lexicon'
+import {useCommonStore} from '@/stores/common'
+import {useLexiconStore} from '@/stores/lexicon'
 
 export interface Report {
     name: string

@@ -1,23 +1,3 @@
-use crate::Result;
-use arrow::array::ArrayRef;
-use arrow::datatypes::{Schema, SchemaRef};
-
-use arrow::error::Result as ArrowResult;
-use arrow::record_batch::RecordBatch;
-
-use axum::async_trait;
-use datafusion::execution::runtime_env::RuntimeEnv;
-
-use datafusion::physical_plan::expressions::PhysicalSortExpr;
-use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
-use datafusion::physical_plan::{
-    DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
-    Statistics,
-};
-use datafusion_common::Result as DFResult;
-use datafusion_common::ScalarValue;
-
-use futures::{Stream, StreamExt};
 use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
@@ -25,7 +5,25 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+
+use arrow::array::ArrayRef;
+use arrow::datatypes::{Schema, SchemaRef};
+use arrow::error::Result as ArrowResult;
+use arrow::record_batch::RecordBatch;
+use axum::async_trait;
+use datafusion::execution::context::TaskContext;
+use datafusion::physical_plan::{
+    DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
+    Statistics,
+};
+use datafusion::physical_plan::expressions::PhysicalSortExpr;
+use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
+use datafusion_common::Result as DFResult;
+use datafusion_common::ScalarValue;
+use futures::{Stream, StreamExt};
+
 use crate::error::QueryError;
+use crate::Result;
 
 pub struct MergeExec {
     inputs: Vec<Arc<dyn ExecutionPlan>>,
@@ -79,7 +77,7 @@ impl ExecutionPlan for MergeExec {
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
@@ -87,14 +85,14 @@ impl ExecutionPlan for MergeExec {
         ))
     }
 
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
-        runtime: Arc<RuntimeEnv>,
-    ) -> datafusion_common::Result<SendableRecordBatchStream> {
+        context: Arc<TaskContext>,
+    ) -> DFResult<SendableRecordBatchStream> {
         let mut streams: Vec<SendableRecordBatchStream> = vec![];
         for input in self.inputs.iter() {
-            let stream = input.execute(partition, runtime.clone()).await?;
+            let stream = input.execute(partition, context.clone())?;
             streams.push(stream)
         }
 
@@ -169,6 +167,7 @@ impl MergeStream {
         }
     }
 }
+
 impl RecordBatchStream for MergeStream {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
@@ -187,17 +186,17 @@ impl Stream for MergeStream {
 
 #[cfg(test)]
 mod tests {
-    use crate::physical_plan::merge::MergeExec;
-    use arrow::array::{ArrayRef, BooleanArray, Int32Array, Int8Array, StringArray};
-
-    use arrow::record_batch::RecordBatch;
-    pub use datafusion::error::Result;
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-    use datafusion::physical_plan::common::collect;
-    use datafusion::physical_plan::memory::MemoryExec;
-    use datafusion::physical_plan::ExecutionPlan;
-
     use std::sync::Arc;
+
+    use arrow::array::{ArrayRef, BooleanArray, Int32Array, Int8Array, StringArray};
+    use arrow::record_batch::RecordBatch;
+    use datafusion::physical_plan::common::collect;
+    use datafusion::physical_plan::ExecutionPlan;
+    use datafusion::physical_plan::memory::MemoryExec;
+    use datafusion::prelude::SessionContext;
+    pub use datafusion_common::Result;
+
+    use crate::physical_plan::merge::MergeExec;
 
     #[tokio::test]
     async fn test() -> Result<()> {
@@ -226,13 +225,10 @@ mod tests {
         };
 
         let input2 = {
-            let batches = vec![RecordBatch::try_from_iter(vec![
-                (
-                    "name",
-                    Arc::new(StringArray::from(vec!["b".to_string(), "b".to_string()])) as ArrayRef,
-                ),
-                ("a", Arc::new(Int32Array::from(vec![5, 6])) as ArrayRef),
-                ("b", Arc::new(Int8Array::from(vec![1, 2])) as ArrayRef),
+            let batches = vec![RecordBatch::try_from_iter_with_nullable(vec![
+                ("name", Arc::new(StringArray::from(vec!["b".to_string(), "b".to_string()])) as ArrayRef, true),
+                ("a", Arc::new(Int32Array::from(vec![5, 6])) as ArrayRef, true),
+                ("b", Arc::new(Int8Array::from(vec![1, 2])) as ArrayRef, true),
             ])?];
 
             let schema = batches[0].schema();
@@ -241,29 +237,15 @@ mod tests {
 
         let input3 = {
             let batches = vec![
-                RecordBatch::try_from_iter(vec![
-                    (
-                        "name",
-                        Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()]))
-                            as ArrayRef,
-                    ),
-                    ("a", Arc::new(Int32Array::from(vec![7, 8])) as ArrayRef),
-                    (
-                        "c",
-                        Arc::new(BooleanArray::from(vec![true, true])) as ArrayRef,
-                    ),
+                RecordBatch::try_from_iter_with_nullable(vec![
+                    ("name", Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()])) as ArrayRef, true),
+                    ("a", Arc::new(Int32Array::from(vec![7, 8])) as ArrayRef, true),
+                    ("c", Arc::new(BooleanArray::from(vec![true, true])) as ArrayRef, true),
                 ])?,
-                RecordBatch::try_from_iter(vec![
-                    (
-                        "name",
-                        Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()]))
-                            as ArrayRef,
-                    ),
-                    ("a", Arc::new(Int32Array::from(vec![9, 10])) as ArrayRef),
-                    (
-                        "c",
-                        Arc::new(BooleanArray::from(vec![false, false])) as ArrayRef,
-                    ),
+                RecordBatch::try_from_iter_with_nullable(vec![
+                    ("name", Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()])) as ArrayRef, true),
+                    ("a", Arc::new(Int32Array::from(vec![9, 10])) as ArrayRef, true),
+                    ("c", Arc::new(BooleanArray::from(vec![false, false])) as ArrayRef, true),
                 ])?,
             ];
 
@@ -272,8 +254,9 @@ mod tests {
         };
 
         let mux = MergeExec::try_new(vec![input1, input2, input3]).unwrap();
-        let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
-        let stream = mux.execute(0, runtime).await?;
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = mux.execute(0, task_ctx)?;
         let result = collect(stream).await?;
 
         print!("{}", arrow::util::pretty::pretty_format_batches(&result)?);

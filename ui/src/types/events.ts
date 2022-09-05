@@ -1,15 +1,15 @@
-import { OperationId } from '@/types'
-import { AggregateId } from '@/types/aggregate'
-import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
+import {OperationId} from '@/types'
+import {AggregateId} from '@/types/aggregate'
+import {Each} from '@/components/uikit/UiCalendar/UiCalendar'
 import {
-    EventType,
-    PropertyType,
-    DataType,
-    Value,
     CustomEvent,
     CustomEventEventEventTypeEnum,
+    DataType,
     Event,
     EventRefOneOfEventTypeEnum,
+    EventType,
+    PropertyType,
+    Value,
 } from '@/api'
 
 export type PropertyRef = {

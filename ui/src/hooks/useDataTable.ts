@@ -1,6 +1,6 @@
-import { DataTableResponse, DataTableResponseColumnsInner } from '@/api'
-import { getStringDateByFormat } from '@/helpers/getStringDates'
-import { Column, Row, Cell } from '@/components/uikit/UiTable/UiTable'
+import {DataTableResponse, DataTableResponseColumnsInner} from '@/api'
+import {getStringDateByFormat} from '@/helpers/getStringDates'
+import {Cell, Column, Row} from '@/components/uikit/UiTable/UiTable'
 
 const FIXED_COLUMNS_TYPES = ['dimension', 'metric']
 

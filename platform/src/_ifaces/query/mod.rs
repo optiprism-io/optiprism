@@ -6,7 +6,7 @@ use super::dquery::EventSegmentation;
 use arrow::datatypes::DataType;
 use chrono::{Date, Utc};
 use datafusion::error::Result;
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 
 trait Query {
     fn event_segmentation(&self, query: &EventSegmentation) -> Result<QueryResult>;

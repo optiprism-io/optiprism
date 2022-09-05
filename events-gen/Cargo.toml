@@ -24,7 +24,7 @@ serde = { version = "1.0.133", features = ["derive"] }
 cubic_spline = "1.0.0"
 splines = "4.1.0"
 crossbeam-channel = "0.3.9"
-arrow = { version = "9.0.0", features = ["prettyprint"] }
+arrow = { version = "20.0.0", features = ["prettyprint"] }
 metadata = { path = "../metadata" }
 tokio = { version = "1.15.0", features = ["full"] }
 enum-iterator = "1.0.0"

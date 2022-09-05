@@ -463,8 +463,7 @@ mod tests {
     use crate::error::Result;
     use crate::queries::event_segmentation::{
         AggregateFunction, Analysis, Breakdown, ChartType, Compare, Event, EventFilter,
-        EventSegmentation, EventType, PartitionedAggregateFunction, PropValueOperation,
-        PropertyType, Query, QueryTime, TimeUnit,
+        EventSegmentation, PartitionedAggregateFunction, PropValueOperation, Query, QueryTime, TimeUnit,
     };
     use chrono::{DateTime, Utc};
 

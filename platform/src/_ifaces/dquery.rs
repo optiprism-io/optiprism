@@ -1,4 +1,4 @@
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 
 enum Condition {
     Eq,

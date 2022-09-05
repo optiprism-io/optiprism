@@ -7,8 +7,8 @@ use arrow::error::{ArrowError, Result as ArrowResult};
 use arrow::record_batch::RecordBatch;
 
 use axum::async_trait;
-use datafusion::error::Result as DFResult;
-use datafusion::execution::runtime_env::RuntimeEnv;
+use datafusion_common::Result as DFResult;
+
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 
 use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
@@ -28,6 +28,7 @@ use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use datafusion::execution::context::TaskContext;
 
 pub struct DictionaryDecodeExec {
     input: Arc<dyn ExecutionPlan>,
@@ -89,7 +90,7 @@ impl ExecutionPlan for DictionaryDecodeExec {
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(DictionaryDecodeExec::new(
@@ -98,12 +99,12 @@ impl ExecutionPlan for DictionaryDecodeExec {
         )))
     }
 
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
-        runtime: Arc<RuntimeEnv>,
+        context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
-        let stream = self.input.execute(partition, runtime.clone()).await?;
+        let stream = self.input.execute(partition, context)?;
 
         Ok(Box::pin(DictionaryDecodeStream {
             stream,
@@ -146,12 +147,12 @@ macro_rules! decode_array {
 
         for v in src_arr.iter() {
             match v {
-                None => result.append_null().unwrap(),
+                None => result.append_null(),
                 Some(key) => {
                     let value = block_on($dict.get_value(key as u64))
                         .map_err(|err| ArrowError::ExternalError(Box::new(err)))
                         .unwrap();
-                    result.append_value(value).unwrap();
+                    result.append_value(value);
                 }
             }
         }

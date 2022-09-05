@@ -1,4 +1,4 @@
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use std::cmp::Ordering;
 use super::error::Result;
 use std::sync::atomic::{AtomicUsize, Ordering as MemoryOrdering};

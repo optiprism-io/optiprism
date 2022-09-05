@@ -1,4 +1,4 @@
-import { EventsApi, EventRecordsListRequest, QueryApi, FunnelQuery } from '@/api'
+import {EventRecordsListRequest, EventsApi, FunnelQuery, QueryApi} from '@/api'
 
 const api = new EventsApi()
 const queryApi = new QueryApi()

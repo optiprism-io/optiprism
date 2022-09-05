@@ -16,7 +16,7 @@ use datafusion::physical_plan::planner::{
     DefaultPhysicalPlanner, ExtensionPlanner as DFExtensionPlanner,
 };
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, PhysicalPlanner};
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use std::sync::Arc;
 
 pub struct QueryPlanner {}

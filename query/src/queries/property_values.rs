@@ -1,17 +1,22 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use datafusion::logical_plan::DFSchema;
+use datafusion::logical_plan::LogicalPlan;
+use datafusion::logical_plan::plan::{Aggregate, Extension, Filter as PlanFilter, Sort};
+use datafusion_common::{Column, ScalarValue};
+use datafusion_expr::{col, Expr};
+use datafusion_expr::utils::exprlist_to_fields;
+
+use metadata::dictionaries::provider::SingleDictionaryProvider;
+use metadata::Metadata;
+use metadata::properties::provider::Namespace;
+
+use crate::Context;
 use crate::error::Result;
 use crate::expr::{event_expression, property_expression};
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
-use crate::queries::types::{EventRef, PropValueOperation, PropertyRef};
-use crate::Context;
-use datafusion::logical_plan::plan::{Aggregate, Extension, Filter as PlanFilter, Sort};
-use datafusion::logical_plan::LogicalPlan;
-use datafusion::logical_plan::{exprlist_to_fields, DFSchema};
-use datafusion_common::{Column, ScalarValue};
-use datafusion_expr::{col, Expr};
-use metadata::dictionaries::provider::SingleDictionaryProvider;
-use metadata::properties::provider::Namespace;
-use metadata::Metadata;
-use std::sync::Arc;
+use crate::queries::types::{EventRef, PropertyRef, PropValueOperation};
 
 pub struct LogicalPlanBuilder {}
 
@@ -24,7 +29,7 @@ macro_rules! property_col {
         let col_name = prop.column_name($namespace);
         let expr = col(col_name.as_str());
 
-        let aggr_schema = DFSchema::new(exprlist_to_fields(vec![&expr], $input.schema())?)?;
+        let aggr_schema = DFSchema::new_with_metadata(exprlist_to_fields(vec![&expr], &$input)?,HashMap::new())?;
         let expr = LogicalPlan::Aggregate(Aggregate {
             input: Arc::new($input.clone()),
             group_expr: vec![expr],

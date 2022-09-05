@@ -1,16 +1,16 @@
-import { get } from '../apiClient'
-import { Value, OperationId } from '@/types'
-import { PropertyRef } from '@/types/events'
+import {get} from '../apiClient'
+import {OperationId, Value} from '@/types'
+import {PropertyRef} from '@/types/events'
 import {
-    PropertiesApi,
-    EventsApi,
     CreateCustomEventRequest,
-    PropertyType,
     CustomEventEvent,
+    EventsApi,
     EventType,
+    PropertiesApi,
+    PropertyType,
+    UpdateCustomEventRequest,
     UpdateEventRequest,
     UpdatePropertyRequest,
-    UpdateCustomEventRequest,
 } from '@/api'
 
 const api = new EventsApi()

@@ -1,13 +1,16 @@
+use std::any::Any;
+use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
+
 use arrow::datatypes::DataType;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
 use datafusion_common::{DFField, DFSchema};
 use datafusion_expr::Expr;
-use std::any::Any;
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
-use crate::error::QueryError;
 
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+
+use crate::error::QueryError;
 use crate::Result;
 
 pub struct UnpivotNode {
@@ -25,7 +28,7 @@ impl UnpivotNode {
         name_col: String,
         value_col: String,
     ) -> Result<Self> {
-        let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
+        let value_type = DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let schema = {
             let mut fields: Vec<DFField> = input
@@ -43,7 +46,7 @@ impl UnpivotNode {
             let value_field = DFField::new(None, value_col.as_str(), value_type, false);
             fields.push(value_field);
 
-            Arc::new(DFSchema::new(fields)?)
+            Arc::new(DFSchema::new_with_metadata(fields,HashMap::new())?)
         };
 
         Ok(Self {
@@ -87,7 +90,7 @@ impl UserDefinedLogicalNode for UnpivotNode {
         &self,
         _: &[Expr],
         inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+    ) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
             UnpivotNode::try_new(
                 inputs[0].clone(),

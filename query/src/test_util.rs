@@ -1,17 +1,26 @@
-use crate::error::Result;
-use crate::event_fields;
-use arrow::datatypes::DataType;
-use datafusion::datasource::object_store::local::LocalFileSystem;
-use datafusion::logical_plan::LogicalPlan;
-use datafusion::prelude::CsvReadOptions;
-use metadata::database::{Column, Table, TableRef};
-use metadata::properties::provider::Namespace;
-use metadata::properties::{CreatePropertyRequest, Property};
-use metadata::store::Store;
-use metadata::{database, events, properties, Metadata};
 use std::env::temp_dir;
 use std::sync::Arc;
+
+use arrow::datatypes::DataType;
+use datafusion::datasource::listing::{
+    ListingTable, ListingTableConfig, ListingTableUrl,
+};
+use datafusion::datasource::provider_as_source;
+use datafusion::logical_plan::LogicalPlan;
+use datafusion::prelude::CsvReadOptions;
+use datafusion_expr::logical_plan::builder::UNNAMED_TABLE;
+use datafusion_expr::LogicalPlanBuilder;
 use uuid::Uuid;
+
+use metadata::{database, events, Metadata, properties};
+use metadata::database::{Column, Table, TableRef};
+use metadata::properties::{CreatePropertyRequest, Property};
+use metadata::properties::provider::Namespace;
+use metadata::store::Store;
+
+use crate::error::Result;
+use crate::event_fields;
+
 pub async fn events_provider(
     db: Arc<database::Provider>,
     org_id: u64,
@@ -19,18 +28,20 @@ pub async fn events_provider(
 ) -> Result<LogicalPlan> {
     let table = db.get_table(TableRef::Events(org_id, proj_id)).await?;
     let schema = table.arrow_schema();
-    let options = CsvReadOptions::new().schema(&schema);
-    let path = "../tests/events.csv";
-    let df_input = datafusion::logical_plan::LogicalPlanBuilder::scan_csv(
-        Arc::new(LocalFileSystem {}),
-        path,
-        options,
-        None,
-        1,
-    )
-    .await?;
 
-    Ok(df_input.build()?)
+    let options = CsvReadOptions::new();
+    let table_path = ListingTableUrl::parse("../tests/events.csv")?;
+    let target_partitions = 1;
+    let listing_options = options.to_listing_options(target_partitions);
+
+    let config = ListingTableConfig::new(table_path.clone())
+        .with_listing_options(listing_options)
+        .with_schema(Arc::new(schema));
+    let provider = ListingTable::try_new(config)?;
+    Ok(
+        LogicalPlanBuilder::scan(UNNAMED_TABLE, provider_as_source(Arc::new(provider)), None)?
+            .build()?,
+    )
 }
 
 pub async fn create_property(
@@ -155,7 +166,7 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
             display_name: None,
             typ: DataType::Utf8,
             status: properties::Status::Enabled,
-            nullable: false,
+            nullable: true,
             is_array: false,
             is_dictionary: false,
             dictionary_type: None,
@@ -259,7 +270,7 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
             display_name: None,
             typ: DataType::Float64,
             status: properties::Status::Enabled,
-            nullable: false,
+            nullable: true,
             is_array: false,
             is_dictionary: false,
             dictionary_type: None,

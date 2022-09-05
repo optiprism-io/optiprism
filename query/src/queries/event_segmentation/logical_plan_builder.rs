@@ -1,41 +1,34 @@
-use crate::error::Result;
-use chrono::{DateTime, Duration, Utc};
-use datafusion::logical_plan::{exprlist_to_fields, Column, DFSchema, LogicalPlan};
-use datafusion::physical_plan::aggregates::AggregateFunction;
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use crate::logical_plan::expr::{aggregate_partitioned, multi_and, sorted_distinct_count};
-
-use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-
-use crate::queries::types::{EventRef, PropertyRef, TimeUnit};
-use crate::{event_fields, Context};
-
-use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
-
-use datafusion_expr::expr_fn::and;
-use datafusion_expr::{col, lit, BuiltinScalarFunction, Expr};
-
-use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
-use crate::logical_plan::merge::MergeNode;
-use crate::logical_plan::pivot::PivotNode;
-use crate::logical_plan::unpivot::UnpivotNode;
-
+use chrono::{DateTime, Duration, Utc};
 use chrono::prelude::*;
 use chronoutil::DateRule;
-
+use datafusion::logical_plan::{Column, DFSchema, LogicalPlan};
+use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
+use datafusion::physical_plan::aggregates::AggregateFunction;
+use datafusion_expr::{BuiltinScalarFunction, col, Expr, lit};
+use datafusion_expr::expr_fn::and;
+use datafusion_expr::utils::exprlist_to_fields;
 use futures::executor;
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;
-use metadata::properties::provider::Namespace;
 use metadata::Metadata;
+use metadata::properties::provider::Namespace;
 
-use std::sync::Arc;
-
+use crate::{Context, event_fields};
+use crate::error::Result;
 use crate::expr::{event_expression, property_col, property_expression, time_expression};
+use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
+use crate::logical_plan::expr::{aggregate_partitioned, multi_and, sorted_distinct_count};
+use crate::logical_plan::merge::MergeNode;
+use crate::logical_plan::pivot::PivotNode;
+use crate::logical_plan::unpivot::UnpivotNode;
+use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 use crate::queries::event_segmentation::types::{
     Breakdown, Event, EventFilter, EventSegmentation, Query,
 };
+use crate::queries::types::{EventRef, PropertyRef, TimeUnit};
 
 pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
@@ -358,7 +351,7 @@ impl LogicalPlanBuilder {
         // todo check for duplicates
         let all_expr = group_expr.iter().chain(aggr_expr.iter());
 
-        let aggr_schema = DFSchema::new(exprlist_to_fields(all_expr, input.schema())?)?;
+        let aggr_schema = DFSchema::new_with_metadata(exprlist_to_fields(all_expr, &input)?, HashMap::new())?;
 
         let expr = LogicalPlan::Aggregate(Aggregate {
             input: Arc::new(input),

@@ -1,8 +1,8 @@
 use std::string::FromUtf8Error;
-use std::{error, error::Error as StdError, fmt::{self, Display, Formatter}, result};
-use std::str::Utf8Error;
+use std::{error, result};
+
 use thiserror::Error;
-use crate::database::{Column, Table, TableRef};
+use crate::database::{Column, TableRef};
 use crate::properties;
 
 pub type Result<T> = result::Result<T, MetadataError>;

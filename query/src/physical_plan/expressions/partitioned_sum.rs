@@ -5,15 +5,13 @@ use crate::physical_plan::expressions::partitioned_aggregate::{
     Buffer, PartitionedAccumulator, Value,
 };
 use crate::DEFAULT_BATCH_SIZE;
-use arrow::array::{
-    ArrayRef, DecimalArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array,
-    Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
-};
+use arrow::array::{ArrayRef, Decimal128Array, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
 
 use arrow::datatypes::DataType;
 
 use datafusion::physical_plan::Accumulator;
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
+use datafusion_expr::AggregateState;
 
 #[derive(Debug)]
 pub struct PartitionedSumAccumulator {
@@ -29,7 +27,7 @@ impl PartitionedSumAccumulator {
                 Value::UInt64(0)
             }
             DataType::Float16 | DataType::Float32 | DataType::Float64 => Value::Float64(0.0),
-            DataType::Decimal(_, _) => Value::Decimal(0),
+            DataType::Decimal128(_, _) => Value::Decimal128(0),
             _ => unimplemented!(),
         };
         Ok(Self {
@@ -74,23 +72,23 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
             DataType::Int64 => update_batch!(self, val_arr, spans, i64, Int64, Int64Array),
             DataType::Float32 => update_batch!(self, val_arr, spans, f64, Float64, Float32Array),
             DataType::Float64 => update_batch!(self, val_arr, spans, f64, Float64, Float64Array),
-            DataType::Decimal(_, _) => {
+            DataType::Decimal128(_, _) => {
                 let mut sum: i128 = self.sum.into();
-                let arr = val_arr.as_any().downcast_ref::<DecimalArray>().unwrap();
+                let arr = val_arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
                 for (idx, value) in arr.iter().enumerate() {
                     if spans[idx] {
-                        self.buffer.push(Value::Decimal(sum))?;
+                        self.buffer.push(Value::Decimal128(sum))?;
                         sum = 0;
                     }
 
                     match value {
                         None => continue,
                         Some(value) => {
-                            sum += value;
+                            sum += value.as_i128();
                         }
                     }
                 }
-                self.sum = Value::Decimal(sum)
+                self.sum = Value::Decimal128(sum)
             }
             _ => unimplemented!(),
         }
@@ -102,7 +100,7 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
         Ok(self.buffer.merge_batch(states)?)
     }
 
-    fn state(&self) -> Result<Vec<ScalarValue>> {
+    fn state(&self) -> Result<Vec<AggregateState>> {
         self.buffer.flush_with_value(self.sum)?;
         Ok(self.buffer.state()?)
     }
@@ -122,7 +120,7 @@ mod tests {
     use arrow::datatypes::DataType;
     use datafusion::physical_plan::expressions::AvgAccumulator;
 
-    use datafusion::scalar::ScalarValue as DFScalarValue;
+    use datafusion_common::ScalarValue as DFScalarValue;
 
     use datafusion_expr::Accumulator;
     use rust_decimal::Decimal;
@@ -163,8 +161,8 @@ mod tests {
     #[test]
     fn test_decimal() -> Result<()> {
         let outer_acc: Box<dyn Accumulator> =
-            Box::new(AvgAccumulator::try_new(&DataType::Decimal(10, 2))?);
-        let mut sum_acc = PartitionedSumAccumulator::try_new(DataType::Decimal(10, 2), outer_acc)?;
+            Box::new(AvgAccumulator::try_new(&DataType::Decimal128(10, 2))?);
+        let mut sum_acc = PartitionedSumAccumulator::try_new(DataType::Decimal128(10, 2), outer_acc)?;
         let spans = vec![
             false, false, true, false, false, true, false, false, false, true,
         ];

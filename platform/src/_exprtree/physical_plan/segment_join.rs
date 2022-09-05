@@ -19,7 +19,7 @@ use datafusion::physical_plan::{
     ColumnarValue, ExecutionPlan, Partitioning, PhysicalExpr, RecordBatchStream,
     SendableRecordBatchStream,
 };
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use futures::{Stream, StreamExt, TryStream, TryStreamExt};
 use std::any::Any;
 use std::borrow::{Borrow, BorrowMut};
@@ -601,7 +601,7 @@ mod tests {
     use datafusion::physical_plan::expressions::{col, BinaryExpr, Column, Literal};
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::{common, ExecutionPlan};
-    use datafusion::scalar::ScalarValue;
+    use datafusion_common::ScalarValue;
     use std::collections::BTreeMap;
     use std::convert::TryFrom;
     use std::convert::TryInto;

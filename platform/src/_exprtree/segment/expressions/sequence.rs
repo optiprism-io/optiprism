@@ -298,7 +298,7 @@ mod tests {
     use datafusion::logical_plan::Operator;
     use datafusion::physical_plan::expressions::{BinaryExpr, Column, Literal};
     use datafusion::physical_plan::PhysicalExpr;
-    use datafusion::scalar::ScalarValue;
+    use datafusion_common::ScalarValue;
     use std::sync::Arc;
 
     fn build_table(

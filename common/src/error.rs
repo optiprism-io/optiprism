@@ -1,7 +1,6 @@
-use datafusion::error::DataFusionError;
+use datafusion_common::DataFusionError;
 use jsonwebtoken::errors::Error as JWTError;
 use std::{
-    fmt::{self, Display, Formatter},
     result,
 };
 use thiserror::Error;

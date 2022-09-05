@@ -1,11 +1,13 @@
+use std::any::Any;
+use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
+
 use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
 use datafusion_common::{Column, DFField, DFSchema};
 use datafusion_expr::Expr;
-use std::any::Any;
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
-use crate::error::QueryError;
 
+use crate::error::QueryError;
 use crate::Result;
 
 pub struct PivotNode {
@@ -49,7 +51,7 @@ impl PivotNode {
 
             fields.extend_from_slice(&result_fields);
 
-            Arc::new(DFSchema::new(fields)?)
+            Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?)
         };
 
         Ok(Self {
@@ -93,7 +95,7 @@ impl UserDefinedLogicalNode for PivotNode {
         &self,
         _: &[Expr],
         inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+    ) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
             PivotNode::try_new(
                 inputs[0].clone(),
@@ -101,8 +103,8 @@ impl UserDefinedLogicalNode for PivotNode {
                 self.value_col.clone(),
                 self.result_cols.clone(),
             )
-            .map_err(QueryError::into_datafusion_plan_error)
-            .unwrap(),
+                .map_err(QueryError::into_datafusion_plan_error)
+                .unwrap(),
         )
     }
 }

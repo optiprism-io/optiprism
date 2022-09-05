@@ -1,4 +1,4 @@
-import { App as Application } from 'vue';
+import {App as Application} from 'vue';
 
 export type I18N = { $t: $T}
 export type $T = (key: string) => string

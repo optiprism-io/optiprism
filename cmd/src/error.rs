@@ -1,19 +1,16 @@
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
+use std::{
+    result,
 };
+
+use datafusion::error::DataFusionError;
+use thiserror::Error;
+
 use common::error::CommonError;
 use events_gen::error::EventsGenError;
 use metadata::error::MetadataError;
 use platform::PlatformError;
-
-use datafusion::error::DataFusionError;
-use std::{
-    fmt::{self, Display, Formatter},
-    result,
-};
 use query::error::QueryError;
-use thiserror::Error;
+
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Error, Debug)]

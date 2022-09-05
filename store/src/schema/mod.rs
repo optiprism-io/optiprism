@@ -206,7 +206,7 @@ fn datatype_db_name(dt: &DataType) -> String {
         DataType::Struct(_) => "struct".to_string(),
         DataType::Union(_) => "union".to_string(),
         DataType::Dictionary(_, _) => "dictionary".to_string(),
-        DataType::Decimal(_, _) => "decimal".to_string(),
+        DataType::Decimal128(_, _) => "decimal".to_string(),
         DataType::Map(_, _) => unimplemented!(),
     }
 }

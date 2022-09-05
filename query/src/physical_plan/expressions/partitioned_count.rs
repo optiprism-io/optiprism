@@ -8,7 +8,8 @@ use arrow::array::ArrayRef;
 use arrow::datatypes::DataType;
 
 use datafusion::physical_plan::Accumulator;
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
+use datafusion_expr::AggregateState;
 
 #[derive(Debug)]
 pub struct PartitionedCountAccumulator {
@@ -42,7 +43,7 @@ impl PartitionedAccumulator for PartitionedCountAccumulator {
         Ok(self.buffer.merge_batch(states)?)
     }
 
-    fn state(&self) -> Result<Vec<ScalarValue>> {
+    fn state(&self) -> Result<Vec<AggregateState>> {
         self.buffer.flush_with_value(self.count.into())?;
         Ok(self.buffer.state()?)
     }
@@ -62,7 +63,7 @@ mod tests {
     use arrow::datatypes::DataType;
     use datafusion::physical_plan::expressions::AvgAccumulator;
 
-    use datafusion::scalar::ScalarValue as DFScalarValue;
+    use datafusion_common::ScalarValue as DFScalarValue;
 
     use datafusion_expr::Accumulator;
 

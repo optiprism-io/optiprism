@@ -1,12 +1,16 @@
-use crate::Result;
+use std::any::Any;
+use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
+
 use arrow::datatypes::DataType;
 use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
 use datafusion_common::{Column, DFField, DFSchema};
 use datafusion_expr::Expr;
+
 use metadata::dictionaries::provider::SingleDictionaryProvider;
-use std::any::Any;
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
+
+use crate::Result;
 
 pub struct DictionaryDecodeNode {
     pub input: LogicalPlan,
@@ -39,7 +43,7 @@ impl DictionaryDecodeNode {
             })
             .collect();
 
-        let schema = Arc::new(DFSchema::new(fields)?);
+        let schema = Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?);
 
         Ok(Self {
             input,
@@ -80,7 +84,7 @@ impl UserDefinedLogicalNode for DictionaryDecodeNode {
         &self,
         _exprs: &[Expr],
         inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+    ) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
             DictionaryDecodeNode::try_new(inputs[0].clone(), self.decode_cols.clone()).unwrap(),
         )

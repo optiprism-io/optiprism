@@ -1,6 +1,6 @@
 use crate::exprtree::error::{Error, Result};
 use chrono::{Date, Utc};
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 
 struct Property {
     id: u64,

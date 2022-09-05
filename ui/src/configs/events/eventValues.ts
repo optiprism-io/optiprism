@@ -1,4 +1,4 @@
-import { defineComponent } from 'vue'
+import {defineComponent} from 'vue'
 
 import UiInputTags from '@/components/uikit/UiInputTags.vue'
 import UiInput from '@/components/uikit/UiInput.vue'

@@ -3,12 +3,12 @@ import '@patternfly/patternfly/patternfly-addons.scss';
 import 'floating-vue/dist/style.css'
 import '@/assets/styles/main.scss';
 import lang from '@/lang';
-import { createApp } from 'vue';
-import { createPinia } from 'pinia';
+import {createApp} from 'vue';
+import {createPinia} from 'pinia';
 import App from '@/App.vue';
 import makeServer from '@/server';
 import FloatingVue from 'floating-vue'
-import { router } from '@/router'
+import {router} from '@/router'
 import uikitPlugin from '@/plugins/uikit';
 import i18nPlugin from '@/plugins/i18n';
 

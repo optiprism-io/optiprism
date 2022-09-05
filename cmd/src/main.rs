@@ -1,23 +1,25 @@
+extern crate bytesize;
 extern crate log;
 
-extern crate bytesize;
+use std::{env::set_var, net::SocketAddr, sync::Arc};
+use std::env::temp_dir;
+use std::path::PathBuf;
 
-mod error;
-
-use crate::error::Error;
 use axum::{Router, Server};
 use bytesize::ByteSize;
 use chrono::{DateTime, Utc};
 use datafusion::datasource::MemTable;
-use error::Result;
 use log::info;
-use metadata::store::Store;
-use metadata::Metadata;
-use query::QueryProvider;
-use std::env::temp_dir;
-use std::path::PathBuf;
-use std::{env::set_var, net::SocketAddr, sync::Arc};
 use uuid::Uuid;
+
+use error::Result;
+use metadata::Metadata;
+use metadata::store::Store;
+use query::QueryProvider;
+
+use crate::error::Error;
+
+mod error;
 
 #[tokio::main]
 async fn main() -> Result<()> {

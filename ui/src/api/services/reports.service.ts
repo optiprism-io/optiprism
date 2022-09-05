@@ -1,4 +1,5 @@
-import { ReportsApi, EventSegmentation } from '@/api'
+import {EventSegmentation, ReportsApi} from '@/api'
+
 const api = new ReportsApi()
 
 const schemaReports = {

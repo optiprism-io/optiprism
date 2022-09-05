@@ -15,7 +15,6 @@ mod tests {
     use chrono::{DateTime, Utc};
 
     use arrow::datatypes::DataType as DFDataType;
-    use datafusion::datasource::object_store::local::LocalFileSystem;
     use datafusion::prelude::CsvReadOptions;
 
     use axum::headers::{HeaderMap, HeaderValue};

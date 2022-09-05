@@ -1,10 +1,5 @@
-use crate::{ Result};
-use arrow::array::{
-    Array, ArrayRef, BooleanArray, BooleanBuilder, DecimalArray, DecimalBuilder, Float32Builder,
-    Float64Builder, Int16Array, Int16Builder, Int32Array, Int32Builder, Int64Array, Int64Builder,
-    Int8Array, Int8Builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder,
-    UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
-};
+use crate::{Result};
+use arrow::array::{Array, ArrayAccessor, ArrayRef, BooleanArray, BooleanBuilder, Decimal128Array, Decimal128Builder, Float32Builder, Float64Builder, Int16Array, Int16Builder, Int32Array, Int32Builder, Int64Array, Int64Builder, Int8Array, Int8Builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
@@ -13,7 +8,7 @@ use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use datafusion::arrow::array::{
     Float32Array, Float64Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
-use datafusion::execution::runtime_env::RuntimeEnv;
+
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 use datafusion::physical_plan::{
@@ -27,7 +22,9 @@ use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use datafusion::execution::context::TaskContext;
 use crate::error::QueryError;
+use datafusion_common::Result as DFResult;
 
 /// `UNPIVOT` execution plan operator. Unpivot transforms columns into rows. E.g.
 pub struct UnpivotExec {
@@ -46,7 +43,7 @@ impl UnpivotExec {
         name_col: String,
         value_col: String,
     ) -> Result<Self> {
-        let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
+        let value_type = DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE);
 
         let mut uniq_cols = cols.clone();
         uniq_cols.sort();
@@ -122,7 +119,7 @@ impl ExecutionPlan for UnpivotExec {
     }
 
     fn with_new_children(
-        &self,
+        self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
@@ -132,16 +129,16 @@ impl ExecutionPlan for UnpivotExec {
                 self.name_col.clone(),
                 self.value_col.clone(),
             )
-            .map_err(QueryError::into_datafusion_execution_error)?,
+                .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
-    async fn execute(
+    fn execute(
         &self,
         partition: usize,
-        runtime: Arc<RuntimeEnv>,
-    ) -> datafusion_common::Result<SendableRecordBatchStream> {
-        let stream = self.input.execute(partition, runtime.clone()).await?;
+        context: Arc<TaskContext>,
+    ) -> DFResult<SendableRecordBatchStream> {
+        let stream = self.input.execute(partition, context)?;
 
         Ok(Box::pin(UnpivotStream {
             stream,
@@ -208,17 +205,17 @@ macro_rules! build_group_arr {
             if src_arr.is_null(row_idx) {
                     // append value multiple time, one for each unpivot column
                     for _ in 0..$unpivot_cols_len {
-                        result.append_null().unwrap();
+                        result.append_null()
                     }
                 } else {
                 // populate null
                 for _ in 0..$unpivot_cols_len {
-                        result.append_value(src_arr.value(row_idx)).unwrap();
+                        result.append_value(src_arr.value(row_idx));
                     }
                 }
         }
 
-        Arc::new(result.finish()) as ArrayRef
+        Ok(Arc::new(result.finish()) as ArrayRef)
     }};
 }
 
@@ -237,9 +234,9 @@ macro_rules! build_value_arr {
             // iterate over each column to unpivot and append its value to the result
             for arr in arrs.iter() {
                 if arr.is_null(idx) {
-                    result.append_null()?;
+                    result.append_null();
                 } else {
-                    result.append_value(arr.value(idx))?;
+                    result.append_value(arr.value(idx));
                 }
             }
         }
@@ -349,31 +346,33 @@ pub fn unpivot(
                 unpivot_cols_len,
                 TimestampNanosecondBuilder
             ),
-            DataType::Decimal(precision, scale) => {
+            DataType::Decimal128(precision, scale) => {
                 // build group array realisation for decimal type
-                let src_arr_typed = arr.as_any().downcast_ref::<DecimalArray>().unwrap();
-                let mut result = DecimalBuilder::new(builder_cap, *precision, *scale);
+                let src_arr_typed = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
+                let mut result = Decimal128Builder::new(builder_cap, *precision, *scale);
 
                 for row_idx in 0..arr.len() {
                     if src_arr_typed.is_null(row_idx) {
                         for _ in 0..=unpivot_cols_len {
-                            result.append_null().unwrap();
+                            result.append_null();
                         }
                     } else {
                         for _ in 0..=unpivot_cols_len {
-                            result.append_value(src_arr_typed.value(row_idx)).unwrap();
+                            if let Err(err) = result.append_value(src_arr_typed.value(row_idx)) {
+                                return Err(err);
+                            }
                         }
                     }
                 }
 
-                Arc::new(result.finish()) as ArrayRef
+                Ok(Arc::new(result.finish()) as ArrayRef)
             }
             _ => unimplemented!("{}", arr.data_type()),
         })
-        .collect();
+        .collect::<ArrowResult<Vec<_>>>()?;
 
     // define value type
-    let value_type = DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE);
+    let value_type = DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE);
 
     // cast unpivot cols to value type
     let unpivot_arrs: Vec<ArrayRef> = batch
@@ -382,7 +381,7 @@ pub fn unpivot(
         .enumerate()
         .filter(|(idx, _)| cols.contains(batch.schema().field(*idx).name()))
         .map(|(_, arr)| match arr.data_type() {
-            DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE) => arr.clone(),
+            DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE) => arr.clone(),
             DataType::UInt64 => {
                 // first cast uint to int because Arrow 9.1.0 doesn't support casting from uint to decimal
                 let int_arr = arrow::compute::cast(arr, &DataType::Int64).unwrap();
@@ -396,7 +395,7 @@ pub fn unpivot(
         let mut builder = StringBuilder::new(builder_cap);
         for _ in 0..batch.num_rows() {
             for c in cols.iter() {
-                builder.append_value(c.as_str())?;
+                builder.append_value(c.as_str());
             }
         }
 
@@ -410,17 +409,17 @@ pub fn unpivot(
         DataType::Float64 => {
             build_value_arr!(Float64Array, Float64Builder, builder_cap, unpivot_arrs)
         }
-        DataType::Decimal(DECIMAL_PRECISION, DECIMAL_SCALE) => {
-            let arrs: Vec<&DecimalArray> = unpivot_arrs
+        DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE) => {
+            let arrs: Vec<&Decimal128Array> = unpivot_arrs
                 .iter()
-                .map(|x| x.as_any().downcast_ref::<DecimalArray>().unwrap())
+                .map(|x| x.as_any().downcast_ref::<Decimal128Array>().unwrap())
                 .collect();
-            let mut result = DecimalBuilder::new(builder_cap, DECIMAL_PRECISION, DECIMAL_SCALE);
+            let mut result = Decimal128Builder::new(builder_cap, DECIMAL_PRECISION, DECIMAL_SCALE);
 
             for idx in 0..unpivot_arrs[0].len() {
                 for arr in arrs.iter() {
                     if arr.is_null(idx) {
-                        result.append_null()?;
+                        result.append_null();
                     } else {
                         result.append_value(arr.value(idx))?;
                     }
@@ -445,12 +444,13 @@ mod tests {
     use crate::physical_plan::unpivot::UnpivotExec;
     use arrow::array::{ArrayRef, Float32Array, Float64Array, Int32Array, StringArray};
     use arrow::record_batch::RecordBatch;
-    pub use datafusion::error::Result;
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+    pub use datafusion_common::Result;
+
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use std::sync::Arc;
+    use datafusion::prelude::SessionContext;
 
     #[tokio::test]
     async fn test() -> Result<()> {
@@ -503,9 +503,10 @@ mod tests {
             "name".to_string(),
             "value".to_string(),
         )
-        .unwrap();
-        let runtime = Arc::new(RuntimeEnv::new(RuntimeConfig::new())?);
-        let stream = exec.execute(0, runtime).await?;
+            .unwrap();
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = exec.execute(0, task_ctx)?;
         let result = collect(stream).await?;
 
         print!("{}", arrow::util::pretty::pretty_format_batches(&result)?);

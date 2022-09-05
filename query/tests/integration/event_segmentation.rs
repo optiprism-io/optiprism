@@ -6,24 +6,23 @@ mod tests {
 
     use chrono::{DateTime, Duration, Utc};
 
-    use arrow::datatypes::DataType as DFDataType;
+    
 
     use arrow::util::pretty::print_batches;
-    use datafusion::datasource::object_store::local::LocalFileSystem;
 
     use datafusion::physical_plan::{collect, PhysicalPlanner};
-    use datafusion::prelude::{CsvReadOptions, ExecutionConfig, ExecutionContext};
+    use datafusion::prelude::{SessionConfig, SessionContext};
 
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-    use datafusion::logical_plan::LogicalPlan;
+    use datafusion::execution::runtime_env::{RuntimeEnv};
+    
     use datafusion::physical_plan::coalesce_batches::concat_batches;
 
     use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;
-    use metadata::database::{Column, Table, TableRef};
-    use metadata::properties::provider::Namespace;
-    use metadata::properties::{CreatePropertyRequest, Property};
-    use metadata::{database, events, properties, Metadata};
+    
+    
+    
+    
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
@@ -37,6 +36,7 @@ mod tests {
     use std::ops::Sub;
     use std::sync::Arc;
     use uuid::Uuid;
+    use datafusion::execution::context::SessionState;
 
     #[tokio::test]
     async fn test_filters() -> Result<()> {
@@ -286,20 +286,21 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
         let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
+        println!("logical plan: {:?}", plan);
 
-        let config = ExecutionConfig::new()
-            .with_query_planner(Arc::new(QueryPlanner {}))
-            .with_target_partitions(1);
+        let runtime = Arc::new(RuntimeEnv::default());
+        let config = SessionConfig::new().with_target_partitions(1);
+        let session_state = SessionState::with_config_rt(config, runtime)
+            .with_query_planner(Arc::new(QueryPlanner {})).with_optimizer_rules(vec![]);
 
-        let ctx = ExecutionContext::with_config(config);
-
-        let physical_plan = ctx.create_physical_plan(&plan).await?;
+        let exec_ctx = SessionContext::with_state(session_state);
+        let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
 
         let result = collect(
             physical_plan,
-            Arc::new(RuntimeEnv::new(RuntimeConfig::new())?),
+            exec_ctx.task_ctx(),
         )
-        .await?;
+            .await?;
 
         let concated = concat_batches(&result[0].schema(), &result, 0)?;
 

@@ -1,20 +1,20 @@
-use crate::logical_plan::expr::{lit_timestamp, multi_or};
-use crate::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime};
-use crate::{event_fields, Result};
-use crate::{Context};
+use std::sync::Arc;
+
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
-
 use datafusion::logical_plan::ExprSchemable;
 use datafusion_common::{Column, ExprSchema, ScalarValue};
+use datafusion_expr::{col, Expr, lit, Operator};
 use datafusion_expr::expr_fn::{and, binary_expr};
-use datafusion_expr::{col, lit, Expr, Operator};
 
-use metadata::properties::provider::Namespace;
 use metadata::{dictionaries, Metadata};
+use metadata::properties::provider::Namespace;
 
-use std::sync::Arc;
+use crate::{event_fields, Result};
+use crate::Context;
 use crate::error::QueryError;
+use crate::logical_plan::expr::{lit_timestamp, multi_or};
+use crate::queries::types::{EventRef, PropertyRef, PropValueOperation, QueryTime};
 
 /// builds expression on timestamp
 pub fn time_expression<S: ExprSchema>(

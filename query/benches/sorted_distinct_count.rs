@@ -1,11 +1,12 @@
 use arrow::array::{ArrayRef, Int64Array};
 use arrow::datatypes::DataType;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use datafusion::physical_plan::expressions::DistinctCount;
-use datafusion::physical_plan::{Accumulator, AggregateExpr};
+use datafusion_core::physical_plan::expressions::DistinctCount;
+use datafusion_core::physical_plan::{Accumulator, AggregateExpr};
 use query::physical_plan::expressions::sorted_distinct_count::SortedDistinctCountAccumulator;
 use rand::Rng;
 use std::sync::Arc;
+use datafusion::physical_expr::expressions::DistinctCount;
 
 fn new_random_array(size: usize, limit: usize) -> ArrayRef {
     let mut vec = Vec::with_capacity(size);

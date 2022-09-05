@@ -3,7 +3,7 @@ use crate::Result;
 use chrono::{DateTime, Utc};
 use common::DECIMAL_PRECISION;
 use convert_case::{Case, Casing};
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
 use query::queries::types as query_types;
 use rust_decimal::Decimal;

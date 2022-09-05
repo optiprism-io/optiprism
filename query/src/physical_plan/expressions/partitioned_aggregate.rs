@@ -25,26 +25,23 @@ use std::fmt::Debug;
 
 use std::sync::{Arc, Mutex};
 
-use arrow::array::{
-    Array, ArrayRef, DecimalBuilder, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
-    UInt16Array, UInt32Array, UInt64Array, UInt8Array,
-};
+use arrow::array::{Array, ArrayRef, Decimal128Builder, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
 use arrow::datatypes::DataType;
-use datafusion::error::Result as DFResult;
+use datafusion_common::Result as DFResult;
 
 use crate::physical_plan::expressions::partitioned_count::PartitionedCountAccumulator;
 use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
 
 use datafusion::physical_plan::expressions::{AvgAccumulator, MaxAccumulator, MinAccumulator};
 use datafusion::physical_plan::Accumulator;
-use datafusion::scalar::ScalarValue;
-use datafusion_expr::AggregateFunction;
+use datafusion_common::ScalarValue;
+use datafusion_expr::{AggregateFunction, AggregateState};
 
 // PartitionedAccumulator extends Accumulator trait with reset
 pub trait PartitionedAccumulator: Debug + Send + Sync {
     fn update_batch(&mut self, spans: &[bool], values: &[ArrayRef]) -> Result<()>;
     fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()>;
-    fn state(&self) -> Result<Vec<ScalarValue>>;
+    fn state(&self) -> Result<Vec<AggregateState>>;
     fn evaluate(&self) -> Result<ScalarValue>;
 }
 
@@ -108,10 +105,10 @@ impl Buffer {
             DataType::Float32 | DataType::Float64 => {
                 buffer_to_array_ref!(buffer, f64, Float64Array)
             }
-            DataType::Decimal(precision, scale) => {
-                let mut builder = DecimalBuilder::new(buffer.len(), precision, scale);
+            DataType::Decimal128(precision, scale) => {
+                let mut builder = Decimal128Builder::new(buffer.len(), precision, scale);
                 for v in buffer.iter() {
-                    builder.append_value(v.into())?;
+                    builder.append_value(v)?;
                 }
                 Arc::new(builder.finish()) as ArrayRef
             }
@@ -130,7 +127,7 @@ impl Buffer {
         self.buffer.is_empty()
     }
 
-    pub fn state(&self) -> DFResult<Vec<ScalarValue>> {
+    pub fn state(&self) -> DFResult<Vec<AggregateState>> {
         self.acc.lock().unwrap().state()
     }
 
@@ -164,7 +161,7 @@ pub enum Value {
     Int64(i64),
     UInt64(u64),
     Float64(f64),
-    Decimal(i128),
+    Decimal128(i128),
     Null,
 }
 
@@ -189,7 +186,7 @@ impl From<&Value> for i64 {
 impl From<Value> for i128 {
     fn from(v: Value) -> Self {
         match v {
-            Value::Decimal(v) => v,
+            Value::Decimal128(v) => v,
             _ => unreachable!(),
         }
     }
@@ -198,7 +195,7 @@ impl From<Value> for i128 {
 impl From<&Value> for i128 {
     fn from(v: &Value) -> Self {
         match v {
-            Value::Decimal(v) => *v,
+            Value::Decimal128(v) => *v,
             _ => unreachable!(),
         }
     }
@@ -381,7 +378,7 @@ macro_rules! make_spans {
     }};
 }
 impl Accumulator for PartitionedAggregateAccumulator {
-    fn state(&self) -> DFResult<Vec<ScalarValue>> {
+    fn state(&self) -> DFResult<Vec<AggregateState>> {
         self.acc
             .state()
             .map_err(QueryError::into_datafusion_execution_error)

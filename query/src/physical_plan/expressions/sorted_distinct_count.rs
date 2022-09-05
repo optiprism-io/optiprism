@@ -5,11 +5,11 @@ use arrow::array::{
 };
 use arrow::compute;
 use arrow::datatypes::{DataType, TimeUnit};
-use datafusion::error::{DataFusionError, Result};
-use datafusion::physical_plan::functions::{Signature, TypeSignature, Volatility};
+use datafusion_common::{DataFusionError, Result};
+use datafusion_expr::{AggregateState, Signature, TypeSignature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::Accumulator;
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 use datafusion_expr::{AccumulatorFunctionImplementation, ReturnTypeFunction, StateTypeFunction};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -137,9 +137,9 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
             distinct_count_array!(array, TimestampSecondArray, state)
         }
 
-        // "the trait `From<i128>` is not implemented for `datafusion::scalar::ScalarValue`"
+        // "the trait `From<i128>` is not implemented for `datafusion_common::ScalarValue`"
         // TODO Enable once https://github.com/apache/arrow-datafusion/pull/1394 is released
-        // DataType::Decimal(_, _) => distinct_count_array!(array, DecimalArray, state),
+        // DataType::Decimal128(_, _) => distinct_count_array!(array, DecimalArray, state),
         other => {
             let message = format!(
                 "Ordered distinct count over array of type \"{:?}\" is not supported",
@@ -151,8 +151,8 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
 }
 
 impl Accumulator for SortedDistinctCountAccumulator {
-    fn state(&self) -> Result<Vec<ScalarValue>> {
-        Ok(vec![ScalarValue::UInt64(Some(self.count))])
+    fn state(&self) -> Result<Vec<AggregateState>> {
+        Ok(vec![AggregateState::Scalar(ScalarValue::UInt64(Some(self.count)))])
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
@@ -175,16 +175,16 @@ impl Accumulator for SortedDistinctCountAccumulator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    
 
-    fn check_batch(sequences: &[Vec<i64>], expected: usize) -> datafusion::error::Result<()> {
+    fn check_batch(sequences: &[Vec<i64>], expected: usize) -> datafusion_common::Result<()> {
         let mut acc = SortedDistinctCountAccumulator::try_new(&DataType::Int64)?;
         for seq in sequences {
             let array = Int64Array::from(seq.to_owned());
             let array_ref = Arc::new(array);
             acc.update_batch(&[array_ref])?;
         }
-        let state = acc.state()?[0].clone();
-        assert_eq!(state, ScalarValue::UInt64(Some(expected as u64)));
+        assert_eq!(acc.state()?[0].as_scalar()?.to_owned(), ScalarValue::UInt64(Some(expected as u64)));
         Ok(())
     }
 
@@ -198,7 +198,7 @@ mod tests {
             ],
             9,
         )
-        .unwrap();
+            .unwrap();
     }
 
     #[test]
@@ -211,6 +211,6 @@ mod tests {
             ],
             9,
         )
-        .unwrap();
+            .unwrap();
     }
 }

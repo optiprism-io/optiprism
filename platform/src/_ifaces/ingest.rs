@@ -2,7 +2,7 @@ use crate::exprtree::error::{Error, Result};
 use crate::ifaces::event;
 use crate::ifaces::user;
 use chrono::{Date, Utc};
-use datafusion::scalar::ScalarValue;
+use datafusion_common::ScalarValue;
 
 struct Property {
     name: String,

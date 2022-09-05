@@ -16,7 +16,7 @@ use arrow::array::{
     Array, BooleanArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
     StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
-use arrow::array::{ArrayRef, DecimalArray};
+use arrow::array::{ArrayRef, Decimal128Array};
 use arrow::datatypes::DataType;
 pub use auth::Provider as AuthProvider;
 pub use context::Context;
@@ -49,13 +49,13 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
         DataType::Float64 => arr_to_json_values!(arr, Float64Array),
         DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
         DataType::Utf8 => arr_to_json_values!(arr, StringArray),
-        DataType::Decimal(_, s) => {
-            let arr = arr.as_any().downcast_ref::<DecimalArray>().unwrap();
+        DataType::Decimal128(_, s) => {
+            let arr = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
             arr.iter()
                 .map(|value| match value {
                     None => Ok(Value::Null),
                     Some(v) => {
-                        let d = match Decimal::try_new(v as i64, *s as u32) {
+                        let d = match Decimal::try_new(v.as_i128() as i64, *s as u32) {
                             Ok(v) => v,
                             Err(err) => return Err(err.into()),
                         };
