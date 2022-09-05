@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
     use arrow::util::pretty::print_batches;
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+    use datafusion::execution::runtime_env::{RuntimeEnv};
     use datafusion::physical_plan::coalesce_batches::concat_batches;
-    use datafusion::physical_plan::{collect, displayable};
+    use datafusion::physical_plan::{collect};
     use datafusion_common::ScalarValue;
     use query::error::Result;
     use query::physical_plan::planner::QueryPlanner;

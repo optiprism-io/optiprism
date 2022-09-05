@@ -3,7 +3,7 @@ use crate::profiles::Profile;
 use crate::store::events::Event;
 use crate::store::scenario::State;
 use arrow::array::{
-    ArrayRef, DecimalBuilder, TimestampSecondBuilder, UInt16Builder, UInt64Builder, UInt8Builder,
+    ArrayRef, Decimal128Builder, TimestampSecondBuilder, UInt16Builder, UInt64Builder, UInt8Builder,
 };
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
@@ -19,14 +19,14 @@ pub struct RecordBatchBuilder {
     product_category: UInt16Builder,
     product_subcategory: UInt16Builder,
     product_brand: UInt16Builder,
-    product_price: DecimalBuilder,
-    product_discount_price: DecimalBuilder,
+    product_price: Decimal128Builder,
+    product_discount_price: Decimal128Builder,
     // search_query: UInt16Builder,
-    spent_total: DecimalBuilder,
+    spent_total: Decimal128Builder,
     products_bought: UInt8Builder,
     cart_items_number: UInt8Builder,
-    cart_amount: DecimalBuilder,
-    revenue: DecimalBuilder,
+    cart_amount: Decimal128Builder,
+    revenue: Decimal128Builder,
     country: UInt16Builder,
     city: UInt16Builder,
     device: UInt16Builder,
@@ -47,14 +47,14 @@ impl RecordBatchBuilder {
             product_category: UInt16Builder::new(cap),
             product_subcategory: UInt16Builder::new(cap),
             product_brand: UInt16Builder::new(cap),
-            product_price: DecimalBuilder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
-            product_discount_price: DecimalBuilder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
+            product_price: Decimal128Builder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
+            product_discount_price: Decimal128Builder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
             // search_query: UInt16Builder::new(cap),
-            spent_total: DecimalBuilder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
+            spent_total: Decimal128Builder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
             products_bought: UInt8Builder::new(cap),
             cart_items_number: UInt8Builder::new(cap),
-            cart_amount: DecimalBuilder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
-            revenue: DecimalBuilder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
+            cart_amount: Decimal128Builder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
+            revenue: Decimal128Builder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
             country: UInt16Builder::new(cap),
             city: UInt16Builder::new(cap),
             device: UInt16Builder::new(cap),

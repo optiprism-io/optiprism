@@ -1,23 +1,19 @@
-import { defineStore } from 'pinia';
-import {
-    Condition,
-    PropertyRef,
-    ConditionFilter,
-} from '@/types/events';
-import { OperationId, Value } from '@/types';
+import {defineStore} from 'pinia';
+import {Condition, ConditionFilter, PropertyRef,} from '@/types/events';
+import {OperationId, Value} from '@/types';
 import schemaService from '@/api/services/schema.service';
-import { useLexiconStore } from '@/stores/lexicon';
+import {useLexiconStore} from '@/stores/lexicon';
 import {
-    ChangeFilterPropertyCondition,
     ChangeEventCondition,
-    RemoveFilterCondition,
     ChangeFilterOperation,
+    ChangeFilterPropertyCondition,
     FilterValueCondition,
     Ids,
-    PeriodConditionPayload,
     PayloadChangeAgregateCondition,
-    PayloadChangeValueItem,
     PayloadChangeEach,
+    PayloadChangeValueItem,
+    PeriodConditionPayload,
+    RemoveFilterCondition,
 } from '@/components/events/Segments/Segments'
 import {
     Event,

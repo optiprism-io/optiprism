@@ -1,10 +1,6 @@
-import { defineStore } from 'pinia';
-import { Filter } from '@/types/filters';
-import {
-    EventFilters,
-    EventFiltersGroupsInnerFiltersInner,
-    EventFiltersGroupsInnerFiltersInnerTypeEnum,
-} from '@/api'
+import {defineStore} from 'pinia';
+import {Filter} from '@/types/filters';
+import {EventFilters, EventFiltersGroupsInnerFiltersInner, EventFiltersGroupsInnerFiltersInnerTypeEnum,} from '@/api'
 
 export const filterConditions = ['and', 'or'] as const;
 export type FilterCondition = typeof filterConditions[number];

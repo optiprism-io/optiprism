@@ -1,5 +1,5 @@
 use crate::{Result};
-use arrow::array::{Array, ArrayAccessor, ArrayRef, BooleanArray, BooleanBuilder, Decimal128Array, Decimal128Builder, DecimalArray, DecimalBuilder, Float32Builder, Float64Builder, Int16Array, Int16Builder, Int32Array, Int32Builder, Int64Array, Int64Builder, Int8Array, Int8Builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder};
+use arrow::array::{Array, ArrayAccessor, ArrayRef, BooleanArray, BooleanBuilder, Decimal128Array, Decimal128Builder, Float32Builder, Float64Builder, Int16Array, Int16Builder, Int32Array, Int32Builder, Int64Array, Int64Builder, Int8Array, Int8Builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
@@ -8,7 +8,7 @@ use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use datafusion::arrow::array::{
     Float32Array, Float64Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
-use datafusion::execution::runtime_env::RuntimeEnv;
+
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 use datafusion::physical_plan::{
@@ -215,7 +215,7 @@ macro_rules! build_group_arr {
                 }
         }
 
-        Arc::new(result.finish()) as ArrayRef
+        Ok(Arc::new(result.finish()) as ArrayRef)
     }};
 }
 
@@ -358,16 +358,18 @@ pub fn unpivot(
                         }
                     } else {
                         for _ in 0..=unpivot_cols_len {
-                            result.append_value(src_arr_typed.value(row_idx));
+                            if let Err(err) = result.append_value(src_arr_typed.value(row_idx)) {
+                                return Err(err);
+                            }
                         }
                     }
                 }
 
-                Arc::new(result.finish()) as ArrayRef
+                Ok(Arc::new(result.finish()) as ArrayRef)
             }
             _ => unimplemented!("{}", arr.data_type()),
         })
-        .collect();
+        .collect::<ArrowResult<Vec<_>>>()?;
 
     // define value type
     let value_type = DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE);
@@ -408,11 +410,11 @@ pub fn unpivot(
             build_value_arr!(Float64Array, Float64Builder, builder_cap, unpivot_arrs)
         }
         DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE) => {
-            let arrs: Vec<&DecimalArray> = unpivot_arrs
+            let arrs: Vec<&Decimal128Array> = unpivot_arrs
                 .iter()
-                .map(|x| x.as_any().downcast_ref::<DecimalArray>().unwrap())
+                .map(|x| x.as_any().downcast_ref::<Decimal128Array>().unwrap())
                 .collect();
-            let mut result = DecimalBuilder::new(builder_cap, DECIMAL_PRECISION, DECIMAL_SCALE);
+            let mut result = Decimal128Builder::new(builder_cap, DECIMAL_PRECISION, DECIMAL_SCALE);
 
             for idx in 0..unpivot_arrs[0].len() {
                 for arr in arrs.iter() {
@@ -443,7 +445,7 @@ mod tests {
     use arrow::array::{ArrayRef, Float32Array, Float64Array, Int32Array, StringArray};
     use arrow::record_batch::RecordBatch;
     pub use datafusion_common::Result;
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;

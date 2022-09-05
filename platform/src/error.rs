@@ -1,9 +1,11 @@
-use axum::{http, http::StatusCode, Json, response::{IntoResponse, Response}};
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-use std::{error, fmt::{self, Display, Formatter}, result};
+use std::{error, result};
 use std::collections::HashMap;
 use std::fmt::Debug;
+
+use axum::{http::StatusCode, Json, response::{IntoResponse, Response}};
+use serde::Serialize;
+use thiserror::Error;
+
 use metadata::error::{AccountError, DatabaseError, DictionaryError, EventError, MetadataError, OrganizationError, ProjectError, PropertyError, StoreError};
 use query::error::QueryError;
 
@@ -142,7 +144,7 @@ impl IntoResponse for PlatformError {
                 QueryError::Metadata(err) => ErrorResponse::internal(Box::new(err)),
             },
             PlatformError::BadRequest(msg) => ErrorResponse::new_inner(StatusCode::BAD_REQUEST, msg),
-            PlatformError::Internal(msg) => ErrorResponse::new_inner(StatusCode::INTERNAL_SERVER_ERROR, "internal server error".to_string()),
+            PlatformError::Internal(_msg) => ErrorResponse::new_inner(StatusCode::INTERNAL_SERVER_ERROR, "internal server error".to_string()),
         };
 
             (a,Json(b)).into_response()

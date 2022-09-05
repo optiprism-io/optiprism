@@ -1,12 +1,11 @@
+use std::result;
+
+
 use arrow::error::ArrowError;
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
 use datafusion::error::DataFusionError;
-use metadata::error::MetadataError;
-use std::fmt::{Display, Formatter};
-use std::{fmt, result};
-use store::error::StoreError;
 use thiserror::Error;
+
+use metadata::error::MetadataError;
 
 pub type Result<T> = result::Result<T, QueryError>;
 

@@ -4,7 +4,7 @@ use bincode::{deserialize, serialize};
 use chrono::Utc;
 
 use tokio::sync::RwLock;
-use datafusion::logical_plan::or;
+
 
 use crate::error::{EventError, MetadataError, StoreError};
 use crate::events::types::{CreateEventRequest, UpdateEventRequest};

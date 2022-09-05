@@ -25,7 +25,7 @@ use std::fmt::Debug;
 
 use std::sync::{Arc, Mutex};
 
-use arrow::array::{Array, ArrayRef, Decimal128Builder, DecimalBuilder, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+use arrow::array::{Array, ArrayRef, Decimal128Builder, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
 use arrow::datatypes::DataType;
 use datafusion_common::Result as DFResult;
 

@@ -1,24 +1,23 @@
-import { defineStore } from 'pinia';
+import {defineStore} from 'pinia';
 import schemaService from '@/api/services/schema.service';
 import {
-    UserCustomProperty,
-    EventCustomProperty,
-    UserProperty,
     customEventRef,
-    eventRef,
-    PropertyRef,
-    EventRef,
-    eventsQueries,
+    EventCustomProperty,
     EventQueryRef,
+    EventRef,
+    eventRef,
+    eventsQueries,
     EventsQuery,
+    PropertyRef,
+    UserCustomProperty,
 } from '@/types/events';
-import { Cohort } from '@/types';
-import { aggregates } from '@/types/aggregate'
-import { Group, Item } from '@/components/Select/SelectTypes';
-import { useEventsStore, Events } from '@/stores/eventSegmentation/events';
-import { ApplyPayload } from '@/components/events/EventManagementPopup.vue'
-import { PropertyType, CustomEvent, EventType, Property, Event } from '@/api'
-import { useCommonStore, PropertyTypeEnum } from '@/stores/common'
+import {Cohort} from '@/types';
+import {aggregates} from '@/types/aggregate'
+import {Group, Item} from '@/components/Select/SelectTypes';
+import {Events, useEventsStore} from '@/stores/eventSegmentation/events';
+import {ApplyPayload} from '@/components/events/EventManagementPopup.vue'
+import {CustomEvent, Event, EventType, Property, PropertyType} from '@/api'
+import {PropertyTypeEnum, useCommonStore} from '@/stores/common'
 
 type Lexicon = {
     cohorts: Cohort[];

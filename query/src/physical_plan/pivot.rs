@@ -2,12 +2,12 @@ use crate::{Result};
 use ahash::RandomState;
 use arrow::array::{Array, ArrayRef, StringArray};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-use arrow::error::{ArrowError, Result as ArrowResult};
+use arrow::error::{Result as ArrowResult};
 use arrow::record_batch::RecordBatch;
 
 use axum::async_trait;
 use datafusion_common::Result as DFResult;
-use datafusion::execution::runtime_env::RuntimeEnv;
+
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::hash_utils::create_hashes;
 use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
@@ -333,7 +333,7 @@ mod tests {
     use arrow::array::{ArrayRef, Float64Array, Int32Array, StringArray};
     use arrow::record_batch::RecordBatch;
     pub use datafusion_common::Result;
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+    
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::expressions::Column;
     use datafusion::physical_plan::memory::MemoryExec;

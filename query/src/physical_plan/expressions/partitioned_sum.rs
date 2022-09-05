@@ -5,7 +5,7 @@ use crate::physical_plan::expressions::partitioned_aggregate::{
     Buffer, PartitionedAccumulator, Value,
 };
 use crate::DEFAULT_BATCH_SIZE;
-use arrow::array::{ArrayRef, Decimal128Array, DecimalArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+use arrow::array::{ArrayRef, Decimal128Array, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
 
 use arrow::datatypes::DataType;
 

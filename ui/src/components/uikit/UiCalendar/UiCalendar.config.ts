@@ -1,4 +1,4 @@
-import { Each } from './UiCalendar'
+import {Each} from './UiCalendar'
 
 export const eachMap: Each[] = [
     'month',

@@ -1,23 +1,3 @@
-use crate::Result;
-use arrow::array::ArrayRef;
-use arrow::datatypes::{Schema, SchemaRef};
-
-use arrow::error::Result as ArrowResult;
-use arrow::record_batch::RecordBatch;
-
-use axum::async_trait;
-use datafusion::execution::runtime_env::RuntimeEnv;
-
-use datafusion::physical_plan::expressions::PhysicalSortExpr;
-use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
-use datafusion::physical_plan::{
-    DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
-    Statistics,
-};
-use datafusion_common::Result as DFResult;
-use datafusion_common::ScalarValue;
-
-use futures::{Stream, StreamExt};
 use std::any::Any;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
@@ -25,8 +5,25 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+
+use arrow::array::ArrayRef;
+use arrow::datatypes::{Schema, SchemaRef};
+use arrow::error::Result as ArrowResult;
+use arrow::record_batch::RecordBatch;
+use axum::async_trait;
 use datafusion::execution::context::TaskContext;
+use datafusion::physical_plan::{
+    DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
+    Statistics,
+};
+use datafusion::physical_plan::expressions::PhysicalSortExpr;
+use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
+use datafusion_common::Result as DFResult;
+use datafusion_common::ScalarValue;
+use futures::{Stream, StreamExt};
+
 use crate::error::QueryError;
+use crate::Result;
 
 pub struct MergeExec {
     inputs: Vec<Arc<dyn ExecutionPlan>>,
@@ -189,19 +186,17 @@ impl Stream for MergeStream {
 
 #[cfg(test)]
 mod tests {
-    use crate::physical_plan::merge::MergeExec;
-    use arrow::array::{ArrayRef, BooleanArray, Int32Array, Int8Array, StringArray};
-
-    use arrow::record_batch::RecordBatch;
-    pub use datafusion_common::Result;
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-    use datafusion::physical_plan::common::collect;
-    use datafusion::physical_plan::memory::MemoryExec;
-    use datafusion::physical_plan::ExecutionPlan;
-
     use std::sync::Arc;
-    use datafusion::execution::context;
+
+    use arrow::array::{ArrayRef, BooleanArray, Int32Array, Int8Array, StringArray};
+    use arrow::record_batch::RecordBatch;
+    use datafusion::physical_plan::common::collect;
+    use datafusion::physical_plan::ExecutionPlan;
+    use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::prelude::SessionContext;
+    pub use datafusion_common::Result;
+
+    use crate::physical_plan::merge::MergeExec;
 
     #[tokio::test]
     async fn test() -> Result<()> {

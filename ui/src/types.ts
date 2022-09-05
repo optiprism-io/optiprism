@@ -1,4 +1,4 @@
-import { PropertyFilterOperation, Value as ApiValue, DataType } from '@/api'
+import {DataType, PropertyFilterOperation, Value as ApiValue} from '@/api'
 
 export type Value = ApiValue
 

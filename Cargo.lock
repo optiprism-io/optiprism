@@ -2032,6 +2032,7 @@ dependencies = [
  "convert_case",
  "criterion",
  "datafusion",
+ "datafusion-common",
  "metadata",
  "query",
  "reqwest",

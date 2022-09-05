@@ -1,11 +1,13 @@
+use std::any::Any;
+use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
+
 use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
 use datafusion_common::DFSchema;
 use datafusion_expr::Expr;
-use std::any::Any;
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
-use crate::error::QueryError;
 
+use crate::error::QueryError;
 use crate::Result;
 
 pub struct MergeNode {
@@ -15,7 +17,7 @@ pub struct MergeNode {
 
 impl MergeNode {
     pub fn try_new(inputs: Vec<LogicalPlan>) -> Result<Self> {
-        let mut schema = DFSchema::new(vec![])?;
+        let mut schema = DFSchema::new_with_metadata(vec![], HashMap::new())?;
         for input in inputs.iter() {
             schema.merge(input.schema());
         }

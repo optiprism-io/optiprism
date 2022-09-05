@@ -1,7 +1,7 @@
 use arrow::error::ArrowError;
 use metadata::error::MetadataError;
-use std::fmt::{Display, Formatter};
-use std::{fmt, result};
+
+use std::{result};
 use thiserror::Error;
 pub type Result<T> = result::Result<T, EventsGenError>;
 

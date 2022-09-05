@@ -1,14 +1,16 @@
-use arrow::datatypes::DataType;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
-use datafusion_common::{DFField, DFSchema};
-use datafusion_expr::Expr;
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use crate::error::QueryError;
 
+use arrow::datatypes::DataType;
+use datafusion::logical_plan::{DFSchemaRef, LogicalPlan, UserDefinedLogicalNode};
+use datafusion_common::{DFField, DFSchema};
+use datafusion_expr::Expr;
+
+use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+
+use crate::error::QueryError;
 use crate::Result;
 
 pub struct UnpivotNode {

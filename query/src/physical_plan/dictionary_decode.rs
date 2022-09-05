@@ -8,7 +8,7 @@ use arrow::record_batch::RecordBatch;
 
 use axum::async_trait;
 use datafusion_common::Result as DFResult;
-use datafusion::execution::runtime_env::RuntimeEnv;
+
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 
 use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};

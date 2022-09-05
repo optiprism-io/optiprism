@@ -1,4 +1,4 @@
-import {computed, DefineComponent, defineComponent, PropType, Ref, ref, watch} from 'vue';
+import {computed, DefineComponent, defineComponent, PropType, Ref, ref} from 'vue';
 import UiSelectItem from '@/components/uikit/UiSelect/UiSelectItem.vue'
 import {UiSelectItemInterface} from './types';
 import UiSelectGroup from '@/components/uikit/UiSelect/UiSelectGroup.vue'

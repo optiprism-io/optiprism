@@ -6,23 +6,23 @@ mod tests {
 
     use chrono::{DateTime, Duration, Utc};
 
-    use arrow::datatypes::DataType as DFDataType;
+    
 
     use arrow::util::pretty::print_batches;
 
     use datafusion::physical_plan::{collect, PhysicalPlanner};
-    use datafusion::prelude::{CsvReadOptions, SessionConfig, SessionContext};
+    use datafusion::prelude::{SessionConfig, SessionContext};
 
-    use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-    use datafusion::logical_plan::LogicalPlan;
+    use datafusion::execution::runtime_env::{RuntimeEnv};
+    
     use datafusion::physical_plan::coalesce_batches::concat_batches;
 
     use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;
-    use metadata::database::{Column, Table, TableRef};
-    use metadata::properties::provider::Namespace;
-    use metadata::properties::{CreatePropertyRequest, Property};
-    use metadata::{database, events, properties, Metadata};
+    
+    
+    
+    
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;

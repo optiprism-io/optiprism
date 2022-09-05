@@ -6,6 +6,7 @@ use datafusion_core::physical_plan::{Accumulator, AggregateExpr};
 use query::physical_plan::expressions::sorted_distinct_count::SortedDistinctCountAccumulator;
 use rand::Rng;
 use std::sync::Arc;
+use datafusion::physical_expr::expressions::DistinctCount;
 
 fn new_random_array(size: usize, limit: usize) -> ArrayRef {
     let mut vec = Vec::with_capacity(size);

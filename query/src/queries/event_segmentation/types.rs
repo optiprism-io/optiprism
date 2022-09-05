@@ -1,8 +1,9 @@
-use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-use crate::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
 use chrono::{DateTime, Utc};
 use datafusion_common::ScalarValue;
 use datafusion_expr::AggregateFunction;
+
+use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
+use crate::queries::types::{EventRef, PropertyRef, PropValueOperation, QueryTime, TimeUnit};
 
 #[derive(Clone, Debug)]
 pub enum SegmentTime {
@@ -179,16 +180,17 @@ pub struct EventSegmentation {
 
 #[cfg(test)]
 mod tests {
+    use chrono::{DateTime, Utc};
+    use datafusion_common::ScalarValue;
+    use datafusion_expr::AggregateFunction;
+
     use crate::event_fields;
     use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
     use crate::queries::event_segmentation::types::{
         Analysis, Breakdown, ChartType, Compare, Event, EventFilter, EventSegmentation, NamedQuery,
         Query,
     };
-    use crate::queries::types::{EventRef, PropValueOperation, PropertyRef, QueryTime, TimeUnit};
-    use chrono::{DateTime, Utc};
-    use datafusion_common::ScalarValue;
-    use datafusion_expr::AggregateFunction;
+    use crate::queries::types::{EventRef, PropertyRef, PropValueOperation, QueryTime, TimeUnit};
 
     #[test]
     fn test_serialize() {

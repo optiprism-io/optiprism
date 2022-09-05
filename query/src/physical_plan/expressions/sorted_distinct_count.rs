@@ -175,7 +175,7 @@ impl Accumulator for SortedDistinctCountAccumulator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use datafusion_expr::{AggregateState};
+    
 
     fn check_batch(sequences: &[Vec<i64>], expected: usize) -> datafusion_common::Result<()> {
         let mut acc = SortedDistinctCountAccumulator::try_new(&DataType::Int64)?;

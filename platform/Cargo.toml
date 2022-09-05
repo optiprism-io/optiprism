@@ -20,6 +20,7 @@ opt-level = 3
 url = "2.2.2"
 anyhow = "1.0"
 datafusion = "11.0.0"
+datafusion-common = "11.0.0"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
 reqwest = { version = "0.11", features = ["json"] }
 common = { path = "../common" }

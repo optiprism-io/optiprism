@@ -1,7 +1,7 @@
-import { createServer } from 'miragejs'
-import { DataType } from '@/api'
-import { BASE_PATH } from '@/api/base'
-import { EventStatus, UserCustomProperty } from '@/types/events';
+import {createServer} from 'miragejs'
+import {DataType} from '@/api'
+import {BASE_PATH} from '@/api/base'
+import {EventStatus, UserCustomProperty} from '@/types/events';
 import splineChartMocks from '@/mocks/splineChart.json';
 import liveStreamMocks from '@/mocks/reports/liveStream.json'
 import funnelsMocks from '@/mocks/reports/funnels.json'
