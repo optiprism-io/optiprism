@@ -1,17 +1,16 @@
 use crate::OptionalProperty;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use datafusion_common::ScalarValue;
+use crate::scalar::ScalarValue;
 use crate::types::{EventRef, PropertyRef, PropValueOperation};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-#[serde(rename_all = "lowercase")]
 pub enum Status {
     Enabled,
     Disabled,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum EventFilter {
     Property {
         property: PropertyRef,
@@ -30,6 +29,7 @@ pub enum EventType {
 pub struct Event {
     pub id: u64,
     pub typ: EventType,
+    pub filters: Option<Vec<EventFilter>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

@@ -1,11 +1,12 @@
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum EventRef {
     Regular(String),
     Custom(u64),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum PropValueOperation {
     Eq,
     Neq,
@@ -27,7 +28,7 @@ pub enum PropValueOperation {
 }
 
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum PropertyRef {
     User(String),
     Event(String),

@@ -67,7 +67,7 @@ async fn create_event() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: event.id, typ: EventType::Regular }],
+        events: vec![Event { id: event.id, typ: EventType::Regular, filters: None }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await?;
@@ -88,7 +88,7 @@ async fn create_event_not_found() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: 1, typ: EventType::Regular }],
+        events: vec![Event { id: 1, typ: EventType::Regular, filters: None }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await;
@@ -119,7 +119,7 @@ async fn create_event_duplicate_name() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: 1, typ: EventType::Regular }],
+        events: vec![Event { id: 1, typ: EventType::Regular, filters: None }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await;
@@ -153,7 +153,7 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: 1, typ: EventType::Regular }],
+        events: vec![Event { id: 1, typ: EventType::Regular, filters: None }],
     };
     let resp = prov.create(1, 1, req.clone()).await?;
 
@@ -164,7 +164,7 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: resp.id, typ: EventType::Custom }],
+        events: vec![Event { id: resp.id, typ: EventType::Custom, filters: None }],
     };
     let resp = prov.create(1, 1, req.clone()).await?;
 
@@ -175,7 +175,7 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: resp.id, typ: EventType::Custom }],
+        events: vec![Event { id: resp.id, typ: EventType::Custom, filters: None }],
     };
     let resp = prov.create(1, 1, req.clone()).await;
     assert!(matches!(resp,Err(MetadataError::CustomEvent(CustomEventError::RecursionLevelExceeded(_)))));
@@ -206,7 +206,7 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: 1, typ: EventType::Regular }],
+        events: vec![Event { id: 1, typ: EventType::Regular, filters: None }],
     };
     prov.create(1, 1, req.clone()).await?;
 
@@ -217,7 +217,7 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: 1, typ: EventType::Custom }],
+        events: vec![Event { id: 1, typ: EventType::Custom, filters: None }],
     };
     prov.create(1, 1, req.clone()).await?;
 
@@ -228,7 +228,7 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: None,
         is_system: None,
-        events: Some(vec![Event { id: 2, typ: EventType::Custom }]),
+        events: Some(vec![Event { id: 2, typ: EventType::Custom, filters: None }]),
     };
     let resp = prov.update(1, 1, 1, req.clone()).await;
     assert!(matches!(resp,Err(MetadataError::CustomEvent(CustomEventError::DuplicateEvent))));
@@ -241,7 +241,7 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: None,
         is_system: None,
-        events: Some(vec![Event { id: 1, typ: EventType::Custom }]),
+        events: Some(vec![Event { id: 1, typ: EventType::Custom, filters: None }]),
     };
     let resp = prov.update(1, 1, 1, req.clone()).await;
     assert!(matches!(resp,Err(MetadataError::CustomEvent(CustomEventError::DuplicateEvent))));
@@ -271,7 +271,7 @@ async fn update_event() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: event.id, typ: EventType::Regular }],
+        events: vec![Event { id: event.id, typ: EventType::Regular, filters: None }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await?;
