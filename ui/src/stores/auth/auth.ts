@@ -5,7 +5,7 @@ import { LocalStorageAccessor } from '@/utils/localStorageAccessor'
 
 export interface AuthState {
   accessToken: string | null
-  refreshToken: LocalStorageAccessor
+  refreshToken: LocalStorageAccessor,
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -24,7 +24,7 @@ export const useAuthStore = defineStore('auth', {
                 const res = await authService.login(args.email, args.password)
                 this.setToken(res.data)
             } catch (e) {
-                console.log(e)
+                return Promise.reject(e)
             }
         },
         async authAccess(): Promise<void> {

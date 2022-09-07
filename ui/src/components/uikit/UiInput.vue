@@ -8,6 +8,8 @@
         :min="props.min"
         :required="props.required"
         :name="props.name"
+        :type="props.type"
+        :aria-invalid="invalid"
         @input="updateValue"
         @blur="blur"
     >
@@ -27,6 +29,8 @@ interface Props {
     required?: boolean
     name?: string
     label?: string
+    error?: string
+    invalid?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {

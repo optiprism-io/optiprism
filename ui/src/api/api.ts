@@ -1035,10 +1035,10 @@ export interface ErrorResponse {
     'message'?: string;
     /**
      * 
-     * @type {Array<{ [key: string]: string; }>}
+     * @type {{ [key: string]: string; }}
      * @memberof ErrorResponse
      */
-    'fields'?: Array<{ [key: string]: string; }>;
+    'fields'?: { [key: string]: string; };
 }
 
 export const ErrorResponseCodeEnum = {

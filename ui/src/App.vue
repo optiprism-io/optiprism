@@ -11,6 +11,10 @@ const authStore = useAuthStore()
 axios.interceptors.response.use(res => res, async err => {
     const originalConfig = err.config;
     if (err.response) {
+        if (err.response.status === 400 && err.response.data) {
+            return Promise.reject(err.response.data);
+        }
+
         if (err.response.status === 401 && !originalConfig._retry) {
             /* To prevent infinite loop */
             originalConfig._retry = true;

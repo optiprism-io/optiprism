@@ -1,5 +1,5 @@
 <template>
-    <div class="pf-c-background-image">
+    <div class="login pf-c-background-image">
         <svg
             xmlns="http://www.w3.org/2000/svg"
             class="pf-c-background-image__filter"
@@ -41,7 +41,7 @@
                 <img
                     class="pf-c-brand"
                     src="@/assets/img/logo-black.svg"
-                    alt="PatternFly Logo"
+                    alt="Optyprism"
                 >
             </header>
             <main class="pf-c-login__main">
@@ -52,7 +52,7 @@
                 </header>
                 <div class="pf-c-login__main-body">
                     <form
-                        class="pf-c-form"
+                        class="pf-c-form login-form"
                         @submit.prevent="login"
                     >
                         <p class="pf-c-form__helper-text pf-m-error pf-m-hidden">
@@ -64,13 +64,13 @@
                             </span>
                             Invalid login credentials.
                         </p>
-                        <div class="pf-c-form__group">
+                        <div class="pf-c-form__group pf-u-mb-md login-form__field">
                             <label
                                 class="pf-c-form__label"
                                 for="login-demo-form-username"
                             >
                                 <span class="pf-c-form__label-text">
-                                    Username
+                                    Email
                                 </span>
                                 <span
                                     class="pf-c-form__label-required"
@@ -79,22 +79,29 @@
                                     &#42;
                                 </span>
                             </label>
-
-                            <input
+                            <UiInput
                                 v-model="email"
-                                class="pf-c-form-control"
-                                required
-                                type="email"
-                                name="login-demo-form-username"
+                                name="login-email"
+                                :invalid="Boolean(errorFields.email)"
+                            />
+                            <p
+                                v-if="errorFields.email"
+                                class="login-form__field-info pf-c-form__helper-text pf-m-error"
+                                aria-live="polite"
                             >
+                                <span class="pf-c-form__helper-text-icon">
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                </span>
+                                {{ errorFields.email }}
+                            </p>
                         </div>
-                        <div class="pf-c-form__group">
+                        <div class="pf-c-form__group pf-u-mb-md login-form__field">
                             <label
                                 class="pf-c-form__label"
                                 for="login-demo-form-password"
                             >
                                 <span class="pf-c-form__label-text">
-                                    Password
+                                    {{ $t('login.password') }}
                                 </span>
                                 <span
                                     class="pf-c-form__label-required"
@@ -103,14 +110,22 @@
                                     &#42;
                                 </span>
                             </label>
-
-                            <input
+                            <UiInput
                                 v-model="password"
-                                class="pf-c-form-control"
-                                required
+                                name="login-password"
                                 type="password"
-                                name="login-demo-form-password"
+                                :invalid="Boolean(errorFields.password)"
+                            />
+                            <p
+                                v-if="errorFields.password"
+                                class="login-form__field-info pf-c-form__helper-text pf-m-error"
+                                aria-live="polite"
                             >
+                                <span class="pf-c-form__helper-text-icon">
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                </span>
+                                {{ errorFields.password }}
+                            </p>
                         </div>
                         <div class="pf-c-form__group">
                             <div class="pf-c-check">
@@ -125,7 +140,7 @@
                                     class="pf-c-check__label"
                                     for="login-demo-checkbox"
                                 >
-                                    Keep me logged in for 30 days.
+                                    {{ $t('login.keep') }}
                                 </label>
                             </div>
                         </div>
@@ -150,6 +165,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { computed, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth/auth'
 import { pagesMap } from '@/router'
+import { ErrorResponse } from '@/api'
+import UiInput from '@/components/uikit/UiInput.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -157,13 +174,14 @@ const authStore = useAuthStore()
 
 const email = ref('')
 const password = ref('')
+const errorFields = ref<{ [key: string]: string }>({})
 
 const nextPath = computed(() => {
     const next = route.query.next
     return next && typeof next === 'string' ? next : pagesMap.reportsEventSegmentation.path
 })
 
-const login = async (): Promise<void> => {
+const login = async (): Promise<void | Error> => {
     try {
         await authStore.login({
             email: email.value,
@@ -173,8 +191,10 @@ const login = async (): Promise<void> => {
         if (authStore.accessToken) {
             router.push({ path: nextPath.value })
         }
-    } catch (e) {
-        console.log(e)
+    } catch (e: any) {
+        const errorResponce = e as ErrorResponse
+
+        errorFields.value = errorResponce?.fields as { [key: string]: string; };
     }
 }
 </script>
@@ -185,6 +205,18 @@ const login = async (): Promise<void> => {
         @media screen and (min-width: 1200px) {
             max-width: 400px;
         }
+    }
+}
+
+.login-form {
+    &__field {
+        position: relative;
+    }
+
+    &__field-info {
+        position: absolute;
+        bottom: -1.5rem;
+        left: 0;
     }
 }
 </style>

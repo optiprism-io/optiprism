@@ -1,4 +1,9 @@
 {
+  "login": {
+    "keep": "Keep me logged in for 30 days.",
+    "password": "Password"
+  },
+
   "userMenu": {
     "logout": "Logout"
   },
