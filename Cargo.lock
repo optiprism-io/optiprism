@@ -1580,6 +1580,7 @@ dependencies = [
  "common",
  "convert_case",
  "datafusion",
+ "datafusion-common",
  "futures",
  "rocksdb",
  "serde",

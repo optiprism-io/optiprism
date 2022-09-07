@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 datafusion = "11.0.0"
+datafusion-common = "11.0.0"
 common = { path = "../common" }
 async-mutex = "1.4.0"
 axum = { version = "0.4.3" }
