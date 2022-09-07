@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
-use datafusion_common::ScalarValue;
 use datafusion_expr::AggregateFunction;
+use common::types::{EventFilter, EventRef, PropertyRef};
 
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-use crate::queries::types::{EventRef, PropertyRef, PropValueOperation, QueryTime, TimeUnit};
+use crate::queries::types::{QueryTime, TimeUnit};
 
 #[derive(Clone, Debug)]
 pub enum SegmentTime {
@@ -128,15 +128,6 @@ impl NamedQuery {
 }
 
 #[derive(Clone, Debug)]
-pub enum EventFilter {
-    Property {
-        property: PropertyRef,
-        operation: PropValueOperation,
-        value: Option<Vec<ScalarValue>>,
-    },
-}
-
-#[derive(Clone, Debug)]
 pub enum Breakdown {
     Property(PropertyRef),
 }
@@ -181,8 +172,9 @@ pub struct EventSegmentation {
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, Utc};
-    use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;
+    use common::ScalarValue;
+    use common::types::{EventRef, PropertyRef, PropValueOperation};
 
     use crate::event_fields;
     use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
@@ -211,7 +203,7 @@ mod tests {
                 unit: TimeUnit::Second,
             }),
             events: vec![Event::new(
-                EventRef::Regular("e1".to_string()),
+                EventRef::RegularName("e1".to_string()),
                 Some(vec![
                     EventFilter::Property {
                         property: PropertyRef::User("p1".to_string()),

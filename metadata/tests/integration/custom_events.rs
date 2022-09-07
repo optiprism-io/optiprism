@@ -6,7 +6,8 @@ use std::sync::Arc;
 use metadata::events::types::CreateEventRequest;
 use metadata::custom_events::{CreateCustomEventRequest, Provider, Status, UpdateCustomEventRequest};
 use uuid::Uuid;
-use metadata::custom_events::types::{Event, EventType};
+use common::types::EventRef;
+use metadata::custom_events::types::{Event};
 use metadata::events;
 
 fn get_providers() -> (Arc<events::Provider>, Provider) {
@@ -67,7 +68,7 @@ async fn create_event() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: event.id, typ: EventType::Regular, filters: None }],
+        events: vec![Event { event: EventRef::Regular(event.id), filters: None }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await?;
@@ -88,7 +89,7 @@ async fn create_event_not_found() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: 1, typ: EventType::Regular, filters: None }],
+        events: vec![Event { event: EventRef::Regular(1), filters: None }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await;
@@ -119,7 +120,7 @@ async fn create_event_duplicate_name() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: 1, typ: EventType::Regular, filters: None }],
+        events: vec![Event { event: EventRef::Regular(1), filters: None }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await;
@@ -153,7 +154,7 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: 1, typ: EventType::Regular, filters: None }],
+        events: vec![Event { event: EventRef::Regular(1), filters: None }],
     };
     let resp = prov.create(1, 1, req.clone()).await?;
 
@@ -164,7 +165,7 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: resp.id, typ: EventType::Custom, filters: None }],
+        events: vec![Event { event: EventRef::Custom(1), filters: None }],
     };
     let resp = prov.create(1, 1, req.clone()).await?;
 
@@ -175,7 +176,7 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: resp.id, typ: EventType::Custom, filters: None }],
+        events: vec![Event { event: EventRef::Custom(resp.id), filters: None }],
     };
     let resp = prov.create(1, 1, req.clone()).await;
     assert!(matches!(resp,Err(MetadataError::CustomEvent(CustomEventError::RecursionLevelExceeded(_)))));
@@ -206,7 +207,7 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: 1, typ: EventType::Regular, filters: None }],
+        events: vec![Event { event: EventRef::Regular(1), filters: None }],
     };
     prov.create(1, 1, req.clone()).await?;
 
@@ -217,7 +218,7 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: 1, typ: EventType::Custom, filters: None }],
+        events: vec![Event { event: EventRef::Custom(1), filters: None }],
     };
     prov.create(1, 1, req.clone()).await?;
 
@@ -228,7 +229,7 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: None,
         is_system: None,
-        events: Some(vec![Event { id: 2, typ: EventType::Custom, filters: None }]),
+        events: Some(vec![Event { event: EventRef::Custom(2), filters: None }]),
     };
     let resp = prov.update(1, 1, 1, req.clone()).await;
     assert!(matches!(resp,Err(MetadataError::CustomEvent(CustomEventError::DuplicateEvent))));
@@ -241,7 +242,7 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: None,
         is_system: None,
-        events: Some(vec![Event { id: 1, typ: EventType::Custom, filters: None }]),
+        events: Some(vec![Event { event: EventRef::Custom(1), filters: None }]),
     };
     let resp = prov.update(1, 1, 1, req.clone()).await;
     assert!(matches!(resp,Err(MetadataError::CustomEvent(CustomEventError::DuplicateEvent))));
@@ -271,7 +272,7 @@ async fn update_event() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { id: event.id, typ: EventType::Regular, filters: None }],
+        events: vec![Event { event: EventRef::Regular(1), filters: None }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await?;

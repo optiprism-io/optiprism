@@ -7,6 +7,7 @@ use datafusion::logical_plan::plan::{Aggregate, Extension, Filter as PlanFilter,
 use datafusion_common::{Column, ScalarValue};
 use datafusion_expr::{col, Expr};
 use datafusion_expr::utils::exprlist_to_fields;
+use common::types::{EventRef, PropertyRef, PropValueOperation};
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use metadata::Metadata;
@@ -16,7 +17,6 @@ use crate::Context;
 use crate::error::Result;
 use crate::expr::{event_expression, property_expression};
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
-use crate::queries::types::{EventRef, PropertyRef, PropValueOperation};
 
 pub struct LogicalPlanBuilder {}
 

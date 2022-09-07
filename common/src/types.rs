@@ -1,8 +1,8 @@
 use arrow::datatypes::DataType as ArrowDataType;
 use arrow::datatypes::TimeUnit::Second;
-use datafusion_common::ScalarValue as DFScalarValue;
-use rust_decimal::Decimal;
+use datafusion::logical_plan::Operator;
 use serde::{Deserialize, Serialize};
+use crate::ScalarValue;
 
 pub const DECIMAL_PRECISION: usize = 19;
 pub const DECIMAL_SCALE: usize = 10;
@@ -36,46 +36,77 @@ pub enum DictionaryDataType {
     UInt64,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub enum ScalarValue {
-    Number(Option<Decimal>),
-    String(Option<String>),
-    Boolean(Option<bool>),
-    Timestamp(Option<i64>),
+#[derive(Serialize, Deserialize, Clone, Debug, Hash, Eq, PartialEq)]
+pub enum PropertyRef {
+    User(String),
+    Event(String),
+    Custom(u64),
 }
 
-impl From<ScalarValue> for DFScalarValue {
-    fn from(v: ScalarValue) -> Self {
-        match v {
-            ScalarValue::Number(v) => match v {
-                None => DFScalarValue::Decimal128(None, 0, 0),
-                Some(v) => DFScalarValue::Decimal128(
-                    Some(v.mantissa()),
-                    DECIMAL_PRECISION,
-                    v.scale() as usize,
-                ),
-            },
-            ScalarValue::String(v) => DFScalarValue::Utf8(v),
-            ScalarValue::Boolean(v) => DFScalarValue::Boolean(v),
-            ScalarValue::Timestamp(v) => DFScalarValue::TimestampSecond(v, None),
-        }
-    }
-}
-
-impl ScalarValue {
-    pub fn to_df(self) -> DFScalarValue {
+impl PropertyRef {
+    pub fn name(&self) -> String {
         match self {
-            ScalarValue::Number(v) => match v {
-                None => DFScalarValue::Decimal128(None, 0, 0),
-                Some(v) => DFScalarValue::Decimal128(
-                    Some(v.mantissa()),
-                    DECIMAL_PRECISION,
-                    v.scale() as usize,
-                ),
-            },
-            ScalarValue::String(v) => DFScalarValue::Utf8(v),
-            ScalarValue::Boolean(v) => DFScalarValue::Boolean(v),
-            ScalarValue::Timestamp(v) => DFScalarValue::TimestampSecond(v, None),
+            PropertyRef::User(name) => name.clone(),
+            PropertyRef::Event(name) => name.clone(),
+            PropertyRef::Custom(_id) => unimplemented!(),
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum EventRef {
+    RegularName(String),
+    Regular(u64),
+    Custom(u64),
+}
+
+impl EventRef {
+    pub fn name(&self) -> String {
+        match self {
+            EventRef::RegularName(name) => name.to_owned(),
+            EventRef::Regular(id) => id.to_string(),
+            EventRef::Custom(id) => id.to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum PropValueOperation {
+    Eq,
+    Neq,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    True,
+    False,
+    Exists,
+    Empty,
+    ArrAll,
+    ArrAny,
+    ArrNone,
+    Like,
+    NotLike,
+    Regex,
+    NotRegex,
+}
+
+impl From<PropValueOperation> for Operator {
+    fn from(pv: PropValueOperation) -> Self {
+        match pv {
+            PropValueOperation::Eq => Operator::Eq,
+            PropValueOperation::Neq => Operator::NotEq,
+            PropValueOperation::Like => Operator::Like,
+            _ => panic!("unreachable"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum EventFilter {
+    Property {
+        property: PropertyRef,
+        operation: PropValueOperation,
+        value: Option<Vec<ScalarValue>>,
+    },
 }

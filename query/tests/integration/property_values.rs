@@ -8,12 +8,12 @@ mod tests {
     use query::error::Result;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::property_values::{Filter, LogicalPlanBuilder, PropertyValues};
-    use query::queries::types::{EventRef, PropValueOperation, PropertyRef};
     use query::test_util::{create_entities, create_md, events_provider};
     use query::Context;
     use std::sync::Arc;
     use datafusion::execution::context::SessionState;
     use datafusion::prelude::{SessionConfig, SessionContext};
+    use common::types::{EventRef, PropertyRef, PropValueOperation};
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {
@@ -33,7 +33,7 @@ mod tests {
 
         let req = PropertyValues {
             property: PropertyRef::Event("Product Name".to_string()),
-            event: Some(EventRef::Regular("View Product".to_string())),
+            event: Some(EventRef::RegularName("View Product".to_string())),
             filter: Some(Filter {
                 operation: PropValueOperation::Like,
                 value: Some(vec![ScalarValue::Utf8(Some("goo%".to_string()))]),

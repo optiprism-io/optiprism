@@ -7,10 +7,12 @@ use chronoutil::DateRule;
 use datafusion::logical_plan::{Column, DFSchema, LogicalPlan};
 use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
 use datafusion::physical_plan::aggregates::AggregateFunction;
+use datafusion_common::ScalarValue;
 use datafusion_expr::{BuiltinScalarFunction, col, Expr, lit};
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::utils::exprlist_to_fields;
 use futures::executor;
+use common::types::{EventFilter, PropertyRef};
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use metadata::Metadata;
@@ -26,9 +28,9 @@ use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 use crate::queries::event_segmentation::types::{
-    Breakdown, Event, EventFilter, EventSegmentation, Query,
+    Breakdown, Event, EventSegmentation, Query,
 };
-use crate::queries::types::{EventRef, PropertyRef, TimeUnit};
+use crate::queries::types::{TimeUnit};
 
 pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
@@ -238,12 +240,7 @@ impl LogicalPlanBuilder {
 
         // global event filters
         if let Some(filters) = &self.es.filters {
-            match &event.event {
-                EventRef::Regular(_) => {
-                    expr = and(expr.clone(), self.event_filters_expression(filters).await?);
-                }
-                EventRef::Custom(_) => unimplemented!(),
-            }
+            expr = and(expr.clone(), self.event_filters_expression(filters).await?);
         }
 
         //global filter
@@ -380,7 +377,7 @@ impl LogicalPlanBuilder {
                         &self.metadata,
                         property,
                         operation,
-                        value.to_owned(),
+                        value.clone().and_then(|v|Some(v.iter().map(|v|v.clone().into()).collect::<Vec<ScalarValue>>())).to_owned(),
                     )),
                 }
             })

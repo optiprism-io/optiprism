@@ -1,8 +1,8 @@
 use crate::OptionalProperty;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::scalar::ScalarValue;
-use crate::types::{EventRef, PropertyRef, PropValueOperation};
+use common::scalar::ScalarValue;
+use common::types::{EventFilter, EventRef};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Status {
@@ -11,24 +11,8 @@ pub enum Status {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum EventFilter {
-    Property {
-        property: PropertyRef,
-        operation: PropValueOperation,
-        value: Option<Vec<ScalarValue>>,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum EventType {
-    Regular,
-    Custom,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Event {
-    pub id: u64,
-    pub typ: EventType,
+    pub event: EventRef,
     pub filters: Option<Vec<EventFilter>>,
 }
 

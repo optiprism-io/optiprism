@@ -1,6 +1,5 @@
 use arrow::datatypes::{DataType, Field};
 use datafusion_common::ScalarValue as DFScalarValue;
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
