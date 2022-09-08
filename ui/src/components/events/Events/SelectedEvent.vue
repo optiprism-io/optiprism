@@ -166,8 +166,15 @@ import Query from '@/components/events/Events/Query.vue';
 import {Group, Item} from '@/components/Select/SelectTypes';
 import schemaService from '@/api/services/schema.service'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
-import {EventType} from '@/api'
+import {
+    EventType,
+    PropertyValuesList200ResponseValues,
+    PropertyValuesListRequestEventTypeEnum
+} from '@/api'
 import CommonIdentifier from '@/components/common/identifier/CommonIdentifier.vue';
+import { useCommonStore } from '@/stores/common'
+
+const commonStore = useCommonStore()
 
 type Props = {
   eventRef: EventRef
@@ -272,19 +279,20 @@ const addFilter = (): void => {
 
 const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => {
     let event = props.event
-    let valuesList: string[] = []
+    let valuesList: PropertyValuesList200ResponseValues = []
 
     try {
-        const res = await schemaService.propertyValues({
-            event_name: lexiconStore.eventName(props.event.ref),
-            event_type: props.event.ref.type,
-            property_name: lexiconStore.propertyName(propRef),
-            property_type: propRef.type
-        });
-        if (res) {
-            valuesList = res
+        const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
+            eventName: lexiconStore.eventName(props.event.ref),
+            eventType: props.event.ref.type as PropertyValuesListRequestEventTypeEnum,
+            propertyName: lexiconStore.propertyName(propRef),
+            propertyType: propRef.type
+        })
+
+        if (res.data.values) {
+            valuesList = res.data.values
         }
-    } catch (error) {
+    } catch (e) {
         throw new Error('error getEventsValues')
     }
 

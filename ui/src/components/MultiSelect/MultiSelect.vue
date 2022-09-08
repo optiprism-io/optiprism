@@ -27,7 +27,7 @@ import MultiSelectList from '@/components/MultiSelect/MultiSelectList.vue'
 
 export interface Item {
     item: any;
-    name: string;
+    name: string | boolean | number;
 }
 
 const emit = defineEmits<{

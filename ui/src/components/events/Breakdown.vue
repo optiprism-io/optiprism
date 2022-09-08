@@ -109,7 +109,7 @@ const propertyName = (ref: PropertyRef): string => {
         case PropertyType.Event:
             return lexiconStore.findEventPropertyById(ref.id).name
         case PropertyType.Custom:
-            return lexiconStore.findEventCustomPropertyById(ref.id).name
+            return lexiconStore.findEventCustomPropertyById(ref.id)?.name || ''
         case PropertyType.User:
             return lexiconStore.findUserPropertyById(ref.id).name
     }

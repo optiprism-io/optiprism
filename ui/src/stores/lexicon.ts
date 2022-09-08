@@ -1,9 +1,10 @@
 import {defineStore} from 'pinia';
 import schemaService from '@/api/services/schema.service';
 import {
+    UserCustomProperty,
     customEventRef,
-    EventCustomProperty,
-    EventQueryRef,
+    eventRef,
+    PropertyRef,
     EventRef,
     eventRef,
     eventsQueries,
@@ -11,13 +12,20 @@ import {
     PropertyRef,
     UserCustomProperty,
 } from '@/types/events';
-import {Cohort} from '@/types';
-import {aggregates} from '@/types/aggregate'
-import {Group, Item} from '@/components/Select/SelectTypes';
-import {Events, useEventsStore} from '@/stores/eventSegmentation/events';
-import {ApplyPayload} from '@/components/events/EventManagementPopup.vue'
-import {CustomEvent, Event, EventType, Property, PropertyType} from '@/api'
-import {PropertyTypeEnum, useCommonStore} from '@/stores/common'
+import { Cohort } from '@/types';
+import { aggregates } from '@/types/aggregate'
+import { Group, Item } from '@/components/Select/SelectTypes';
+import { useEventsStore, Events } from '@/stores/eventSegmentation/events';
+import { ApplyPayload } from '@/components/events/EventManagementPopup.vue'
+import {
+    PropertyType,
+    CustomEvent,
+    EventType,
+    Property,
+    Event,
+    CustomProperty,
+} from '@/api'
+import { useCommonStore, PropertyTypeEnum } from '@/stores/common'
 
 type Lexicon = {
     cohorts: Cohort[];
@@ -27,7 +35,7 @@ type Lexicon = {
     eventsLoading: boolean;
 
     eventProperties: Property[];
-    eventCustomProperties: EventCustomProperty[];
+    eventCustomProperties: CustomProperty[];
     eventPropertiesLoading: boolean;
 
     userProperties: Property[];
@@ -132,7 +140,11 @@ export const useLexiconStore = defineStore('lexicon', {
             this.eventsLoading = true
 
             try {
-                this.events = await schemaService.events()
+                const res = await schemaService.events(commonStore.organizationId, commonStore.projectId)
+
+                if (res.data?.events) {
+                    this.events = res.data?.events
+                }
 
                 const responseCustomEvents = await schemaService.customEvents(commonStore.organizationId, commonStore.projectId)
                 this.customEvents = <CustomEvent[]>responseCustomEvents.data
@@ -143,20 +155,33 @@ export const useLexiconStore = defineStore('lexicon', {
             this.eventsLoading = false
         },
         async getEventProperties() {
-            this.eventPropertiesLoading = true;
+            const commonStore = useCommonStore()
+
+            this.eventPropertiesLoading = true
             try {
-                this.eventProperties = await schemaService.eventProperties();
-                this.eventCustomProperties = await schemaService.eventCustomProperties();
+                const res = await schemaService.eventProperties(commonStore.organizationId, commonStore.projectId)
+                if (res.data.events) {
+                    this.eventProperties = res.data.events
+                }
+
+                const resCustom = await schemaService.eventCustomProperties(commonStore.organizationId, commonStore.projectId)
+                if (resCustom.data.events) {
+                    this.eventCustomProperties = resCustom.data.events
+                }
             } catch (error) {
-                throw new Error('error getEventProperties');
+                throw new Error('error getEventProperties')
             }
-            this.eventPropertiesLoading = false;
+            this.eventPropertiesLoading = false
         },
         async getUserProperties() {
+            const commonStore = useCommonStore()
             this.eventPropertiesLoading = true;
             try {
-                this.userProperties = await schemaService.userProperties();
-                this.userCustomProperties = await schemaService.userCustomProperties();
+                const res = await schemaService.userProperties(commonStore.organizationId, commonStore.projectId);
+
+                if (res.data.events) {
+                    this.userProperties = res.data.events
+                }
             } catch (error) {
                 throw new Error('error getUserProperties');
             }
@@ -227,7 +252,7 @@ export const useLexiconStore = defineStore('lexicon', {
             };
         },
         findEventCustomProperties(state: Lexicon) {
-            return (id: number): EventCustomProperty[] => {
+            return (id: number): CustomProperty[] => {
                 const event = this.findEventById(id);
                 return state.eventCustomProperties.filter((prop): boolean => !!event.userProperties?.includes(Number(prop.id)))
             };
@@ -251,7 +276,7 @@ export const useLexiconStore = defineStore('lexicon', {
             };
         },
         findEventCustomPropertyByName(state: Lexicon) {
-            return (name: string): EventCustomProperty => {
+            return (name: string): CustomProperty => {
                 const e = state.eventCustomProperties.find((prop): boolean => prop.name === name)
                 if (e) {
                     return e
@@ -260,7 +285,7 @@ export const useLexiconStore = defineStore('lexicon', {
             }
         },
         findEventCustomPropertyById(state: Lexicon) {
-            return (id: number): EventCustomProperty => {
+            return (id: number): CustomProperty => {
                 const e = state.eventCustomProperties.find((prop): boolean => prop.id === id);
                 if (e) {
                     return e;
@@ -287,7 +312,7 @@ export const useLexiconStore = defineStore('lexicon', {
             };
         },
         property() {
-            return (ref: PropertyRef): Property | EventCustomProperty | UserCustomProperty => {
+            return (ref: PropertyRef): Property | CustomProperty | UserCustomProperty => {
                 switch (ref.type) {
                     case PropertyType.Event:
                         return this.findEventPropertyById(ref.id);
@@ -304,7 +329,7 @@ export const useLexiconStore = defineStore('lexicon', {
                     case PropertyType.Event:
                         return this.findEventPropertyById(ref.id).name;
                     case PropertyType.Custom:
-                        return this.findEventCustomPropertyById(ref.id).name;
+                        return this.findEventCustomPropertyById(ref.id)?.name || '';
                     case PropertyType.User:
                         return this.findUserPropertyById(ref.id).name;
                 }

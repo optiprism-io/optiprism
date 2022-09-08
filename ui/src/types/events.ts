@@ -10,6 +10,7 @@ import {
     EventType,
     PropertyType,
     Value,
+    PropertyValuesList200ResponseValues,
 } from '@/api'
 
 export type PropertyRef = {
@@ -225,7 +226,7 @@ export interface ConditionFilter {
     propRef?: PropertyRef
     opId: OperationId
     values: Value[]
-    valuesList: string[]
+    valuesList: PropertyValuesList200ResponseValues
     error?: boolean
 }
 
@@ -238,7 +239,7 @@ export interface Condition {
     opId?: OperationId
     values?: Value[]
     valueItem?: string | number
-    valuesList?: string[]
+    valuesList?: PropertyValuesList200ResponseValues
     period?: {
         from?: string
         to?: string

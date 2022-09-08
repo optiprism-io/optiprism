@@ -146,7 +146,7 @@ const breakdownName = (): string => {
     if (isBreakdownEventCommonCustomProperty(props.breakdown)) {
         return lexiconStore.findEventCustomPropertyById(
             (props.breakdown as BreakdownEventCommonCustomProperty).propertyId
-        ).name;
+        )?.name || '';
     }
 
     throw new Error('unhandled');

@@ -139,12 +139,14 @@ const items = computed(() => {
 
         if (firstCustomProps.length > 0) {
             let items: Item<BreakdownEventCommonProperty, null>[] = [];
-            firstCustomProps.forEach(prop =>
-                items.push({
-                    item: newBreakdownEventCommonProperty(prop.id),
-                    name: prop.name
-                })
-            );
+            firstCustomProps.forEach(prop => {
+                if (prop.id) {
+                    items.push({
+                        item: newBreakdownEventCommonProperty(prop.id),
+                        name: prop.name || ''
+                    })
+                }
+            })
 
             ret.push({
                 name: 'Event Custom Properties',

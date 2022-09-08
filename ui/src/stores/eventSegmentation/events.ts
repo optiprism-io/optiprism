@@ -26,6 +26,7 @@ import {
     EventFilterByProperty,
     EventRecordsListRequestEventsInnerEventTypeEnum,
     EventType,
+    PropertyValuesList200ResponseValues,
 } from '@/api'
 
 import { useLexiconStore } from '@/stores/lexicon'
@@ -40,7 +41,7 @@ export interface EventFilter {
     propRef?: PropertyRef;
     opId: OperationId;
     values: Value[];
-    valuesList: string[] | []
+    valuesList: PropertyValuesList200ResponseValues | []
     error?: boolean;
 }
 

@@ -314,7 +314,7 @@ const isShowSelectDate = computed(() => {
 
 const conditionValuesItems = computed(() => {
     if (props.condition.valuesList) {
-        return props.condition.valuesList.map((item: string, i) => {
+        return props.condition.valuesList.map((item) => {
             return { item, name: item }
         })
     } else {

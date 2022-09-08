@@ -31,6 +31,8 @@ const addHoldingConstant = (property: PropertyRef): void => {
             ? lexiconStore.findEventCustomPropertyById(Number(property.id))
             : lexiconStore.findEventPropertyById(Number(property.id));
 
-    stepsStore.addHoldingProperty({id, name});
+    if (id && name) {
+        stepsStore.addHoldingProperty({id, name})
+    }
 }
 </script>

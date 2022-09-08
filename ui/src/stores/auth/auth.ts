@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import axios from 'axios'
 import { BasicLoginRequest, BasicLogin200Response } from '@/api'
 import { authService } from '@/api/services/auth.service'
 import { LocalStorageAccessor } from '@/utils/localStorageAccessor'
@@ -34,14 +35,15 @@ export const useAuthStore = defineStore('auth', {
 
             try {
                 const res = await authService.refreshToken(this.refreshToken.value)
-                this.setToken(res.data)
+                await this.setToken(res.data)
             } catch (e) {
                 console.log(e)
             }
         },
         setToken(token: BasicLogin200Response): void {
-            this.accessToken = token.accessToken ?? '';
-            this.refreshToken.value = token.refreshToken ?? '';
+            axios.defaults.headers.common['Authorization'] = token?.accessToken ? `Bearer ${token.accessToken}` : ''
+            this.accessToken = token.accessToken ?? ''
+            this.refreshToken.value = token.refreshToken ?? ''
         },
         reset(): void {
             this.accessToken = null
