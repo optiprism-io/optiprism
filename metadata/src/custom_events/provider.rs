@@ -78,14 +78,12 @@ impl Provider {
 
         let mut ids = Vec::new();
         self.validate_events(organization_id, project_id, &req.events, 0, &mut ids).await?;
-        println!("!!");
 
         let idx_keys = index_keys(
             organization_id,
             project_id,
             &req.name,
         );
-        println!("!!");
 
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(CustomEventError::EventAlreadyExist(error::CustomEvent::new_with_name(organization_id, project_id, req.name)).into()),
@@ -266,10 +264,8 @@ impl Provider {
             if level > self.max_events_level {
                 return Err(CustomEventError::RecursionLevelExceeded(self.max_events_level).into());
             }
-            println!("!!1");
 
             for event in events.iter() {
-                println!("!!1");
 
                 match &event.event {
                     EventRef::RegularName(name) => { self.events.get_by_name(organization_id, project_id, name.as_str()).await?; }
@@ -280,8 +276,6 @@ impl Provider {
                         }
                         let custom_event = self.get_by_id(organization_id, project_id, *id).await?;
                         ids.push(custom_event.id);
-                        println!("!!1ы");
-
                         self.validate_events(organization_id, project_id, &custom_event.events, level + 1, ids).await?;
                     }
                 }

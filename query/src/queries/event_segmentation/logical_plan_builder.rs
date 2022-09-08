@@ -1,24 +1,23 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::{DateTime, Duration, Utc};
 use chrono::prelude::*;
+use chrono::{DateTime, Duration, Utc};
 use chronoutil::DateRule;
-use datafusion::logical_plan::{Column, DFSchema, LogicalPlan};
+use common::types::{EventFilter, PropertyRef};
 use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
+use datafusion::logical_plan::{Column, DFSchema, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion_common::ScalarValue;
-use datafusion_expr::{BuiltinScalarFunction, col, Expr, lit};
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::utils::exprlist_to_fields;
+use datafusion_expr::{col, lit, BuiltinScalarFunction, Expr};
 use futures::executor;
-use common::types::{EventFilter, PropertyRef};
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;
-use metadata::Metadata;
 use metadata::properties::provider::Namespace;
+use metadata::Metadata;
 
-use crate::{Context, event_fields};
 use crate::error::Result;
 use crate::expr::{event_expression, property_col, property_expression, time_expression};
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
@@ -27,10 +26,9 @@ use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-use crate::queries::event_segmentation::types::{
-    Breakdown, Event, EventSegmentation, Query,
-};
-use crate::queries::types::{TimeUnit};
+use crate::queries::event_segmentation::types::{Breakdown, Event, EventSegmentation, Query};
+use crate::queries::types::TimeUnit;
+use crate::{event_fields, Context};
 
 pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
@@ -348,7 +346,8 @@ impl LogicalPlanBuilder {
         // todo check for duplicates
         let all_expr = group_expr.iter().chain(aggr_expr.iter());
 
-        let aggr_schema = DFSchema::new_with_metadata(exprlist_to_fields(all_expr, &input)?, HashMap::new())?;
+        let aggr_schema =
+            DFSchema::new_with_metadata(exprlist_to_fields(all_expr, &input)?, HashMap::new())?;
 
         let expr = LogicalPlan::Aggregate(Aggregate {
             input: Arc::new(input),
@@ -377,7 +376,16 @@ impl LogicalPlanBuilder {
                         &self.metadata,
                         property,
                         operation,
-                        value.clone().and_then(|v|Some(v.iter().map(|v|v.clone().into()).collect::<Vec<ScalarValue>>())).to_owned(),
+                        value
+                            .clone()
+                            .and_then(|v| {
+                                Some(
+                                    v.iter()
+                                        .map(|v| v.clone().into())
+                                        .collect::<Vec<ScalarValue>>(),
+                                )
+                            })
+                            .to_owned(),
                     )),
                 }
             })

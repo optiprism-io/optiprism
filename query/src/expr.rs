@@ -4,7 +4,7 @@ use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
 use datafusion::logical_plan::ExprSchemable;
 use datafusion_common::{Column, ExprSchema, ScalarValue};
-use datafusion_expr::{col, Expr, lit, Operator};
+use datafusion_expr::{col, Expr, lit, Operator, or};
 use datafusion_expr::expr_fn::{and, binary_expr};
 use futures::executor;
 use common::types::{EventFilter, EventRef, PropertyRef, PropValueOperation};
@@ -83,16 +83,16 @@ pub async fn event_expression(
                     EventRef::Custom(id) => executor::block_on(event_expression(ctx, metadata, &EventRef::Custom(*id)))?
                 };
 
-                /*if let Some(filters) = &event.filters {
+                if let Some(filters) = &event.filters {
                     expr = and(expr.clone(), event_filters_expression(ctx, metadata, filters).await?);
-                }*/
+                }
 
                 exprs.push(expr);
             }
 
             let mut final_expr = exprs[0].clone();
             for expr in exprs.iter().skip(1) {
-                final_expr = and(final_expr.clone(), expr.to_owned())
+                final_expr = or(final_expr.clone(), expr.to_owned())
             }
 
             final_expr
