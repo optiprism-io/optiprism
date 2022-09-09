@@ -1,16 +1,16 @@
 use crate::PlatformError;
 use crate::Result;
 use chrono::{DateTime, Utc};
-use common::DECIMAL_PRECISION;
+use common::{DECIMAL_PRECISION, ScalarValue};
 use convert_case::{Case, Casing};
-use datafusion_common::ScalarValue;
 use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
 use query::queries::types as query_types;
-use rust_decimal::Decimal;
+use rust_decimal::{Decimal};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Number, Value};
+use num_traits::ToPrimitive;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum PropValueOperation {
     Eq,
@@ -29,29 +29,57 @@ pub enum PropValueOperation {
     Regex,
     Like,
     NotLike,
+    NotRegex,
 }
 
-impl TryInto<query_types::PropValueOperation> for PropValueOperation {
+impl TryInto<common::types::PropValueOperation> for PropValueOperation {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_types::PropValueOperation, Self::Error> {
+    fn try_into(self) -> std::result::Result<common::types::PropValueOperation, Self::Error> {
         Ok(match self {
-            PropValueOperation::Eq => query_types::PropValueOperation::Eq,
-            PropValueOperation::Neq => query_types::PropValueOperation::Neq,
-            PropValueOperation::Gt => query_types::PropValueOperation::Gt,
-            PropValueOperation::Gte => query_types::PropValueOperation::Gte,
-            PropValueOperation::Lt => query_types::PropValueOperation::Lt,
-            PropValueOperation::Lte => query_types::PropValueOperation::Lte,
-            PropValueOperation::True => query_types::PropValueOperation::True,
-            PropValueOperation::False => query_types::PropValueOperation::False,
-            PropValueOperation::Exists => query_types::PropValueOperation::Exists,
-            PropValueOperation::Empty => query_types::PropValueOperation::Empty,
-            PropValueOperation::ArrAll => query_types::PropValueOperation::ArrAll,
-            PropValueOperation::ArrAny => query_types::PropValueOperation::ArrAny,
-            PropValueOperation::ArrNone => query_types::PropValueOperation::ArrNone,
-            PropValueOperation::Regex => query_types::PropValueOperation::Regex,
-            PropValueOperation::Like => query_types::PropValueOperation::Like,
-            PropValueOperation::NotLike => query_types::PropValueOperation::NotLike,
+            PropValueOperation::Eq => common::types::PropValueOperation::Eq,
+            PropValueOperation::Neq => common::types::PropValueOperation::Neq,
+            PropValueOperation::Gt => common::types::PropValueOperation::Gt,
+            PropValueOperation::Gte => common::types::PropValueOperation::Gte,
+            PropValueOperation::Lt => common::types::PropValueOperation::Lt,
+            PropValueOperation::Lte => common::types::PropValueOperation::Lte,
+            PropValueOperation::True => common::types::PropValueOperation::True,
+            PropValueOperation::False => common::types::PropValueOperation::False,
+            PropValueOperation::Exists => common::types::PropValueOperation::Exists,
+            PropValueOperation::Empty => common::types::PropValueOperation::Empty,
+            PropValueOperation::ArrAll => common::types::PropValueOperation::ArrAll,
+            PropValueOperation::ArrAny => common::types::PropValueOperation::ArrAny,
+            PropValueOperation::ArrNone => common::types::PropValueOperation::ArrNone,
+            PropValueOperation::Regex => common::types::PropValueOperation::Regex,
+            PropValueOperation::Like => common::types::PropValueOperation::Like,
+            PropValueOperation::NotLike => common::types::PropValueOperation::NotLike,
+            PropValueOperation::NotRegex => common::types::PropValueOperation::NotRegex,
+        })
+    }
+}
+
+impl TryInto<PropValueOperation> for common::types::PropValueOperation {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<PropValueOperation, Self::Error> {
+        Ok(match self {
+            common::types::PropValueOperation::Eq => PropValueOperation::Eq,
+            common::types::PropValueOperation::Neq => PropValueOperation::Neq,
+            common::types::PropValueOperation::Gt => PropValueOperation::Gt,
+            common::types::PropValueOperation::Gte => PropValueOperation::Gte,
+            common::types::PropValueOperation::Lt => PropValueOperation::Lt,
+            common::types::PropValueOperation::Lte => PropValueOperation::Lte,
+            common::types::PropValueOperation::True => PropValueOperation::True,
+            common::types::PropValueOperation::False => PropValueOperation::False,
+            common::types::PropValueOperation::Exists => PropValueOperation::Exists,
+            common::types::PropValueOperation::Empty => PropValueOperation::Empty,
+            common::types::PropValueOperation::ArrAll => PropValueOperation::ArrAll,
+            common::types::PropValueOperation::ArrAny => PropValueOperation::ArrAny,
+            common::types::PropValueOperation::ArrNone => PropValueOperation::ArrNone,
+            common::types::PropValueOperation::Regex => PropValueOperation::Regex,
+            common::types::PropValueOperation::Like => PropValueOperation::Like,
+            common::types::PropValueOperation::NotLike => PropValueOperation::NotLike,
+            common::types::PropValueOperation::NotRegex => PropValueOperation::NotRegex,
         })
     }
 }
@@ -236,7 +264,21 @@ pub fn json_value_to_scalar(v: &Value) -> Result<ScalarValue> {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+pub fn scalar_to_json_value(v: &ScalarValue) -> Result<Value> {
+    match v {
+        ScalarValue::Decimal128(None, _, _) => Ok(Value::Null),
+        ScalarValue::Boolean(None) => Ok(Value::Null),
+        ScalarValue::Utf8(None) => Ok(Value::Null),
+        ScalarValue::Decimal128(Some(v), p, s) => {
+            Ok(Value::Number(Number::from_f64(Decimal::new(*v as i64, *s as u32).to_f64().unwrap()).unwrap()))
+        }
+        ScalarValue::Boolean(Some(v)) => Ok(Value::Bool(*v)),
+        ScalarValue::Utf8(Some(v)) => Ok(Value::String(v.to_owned())),
+        _ => Err(PlatformError::BadRequest("unexpected value".to_string())),
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "eventType", rename_all = "camelCase")]
 pub enum EventRef {
     #[serde(rename_all = "camelCase")]
@@ -256,7 +298,28 @@ impl EventRef {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+impl Into<common::types::EventRef> for EventRef {
+    fn into(self) -> common::types::EventRef {
+        match self {
+            EventRef::Regular { event_name } => common::types::EventRef::RegularName(event_name),
+            EventRef::Custom { event_id } => common::types::EventRef::Custom(event_id),
+        }
+    }
+}
+
+impl TryInto<EventRef> for common::types::EventRef {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<EventRef, Self::Error> {
+        Ok(match self {
+            common::types::EventRef::RegularName(name) => EventRef::Regular { event_name: name },
+            common::types::EventRef::Regular(_) => unimplemented!(),
+            common::types::EventRef::Custom(id) => EventRef::Custom { event_id: id },
+        })
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "propertyType", rename_all = "camelCase")]
 pub enum PropertyRef {
     #[serde(rename_all = "camelCase")]
@@ -267,25 +330,81 @@ pub enum PropertyRef {
     Custom { property_id: u64 },
 }
 
-impl TryInto<query_types::EventRef> for EventRef {
+impl TryInto<common::types::PropertyRef> for PropertyRef {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_types::EventRef, Self::Error> {
+    fn try_into(self) -> std::result::Result<common::types::PropertyRef, Self::Error> {
         Ok(match self {
-            EventRef::Regular { event_name } => query_types::EventRef::Regular(event_name),
-            EventRef::Custom { event_id } => query_types::EventRef::Custom(event_id),
+            PropertyRef::User { property_name } => common::types::PropertyRef::User(property_name),
+            PropertyRef::Event { property_name } => common::types::PropertyRef::Event(property_name),
+            PropertyRef::Custom { property_id } => common::types::PropertyRef::Custom(property_id),
         })
     }
 }
 
-impl TryInto<query_types::PropertyRef> for PropertyRef {
+impl TryInto<PropertyRef> for common::types::PropertyRef {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_types::PropertyRef, Self::Error> {
+    fn try_into(self) -> std::result::Result<PropertyRef, Self::Error> {
         Ok(match self {
-            PropertyRef::User { property_name } => query_types::PropertyRef::User(property_name),
-            PropertyRef::Event { property_name } => query_types::PropertyRef::Event(property_name),
-            PropertyRef::Custom { property_id } => query_types::PropertyRef::Custom(property_id),
+            common::types::PropertyRef::User(property_name) => PropertyRef::User { property_name },
+            common::types::PropertyRef::Event(property_name) => PropertyRef::Event { property_name },
+            common::types::PropertyRef::Custom(property_id) => PropertyRef::Custom { property_id }
+        })
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum EventFilter {
+    #[serde(rename_all = "camelCase")]
+    Property {
+        #[serde(flatten)]
+        property: PropertyRef,
+        operation: PropValueOperation,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Vec<Value>>,
+    },
+}
+
+impl TryInto<common::types::EventFilter> for &EventFilter {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<common::types::EventFilter, Self::Error> {
+        Ok(match self {
+            EventFilter::Property {
+                property,
+                operation,
+                value,
+            } => common::types::EventFilter::Property {
+                property: property.to_owned().try_into()?,
+                operation: operation.to_owned().try_into()?,
+                value: match value {
+                    None => None,
+                    Some(v) => Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?),
+                },
+            },
+        })
+    }
+}
+
+impl TryInto<EventFilter> for common::types::EventFilter {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<EventFilter, Self::Error> {
+        Ok(match self {
+            common::types::EventFilter::Property {
+                property,
+                operation,
+                value,
+            } => EventFilter::Property {
+                property: property.to_owned().try_into()?,
+                operation: operation.to_owned().try_into()?,
+                value: match value {
+                    None => None,
+                    Some(v) => Some(v.iter().map(scalar_to_json_value).collect::<Result<_>>()?),
+                },
+            },
         })
     }
 }

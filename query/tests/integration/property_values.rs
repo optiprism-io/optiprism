@@ -4,7 +4,6 @@ mod tests {
     use datafusion::execution::runtime_env::{RuntimeEnv};
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use datafusion::physical_plan::{collect};
-    use datafusion_common::ScalarValue;
     use query::error::Result;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::property_values::{Filter, LogicalPlanBuilder, PropertyValues};
@@ -13,6 +12,7 @@ mod tests {
     use std::sync::Arc;
     use datafusion::execution::context::SessionState;
     use datafusion::prelude::{SessionConfig, SessionContext};
+    use common::ScalarValue;
     use common::types::{EventRef, PropertyRef, PropValueOperation};
 
     #[tokio::test]

@@ -15,11 +15,16 @@ pub enum Permission {
     ListAccounts,
 
     CreateEvent,
+    CreateCustomEvent,
     GetEventById,
+    GetCustomEventById,
     GetEventByName,
     UpdateEvent,
+    UpdateCustomEvent,
     DeleteEvent,
+    DeleteCustomEvent,
     ListEvents,
+    ListCustomEvents,
     AttachPropertyToEvent,
     DetachPropertyFromEvent,
 

@@ -5,8 +5,9 @@ use std::fmt::Debug;
 use axum::{http::StatusCode, Json, response::{IntoResponse, Response}};
 use serde::Serialize;
 use thiserror::Error;
+use common::error::CommonError;
 
-use metadata::error::{AccountError, DatabaseError, DictionaryError, EventError, MetadataError, OrganizationError, ProjectError, PropertyError, StoreError};
+use metadata::error::{AccountError, CustomEventError, DatabaseError, DictionaryError, EventError, MetadataError, OrganizationError, ProjectError, PropertyError, StoreError};
 use query::error::QueryError;
 
 pub type Result<T> = result::Result<T, PlatformError>;
@@ -25,6 +26,8 @@ pub enum PlatformError {
     Metadata(#[from] MetadataError),
     #[error("query: {0:?}")]
     Query(#[from] QueryError),
+    #[error("common: {0:?}")]
+    Common(#[from] CommonError),
 }
 
 #[derive(Serialize, Debug)]
@@ -134,6 +137,13 @@ impl IntoResponse for PlatformError {
                 MetadataError::Bincode(err) => ErrorResponse::internal(Box::new(err)),
                 MetadataError::Io(err) => ErrorResponse::internal(Box::new(err)),
                 MetadataError::Other(_) => ErrorResponse::internal(Box::new(err)),
+                MetadataError::CustomEvent(err) => match err {
+                    CustomEventError::EventNotFound(_) => ErrorResponse::not_found(Box::new(err)),
+                    CustomEventError::EventAlreadyExist(_) => ErrorResponse::conflict(Box::new(err)),
+                    CustomEventError::RecursionLevelExceeded(_) => ErrorResponse::bad_request(Box::new(err)),
+                    CustomEventError::DuplicateEvent => ErrorResponse::conflict(Box::new(err)),
+                    CustomEventError::EmptyEvents => ErrorResponse::bad_request(Box::new(err)),
+                }
             }
             PlatformError::Query(err) => match err {
                 QueryError::Internal(_) => ErrorResponse::internal(Box::new(err)),
@@ -145,8 +155,12 @@ impl IntoResponse for PlatformError {
             },
             PlatformError::BadRequest(msg) => ErrorResponse::new_inner(StatusCode::BAD_REQUEST, msg),
             PlatformError::Internal(_msg) => ErrorResponse::new_inner(StatusCode::INTERNAL_SERVER_ERROR, "internal server error".to_string()),
+            PlatformError::Common(err) => match err {
+                CommonError::DataFusionError(_) => ErrorResponse::internal(Box::new(err)),
+                CommonError::JWTError(_) => ErrorResponse::internal(Box::new(err)),
+            }
         };
 
-            (a,Json(b)).into_response()
+        (a, Json(b)).into_response()
     }
 }

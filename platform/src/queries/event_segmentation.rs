@@ -1,7 +1,4 @@
-use crate::queries::types::{
-    json_value_to_scalar, AggregateFunction, EventRef, PartitionedAggregateFunction,
-    PropValueOperation, PropertyRef, QueryTime, TimeUnit,
-};
+use crate::queries::types::{json_value_to_scalar, AggregateFunction, EventRef, PartitionedAggregateFunction, PropValueOperation, PropertyRef, QueryTime, TimeUnit, EventFilter};
 use crate::PlatformError;
 use crate::Result;
 use chrono::{DateTime, Utc};
@@ -274,48 +271,6 @@ impl TryInto<query_es_types::Query> for &Query {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum PropertyType {
-    User,
-    Event,
-    Custom,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum EventFilter {
-    #[serde(rename_all = "camelCase")]
-    Property {
-        #[serde(flatten)]
-        property: PropertyRef,
-        operation: PropValueOperation,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        value: Option<Vec<Value>>,
-    },
-}
-
-impl TryInto<query_es_types::EventFilter> for &EventFilter {
-    type Error = PlatformError;
-
-    fn try_into(self) -> std::result::Result<query_es_types::EventFilter, Self::Error> {
-        Ok(match self {
-            EventFilter::Property {
-                property,
-                operation,
-                value,
-            } => query_es_types::EventFilter::Property {
-                property: property.to_owned().try_into()?,
-                operation: operation.to_owned().try_into()?,
-                value: match value {
-                    None => None,
-                    Some(v) => Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?),
-                },
-            },
-        })
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Breakdown {
     Property {
@@ -360,7 +315,7 @@ impl TryInto<query_es_types::Event> for &Event {
 
     fn try_into(self) -> std::result::Result<query_es_types::Event, Self::Error> {
         Ok(query_es_types::Event {
-            event: self.event.clone().try_into()?,
+            event: self.event.to_owned().into(),
             filters: self
                 .filters
                 .as_ref()

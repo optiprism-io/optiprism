@@ -8,6 +8,7 @@ pub mod http;
 pub mod properties;
 pub mod provider;
 pub mod queries;
+pub mod custom_events;
 
 use rust_decimal::prelude::ToPrimitive;
 
@@ -22,6 +23,7 @@ pub use auth::Provider as AuthProvider;
 pub use context::Context;
 pub use error::{PlatformError, Result};
 pub use events::Provider as EventsProvider;
+pub use custom_events::Provider as CustomEventsProvider;
 pub use properties::Provider as PropertiesProvider;
 pub use provider::PlatformProvider;
 use rust_decimal::Decimal;

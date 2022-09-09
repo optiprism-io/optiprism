@@ -8,11 +8,11 @@ use common::types::{EventFilter, PropertyRef};
 use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
 use datafusion::logical_plan::{Column, DFSchema, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;
-use datafusion_common::ScalarValue;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::{col, lit, BuiltinScalarFunction, Expr};
 use futures::executor;
+use common::ScalarValue;
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use metadata::properties::provider::Namespace;
@@ -376,16 +376,7 @@ impl LogicalPlanBuilder {
                         &self.metadata,
                         property,
                         operation,
-                        value
-                            .clone()
-                            .and_then(|v| {
-                                Some(
-                                    v.iter()
-                                        .map(|v| v.clone().into())
-                                        .collect::<Vec<ScalarValue>>(),
-                                )
-                            })
-                            .to_owned(),
+                        value.to_owned(),
                     )),
                 }
             })

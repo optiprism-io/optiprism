@@ -1,5 +1,5 @@
-use arrow::datatypes::{DataType, Field};
-use datafusion_common::ScalarValue as DFScalarValue;
+use arrow::datatypes::{DataType, Field, IntervalUnit, TimeUnit};
+use datafusion_common::{DataFusionError, ScalarValue as DFScalarValue};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -67,6 +67,64 @@ pub enum ScalarValue {
     Struct(Option<Vec<ScalarValue>>, Box<Vec<Field>>),
     /// Dictionary type: index type and value
     Dictionary(Box<DataType>, Box<ScalarValue>),
+}
+
+impl ScalarValue {
+    /// Getter for the `DataType` of the value
+    pub fn get_datatype(&self) -> DataType {
+        match self {
+            ScalarValue::Boolean(_) => DataType::Boolean,
+            ScalarValue::UInt8(_) => DataType::UInt8,
+            ScalarValue::UInt16(_) => DataType::UInt16,
+            ScalarValue::UInt32(_) => DataType::UInt32,
+            ScalarValue::UInt64(_) => DataType::UInt64,
+            ScalarValue::Int8(_) => DataType::Int8,
+            ScalarValue::Int16(_) => DataType::Int16,
+            ScalarValue::Int32(_) => DataType::Int32,
+            ScalarValue::Int64(_) => DataType::Int64,
+            ScalarValue::Decimal128(_, precision, scale) => {
+                DataType::Decimal128(*precision, *scale)
+            }
+            ScalarValue::TimestampSecond(_, tz_opt) => {
+                DataType::Timestamp(TimeUnit::Second, tz_opt.clone())
+            }
+            ScalarValue::TimestampMillisecond(_, tz_opt) => {
+                DataType::Timestamp(TimeUnit::Millisecond, tz_opt.clone())
+            }
+            ScalarValue::TimestampMicrosecond(_, tz_opt) => {
+                DataType::Timestamp(TimeUnit::Microsecond, tz_opt.clone())
+            }
+            ScalarValue::TimestampNanosecond(_, tz_opt) => {
+                DataType::Timestamp(TimeUnit::Nanosecond, tz_opt.clone())
+            }
+            ScalarValue::Float32(_) => DataType::Float32,
+            ScalarValue::Float64(_) => DataType::Float64,
+            ScalarValue::Utf8(_) => DataType::Utf8,
+            ScalarValue::LargeUtf8(_) => DataType::LargeUtf8,
+            ScalarValue::Binary(_) => DataType::Binary,
+            ScalarValue::LargeBinary(_) => DataType::LargeBinary,
+            ScalarValue::List(_, field) => DataType::List(Box::new(Field::new(
+                "item",
+                field.data_type().clone(),
+                true,
+            ))),
+            ScalarValue::Date32(_) => DataType::Date32,
+            ScalarValue::Date64(_) => DataType::Date64,
+            ScalarValue::Time64(_) => DataType::Time64(TimeUnit::Nanosecond),
+            ScalarValue::IntervalYearMonth(_) => {
+                DataType::Interval(IntervalUnit::YearMonth)
+            }
+            ScalarValue::IntervalDayTime(_) => DataType::Interval(IntervalUnit::DayTime),
+            ScalarValue::IntervalMonthDayNano(_) => {
+                DataType::Interval(IntervalUnit::MonthDayNano)
+            }
+            ScalarValue::Struct(_, fields) => DataType::Struct(fields.as_ref().clone()),
+            ScalarValue::Dictionary(k, v) => {
+                DataType::Dictionary(k.clone(), Box::new(v.get_datatype()))
+            }
+            ScalarValue::Null => DataType::Null,
+        }
+    }
 }
 
 impl From<ScalarValue> for DFScalarValue {
@@ -168,5 +226,64 @@ impl From<DFScalarValue> for ScalarValue {
             ),
             DFScalarValue::Dictionary(t, v) => ScalarValue::Dictionary(t, Box::new((*v).into())),
         }
+    }
+}
+
+impl TryFrom<&DataType> for ScalarValue {
+    type Error = DataFusionError;
+
+    /// Create a Null instance of ScalarValue for this datatype
+    fn try_from(datatype: &DataType) -> datafusion_common::Result<Self> {
+        Ok(match datatype {
+            DataType::Boolean => ScalarValue::Boolean(None),
+            DataType::Float64 => ScalarValue::Float64(None),
+            DataType::Float32 => ScalarValue::Float32(None),
+            DataType::Int8 => ScalarValue::Int8(None),
+            DataType::Int16 => ScalarValue::Int16(None),
+            DataType::Int32 => ScalarValue::Int32(None),
+            DataType::Int64 => ScalarValue::Int64(None),
+            DataType::UInt8 => ScalarValue::UInt8(None),
+            DataType::UInt16 => ScalarValue::UInt16(None),
+            DataType::UInt32 => ScalarValue::UInt32(None),
+            DataType::UInt64 => ScalarValue::UInt64(None),
+            DataType::Decimal128(precision, scale) => {
+                ScalarValue::Decimal128(None, *precision, *scale)
+            }
+            DataType::Utf8 => ScalarValue::Utf8(None),
+            DataType::LargeUtf8 => ScalarValue::LargeUtf8(None),
+            DataType::Date32 => ScalarValue::Date32(None),
+            DataType::Date64 => ScalarValue::Date64(None),
+            DataType::Time64(TimeUnit::Nanosecond) => ScalarValue::Time64(None),
+            DataType::Timestamp(TimeUnit::Second, tz_opt) => {
+                ScalarValue::TimestampSecond(None, tz_opt.clone())
+            }
+            DataType::Timestamp(TimeUnit::Millisecond, tz_opt) => {
+                ScalarValue::TimestampMillisecond(None, tz_opt.clone())
+            }
+            DataType::Timestamp(TimeUnit::Microsecond, tz_opt) => {
+                ScalarValue::TimestampMicrosecond(None, tz_opt.clone())
+            }
+            DataType::Timestamp(TimeUnit::Nanosecond, tz_opt) => {
+                ScalarValue::TimestampNanosecond(None, tz_opt.clone())
+            }
+            DataType::Dictionary(index_type, value_type) => ScalarValue::Dictionary(
+                index_type.clone(),
+                Box::new(value_type.as_ref().try_into()?),
+            ),
+            DataType::List(ref nested_type) => ScalarValue::List(
+                None,
+                Box::new(Field::new("item", nested_type.data_type().clone(), true)),
+            ),
+            DataType::Struct(fields) => {
+                ScalarValue::Struct(None, Box::new(fields.clone()))
+            }
+            DataType::Null => ScalarValue::Null,
+            _ => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Can't create a scalar from data_type \"{:?}\"",
+                    datatype
+                )));
+            }
+        })
     }
 }

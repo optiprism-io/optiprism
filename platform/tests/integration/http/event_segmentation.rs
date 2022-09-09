@@ -26,13 +26,10 @@ mod tests {
     use metadata::properties::{CreatePropertyRequest, Property};
     use metadata::{events, properties};
     use platform::queries::event_segmentation::{
-        Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, EventType,
-        PropertyType, Query,
+        Analysis, Breakdown, ChartType, Event, EventSegmentation, EventType,
+        Query,
     };
-    use platform::queries::types::{
-        AggregateFunction, EventRef, PartitionedAggregateFunction, PropValueOperation, PropertyRef,
-        QueryTime, TimeUnit,
-    };
+    use platform::queries::types::{AggregateFunction, EventRef, PartitionedAggregateFunction, PropValueOperation, PropertyRef, QueryTime, TimeUnit, EventFilter};
     use query::test_util::{create_entities, create_md, events_provider};
     use reqwest::Client;
     use serde_json::Value;

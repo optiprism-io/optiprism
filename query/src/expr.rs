@@ -3,10 +3,11 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
 use datafusion::logical_plan::ExprSchemable;
-use datafusion_common::{Column, ExprSchema, ScalarValue};
+use datafusion_common::{Column, ExprSchema, ScalarValue as DFScalarValue};
 use datafusion_expr::{col, Expr, lit, Operator, or};
 use datafusion_expr::expr_fn::{and, binary_expr};
 use futures::executor;
+use common::ScalarValue;
 use common::types::{EventFilter, EventRef, PropertyRef, PropValueOperation};
 
 use metadata::{dictionaries, Metadata};
@@ -57,7 +58,7 @@ pub async fn event_expression(
             binary_expr(
                 col(event_fields::EVENT),
                 Operator::Eq,
-                lit(ScalarValue::from(e.id)),
+                lit(DFScalarValue::from(e.id)),
             )
         }
         EventRef::Regular(id) => {
@@ -69,7 +70,7 @@ pub async fn event_expression(
             binary_expr(
                 col(event_fields::EVENT),
                 Operator::Eq,
-                lit(ScalarValue::from(e.id)),
+                lit(DFScalarValue::from(e.id)),
             )
         }
 
@@ -117,7 +118,7 @@ pub async fn event_filters_expression(ctx: &Context, metadata: &Arc<Metadata>, f
                     metadata,
                     property,
                     operation,
-                    value.clone().and_then(|v|Some(v.iter().map(|v|v.clone().into()).collect::<Vec<ScalarValue>>())).to_owned(),
+                    value.clone().and_then(|v| Some(v.iter().map(|v| v.clone().into()).collect::<Vec<ScalarValue>>())).to_owned(),
                 )),
             }
         })
@@ -276,14 +277,14 @@ pub fn named_property_expression(
                 1 => binary_expr(
                     prop_col,
                     operation.clone().into(),
-                    lit(values_vec[0].clone()),
+                    lit(DFScalarValue::from(values_vec[0].to_owned())),
                 ),
                 _ => {
                     // iterate over all possible values
                     let exprs = values_vec
                         .iter()
                         .map(|v| {
-                            binary_expr(prop_col.clone(), operation.clone().into(), lit(v.clone()))
+                            binary_expr(prop_col.clone(), operation.clone().into(), lit(DFScalarValue::from(v.to_owned())))
                         })
                         .collect();
 

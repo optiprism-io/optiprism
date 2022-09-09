@@ -19,16 +19,7 @@ mod tests {
 
     use axum::headers::{HeaderMap, HeaderValue};
     use axum::http::StatusCode;
-    use datafusion::datasource::file_format::csv::CsvFormat;
-    use datafusion::datasource::listing::{ListingOptions, ListingTable, ListingTableConfig};
-    use metadata::database::{Column, Table, TableRef};
-    use metadata::properties::provider::Namespace;
-    use metadata::properties::{CreatePropertyRequest, Property};
-    use metadata::{events, properties};
-    use platform::queries::event_segmentation::{
-        Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, EventType,
-        PropertyType, Query,
-    };
+
     use platform::queries::property_values::{Filter, PropertyValues};
     use platform::queries::types::{
         AggregateFunction, EventRef, PartitionedAggregateFunction, PropValueOperation, PropertyRef,

@@ -4,9 +4,10 @@ use std::sync::Arc;
 use datafusion::logical_plan::DFSchema;
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::logical_plan::plan::{Aggregate, Extension, Filter as PlanFilter, Sort};
-use datafusion_common::{Column, ScalarValue};
+use datafusion_common::{Column};
 use datafusion_expr::{col, Expr};
 use datafusion_expr::utils::exprlist_to_fields;
+use common::ScalarValue;
 use common::types::{EventRef, PropertyRef, PropValueOperation};
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;

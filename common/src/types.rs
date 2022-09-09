@@ -110,3 +110,5 @@ pub enum EventFilter {
         value: Option<Vec<ScalarValue>>,
     },
 }
+
+pub type OptionalProperty<T> = Option<T>;

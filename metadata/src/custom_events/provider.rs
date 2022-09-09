@@ -1,35 +1,27 @@
-use std::sync::Arc;
 use axum::body::HttpBody;
+use std::sync::Arc;
 
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use futures::future::{BoxFuture, FutureExt};
 
+use common::types::EventRef;
 use tokio::sync::RwLock;
-use common::types::{EventRef};
 
-
+use crate::custom_events::types::{CreateCustomEventRequest, Event, UpdateCustomEventRequest};
+use crate::custom_events::CustomEvent;
 use crate::error::{CustomEventError, MetadataError, StoreError};
 use crate::metadata::{list, ListResponse};
 use crate::store::index::hash_map::HashMap;
 use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::{error, events, Result};
-use crate::custom_events::CustomEvent;
-use crate::custom_events::types::{CreateCustomEventRequest, Event, UpdateCustomEventRequest};
 
 const NAMESPACE: &[u8] = b"custom_events";
 const IDX_NAME: &[u8] = b"name";
 const MAX_EVENTS_LEVEL: usize = 3;
 
-fn index_keys(
-    organization_id: u64,
-    project_id: u64,
-    name: &str,
-) -> Vec<Option<Vec<u8>>> {
-    [
-        index_name_key(organization_id, project_id, name),
-    ]
-        .to_vec()
+fn index_keys(organization_id: u64, project_id: u64, name: &str) -> Vec<Option<Vec<u8>>> {
+    [index_name_key(organization_id, project_id, name)].to_vec()
 }
 
 fn index_name_key(organization_id: u64, project_id: u64, name: &str) -> Option<Vec<u8>> {
@@ -77,16 +69,22 @@ impl Provider {
         }
 
         let mut ids = Vec::new();
-        self.validate_events(organization_id, project_id, &req.events, 0, &mut ids).await?;
+        self.validate_events(organization_id, project_id, &req.events, 0, &mut ids)
+            .await?;
 
-        let idx_keys = index_keys(
-            organization_id,
-            project_id,
-            &req.name,
-        );
+        let idx_keys = index_keys(organization_id, project_id, &req.name);
 
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(CustomEventError::EventAlreadyExist(error::CustomEvent::new_with_name(organization_id, project_id, req.name)).into()),
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
+                return Err(
+                    CustomEventError::EventAlreadyExist(error::CustomEvent::new_with_name(
+                        organization_id,
+                        project_id,
+                        req.name,
+                    ))
+                    .into(),
+                )
+            }
             Err(other) => return Err(other),
             Ok(_) => {}
         }
@@ -124,11 +122,23 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
+    pub async fn get_by_id(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        id: u64,
+    ) -> Result<CustomEvent> {
         let key = make_data_value_key(organization_id, project_id, NAMESPACE, id);
 
         match self.store.get(key).await? {
-            None => Err(CustomEventError::EventNotFound(error::CustomEvent::new_with_id(organization_id, project_id, id)).into()),
+            None => Err(
+                CustomEventError::EventNotFound(error::CustomEvent::new_with_id(
+                    organization_id,
+                    project_id,
+                    id,
+                ))
+                .into(),
+            ),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -148,15 +158,27 @@ impl Provider {
                 IDX_NAME,
                 name,
             ))
-            .await {
-            Err(MetadataError::Store(StoreError::KeyNotFound(name))) => Err(CustomEventError::EventNotFound(error::CustomEvent::new_with_name(organization_id, project_id, name)).into()),
+            .await
+        {
+            Err(MetadataError::Store(StoreError::KeyNotFound(name))) => Err(
+                CustomEventError::EventNotFound(error::CustomEvent::new_with_name(
+                    organization_id,
+                    project_id,
+                    name,
+                ))
+                .into(),
+            ),
             Err(other) => Err(other),
-            Ok(data) => Ok(deserialize(&data)?)
+            Ok(data) => Ok(deserialize(&data)?),
         }
     }
 
-    pub async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<CustomEvent>> {
-        list(self.store.clone(), organization_id, project_id, NAMESPACE).await
+    pub async fn list(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+    ) -> Result<ListResponse<CustomEvent>> {
+        list(self.store.clone(), organization_id, project_id, NAMESPACE).await.into()
     }
 
     pub async fn update(
@@ -185,10 +207,21 @@ impl Provider {
             event.name = name.to_owned();
         }
 
-        match self.idx
+        match self
+            .idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(CustomEventError::EventAlreadyExist(error::CustomEvent::new_with_id(organization_id, project_id, event_id)).into()),
+            .await
+        {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
+                return Err(
+                    CustomEventError::EventAlreadyExist(error::CustomEvent::new_with_id(
+                        organization_id,
+                        project_id,
+                        event_id,
+                    ))
+                    .into(),
+                )
+            }
             Err(other) => return Err(other),
             Ok(_) => {}
         }
@@ -214,7 +247,8 @@ impl Provider {
             }
 
             let mut ids = vec![event.id];
-            self.validate_events(organization_id, project_id, &events, 0, &mut ids).await?;
+            self.validate_events(organization_id, project_id, &events, 0, &mut ids)
+                .await?;
 
             event.events = events;
         }
@@ -233,7 +267,12 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
+    pub async fn delete(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        id: u64,
+    ) -> Result<CustomEvent> {
         let _guard = self.guard.write().await;
         let event = self.get_by_id(organization_id, project_id, id).await?;
         self.store
@@ -246,42 +285,57 @@ impl Provider {
             .await?;
 
         self.idx
-            .delete(
-                index_keys(
-                    organization_id,
-                    project_id,
-                    &event.name,
-                )
-                    .as_ref(),
-            )
+            .delete(index_keys(organization_id, project_id, &event.name).as_ref())
             .await?;
 
         Ok(event)
     }
 
-    fn validate_events<'a>(&'a self, organization_id: u64, project_id: u64, events: &'a [Event], level: usize, ids: &'a mut Vec<u64>) -> BoxFuture<'a, Result<()>> {
+    fn validate_events<'a>(
+        &'a self,
+        organization_id: u64,
+        project_id: u64,
+        events: &'a [Event],
+        level: usize,
+        ids: &'a mut Vec<u64>,
+    ) -> BoxFuture<'a, Result<()>> {
         async move {
             if level > self.max_events_level {
                 return Err(CustomEventError::RecursionLevelExceeded(self.max_events_level).into());
             }
 
             for event in events.iter() {
-
                 match &event.event {
-                    EventRef::RegularName(name) => { self.events.get_by_name(organization_id, project_id, name.as_str()).await?; }
-                    EventRef::Regular(id) => { self.events.get_by_id(organization_id, project_id, *id).await?; }
+                    EventRef::RegularName(name) => {
+                        self.events
+                            .get_by_name(organization_id, project_id, name.as_str())
+                            .await?;
+                    }
+                    EventRef::Regular(id) => {
+                        self.events
+                            .get_by_id(organization_id, project_id, *id)
+                            .await?;
+                    }
                     EventRef::Custom(id) => {
                         if ids.contains(id) {
                             return Err(CustomEventError::DuplicateEvent.into());
                         }
                         let custom_event = self.get_by_id(organization_id, project_id, *id).await?;
                         ids.push(custom_event.id);
-                        self.validate_events(organization_id, project_id, &custom_event.events, level + 1, ids).await?;
+                        self.validate_events(
+                            organization_id,
+                            project_id,
+                            &custom_event.events,
+                            level + 1,
+                            ids,
+                        )
+                        .await?;
                     }
                 }
             }
 
             Ok(())
-        }.boxed()
+        }
+        .boxed()
     }
 }

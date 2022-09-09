@@ -1,8 +1,7 @@
-use crate::OptionalProperty;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use common::scalar::ScalarValue;
-use common::types::{EventFilter, EventRef};
+use common::types::{EventFilter, EventRef, OptionalProperty};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Status {

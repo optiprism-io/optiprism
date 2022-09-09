@@ -32,7 +32,7 @@ impl TryInto<query::queries::property_values::PropertyValues> for PropertyValues
     ) -> std::result::Result<query::queries::property_values::PropertyValues, Self::Error> {
         Ok(query::queries::property_values::PropertyValues {
             property: self.property.try_into()?,
-            event: self.event.map(|event| event.try_into()).transpose()?,
+            event: self.event.map(|event| event.into()),
             filter: self.filter.map(|filter| filter.try_into()).transpose()?,
         })
     }
