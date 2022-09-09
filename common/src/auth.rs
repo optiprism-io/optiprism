@@ -1,7 +1,5 @@
-use crate::{
-    rbac::{Permission, Role, Scope},
-};
 use crate::error::Result;
+use crate::rbac::{Permission, Role, Scope};
 
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};

@@ -1,4 +1,4 @@
-use crate::error::{ MetadataError, PropertyError, StoreError};
+use crate::error::{MetadataError, PropertyError, StoreError};
 use crate::metadata::{list, ListResponse};
 use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
@@ -38,7 +38,7 @@ fn index_keys(
         index_name_key(organization_id, project_id, ns, name),
         index_display_name_key(organization_id, project_id, ns, display_name),
     ]
-        .to_vec()
+    .to_vec()
 }
 
 fn index_name_key(
@@ -64,7 +64,7 @@ fn index_display_name_key(
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-            .to_vec()
+        .to_vec()
     })
 }
 
@@ -118,14 +118,17 @@ impl Provider {
             req.display_name.clone(),
         );
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(PropertyError::PropertyAlreadyExist(error::Property {
-                organization_id,
-                project_id,
-                namespace: self.ns.clone(),
-                event_id: None,
-                property_id: None,
-                property_name: Some(req.name),
-            }).into()),
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
+                return Err(PropertyError::PropertyAlreadyExist(error::Property {
+                    organization_id,
+                    project_id,
+                    namespace: self.ns.clone(),
+                    event_id: None,
+                    property_id: None,
+                    property_name: Some(req.name),
+                })
+                .into())
+            }
             Err(other) => return Err(other),
             Ok(_) => {}
         }
@@ -207,7 +210,8 @@ impl Provider {
                 event_id: None,
                 property_id: Some(id),
                 property_name: None,
-            }).into()),
+            })
+            .into()),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -237,17 +241,21 @@ impl Provider {
                 IDX_NAME,
                 name,
             ))
-            .await {
-            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(PropertyError::PropertyNotFound(error::Property {
-                organization_id,
-                project_id,
-                namespace: self.ns.clone(),
-                event_id: None,
-                property_id: None,
-                property_name: Some(name.to_string()),
-            }).into()),
+            .await
+        {
+            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => {
+                Err(PropertyError::PropertyNotFound(error::Property {
+                    organization_id,
+                    project_id,
+                    namespace: self.ns.clone(),
+                    event_id: None,
+                    property_id: None,
+                    property_name: Some(name.to_string()),
+                })
+                .into())
+            }
             Err(other) => Err(other),
-            Ok(data) => Ok(deserialize(&data)?)
+            Ok(data) => Ok(deserialize(&data)?),
         }
     }
 
@@ -262,7 +270,7 @@ impl Provider {
             project_id,
             self.ns.as_bytes(),
         )
-            .await
+        .await
     }
 
     pub async fn update(
@@ -311,17 +319,22 @@ impl Provider {
             ));
             prop.display_name = display_name.to_owned();
         }
-        match self.idx
+        match self
+            .idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(PropertyError::PropertyAlreadyExist(error::Property {
-                organization_id,
-                project_id,
-                namespace: self.ns.clone(),
-                event_id: None,
-                property_id: Some(property_id),
-                property_name: None,
-            }).into()),
+            .await
+        {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
+                return Err(PropertyError::PropertyAlreadyExist(error::Property {
+                    organization_id,
+                    project_id,
+                    namespace: self.ns.clone(),
+                    event_id: None,
+                    property_id: Some(property_id),
+                    property_name: None,
+                })
+                .into())
+            }
             Err(other) => return Err(other),
             Ok(_) => {}
         }
@@ -392,7 +405,7 @@ impl Provider {
                     &prop.name,
                     prop.display_name.clone(),
                 )
-                    .as_ref(),
+                .as_ref(),
             )
             .await?;
         Ok(prop)

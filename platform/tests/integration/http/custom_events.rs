@@ -4,9 +4,14 @@ use chrono::Utc;
 use metadata::metadata::ListResponse;
 use metadata::store::Store;
 use platform::error::Result;
-use platform::events::Provider as EventsProvider;
-use platform::events::{CreateEventRequest, UpdateEventRequest};
-use platform::http::{custom_events, events};
+
+use metadata::custom_events::Provider;
+use platform::custom_events::types::{
+    CreateCustomEventRequest, CustomEvent, Event, Status, UpdateCustomEventRequest,
+};
+use platform::http::custom_events;
+use platform::queries::types::EventRef;
+use platform::CustomEventsProvider;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, StatusCode};
 use std::env::temp_dir;
@@ -14,10 +19,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
-use metadata::custom_events::Provider;
-use platform::custom_events::types::{CreateCustomEventRequest, CustomEvent, Event, Status, UpdateCustomEventRequest};
-use platform::CustomEventsProvider;
-use platform::queries::types::EventRef;
 
 fn assert(l: &CustomEvent, r: &CustomEvent) {
     assert_eq!(l.id, 1);
@@ -48,29 +49,41 @@ async fn test_custom_events() -> Result<()> {
 
     sleep(Duration::from_millis(100)).await;
 
-    let event1 = md_events.create(1, 1, metadata::events::CreateEventRequest {
-        created_by: 0,
-        tags: None,
-        name: "e1".to_string(),
-        display_name: None,
-        description: None,
-        status: metadata::events::Status::Enabled,
-        is_system: false,
-        properties: None,
-        custom_properties: None,
-    }).await?;
+    let event1 = md_events
+        .create(
+            1,
+            1,
+            metadata::events::CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name: "e1".to_string(),
+                display_name: None,
+                description: None,
+                status: metadata::events::Status::Enabled,
+                is_system: false,
+                properties: None,
+                custom_properties: None,
+            },
+        )
+        .await?;
 
-    let event2 = md_events.create(1, 1, metadata::events::CreateEventRequest {
-        created_by: 0,
-        tags: None,
-        name: "e2".to_string(),
-        display_name: None,
-        description: None,
-        status: metadata::events::Status::Enabled,
-        is_system: false,
-        properties: None,
-        custom_properties: None,
-    }).await?;
+    let event2 = md_events
+        .create(
+            1,
+            1,
+            metadata::events::CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name: "e2".to_string(),
+                display_name: None,
+                description: None,
+                status: metadata::events::Status::Enabled,
+                is_system: false,
+                properties: None,
+                custom_properties: None,
+            },
+        )
+        .await?;
 
     let mut ce1 = CustomEvent {
         id: 1,
@@ -84,10 +97,15 @@ async fn test_custom_events() -> Result<()> {
         description: Some("desc".to_string()),
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { event: EventRef::Regular { event_name: event1.name.clone() }, filters: None }],
+        events: vec![Event {
+            event: EventRef::Regular {
+                event_name: event1.name.clone(),
+            },
+            filters: None,
+        }],
     };
 
-    println!("{:?}\n",ce1);
+    println!("{:?}\n", ce1);
     let cl = Client::new();
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -154,7 +172,7 @@ async fn test_custom_events() -> Result<()> {
         let status = resp.status();
         assert_eq!(status, StatusCode::OK);
         let resp: CustomEvent = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
-        println!("resp {:?}\n",resp);
+        println!("resp {:?}\n", resp);
         assert(&resp, &ce1)
     }
 
@@ -163,7 +181,12 @@ async fn test_custom_events() -> Result<()> {
         ce1.tags = Some(vec!["ert".to_string()]);
         ce1.description = Some("xcv".to_string());
         ce1.status = Status::Disabled;
-        ce1.events = vec![Event { event: EventRef::Regular { event_name: event2.name.clone() }, filters: None }];
+        ce1.events = vec![Event {
+            event: EventRef::Regular {
+                event_name: event2.name.clone(),
+            },
+            filters: None,
+        }];
 
         let req = UpdateCustomEventRequest {
             tags: Some(ce1.tags.clone()),
@@ -171,7 +194,12 @@ async fn test_custom_events() -> Result<()> {
             description: Some(ce1.description.clone()),
             status: Some(ce1.status.clone()),
             is_system: None,
-            events: Some(vec![Event { event: EventRef::Regular { event_name: event2.name }, filters: None }]),
+            events: Some(vec![Event {
+                event: EventRef::Regular {
+                    event_name: event2.name,
+                },
+                filters: None,
+            }]),
         };
 
         let body = serde_json::to_string(&req).unwrap();

@@ -28,7 +28,9 @@ impl Provider {
     pub async fn create_table(&self, table: Table) -> Result<()> {
         let mut tables = self.tables.write().await;
         if tables.iter().any(|t| t.typ == table.typ) {
-            return Err(MetadataError::Database(DatabaseError::TableAlreadyExists(table.typ)).into());
+            return Err(
+                MetadataError::Database(DatabaseError::TableAlreadyExists(table.typ)).into(),
+            );
         }
 
         tables.push(table.clone());

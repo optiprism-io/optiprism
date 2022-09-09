@@ -12,7 +12,6 @@ use datafusion_expr::expr_fn::and;
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::{col, lit, BuiltinScalarFunction, Expr};
 use futures::executor;
-use common::ScalarValue;
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use metadata::properties::provider::Namespace;

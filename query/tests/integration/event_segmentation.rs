@@ -6,18 +6,16 @@ mod tests {
 
     use chrono::{DateTime, Duration, Utc};
 
-
     use arrow::util::pretty::print_batches;
 
     use datafusion::physical_plan::{collect, PhysicalPlanner};
     use datafusion::prelude::{SessionConfig, SessionContext};
 
-    use datafusion::execution::runtime_env::{RuntimeEnv};
+    use datafusion::execution::runtime_env::RuntimeEnv;
 
     use datafusion::physical_plan::coalesce_batches::concat_batches;
 
     use datafusion_expr::AggregateFunction;
-
 
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
     use query::physical_plan::planner::QueryPlanner;
@@ -28,15 +26,15 @@ mod tests {
     use query::queries::types::{QueryTime, TimeUnit};
     use query::{event_fields, Context};
 
+    use common::types::{EventFilter, EventRef, PropValueOperation, PropertyRef};
+    use common::ScalarValue;
+    use datafusion::execution::context::SessionState;
+    use metadata::custom_events;
+    use metadata::custom_events::CreateCustomEventRequest;
     use query::test_util::{create_entities, create_md, events_provider};
     use std::ops::Sub;
     use std::sync::Arc;
     use uuid::Uuid;
-    use datafusion::execution::context::SessionState;
-    use common::ScalarValue;
-    use common::types::{EventFilter, EventRef, PropertyRef, PropValueOperation};
-    use metadata::custom_events;
-    use metadata::custom_events::CreateCustomEventRequest;
 
     #[tokio::test]
     async fn test_filters() -> Result<()> {
@@ -291,16 +289,13 @@ mod tests {
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
         let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {})).with_optimizer_rules(vec![]);
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_optimizer_rules(vec![]);
 
         let exec_ctx = SessionContext::with_state(session_state);
         let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
 
-        let result = collect(
-            physical_plan,
-            exec_ctx.task_ctx(),
-        )
-            .await?;
+        let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
 
         let concated = concat_batches(&result[0].schema(), &result, 0)?;
 
@@ -315,38 +310,46 @@ mod tests {
         let md = create_md()?;
         create_entities(md.clone(), org_id, proj_id).await?;
 
-        let custom_event = md.custom_events.create(1, 1, CreateCustomEventRequest {
-            created_by: 0,
-            tags: None,
-            name: "".to_string(),
-            description: None,
-            status: custom_events::Status::Enabled,
-            is_system: false,
-            events: vec![
-                custom_events::types::Event {
-                    event: EventRef::RegularName("View Product".to_string()),
-                    filters: Some(vec![
-                        EventFilter::Property {
-                            property: PropertyRef::User("Is Premium".to_string()),
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::Boolean(Some(true))]),
-                        },
-                        EventFilter::Property {
-                            property: PropertyRef::User("Country".to_string()),
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![
-                                ScalarValue::Utf8(Some("spain".to_string())),
-                                ScalarValue::Utf8(Some("german".to_string())),
+        let custom_event = md
+            .custom_events
+            .create(
+                1,
+                1,
+                CreateCustomEventRequest {
+                    created_by: 0,
+                    tags: None,
+                    name: "".to_string(),
+                    description: None,
+                    status: custom_events::Status::Enabled,
+                    is_system: false,
+                    events: vec![
+                        custom_events::types::Event {
+                            event: EventRef::RegularName("View Product".to_string()),
+                            filters: Some(vec![
+                                EventFilter::Property {
+                                    property: PropertyRef::User("Is Premium".to_string()),
+                                    operation: PropValueOperation::Eq,
+                                    value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                                },
+                                EventFilter::Property {
+                                    property: PropertyRef::User("Country".to_string()),
+                                    operation: PropValueOperation::Eq,
+                                    value: Some(vec![
+                                        ScalarValue::Utf8(Some("spain".to_string())),
+                                        ScalarValue::Utf8(Some("german".to_string())),
+                                    ]),
+                                },
                             ]),
                         },
-                    ]),
+                        custom_events::types::Event {
+                            event: EventRef::RegularName("Buy Product".to_string()),
+                            filters: None,
+                        },
+                    ],
                 },
-                custom_events::types::Event {
-                    event: EventRef::RegularName("Buy Product".to_string()),
-                    filters: None,
-                },
-            ],
-        }).await.unwrap();
+            )
+            .await
+            .unwrap();
 
         let _from = DateTime::parse_from_rfc3339("2020-09-08T13:42:00.000000+00:00")
             .unwrap()
@@ -364,19 +367,17 @@ mod tests {
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
-            events: vec![
-                Event::new(
-                    EventRef::Custom(custom_event.id),
-                    None,
-                    Some(vec![Breakdown::Property(PropertyRef::User(
-                        "Device".to_string(),
-                    ))]),
-                    vec![NamedQuery::new(
-                        Query::CountEvents,
-                        Some("count1".to_string()),
-                    )],
-                ),
-            ],
+            events: vec![Event::new(
+                EventRef::Custom(custom_event.id),
+                None,
+                Some(vec![Breakdown::Property(PropertyRef::User(
+                    "Device".to_string(),
+                ))]),
+                vec![NamedQuery::new(
+                    Query::CountEvents,
+                    Some("count1".to_string()),
+                )],
+            )],
             filters: None,
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Country".to_string(),
@@ -399,16 +400,13 @@ mod tests {
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
         let session_state = SessionState::with_config_rt(config, runtime)
-            .with_query_planner(Arc::new(QueryPlanner {})).with_optimizer_rules(vec![]);
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_optimizer_rules(vec![]);
 
         let exec_ctx = SessionContext::with_state(session_state);
         let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
 
-        let result = collect(
-            physical_plan,
-            exec_ctx.task_ctx(),
-        )
-            .await?;
+        let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
 
         let concated = concat_batches(&result[0].schema(), &result, 0)?;
 

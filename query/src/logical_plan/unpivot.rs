@@ -46,7 +46,7 @@ impl UnpivotNode {
             let value_field = DFField::new(None, value_col.as_str(), value_type, false);
             fields.push(value_field);
 
-            Arc::new(DFSchema::new_with_metadata(fields,HashMap::new())?)
+            Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?)
         };
 
         Ok(Self {
@@ -86,11 +86,7 @@ impl UserDefinedLogicalNode for UnpivotNode {
         write!(f, "Unpivot")
     }
 
-    fn from_template(
-        &self,
-        _: &[Expr],
-        inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode> {
+    fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
             UnpivotNode::try_new(
                 inputs[0].clone(),

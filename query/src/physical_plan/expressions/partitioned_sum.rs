@@ -5,7 +5,10 @@ use crate::physical_plan::expressions::partitioned_aggregate::{
     Buffer, PartitionedAccumulator, Value,
 };
 use crate::DEFAULT_BATCH_SIZE;
-use arrow::array::{ArrayRef, Decimal128Array, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+use arrow::array::{
+    ArrayRef, Decimal128Array, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array,
+    Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+};
 
 use arrow::datatypes::DataType;
 
@@ -162,7 +165,8 @@ mod tests {
     fn test_decimal() -> Result<()> {
         let outer_acc: Box<dyn Accumulator> =
             Box::new(AvgAccumulator::try_new(&DataType::Decimal128(10, 2))?);
-        let mut sum_acc = PartitionedSumAccumulator::try_new(DataType::Decimal128(10, 2), outer_acc)?;
+        let mut sum_acc =
+            PartitionedSumAccumulator::try_new(DataType::Decimal128(10, 2), outer_acc)?;
         let spans = vec![
             false, false, true, false, false, true, false, false, false, true,
         ];

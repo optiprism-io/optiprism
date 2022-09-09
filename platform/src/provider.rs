@@ -1,5 +1,7 @@
 use crate::queries::provider::QueryProvider;
-use crate::{AccountsProvider, AuthProvider, CustomEventsProvider, EventsProvider, PropertiesProvider};
+use crate::{
+    AccountsProvider, AuthProvider, CustomEventsProvider, EventsProvider, PropertiesProvider,
+};
 use metadata::Metadata;
 use std::sync::Arc;
 

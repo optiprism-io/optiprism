@@ -1,9 +1,9 @@
 extern crate bytesize;
 extern crate log;
 
-use std::{env::set_var, net::SocketAddr, sync::Arc};
 use std::env::temp_dir;
 use std::path::PathBuf;
+use std::{env::set_var, net::SocketAddr, sync::Arc};
 
 use axum::{Router, Server};
 use bytesize::ByteSize;
@@ -13,8 +13,8 @@ use log::info;
 use uuid::Uuid;
 
 use error::Result;
-use metadata::Metadata;
 use metadata::store::Store;
+use metadata::Metadata;
 use query::QueryProvider;
 
 use crate::error::Error;

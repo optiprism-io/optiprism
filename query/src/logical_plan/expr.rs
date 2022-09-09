@@ -3,23 +3,23 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
 use datafusion::logical_plan::ExprSchemable;
-use datafusion_common::{DFSchema, ScalarValue};
 use datafusion_common::Result as DFResult;
+use datafusion_common::{DFSchema, ScalarValue};
+use datafusion_expr::aggregate_function::return_type;
+use datafusion_expr::expr_fn::{and, or};
 pub use datafusion_expr::{lit, lit_timestamp_nano, Literal};
 use datafusion_expr::{
     AccumulatorFunctionImplementation, AggregateFunction, AggregateUDF, Expr, ReturnTypeFunction,
     Signature, StateTypeFunction, Volatility,
 };
-use datafusion_expr::aggregate_function::return_type;
-use datafusion_expr::expr_fn::{and, or};
 
-use crate::Result;
 use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate::state_types;
 use crate::physical_plan::expressions::partitioned_aggregate::{
     PartitionedAggregate, PartitionedAggregateFunction,
 };
 use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
+use crate::Result;
 
 pub fn multi_or(exprs: Vec<Expr>) -> Expr {
     // combine multiple values with OR
@@ -54,7 +54,12 @@ pub fn lit_timestamp(data_type: DataType, date_time: &DateTime<Utc>) -> Result<E
         DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, tz) => {
             ScalarValue::TimestampMicrosecond(Some(date_time.timestamp_nanos() / 1000), tz)
         }
-        _ => return Err(QueryError::Plan(format!("unsupported \"{:?}\" timestamp data type",data_type))),
+        _ => {
+            return Err(QueryError::Plan(format!(
+                "unsupported \"{:?}\" timestamp data type",
+                data_type
+            )))
+        }
     }))
 }
 

@@ -1,14 +1,14 @@
 use crate::PlatformError;
 use crate::Result;
 use chrono::{DateTime, Utc};
-use common::{DECIMAL_PRECISION, ScalarValue};
+use common::{ScalarValue, DECIMAL_PRECISION};
 use convert_case::{Case, Casing};
+use num_traits::ToPrimitive;
 use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
 use query::queries::types as query_types;
-use rust_decimal::{Decimal};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
-use num_traits::ToPrimitive;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -269,9 +269,9 @@ pub fn scalar_to_json_value(v: &ScalarValue) -> Result<Value> {
         ScalarValue::Decimal128(None, _, _) => Ok(Value::Null),
         ScalarValue::Boolean(None) => Ok(Value::Null),
         ScalarValue::Utf8(None) => Ok(Value::Null),
-        ScalarValue::Decimal128(Some(v), p, s) => {
-            Ok(Value::Number(Number::from_f64(Decimal::new(*v as i64, *s as u32).to_f64().unwrap()).unwrap()))
-        }
+        ScalarValue::Decimal128(Some(v), _p, s) => Ok(Value::Number(
+            Number::from_f64(Decimal::new(*v as i64, *s as u32).to_f64().unwrap()).unwrap(),
+        )),
         ScalarValue::Boolean(Some(v)) => Ok(Value::Bool(*v)),
         ScalarValue::Utf8(Some(v)) => Ok(Value::String(v.to_owned())),
         _ => Err(PlatformError::BadRequest("unexpected value".to_string())),
@@ -336,7 +336,9 @@ impl TryInto<common::types::PropertyRef> for PropertyRef {
     fn try_into(self) -> std::result::Result<common::types::PropertyRef, Self::Error> {
         Ok(match self {
             PropertyRef::User { property_name } => common::types::PropertyRef::User(property_name),
-            PropertyRef::Event { property_name } => common::types::PropertyRef::Event(property_name),
+            PropertyRef::Event { property_name } => {
+                common::types::PropertyRef::Event(property_name)
+            }
             PropertyRef::Custom { property_id } => common::types::PropertyRef::Custom(property_id),
         })
     }
@@ -348,8 +350,10 @@ impl TryInto<PropertyRef> for common::types::PropertyRef {
     fn try_into(self) -> std::result::Result<PropertyRef, Self::Error> {
         Ok(match self {
             common::types::PropertyRef::User(property_name) => PropertyRef::User { property_name },
-            common::types::PropertyRef::Event(property_name) => PropertyRef::Event { property_name },
-            common::types::PropertyRef::Custom(property_id) => PropertyRef::Custom { property_id }
+            common::types::PropertyRef::Event(property_name) => {
+                PropertyRef::Event { property_name }
+            }
+            common::types::PropertyRef::Custom(property_id) => PropertyRef::Custom { property_id },
         })
     }
 }

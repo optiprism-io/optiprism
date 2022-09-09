@@ -1,9 +1,9 @@
 use std::string::FromUtf8Error;
 use std::{error, result};
 
-use thiserror::Error;
 use crate::database::{Column, TableRef};
 use crate::properties;
+use thiserror::Error;
 
 pub type Result<T> = result::Result<T, MetadataError>;
 
@@ -124,9 +124,7 @@ pub struct Organization {
 
 impl Organization {
     pub fn new(id: u64) -> Self {
-        Self {
-            id,
-        }
+        Self { id }
     }
 }
 

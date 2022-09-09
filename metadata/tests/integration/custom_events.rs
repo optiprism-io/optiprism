@@ -3,12 +3,14 @@ use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use metadata::events::types::CreateEventRequest;
-use metadata::custom_events::{CreateCustomEventRequest, Provider, Status, UpdateCustomEventRequest};
-use uuid::Uuid;
 use common::types::EventRef;
-use metadata::custom_events::types::{Event};
+use metadata::custom_events::types::Event;
+use metadata::custom_events::{
+    CreateCustomEventRequest, Provider, Status, UpdateCustomEventRequest,
+};
 use metadata::events;
+use metadata::events::types::CreateEventRequest;
+use uuid::Uuid;
 
 fn get_providers() -> (Arc<events::Provider>, Provider) {
     let mut path = temp_dir();
@@ -49,17 +51,23 @@ async fn non_exist() -> Result<()> {
 async fn create_event() -> Result<()> {
     let (event_prov, prov) = get_providers();
 
-    let event = event_prov.create(1, 1, CreateEventRequest {
-        created_by: 0,
-        tags: None,
-        name: "e1".to_string(),
-        display_name: None,
-        description: None,
-        status: events::Status::Enabled,
-        is_system: false,
-        properties: None,
-        custom_properties: None,
-    }).await?;
+    let event = event_prov
+        .create(
+            1,
+            1,
+            CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name: "e1".to_string(),
+                display_name: None,
+                description: None,
+                status: events::Status::Enabled,
+                is_system: false,
+                properties: None,
+                custom_properties: None,
+            },
+        )
+        .await?;
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -68,7 +76,10 @@ async fn create_event() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { event: EventRef::Regular(event.id), filters: None }],
+        events: vec![Event {
+            event: EventRef::Regular(event.id),
+            filters: None,
+        }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await?;
@@ -80,7 +91,7 @@ async fn create_event() -> Result<()> {
 
 #[tokio::test]
 async fn create_event_not_found() -> Result<()> {
-    let (event_prov, prov) = get_providers();
+    let (_event_prov, prov) = get_providers();
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -89,7 +100,10 @@ async fn create_event_not_found() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { event: EventRef::Regular(1), filters: None }],
+        events: vec![Event {
+            event: EventRef::Regular(1),
+            filters: None,
+        }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await;
@@ -101,17 +115,23 @@ async fn create_event_not_found() -> Result<()> {
 async fn create_event_duplicate_name() -> Result<()> {
     let (event_prov, prov) = get_providers();
 
-    event_prov.create(1, 1, CreateEventRequest {
-        created_by: 0,
-        tags: None,
-        name: "e1".to_string(),
-        display_name: None,
-        description: None,
-        status: events::Status::Enabled,
-        is_system: false,
-        properties: None,
-        custom_properties: None,
-    }).await?;
+    event_prov
+        .create(
+            1,
+            1,
+            CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name: "e1".to_string(),
+                display_name: None,
+                description: None,
+                status: events::Status::Enabled,
+                is_system: false,
+                properties: None,
+                custom_properties: None,
+            },
+        )
+        .await?;
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -120,7 +140,10 @@ async fn create_event_duplicate_name() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { event: EventRef::Regular(1), filters: None }],
+        events: vec![Event {
+            event: EventRef::Regular(1),
+            filters: None,
+        }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await;
@@ -135,17 +158,23 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
     let (event_prov, prov) = get_providers();
     let prov = prov.with_max_events_level(1);
 
-    event_prov.create(1, 1, CreateEventRequest {
-        created_by: 0,
-        tags: None,
-        name: "e1".to_string(),
-        display_name: None,
-        description: None,
-        status: events::Status::Enabled,
-        is_system: false,
-        properties: None,
-        custom_properties: None,
-    }).await?;
+    event_prov
+        .create(
+            1,
+            1,
+            CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name: "e1".to_string(),
+                display_name: None,
+                description: None,
+                status: events::Status::Enabled,
+                is_system: false,
+                properties: None,
+                custom_properties: None,
+            },
+        )
+        .await?;
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -154,9 +183,12 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { event: EventRef::Regular(1), filters: None }],
+        events: vec![Event {
+            event: EventRef::Regular(1),
+            filters: None,
+        }],
     };
-    let resp = prov.create(1, 1, req.clone()).await?;
+    let _resp = prov.create(1, 1, req.clone()).await?;
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -165,7 +197,10 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { event: EventRef::Custom(1), filters: None }],
+        events: vec![Event {
+            event: EventRef::Custom(1),
+            filters: None,
+        }],
     };
     let resp = prov.create(1, 1, req.clone()).await?;
 
@@ -176,10 +211,18 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { event: EventRef::Custom(resp.id), filters: None }],
+        events: vec![Event {
+            event: EventRef::Custom(resp.id),
+            filters: None,
+        }],
     };
     let resp = prov.create(1, 1, req.clone()).await;
-    assert!(matches!(resp,Err(MetadataError::CustomEvent(CustomEventError::RecursionLevelExceeded(_)))));
+    assert!(matches!(
+        resp,
+        Err(MetadataError::CustomEvent(
+            CustomEventError::RecursionLevelExceeded(_)
+        ))
+    ));
     Ok(())
 }
 
@@ -188,17 +231,23 @@ async fn test_duplicate() -> Result<()> {
     let (event_prov, prov) = get_providers();
     let prov = prov.with_max_events_level(5);
 
-    event_prov.create(1, 1, CreateEventRequest {
-        created_by: 0,
-        tags: None,
-        name: "e1".to_string(),
-        display_name: None,
-        description: None,
-        status: events::Status::Enabled,
-        is_system: false,
-        properties: None,
-        custom_properties: None,
-    }).await?;
+    event_prov
+        .create(
+            1,
+            1,
+            CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name: "e1".to_string(),
+                display_name: None,
+                description: None,
+                status: events::Status::Enabled,
+                is_system: false,
+                properties: None,
+                custom_properties: None,
+            },
+        )
+        .await?;
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -207,7 +256,10 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { event: EventRef::Regular(1), filters: None }],
+        events: vec![Event {
+            event: EventRef::Regular(1),
+            filters: None,
+        }],
     };
     prov.create(1, 1, req.clone()).await?;
 
@@ -218,7 +270,10 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { event: EventRef::Custom(1), filters: None }],
+        events: vec![Event {
+            event: EventRef::Custom(1),
+            filters: None,
+        }],
     };
     prov.create(1, 1, req.clone()).await?;
 
@@ -229,10 +284,16 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: None,
         is_system: None,
-        events: Some(vec![Event { event: EventRef::Custom(2), filters: None }]),
+        events: Some(vec![Event {
+            event: EventRef::Custom(2),
+            filters: None,
+        }]),
     };
     let resp = prov.update(1, 1, 1, req.clone()).await;
-    assert!(matches!(resp,Err(MetadataError::CustomEvent(CustomEventError::DuplicateEvent))));
+    assert!(matches!(
+        resp,
+        Err(MetadataError::CustomEvent(CustomEventError::DuplicateEvent))
+    ));
 
     // self-pointing
     let req = UpdateCustomEventRequest {
@@ -242,10 +303,16 @@ async fn test_duplicate() -> Result<()> {
         description: None,
         status: None,
         is_system: None,
-        events: Some(vec![Event { event: EventRef::Custom(1), filters: None }]),
+        events: Some(vec![Event {
+            event: EventRef::Custom(1),
+            filters: None,
+        }]),
     };
     let resp = prov.update(1, 1, 1, req.clone()).await;
-    assert!(matches!(resp,Err(MetadataError::CustomEvent(CustomEventError::DuplicateEvent))));
+    assert!(matches!(
+        resp,
+        Err(MetadataError::CustomEvent(CustomEventError::DuplicateEvent))
+    ));
     Ok(())
 }
 
@@ -253,17 +320,23 @@ async fn test_duplicate() -> Result<()> {
 async fn update_event() -> Result<()> {
     let (event_prov, prov) = get_providers();
 
-    let event = event_prov.create(1, 1, CreateEventRequest {
-        created_by: 0,
-        tags: None,
-        name: "e1".to_string(),
-        display_name: None,
-        description: None,
-        status: events::Status::Enabled,
-        is_system: false,
-        properties: None,
-        custom_properties: None,
-    }).await?;
+    let _event = event_prov
+        .create(
+            1,
+            1,
+            CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name: "e1".to_string(),
+                display_name: None,
+                description: None,
+                status: events::Status::Enabled,
+                is_system: false,
+                properties: None,
+                custom_properties: None,
+            },
+        )
+        .await?;
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -272,7 +345,10 @@ async fn update_event() -> Result<()> {
         description: None,
         status: Status::Enabled,
         is_system: false,
-        events: vec![Event { event: EventRef::Regular(1), filters: None }],
+        events: vec![Event {
+            event: EventRef::Regular(1),
+            filters: None,
+        }],
     };
 
     let resp = prov.create(1, 1, req.clone()).await?;

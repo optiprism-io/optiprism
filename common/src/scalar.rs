@@ -111,13 +111,9 @@ impl ScalarValue {
             ScalarValue::Date32(_) => DataType::Date32,
             ScalarValue::Date64(_) => DataType::Date64,
             ScalarValue::Time64(_) => DataType::Time64(TimeUnit::Nanosecond),
-            ScalarValue::IntervalYearMonth(_) => {
-                DataType::Interval(IntervalUnit::YearMonth)
-            }
+            ScalarValue::IntervalYearMonth(_) => DataType::Interval(IntervalUnit::YearMonth),
             ScalarValue::IntervalDayTime(_) => DataType::Interval(IntervalUnit::DayTime),
-            ScalarValue::IntervalMonthDayNano(_) => {
-                DataType::Interval(IntervalUnit::MonthDayNano)
-            }
+            ScalarValue::IntervalMonthDayNano(_) => DataType::Interval(IntervalUnit::MonthDayNano),
             ScalarValue::Struct(_, fields) => DataType::Struct(fields.as_ref().clone()),
             ScalarValue::Dictionary(k, v) => {
                 DataType::Dictionary(k.clone(), Box::new(v.get_datatype()))
@@ -274,9 +270,7 @@ impl TryFrom<&DataType> for ScalarValue {
                 None,
                 Box::new(Field::new("item", nested_type.data_type().clone(), true)),
             ),
-            DataType::Struct(fields) => {
-                ScalarValue::Struct(None, Box::new(fields.clone()))
-            }
+            DataType::Struct(fields) => ScalarValue::Struct(None, Box::new(fields.clone())),
             DataType::Null => ScalarValue::Null,
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(

@@ -1,11 +1,13 @@
-use crate::queries::types::{json_value_to_scalar, AggregateFunction, EventRef, PartitionedAggregateFunction, PropValueOperation, PropertyRef, QueryTime, TimeUnit, EventFilter};
+use crate::queries::types::{
+    AggregateFunction, EventFilter, EventRef, PartitionedAggregateFunction, PropertyRef, QueryTime,
+    TimeUnit,
+};
 use crate::PlatformError;
-use crate::Result;
+
 use chrono::{DateTime, Utc};
 use query::queries::event_segmentation::types as query_es_types;
 use query::queries::event_segmentation::types::NamedQuery;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -418,11 +420,11 @@ mod tests {
     use crate::error::Result;
     use crate::queries::event_segmentation::{
         AggregateFunction, Analysis, Breakdown, ChartType, Compare, Event, EventFilter,
-        EventSegmentation, PartitionedAggregateFunction, PropValueOperation, Query, QueryTime, TimeUnit,
+        EventSegmentation, PartitionedAggregateFunction, Query, QueryTime, TimeUnit,
     };
     use chrono::{DateTime, Utc};
 
-    use crate::queries::types::{EventRef, PropertyRef};
+    use crate::queries::types::{EventRef, PropValueOperation, PropertyRef};
     use query::event_fields;
     use query::queries::event_segmentation::types::EventSegmentation as QueryEventSegmentation;
     use serde_json::json;

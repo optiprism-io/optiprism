@@ -1,8 +1,8 @@
 pub mod auth;
+pub mod custom_events;
 pub mod events;
 pub mod properties;
 pub mod queries;
-pub mod custom_events;
 
 use crate::PlatformProvider;
 use axum::Router;

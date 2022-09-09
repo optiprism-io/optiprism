@@ -1,8 +1,8 @@
+use crate::ScalarValue;
 use arrow::datatypes::DataType as ArrowDataType;
 use arrow::datatypes::TimeUnit::Second;
 use datafusion::logical_plan::Operator;
 use serde::{Deserialize, Serialize};
-use crate::ScalarValue;
 
 pub const DECIMAL_PRECISION: usize = 19;
 pub const DECIMAL_SCALE: usize = 10;

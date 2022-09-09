@@ -1,10 +1,10 @@
 use arrow::datatypes::DataType;
 use metadata::database::{Column, Provider, Table, TableRef};
 use metadata::error::Result;
+use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 use uuid::Uuid;
-use metadata::store::Store;
 
 #[tokio::test]
 async fn test_database() -> Result<()> {

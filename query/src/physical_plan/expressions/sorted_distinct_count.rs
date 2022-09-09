@@ -5,12 +5,12 @@ use arrow::array::{
 };
 use arrow::compute;
 use arrow::datatypes::{DataType, TimeUnit};
-use datafusion_common::{DataFusionError, Result};
-use datafusion_expr::{AggregateState, Signature, TypeSignature, Volatility};
 use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::Accumulator;
 use datafusion_common::ScalarValue;
+use datafusion_common::{DataFusionError, Result};
 use datafusion_expr::{AccumulatorFunctionImplementation, ReturnTypeFunction, StateTypeFunction};
+use datafusion_expr::{AggregateState, Signature, TypeSignature, Volatility};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -152,7 +152,9 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
 
 impl Accumulator for SortedDistinctCountAccumulator {
     fn state(&self) -> Result<Vec<AggregateState>> {
-        Ok(vec![AggregateState::Scalar(ScalarValue::UInt64(Some(self.count)))])
+        Ok(vec![AggregateState::Scalar(ScalarValue::UInt64(Some(
+            self.count,
+        )))])
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
@@ -175,7 +177,6 @@ impl Accumulator for SortedDistinctCountAccumulator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     fn check_batch(sequences: &[Vec<i64>], expected: usize) -> datafusion_common::Result<()> {
         let mut acc = SortedDistinctCountAccumulator::try_new(&DataType::Int64)?;
@@ -184,7 +185,10 @@ mod tests {
             let array_ref = Arc::new(array);
             acc.update_batch(&[array_ref])?;
         }
-        assert_eq!(acc.state()?[0].as_scalar()?.to_owned(), ScalarValue::UInt64(Some(expected as u64)));
+        assert_eq!(
+            acc.state()?[0].as_scalar()?.to_owned(),
+            ScalarValue::UInt64(Some(expected as u64))
+        );
         Ok(())
     }
 
@@ -198,7 +202,7 @@ mod tests {
             ],
             9,
         )
-            .unwrap();
+        .unwrap();
     }
 
     #[test]
@@ -211,6 +215,6 @@ mod tests {
             ],
             9,
         )
-            .unwrap();
+        .unwrap();
     }
 }

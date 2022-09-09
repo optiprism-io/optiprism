@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use chronoutil::RelativeDuration;
-use datafusion_expr::Operator;
 
 #[derive(Clone, Debug)]
 pub enum QueryTime {

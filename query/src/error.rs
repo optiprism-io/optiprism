@@ -1,6 +1,5 @@
 use std::result;
 
-
 use arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
 use thiserror::Error;

@@ -1,9 +1,9 @@
+use crate::error::Result;
 use crate::queries::types::{EventFilter, EventRef};
 use crate::PlatformError;
 use chrono::{DateTime, Utc};
-use crate::error::Result;
 use common::types::OptionalProperty;
-use metadata::metadata::ListResponse;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -99,7 +99,11 @@ impl TryInto<CustomEvent> for metadata::custom_events::CustomEvent {
             description: self.description,
             status: self.status.into(),
             is_system: self.is_system,
-            events: self.events.iter().map(|e|e.to_owned().try_into()).collect::<Result<_>>()?,
+            events: self
+                .events
+                .iter()
+                .map(|e| e.to_owned().try_into())
+                .collect::<Result<_>>()?,
         })
     }
 }

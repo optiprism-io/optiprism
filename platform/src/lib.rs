@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod auth;
 pub mod context;
+pub mod custom_events;
 pub mod data_table;
 pub mod error;
 pub mod events;
@@ -8,7 +9,6 @@ pub mod http;
 pub mod properties;
 pub mod provider;
 pub mod queries;
-pub mod custom_events;
 
 use rust_decimal::prelude::ToPrimitive;
 
@@ -21,9 +21,9 @@ use arrow::array::{ArrayRef, Decimal128Array};
 use arrow::datatypes::DataType;
 pub use auth::Provider as AuthProvider;
 pub use context::Context;
+pub use custom_events::Provider as CustomEventsProvider;
 pub use error::{PlatformError, Result};
 pub use events::Provider as EventsProvider;
-pub use custom_events::Provider as CustomEventsProvider;
 pub use properties::Provider as PropertiesProvider;
 pub use provider::PlatformProvider;
 use rust_decimal::Decimal;

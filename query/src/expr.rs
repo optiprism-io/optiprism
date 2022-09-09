@@ -2,22 +2,22 @@ use std::sync::Arc;
 
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
+use common::types::{EventFilter, EventRef, PropValueOperation, PropertyRef};
+use common::ScalarValue;
 use datafusion::logical_plan::ExprSchemable;
 use datafusion_common::{Column, ExprSchema, ScalarValue as DFScalarValue};
-use datafusion_expr::{col, Expr, lit, Operator, or};
 use datafusion_expr::expr_fn::{and, binary_expr};
+use datafusion_expr::{col, lit, or, Expr, Operator};
 use futures::executor;
-use common::ScalarValue;
-use common::types::{EventFilter, EventRef, PropertyRef, PropValueOperation};
 
-use metadata::{dictionaries, Metadata};
 use metadata::properties::provider::Namespace;
+use metadata::{dictionaries, Metadata};
 
-use crate::{event_fields, Result};
-use crate::Context;
 use crate::error::QueryError;
 use crate::logical_plan::expr::{lit_timestamp, multi_and, multi_or};
 use crate::queries::types::QueryTime;
+use crate::Context;
+use crate::{event_fields, Result};
 
 /// builds expression on timestamp
 pub fn time_expression<S: ExprSchema>(
@@ -75,17 +75,33 @@ pub async fn event_expression(
         }
 
         EventRef::Custom(id) => {
-            let e = metadata.custom_events.get_by_id(ctx.organization_id, ctx.project_id, *id).await?;
+            let e = metadata
+                .custom_events
+                .get_by_id(ctx.organization_id, ctx.project_id, *id)
+                .await?;
             let mut exprs: Vec<Expr> = Vec::new();
             for event in e.events.iter() {
                 let mut expr = match &event.event {
-                    EventRef::RegularName(name) => executor::block_on(event_expression(ctx, metadata, &EventRef::RegularName(name.to_owned())))?,
-                    EventRef::Regular(id) => executor::block_on(event_expression(ctx, metadata, &EventRef::Regular(*id)))?,
-                    EventRef::Custom(id) => executor::block_on(event_expression(ctx, metadata, &EventRef::Custom(*id)))?
+                    EventRef::RegularName(name) => executor::block_on(event_expression(
+                        ctx,
+                        metadata,
+                        &EventRef::RegularName(name.to_owned()),
+                    ))?,
+                    EventRef::Regular(id) => executor::block_on(event_expression(
+                        ctx,
+                        metadata,
+                        &EventRef::Regular(*id),
+                    ))?,
+                    EventRef::Custom(id) => {
+                        executor::block_on(event_expression(ctx, metadata, &EventRef::Custom(*id)))?
+                    }
                 };
 
                 if let Some(filters) = &event.filters {
-                    expr = and(expr.clone(), event_filters_expression(ctx, metadata, filters).await?);
+                    expr = and(
+                        expr.clone(),
+                        event_filters_expression(ctx, metadata, filters).await?,
+                    );
                 }
 
                 exprs.push(expr);
@@ -102,7 +118,11 @@ pub async fn event_expression(
 }
 
 /// builds event filters expression
-pub async fn event_filters_expression(ctx: &Context, metadata: &Arc<Metadata>, filters: &[EventFilter]) -> Result<Expr> {
+pub async fn event_filters_expression(
+    ctx: &Context,
+    metadata: &Arc<Metadata>,
+    filters: &[EventFilter],
+) -> Result<Expr> {
     // iterate over filters
     let filters_exprs = filters
         .iter()
@@ -118,7 +138,16 @@ pub async fn event_filters_expression(ctx: &Context, metadata: &Arc<Metadata>, f
                     metadata,
                     property,
                     operation,
-                    value.clone().and_then(|v| Some(v.iter().map(|v| v.clone().into()).collect::<Vec<ScalarValue>>())).to_owned(),
+                    value
+                        .clone()
+                        .and_then(|v| {
+                            Some(
+                                v.iter()
+                                    .map(|v| v.clone().into())
+                                    .collect::<Vec<ScalarValue>>(),
+                            )
+                        })
+                        .to_owned(),
                 )),
             }
         })
@@ -156,7 +185,12 @@ pub async fn encode_property_dict_values(
                     DataType::UInt16 => ScalarValue::UInt16(Some(key as u16)),
                     DataType::UInt32 => ScalarValue::UInt32(Some(key as u32)),
                     DataType::UInt64 => ScalarValue::UInt64(Some(key as u64)),
-                    _ => return Err(QueryError::Plan(format!("unsupported dictionary type \"{:?}\"", dict_type)))
+                    _ => {
+                        return Err(QueryError::Plan(format!(
+                            "unsupported dictionary type \"{:?}\"",
+                            dict_type
+                        )))
+                    }
                 };
 
                 ret.push(scalar_value);
@@ -164,7 +198,10 @@ pub async fn encode_property_dict_values(
                 ret.push(ScalarValue::try_from(dict_type)?);
             }
         } else {
-            return Err(QueryError::Plan(format!("value type should be Utf8, but \"{:?}\" was given", value.get_datatype())));
+            return Err(QueryError::Plan(format!(
+                "value type should be Utf8, but \"{:?}\" was given",
+                value.get_datatype()
+            )));
         }
     }
 
@@ -200,7 +237,7 @@ pub async fn property_expression(
                     col_name.as_str(),
                     &values.unwrap(),
                 )
-                    .await?;
+                .await?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)
@@ -226,7 +263,7 @@ pub async fn property_expression(
                     col_name.as_str(),
                     &values.unwrap(),
                 )
-                    .await?;
+                .await?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)
@@ -270,7 +307,10 @@ pub fn named_property_expression(
         PropValueOperation::Eq | PropValueOperation::Neq | PropValueOperation::Like => {
             // expressions for OR
             let values_vec = values.ok_or_else(|| {
-                QueryError::Plan(format!("value should be defined for \"{:?}\" operation", operation))
+                QueryError::Plan(format!(
+                    "value should be defined for \"{:?}\" operation",
+                    operation
+                ))
             })?;
 
             Ok(match values_vec.len() {
@@ -284,7 +324,11 @@ pub fn named_property_expression(
                     let exprs = values_vec
                         .iter()
                         .map(|v| {
-                            binary_expr(prop_col.clone(), operation.clone().into(), lit(DFScalarValue::from(v.to_owned())))
+                            binary_expr(
+                                prop_col.clone(),
+                                operation.clone().into(),
+                                lit(DFScalarValue::from(v.to_owned())),
+                            )
                         })
                         .collect();
 

@@ -1,4 +1,4 @@
-use crate::error::{ EventsGenError, Result};
+use crate::error::{EventsGenError, Result};
 use cubic_spline::{Points, SplineOpts};
 
 pub fn calc_cubic_spline(total_points: usize, key_points: Vec<f64>) -> Result<Vec<f64>> {

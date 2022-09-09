@@ -119,8 +119,7 @@ impl RecordBatchBuilder {
             }
             Some(product) => {
                 self.product_name.append_value(product.name as u16);
-                self.product_category
-                    .append_value(product.category as u16);
+                self.product_category.append_value(product.category as u16);
                 self.product_subcategory
                     .append_option(product.subcategory.map(|v| v as u16));
                 self.product_brand
@@ -152,8 +151,7 @@ impl RecordBatchBuilder {
 
         let mut cart_amount: Option<Decimal> = None;
         if !state.cart.is_empty() {
-            self.cart_items_number
-                .append_value(state.cart.len() as u8);
+            self.cart_items_number.append_value(state.cart.len() as u8);
             let mut _cart_amount: Decimal = state
                 .cart
                 .iter()
@@ -178,8 +176,7 @@ impl RecordBatchBuilder {
 
         self.country
             .append_option(profile.geo.country.map(|v| v as u16));
-        self.city
-            .append_option(profile.geo.city.map(|v| v as u16));
+        self.city.append_option(profile.geo.city.map(|v| v as u16));
         self.device
             .append_option(profile.device.device.map(|v| v as u16));
         self.device_category

@@ -1,4 +1,3 @@
-use axum::body::HttpBody;
 use std::sync::Arc;
 
 use bincode::{deserialize, serialize};
@@ -178,7 +177,9 @@ impl Provider {
         organization_id: u64,
         project_id: u64,
     ) -> Result<ListResponse<CustomEvent>> {
-        list(self.store.clone(), organization_id, project_id, NAMESPACE).await.into()
+        list(self.store.clone(), organization_id, project_id, NAMESPACE)
+            .await
+            .into()
     }
 
     pub async fn update(

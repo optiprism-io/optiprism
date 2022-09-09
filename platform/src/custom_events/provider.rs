@@ -1,9 +1,11 @@
+use crate::custom_events::types::{
+    CreateCustomEventRequest, CustomEvent, UpdateCustomEventRequest,
+};
 use crate::{Context, Result};
 use common::rbac::Permission;
+use metadata::custom_events;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
-use metadata::custom_events;
-use crate::custom_events::types::{CreateCustomEventRequest, CustomEvent, UpdateCustomEventRequest};
 
 pub struct Provider {
     prov: Arc<custom_events::Provider>,
@@ -29,16 +31,16 @@ impl Provider {
             description: req.description,
             status: req.status.into(),
             is_system: req.is_system,
-            events: req.events.iter().map(|e| e.to_owned().try_into()).collect::<Result<_>>()?,
+            events: req
+                .events
+                .iter()
+                .map(|e| e.to_owned().try_into())
+                .collect::<Result<_>>()?,
         };
 
         let event = self
             .prov
-            .create(
-                organization_id,
-                project_id,
-                md_req,
-            )
+            .create(organization_id, project_id, md_req)
             .await?;
 
         Ok(event.try_into()?)
@@ -52,7 +54,11 @@ impl Provider {
         id: u64,
     ) -> Result<CustomEvent> {
         ctx.check_permission(organization_id, project_id, Permission::GetCustomEventById)?;
-        Ok(self.prov.get_by_id(organization_id, project_id, id).await?.try_into()?)
+        Ok(self
+            .prov
+            .get_by_id(organization_id, project_id, id)
+            .await?
+            .try_into()?)
     }
 
     pub async fn list(
@@ -63,7 +69,14 @@ impl Provider {
     ) -> Result<ListResponse<CustomEvent>> {
         ctx.check_permission(organization_id, project_id, Permission::ListCustomEvents)?;
         let resp = self.prov.list(organization_id, project_id).await?;
-        Ok(ListResponse { data: resp.data.iter().map(|v| v.to_owned().try_into()).collect::<Result<_>>()?, meta: resp.meta })
+        Ok(ListResponse {
+            data: resp
+                .data
+                .iter()
+                .map(|v| v.to_owned().try_into())
+                .collect::<Result<_>>()?,
+            meta: resp.meta,
+        })
     }
 
     pub async fn update(
@@ -72,7 +85,7 @@ impl Provider {
         organization_id: u64,
         project_id: u64,
         event_id: u64,
-        mut req: UpdateCustomEventRequest,
+        req: UpdateCustomEventRequest,
     ) -> Result<CustomEvent> {
         ctx.check_permission(organization_id, project_id, Permission::UpdateCustomEvent)?;
 
@@ -85,7 +98,12 @@ impl Provider {
             md_req.status.insert(status.into());
         }
         if let Some(events) = req.events {
-            md_req.events.insert(events.iter().map(|e| e.to_owned().try_into()).collect::<Result<_>>()?);
+            md_req.events.insert(
+                events
+                    .iter()
+                    .map(|e| e.to_owned().try_into())
+                    .collect::<Result<_>>()?,
+            );
         }
         let event = self
             .prov
@@ -103,6 +121,10 @@ impl Provider {
         id: u64,
     ) -> Result<CustomEvent> {
         ctx.check_permission(organization_id, project_id, Permission::DeleteCustomEvent)?;
-        Ok(self.prov.delete(organization_id, project_id, id).await?.try_into()?)
+        Ok(self
+            .prov
+            .delete(organization_id, project_id, id)
+            .await?
+            .try_into()?)
     }
 }
