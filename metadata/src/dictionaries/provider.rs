@@ -85,7 +85,13 @@ impl Provider {
     ) -> Result<String> {
         let store_key = make_key_key(organization_id, project_id, dict, key);
         match self.store.get(store_key.as_slice()).await? {
-            None => Err(DictionaryError::KeyNotFound(DictionaryKey::new(organization_id, project_id, dict.to_string(), key)).into()),
+            None => Err(DictionaryError::KeyNotFound(DictionaryKey::new(
+                organization_id,
+                project_id,
+                dict.to_string(),
+                key,
+            ))
+            .into()),
             Some(value) => Ok(String::from_utf8(value)?),
         }
     }
@@ -99,7 +105,13 @@ impl Provider {
     ) -> Result<u64> {
         let store_key = make_value_key(organization_id, project_id, dict, value);
         match self.store.get(store_key.as_slice()).await? {
-            None => Err(DictionaryError::ValueNotFound(DictionaryValue::new(organization_id, project_id, dict.to_string(), value.to_string())).into()),
+            None => Err(DictionaryError::ValueNotFound(DictionaryValue::new(
+                organization_id,
+                project_id,
+                dict.to_string(),
+                value.to_string(),
+            ))
+            .into()),
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
         }
     }

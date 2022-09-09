@@ -1,11 +1,11 @@
 use super::{CreateRequest, ListRequest, Organization, UpdateRequest};
+use crate::error::OrganizationError;
 use crate::store::Store;
-use crate::{error,Result};
+use crate::{error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use futures::lock::Mutex;
 use std::sync::Arc;
-use crate::error::OrganizationError;
 
 const SEQUENCE_KEY: &str = "organizations/id_seq";
 const DATA_PREFIX: &str = "organizations/data/";
@@ -42,7 +42,9 @@ impl Provider {
 
     pub async fn get_by_id(&self, id: u64) -> Result<Organization> {
         match self.store.get(&data_key(id)).await? {
-            None => Err(OrganizationError::OrganizationNotFound(error::Organization::new(id)).into()),
+            None => {
+                Err(OrganizationError::OrganizationNotFound(error::Organization::new(id)).into())
+            }
             Some(value) => Ok(deserialize(&value)?),
         }
     }

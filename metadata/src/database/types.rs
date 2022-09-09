@@ -63,8 +63,12 @@ impl Table {
 impl TableRef {
     pub fn qualified_name(&self) -> String {
         match &self {
-            TableRef::Events(organization_id, project_id) => format!("events({},{})", organization_id, project_id),
-            TableRef::Users(organization_id, project_id) => format!("users({},{})", organization_id, project_id),
+            TableRef::Events(organization_id, project_id) => {
+                format!("events({},{})", organization_id, project_id)
+            }
+            TableRef::Users(organization_id, project_id) => {
+                format!("users({},{})", organization_id, project_id)
+            }
             TableRef::System(name) => format!("system({})", name),
         }
     }

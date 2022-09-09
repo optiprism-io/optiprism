@@ -1,9 +1,9 @@
 use std::string::FromUtf8Error;
 use std::{error, result};
 
-use thiserror::Error;
 use crate::database::{Column, TableRef};
 use crate::properties;
+use thiserror::Error;
 
 pub type Result<T> = result::Result<T, MetadataError>;
 
@@ -35,6 +35,48 @@ pub struct Event {
     project_id: u64,
     event_id: Option<u64>,
     event_name: Option<String>,
+}
+
+#[derive(Error, Debug)]
+pub enum CustomEventError {
+    #[error("event not found: {0:?}")]
+    EventNotFound(CustomEvent),
+    #[error("event already exist: {0:?}")]
+    EventAlreadyExist(CustomEvent),
+    #[error("recursion level {0} exceeded")]
+    RecursionLevelExceeded(usize),
+    #[error("duplicate event")]
+    DuplicateEvent,
+    #[error("empty events")]
+    EmptyEvents,
+}
+
+#[derive(Debug)]
+pub struct CustomEvent {
+    pub organization_id: u64,
+    pub project_id: u64,
+    pub event_id: Option<u64>,
+    pub event_name: Option<String>,
+}
+
+impl CustomEvent {
+    pub fn new_with_name(organization_id: u64, project_id: u64, event_name: String) -> Self {
+        Self {
+            organization_id,
+            project_id,
+            event_id: None,
+            event_name: Some(event_name),
+        }
+    }
+
+    pub fn new_with_id(organization_id: u64, project_id: u64, event_id: u64) -> Self {
+        Self {
+            organization_id,
+            project_id,
+            event_id: Some(event_id),
+            event_name: None,
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -82,9 +124,7 @@ pub struct Organization {
 
 impl Organization {
     pub fn new(id: u64) -> Self {
-        Self {
-            id,
-        }
+        Self { id }
     }
 }
 
@@ -215,6 +255,8 @@ pub enum MetadataError {
     Project(#[from] ProjectError),
     #[error("event {0:?}")]
     Event(#[from] EventError),
+    #[error("custom event {0:?}")]
+    CustomEvent(#[from] CustomEventError),
     #[error("property {0:?}")]
     Property(#[from] PropertyError),
     #[error("dictionary {0:?}")]

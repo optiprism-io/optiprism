@@ -1,5 +1,11 @@
-use crate::{Result};
-use arrow::array::{Array, ArrayAccessor, ArrayRef, BooleanArray, BooleanBuilder, Decimal128Array, Decimal128Builder, Float32Builder, Float64Builder, Int16Array, Int16Builder, Int32Array, Int32Builder, Int64Array, Int64Builder, Int8Array, Int8Builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder};
+use crate::Result;
+use arrow::array::{
+    Array, ArrayAccessor, ArrayRef, BooleanArray, BooleanBuilder, Decimal128Array,
+    Decimal128Builder, Float32Builder, Float64Builder, Int16Array, Int16Builder, Int32Array,
+    Int32Builder, Int64Array, Int64Builder, Int8Array, Int8Builder, StringBuilder,
+    TimestampNanosecondArray, TimestampNanosecondBuilder, UInt16Builder, UInt32Builder,
+    UInt64Builder, UInt8Builder,
+};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
@@ -9,12 +15,15 @@ use datafusion::arrow::array::{
     Float32Array, Float64Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
 
+use crate::error::QueryError;
+use datafusion::execution::context::TaskContext;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 use datafusion::physical_plan::{
     DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
     Statistics,
 };
+use datafusion_common::Result as DFResult;
 use futures::{Stream, StreamExt};
 use std::any::Any;
 use std::fmt;
@@ -22,9 +31,6 @@ use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use datafusion::execution::context::TaskContext;
-use crate::error::QueryError;
-use datafusion_common::Result as DFResult;
 
 /// `UNPIVOT` execution plan operator. Unpivot transforms columns into rows. E.g.
 pub struct UnpivotExec {
@@ -129,7 +135,7 @@ impl ExecutionPlan for UnpivotExec {
                 self.name_col.clone(),
                 self.value_col.clone(),
             )
-                .map_err(QueryError::into_datafusion_execution_error)?,
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -449,8 +455,8 @@ mod tests {
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
-    use std::sync::Arc;
     use datafusion::prelude::SessionContext;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test() -> Result<()> {
@@ -503,7 +509,7 @@ mod tests {
             "name".to_string(),
             "value".to_string(),
         )
-            .unwrap();
+        .unwrap();
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx)?;

@@ -1,19 +1,19 @@
 #[cfg(test)]
 mod tests {
     use arrow::util::pretty::print_batches;
-    use datafusion::execution::runtime_env::{RuntimeEnv};
+    use common::types::{EventRef, PropValueOperation, PropertyRef};
+    use common::ScalarValue;
+    use datafusion::execution::context::SessionState;
+    use datafusion::execution::runtime_env::RuntimeEnv;
     use datafusion::physical_plan::coalesce_batches::concat_batches;
-    use datafusion::physical_plan::{collect};
-    use datafusion_common::ScalarValue;
+    use datafusion::physical_plan::collect;
+    use datafusion::prelude::{SessionConfig, SessionContext};
     use query::error::Result;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::property_values::{Filter, LogicalPlanBuilder, PropertyValues};
-    use query::queries::types::{EventRef, PropValueOperation, PropertyRef};
     use query::test_util::{create_entities, create_md, events_provider};
     use query::Context;
     use std::sync::Arc;
-    use datafusion::execution::context::SessionState;
-    use datafusion::prelude::{SessionConfig, SessionContext};
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {
@@ -33,7 +33,7 @@ mod tests {
 
         let req = PropertyValues {
             property: PropertyRef::Event("Product Name".to_string()),
-            event: Some(EventRef::Regular("View Product".to_string())),
+            event: Some(EventRef::RegularName("View Product".to_string())),
             filter: Some(Filter {
                 operation: PropValueOperation::Like,
                 value: Some(vec![ScalarValue::Utf8(Some("goo%".to_string()))]),
@@ -50,11 +50,7 @@ mod tests {
         let exec_ctx = SessionContext::with_state(session_state);
         let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
 
-        let result = collect(
-            physical_plan,
-            exec_ctx.task_ctx(),
-        )
-            .await?;
+        let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
         let concatenated = concat_batches(&result[0].schema(), &result, 0)?;
 
         print_batches(&[concatenated])?;

@@ -12,12 +12,12 @@ use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
+use datafusion::physical_plan::expressions::PhysicalSortExpr;
+use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 use datafusion::physical_plan::{
     DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
     Statistics,
 };
-use datafusion::physical_plan::expressions::PhysicalSortExpr;
-use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::{Stream, StreamExt};
@@ -191,8 +191,8 @@ mod tests {
     use arrow::array::{ArrayRef, BooleanArray, Int32Array, Int8Array, StringArray};
     use arrow::record_batch::RecordBatch;
     use datafusion::physical_plan::common::collect;
-    use datafusion::physical_plan::ExecutionPlan;
     use datafusion::physical_plan::memory::MemoryExec;
+    use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
     pub use datafusion_common::Result;
 
@@ -226,8 +226,16 @@ mod tests {
 
         let input2 = {
             let batches = vec![RecordBatch::try_from_iter_with_nullable(vec![
-                ("name", Arc::new(StringArray::from(vec!["b".to_string(), "b".to_string()])) as ArrayRef, true),
-                ("a", Arc::new(Int32Array::from(vec![5, 6])) as ArrayRef, true),
+                (
+                    "name",
+                    Arc::new(StringArray::from(vec!["b".to_string(), "b".to_string()])) as ArrayRef,
+                    true,
+                ),
+                (
+                    "a",
+                    Arc::new(Int32Array::from(vec![5, 6])) as ArrayRef,
+                    true,
+                ),
                 ("b", Arc::new(Int8Array::from(vec![1, 2])) as ArrayRef, true),
             ])?];
 
@@ -238,14 +246,40 @@ mod tests {
         let input3 = {
             let batches = vec![
                 RecordBatch::try_from_iter_with_nullable(vec![
-                    ("name", Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()])) as ArrayRef, true),
-                    ("a", Arc::new(Int32Array::from(vec![7, 8])) as ArrayRef, true),
-                    ("c", Arc::new(BooleanArray::from(vec![true, true])) as ArrayRef, true),
+                    (
+                        "name",
+                        Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()]))
+                            as ArrayRef,
+                        true,
+                    ),
+                    (
+                        "a",
+                        Arc::new(Int32Array::from(vec![7, 8])) as ArrayRef,
+                        true,
+                    ),
+                    (
+                        "c",
+                        Arc::new(BooleanArray::from(vec![true, true])) as ArrayRef,
+                        true,
+                    ),
                 ])?,
                 RecordBatch::try_from_iter_with_nullable(vec![
-                    ("name", Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()])) as ArrayRef, true),
-                    ("a", Arc::new(Int32Array::from(vec![9, 10])) as ArrayRef, true),
-                    ("c", Arc::new(BooleanArray::from(vec![false, false])) as ArrayRef, true),
+                    (
+                        "name",
+                        Arc::new(StringArray::from(vec!["c".to_string(), "c".to_string()]))
+                            as ArrayRef,
+                        true,
+                    ),
+                    (
+                        "a",
+                        Arc::new(Int32Array::from(vec![9, 10])) as ArrayRef,
+                        true,
+                    ),
+                    (
+                        "c",
+                        Arc::new(BooleanArray::from(vec![false, false])) as ArrayRef,
+                        true,
+                    ),
                 ])?,
             ];
 

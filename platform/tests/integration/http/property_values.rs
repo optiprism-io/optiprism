@@ -1,39 +1,21 @@
 #[cfg(test)]
 mod tests {
     use axum::{Router, Server};
-    use metadata::Metadata;
+
     use platform::error::Result;
     use platform::http::queries;
     use query::{Context, QueryProvider};
-    use std::env::temp_dir;
+
     use std::net::SocketAddr;
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::time::sleep;
-    use uuid::Uuid;
-
-    use chrono::{DateTime, Utc};
-
-    use arrow::datatypes::DataType as DFDataType;
-    use datafusion::prelude::CsvReadOptions;
 
     use axum::headers::{HeaderMap, HeaderValue};
     use axum::http::StatusCode;
-    use datafusion::datasource::file_format::csv::CsvFormat;
-    use datafusion::datasource::listing::{ListingOptions, ListingTable, ListingTableConfig};
-    use metadata::database::{Column, Table, TableRef};
-    use metadata::properties::provider::Namespace;
-    use metadata::properties::{CreatePropertyRequest, Property};
-    use metadata::{events, properties};
-    use platform::queries::event_segmentation::{
-        Analysis, Breakdown, ChartType, Event, EventFilter, EventSegmentation, EventType,
-        PropertyType, Query,
-    };
+
     use platform::queries::property_values::{Filter, PropertyValues};
-    use platform::queries::types::{
-        AggregateFunction, EventRef, PartitionedAggregateFunction, PropValueOperation, PropertyRef,
-        QueryTime, TimeUnit,
-    };
+    use platform::queries::types::{EventRef, PropValueOperation, PropertyRef};
     use query::test_util::{create_entities, create_md, events_provider};
     use reqwest::Client;
     use serde_json::Value;
@@ -46,7 +28,7 @@ mod tests {
             let org_id = 1;
             let proj_id = 1;
 
-            let ctx = Context {
+            let _ctx = Context {
                 organization_id: org_id,
                 account_id: 1,
                 project_id: proj_id,

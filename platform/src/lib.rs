@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod auth;
 pub mod context;
+pub mod custom_events;
 pub mod data_table;
 pub mod error;
 pub mod events;
@@ -20,6 +21,7 @@ use arrow::array::{ArrayRef, Decimal128Array};
 use arrow::datatypes::DataType;
 pub use auth::Provider as AuthProvider;
 pub use context::Context;
+pub use custom_events::Provider as CustomEventsProvider;
 pub use error::{PlatformError, Result};
 pub use events::Provider as EventsProvider;
 pub use properties::Provider as PropertiesProvider;

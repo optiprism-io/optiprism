@@ -1,8 +1,8 @@
-use crate::{Result};
+use crate::Result;
 use ahash::RandomState;
 use arrow::array::{Array, ArrayRef, StringArray};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-use arrow::error::{Result as ArrowResult};
+use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 
 use axum::async_trait;
@@ -20,12 +20,12 @@ use fnv::FnvHashMap;
 use futures::{Stream, StreamExt};
 use std::any::Any;
 
+use crate::error::QueryError;
+use datafusion::execution::context::TaskContext;
 use std::fmt;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use datafusion::execution::context::TaskContext;
-use crate::error::QueryError;
 
 #[derive(Debug)]
 pub struct PivotExec {
@@ -124,7 +124,7 @@ impl ExecutionPlan for PivotExec {
                 self.value_col.clone(),
                 self.result_cols.clone(),
             )
-                .map_err(QueryError::into_datafusion_execution_error)?,
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -253,7 +253,13 @@ impl PivotStream {
             let col_name = name_arr.value(row);
 
             match self.result_map.get_mut(col_name) {
-                None => return Err(QueryError::Execution(format!("unknown name column \"{:?}\"", col_name)).into()),
+                None => {
+                    return Err(QueryError::Execution(format!(
+                        "unknown name column \"{:?}\"",
+                        col_name
+                    ))
+                    .into())
+                }
                 Some(values) => {
                     if values.len() - 1 < group_idx {
                         values.resize(
@@ -333,13 +339,13 @@ mod tests {
     use arrow::array::{ArrayRef, Float64Array, Int32Array, StringArray};
     use arrow::record_batch::RecordBatch;
     pub use datafusion_common::Result;
-    
+
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::expressions::Column;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
-    use std::sync::Arc;
     use datafusion::prelude::SessionContext;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test() -> Result<()> {
@@ -386,7 +392,7 @@ mod tests {
             Column::new_with_schema("v", input.schema().as_ref())?,
             vec!["2".to_string(), "1".to_string(), "3".to_string()],
         )
-            .unwrap();
+        .unwrap();
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx)?;

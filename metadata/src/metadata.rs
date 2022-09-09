@@ -1,6 +1,7 @@
 use crate::store::{make_data_key, Store};
 use crate::{
-    accounts, database, dictionaries, events, organizations, projects, properties, Result,
+    accounts, custom_events, database, dictionaries, events, organizations, projects, properties,
+    Result,
 };
 use bincode::deserialize;
 use serde::de::DeserializeOwned;
@@ -50,6 +51,7 @@ where
 
 pub struct Metadata {
     pub events: Arc<events::Provider>,
+    pub custom_events: Arc<custom_events::Provider>,
     pub event_properties: Arc<properties::Provider>,
     pub user_properties: Arc<properties::Provider>,
     pub organizations: Arc<organizations::Provider>,
@@ -61,8 +63,10 @@ pub struct Metadata {
 
 impl Metadata {
     pub fn try_new(store: Arc<Store>) -> Result<Self> {
+        let events = Arc::new(events::Provider::new(store.clone()));
         Ok(Metadata {
-            events: Arc::new(events::Provider::new(store.clone())),
+            events: events.clone(),
+            custom_events: Arc::new(custom_events::Provider::new(store.clone(), events.clone())),
             event_properties: Arc::new(properties::Provider::new_event(store.clone())),
             user_properties: Arc::new(properties::Provider::new_user(store.clone())),
             organizations: Arc::new(organizations::Provider::new(store.clone())),

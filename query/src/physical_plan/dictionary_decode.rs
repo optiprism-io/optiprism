@@ -23,12 +23,12 @@ use futures::{Stream, StreamExt};
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use std::any::Any;
 
+use datafusion::execution::context::TaskContext;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use datafusion::execution::context::TaskContext;
 
 pub struct DictionaryDecodeExec {
     input: Arc<dyn ExecutionPlan>,

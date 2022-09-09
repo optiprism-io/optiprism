@@ -1,12 +1,20 @@
-use std::{error, result};
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::{error, result};
 
-use axum::{http::StatusCode, Json, response::{IntoResponse, Response}};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
+use common::error::CommonError;
 use serde::Serialize;
 use thiserror::Error;
 
-use metadata::error::{AccountError, DatabaseError, DictionaryError, EventError, MetadataError, OrganizationError, ProjectError, PropertyError, StoreError};
+use metadata::error::{
+    AccountError, CustomEventError, DatabaseError, DictionaryError, EventError, MetadataError,
+    OrganizationError, ProjectError, PropertyError, StoreError,
+};
 use query::error::QueryError;
 
 pub type Result<T> = result::Result<T, PlatformError>;
@@ -25,6 +33,8 @@ pub enum PlatformError {
     Metadata(#[from] MetadataError),
     #[error("query: {0:?}")]
     Query(#[from] QueryError),
+    #[error("common: {0:?}")]
+    Common(#[from] CommonError),
 }
 
 #[derive(Serialize, Debug)]
@@ -69,7 +79,7 @@ impl ErrorResponse {
                     message: err.to_string(),
                 },
                 fields: None,
-            }
+            },
         )
     }
 
@@ -83,7 +93,7 @@ impl ErrorResponse {
                     message: msg.to_string(),
                 },
                 fields: None,
-            }
+            },
         )
     }
 }
@@ -98,43 +108,60 @@ impl IntoResponse for PlatformError {
                     DatabaseError::ColumnAlreadyExists(_) => ErrorResponse::conflict(Box::new(err)),
                     DatabaseError::TableNotFound(_) => ErrorResponse::not_found(Box::new(err)),
                     DatabaseError::TableAlreadyExists(_) => ErrorResponse::conflict(Box::new(err)),
-                }
+                },
                 MetadataError::Account(err) => match err {
                     AccountError::AccountNotFound(_) => ErrorResponse::not_found(Box::new(err)),
                     AccountError::AccountAlreadyExist(_) => ErrorResponse::conflict(Box::new(err)),
-                }
+                },
                 MetadataError::Organization(err) => match err {
-                    OrganizationError::OrganizationNotFound(_) => ErrorResponse::not_found(Box::new(err)),
-                    OrganizationError::OrganizationAlreadyExist(_) => ErrorResponse::conflict(Box::new(err)),
-                }
+                    OrganizationError::OrganizationNotFound(_) => {
+                        ErrorResponse::not_found(Box::new(err))
+                    }
+                    OrganizationError::OrganizationAlreadyExist(_) => {
+                        ErrorResponse::conflict(Box::new(err))
+                    }
+                },
                 MetadataError::Project(err) => match err {
                     ProjectError::ProjectNotFound(_) => ErrorResponse::not_found(Box::new(err)),
                     ProjectError::ProjectAlreadyExist(_) => ErrorResponse::conflict(Box::new(err)),
-                }
+                },
                 MetadataError::Event(err) => match err {
                     EventError::EventNotFound(_) => ErrorResponse::not_found(Box::new(err)),
                     EventError::EventAlreadyExist(_) => ErrorResponse::conflict(Box::new(err)),
                     EventError::PropertyNotFound(_) => ErrorResponse::not_found(Box::new(err)),
                     EventError::PropertyAlreadyExist(_) => ErrorResponse::conflict(Box::new(err)),
-                }
+                },
                 MetadataError::Property(err) => match err {
                     PropertyError::PropertyNotFound(_) => ErrorResponse::not_found(Box::new(err)),
-                    PropertyError::PropertyAlreadyExist(_) => ErrorResponse::conflict(Box::new(err)),
-                }
+                    PropertyError::PropertyAlreadyExist(_) => {
+                        ErrorResponse::conflict(Box::new(err))
+                    }
+                },
                 MetadataError::Dictionary(err) => match err {
                     DictionaryError::KeyNotFound(_) => ErrorResponse::not_found(Box::new(err)),
                     DictionaryError::ValueNotFound(_) => ErrorResponse::not_found(Box::new(err)),
-                }
+                },
                 MetadataError::Store(err) => match err {
                     StoreError::KeyAlreadyExists(_) => ErrorResponse::conflict(Box::new(err)),
                     StoreError::KeyNotFound(_) => ErrorResponse::not_found(Box::new(err)),
-                }
+                },
                 MetadataError::RocksDb(err) => ErrorResponse::internal(Box::new(err)),
                 MetadataError::FromUtf8(err) => ErrorResponse::internal(Box::new(err)),
                 MetadataError::Bincode(err) => ErrorResponse::internal(Box::new(err)),
                 MetadataError::Io(err) => ErrorResponse::internal(Box::new(err)),
                 MetadataError::Other(_) => ErrorResponse::internal(Box::new(err)),
-            }
+                MetadataError::CustomEvent(err) => match err {
+                    CustomEventError::EventNotFound(_) => ErrorResponse::not_found(Box::new(err)),
+                    CustomEventError::EventAlreadyExist(_) => {
+                        ErrorResponse::conflict(Box::new(err))
+                    }
+                    CustomEventError::RecursionLevelExceeded(_) => {
+                        ErrorResponse::bad_request(Box::new(err))
+                    }
+                    CustomEventError::DuplicateEvent => ErrorResponse::conflict(Box::new(err)),
+                    CustomEventError::EmptyEvents => ErrorResponse::bad_request(Box::new(err)),
+                },
+            },
             PlatformError::Query(err) => match err {
                 QueryError::Internal(_) => ErrorResponse::internal(Box::new(err)),
                 QueryError::Plan(_) => ErrorResponse::internal(Box::new(err)),
@@ -143,10 +170,19 @@ impl IntoResponse for PlatformError {
                 QueryError::Arrow(err) => ErrorResponse::internal(Box::new(err)),
                 QueryError::Metadata(err) => ErrorResponse::internal(Box::new(err)),
             },
-            PlatformError::BadRequest(msg) => ErrorResponse::new_inner(StatusCode::BAD_REQUEST, msg),
-            PlatformError::Internal(_msg) => ErrorResponse::new_inner(StatusCode::INTERNAL_SERVER_ERROR, "internal server error".to_string()),
+            PlatformError::BadRequest(msg) => {
+                ErrorResponse::new_inner(StatusCode::BAD_REQUEST, msg)
+            }
+            PlatformError::Internal(_msg) => ErrorResponse::new_inner(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal server error".to_string(),
+            ),
+            PlatformError::Common(err) => match err {
+                CommonError::DataFusionError(_) => ErrorResponse::internal(Box::new(err)),
+                CommonError::JWTError(_) => ErrorResponse::internal(Box::new(err)),
+            },
         };
 
-            (a,Json(b)).into_response()
+        (a, Json(b)).into_response()
     }
 }

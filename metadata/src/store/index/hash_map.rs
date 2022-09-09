@@ -1,4 +1,4 @@
-use crate::error::{ StoreError};
+use crate::error::StoreError;
 use crate::store::Store;
 use crate::Result;
 use std::sync::Arc;
@@ -16,7 +16,9 @@ impl HashMap {
     pub async fn check_insert_constraints(&self, keys: &[Option<Vec<u8>>]) -> Result<()> {
         for key in keys.iter().flatten() {
             if (self.store.get(key).await?).is_some() {
-                return Err(StoreError::KeyAlreadyExists(String::from_utf8(key.to_owned())?).into());
+                return Err(
+                    StoreError::KeyAlreadyExists(String::from_utf8(key.to_owned())?).into(),
+                );
             }
         }
         Ok(())
@@ -37,7 +39,9 @@ impl HashMap {
         for (key, prev_key) in keys.iter().zip(prev_keys) {
             if let Some(key_v) = key {
                 if key != prev_key && (self.store.get(key_v).await?).is_some() {
-                    return Err(StoreError::KeyAlreadyExists(String::from_utf8(key_v.to_owned())?).into());
+                    return Err(
+                        StoreError::KeyAlreadyExists(String::from_utf8(key_v.to_owned())?).into(),
+                    );
                 }
             }
         }
@@ -77,7 +81,9 @@ impl HashMap {
         K: AsRef<[u8]>,
     {
         match self.store.get(key.as_ref()).await? {
-            None => Err(StoreError::KeyNotFound(String::from_utf8(key.as_ref().to_owned())?).into()),
+            None => {
+                Err(StoreError::KeyNotFound(String::from_utf8(key.as_ref().to_owned())?).into())
+            }
             Some(v) => Ok(v),
         }
     }

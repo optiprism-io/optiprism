@@ -5,15 +5,14 @@ use chrono::Utc;
 
 use tokio::sync::RwLock;
 
-
 use crate::error::{EventError, MetadataError, StoreError};
 use crate::events::types::{CreateEventRequest, UpdateEventRequest};
 use crate::events::Event;
 use crate::metadata::{list, ListResponse};
+use crate::properties::provider::Namespace;
 use crate::store::index::hash_map::HashMap;
 use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
 use crate::{error, Result};
-use crate::properties::provider::Namespace;
 
 const NAMESPACE: &[u8] = b"events";
 const IDX_NAME: &[u8] = b"name";
@@ -29,7 +28,7 @@ fn index_keys(
         index_name_key(organization_id, project_id, name),
         index_display_name_key(organization_id, project_id, display_name),
     ]
-        .to_vec()
+    .to_vec()
 }
 
 fn index_name_key(organization_id: u64, project_id: u64, name: &str) -> Option<Vec<u8>> {
@@ -49,7 +48,7 @@ fn index_display_name_key(
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
-            .to_vec()
+        .to_vec()
     })
 }
 
@@ -92,7 +91,14 @@ impl Provider {
         );
 
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_name(organization_id, project_id, req.name)).into()),
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
+                return Err(EventError::EventAlreadyExist(error::Event::new_with_name(
+                    organization_id,
+                    project_id,
+                    req.name,
+                ))
+                .into())
+            }
             Err(other) => return Err(other),
             Ok(_) => {}
         }
@@ -155,7 +161,12 @@ impl Provider {
         let key = make_data_value_key(organization_id, project_id, NAMESPACE, id);
 
         match self.store.get(key).await? {
-            None => Err(EventError::EventNotFound(error::Event::new_with_id(organization_id, project_id, id)).into()),
+            None => Err(EventError::EventNotFound(error::Event::new_with_id(
+                organization_id,
+                project_id,
+                id,
+            ))
+            .into()),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -185,10 +196,18 @@ impl Provider {
                 IDX_NAME,
                 name,
             ))
-            .await {
-            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(EventError::EventNotFound(error::Event::new_with_name(organization_id, project_id, name.to_string())).into()),
+            .await
+        {
+            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => {
+                Err(EventError::EventNotFound(error::Event::new_with_name(
+                    organization_id,
+                    project_id,
+                    name.to_string(),
+                ))
+                .into())
+            }
             Err(other) => Err(other),
-            Ok(data) => Ok(deserialize(&data)?)
+            Ok(data) => Ok(deserialize(&data)?),
         }
     }
 
@@ -234,10 +253,19 @@ impl Provider {
             ));
             event.display_name = display_name.to_owned();
         }
-        match self.idx
+        match self
+            .idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
-            .await {
-            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => return Err(EventError::EventAlreadyExist(error::Event::new_with_id(organization_id, project_id, event_id)).into()),
+            .await
+        {
+            Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
+                return Err(EventError::EventAlreadyExist(error::Event::new_with_id(
+                    organization_id,
+                    project_id,
+                    event_id,
+                ))
+                .into())
+            }
             Err(other) => return Err(other),
             Ok(_) => {}
         }
@@ -292,14 +320,17 @@ impl Provider {
             None => Some(vec![prop_id]),
             Some(props) => match props.iter().find(|x| prop_id == **x) {
                 None => Some([props, vec![prop_id]].concat()),
-                Some(_) => return Err(EventError::PropertyAlreadyExist(error::Property {
-                    organization_id,
-                    project_id,
-                    namespace: Namespace::Event,
-                    event_id: Some(event_id),
-                    property_id: Some(prop_id),
-                    property_name: None,
-                }).into()),
+                Some(_) => {
+                    return Err(EventError::PropertyAlreadyExist(error::Property {
+                        organization_id,
+                        project_id,
+                        namespace: Namespace::Event,
+                        event_id: Some(event_id),
+                        property_id: Some(prop_id),
+                        property_name: None,
+                    })
+                    .into())
+                }
             },
         };
 
@@ -324,23 +355,29 @@ impl Provider {
             .get_by_id(organization_id, project_id, event_id)
             .await?;
         event.properties = match event.properties {
-            None => return Err(EventError::PropertyNotFound(error::Property {
-                organization_id,
-                project_id,
-                namespace: Namespace::Event,
-                event_id: Some(event_id),
-                property_id: Some(prop_id),
-                property_name: None,
-            }).into()),
-            Some(props) => match props.iter().find(|x| prop_id == **x) {
-                None => return Err(EventError::PropertyAlreadyExist(error::Property {
+            None => {
+                return Err(EventError::PropertyNotFound(error::Property {
                     organization_id,
                     project_id,
                     namespace: Namespace::Event,
                     event_id: Some(event_id),
                     property_id: Some(prop_id),
                     property_name: None,
-                }).into()),
+                })
+                .into())
+            }
+            Some(props) => match props.iter().find(|x| prop_id == **x) {
+                None => {
+                    return Err(EventError::PropertyAlreadyExist(error::Property {
+                        organization_id,
+                        project_id,
+                        namespace: Namespace::Event,
+                        event_id: Some(event_id),
+                        property_id: Some(prop_id),
+                        property_name: None,
+                    })
+                    .into())
+                }
                 Some(_) => Some(props.into_iter().filter(|x| prop_id != *x).collect()),
             },
         };
@@ -374,7 +411,7 @@ impl Provider {
                     &event.name,
                     event.display_name.clone(),
                 )
-                    .as_ref(),
+                .as_ref(),
             )
             .await?;
 

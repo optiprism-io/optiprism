@@ -1,10 +1,10 @@
+use metadata::store::Store;
 use metadata::{
     organizations::{CreateRequest, ListRequest},
     Metadata, Result,
 };
 use std::{env::temp_dir, sync::Arc};
 use uuid::Uuid;
-use metadata::store::Store;
 
 #[tokio::test]
 async fn test_organizations() -> Result<()> {

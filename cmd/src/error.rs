@@ -1,6 +1,4 @@
-use std::{
-    result,
-};
+use std::result;
 
 use datafusion::error::DataFusionError;
 use thiserror::Error;

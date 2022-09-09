@@ -1,4 +1,4 @@
-use datafusion::execution::context::{SessionState, QueryPlanner as DFQueryPlanner};
+use datafusion::execution::context::{QueryPlanner as DFQueryPlanner, SessionState};
 use datafusion::physical_plan::planner::{
     DefaultPhysicalPlanner, ExtensionPlanner as DFExtensionPlanner,
 };
@@ -14,9 +14,9 @@ use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::unpivot::UnpivotExec;
 use axum::async_trait;
-use datafusion_common::{DataFusionError, Result};
 use datafusion::logical_plan::{LogicalPlan, UserDefinedLogicalNode};
 use datafusion::physical_plan::{expressions, ExecutionPlan, PhysicalPlanner};
+use datafusion_common::{DataFusionError, Result};
 
 pub struct QueryPlanner {}
 

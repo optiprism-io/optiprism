@@ -91,11 +91,7 @@ impl UserDefinedLogicalNode for PivotNode {
         write!(f, "Pivot")
     }
 
-    fn from_template(
-        &self,
-        _: &[Expr],
-        inputs: &[LogicalPlan],
-    ) -> Arc<dyn UserDefinedLogicalNode> {
+    fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
         Arc::new(
             PivotNode::try_new(
                 inputs[0].clone(),
@@ -103,8 +99,8 @@ impl UserDefinedLogicalNode for PivotNode {
                 self.value_col.clone(),
                 self.result_cols.clone(),
             )
-                .map_err(QueryError::into_datafusion_plan_error)
-                .unwrap(),
+            .map_err(QueryError::into_datafusion_plan_error)
+            .unwrap(),
         )
     }
 }

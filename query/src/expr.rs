@@ -2,19 +2,22 @@ use std::sync::Arc;
 
 use arrow::datatypes::DataType;
 use chrono::{DateTime, Utc};
+use common::types::{EventFilter, EventRef, PropValueOperation, PropertyRef};
+use common::ScalarValue;
 use datafusion::logical_plan::ExprSchemable;
-use datafusion_common::{Column, ExprSchema, ScalarValue};
-use datafusion_expr::{col, Expr, lit, Operator};
+use datafusion_common::{Column, ExprSchema, ScalarValue as DFScalarValue};
 use datafusion_expr::expr_fn::{and, binary_expr};
+use datafusion_expr::{col, lit, or, Expr, Operator};
+use futures::executor;
 
-use metadata::{dictionaries, Metadata};
 use metadata::properties::provider::Namespace;
+use metadata::{dictionaries, Metadata};
 
-use crate::{event_fields, Result};
-use crate::Context;
 use crate::error::QueryError;
-use crate::logical_plan::expr::{lit_timestamp, multi_or};
-use crate::queries::types::{EventRef, PropertyRef, PropValueOperation, QueryTime};
+use crate::logical_plan::expr::{lit_timestamp, multi_and, multi_or};
+use crate::queries::types::QueryTime;
+use crate::Context;
+use crate::{event_fields, Result};
 
 /// builds expression on timestamp
 pub fn time_expression<S: ExprSchema>(
@@ -46,7 +49,7 @@ pub async fn event_expression(
 ) -> Result<Expr> {
     Ok(match &event {
         // regular event
-        EventRef::Regular(name) => {
+        EventRef::RegularName(name) => {
             let e = metadata
                 .events
                 .get_by_name(ctx.organization_id, ctx.project_id, name)
@@ -55,12 +58,106 @@ pub async fn event_expression(
             binary_expr(
                 col(event_fields::EVENT),
                 Operator::Eq,
-                lit(ScalarValue::from(e.id)),
+                lit(DFScalarValue::from(e.id)),
+            )
+        }
+        EventRef::Regular(id) => {
+            let e = metadata
+                .events
+                .get_by_id(ctx.organization_id, ctx.project_id, *id)
+                .await?;
+
+            binary_expr(
+                col(event_fields::EVENT),
+                Operator::Eq,
+                lit(DFScalarValue::from(e.id)),
             )
         }
 
-        EventRef::Custom(_event_name) => unimplemented!(),
+        EventRef::Custom(id) => {
+            let e = metadata
+                .custom_events
+                .get_by_id(ctx.organization_id, ctx.project_id, *id)
+                .await?;
+            let mut exprs: Vec<Expr> = Vec::new();
+            for event in e.events.iter() {
+                let mut expr = match &event.event {
+                    EventRef::RegularName(name) => executor::block_on(event_expression(
+                        ctx,
+                        metadata,
+                        &EventRef::RegularName(name.to_owned()),
+                    ))?,
+                    EventRef::Regular(id) => executor::block_on(event_expression(
+                        ctx,
+                        metadata,
+                        &EventRef::Regular(*id),
+                    ))?,
+                    EventRef::Custom(id) => {
+                        executor::block_on(event_expression(ctx, metadata, &EventRef::Custom(*id)))?
+                    }
+                };
+
+                if let Some(filters) = &event.filters {
+                    expr = and(
+                        expr.clone(),
+                        event_filters_expression(ctx, metadata, filters).await?,
+                    );
+                }
+
+                exprs.push(expr);
+            }
+
+            let mut final_expr = exprs[0].clone();
+            for expr in exprs.iter().skip(1) {
+                final_expr = or(final_expr.clone(), expr.to_owned())
+            }
+
+            final_expr
+        }
     })
+}
+
+/// builds event filters expression
+pub async fn event_filters_expression(
+    ctx: &Context,
+    metadata: &Arc<Metadata>,
+    filters: &[EventFilter],
+) -> Result<Expr> {
+    // iterate over filters
+    let filters_exprs = filters
+        .iter()
+        .map(|filter| {
+            // match filter type
+            match filter {
+                EventFilter::Property {
+                    property,
+                    operation,
+                    value,
+                } => executor::block_on(property_expression(
+                    ctx,
+                    metadata,
+                    property,
+                    operation,
+                    value
+                        .clone()
+                        .and_then(|v| {
+                            Some(
+                                v.iter()
+                                    .map(|v| v.clone().into())
+                                    .collect::<Vec<ScalarValue>>(),
+                            )
+                        })
+                        .to_owned(),
+                )),
+            }
+        })
+        .collect::<Result<Vec<Expr>>>()?;
+
+    if filters_exprs.len() == 1 {
+        return Ok(filters_exprs[0].clone());
+    }
+
+    Ok(multi_and(filters_exprs))
 }
 
 pub async fn encode_property_dict_values(
@@ -88,7 +185,12 @@ pub async fn encode_property_dict_values(
                     DataType::UInt16 => ScalarValue::UInt16(Some(key as u16)),
                     DataType::UInt32 => ScalarValue::UInt32(Some(key as u32)),
                     DataType::UInt64 => ScalarValue::UInt64(Some(key as u64)),
-                    _ => return Err(QueryError::Plan(format!("unsupported dictionary type \"{:?}\"", dict_type)))
+                    _ => {
+                        return Err(QueryError::Plan(format!(
+                            "unsupported dictionary type \"{:?}\"",
+                            dict_type
+                        )))
+                    }
                 };
 
                 ret.push(scalar_value);
@@ -96,7 +198,10 @@ pub async fn encode_property_dict_values(
                 ret.push(ScalarValue::try_from(dict_type)?);
             }
         } else {
-            return Err(QueryError::Plan(format!("value type should be Utf8, but \"{:?}\" was given", value.get_datatype())));
+            return Err(QueryError::Plan(format!(
+                "value type should be Utf8, but \"{:?}\" was given",
+                value.get_datatype()
+            )));
         }
     }
 
@@ -132,7 +237,7 @@ pub async fn property_expression(
                     col_name.as_str(),
                     &values.unwrap(),
                 )
-                    .await?;
+                .await?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)
@@ -158,7 +263,7 @@ pub async fn property_expression(
                     col_name.as_str(),
                     &values.unwrap(),
                 )
-                    .await?;
+                .await?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)
@@ -202,21 +307,28 @@ pub fn named_property_expression(
         PropValueOperation::Eq | PropValueOperation::Neq | PropValueOperation::Like => {
             // expressions for OR
             let values_vec = values.ok_or_else(|| {
-                QueryError::Plan(format!("value should be defined for \"{:?}\" operation", operation))
+                QueryError::Plan(format!(
+                    "value should be defined for \"{:?}\" operation",
+                    operation
+                ))
             })?;
 
             Ok(match values_vec.len() {
                 1 => binary_expr(
                     prop_col,
                     operation.clone().into(),
-                    lit(values_vec[0].clone()),
+                    lit(DFScalarValue::from(values_vec[0].to_owned())),
                 ),
                 _ => {
                     // iterate over all possible values
                     let exprs = values_vec
                         .iter()
                         .map(|v| {
-                            binary_expr(prop_col.clone(), operation.clone().into(), lit(v.clone()))
+                            binary_expr(
+                                prop_col.clone(),
+                                operation.clone().into(),
+                                lit(DFScalarValue::from(v.to_owned())),
+                            )
                         })
                         .collect();
 

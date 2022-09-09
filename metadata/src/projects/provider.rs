@@ -1,11 +1,11 @@
 use super::{CreateRequest, ListRequest, Project, UpdateRequest};
+use crate::error::ProjectError;
 use crate::store::Store;
 use crate::{error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use futures::lock::Mutex;
 use std::sync::Arc;
-use crate::error::ProjectError;
 
 const SEQUENCE_KEY: &[u8] = b"projects/id_seq";
 const DATA_PREFIX: &[u8] = b"projects/data/";
@@ -54,7 +54,9 @@ impl Provider {
     pub async fn get_by_id(&self, organization_id: u64, id: u64) -> Result<Project> {
         let key = data_key(organization_id, id);
         match self.store.get(&key).await? {
-            None => Err(ProjectError::ProjectNotFound(error::Project::new(organization_id,id)).into()),
+            None => {
+                Err(ProjectError::ProjectNotFound(error::Project::new(organization_id, id)).into())
+            }
             Some(value) => Ok(deserialize(&value)?),
         }
     }
