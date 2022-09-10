@@ -2,4 +2,4 @@
 .vscode
 
 target
-Cargo.lock
+rust/Cargo.lock
