@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "metadata",
+    "common",
+    "query",
+    "store",
+    "platform",
+    "cmd",
+    "events-gen",
+]
