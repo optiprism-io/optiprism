@@ -47,7 +47,7 @@
             <main class="pf-c-login__main">
                 <header class="pf-c-login__main-header">
                     <h1 class="pf-c-title pf-m-3xl">
-                        Log in to your account
+                        {{ $t('login.text') }}
                     </h1>
                 </header>
                 <div class="pf-c-login__main-body">
@@ -55,15 +55,6 @@
                         class="pf-c-form login-form"
                         @submit.prevent="login"
                     >
-                        <p class="pf-c-form__helper-text pf-m-error pf-m-hidden">
-                            <span class="pf-c-form__helper-text-icon">
-                                <i
-                                    class="fas fa-exclamation-circle"
-                                    aria-hidden="true"
-                                />
-                            </span>
-                            Invalid login credentials.
-                        </p>
                         <div class="pf-c-form__group pf-u-mb-md login-form__field">
                             <label
                                 class="pf-c-form__label"
@@ -90,7 +81,10 @@
                                 aria-live="polite"
                             >
                                 <span class="pf-c-form__helper-text-icon">
-                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                    <i
+                                        class="fas fa-exclamation-circle"
+                                        aria-hidden="true"
+                                    />
                                 </span>
                                 {{ errorFields.email }}
                             </p>
@@ -122,34 +116,26 @@
                                 aria-live="polite"
                             >
                                 <span class="pf-c-form__helper-text-icon">
-                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                    <i
+                                        class="fas fa-exclamation-circle"
+                                        aria-hidden="true"
+                                    />
                                 </span>
                                 {{ errorFields.password }}
                             </p>
                         </div>
                         <div class="pf-c-form__group">
-                            <div class="pf-c-check">
-                                <input
-                                    id="login-demo-checkbox"
-                                    class="pf-c-check__input"
-                                    type="checkbox"
-                                    name="login-demo-checkbox"
-                                >
-
-                                <label
-                                    class="pf-c-check__label"
-                                    for="login-demo-checkbox"
-                                >
-                                    {{ $t('login.keep') }}
-                                </label>
-                            </div>
+                            <UiCheckbox
+                                v-model="keepLogged"
+                                :label="$t('login.keep')"
+                            />
                         </div>
                         <div class="pf-c-form__group pf-m-action">
                             <button
                                 class="pf-c-button pf-m-primary pf-m-block"
                                 type="submit"
                             >
-                                Log in
+                                {{ $t('login.logIn') }}
                             </button>
                         </div>
                     </form>
@@ -167,6 +153,7 @@ import { useAuthStore } from '@/stores/auth/auth'
 import { pagesMap } from '@/router'
 import { ErrorResponse } from '@/api'
 import UiInput from '@/components/uikit/UiInput.vue'
+import UiCheckbox from '@/components/uikit/UiCheckbox.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -174,6 +161,7 @@ const authStore = useAuthStore()
 
 const email = ref('')
 const password = ref('')
+const keepLogged = ref(false)
 const errorFields = ref<{ [key: string]: string }>({})
 
 const nextPath = computed(() => {
@@ -186,6 +174,7 @@ const login = async (): Promise<void | Error> => {
         await authStore.login({
             email: email.value,
             password: password.value,
+            keepLogged: keepLogged.value,
         })
 
         if (authStore.accessToken) {

@@ -11,6 +11,10 @@ import eventMocks from '@/mocks/eventSegmentations/events.json';
 import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
 import customEventsMocks from '@/mocks/eventSegmentations/customEvents.json';
 
+const accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
+const refreshToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Im5pa28ga3VzaCIsImlhdCI6MTUxNjIzOTAyMn0.FzpmXmStgiYEO15ZbwwPafVRQSOCO_xidYjrjRvVIbQ'
+const csrfToken = 'CIwNZNlR4XbisJF39I8yWnWX9wX4WFoz'
+
 export default function ({ environment = 'development' } = {}) {
     return createServer({
         seeds(server) {
@@ -176,36 +180,26 @@ export default function ({ environment = 'development' } = {}) {
 
                 if (property.email.length <= 5 || property.password.length < 5) {
                     return new Response(400, { some: 'header' }, {
-                        "code": "1000_invalid_token",
-                        "message": "string",
-                        "fields": {
-                            "email": "Email is too short",
+                        'code': '1000_invalid_token',
+                        'message': 'string',
+                        'fields': {
+                            'email': 'Email is too short',
                         }
                     });
                 } else {
-                    const accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
-                    let now = new Date()
-                    let cookieExpiration = new Date(now.getTime() + 24 * 30 * 3600 * 1000)
-                    document.cookie = `accessToken=${accessToken}; domain=localhost; path=/; expires=${cookieExpiration.toUTCString()};`
-
                     return {
                         accessToken,
-                        refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Im5pa28ga3VzaCIsImlhdCI6MTUxNjIzOTAyMn0.FzpmXmStgiYEO15ZbwwPafVRQSOCO_xidYjrjRvVIbQ',
-                        csrfToken: 'CIwNZNlR4XbisJF39I8yWnWX9wX4WFoz'
+                        refreshToken,
+                        csrfToken,
                     }
                 }
             })
 
             this.post(`${BASE_PATH}/v1/auth/access`, (): BasicLogin200Response => {
-                const accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
-                let now = new Date()
-                let cookieExpiration = new Date(now.getTime() + 24 * 30 * 3600 * 1000)
-                document.cookie = `accessToken=${accessToken}; domain=localhost; path=/; expires=${cookieExpiration.toUTCString()};`
-
                 return {
                     accessToken,
-                    refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Im5pa28ga3VzaCIsImlhdCI6MTUxNjIzOTAyMn0.FzpmXmStgiYEO15ZbwwPafVRQSOCO_xidYjrjRvVIbQ',
-                    csrfToken: 'CIwNZNlR4XbisJF39I8yWnWX9wX4WFoz'
+                    refreshToken,
+                    csrfToken,
                 }
             })
         }

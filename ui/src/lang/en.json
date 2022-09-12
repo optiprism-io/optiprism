@@ -1,7 +1,9 @@
 {
   "login": {
     "keep": "Keep me logged in for 30 days.",
-    "password": "Password"
+    "password": "Password",
+    "text": "Log in to your account",
+    "logIn": "Log in"
   },
 
   "userMenu": {
