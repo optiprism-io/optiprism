@@ -1,16 +1,14 @@
 import {defineStore} from 'pinia';
 import schemaService from '@/api/services/schema.service';
 import {
-    UserCustomProperty,
     customEventRef,
-    eventRef,
-    PropertyRef,
     EventRef,
     eventRef,
     eventsQueries,
     EventsQuery,
     PropertyRef,
     UserCustomProperty,
+    EventQueryRef,
 } from '@/types/events';
 import { Cohort } from '@/types';
 import { aggregates } from '@/types/aggregate'
