@@ -14,6 +14,7 @@
         "axios": "^0.26.0",
         "floating-vue": "^2.0.0-beta.6",
         "lodash": "^4.17.21",
+        "nanoid": "^4.0.0",
         "pinia": "^2.0.11",
         "typescript-cookie": "^1.0.4",
         "vue": "^3.2.31",
