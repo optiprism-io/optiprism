@@ -5,7 +5,7 @@ use common::{
     rbac::Permission,
 };
 use metadata::accounts::{
-    Account, CreateRequest as CreateAccountRequest, Provider as AccountProvider,
+    Account, CreateAccountRequest as CreateAccountRequest, Provider as AccountProvider,
 };
 use std::sync::Arc;
 

@@ -1,4 +1,4 @@
-use super::{Account, CreateRequest, UpdateRequest};
+use super::{Account, CreateAccountRequest, UpdateRequest};
 use crate::error::{AccountError, MetadataError, StoreError};
 use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::store::index::hash_map::HashMap;
@@ -47,7 +47,7 @@ impl Provider {
         }
     }
 
-    pub async fn create(&self, req: CreateRequest) -> Result<Account> {
+    pub async fn create(&self, req: CreateAccountRequest) -> Result<Account> {
         let _guard = self.guard.write().await;
         let idx_keys = index_keys(req.email.as_str());
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {

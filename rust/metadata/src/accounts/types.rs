@@ -10,10 +10,8 @@ pub struct Account {
     pub created_by: u64,
     pub updated_at: Option<DateTime<Utc>>,
     pub updated_by: Option<u64>,
-    pub admin: bool,
     pub salt: String,
     pub password: String,
-    pub organization_id: u64,
     pub email: String,
     pub roles: Option<HashMap<Scope, Role>>,
     pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
@@ -23,9 +21,8 @@ pub struct Account {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct CreateRequest {
+pub struct CreateAccountRequest {
     pub created_by: u64,
-    pub admin: bool,
     pub salt: String,
     pub password: String,
     pub organization_id: u64,
@@ -37,7 +34,7 @@ pub struct CreateRequest {
     pub last_name: Option<String>,
 }
 
-impl CreateRequest {
+impl CreateAccountRequest {
     pub fn into_account(self, id: u64, created_at: DateTime<Utc>) -> Account {
         Account {
             id,

@@ -1,5 +1,5 @@
 use super::{LogInRequest, SignUpRequest, TokensResponse};
-use crate::{Context, Result};
+use crate::{Context, PlatformError, Result};
 use chrono::Utc;
 use common::auth::{make_password_hash, make_salt};
 use common::{
@@ -9,11 +9,15 @@ use common::{
     },
     rbac::{Permission, Role, Scope},
 };
+
 use metadata::{
-    accounts::CreateRequest as CreateAccountRequest,
+    accounts::CreateAccountRequest as CreateAccountRequest,
     organizations::CreateRequest as CreateOrganizationRequest, Metadata,
 };
 use std::{collections::HashMap, ops::Add, sync::Arc};
+use metadata::error::{AccountError, MetadataError};
+use crate::auth::auth::is_valid_password;
+use crate::error::AuthError;
 
 pub struct Provider {
     md: Arc<Metadata>,
@@ -25,13 +29,6 @@ impl Provider {
     }
 
     pub async fn sign_up(&self, ctx: Context, request: SignUpRequest) -> Result<TokensResponse> {
-        let organization = self
-            .md
-            .organizations
-            .create(CreateOrganizationRequest {
-                name: request.organization_name,
-            })
-            .await?;
         let mut roles = HashMap::new();
         roles.insert(Scope::Organization, Role::Owner);
 
@@ -63,12 +60,16 @@ impl Provider {
     }
 
     pub async fn log_in(&self, _ctx: Context, request: LogInRequest) -> Result<TokensResponse> {
-        let account = self.md.accounts.get_by_email(&request.email).await?;
+        let account = match self.md.accounts.get_by_email(&request.email).await {
+            Ok(account) =>account,
+            Err(err) => return Err(AuthError::InvalidCredentials.into())
+        };
+
         if !is_valid_password(&request.password, &account.salt, &account.password) {
-            unimplemented!();
+            return Err(AuthError::InvalidCredentials.into());
         }
+
         make_token_response(
-            account.organization_id,
             account.id,
             account.roles,
             account.permissions,
@@ -93,7 +94,7 @@ fn make_token_response(
             },
             ACCESS_TOKEN_KEY.as_bytes(),
         )
-        .expect("error"),
+            .expect("error"),
         refresh_token: make_token(
             RefreshClaims {
                 organization_id,
@@ -102,6 +103,6 @@ fn make_token_response(
             },
             REFRESH_TOKEN_KEY.as_bytes(),
         )
-        .expect("error"),
+            .expect("error"),
     })
 }

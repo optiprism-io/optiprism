@@ -20,6 +20,14 @@ use query::error::QueryError;
 pub type Result<T> = result::Result<T, PlatformError>;
 
 #[derive(Error, Debug)]
+pub enum AuthError {
+    #[error("invalid credentials")]
+    InvalidCredentials,
+    #[error("invalid token")]
+    InvalidToken,
+}
+
+#[derive(Error, Debug)]
 pub enum PlatformError {
     #[error("bad request: {0:?}")]
     BadRequest(String),
@@ -35,6 +43,8 @@ pub enum PlatformError {
     Query(#[from] QueryError),
     #[error("common: {0:?}")]
     Common(#[from] CommonError),
+    #[error("auth: {0:?}")]
+    Auth(#[from] AuthError),
 }
 
 #[derive(Serialize, Debug)]
@@ -55,6 +65,10 @@ struct ErrorResponse {
 impl ErrorResponse {
     pub fn bad_request(err: Box<dyn error::Error>) -> (StatusCode, Self) {
         ErrorResponse::new(err, StatusCode::BAD_REQUEST)
+    }
+
+    pub fn forbidden(err: Box<dyn error::Error>) -> (StatusCode, Self) {
+        ErrorResponse::new(err, StatusCode::FORBIDDEN)
     }
 
     pub fn conflict(err: Box<dyn error::Error>) -> (StatusCode, Self) {
@@ -181,6 +195,10 @@ impl IntoResponse for PlatformError {
                 CommonError::DataFusionError(_) => ErrorResponse::internal(Box::new(err)),
                 CommonError::JWTError(_) => ErrorResponse::internal(Box::new(err)),
             },
+            PlatformError::Auth(err) => match err {
+                AuthError::InvalidCredentials => ErrorResponse::forbidden(Box::new(err)),
+                AuthError::InvalidToken => ErrorResponse::forbidden(Box::new(err))
+            }
         };
 
         (a, Json(b)).into_response()
