@@ -97,7 +97,7 @@ const props = defineProps<{
     index: number;
 }>();
 
-let showControls = ref(false);
+const showControls = ref(false);
 
 const emit = defineEmits<{
     (e: 'removeBreakdown', index: number): void;
@@ -125,7 +125,7 @@ const changeCohort = (id: number): void => {
 
 const breakdownName = (): string => {
     if (isBreakdownCohort(props.breakdown)) {
-        let b = props.breakdown as BreakdownCohort;
+        const b = props.breakdown as BreakdownCohort;
         if (b.cohortId) {
             return lexiconStore.findCohortById(b.cohortId).name;
         }

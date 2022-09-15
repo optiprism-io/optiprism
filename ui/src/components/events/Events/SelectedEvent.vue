@@ -258,8 +258,8 @@ const removeFilter = (filterIdx: number): void => {
 }
 
 const addFilter = (): void => {
-    let event = props.event
-    let emptyFilter = event.filters.find((filter): boolean => filter.propRef === undefined)
+    const event = props.event
+    const emptyFilter = event.filters.find((filter): boolean => filter.propRef === undefined)
 
     if (emptyFilter) {
         return
@@ -278,7 +278,7 @@ const addFilter = (): void => {
 };
 
 const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => {
-    let event = props.event
+    const event = props.event
     let valuesList: PropertyValuesList200ResponseValues = []
 
     try {
@@ -305,20 +305,20 @@ const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => 
 }
 
 const changeFilterOperation = (filterIdx: number, opId: OperationId) => {
-    let event = props.event
+    const event = props.event
 
     event.filters[filterIdx].opId = opId
     event.filters[filterIdx].values = []
 }
 
 const addFilterValue = (filterIdx: number, value: Value): void => {
-    let event = props.event
+    const event = props.event
 
     event.filters[filterIdx].values.push(value)
 }
 
 const removeFilterValue = (filterIdx: number, value: Value): void => {
-    let event = props.event
+    const event = props.event
 
     event.filters[filterIdx].values = props.event.filters[filterIdx].values.filter(v => v !== value)
 };
@@ -342,7 +342,7 @@ const removeBreakdown = (breakdownIdx: number): void => {
 };
 
 const eventName = (ref: EventRef): string => {
-    let event = lexiconStore.findEventById(ref.id)
+    const event = lexiconStore.findEventById(ref.id)
 
     switch (ref.type) {
         case EventType.Regular:

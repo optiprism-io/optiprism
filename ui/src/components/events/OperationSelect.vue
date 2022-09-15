@@ -68,7 +68,7 @@ const items = computed(() => {
     return ret;
 });
 
-let selectedItem = computed((): OperationId | undefined => {
+const selectedItem = computed((): OperationId | undefined => {
     if (props.selected) {
         return props.selected;
     } else {

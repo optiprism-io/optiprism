@@ -27,11 +27,7 @@ const routes = [
         children: [
             {
                 path: '',
-                name: 'main',
-                component: () => import('@/pages/Index.vue'),
-                redirect: () => {
-                    return { name: pagesMap.reportsEventSegmentation.name }
-                },
+                redirect: { name: pagesMap.reportsEventSegmentation.name }
             },
             {
                 path: 'users',

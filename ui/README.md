@@ -7,7 +7,7 @@ Startup and installation using standard commands from the vite (scripts in packa
 
 ## Info
 - Сoding style is based on rules from `.eslintrc.js`
-- Сheck with command before deployment: `$ npm run lint` and `$ npm run build`
+- Сheck with command before deployment: `$ yarn lint` and `$ yarn build`
 - For styles and html we use [Patternfly](https://www.patternfly.org/v4/) and [FloatingVue](https://github.com/Akryum/floating-vue) for floating elements such as popups, tooltips, dropdowns etc.
 
 ## Structure

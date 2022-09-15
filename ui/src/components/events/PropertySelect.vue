@@ -51,7 +51,7 @@ const getEventProperties = (eventRef: EventRef) => {
         const eventProperties = lexiconStore.findEventProperties(eventRef.id)
 
         if (eventProperties.length) {
-            let items: Item<PropertyRef, null>[] = [];
+            const items: Item<PropertyRef, null>[] = [];
             eventProperties.forEach((prop: Property): void => {
                 const propertyRef: PropertyRef = {
                     type: PropertyType.Event,
@@ -70,7 +70,7 @@ const getEventProperties = (eventRef: EventRef) => {
         const eventCustomProperties = lexiconStore.findEventCustomProperties(eventRef.id);
 
         if (eventCustomProperties.length) {
-            let items: Item<PropertyRef, null>[] = [];
+            const items: Item<PropertyRef, null>[] = [];
 
             eventCustomProperties.forEach((prop: CustomProperty): void => {
                 if (prop.id) {
@@ -100,7 +100,7 @@ const items = computed(() => {
     let ret: Group<Item<PropertyRef, null>[]>[] = [];
 
     if (lexiconStore.eventProperties.length) {
-        let items: Item<PropertyRef, null>[] = [];
+        const items: Item<PropertyRef, null>[] = [];
         lexiconStore.eventProperties.forEach((prop: Property): void => {
             const propertyRef: PropertyRef = {
                 type: PropertyType.Event,
@@ -118,7 +118,7 @@ const items = computed(() => {
     }
 
     if (lexiconStore.userProperties.length) {
-        let items: Item<PropertyRef, null>[] = [];
+        const items: Item<PropertyRef, null>[] = [];
         lexiconStore.userProperties.forEach((prop: Property): void => {
             const propertyRef: PropertyRef = {
                 type: PropertyType.User,

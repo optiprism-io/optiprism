@@ -42,15 +42,15 @@ const eventStore = useEventsStore();
 const events = eventStore.events;
 
 const items = computed(() => {
-    let ret: Group<Item<BreakdownCohort | BreakdownUserProperty | BreakdownUserCustomProperty | BreakdownEventCommonProperty, null>[]>[] = [];
+    const ret: Group<Item<BreakdownCohort | BreakdownUserProperty | BreakdownUserCustomProperty | BreakdownEventCommonProperty, null>[]>[] = [];
     {
-        let items: Item<BreakdownCohort, null>[] = [];
+        const items: Item<BreakdownCohort, null>[] = [];
         items.push({ item: newBreakdownCohort(), name: 'Cohort' });
         ret.push({ name: '', items: items });
     }
 
     if (lexiconStore.userProperties.length > 0) {
-        let items: Item<BreakdownUserProperty, null>[] = [];
+        const items: Item<BreakdownUserProperty, null>[] = [];
         lexiconStore.userProperties.forEach((prop: Property): void => {
             items.push({
                 item: newBreakdownUserProperty(prop.id),
@@ -61,7 +61,7 @@ const items = computed(() => {
     }
 
     if (lexiconStore.userCustomProperties.length > 0) {
-        let items: Item<BreakdownUserCustomProperty, null>[] = [];
+        const items: Item<BreakdownUserCustomProperty, null>[] = [];
         lexiconStore.userCustomProperties.forEach((prop: UserCustomProperty): void => {
             items.push({
                 item: newBreakdownUserCustomProperty(prop.id),
@@ -72,16 +72,16 @@ const items = computed(() => {
     }
 
     if (events.length > 0) {
-        let firstProps = lexiconStore.findEventProperties(events[0].ref.id);
-        let firstCustomProps = lexiconStore.findEventCustomProperties(events[0].ref.id);
+        const firstProps = lexiconStore.findEventProperties(events[0].ref.id);
+        const firstCustomProps = lexiconStore.findEventCustomProperties(events[0].ref.id);
         if (firstProps.length > 0) {
             for (let i = 1; i < events.length; i++) {
-                let props = lexiconStore.findEventProperties(events[i].ref.id);
-                let rem: number[] = [];
+                const props = lexiconStore.findEventProperties(events[i].ref.id);
+                const rem: number[] = [];
                 for (let j = 0; j < firstProps.length; j++) {
-                    let firstProp = firstProps[j];
+                    const firstProp = firstProps[j];
                     let found = false;
-                    for (let curProp of props) {
+                    for (const curProp of props) {
                         if (
                             firstProp.name === curProp.name &&
                             firstProp.isArray === curProp.isArray &&
@@ -101,12 +101,12 @@ const items = computed(() => {
 
             if (firstCustomProps.length > 0) {
                 for (let i = 1; i < events.length; i++) {
-                    let props = lexiconStore.findEventCustomProperties(events[i].ref.id);
-                    let rem: number[] = [];
+                    const props = lexiconStore.findEventCustomProperties(events[i].ref.id);
+                    const rem: number[] = [];
                     for (let j = 0; j < firstCustomProps.length; j++) {
-                        let firstProp = firstCustomProps[j];
+                        const firstProp = firstCustomProps[j];
                         let found = false;
-                        for (let curProp of props) {
+                        for (const curProp of props) {
                             if (
                                 firstProp.name === curProp.name &&
                                 firstProp.isArray === curProp.isArray
@@ -126,7 +126,7 @@ const items = computed(() => {
         }
 
         if (firstProps.length > 0) {
-            let items: Item<BreakdownEventCommonProperty, null>[] = [];
+            const items: Item<BreakdownEventCommonProperty, null>[] = [];
             firstProps.forEach(prop =>
                 items.push({
                     item: newBreakdownEventCommonProperty(prop.id),
@@ -138,7 +138,7 @@ const items = computed(() => {
         }
 
         if (firstCustomProps.length > 0) {
-            let items: Item<BreakdownEventCommonProperty, null>[] = [];
+            const items: Item<BreakdownEventCommonProperty, null>[] = [];
             firstCustomProps.forEach(prop => {
                 if (prop.id) {
                     items.push({
@@ -158,7 +158,7 @@ const items = computed(() => {
     return ret;
 });
 
-let selectedItem = computed(() => {
+const selectedItem = computed(() => {
     if (props.selected) {
         return props.selected;
     } else {
