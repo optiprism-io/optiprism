@@ -123,6 +123,370 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /v1/organizations/{organization_id}/projects/{project_id}/dashboards:
+    get:
+      summary: Dashboards list
+      operationId: dashboardsList
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - dashboards
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200':
+          description: dashboard list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      dashboards:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Dashboard'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      summary: Create dashboard
+      operationId: createDashboard
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - dashboards
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDashboardRequest'
+      responses:
+        201:
+          description: report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}:
+    get:
+      summary: Get dashboard
+      operationId: getDashboard
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - dashboards
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: dashboard_id
+          in: path
+          description: Dashboard ID
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      summary: Update dashboard
+      operationId: updateDashboard
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - dashboards
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: dashboard_id
+          in: path
+          description: Report ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDashboardRequest'
+      responses:
+        200:
+          description: dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      summary: Delete dashboard
+      operationId: deleteDashboard
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - dashboards
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: dashboard_id
+          in: path
+          description: Dashboard ID
+          required: true
+          schema:
+            type: number
+      responses:
+        204:
+          description: deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/organizations/{organization_id}/projects/{project_id}/reports:
+    get:
+      summary: Reports list
+      operationId: reportsList
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - reports
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200':
+          description: report list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - properties:
+                      dashboards:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Report'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      summary: Create report
+      operationId: createReport
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - reports
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportRequest'
+      responses:
+        201:
+          description: report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/organizations/{organization_id}/projects/{project_id}/reports/{report_id}:
+    get:
+      summary: Get report
+      operationId: getReport
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - reports
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: report_id
+          in: path
+          description: Report ID
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      summary: Update report
+      operationId: updateReport
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - reports
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: report_id
+          in: path
+          description: Report ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReportRequest'
+      responses:
+        200:
+          description: event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      summary: Delete report
+      operationId: deleteReport
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - reports
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+        - name: report_id
+          in: path
+          description: Report ID
+          required: true
+          schema:
+            type: number
+      responses:
+        204:
+          description: deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
   /v1/organizations/{organization_id}/projects/{project_id}/schema/events:
     get:
       summary: Events list
@@ -1367,6 +1731,241 @@ components:
             properties:
               id:
                 type: integer
+
+    CreateDashboardRequest:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+            description: event tags
+        name:
+          type: string
+          description: dashboard name
+        description:
+          type: string
+          description: description
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              panels:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    span:
+                      type: integer
+                      format: int64
+                      description: span
+                    type:
+                      type: string
+                      enum: [ 'report' ]
+                    reportId:
+                      type: integer
+                      format: int64
+
+    UpdateDashboardRequest:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+            description: event tags
+        name:
+          type: string
+          description: dashboard name
+        description:
+          type: string
+          description: description
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              panels:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    span:
+                      type: integer
+                      format: int64
+                      description: span
+                    type:
+                      type: string
+                      enum: [ 'report' ]
+                    reportId:
+                      type: integer
+                      format: int64
+
+    Dashboard:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: dashboard unique id
+        createdAt:
+          type: string
+          format: date-time
+          description: create date
+        updatedAt:
+          type: string
+          format: date-time
+          description: update (once updated)
+        createdBy:
+          type: integer
+          format: int64
+          description: id of creator User
+        updatedBy:
+          type: integer
+          format: int64
+          description: id of updater User
+        projectId:
+          type: integer
+          format: int64
+          description: project id
+        tags:
+          type: array
+          items:
+            type: string
+            description: event tags
+        name:
+          type: string
+          description: event name. Must be unique among all project events (including custom). The name field is used while events ingesting.
+        description:
+          type: string
+          description: description
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              panels:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    span:
+                      type: integer
+                      format: int64
+                      description: project id
+                    type:
+                      type: string
+                      enum: ['report']
+                    reportId:
+                      type: integer
+                      format: int64
+                    report:
+                      $ref: '#/components/schemas/Report'
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: report unique id
+        createdAt:
+          type: string
+          format: date-time
+          description: create date
+        updatedAt:
+          type: string
+          format: date-time
+          description: update (once updated)
+        createdBy:
+          type: integer
+          format: int64
+          description: id of creator User
+        updatedBy:
+          type: integer
+          format: int64
+          description: id of updater User
+        tags:
+          type: array
+          items:
+            type: string
+            description: event tags
+        name:
+          type: string
+        description:
+          type: string
+          description: description
+        report:
+          type: object
+          allOf:
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - eventSegmentation
+                    - funnel
+            - type: object
+              oneOf:
+                - $ref: '#/components/schemas/EventSegmentation'
+                - $ref: '#/components/schemas/FunnelQuery'
+
+    CreateReportRequest:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+            description: event tags
+        name:
+          type: string
+        description:
+          type: string
+          description: description
+        report:
+          type: object
+          allOf:
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - eventSegmentation
+                    - funnel
+            - type: object
+              oneOf:
+                - $ref: '#/components/schemas/EventSegmentation'
+                - $ref: '#/components/schemas/FunnelQuery'
+
+    UpdateReportRequest:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+            description: event tags
+        name:
+          type: string
+        description:
+          type: string
+          description: description
+        report:
+          type: object
+          allOf:
+            - type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - eventSegmentation
+                    - funnel
+            - type: object
+              oneOf:
+                - $ref: '#/components/schemas/EventSegmentation'
+                - $ref: '#/components/schemas/FunnelQuery'
 
     Event:
       type: object
