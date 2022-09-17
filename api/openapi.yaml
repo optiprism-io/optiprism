@@ -244,7 +244,7 @@ paths:
         - $ref: '#/components/parameters/ProjectID'
         - name: dashboard_id
           in: path
-          description: Report ID
+          description: Dashboard ID
           required: true
           schema:
             type: string
