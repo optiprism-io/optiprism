@@ -4,16 +4,25 @@
             class="pf-u-mb-md"
             :items="items"
         />
-        <router-view />
+        <div
+            v-if="reportsStore.loading"
+            class="pf-u-h-66vh pf-u-display-flex pf-u-align-items-center pf-u-justify-content-center"
+        >
+            <UiSpinner :size="'xl'" />
+        </div>
+        <router-view v-else />
     </section>
 </template>
 
 <script lang="ts" setup>
 import {computed, inject, onMounted} from 'vue'
 import { useRoute } from 'vue-router'
+import { pagesMap } from '@/router'
 import { useLexiconStore } from '@/stores/lexicon'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
-import { pagesMap } from '@/router'
+import { useReportsStore } from '@/stores/reports/reports'
+
+import UiSpinner from '@/components/uikit/UiSpinner.vue'
 
 const i18n = inject<any>('i18n')
 const route = useRoute()
@@ -48,6 +57,7 @@ const items = computed(() => {
 
 const lexiconStore = useLexiconStore();
 const eventsStore = useEventsStore();
+const reportsStore = useReportsStore()
 
 onMounted(async () => {
     await lexiconStore.getEvents();
@@ -55,5 +65,7 @@ onMounted(async () => {
     await lexiconStore.getUserProperties();
 
     await eventsStore.initPeriod();
+
+    reportsStore.getList()
 });
 </script>

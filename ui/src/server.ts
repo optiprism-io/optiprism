@@ -23,6 +23,7 @@ export default function ({ environment = 'development' } = {}) {
                 customEvents: customEventsMocks,
                 eventProperties: eventPropertiesMocks,
                 userProperties: userPropertiesMocks,
+                reports: [],
             })
         },
 
@@ -162,6 +163,14 @@ export default function ({ environment = 'development' } = {}) {
             this.get('/chart', (): any[] => {
                 return splineChartMocks;
             });
+
+
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports`, (schema) => {
+                return {
+                    dashboards: schema.db.reports,
+                    meta: {}
+                }
+            })
 
             this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/reports/event-segmentation`, (_, request) => {
                 const body = JSON.parse(request.requestBody);
