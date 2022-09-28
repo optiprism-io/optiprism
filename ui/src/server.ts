@@ -1,4 +1,6 @@
 import { createServer, Response } from 'miragejs'
+import { customAlphabet } from 'nanoid'
+
 import { DataType, BasicLogin200Response } from '@/api'
 import { BASE_PATH } from '@/api/base'
 import { EventStatus, UserCustomProperty } from '@/types/events';
@@ -10,7 +12,10 @@ import eventSegmentationsMocks from '@/mocks/eventSegmentations/eventSegmentatio
 import eventMocks from '@/mocks/eventSegmentations/events.json';
 import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
 import customEventsMocks from '@/mocks/eventSegmentations/customEvents.json';
+import reportsMocks from '@/mocks/reports/reports.json'
 
+const alphabet = '0123456789';
+const nanoid = customAlphabet(alphabet, 4);
 const accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
 const refreshToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Im5pa28ga3VzaCIsImlhdCI6MTUxNjIzOTAyMn0.FzpmXmStgiYEO15ZbwwPafVRQSOCO_xidYjrjRvVIbQ'
 const csrfToken = 'CIwNZNlR4XbisJF39I8yWnWX9wX4WFoz'
@@ -23,7 +28,7 @@ export default function ({ environment = 'development' } = {}) {
                 customEvents: customEventsMocks,
                 eventProperties: eventPropertiesMocks,
                 userProperties: userPropertiesMocks,
-                reports: [],
+                reports: reportsMocks,
             })
         },
 
@@ -170,6 +175,15 @@ export default function ({ environment = 'development' } = {}) {
                     dashboards: schema.db.reports,
                     meta: {}
                 }
+            })
+
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports`, (schema, request) => {
+                const body = JSON.parse(request.requestBody);
+
+                return schema.db.reports.insert({
+                    id: nanoid(),
+                    ...body,
+                })
             })
 
             this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/reports/event-segmentation`, (_, request) => {

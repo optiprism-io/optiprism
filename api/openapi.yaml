@@ -439,7 +439,7 @@ paths:
           description: Report ID
           required: true
           schema:
-            type: string
+            type: number
       requestBody:
         required: true
         content:
@@ -3116,7 +3116,6 @@ components:
         - $ref: '#/components/schemas/SegmentConditionHadPropertyValue'
         - $ref: '#/components/schemas/SegmentConditionDidEvent'
         - $ref: '#/components/schemas/SegmentConditionFunnel'
-        - $ref: '#/components/schemas/SegmentConditionRetained'
 
     TimeBetween:
       type: object
@@ -3455,9 +3454,6 @@ components:
           type: integer
         bucket:
           $ref: '#/components/schemas/TimeUnit'
-
-    SegmentConditionRetained:
-      type: object
 
     QuerySimple:
       type: object

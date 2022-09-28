@@ -1,63 +1,54 @@
 <template>
-    <ToolsLayout>
-        <template #title>
-            <div class="pf-u-display-flex pf-u-justify-content-space-between pf-u-align-items-center">
-                <span>{{ $t('funnels.untitledFunnel') }}</span>
-                <UiSwitch
-                    class="pf-u-ml-auto"
-                    :value="commonStore.syncReports"
-                    :label="$t('reports.sync')"
-                    @input="(value: boolean) => commonStore.syncReports = value"
-                />
-            </div>
+    <TemplateReport>
+        <template #content>
+            <GridContainer>
+                <GridItem :col-lg="6">
+                    <UiCardContainer :title="$t('funnels.steps.title')">
+                        <UiCardTitle>
+                            {{ $t('funnels.steps.title') }}
+                        </UiCardTitle>
+                        <UiCardBody>
+                            <StepsList />
+                        </UiCardBody>
+                        <UiCardTitle>
+                            {{ $t('criteria.label') }}
+                        </UiCardTitle>
+                        <UiCardBody class="pf-l-flex pf-m-column">
+                            <TimeWindow />
+                            <HoldingConstantList />
+                            <ExcludeStepsList />
+                        </UiCardBody>
+                        <UiCardBody class="pf-l-flex">
+                            <ExcludeStepSelect />
+                            <HoldingConstantSelect />
+                        </UiCardBody>
+                    </UiCardContainer>
+                </GridItem>
+                <GridItem :col-lg="6">
+                    <UiCard :title="$t('funnels.userSegments')">
+                        <Segments />
+                    </UiCard>
+                </GridItem>
+                <GridItem :col-lg="6">
+                    <UiCardContainer>
+                        <FilterReports />
+                    </UiCardContainer>
+                </GridItem>
+                <GridItem :col-lg="6">
+                    <UiCard :title="$t('funnels.breakdowns')">
+                        <Breakdowns />
+                    </UiCard>
+                </GridItem>
+            </GridContainer>
         </template>
-
-        <UiCardContainer :title="$t('funnels.steps.title')">
-            <UiCardTitle>
-                {{ $t('funnels.steps.title') }}
-            </UiCardTitle>
-
-            <UiCardBody>
-                <StepsList />
-            </UiCardBody>
-
-            <UiCardTitle>
-                {{ $t('criteria.label') }}
-            </UiCardTitle>
-
-            <UiCardBody class="pf-l-flex pf-m-column">
-                <TimeWindow />
-                <HoldingConstantList />
-                <ExcludeStepsList />
-            </UiCardBody>
-
-            <UiCardBody class="pf-l-flex">
-                <ExcludeStepSelect />
-                <HoldingConstantSelect />
-            </UiCardBody>
-        </UiCardContainer>
-
-        <UiCard :title="$t('funnels.userSegments')">
-            <Segments />
-        </UiCard>
-
-        <UiCardContainer>
-            <FilterReports />
-        </UiCardContainer>
-
-        <UiCard :title="$t('funnels.breakdowns')">
-            <Breakdowns />
-        </UiCard>
-
-        <template #main>
+        <template #views>
             <FunnelsViews />
         </template>
-    </ToolsLayout>
+    </TemplateReport>
 </template>
 
 <script setup lang="ts">
 import { onUnmounted } from 'vue'
-import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
 import UiCardContainer from '@/components/uikit/UiCard/UiCardContainer.vue';
 import TimeWindow from '@/components/funnels/time-window/TimeWindow.vue';
 import UiCardTitle from '@/components/uikit/UiCard/UiCardTitle.vue';
@@ -68,11 +59,13 @@ import ExcludeStepsList from '@/components/funnels/exclude/ExcludeStepsList.vue'
 import HoldingConstantSelect from '@/components/funnels/holding/HoldingConstantSelect.vue';
 import ExcludeStepSelect from '@/components/funnels/exclude/ExcludeStepSelect.vue';
 import HoldingConstantList from '@/components/funnels/holding/HoldingConstantList.vue';
-import UiSwitch from '@/components/uikit/UiSwitch.vue'
 import StepsList from '@/components/funnels/steps/StepsList.vue';
 import Segments from '@/components/events/Segments/Segments.vue';
 import FunnelsViews from '@/components/funnels/view/FunnelsViews.vue';
 import FilterReports from '@/components/events/FiltersReports.vue'
+import TemplateReport from '@/components/events/TemplateReport.vue'
+import GridContainer from '@/components/grid/GridContainer.vue'
+import GridItem from '@/components/grid/GridItem.vue'
 import { funnelsToEvents } from '@/utils/reportsMappings'
 
 import { useEventsStore } from '@/stores/eventSegmentation/events'

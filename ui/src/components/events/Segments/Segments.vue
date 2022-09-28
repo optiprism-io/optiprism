@@ -48,6 +48,7 @@ import Segment from '@/components/events/Segments/Segment.vue'
 import { conditions } from '@/configs/events/segmentCondition'
 import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
 import { PropertyRef } from '@/types/events'
+import { DidEventCountTypeEnum } from '@/api'
 const i18n = inject<any>('i18n')
 
 const segmentsStore = useSegmentsStore()
@@ -138,7 +139,7 @@ provide('changeEventCondition', (payload: ChangeEventCondition) => {
         idx: payload.idx,
         idxParent: payload.idxParent,
         value: {
-            id: 'count',
+            id: DidEventCountTypeEnum.DidEventCount,
             name: i18n.$t('events.aggregates.count')
         }
     })

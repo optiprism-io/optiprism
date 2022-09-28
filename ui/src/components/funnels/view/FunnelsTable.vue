@@ -11,7 +11,7 @@
 <script lang="ts" setup>
 import {computed, inject} from 'vue';
 import {Column, ColumnGroup, Row} from '@/components/uikit/UiTable/UiTable';
-import {I18N} from '@/plugins/i18n';
+import {I18N} from '@/utils/i18n';
 import {useEventName} from '@/helpers/useEventName';
 import {useStepsStore} from '@/stores/funnels/steps';
 import { DataTableResponseColumnsInner } from '@/api';

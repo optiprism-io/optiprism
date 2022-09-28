@@ -59,7 +59,7 @@ import {
     PropertyValuesListRequestEventTypeEnum,
 } from '@/api'
 
-interface Segment {
+export interface Segment {
     name: string
     conditions?: Condition[]
 }
@@ -96,7 +96,7 @@ const computedValueAggregate = (item: Condition): DidEventCount | DidEventRelati
     const time = computedValueTime(item)
     const operation = item.opId as PropertyFilterOperation
 
-    if (item.aggregate?.id === 'aggregateProperty' && item.propRef) {
+    if (item.aggregate?.id === DidEventAggregatePropertyTypeEnum.AggregateProperty && item.propRef) {
         const property: Property = item.propRef.type === PropertyTypeEnum.Event ? lexiconStore.findEventPropertyById(item.propRef.id) : lexiconStore.findUserPropertyById(item.propRef.id)
 
         return {
@@ -117,7 +117,7 @@ const computedValueAggregate = (item: Condition): DidEventCount | DidEventRelati
         }
     }
 
-    if (item.aggregate?.id === 'relativeCount' && item.compareEvent) {
+    if (item.aggregate?.id === DidEventRelativeCountTypeEnum.DidEventRelativeCount && item.compareEvent) {
         const eventItem: Event = item.compareEvent.ref.type === EventType.Regular ? lexiconStore.findEventById(item.compareEvent.ref.id) : lexiconStore.findCustomEventById(item.compareEvent.ref.id)
 
         return {
@@ -125,6 +125,7 @@ const computedValueAggregate = (item: Condition): DidEventCount | DidEventRelati
             operation,
             time,
             rightEvent: {
+                eventId: eventItem.id,
                 eventName: eventItem.name,
                 eventType: item.compareEvent.ref.type === EventRefOneOfEventTypeEnum.Regular ? EventRefOneOf1EventTypeEnum.Custom : EventRefOneOfEventTypeEnum.Regular,
             },
@@ -152,11 +153,11 @@ export const useSegmentsStore = defineStore('segments', {
                     name: segment.name,
                     conditions: segment.conditions ? segment.conditions.reduce((items: SegmentCondition[], item) => {
                         if (item.action?.id === SegmentConditionDidEventTypeEnum.DidEvent && item.event) {
-                            if (item?.aggregate?.id === 'relativeCount' && !item.compareEvent) {
+                            if (item?.aggregate?.id === DidEventRelativeCountTypeEnum.DidEventRelativeCount && !item.compareEvent) {
                                 return items
                             }
 
-                            if (item?.aggregate?.id === 'aggregateProperty' && !item.propRef) {
+                            if (item?.aggregate?.id === DidEventAggregatePropertyTypeEnum.AggregateProperty && !item.propRef) {
                                 return items
                             }
 
@@ -165,6 +166,7 @@ export const useSegmentsStore = defineStore('segments', {
                             const condition: SegmentConditionDidEvent = {
                                 type: SegmentConditionDidEventTypeEnum.DidEvent,
                                 eventName: eventItem.name,
+                                eventId: eventItem.id,
                                 eventType: item.event.ref.type === EventType.Custom ? SegmentConditionDidEventEventTypeEnum.Custom : undefined,
                                 filters: item.filters.filter(item => item.propRef).reduce((items: EventFilterByProperty[], filterRef) => {
                                     if (filterRef.propRef) {

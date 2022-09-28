@@ -32,7 +32,7 @@
 
 <script setup lang="ts">
 import { computed, inject } from 'vue'
-import { I18N } from '@/plugins/i18n'
+import { I18N } from '@/utils/i18n'
 import UiCardTitle from '@/components/uikit/UiCard/UiCardTitle.vue'
 import UiCardBody from '@/components/uikit/UiCard/UiCardBody.vue'
 import FilterGroupsList from '@/components/funnels/filters/FilterGroupsList.vue'

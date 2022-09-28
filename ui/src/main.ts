@@ -22,7 +22,7 @@ app.use(createPinia());
 FloatingVue.options.disposeTimeout = 300
 app.use(FloatingVue);
 app.use(uikitPlugin);
-app.use(i18nPlugin, lang.en);
+app.use(i18nPlugin);
 app.use(router);
 
 app.directive('click-outside', {
@@ -39,6 +39,7 @@ app.directive('click-outside', {
     }
 })
 
+app.config.globalProperties.loadDictionary(lang.en)
 app.mount('#app');
 
 app.config.errorHandler = (err, vm, info) => {

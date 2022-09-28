@@ -1,12 +1,22 @@
 import { defineStore } from 'pinia'
 import reportsService from '@/api/services/reports.service'
 import { useCommonStore } from '@/stores/common'
-import { Report } from '@/api'
+import { useEventsStore } from '@/stores/eventSegmentation/events'
+import { useFunnelsStore } from '@/stores/funnels/funnels'
+import { useFilterGroupsStore } from '@/stores/reports/filters'
+import { useBreakdownsStore } from '@/stores/reports/breakdowns'
+import { useSegmentsStore } from '@/stores/reports/segments'
+import {
+    Report,
+    ReportReportTypeEnum,
+    FunnelQueryChartType,
+} from '@/api'
 
 type Reports = {
     list: Report[]
     loading: boolean
-    reportId: number
+    saveLoading: boolean
+    reportId: number | string
 }
 
 export const useReportsStore = defineStore('reports', {
@@ -14,11 +24,20 @@ export const useReportsStore = defineStore('reports', {
         list: [],
         loading: true,
         reportId: 0,
+        saveLoading: false,
     }),
-    getters: {},
+    getters: {
+        activeReport(): null | Report {
+            const report = this.list.find(item => item.id && String(item.id) === String(this.reportId))
+
+            return report ?? null
+        },
+        reportsId(): string[] {
+            return this.list.map(item => String(item.id))
+        },
+    },
     actions: {
         async getList() {
-            this.loading = true
             const commonStore = useCommonStore()
 
             try {
@@ -30,8 +49,45 @@ export const useReportsStore = defineStore('reports', {
             } catch(e) {
                 throw new Error('error reportsList');
             }
+        },
+        async createReport(name: string, type: ReportReportTypeEnum) {
+            this.saveLoading = true
+            const commonStore = useCommonStore()
+            const eventsStore = useEventsStore()
+            const funnelsStore = useFunnelsStore()
+            const breakdownsStore = useBreakdownsStore()
+            const filterGroupsStore = useFilterGroupsStore()
+            const segmentsStore = useSegmentsStore()
 
-            this.loading = false
+            try {
+                const res = await reportsService.createReport(commonStore.organizationId, commonStore.projectId, {
+                    name,
+                    report: {
+                        type,
+                        time: type === ReportReportTypeEnum.EventSegmentation ? eventsStore.timeRequest : funnelsStore.timeRequest,
+                        group: eventsStore.group,
+                        intervalUnit: eventsStore.controlsGroupBy,
+                        chartType: eventsStore.chartType as FunnelQueryChartType,
+                        analysis: {
+                            type: 'linear',
+                        },
+                        events: type === ReportReportTypeEnum.EventSegmentation ? eventsStore.propsForEventSegmentationResult.events : [],
+                        filters: filterGroupsStore.filters,
+                        breakdowns: breakdownsStore.breakdownsItems,
+                        segments: segmentsStore.segmentationItems,
+
+                        // TODO funnels
+                    }
+                })
+
+                if (res.data?.id) {
+                    this.reportId = res.data.id
+                }
+            } catch(e) {
+                throw new Error('error reportsList');
+            }
+
+            this.saveLoading = false
         }
     },
 })
