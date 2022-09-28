@@ -31,7 +31,7 @@ paths:
       summary: Basic login
       operationId: basicLogin
       tags:
-        - auth
+        - session
       requestBody:
         required: true
         content:
@@ -73,7 +73,7 @@ paths:
       summary: Refresh access token
       operationId: authAccess
       tags:
-        - auth
+        - session
       requestBody:
         required: true
         content:
@@ -110,7 +110,7 @@ paths:
       summary: Log out
       operationId: logout
       tags:
-        - auth
+        - session
       responses:
         '204':
           description: logout
