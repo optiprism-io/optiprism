@@ -18,14 +18,14 @@ impl QueryProvider {
     pub async fn event_segmentation(
         &self,
         ctx: Context,
-        _organization_id: u64,
+        organization_id: u64,
         project_id: u64,
         req: EventSegmentation,
     ) -> Result<DataTable> {
         let lreq = req.try_into()?;
         let result = self
             .query
-            .event_segmentation(ctx.into_query_context(project_id), lreq)
+            .event_segmentation(query::Context::new(organization_id,project_id), lreq)
             .await?;
 
         result.try_into()
@@ -41,7 +41,7 @@ impl QueryProvider {
         let lreq = req.try_into()?;
         let result = self
             .query
-            .property_values(ctx.into_query_context(project_id), lreq)
+            .property_values(query::Context::new(organization_id,project_id), lreq)
             .await?;
 
         result.try_into()

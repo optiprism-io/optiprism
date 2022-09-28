@@ -9,7 +9,7 @@ pub mod organizations;
 pub mod projects;
 pub mod properties;
 pub mod store;
-// pub mod types;
+pub mod teams;
 
 pub use crate::metadata::Metadata;
 pub use error::Result;

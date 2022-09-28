@@ -1,15 +1,16 @@
 use crate::{
-    auth::types::{LogInRequest, SignUpRequest, TokensResponse},
+    auth::types::{LogInRequest, SignUpRequest},
     AuthProvider, Context, Result,
 };
 use axum::{extract::Extension, routing::post, AddExtensionLayer, Json, Router};
 use std::sync::Arc;
+use crate::auth::types::TokenResponse;
 
 async fn sign_up(
     ctx: Context,
     Extension(provider): Extension<Arc<AuthProvider>>,
     Json(request): Json<SignUpRequest>,
-) -> Result<Json<TokensResponse>> {
+) -> Result<Json<TokenResponse>> {
     Ok(Json(provider.sign_up(ctx, request).await?))
 }
 

@@ -11,10 +11,7 @@ use common::error::CommonError;
 use serde::Serialize;
 use thiserror::Error;
 
-use metadata::error::{
-    AccountError, CustomEventError, DatabaseError, DictionaryError, EventError, MetadataError,
-    OrganizationError, ProjectError, PropertyError, StoreError,
-};
+use metadata::error::{AccountError, CustomEventError, DatabaseError, DictionaryError, EventError, MetadataError, OrganizationError, ProjectError, PropertyError, StoreError, TeamError};
 use query::error::QueryError;
 
 pub type Result<T> = result::Result<T, PlatformError>;
@@ -31,6 +28,10 @@ pub enum AuthError {
 pub enum PlatformError {
     #[error("bad request: {0:?}")]
     BadRequest(String),
+    #[error("unauthorized")]
+    Unauthorized,
+    #[error("forbidden")]
+    Forbidden,
     #[error("internal: {0:?}")]
     Internal(String),
     #[error("serde: {0:?}")]
@@ -43,7 +44,7 @@ pub enum PlatformError {
     Query(#[from] QueryError),
     #[error("common: {0:?}")]
     Common(#[from] CommonError),
-    #[error("auth: {0:?}")]
+    #[error("session: {0:?}")]
     Auth(#[from] AuthError),
 }
 
@@ -69,6 +70,10 @@ impl ErrorResponse {
 
     pub fn forbidden(err: Box<dyn error::Error>) -> (StatusCode, Self) {
         ErrorResponse::new(err, StatusCode::FORBIDDEN)
+    }
+
+    pub fn unauthorized(err: Box<dyn error::Error>) -> (StatusCode, Self) {
+        ErrorResponse::new(err, StatusCode::UNAUTHORIZED)
     }
 
     pub fn conflict(err: Box<dyn error::Error>) -> (StatusCode, Self) {
@@ -175,6 +180,10 @@ impl IntoResponse for PlatformError {
                     CustomEventError::DuplicateEvent => ErrorResponse::conflict(Box::new(err)),
                     CustomEventError::EmptyEvents => ErrorResponse::bad_request(Box::new(err)),
                 },
+                MetadataError::Team(err) => match err {
+                    TeamError::TeamNotFound(_) => ErrorResponse::not_found(Box::new(err)),
+                    TeamError::TeamAlreadyExist(_) => ErrorResponse::conflict(Box::new(err)),
+                }
             },
             PlatformError::Query(err) => match err {
                 QueryError::Internal(_) => ErrorResponse::internal(Box::new(err)),
@@ -198,7 +207,9 @@ impl IntoResponse for PlatformError {
             PlatformError::Auth(err) => match err {
                 AuthError::InvalidCredentials => ErrorResponse::forbidden(Box::new(err)),
                 AuthError::InvalidToken => ErrorResponse::forbidden(Box::new(err))
-            }
+            },
+            PlatformError::Unauthorized => ErrorResponse::unauthorized(Box::new(err)),
+            PlatformError::Forbidden => ErrorResponse::forbidden(Box::new(err)),
         };
 
         (a, Json(b)).into_response()

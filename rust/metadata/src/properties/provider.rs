@@ -1,13 +1,14 @@
 use crate::error::{MetadataError, PropertyError, StoreError};
-use crate::metadata::{list, ListResponse};
+use crate::metadata::{ListResponse};
 use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
 use crate::store::index::hash_map::HashMap;
-use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
+use crate::store::{Store};
 use crate::{error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key, org_proj_ns};
 
 #[derive(Clone, Debug)]
 pub enum Namespace {
@@ -47,7 +48,7 @@ fn index_name_key(
     ns: &Namespace,
     name: &str,
 ) -> Option<Vec<u8>> {
-    Some(make_index_key(organization_id, project_id, ns.as_bytes(), IDX_NAME, name).to_vec())
+    Some(make_index_key(org_proj_ns(organization_id, project_id, ns.as_bytes()).as_slice(), IDX_NAME, name).to_vec())
 }
 
 fn index_display_name_key(
@@ -58,9 +59,7 @@ fn index_display_name_key(
 ) -> Option<Vec<u8>> {
     display_name.map(|v| {
         make_index_key(
-            organization_id,
-            project_id,
-            ns.as_bytes(),
+            org_proj_ns(organization_id, project_id, ns.as_bytes()).as_slice(),
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
@@ -136,9 +135,7 @@ impl Provider {
         let id = self
             .store
             .next_seq(make_id_seq_key(
-                organization_id,
-                project_id,
-                self.ns.as_bytes(),
+                org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice()
             ))
             .await?;
         let created_at = Utc::now();
@@ -166,7 +163,7 @@ impl Provider {
         let data = serialize(&prop)?;
         self.store
             .put(
-                make_data_value_key(organization_id, project_id, self.ns.as_bytes(), prop.id),
+                make_data_value_key(org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(), prop.id),
                 &data,
             )
             .await?;
@@ -200,7 +197,7 @@ impl Provider {
         project_id: u64,
         id: u64,
     ) -> Result<Property> {
-        let key = make_data_value_key(organization_id, project_id, self.ns.as_bytes(), id);
+        let key = make_data_value_key(org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(), id);
 
         match self.store.get(&key).await? {
             None => Err(PropertyError::PropertyNotFound(error::Property {
@@ -235,9 +232,7 @@ impl Provider {
         match self
             .idx
             .get(make_index_key(
-                organization_id,
-                project_id,
-                self.ns.as_bytes(),
+                org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
                 IDX_NAME,
                 name,
             ))
@@ -266,9 +261,7 @@ impl Provider {
     ) -> Result<ListResponse<Property>> {
         list(
             self.store.clone(),
-            organization_id,
-            project_id,
-            self.ns.as_bytes(),
+            org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice()
         )
         .await
     }
@@ -372,7 +365,7 @@ impl Provider {
         let data = serialize(&prop)?;
         self.store
             .put(
-                make_data_value_key(organization_id, project_id, self.ns.as_bytes(), prop.id),
+                make_data_value_key(org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(), prop.id),
                 &data,
             )
             .await?;
@@ -389,9 +382,7 @@ impl Provider {
         let prop = self.get_by_id(organization_id, project_id, id).await?;
         self.store
             .delete(make_data_value_key(
-                organization_id,
-                project_id,
-                self.ns.as_bytes(),
+                org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
                 id,
             ))
             .await?;

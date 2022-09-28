@@ -8,11 +8,12 @@ use tokio::sync::RwLock;
 use crate::error::{EventError, MetadataError, StoreError};
 use crate::events::types::{CreateEventRequest, UpdateEventRequest};
 use crate::events::Event;
-use crate::metadata::{list, ListResponse};
+use crate::metadata::{ListResponse};
 use crate::properties::provider::Namespace;
 use crate::store::index::hash_map::HashMap;
-use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
+use crate::store::{ Store};
 use crate::{error, Result};
+use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key, org_proj_ns};
 
 const NAMESPACE: &[u8] = b"events";
 const IDX_NAME: &[u8] = b"name";
@@ -32,7 +33,7 @@ fn index_keys(
 }
 
 fn index_name_key(organization_id: u64, project_id: u64, name: &str) -> Option<Vec<u8>> {
-    Some(make_index_key(organization_id, project_id, NAMESPACE, IDX_NAME, name).to_vec())
+    Some(make_index_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(), IDX_NAME, name).to_vec())
 }
 
 fn index_display_name_key(
@@ -42,9 +43,7 @@ fn index_display_name_key(
 ) -> Option<Vec<u8>> {
     display_name.map(|v| {
         make_index_key(
-            organization_id,
-            project_id,
-            NAMESPACE,
+            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
@@ -106,7 +105,7 @@ impl Provider {
         let created_at = Utc::now();
         let id = self
             .store
-            .next_seq(make_id_seq_key(organization_id, project_id, NAMESPACE))
+            .next_seq(make_id_seq_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice()))
             .await?;
 
         let event = Event {
@@ -128,7 +127,7 @@ impl Provider {
         let data = serialize(&event)?;
         self.store
             .put(
-                make_data_value_key(organization_id, project_id, NAMESPACE, event.id),
+                make_data_value_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(), event.id),
                 &data,
             )
             .await?;
@@ -158,7 +157,7 @@ impl Provider {
     }
 
     pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
-        let key = make_data_value_key(organization_id, project_id, NAMESPACE, id);
+        let key = make_data_value_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(), id);
 
         match self.store.get(key).await? {
             None => Err(EventError::EventNotFound(error::Event::new_with_id(
@@ -190,9 +189,7 @@ impl Provider {
         match self
             .idx
             .get(make_index_key(
-                organization_id,
-                project_id,
-                NAMESPACE,
+                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
                 IDX_NAME,
                 name,
             ))
@@ -212,7 +209,7 @@ impl Provider {
     }
 
     pub async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
-        list(self.store.clone(), organization_id, project_id, NAMESPACE).await
+        list(self.store.clone(), org_proj_ns(organization_id, project_id, NAMESPACE).as_slice()).await
     }
 
     pub async fn update(
@@ -244,7 +241,7 @@ impl Provider {
             idx_keys.push(index_display_name_key(
                 organization_id,
                 project_id,
-                display_name.clone(),
+                display_name.to_owned(),
             ));
             idx_prev_keys.push(index_display_name_key(
                 organization_id,
@@ -294,7 +291,7 @@ impl Provider {
         let data = serialize(&event)?;
         self.store
             .put(
-                make_data_value_key(organization_id, project_id, NAMESPACE, event.id),
+                make_data_value_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(), event.id),
                 &data,
             )
             .await?;
@@ -336,7 +333,7 @@ impl Provider {
 
         self.store
             .put(
-                make_data_value_key(organization_id, event.project_id, NAMESPACE, event.id),
+                make_data_value_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(), event.id),
                 serialize(&event)?,
             )
             .await?;
@@ -384,7 +381,7 @@ impl Provider {
 
         self.store
             .put(
-                make_data_value_key(organization_id, event.project_id, NAMESPACE, event.id),
+                make_data_value_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(), event.id),
                 serialize(&event)?,
             )
             .await?;
@@ -396,9 +393,7 @@ impl Provider {
         let event = self.get_by_id(organization_id, project_id, id).await?;
         self.store
             .delete(make_data_value_key(
-                organization_id,
-                project_id,
-                NAMESPACE,
+                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
                 id,
             ))
             .await?;

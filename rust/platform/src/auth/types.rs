@@ -1,12 +1,14 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct LogInRequest {
     pub email: String,
     pub password: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct SignUpRequest {
     pub email: String,
     pub password: String,
@@ -15,13 +17,14 @@ pub struct SignUpRequest {
     pub last_name: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct RecoverPasswordRequest {
     pub email: String,
 }
 
-#[derive(Serialize)]
-pub struct TokensResponse {
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenResponse {
     pub access_token: String,
-    pub refresh_token: String,
 }

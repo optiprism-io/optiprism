@@ -105,7 +105,6 @@ async fn test_custom_events() -> Result<()> {
         }],
     };
 
-    println!("{:?}\n", ce1);
     let cl = Client::new();
     let mut headers = HeaderMap::new();
     headers.insert(

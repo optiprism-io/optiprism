@@ -17,6 +17,12 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
+password-hash = "0.4.2"
+tower = "0.4.13"
+bytes = "1.2.1"
+jsonwebtoken = "8.1.1"
+rand = "0.8.4"
+argon2 = "0.4.1"
 url = "2.2.2"
 anyhow = "1.0"
 datafusion = "11.0.0"

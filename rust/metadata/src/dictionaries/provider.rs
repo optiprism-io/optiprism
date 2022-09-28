@@ -1,8 +1,9 @@
 use crate::error::{DictionaryError, DictionaryKey, DictionaryValue, Result};
-use crate::store::{make_id_seq_key, make_main_key, Store};
+use crate::store::{Store};
 use byteorder::{ByteOrder, LittleEndian};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use crate::store::path_helpers::{make_id_seq_key, org_proj_ns};
 
 const NAMESPACE: &[u8] = b"dictinaries";
 
@@ -11,15 +12,19 @@ fn dict_ns(dict: &str) -> Vec<u8> {
 }
 
 fn make_key_key(organization_id: u64, project_id: u64, dict: &str, key: u64) -> Vec<u8> {
-    let main_key = make_main_key(organization_id, project_id, dict_ns(dict).as_slice());
-
-    [main_key.as_slice(), b"keys/", key.to_le_bytes().as_ref()].concat()
+    [
+        org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice()).as_slice(),
+        b"keys/",
+        key.to_le_bytes().as_ref(),
+    ].concat()
 }
 
 fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str) -> Vec<u8> {
-    let main_key = make_main_key(organization_id, project_id, dict_ns(dict).as_slice());
-
-    [main_key.as_slice(), b"values/", value.as_bytes()].concat()
+    [
+        org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice()).as_slice(),
+        b"values/",
+        value.as_bytes()
+    ].concat()
 }
 
 pub struct Provider {
@@ -51,11 +56,7 @@ impl Provider {
             None => {
                 let id = self
                     .store
-                    .next_seq(make_id_seq_key(
-                        organization_id,
-                        project_id,
-                        dict_ns(dict).as_slice(),
-                    ))
+                    .next_seq(make_id_seq_key(org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice()).as_slice()))
                     .await?;
                 self.store
                     .put(
@@ -91,7 +92,7 @@ impl Provider {
                 dict.to_string(),
                 key,
             ))
-            .into()),
+                .into()),
             Some(value) => Ok(String::from_utf8(value)?),
         }
     }
@@ -111,7 +112,7 @@ impl Provider {
                 dict.to_string(),
                 value.to_string(),
             ))
-            .into()),
+                .into()),
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
         }
     }

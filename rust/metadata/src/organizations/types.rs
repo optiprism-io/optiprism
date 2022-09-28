@@ -1,32 +1,26 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use common::rbac::Role;
+use common::types::OptionalProperty;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Organization {
     pub id: u64,
     pub created_at: DateTime<Utc>,
+    pub created_by: u64,
     pub updated_at: Option<DateTime<Utc>>,
+    pub updated_by: Option<u64>,
     pub name: String,
-    // TODO: add fields
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct CreateRequest {
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CreateOrganizationRequest {
+    pub created_by: u64,
     pub name: String,
-    // TODO: add fields
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct UpdateRequest {
-    pub id: u64,
-    pub name: Option<String>,
-    // TODO: add fields
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ListRequest {
-    // pub order
-    pub limit: Option<u64>,
-    pub offset: Option<u64>,
-    // TODO: add fields
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UpdateOrganizationRequest {
+    pub updated_by: u64,
+    pub name: OptionalProperty<String>,
 }

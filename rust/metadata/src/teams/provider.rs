@@ -5,16 +5,15 @@ use chrono::Utc;
 
 use tokio::sync::RwLock;
 
-use crate::error::{EventError, MetadataError, ProjectError, StoreError};
+use crate::error::{EventError, MetadataError, TeamError, StoreError};
 use crate::metadata::{ListResponse};
 use crate::store::index::hash_map::HashMap;
 use crate::store::{Store};
 use crate::{error, Result};
-use crate::projects::Project;
-use crate::projects::types::{CreateProjectRequest, UpdateProjectRequest};
+use crate::teams::types::{CreateTeamRequest, Team, UpdateTeamRequest};
 use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key, org_ns};
 
-const NAMESPACE: &[u8] = b"projects";
+const NAMESPACE: &[u8] = b"teams";
 const IDX_NAME: &[u8] = b"name";
 
 fn index_keys(
@@ -49,8 +48,8 @@ impl Provider {
     pub async fn create(
         &self,
         organization_id: u64,
-        req: CreateProjectRequest,
-    ) -> Result<Project> {
+        req: CreateTeamRequest,
+    ) -> Result<Team> {
         let _guard = self.guard.write().await;
 
         let idx_keys = index_keys(
@@ -60,7 +59,7 @@ impl Provider {
 
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(ProjectError::ProjectAlreadyExist(error::Project::new_with_name(
+                return Err(TeamError::TeamAlreadyExist(error::Team::new_with_name(
                     organization_id,
                     req.name,
                 ))
@@ -76,7 +75,7 @@ impl Provider {
             .next_seq(make_id_seq_key(org_ns(organization_id, NAMESPACE).as_slice()))
             .await?;
 
-        let project = Project {
+        let team = Team {
             id,
             created_at,
             updated_at: None,
@@ -85,48 +84,48 @@ impl Provider {
             organization_id,
             name: req.name,
         };
-        let data = serialize(&project)?;
+        let data = serialize(&team)?;
         self.store
             .put(
-                make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project.id),
+                make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team.id),
                 &data,
             )
             .await?;
 
         self.idx.insert(idx_keys.as_ref(), &data).await?;
 
-        Ok(project)
+        Ok(team)
     }
 
-    pub async fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project> {
-        let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id);
+    pub async fn get_by_id(&self, organization_id: u64, team_id: u64) -> Result<Team> {
+        let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id);
 
         match self.store.get(key).await? {
-            None => Err(ProjectError::ProjectNotFound(error::Project::new_with_id(
+            None => Err(TeamError::TeamNotFound(error::Team::new_with_id(
                 organization_id,
-                project_id,
+                team_id,
             ))
                 .into()),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
 
-    pub async fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
+    pub async fn list(&self, organization_id: u64) -> Result<ListResponse<Team>> {
         list(self.store.clone(), org_ns(organization_id, NAMESPACE).as_slice()).await
     }
 
     pub async fn update(
         &self,
         organization_id: u64,
-        project_id: u64,
-        req: UpdateProjectRequest,
-    ) -> Result<Project> {
+        team_id: u64,
+        req: UpdateTeamRequest,
+    ) -> Result<Team> {
         let _guard = self.guard.write().await;
 
-        let prev_project = self
-            .get_by_id(organization_id, project_id)
+        let prev_team = self
+            .get_by_id(organization_id, team_id)
             .await?;
-        let mut project = prev_project.clone();
+        let mut team = prev_team.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
@@ -134,9 +133,9 @@ impl Provider {
             idx_keys.push(index_name_key(organization_id, name.as_str()));
             idx_prev_keys.push(index_name_key(
                 organization_id,
-                prev_project.name.as_str(),
+                prev_team.name.as_str(),
             ));
-            project.name = name.to_owned();
+            team.name = name.to_owned();
         }
 
         match self
@@ -145,9 +144,9 @@ impl Provider {
             .await
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(ProjectError::ProjectAlreadyExist(error::Project::new_with_id(
+                return Err(TeamError::TeamAlreadyExist(error::Team::new_with_id(
                     organization_id,
-                    project_id,
+                    team_id,
                 ))
                     .into());
             }
@@ -155,13 +154,13 @@ impl Provider {
             Ok(_) => {}
         }
 
-        project.updated_at = Some(Utc::now());
-        project.updated_by = Some(req.updated_by);
+        team.updated_at = Some(Utc::now());
+        team.updated_by = Some(req.updated_by);
 
-        let data = serialize(&project)?;
+        let data = serialize(&team)?;
         self.store
             .put(
-                make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id),
+                make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id),
                 &data,
             )
             .await?;
@@ -170,16 +169,16 @@ impl Provider {
             .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
             .await?;
 
-        Ok(project)
+        Ok(team)
     }
 
-    pub async fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
+    pub async fn delete(&self, organization_id: u64, team_id: u64) -> Result<Team> {
         let _guard = self.guard.write().await;
-        let project = self.get_by_id(organization_id, project_id).await?;
-        self.store.delete(make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id)).await?;
+        let team = self.get_by_id(organization_id, team_id).await?;
+        self.store.delete(make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id)).await?;
 
-        self.idx.delete(index_keys(organization_id, &project.name).as_ref()).await?;
+        self.idx.delete(index_keys(organization_id, &team.name).as_ref()).await?;
 
-        Ok(project)
+        Ok(team)
     }
 }

@@ -1,10 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use common::rbac::Role;
 use common::types::OptionalProperty;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Project {
+pub struct Team {
     pub id: u64,
     pub created_at: DateTime<Utc>,
     pub created_by: u64,
@@ -15,14 +14,14 @@ pub struct Project {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CreateProjectRequest {
+pub struct CreateTeamRequest {
     pub created_by: u64,
     pub organization_id: u64,
     pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct UpdateProjectRequest {
+pub struct UpdateTeamRequest {
     pub updated_by: u64,
     pub name: OptionalProperty<String>,
 }

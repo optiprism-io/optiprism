@@ -1,37 +1,37 @@
 use chrono::{DateTime, Utc};
-use common::rbac::{Permission, Role, Scope};
+use common::rbac::{OrganizationRole, Permission, ProjectRole, Role};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use common::types::OptionalProperty;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Account {
     pub id: u64,
     pub created_at: DateTime<Utc>,
-    pub created_by: u64,
+    pub created_by: Option<u64>,
     pub updated_at: Option<DateTime<Utc>>,
     pub updated_by: Option<u64>,
-    pub salt: String,
-    pub password: String,
+    pub password_hash: String,
     pub email: String,
-    pub roles: Option<HashMap<Scope, Role>>,
-    pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
     pub first_name: Option<String>,
     pub last_name: Option<String>,
-    // TODO: add fields
+    pub role: Option<Role>,
+    pub organizations: Option<Vec<(u64, OrganizationRole)>>,
+    pub projects: Option<Vec<(u64, ProjectRole)>>,
+    pub teams: Option<Vec<(u64, Role)>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CreateAccountRequest {
-    pub created_by: u64,
-    pub salt: String,
-    pub password: String,
-    pub organization_id: u64,
+    pub created_by: Option<u64>,
+    pub password_hash: String,
     pub email: String,
-    pub roles: Option<HashMap<Scope, Role>>,
-    pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
     pub first_name: Option<String>,
-    pub middle_name: Option<String>,
     pub last_name: Option<String>,
+    pub role: Option<Role>,
+    pub organizations: Option<Vec<(u64, OrganizationRole)>>,
+    pub projects: Option<Vec<(u64, ProjectRole)>>,
+    pub teams: Option<Vec<(u64, Role)>>,
 }
 
 impl CreateAccountRequest {
@@ -42,63 +42,27 @@ impl CreateAccountRequest {
             created_by: self.created_by,
             updated_at: None,
             updated_by: None,
-            admin: self.admin,
-            salt: self.salt,
-            password: self.password,
-            organization_id: self.organization_id,
+            password_hash: self.password_hash,
             email: self.email,
-            roles: self.roles,
-            permissions: self.permissions,
             first_name: self.first_name,
             last_name: self.last_name,
+            role: self.role,
+            organizations: self.organizations,
+            projects: self.projects,
+            teams: self.teams,
         }
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct UpdateRequest {
-    pub id: u64,
-    pub admin: bool,
-    pub salt: String,
-    pub password: String,
-    pub organization_id: u64,
-    pub email: String,
-    pub roles: Option<HashMap<Scope, Role>>,
-    pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
-    pub first_name: Option<String>,
-    pub middle_name: Option<String>,
-    pub last_name: Option<String>,
-}
-
-impl UpdateRequest {
-    pub fn into_account(
-        self,
-        prev: Account,
-        updated_at: DateTime<Utc>,
-        updated_by: Option<u64>,
-    ) -> Account {
-        Account {
-            id: self.id,
-            created_at: prev.created_at,
-            created_by: prev.created_by,
-            updated_at: Some(updated_at),
-            updated_by,
-            admin: self.admin,
-            salt: self.salt,
-            password: self.password,
-            organization_id: self.organization_id,
-            email: self.email,
-            roles: self.roles,
-            permissions: self.permissions,
-            first_name: self.first_name,
-            last_name: self.last_name,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ListRequest {
-    pub limit: u64,
-    pub offset: u64,
-    // TODO: add fields
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+pub struct UpdateAccountRequest {
+    pub updated_by: u64,
+    pub password: OptionalProperty<String>,
+    pub email: OptionalProperty<String>,
+    pub first_name: OptionalProperty<Option<String>>,
+    pub last_name: OptionalProperty<Option<String>>,
+    pub role: OptionalProperty<Option<Role>>,
+    pub organizations: OptionalProperty<Option<Vec<(u64, OrganizationRole)>>>,
+    pub projects: OptionalProperty<Option<Vec<(u64, ProjectRole)>>>,
+    pub teams: OptionalProperty<Option<Vec<(u64, Role)>>>,
 }

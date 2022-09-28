@@ -1,6 +1,6 @@
 use metadata::store::Store;
 use metadata::{
-    organizations::{CreateRequest, ListRequest},
+    organizations::{CreateOrganizationRequest, ListRequest},
     Metadata, Result,
 };
 use std::{env::temp_dir, sync::Arc};
@@ -16,14 +16,14 @@ async fn test_organizations() -> Result<()> {
 
     let _ = metadata
         .organizations
-        .create(CreateRequest {
+        .create(CreateOrganizationRequest {
             name: "organization1".into(),
         })
         .await
         .unwrap();
     let _ = metadata
         .organizations
-        .create(CreateRequest {
+        .create(CreateOrganizationRequest {
             name: "organization2".into(),
         })
         .await

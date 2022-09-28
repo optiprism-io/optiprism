@@ -10,10 +10,11 @@ use tokio::sync::RwLock;
 use crate::custom_events::types::{CreateCustomEventRequest, Event, UpdateCustomEventRequest};
 use crate::custom_events::CustomEvent;
 use crate::error::{CustomEventError, MetadataError, StoreError};
-use crate::metadata::{list, ListResponse};
+use crate::metadata::{ListResponse};
 use crate::store::index::hash_map::HashMap;
-use crate::store::{make_data_value_key, make_id_seq_key, make_index_key, Store};
+use crate::store::{Store};
 use crate::{error, events, Result};
+use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key, org_proj_ns};
 
 const NAMESPACE: &[u8] = b"custom_events";
 const IDX_NAME: &[u8] = b"name";
@@ -24,7 +25,7 @@ fn index_keys(organization_id: u64, project_id: u64, name: &str) -> Vec<Option<V
 }
 
 fn index_name_key(organization_id: u64, project_id: u64, name: &str) -> Option<Vec<u8>> {
-    Some(make_index_key(organization_id, project_id, NAMESPACE, IDX_NAME, name).to_vec())
+    Some(make_index_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(), IDX_NAME, name).to_vec())
 }
 
 pub struct Provider {
@@ -81,8 +82,8 @@ impl Provider {
                         project_id,
                         req.name,
                     ))
-                    .into(),
-                )
+                        .into(),
+                );
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -91,7 +92,7 @@ impl Provider {
         let created_at = Utc::now();
         let id = self
             .store
-            .next_seq(make_id_seq_key(organization_id, project_id, NAMESPACE))
+            .next_seq(make_id_seq_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice()))
             .await?;
 
         let event = CustomEvent {
@@ -111,7 +112,7 @@ impl Provider {
         let data = serialize(&event)?;
         self.store
             .put(
-                make_data_value_key(organization_id, project_id, NAMESPACE, event.id),
+                make_data_value_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(), event.id),
                 &data,
             )
             .await?;
@@ -127,7 +128,7 @@ impl Provider {
         project_id: u64,
         id: u64,
     ) -> Result<CustomEvent> {
-        let key = make_data_value_key(organization_id, project_id, NAMESPACE, id);
+        let key = make_data_value_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(), id);
 
         match self.store.get(key).await? {
             None => Err(
@@ -136,7 +137,7 @@ impl Provider {
                     project_id,
                     id,
                 ))
-                .into(),
+                    .into(),
             ),
             Some(value) => Ok(deserialize(&value)?),
         }
@@ -151,9 +152,7 @@ impl Provider {
         match self
             .idx
             .get(make_index_key(
-                organization_id,
-                project_id,
-                NAMESPACE,
+                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
                 IDX_NAME,
                 name,
             ))
@@ -165,7 +164,7 @@ impl Provider {
                     project_id,
                     name,
                 ))
-                .into(),
+                    .into(),
             ),
             Err(other) => Err(other),
             Ok(data) => Ok(deserialize(&data)?),
@@ -177,7 +176,7 @@ impl Provider {
         organization_id: u64,
         project_id: u64,
     ) -> Result<ListResponse<CustomEvent>> {
-        list(self.store.clone(), organization_id, project_id, NAMESPACE)
+        list(self.store.clone(), org_proj_ns(organization_id, project_id, NAMESPACE).as_slice())
             .await
             .into()
     }
@@ -220,8 +219,8 @@ impl Provider {
                         project_id,
                         event_id,
                     ))
-                    .into(),
-                )
+                        .into(),
+                );
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -257,7 +256,7 @@ impl Provider {
         let data = serialize(&event)?;
         self.store
             .put(
-                make_data_value_key(organization_id, project_id, NAMESPACE, event.id),
+                make_data_value_key(org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(), event.id),
                 &data,
             )
             .await?;
@@ -278,9 +277,7 @@ impl Provider {
         let event = self.get_by_id(organization_id, project_id, id).await?;
         self.store
             .delete(make_data_value_key(
-                organization_id,
-                project_id,
-                NAMESPACE,
+                org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
                 id,
             ))
             .await?;
@@ -330,13 +327,13 @@ impl Provider {
                             level + 1,
                             ids,
                         )
-                        .await?;
+                            .await?;
                     }
                 }
             }
 
             Ok(())
         }
-        .boxed()
+            .boxed()
     }
 }
