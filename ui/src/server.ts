@@ -186,6 +186,11 @@ export default function ({ environment = 'development' } = {}) {
                 })
             })
 
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
+                const body = JSON.parse(request.requestBody);
+                return schema.db.reports.update(request.params.report_id, body)
+            })
+
             this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/reports/event-segmentation`, (_, request) => {
                 const body = JSON.parse(request.requestBody);
 

@@ -77,7 +77,7 @@ type GetTime = {
 
 const getTime = (props: GetTime) => {
     let each = null
-    let period = {
+    const period = {
         from: '',
         to: '',
         last: 0,
@@ -146,8 +146,6 @@ const computedFilter = async (eventName: string | undefined, eventType: Property
 }
 
 const mapReportToEvents = async (items: EventSegmentationEvent[]): Promise<Event[]> => {
-    const commonStore = useCommonStore()
-
     return await Promise.all(items.map(async (item): Promise<Event> => {
         return {
             ref: {
@@ -317,17 +315,19 @@ const mapReportToSegments = async (items: EventSegmentationSegment[]): Promise<S
                         }
                     case SegmentConditionHadPropertyValueTypeEnum.HadPropertyValue:
                     case SegmentConditionHasPropertyValueTypeEnum.HasPropertyValue:
-                        const property: Property = lexiconStore.findEventPropertyByName(condition.propertyName) || lexiconStore.findUserPropertyByName(condition.propertyName)
-
-                        res.valuesList = await getValues({
-                            propertyName: property.name,
-                            propertyType: property.type as PropertyType,
-                        })
-                        res.opId = condition.operation
-                        res.propRef = {
-                            type: property.type as PropertyType,
-                            id: property.id
+                        if (condition.propertyName) {
+                            const property: Property = lexiconStore.findEventPropertyByName(condition.propertyName) || lexiconStore.findUserPropertyByName(condition.propertyName)
+                            res.propRef = {
+                                type: property.type as PropertyType,
+                                id: property.id
+                            }
+                            res.valuesList = await getValues({
+                                propertyName: property.name,
+                                propertyType: property.type as PropertyType,
+                            })
                         }
+
+                        res.opId = condition.operation
                         res.values = condition.values
                 }
 
@@ -375,7 +375,7 @@ export const eventsToFunnels = () => {
     })
 }
 
-export const reportToEvents = async (id: string) => {
+export const reportToEvents = async (id: number) => {
     const reportsStore = useReportsStore()
     const eventsStore = useEventsStore()
     const filterGroupsStore = useFilterGroupsStore()
@@ -390,6 +390,6 @@ export const reportToEvents = async (id: string) => {
     segmentsStore.segments = report?.segments ? await mapReportToSegments(report.segments) : []
 }
 
-export const reportToFunnels = (id: string) => {
+export const reportToFunnels = (id: number) => {
     // TODO
 }

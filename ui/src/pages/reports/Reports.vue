@@ -19,13 +19,20 @@
                         @on-input="setNameReport"
                     />
                 </div>
-
                 <UiSwitch
                     class="pf-u-ml-auto"
                     :value="commonStore.syncReports"
                     :label="$t('reports.sync')"
                     @input="(value: boolean) => commonStore.syncReports = value"
                 />
+                <div class="pf-u-ml-lg">
+                    <UiSelect
+                        :items="itemsReports"
+                        :text-button="reportSelectText"
+                        :selections="[reportsStore.reportId]"
+                        @on-select="onSelectReport"
+                    />
+                </div>
                 <UiButton
                     class="pf-m-primary pf-u-ml-lg"
                     :progress="reportsStore.saveLoading"
@@ -54,6 +61,7 @@ import { useCommonStore } from '@/stores/common'
 import { useFilterGroupsStore } from '@/stores/reports/filters'
 import { useSegmentsStore } from '@/stores/reports/segments'
 
+import UiSelect from '@/components/uikit/UiSelect.vue'
 import UiSwitch from '@/components/uikit/UiSwitch.vue'
 import UiInlineEdit from '@/components/uikit/UiInlineEdit.vue'
 import UiSpinner from '@/components/uikit/UiSpinner.vue'
@@ -78,7 +86,6 @@ const items = computed(() => {
             link: {
                 name: pagesMap.reportsEventSegmentation.name,
             },
-            icon: 'pf-icon pf-icon-filter'
         },
         {
             name: t('funnels.funnels'),
@@ -86,7 +93,6 @@ const items = computed(() => {
             link: {
                 name: 'reports_funnels'
             },
-            icon: 'pf-icon pf-icon-filter'
         }
     ];
 
@@ -98,23 +104,39 @@ const items = computed(() => {
     })
 })
 
+const reportSelectText = computed(() => {
+    return reportsStore.activeReport ? reportsStore.activeReport.name : t('reports.selectReport')
+})
+
+const itemsReports = computed(() => {
+    return reportsStore.list.map(item => {
+        const id = Number(item.id)
+        return {
+            value: id,
+            key: id,
+            nameDisplay: item.name || '',
+        }
+    })
+})
+
 const setNameReport = (payload: string) => {
     reportName.value = payload
 }
 
 const onSaveReport = async () => {
-    // if (reportsStore.reportId) {
-    // TODO edit report
-    // } else {
-    await reportsStore.createReport(reportName.value, ReportReportTypeEnum.EventSegmentation)
-    await reportsStore.getList()
+    if (reportsStore.reportId) {
+        // TODO ReportReportTypeEnum
+        await reportsStore.editReport(reportName.value, ReportReportTypeEnum.EventSegmentation)
+    } else {
+        await reportsStore.createReport(reportName.value, ReportReportTypeEnum.EventSegmentation)
 
-    router.push({
-        params: {
-            id: reportsStore.reportId,
-        }
-    })
-    // }
+        router.push({
+            params: {
+                id: reportsStore.reportId,
+            }
+        })
+    }
+    await reportsStore.getList()
 }
 
 const onSelectTab = () => {
@@ -127,6 +149,21 @@ const onSelectTab = () => {
     }
 }
 
+const updateReport = async (id: number) => {
+    if (pagesMap.reportsEventSegmentation.name === route.name) {
+        reportToEvents(Number(id))
+    } else {
+        reportToFunnels(Number(id))
+    }
+
+    reportName.value = reportsStore.activeReport?.name ?? t('reports.untitledReport')
+}
+
+const onSelectReport = (id: number) => {
+    updateReport(id)
+    router.push({ params: { id } })
+}
+
 onMounted(async () => {
     reportsStore.loading = true
     lexiconStore.getEvents()
@@ -137,12 +174,8 @@ onMounted(async () => {
     const reportId = route.params.id;
 
     if (reportId) {
-        if (reportsStore.reportsId.includes(String(reportId))) {
-            if (pagesMap.reportsEventSegmentation.name === route.name) {
-                reportToEvents(String(route.params.id))
-            } else {
-                reportToFunnels(String(route.params.id))
-            }
+        if (reportsStore.reportsId.includes(Number(reportId))) {
+            updateReport(Number(reportId))
         } else {
             reportsStore.reportId = 0
             router.push({
@@ -153,7 +186,6 @@ onMounted(async () => {
         }
     }
 
-    reportName.value = reportsStore.activeReport?.name ?? t('reports.untitledReport')
     reportsStore.loading = false
 })
 </script>

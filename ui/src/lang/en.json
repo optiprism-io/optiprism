@@ -77,7 +77,8 @@
     "title": "Reports",
     "sync": "Sync the query data between reports",
     "save": "Save report",
-    "saved": "Report saved"
+    "saved": "Report saved",
+    "selectReport": "Select Report"
   },
 
   "events": {
