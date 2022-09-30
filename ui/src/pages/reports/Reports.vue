@@ -54,12 +54,14 @@ import usei18n from '@/hooks/useI18n'
 import { useLexiconStore } from '@/stores/lexicon'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { ReportReportTypeEnum } from '@/api'
-import { reportToEvents, reportToFunnels } from '@/utils/reportsMappings'
+import { reportToStores } from '@/utils/reportsMappings'
 
 import { useReportsStore } from '@/stores/reports/reports'
 import { useCommonStore } from '@/stores/common'
 import { useFilterGroupsStore } from '@/stores/reports/filters'
 import { useSegmentsStore } from '@/stores/reports/segments'
+import { useBreakdownsStore } from '@/stores/reports/breakdowns'
+import { useStepsStore } from '@/stores/funnels/steps'
 
 import UiSelect from '@/components/uikit/UiSelect.vue'
 import UiSwitch from '@/components/uikit/UiSwitch.vue'
@@ -75,6 +77,8 @@ const reportsStore = useReportsStore()
 const commonStore = useCommonStore()
 const filterGroupsStore = useFilterGroupsStore()
 const segmentsStore = useSegmentsStore()
+const breakdownsStore = useBreakdownsStore()
+const stepsStore = useStepsStore()
 
 const reportName = ref(t('reports.untitledReport'))
 
@@ -124,11 +128,14 @@ const setNameReport = (payload: string) => {
 }
 
 const onSaveReport = async () => {
+    const reportType = pagesMap.reportsEventSegmentation.name === route.name ?
+        ReportReportTypeEnum.EventSegmentation :
+        ReportReportTypeEnum.Funnel
+
     if (reportsStore.reportId) {
-        // TODO ReportReportTypeEnum
-        await reportsStore.editReport(reportName.value, ReportReportTypeEnum.EventSegmentation)
+        await reportsStore.editReport(reportName.value, reportType)
     } else {
-        await reportsStore.createReport(reportName.value, ReportReportTypeEnum.EventSegmentation)
+        await reportsStore.createReport(reportName.value, reportType)
 
         router.push({
             params: {
@@ -146,16 +153,13 @@ const onSelectTab = () => {
         eventsStore.$reset()
         filterGroupsStore.$reset()
         segmentsStore.$reset()
+        breakdownsStore.$reset()
+        stepsStore.$reset()
     }
 }
 
 const updateReport = async (id: number) => {
-    if (pagesMap.reportsEventSegmentation.name === route.name) {
-        reportToEvents(Number(id))
-    } else {
-        reportToFunnels(Number(id))
-    }
-
+    reportToStores(Number(id))
     reportName.value = reportsStore.activeReport?.name ?? t('reports.untitledReport')
 }
 

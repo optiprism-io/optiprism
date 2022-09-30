@@ -32,7 +32,11 @@ const addHoldingConstant = (property: PropertyRef): void => {
             : lexiconStore.findEventPropertyById(Number(property.id));
 
     if (id && name) {
-        stepsStore.addHoldingProperty({id, name})
+        stepsStore.addHoldingProperty({
+            id,
+            name,
+            type: property.type
+        })
     }
 }
 </script>

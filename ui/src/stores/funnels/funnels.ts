@@ -1,20 +1,16 @@
-import {defineStore} from 'pinia';
-import {getLastNDaysRange} from '@/helpers/calendarHelper';
-import {getYYYYMMDD} from '@/helpers/getStringDates';
+import { defineStore } from 'pinia';
+import { getLastNDaysRange } from '@/helpers/calendarHelper';
+import { getYYYYMMDD } from '@/helpers/getStringDates';
 import {
-    BreakdownByProperty,
     DataTableResponseColumnsInner,
-    EventFilterByProperty,
-    FunnelEvent,
-    FunnelEventEventTypeEnum,
     TimeBetween,
     TimeFrom,
-    TimeLast
-} from '@/api';
+    TimeLast,
+} from '@/api'
 import dataService from '@/api/services/datas.service';
-import {useCommonStore} from '@/stores/common';
-import {useStepsStore} from '@/stores/funnels/steps';
-import {useEventName} from '@/helpers/useEventName';
+import { useCommonStore } from '@/stores/common';
+import { useStepsStore } from '@/stores/funnels/steps';
+import { useEventName } from '@/helpers/useEventName';
 import { useFilterGroupsStore } from '@/stores/reports/filters'
 import { useBreakdownsStore } from '@/stores/reports/breakdowns'
 import { useSegmentsStore } from '@/stores/reports/segments'
@@ -35,15 +31,15 @@ const convertColumns = (columns: DataTableResponseColumnsInner[], stepNumbers: n
 }
 
 type FunnelsStore = {
-  controlsPeriod: string | number;
-  period: {
-    from: string,
-    to: string,
-    last: number,
-    type: string,
-  };
-  reports: DataTableResponseColumnsInner[];
-  loading: boolean;
+    controlsPeriod: string | number;
+    period: {
+        from: string,
+        to: string,
+        last: number,
+        type: string,
+    };
+    reports: DataTableResponseColumnsInner[];
+    loading: boolean;
 }
 
 export const useFunnelsStore = defineStore('funnels', {
@@ -126,7 +122,7 @@ export const useFunnelsStore = defineStore('funnels', {
         setControlsPeriod(payload: string) {
             this.controlsPeriod = payload;
         },
-        setPeriod(payload: {from: string, to: string, type: string, last: number}) {
+        setPeriod(payload: { from: string, to: string, type: string, last: number }) {
             this.period = payload;
         },
         initPeriod(): void {
@@ -155,49 +151,9 @@ export const useFunnelsStore = defineStore('funnels', {
                         n: stepsStore.size,
                         unit: stepsStore.unit,
                     },
-                    steps: stepsStore.steps.map(item => {
-                        const events = item.events.map(event => {
-                            return {
-                                eventType: event.event.type,
-                                eventId: event.event.id,
-                                eventName: eventName(event.event),
-                                filters: event.filters.map(filter => {
-                                    return {
-                                        propertyType: filter.propRef?.type ?? '',
-                                        type: 'property',
-                                        operation: filter.opId,
-                                        value: filter.values
-                                    }
-                                })
-                            }
-                        }) as FunnelEvent[]
-
-                        return {
-                            events,
-                            order: 'any',
-                        }
-                    }),
-                    holdingConstants: stepsStore.holdingProperties.map(item => {
-                        return {
-                            propertyType: 'custom',
-                            propertyId: item.id,
-                            propertyName: item.name
-                        }
-                    }),
-                    exclude: stepsStore.excludedEvents.map(item => {
-                        return {
-                            eventType: item.event.type as FunnelEventEventTypeEnum,
-                            eventName: eventName(item.event),
-                            filters: item.filters.map(filter => {
-                                return {
-                                    propertyType: filter.propRef?.type ?? '',
-                                    type: 'property',
-                                    operation: filter.opId,
-                                    value: filter.values
-                                }
-                            }) as EventFilterByProperty[],
-                        }
-                    }),
+                    steps: stepsStore.getSteps,
+                    holdingConstants: stepsStore.getHoldingProperties,
+                    exclude: stepsStore.getExcluded,
                     filters: filterGroupsStore.filters,
                     breakdowns: breakdownsStore.breakdownsItems,
                     segments: segmentsStore.segmentationItems,

@@ -3,6 +3,7 @@ import reportsService from '@/api/services/reports.service'
 import { useCommonStore } from '@/stores/common'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useFunnelsStore } from '@/stores/funnels/funnels'
+import { useStepsStore } from '@/stores/funnels/steps'
 import { useFilterGroupsStore } from '@/stores/reports/filters'
 import { useBreakdownsStore } from '@/stores/reports/breakdowns'
 import { useSegmentsStore } from '@/stores/reports/segments'
@@ -26,6 +27,7 @@ const getReport = (type: ReportReportTypeEnum): ReportReport => {
     const breakdownsStore = useBreakdownsStore()
     const filterGroupsStore = useFilterGroupsStore()
     const segmentsStore = useSegmentsStore()
+    const stepsStore = useStepsStore()
 
     return {
         type,
@@ -33,15 +35,14 @@ const getReport = (type: ReportReportTypeEnum): ReportReport => {
         group: eventsStore.group,
         intervalUnit: eventsStore.controlsGroupBy,
         chartType: eventsStore.chartType as FunnelQueryChartType,
-        analysis: {
-            type: 'linear',
-        },
+        analysis: { type: 'linear' },
         events: type === ReportReportTypeEnum.EventSegmentation ? eventsStore.propsForEventSegmentationResult.events : [],
         filters: filterGroupsStore.filters,
         breakdowns: breakdownsStore.breakdownsItems,
         segments: segmentsStore.segmentationItems,
-
-        // TODO funnels
+        steps: stepsStore.getSteps,
+        holdingConstants: stepsStore.getHoldingProperties,
+        exclude: stepsStore.getExcluded,
     }
 }
 
@@ -72,7 +73,7 @@ export const useReportsStore = defineStore('reports', {
                 if (res.data?.dashboards?.length) {
                     this.list = res.data.dashboards
                 }
-            } catch(e) {
+            } catch (e) {
                 throw new Error('error reportsList');
             }
         },
@@ -89,7 +90,7 @@ export const useReportsStore = defineStore('reports', {
                 if (res.data?.id) {
                     this.reportId = Number(res.data.id)
                 }
-            } catch(e) {
+            } catch (e) {
                 throw new Error('error reportsList');
             }
 

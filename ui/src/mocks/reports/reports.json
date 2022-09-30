@@ -212,6 +212,60 @@
                     "name": "Segment 3",
                     "conditions": []
                 }
+            ],
+            "steps": [
+                {
+                    "events": [
+                        {
+                            "eventType": "custom",
+                            "eventId": 1,
+                            "eventName": "Create Product",
+                            "filters": [
+                                {
+                                    "propertyName": "productName",
+                                    "propertyId": "5",
+                                    "propertyType": "event",
+                                    "type": "property",
+                                    "operation": "regex",
+                                    "value": [
+                                        "Tables",
+                                        "Lamp"
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "order": "any"
+                }
+            ],
+            "exclude": [
+                {
+                    "eventType": "regular",
+                    "eventName": "Sign Up",
+                    "filters": [
+                        {
+                            "propertyType": "event",
+                            "type": "property",
+                            "operation": "neq",
+                            "value": [
+                                "Tables",
+                                "Doors"
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "holdingConstants": [
+                {
+                    "propertyType": "event",
+                    "propertyId": "5",
+                    "propertyName": "productName"
+                },
+                {
+                    "propertyType": "event",
+                    "propertyId": "1",
+                    "propertyName": "query"
+                }
             ]
         }
     }
