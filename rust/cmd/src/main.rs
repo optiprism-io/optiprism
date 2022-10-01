@@ -7,7 +7,7 @@ use std::{env::set_var, net::SocketAddr, sync::Arc};
 
 use axum::{Router, Server};
 use bytesize::ByteSize;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use datafusion::datasource::MemTable;
 use log::info;
 use uuid::Uuid;
@@ -94,10 +94,15 @@ async fn main() -> Result<()> {
     let platform_query_provider = Arc::new(platform::queries::provider::QueryProvider::new(
         query_provider,
     ));
-    let platform = platform::PlatformProvider::new(md.clone(), platform_query_provider);
+    let platform = platform::PlatformProvider::new(
+        md.clone(),
+        platform_query_provider,
+        Duration::days(1),
+        "key".to_string(),
+    );
 
     let mut router = Router::new();
-    router = platform::http::attach_routes(router, platform);
+    router = platform::http::attach_routes(router, platform, md);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     Server::bind(&addr)

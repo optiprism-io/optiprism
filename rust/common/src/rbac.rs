@@ -5,6 +5,8 @@ use lazy_static::lazy_static;
 pub enum Permission {
     All,
     ManageAccounts,
+    ViewAccounts,
+    DeleteAccounts,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -30,6 +32,9 @@ pub enum OrganizationRole {
 pub enum ProjectPermission {
     ManageProject,
     DeleteProject,
+    ManageSchema,
+    DeleteSchema,
+    ViewSchema,
     InviteMembers,
     ManageMembers,
     ExploreReports,

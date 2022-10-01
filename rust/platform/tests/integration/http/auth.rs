@@ -1,5 +1,5 @@
 use axum::http::HeaderValue;
-use axum::{http, Router, Server};
+use axum::{AddExtensionLayer, http, Router, Server};
 use chrono::{Duration, Utc};
 use metadata::metadata::ListResponse;
 use metadata::store::Store;
@@ -11,35 +11,48 @@ use platform::custom_events::types::{
 };
 use platform::http::{auth, custom_events, events};
 use platform::queries::types::EventRef;
-use platform::{AccountsProvider, CustomEventsProvider, EventsProvider};
+use platform::{AccountsProvider, AuthProvider, CustomEventsProvider, EventsProvider};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, StatusCode};
 use std::env::temp_dir;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use convert_case::Casing;
 use tokio::time::{sleep};
 use uuid::Uuid;
+use common::rbac::OrganizationRole;
 use platform::auth::auth::{AccessClaims, make_access_token, make_password_hash};
 use platform::auth::LogInRequest;
 use platform::auth::types::TokenResponse;
 
 #[tokio::test]
-async fn test_custom_events() -> Result<()> {
+async fn test_auth() -> Result<()> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
     let store = Arc::new(Store::new(path));
     let md_accs = Arc::new(metadata::accounts::Provider::new(store.clone()));
+    let md_accs_clone1 = md_accs.clone();
+    let md_accs_clone2 = md_accs.clone();
+    let md_events = Arc::new(metadata::events::Provider::new(store.clone()));
+    let md_events_clone = md_events.clone();
 
+    let token_secret = "secret".to_string();
     tokio::spawn(async {
-        let md_events = Arc::new(metadata::events::Provider::new(store.clone()));
-        let events_prov = Arc::new(EventsProvider::new(md_events));
-        let auth_prov = Arc::new(metadata::auth::Provider::new(store.clone()));
+        let events_prov = Arc::new(EventsProvider::new(md_events_clone));
+        let auth_prov = Arc::new(AuthProvider::new(
+            md_accs_clone1,
+            Duration::days(1),
+            token_secret,
+        ));
+
 
         let mut router = events::attach_routes(Router::new(), events_prov);
         router = auth::attach_routes(router, auth_prov);
+        router = router.layer(AddExtensionLayer::new(md_accs_clone2));
+
         let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
         Server::bind(&addr)
-            .serve(app.into_make_service())
+            .serve(router.into_make_service())
             .await
             .unwrap();
     });
@@ -49,19 +62,16 @@ async fn test_custom_events() -> Result<()> {
 
     let pwd = "password".to_string();
     let acc1 = md_accs.create(metadata::accounts::CreateAccountRequest {
-        created_by: 0,
+        created_by: Some(1),
         password_hash: make_password_hash(pwd.as_str())?.to_string(),
         email: "1@mail.com".to_string(),
         first_name: None,
         last_name: None,
         role: None,
-        organizations: None,
+        organizations: Some(vec![(1, OrganizationRole::Admin)]),
         projects: None,
         teams: None,
     }).await?;
-
-    let claims = AccessClaims { exp: 0, account_id: acc1.id };
-    let token_key = "token";
 
     let cl = Client::new();
 
@@ -86,8 +96,7 @@ async fn test_custom_events() -> Result<()> {
             .send()
             .await
             .unwrap();
-        let status = resp.status();
-        assert_eq!(status, StatusCode::OK);
+        assert_eq!(resp.status(), StatusCode::OK);
         let resp: TokenResponse = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
 
         resp.access_token
@@ -96,13 +105,13 @@ async fn test_custom_events() -> Result<()> {
     let mut jwt_headers = headers.clone();
     jwt_headers.insert(
         http::header::AUTHORIZATION,
-        HeaderValue::from_str(format!("bearer {}", token).as_str()).unwrap(),
+        HeaderValue::from_str(format!("Bearer {}", access_token).as_str()).unwrap(),
     );
 
     {
         let resp = cl
             .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events")
-            .headers(jwt_headers.clone())
+            .headers(headers.clone())
             .send()
             .await
             .unwrap();

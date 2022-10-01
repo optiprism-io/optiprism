@@ -5,6 +5,7 @@ use axum::extract::Path;
 use axum::{extract::Extension, routing, AddExtensionLayer, Json, Router};
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
+use metadata::Metadata;
 
 async fn create(
     ctx: Context,
@@ -64,7 +65,7 @@ async fn delete(
 }
 
 
-pub fn attach_routes(router: Router, accounts: Arc<AccountsProvider>) -> Router {
+pub fn attach_routes(router: Router, accounts: Arc<AccountsProvider>, md_accounts: Arc<metadata::accounts::Provider>) -> Router {
     router
         .route(
             "/v1/accounts",
@@ -74,5 +75,6 @@ pub fn attach_routes(router: Router, accounts: Arc<AccountsProvider>) -> Router 
             "/v1/accounts/:id",
             routing::get(get_by_id).delete(delete).put(update),
         )
+        .layer(AddExtensionLayer::new(md_accounts))
         .layer(AddExtensionLayer::new(accounts))
 }

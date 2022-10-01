@@ -2,7 +2,7 @@ use crate::custom_events::types::{
     CreateCustomEventRequest, CustomEvent, UpdateCustomEventRequest,
 };
 use crate::{Context, Result};
-use common::rbac::Permission;
+use common::rbac::{Permission, ProjectPermission};
 use metadata::custom_events;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
@@ -23,9 +23,10 @@ impl Provider {
         project_id: u64,
         req: CreateCustomEventRequest,
     ) -> Result<CustomEvent> {
-        ctx.check_permission(organization_id, project_id, Permission::CreateCustomEvent)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+
         let md_req = metadata::custom_events::CreateCustomEventRequest {
-            created_by: ctx.account_id,
+            created_by: ctx.account_id.unwrap(),
             tags: req.tags,
             name: req.name,
             description: req.description,
@@ -53,7 +54,7 @@ impl Provider {
         project_id: u64,
         id: u64,
     ) -> Result<CustomEvent> {
-        ctx.check_permission(organization_id, project_id, Permission::GetCustomEventById)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
         Ok(self
             .prov
             .get_by_id(organization_id, project_id, id)
@@ -67,7 +68,8 @@ impl Provider {
         organization_id: u64,
         project_id: u64,
     ) -> Result<ListResponse<CustomEvent>> {
-        ctx.check_permission(organization_id, project_id, Permission::ListCustomEvents)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+
         let resp = self.prov.list(organization_id, project_id).await?;
         Ok(ListResponse {
             data: resp
@@ -87,10 +89,10 @@ impl Provider {
         event_id: u64,
         req: UpdateCustomEventRequest,
     ) -> Result<CustomEvent> {
-        ctx.check_permission(organization_id, project_id, Permission::UpdateCustomEvent)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
         let mut md_req = metadata::custom_events::UpdateCustomEventRequest::default();
-        let _ = md_req.updated_by = ctx.account_id;
+        let _ = md_req.updated_by = ctx.account_id.unwrap();
         let _ = md_req.tags = req.tags;
         let _ = md_req.name = req.name;
         let _ = md_req.description = req.description;
@@ -120,7 +122,8 @@ impl Provider {
         project_id: u64,
         id: u64,
     ) -> Result<CustomEvent> {
-        ctx.check_permission(organization_id, project_id, Permission::DeleteCustomEvent)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
+
         Ok(self
             .prov
             .delete(organization_id, project_id, id)

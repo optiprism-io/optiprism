@@ -10,6 +10,7 @@ use common::{
     rbac::{Permission, Role},
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 use axum::extract::Extension;
 use common::rbac::{ORGANIZATION_PERMISSIONS, OrganizationPermission, OrganizationRole, PERMISSIONS, PROJECT_PERMISSIONS, ProjectPermission, ProjectRole};
 use crate::auth::auth::parse_access_token;
@@ -39,7 +40,7 @@ impl Context {
                 }
             }
         }
-        Err(PlatformError::Forbidden)
+        Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
     pub fn check_organization_permission(&self, organization_id: u64, permission: OrganizationPermission) -> Result<()> {
@@ -52,7 +53,7 @@ impl Context {
             }
         }
 
-        Err(PlatformError::Forbidden)
+        Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
     pub fn check_project_permission(&self, organization_id: u64, project_id: u64, permission: ProjectPermission) -> Result<()> {
@@ -75,7 +76,7 @@ impl Context {
             }
         }
 
-        Err(PlatformError::Forbidden)
+        Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
     fn get_organization_role(&self, organization_id: u64) -> Result<OrganizationRole> {
@@ -87,7 +88,7 @@ impl Context {
             }
         }
 
-        Err(PlatformError::Forbidden)
+        Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
     fn get_project_role(&self, project_id: u64) -> Result<ProjectRole> {
@@ -99,7 +100,7 @@ impl Context {
             }
         }
 
-        Err(PlatformError::Forbidden)
+        Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 }
 
@@ -114,17 +115,17 @@ impl<B> FromRequest<B> for Context
         let TypedHeader(Authorization(bearer)) =
             TypedHeader::<Authorization<Bearer>>::from_request(req)
                 .await
-                .map_err(|err| PlatformError::Unauthorized)?;
+                .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
 
-        let Extension(auth_prov) = Extension::<auth::Provider>::from_request(req)
+        let Extension(auth_prov) = Extension::<Arc<auth::Provider>>::from_request(req)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
-        let claims = parse_access_token(bearer.token(), &auth_prov.access_token_key)?;
-
-        let Extension(md_acc_prov) = Extension::<metadata::accounts::Provider>::from_request(req)
+        let claims = parse_access_token(bearer.token(), &auth_prov.access_token_key).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;;
+        let Extension(md_acc_prov) = Extension::<Arc<metadata::accounts::Provider>>::from_request(req)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
+
         let acc = md_acc_prov.get_by_id(claims.account_id).await?;
         let ctx = Context {
             account_id: Some(acc.id),

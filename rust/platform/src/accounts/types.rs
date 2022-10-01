@@ -25,8 +25,8 @@ pub struct Account {
 impl TryInto<metadata::accounts::Account> for Account {
     type Error = PlatformError;
 
-    fn try_into(self) -> Result<metadata::accounts::Account, Self::Error> {
-        Ok(metadata::accounts::Account{
+    fn try_into(self) -> std::result::Result<metadata::accounts::Account, Self::Error> {
+        Ok(metadata::accounts::Account {
             id: self.id,
             created_at: self.created_at,
             created_by: self.created_by,
@@ -39,7 +39,29 @@ impl TryInto<metadata::accounts::Account> for Account {
             role: self.role,
             organizations: self.organizations,
             projects: self.projects,
-            teams: self.teams
+            teams: self.teams,
+        })
+    }
+}
+
+impl TryInto<Account> for metadata::accounts::Account {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<Account, Self::Error> {
+        Ok(Account {
+            id: self.id,
+            created_at: self.created_at,
+            created_by: self.created_by,
+            updated_at: self.updated_at,
+            updated_by: self.updated_by,
+            password_hash: self.password_hash,
+            email: self.email,
+            first_name: self.first_name,
+            last_name: self.last_name,
+            role: self.role,
+            organizations: self.organizations,
+            projects: self.projects,
+            teams: self.teams,
         })
     }
 }

@@ -5,6 +5,7 @@ use crate::queries::property_values::PropertyValues;
 use crate::Context;
 use crate::Result;
 use std::sync::Arc;
+use common::rbac::ProjectPermission;
 
 pub struct QueryProvider {
     query: Arc<query::QueryProvider>,
@@ -22,10 +23,12 @@ impl QueryProvider {
         project_id: u64,
         req: EventSegmentation,
     ) -> Result<DataTable> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ExploreReports)?;
+
         let lreq = req.try_into()?;
         let result = self
             .query
-            .event_segmentation(query::Context::new(organization_id,project_id), lreq)
+            .event_segmentation(query::Context::new(organization_id, project_id), lreq)
             .await?;
 
         result.try_into()
@@ -34,14 +37,16 @@ impl QueryProvider {
     pub async fn property_values(
         &self,
         ctx: Context,
-        _organization_id: u64,
+        organization_id: u64,
         project_id: u64,
         req: PropertyValues,
     ) -> Result<property_values::ListResponse> {
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ExploreReports)?;
+
         let lreq = req.try_into()?;
         let result = self
             .query
-            .property_values(query::Context::new(organization_id,project_id), lreq)
+            .property_values(query::Context::new(organization_id, project_id), lreq)
             .await?;
 
         result.try_into()

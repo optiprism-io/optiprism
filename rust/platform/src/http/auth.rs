@@ -7,20 +7,23 @@ use std::sync::Arc;
 use crate::auth::types::TokenResponse;
 
 async fn sign_up(
-    ctx: Context,
     Extension(provider): Extension<Arc<AuthProvider>>,
     Json(request): Json<SignUpRequest>,
 ) -> Result<Json<TokenResponse>> {
-    Ok(Json(provider.sign_up(ctx, request).await?))
+    Ok(Json(provider.sign_up(request).await?))
 }
 
 #[axum_debug::debug_handler]
 async fn log_in(
-    ctx: Context,
     Extension(provider): Extension<Arc<AuthProvider>>,
     Json(request): Json<LogInRequest>,
-) -> Result<Json<TokensResponse>> {
-    Ok(Json(provider.log_in(ctx, request).await?))
+) -> Result<Json<TokenResponse>> {
+    Ok(Json(provider.log_in(request).await?))
+}
+
+// String works too
+async fn dd() -> String {
+    "Hello, World!".to_string()
 }
 
 pub fn attach_routes(router: Router, auth: Arc<AuthProvider>) -> Router {

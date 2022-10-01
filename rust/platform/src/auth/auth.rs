@@ -1,6 +1,6 @@
 use crate::error::Result;
 
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -8,8 +8,11 @@ use std::{collections::HashMap, env::var};
 use argon2::Argon2;
 use password_hash::PasswordHash;
 use metadata::accounts::Account;
+use crate::auth::types::TokenResponse;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+#[serde_with::serde_as]
 pub struct AccessClaims {
     pub exp: i64,
     pub account_id: u64,
@@ -20,16 +23,16 @@ pub fn make_token<T: Serialize>(claims: T, key: impl AsRef<[u8]>) -> Result<Stri
         alg: Algorithm::HS512,
         ..Default::default()
     };
-    Ok(encode(&header, &claims, &EncodingKey::from_secret(key))?)
+    Ok(encode(&header, &claims, &EncodingKey::from_secret(key.as_ref()))?)
 }
 
-pub fn make_access_token(expires: Duration, account_id:u64,token_key: impl AsRef<[u8]>) -> Result<String> {
+pub fn make_access_token(expires: Duration, account_id: u64, token_key: impl AsRef<[u8]>) -> Result<String> {
     Ok(make_token(
         AccessClaims {
-            exp: Utc::now().add(expires).timestamp(),
+            exp: (Utc::now() + expires).timestamp(),
             account_id,
         },
-        token_key.as_bytes(),
+        token_key,
     )?)
 }
 
@@ -42,25 +45,9 @@ pub fn parse_access_token(value: &str, token_key: impl AsRef<[u8]>) -> Result<Ac
     Ok(token.claims)
 }
 
-fn make_token_response(
-    account: &Account,
-    access_token_duration: Duration,
-    access_token_key: impl AsRef<[u8]>,
-) -> Result<String> {
-    Ok(TokenResponse {
-        access_token: make_token(
-            AccessClaims {
-                exp: Utc::now().add(access_token_duration).timestamp(),
-                account_id,
-            },
-            access_token_key,
-        )?
-    })
-}
-
-pub fn make_password_hash(password: &str) -> Result<PasswordHash> {
+pub fn make_password_hash(password: &str) -> Result<String> {
     let salt = password_hash::SaltString::generate(rand::thread_rng());
-    Ok(password_hash::PasswordHash::generate(
+    let hash = password_hash::PasswordHash::generate(
         argon2::Argon2::new(
             argon2::Algorithm::Argon2d,
             argon2::Version::V0x10,
@@ -68,9 +55,11 @@ pub fn make_password_hash(password: &str) -> Result<PasswordHash> {
         ),
         password,
         salt.as_str(),
-    )?)
+    )?;
+
+    Ok(hash.to_string())
 }
 
 pub fn verify_password(password: impl AsRef<[u8]>, password_hash: PasswordHash) -> Result<()> {
-    Ok(password_hash.verify_password(&[Argon2::default()], password)?)
+    Ok(password_hash.verify_password(&[&Argon2::default()], password)?)
 }
