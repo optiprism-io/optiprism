@@ -63,11 +63,11 @@ impl Provider {
         ctx.check_permission(Permission::ManageAccounts)?;
 
         let mut md_req = metadata::accounts::UpdateAccountRequest::default();
-        let _ = md_req.updated_by = ctx.account_id.unwrap();
+        md_req.updated_by = ctx.account_id.unwrap();
         if let Some(password) = req.password {
             md_req
                 .password
-                .insert(make_password_hash(password.as_str())?.to_string());
+                .insert(make_password_hash(password.as_str())?);
         }
         if let Some(email) = req.email {
             md_req.email.insert(email);

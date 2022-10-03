@@ -97,10 +97,10 @@ impl Provider {
 
         let mut md_req = metadata::events::UpdateEventRequest::default();
         md_req.updated_by = ctx.account_id.unwrap();
-        md_req.tags.insert(req.tags);
-        md_req.display_name.insert(req.display_name);
-        md_req.description.insert(req.description);
-        md_req.status.insert(req.status);
+        md_req.tags = req.tags;
+        md_req.display_name = req.display_name;
+        md_req.description = req.description;
+        md_req.status = req.status;
         let event = self
             .prov
             .update(organization_id, project_id, event_id, md_req)

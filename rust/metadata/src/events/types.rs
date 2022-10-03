@@ -41,7 +41,7 @@ pub struct CreateEventRequest {
     pub custom_properties: Option<Vec<u64>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct UpdateEventRequest {
     pub updated_by: u64,
     pub tags: OptionalProperty<Option<Vec<String>>>,

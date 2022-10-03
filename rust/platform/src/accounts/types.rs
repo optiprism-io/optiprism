@@ -66,7 +66,7 @@ impl TryInto<Account> for metadata::accounts::Account {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateAccountRequest {
     pub password: String,
@@ -79,7 +79,7 @@ pub struct CreateAccountRequest {
     pub teams: Option<Vec<(u64, Role)>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAccountRequest {
     pub salt: OptionalProperty<String>,

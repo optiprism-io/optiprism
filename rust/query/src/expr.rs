@@ -138,11 +138,7 @@ pub async fn event_filters_expression(
                     metadata,
                     property,
                     operation,
-                    value.to_owned().map(|v| {
-                        v.iter()
-                            .map(|v| v.clone().into())
-                            .collect::<Vec<ScalarValue>>()
-                    }),
+                    value.clone(),
                 )),
             }
         })

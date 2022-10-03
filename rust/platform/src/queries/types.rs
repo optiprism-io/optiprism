@@ -402,8 +402,8 @@ impl TryInto<EventFilter> for common::types::EventFilter {
                 operation,
                 value,
             } => EventFilter::Property {
-                property: property.to_owned().try_into()?,
-                operation: operation.to_owned().try_into()?,
+                property: property.try_into()?,
+                operation: operation.try_into()?,
                 value: match value {
                     None => None,
                     Some(v) => Some(v.iter().map(scalar_to_json_value).collect::<Result<_>>()?),

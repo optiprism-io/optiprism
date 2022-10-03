@@ -189,11 +189,11 @@ impl Provider {
         organization_id: u64,
         project_id: u64,
     ) -> Result<ListResponse<CustomEvent>> {
-        Ok(list(
+        list(
             self.store.clone(),
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
         )
-        .await?)
+        .await
     }
 
     pub async fn update(

@@ -8,7 +8,7 @@ mod tests {
 
     use arrow::util::pretty::print_batches;
 
-    use datafusion::physical_plan::{collect, PhysicalPlanner};
+    use datafusion::physical_plan::collect;
     use datafusion::prelude::{SessionConfig, SessionContext};
 
     use datafusion::execution::runtime_env::RuntimeEnv;

@@ -66,7 +66,7 @@ impl TryInto<Event> for metadata::custom_events::Event {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomEvent {
     pub id: u64,
@@ -108,7 +108,7 @@ impl TryInto<CustomEvent> for metadata::custom_events::CustomEvent {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCustomEventRequest {
     pub tags: Option<Vec<String>>,
@@ -119,7 +119,7 @@ pub struct CreateCustomEventRequest {
     pub events: Vec<Event>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCustomEventRequest {
     pub tags: OptionalProperty<Option<Vec<String>>>,

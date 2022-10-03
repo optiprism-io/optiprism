@@ -79,8 +79,7 @@ async fn test_event_properties() -> Result<()> {
     );
     // list without props should be empty
     {
-        let _ = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties")
+        cl.get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties")
             .headers(headers.clone())
             .send()
             .await

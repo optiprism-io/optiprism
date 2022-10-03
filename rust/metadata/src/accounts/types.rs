@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use common::types::OptionalProperty;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Account {
     pub id: u64,
     pub created_at: DateTime<Utc>,
@@ -21,7 +21,7 @@ pub struct Account {
     pub teams: Option<Vec<(u64, Role)>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CreateAccountRequest {
     pub created_by: Option<u64>,
     pub password_hash: String,
@@ -54,7 +54,7 @@ impl CreateAccountRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct UpdateAccountRequest {
     pub updated_by: u64,
     pub password: OptionalProperty<String>,

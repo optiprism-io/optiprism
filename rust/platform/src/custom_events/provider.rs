@@ -94,7 +94,7 @@ impl Provider {
         md_req.updated_by = ctx.account_id.unwrap();
         md_req.tags = req.tags;
         md_req.name = req.name;
-        let _ = md_req.description = req.description;
+        md_req.description = req.description;
         if let Some(status) = req.status {
             md_req.status.insert(status.into());
         }
