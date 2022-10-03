@@ -1,19 +1,19 @@
 use super::{SignUpRequest};
-use crate::{Context, PlatformError, Result};
-use chrono::{Duration, Utc};
-use common::rbac::{Permission, Role};
+use crate::{PlatformError, Result};
+use chrono::{Duration};
 
-use crate::auth::auth::{make_access_token, make_password_hash, verify_password, AccessClaims, make_refresh_token, parse_refresh_token};
+
+use crate::auth::auth::{make_access_token, make_password_hash, verify_password, make_refresh_token, parse_refresh_token};
 use crate::auth::types::TokensResponse;
-use crate::error::AuthError;
-use argon2::Algorithm::Argon2d;
-use metadata::accounts::Account;
-use metadata::error::{AccountError, MetadataError};
+
+
+
+
 use metadata::{
-    accounts::CreateAccountRequest, organizations::CreateOrganizationRequest, Metadata,
+    accounts::CreateAccountRequest,
 };
 use password_hash::PasswordHash;
-use std::{collections::HashMap, ops::Add, sync::Arc};
+use std::{sync::Arc};
 
 #[derive(Clone)]
 pub struct Provider {

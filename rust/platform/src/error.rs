@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::{error, result};
+use std::{result};
 
 use axum::{
     http::StatusCode,

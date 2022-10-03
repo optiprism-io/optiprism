@@ -1,4 +1,4 @@
-use crate::{accounts, auth, PlatformError};
+use crate::{auth, PlatformError};
 use crate::Result;
 use axum::{
     async_trait,
@@ -9,7 +9,7 @@ use axum::{
 use common::{
     rbac::{Permission, Role},
 };
-use std::collections::HashMap;
+
 use std::sync::Arc;
 use axum::extract::Extension;
 use common::rbac::{ORGANIZATION_PERMISSIONS, OrganizationPermission, OrganizationRole, PERMISSIONS, PROJECT_PERMISSIONS, ProjectPermission, ProjectRole};

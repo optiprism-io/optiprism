@@ -2,7 +2,7 @@ use crate::custom_events::types::{
     CreateCustomEventRequest, CustomEvent, UpdateCustomEventRequest,
 };
 use crate::{Context, Result};
-use common::rbac::{Permission, ProjectPermission};
+use common::rbac::{ProjectPermission};
 use metadata::custom_events;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;

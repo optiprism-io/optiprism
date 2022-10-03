@@ -1,14 +1,14 @@
 use crate::error::Result;
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env::var};
+
 use argon2::Argon2;
 use password_hash::PasswordHash;
-use metadata::accounts::Account;
-use crate::auth::types::TokensResponse;
+
+
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

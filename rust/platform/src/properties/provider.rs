@@ -1,6 +1,6 @@
 use crate::properties::UpdatePropertyRequest;
 use crate::{Context, Result};
-use common::rbac::{Permission, ProjectPermission};
+use common::rbac::{ProjectPermission};
 use metadata::metadata::ListResponse;
 use metadata::properties::provider::Namespace;
 use metadata::properties::provider::Provider as PropertiesProvider;

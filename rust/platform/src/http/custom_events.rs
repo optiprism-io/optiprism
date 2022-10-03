@@ -7,7 +7,7 @@ use crate::custom_events::types::{
 use axum::{extract::Extension, routing, AddExtensionLayer, Json, Router};
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
-use axum::extract::extractor_middleware::ExtractorMiddleware;
+
 
 async fn create(
     ctx: Context,

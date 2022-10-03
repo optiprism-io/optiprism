@@ -1,10 +1,10 @@
 use crate::auth::types::TokensResponse;
 use crate::{
     auth::types::{SignUpRequest},
-    AuthProvider, Context, Result,
+    AuthProvider, Result,
 };
-use axum::response::{IntoResponse, Response};
-use axum::{extract::Extension, http, routing::post, AddExtensionLayer, Json, Router};
+
+use axum::{extract::Extension, routing::post, AddExtensionLayer, Json, Router};
 use reqwest::StatusCode;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
