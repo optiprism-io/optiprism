@@ -102,7 +102,7 @@ impl From<PropValueOperation> for Operator {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum EventFilter {
     Property {
         property: PropertyRef,
