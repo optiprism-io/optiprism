@@ -78,7 +78,9 @@
     "sync": "Sync the query data between reports",
     "save": "Save report",
     "saved": "Report saved",
-    "selectReport": "Select Report"
+    "selectReport": "Select Report",
+    "delete": "Delete report",
+    "deleteConfirm": "You definitely want to delete the report: :name?"
   },
 
   "events": {

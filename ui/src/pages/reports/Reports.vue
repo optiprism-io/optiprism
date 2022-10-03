@@ -19,14 +19,30 @@
                         @on-input="setNameReport"
                     />
                 </div>
+                <UiButton
+                    v-show="reportsStore.reportId"
+                    class="pf-u-ml-auto pf-m-link pf-m-danger"
+                    :progress="reportsStore.saveLoading"
+                    :before-icon="'fas fa-trash'"
+                    @click="onDeleteReport"
+                >
+                    {{ $t('reports.delete') }}
+                </UiButton>
                 <UiSwitch
-                    class="pf-u-ml-auto"
+                    :class="{
+                        'pf-u-ml-lg': reportsStore.reportId,
+                        'pf-u-ml-auto': !reportsStore.reportId,
+                    }"
                     :value="commonStore.syncReports"
                     :label="$t('reports.sync')"
                     @input="(value: boolean) => commonStore.syncReports = value"
                 />
-                <div class="pf-u-ml-lg">
+                <div
+                    v-if="itemsReports.length"
+                    class="pf-u-ml-lg"
+                >
                     <UiSelect
+                        class="report__select"
                         :items="itemsReports"
                         :text-button="reportSelectText"
                         :selections="[reportsStore.reportId]"
@@ -35,7 +51,6 @@
                 </div>
                 <UiButton
                     class="pf-m-primary pf-u-ml-lg"
-                    :progress="reportsStore.saveLoading"
                     @click="onSaveReport"
                 >
                     {{ $t('reports.save') }}
@@ -56,6 +71,7 @@ import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { ReportReportTypeEnum } from '@/api'
 import { reportToStores } from '@/utils/reportsMappings'
 
+import useConfirm from '@/hooks/useConfirm'
 import { useReportsStore } from '@/stores/reports/reports'
 import { useCommonStore } from '@/stores/common'
 import { useFilterGroupsStore } from '@/stores/reports/filters'
@@ -79,6 +95,7 @@ const filterGroupsStore = useFilterGroupsStore()
 const segmentsStore = useSegmentsStore()
 const breakdownsStore = useBreakdownsStore()
 const stepsStore = useStepsStore()
+const { confirm } = useConfirm()
 
 const reportName = ref(t('reports.untitledReport'))
 
@@ -127,6 +144,23 @@ const setNameReport = (payload: string) => {
     reportName.value = payload
 }
 
+const onDeleteReport = async () => {
+    try {
+        await confirm(t('reports.deleteConfirm', { name: `<b>${reportsStore?.activeReport?.name}</b>` || '' }), {
+            applyButton: t('common.apply'),
+            cancelButton: t('common.cancel'),
+            title: t('reports.delete'),
+            applyButtonClass: 'pf-m-danger',
+        })
+
+        reportsStore.deleteReport(reportsStore.reportId)
+        setEmptyReport()
+        reportsStore.getList()
+    } catch(error) {
+        reportsStore.loading = false
+    }
+}
+
 const onSaveReport = async () => {
     const reportType = pagesMap.reportsEventSegmentation.name === route.name ?
         ReportReportTypeEnum.EventSegmentation :
@@ -146,15 +180,19 @@ const onSaveReport = async () => {
     await reportsStore.getList()
 }
 
+const setEmptyReport = () => {
+    reportsStore.reportId = 0
+    reportName.value = t('reports.untitledReport')
+    eventsStore.$reset()
+    filterGroupsStore.$reset()
+    segmentsStore.$reset()
+    breakdownsStore.$reset()
+    stepsStore.$reset()
+}
+
 const onSelectTab = () => {
     if (reportsStore.reportId) {
-        reportsStore.reportId = 0
-        reportName.value = t('reports.untitledReport')
-        eventsStore.$reset()
-        filterGroupsStore.$reset()
-        segmentsStore.$reset()
-        breakdownsStore.$reset()
-        stepsStore.$reset()
+        setEmptyReport()
     }
 }
 
@@ -200,6 +238,10 @@ onMounted(async () => {
         .pf-c-inline-edit__value {
             font-size: 20px;
         }
+    }
+
+    &__select {
+        width: 200px;
     }
 }
 

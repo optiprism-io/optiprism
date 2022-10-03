@@ -70,7 +70,7 @@ export const useReportsStore = defineStore('reports', {
             try {
                 const res = await reportsService.reportsList(commonStore.organizationId, commonStore.projectId)
 
-                if (res.data?.dashboards?.length) {
+                if (res.data?.dashboards) {
                     this.list = res.data.dashboards
                 }
             } catch (e) {
@@ -105,6 +105,11 @@ export const useReportsStore = defineStore('reports', {
                 report: getReport(type)
             })
             this.saveLoading = false
-        }
+        },
+        async deleteReport(reportId: number) {
+            const commonStore = useCommonStore()
+
+            await reportsService.deleteReport(commonStore.organizationId, commonStore.projectId, Number(reportId))
+        },
     },
 })

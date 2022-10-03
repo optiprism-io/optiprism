@@ -37,6 +37,7 @@
 
 <script setup lang="ts">
 import UiSpinner from './UiSpinner.vue';
+import UiIcon from '@/components/uikit/UiIcon.vue'
 
 interface Props {
     active?: boolean;

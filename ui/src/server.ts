@@ -191,6 +191,11 @@ export default function ({ environment = 'development' } = {}) {
                 return schema.db.reports.update(request.params.report_id, body)
             })
 
+            this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
+                schema.db.reports.remove(request.params.report_id)
+                return request.params.report_id;
+            })
+
             this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/reports/event-segmentation`, (_, request) => {
                 const body = JSON.parse(request.requestBody);
 

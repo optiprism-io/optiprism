@@ -3,9 +3,9 @@
         <div
             ref="popupWrapper"
             class="ui-popup-window__wrapper"
+            @mousedown="onClickOutside"
         >
             <div
-                v-click-outside="onClickOutside"
                 class="pf-c-modal-box ui-popup-window__box"
                 :class="[
                     props.size,
@@ -16,6 +16,7 @@
                 aria-modal="true"
                 aria-labelledby="modal-title"
                 aria-describedby="modal-description"
+                @mousedown.stop
             >
                 <button
                     v-if="closable"
@@ -44,7 +45,11 @@
                     </div>
                 </header>
                 <div class="pf-c-modal-box__body pf-u-mb-md pf-u-pb-md">
-                    <slot />
+                    <div
+                        v-if="props.content"
+                        v-html="props.content"
+                    />
+                    <slot v-else />
                 </div>
                 <footer
                     v-if="props.applyButton || props.cancelButton"
@@ -56,7 +61,6 @@
                             class="pf-c-action-list__item"
                         >
                             <UiButton
-                                class="pf-m-primary"
                                 :class="props.applyButtonClass || 'pf-m-primary'"
                                 type="button"
                                 :disabled="props.applyLoading || props.applyDisabled"
@@ -89,15 +93,15 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 import getScrollbarWidth from '@/helpers/getScrollbarWidth'
-
 import UiButton from '@/components/uikit/UiButton.vue'
 
-interface Props {
+export interface Props {
     title?: string
     description?: string
     applyButton?: string
     applyButtonClass?: string
     cancelButton?: string
+    content?: string
 
     closable?: boolean
     applyLoading?: boolean
@@ -105,6 +109,7 @@ interface Props {
     saveBodyOverflow?: boolean
     noRemoveBodyOverflow?: boolean
     fullWidth?: boolean
+    closableOverlay?: boolean
 
     size?: 'pf-m-md' | 'pf-m-sm' | 'pf-m-lg' | null
     centered?: boolean
@@ -121,6 +126,7 @@ const props = withDefaults(defineProps<Props>(), {
     closable: true,
     fullWidth: true,
     centered: false,
+    closableOverlay: true,
 })
 
 const emit = defineEmits<{
@@ -134,6 +140,9 @@ const popupWrapper = ref<HTMLDivElement>()
 const initialBodyOverflow = ref('')
 
 const onClickOutside = (e: MouseEvent) => {
+    if (!props.closableOverlay) {
+        return;
+    }
     const popupWrapperElement = popupWrapper.value
     const clickScroll = popupWrapperElement && popupWrapperElement.clientWidth < e.x
 

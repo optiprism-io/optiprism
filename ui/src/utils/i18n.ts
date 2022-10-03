@@ -1,6 +1,6 @@
 type Dictionary = { [key: string]: string }
 type Placements = { [index: string]: any }
-export type $T = (key: string) => string
+export type $T = (key: string, placements?: Placements) => string
 export type I18N = { $t: $T }
 
 const validateKey = (key?: string) => {
