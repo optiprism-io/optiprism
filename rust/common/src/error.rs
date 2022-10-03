@@ -1,9 +1,10 @@
 use datafusion_common::DataFusionError;
 use jsonwebtoken::errors::Error as JWTError;
-use std::result;
+use std::{error, result};
 use thiserror::Error;
 
 pub type Result<T> = result::Result<T, CommonError>;
+pub type GenericError = Box<dyn error::Error + Send + Sync>;
 
 #[derive(Error, Debug)]
 pub enum CommonError {
@@ -12,3 +13,4 @@ pub enum CommonError {
     #[error("JWTError: {0:?}")]
     JWTError(#[from] JWTError),
 }
+

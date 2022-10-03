@@ -50,6 +50,10 @@ pub enum PlatformError {
     Common(#[from] CommonError),
     #[error("session: {0:?}")]
     Auth(#[from] AuthError),
+    #[error("axum: {0:?}")]
+    Axum(#[from] axum::http::Error),
+    #[error("other: {0:?}")]
+    Other(#[from] anyhow::Error)
 }
 
 #[derive(Serialize, Debug)]
@@ -211,6 +215,8 @@ impl IntoResponse for PlatformError {
             PlatformError::Forbidden(err) => ErrorResponse::forbidden(err),
             PlatformError::PasswordHash(err) => ErrorResponse::internal(format!("{:?}", err)),
             PlatformError::JSONWebToken(err) => ErrorResponse::internal(format!("{:?}", err)),
+            PlatformError::Axum(err) => ErrorResponse::internal(err.to_string()),
+            PlatformError::Other(err) => ErrorResponse::internal(err.to_string()),
         };
 
         (status_code, Json(error_response)).into_response()

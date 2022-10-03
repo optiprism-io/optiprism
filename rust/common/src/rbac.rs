@@ -75,14 +75,19 @@ lazy_static! {
             ProjectPermission::InviteMembers,
             ProjectPermission::ManageMembers,
             ProjectPermission::ExploreReports,
-            ProjectPermission::ManageReports
+            ProjectPermission::ManageReports,
+            ProjectPermission::ViewSchema,
+            ProjectPermission::ManageSchema,
         ]),
         (ProjectRole::Member,vec![
             ProjectPermission::ExploreReports,
-            ProjectPermission::ManageReports
+            ProjectPermission::ManageReports,
+            ProjectPermission::ViewSchema,
+            ProjectPermission::ManageSchema,
         ]),
         (ProjectRole::Reader,vec![
             ProjectPermission::ExploreReports,
+            ProjectPermission::ViewSchema,
         ])
     ];
 }

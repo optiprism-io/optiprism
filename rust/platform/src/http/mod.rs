@@ -18,5 +18,6 @@ pub fn attach_routes(mut router: Router, platform: PlatformProvider, md: Arc<Met
     router = properties::attach_event_routes(router, platform.event_properties.clone());
     router = properties::attach_user_routes(router, platform.user_properties.clone());
     router = queries::attach_routes(router, platform.query);
+
     router
 }

@@ -1,34 +1,58 @@
+use crate::auth::types::TokensResponse;
 use crate::{
-    auth::types::{LogInRequest, SignUpRequest},
+    auth::types::{SignUpRequest},
     AuthProvider, Context, Result,
 };
-use axum::{extract::Extension, routing::post, AddExtensionLayer, Json, Router};
+use axum::response::{IntoResponse, Response};
+use axum::{extract::Extension, http, routing::post, AddExtensionLayer, Json, Router};
+use reqwest::StatusCode;
 use std::sync::Arc;
-use crate::auth::types::TokenResponse;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LogInRequest {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshTokensRequest {
+    pub refresh_token: String,
+}
 
 async fn sign_up(
     Extension(provider): Extension<Arc<AuthProvider>>,
-    Json(request): Json<SignUpRequest>,
-) -> Result<Json<TokenResponse>> {
-    Ok(Json(provider.sign_up(request).await?))
+    Json(req): Json<SignUpRequest>,
+) -> Result<(StatusCode, Json<TokensResponse>)> {
+    Ok((StatusCode::CREATED, Json(provider.sign_up(req).await?)))
 }
 
-#[axum_debug::debug_handler]
 async fn log_in(
     Extension(provider): Extension<Arc<AuthProvider>>,
-    Json(request): Json<LogInRequest>,
-) -> Result<Json<TokenResponse>> {
-    Ok(Json(provider.log_in(request).await?))
+    Json(req): Json<LogInRequest>,
+) -> Result<Json<TokensResponse>> {
+    Ok(Json(
+        provider
+            .log_in(req.email.as_str(), req.password.as_str())
+            .await?,
+    ))
 }
 
-// String works too
-async fn dd() -> String {
-    "Hello, World!".to_string()
+async fn refresh_token(
+    Extension(provider): Extension<Arc<AuthProvider>>,
+    Json(req): Json<RefreshTokensRequest>,
+) -> Result<Json<TokensResponse>> {
+    Ok(Json(
+        provider.refresh_token(req.refresh_token.as_str()).await?,
+    ))
 }
 
 pub fn attach_routes(router: Router, auth: Arc<AuthProvider>) -> Router {
     router
         .route("/v1/auth/signup", post(sign_up))
         .route("/v1/auth/login", post(log_in))
+        .route("/v1/auth/refresh-token", post(refresh_token))
         .layer(AddExtensionLayer::new(auth))
 }

@@ -89,14 +89,17 @@ async fn main() -> Result<()> {
     );
     println!("total size: {}", ByteSize::b(data_size_bytes as u64));
 
-    let provider = Arc::new(MemTable::try_new(batches[0][0].schema(), batches)?);
-    let query_provider = Arc::new(QueryProvider::try_new_from_provider(md.clone(), provider)?);
+    let data_provider = Arc::new(MemTable::try_new(batches[0][0].schema(), batches)?);
+    let query_provider = Arc::new(QueryProvider::try_new_from_provider(md.clone(), data_provider)?);
     let platform_query_provider = Arc::new(platform::queries::provider::QueryProvider::new(
         query_provider,
     ));
+
     let platform = platform::PlatformProvider::new(
         md.clone(),
         platform_query_provider,
+        Duration::days(1),
+        "key".to_string(),
         Duration::days(1),
         "key".to_string(),
     );

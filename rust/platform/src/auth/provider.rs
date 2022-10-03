@@ -1,10 +1,10 @@
-use super::{LogInRequest, SignUpRequest};
+use super::{SignUpRequest};
 use crate::{Context, PlatformError, Result};
 use chrono::{Duration, Utc};
 use common::rbac::{Permission, Role};
 
-use crate::auth::auth::{make_access_token, make_password_hash, verify_password, AccessClaims};
-use crate::auth::types::TokenResponse;
+use crate::auth::auth::{make_access_token, make_password_hash, verify_password, AccessClaims, make_refresh_token, parse_refresh_token};
+use crate::auth::types::TokensResponse;
 use crate::error::AuthError;
 use argon2::Algorithm::Argon2d;
 use metadata::accounts::Account;
@@ -18,9 +18,11 @@ use std::{collections::HashMap, ops::Add, sync::Arc};
 #[derive(Clone)]
 pub struct Provider {
     accounts: Arc<metadata::accounts::Provider>,
-    // accesable from http auth mw
+    // accessible from http auth mw
     pub access_token_duration: Duration,
     pub access_token_key: String,
+    pub refresh_token_duration: Duration,
+    pub refresh_token_key: String,
 }
 
 impl Provider {
@@ -28,15 +30,19 @@ impl Provider {
         accounts: Arc<metadata::accounts::Provider>,
         access_token_duration: Duration,
         access_token_key: String,
+        refresh_token_duration: Duration,
+        refresh_token_key: String,
     ) -> Self {
         Self {
             accounts,
             access_token_duration,
             access_token_key,
+            refresh_token_duration,
+            refresh_token_key,
         }
     }
 
-    pub async fn sign_up(&self, req: SignUpRequest) -> Result<TokenResponse> {
+    pub async fn sign_up(&self, req: SignUpRequest) -> Result<TokensResponse> {
         let account = self
             .accounts
             .create(CreateAccountRequest {
@@ -52,35 +58,39 @@ impl Provider {
             })
             .await?;
 
-        let access_token = make_access_token(
-            self.access_token_duration.clone(),
-            account.id,
-            &self.access_token_key,
-        )?;
+        let tokens = self.make_tokens(account.id).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
 
-        Ok(TokenResponse { access_token })
+        Ok(tokens)
     }
 
-    pub async fn log_in(&self, req: LogInRequest) -> Result<TokenResponse> {
+    pub async fn log_in(&self, email: &str, password: &str) -> Result<TokensResponse> {
         let account = self
             .accounts
-            .get_by_email(&req.email)
+            .get_by_email(email)
             .await
             .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
 
         verify_password(
-            req.password.as_str(),
+            password,
             PasswordHash::new(account.password_hash.as_str())?,
         ).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
 
-        let access_token = make_access_token(
-            self.access_token_duration.clone(),
-            account.id,
-            &self.access_token_key,
-        ).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+        let tokens = self.make_tokens(account.id).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
 
-        Ok(TokenResponse {
-            access_token,
+        Ok(tokens)
+    }
+
+    pub async fn refresh_token(&self, refresh_token: &str) -> Result<TokensResponse> {
+        let refresh_claims = parse_refresh_token(refresh_token, self.refresh_token_key.as_str()).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+        let tokens = self.make_tokens(refresh_claims.account_id).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+
+        Ok(tokens)
+    }
+
+    fn make_tokens(&self, account_id: u64) -> Result<TokensResponse> {
+        Ok(TokensResponse {
+            access_token: make_access_token(account_id, self.access_token_duration, self.access_token_key.as_str())?,
+            refresh_token: make_refresh_token(account_id, self.refresh_token_duration, self.refresh_token_key.as_str())?,
         })
     }
 }
