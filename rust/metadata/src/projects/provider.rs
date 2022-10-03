@@ -5,7 +5,7 @@ use chrono::Utc;
 
 use tokio::sync::RwLock;
 
-use crate::error::{EventError, MetadataError, ProjectError, StoreError};
+use crate::error::{MetadataError, ProjectError, StoreError};
 use crate::metadata::{ListResponse};
 use crate::store::index::hash_map::HashMap;
 use crate::store::{Store};

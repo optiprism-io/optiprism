@@ -4,7 +4,7 @@ use crate::store::Store;
 use crate::{error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
-use futures::lock::Mutex;
+
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use crate::metadata::ListResponse;

@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use common::rbac::Role;
+
 use common::types::OptionalProperty;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

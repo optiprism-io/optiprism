@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use common::rbac::{OrganizationRole, Permission, ProjectRole, Role};
+use common::rbac::{OrganizationRole, ProjectRole, Role};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
 use common::types::OptionalProperty;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

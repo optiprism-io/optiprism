@@ -17,6 +17,7 @@ async fn test_organizations() -> Result<()> {
     let _ = metadata
         .organizations
         .create(CreateOrganizationRequest {
+            created_by: 0,
             name: "organization1".into(),
         })
         .await
@@ -24,6 +25,7 @@ async fn test_organizations() -> Result<()> {
     let _ = metadata
         .organizations
         .create(CreateOrganizationRequest {
+            created_by: 0,
             name: "organization2".into(),
         })
         .await
@@ -31,10 +33,7 @@ async fn test_organizations() -> Result<()> {
 
     let list = metadata
         .organizations
-        .list(ListRequest {
-            offset: None,
-            limit: None,
-        })
+        .list()
         .await
         .unwrap();
 
