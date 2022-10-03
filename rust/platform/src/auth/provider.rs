@@ -3,7 +3,7 @@ use crate::{PlatformError, Result};
 use chrono::{Duration};
 
 
-use crate::auth::token::{make_access_token, make_password_hash, verify_password, make_refresh_token, parse_refresh_token};
+use crate::auth::token::{make_access_token, make_refresh_token, parse_refresh_token};
 use crate::auth::types::TokensResponse;
 
 
@@ -14,6 +14,7 @@ use metadata::{
 };
 use password_hash::PasswordHash;
 use std::{sync::Arc};
+use crate::auth::password::{make_password_hash, verify_password};
 
 #[derive(Clone)]
 pub struct Provider {

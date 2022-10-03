@@ -54,7 +54,7 @@ impl Context {
     }
 
     pub fn check_project_permission(&self, organization_id: u64, project_id: u64, permission: ProjectPermission) -> Result<()> {
-        if let Some(role) = self.get_organization_role(organization_id) {
+        if let Ok(role) = self.get_organization_role(organization_id) {
             match role {
                 OrganizationRole::Owner => return Ok(()),
                 OrganizationRole::Admin => return Ok(()),

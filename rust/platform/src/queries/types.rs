@@ -319,7 +319,7 @@ impl TryInto<EventRef> for common::types::EventRef {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "propertyType", rename_all = "camelCase")]
 pub enum PropertyRef {
     #[serde(rename_all = "camelCase")]

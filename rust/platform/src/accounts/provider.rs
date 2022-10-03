@@ -1,5 +1,4 @@
 use crate::accounts::types::{Account, CreateAccountRequest, UpdateAccountRequest};
-use crate::auth::token::make_password_hash;
 use crate::{Context, Result};
 use common::rbac::Permission;
 use metadata::accounts;
