@@ -22,7 +22,7 @@ use tokio::time::{sleep};
 use uuid::Uuid;
 use common::rbac::{OrganizationRole, ProjectRole, Role};
 use metadata::accounts::UpdateAccountRequest;
-use platform::auth::token::{AccessClaims, make_access_token, make_password_hash};
+use platform::auth::token::{AccessClaims, make_access_token};
 use platform::auth::{SignUpRequest};
 use platform::auth::types::TokensResponse;
 use platform::http::auth::{LogInRequest, RefreshTokensRequest};

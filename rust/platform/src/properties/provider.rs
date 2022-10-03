@@ -2,7 +2,7 @@ use crate::properties::UpdatePropertyRequest;
 use crate::{Context, Result};
 use common::rbac::{ProjectPermission};
 use metadata::metadata::ListResponse;
-use metadata::properties::provider::Namespace;
+
 use metadata::properties::provider::Provider as PropertiesProvider;
 use metadata::properties::Property;
 use std::sync::Arc;
