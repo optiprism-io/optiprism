@@ -3,7 +3,7 @@ extern crate log;
 
 use std::env::temp_dir;
 use std::path::PathBuf;
-use std::{env::set_var, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{Router, Server};
 use bytesize::ByteSize;
@@ -24,14 +24,6 @@ mod error;
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
-    // test env
-    {
-        set_var("FNP_COMMON_SALT", "FNP_COMMON_SALT");
-        set_var("FNP_EMAIL_TOKEN_KEY", "FNP_EMAIL_TOKEN_KEY");
-        set_var("FNP_ACCESS_TOKEN_KEY", "FNP_ACCESS_TOKEN_KEY");
-        set_var("FNP_REFRESH_TOKEN_KEY", "FNP_REFRESH_TOKEN_KEY");
-    }
-
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
     let store = Arc::new(Store::new(path));
