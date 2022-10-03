@@ -1,17 +1,17 @@
+pub mod accounts;
 pub mod auth;
 pub mod custom_events;
 pub mod events;
 pub mod properties;
 pub mod queries;
-pub mod accounts;
 
-use std::sync::Arc;
 use crate::PlatformProvider;
 use axum::Router;
 use metadata::Metadata;
+use std::sync::Arc;
 
 pub fn attach_routes(mut router: Router, platform: PlatformProvider, md: Arc<Metadata>) -> Router {
-    router = accounts::attach_routes(router, platform.accounts.clone(),md.accounts.clone());
+    router = accounts::attach_routes(router, platform.accounts.clone(), md.accounts.clone());
     router = auth::attach_routes(router, platform.auth.clone());
     router = events::attach_routes(router, platform.events.clone());
     router = custom_events::attach_routes(router, platform.custom_events.clone());

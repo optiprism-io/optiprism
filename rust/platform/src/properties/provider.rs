@@ -1,6 +1,6 @@
 use crate::properties::UpdatePropertyRequest;
 use crate::{Context, Result};
-use common::rbac::{ProjectPermission};
+use common::rbac::ProjectPermission;
 use metadata::metadata::ListResponse;
 
 use metadata::properties::provider::Provider as PropertiesProvider;
@@ -13,15 +13,11 @@ pub struct Provider {
 
 impl Provider {
     pub fn new_user(prov: Arc<PropertiesProvider>) -> Self {
-        Self {
-            prov,
-        }
+        Self { prov }
     }
 
     pub fn new_event(prov: Arc<PropertiesProvider>) -> Self {
-        Self {
-            prov,
-        }
+        Self { prov }
     }
 
     pub async fn get_by_id(

@@ -5,11 +5,6 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 
 use serde::{Deserialize, Serialize};
 
-
-
-
-
-
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 #[serde_with::serde_as]
@@ -17,7 +12,6 @@ pub struct AccessClaims {
     pub exp: i64,
     pub account_id: u64,
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -27,16 +21,23 @@ pub struct RefreshClaims {
     pub account_id: u64,
 }
 
-
 pub fn make_token<T: Serialize>(claims: T, key: impl AsRef<[u8]>) -> Result<String> {
     let header = Header {
         alg: Algorithm::HS512,
         ..Default::default()
     };
-    Ok(encode(&header, &claims, &EncodingKey::from_secret(key.as_ref()))?)
+    Ok(encode(
+        &header,
+        &claims,
+        &EncodingKey::from_secret(key.as_ref()),
+    )?)
 }
 
-pub fn make_access_token(account_id: u64, expires: Duration, token_key: impl AsRef<[u8]>) -> Result<String> {
+pub fn make_access_token(
+    account_id: u64,
+    expires: Duration,
+    token_key: impl AsRef<[u8]>,
+) -> Result<String> {
     make_token(
         AccessClaims {
             exp: (Utc::now() + expires).timestamp(),
@@ -46,7 +47,11 @@ pub fn make_access_token(account_id: u64, expires: Duration, token_key: impl AsR
     )
 }
 
-pub fn make_refresh_token(account_id: u64, expires: Duration, token_key: impl AsRef<[u8]>) -> Result<String> {
+pub fn make_refresh_token(
+    account_id: u64,
+    expires: Duration,
+    token_key: impl AsRef<[u8]>,
+) -> Result<String> {
     make_token(
         RefreshClaims {
             exp: (Utc::now() + expires).timestamp(),

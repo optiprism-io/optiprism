@@ -5,14 +5,14 @@ use chrono::Utc;
 
 use tokio::sync::RwLock;
 
-use crate::error::{AccountError, MetadataError, StoreError};
-use crate::metadata::{ListResponse};
-use crate::store::index::hash_map::HashMap;
-use crate::store::{Store};
-use crate::{error, Result};
-use crate::accounts::{Account, CreateAccountRequest};
 use crate::accounts::types::UpdateAccountRequest;
+use crate::accounts::{Account, CreateAccountRequest};
+use crate::error::{AccountError, MetadataError, StoreError};
+use crate::metadata::ListResponse;
+use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key};
+use crate::store::Store;
+use crate::{error, Result};
 
 const NAMESPACE: &[u8] = b"accounts";
 const IDX_EMAIL: &[u8] = b"email";
@@ -40,47 +40,33 @@ impl Provider {
         }
     }
 
-    pub async fn create(
-        &self,
-        req: CreateAccountRequest,
-    ) -> Result<Account> {
+    pub async fn create(&self, req: CreateAccountRequest) -> Result<Account> {
         let _guard = self.guard.write().await;
         self._create(req).await
     }
 
-    pub async fn _create(
-        &self,
-        req: CreateAccountRequest,
-    ) -> Result<Account> {
-        let idx_keys = index_keys(
-            &req.email,
-        );
+    pub async fn _create(&self, req: CreateAccountRequest) -> Result<Account> {
+        let idx_keys = index_keys(&req.email);
 
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(AccountError::AccountAlreadyExist(error::Account::new_with_email(
-                    req.email,
-                ))
-                    .into());
+                return Err(
+                    AccountError::AccountAlreadyExist(error::Account::new_with_email(req.email))
+                        .into(),
+                );
             }
             Err(other) => return Err(other),
             Ok(_) => {}
         }
 
         let created_at = Utc::now();
-        let id = self
-            .store
-            .next_seq(make_id_seq_key(NAMESPACE))
-            .await?;
+        let id = self.store.next_seq(make_id_seq_key(NAMESPACE)).await?;
 
         let account = req.into_account(id, created_at);
 
         let data = serialize(&account)?;
         self.store
-            .put(
-                make_data_value_key(NAMESPACE, account.id),
-                &data,
-            )
+            .put(make_data_value_key(NAMESPACE, account.id), &data)
             .await?;
 
         self.idx.insert(idx_keys.as_ref(), &data).await?;
@@ -92,41 +78,26 @@ impl Provider {
         let key = make_data_value_key(NAMESPACE, id);
 
         match self.store.get(key).await? {
-            None => Err(AccountError::AccountNotFound(error::Account::new_with_id(
-                id,
-            ))
-                .into()),
+            None => Err(AccountError::AccountNotFound(error::Account::new_with_id(id)).into()),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
 
-    pub async fn get_by_email(
-        &self,
-        email: &str,
-    ) -> Result<Account> {
+    pub async fn get_by_email(&self, email: &str) -> Result<Account> {
         let _guard = self.guard.read().await;
         self._get_by_email(email).await
     }
 
-    pub async fn _get_by_email(
-        &self,
-        email: &str,
-    ) -> Result<Account> {
+    pub async fn _get_by_email(&self, email: &str) -> Result<Account> {
         match self
             .idx
-            .get(make_index_key(
-                NAMESPACE,
-                IDX_EMAIL,
-                email,
-            ))
+            .get(make_index_key(NAMESPACE, IDX_EMAIL, email))
             .await
         {
-            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => {
-                Err(AccountError::AccountNotFound(error::Account::new_with_email(
-                    email.to_string(),
-                ))
-                    .into())
-            }
+            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(
+                AccountError::AccountNotFound(error::Account::new_with_email(email.to_string()))
+                    .into(),
+            ),
             Err(other) => Err(other),
             Ok(data) => Ok(deserialize(&data)?),
         }
@@ -136,16 +107,10 @@ impl Provider {
         list(self.store.clone(), NAMESPACE).await
     }
 
-    pub async fn update(
-        &self,
-        account_id: u64,
-        req: UpdateAccountRequest,
-    ) -> Result<Account> {
+    pub async fn update(&self, account_id: u64, req: UpdateAccountRequest) -> Result<Account> {
         let _guard = self.guard.write().await;
 
-        let prev_account = self
-            .get_by_id(account_id)
-            .await?;
+        let prev_account = self.get_by_id(account_id).await?;
 
         let mut account = prev_account.clone();
 
@@ -153,9 +118,7 @@ impl Provider {
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
         if let Some(email) = &req.email {
             idx_keys.push(index_email_key(email.as_str()));
-            idx_prev_keys.push(index_email_key(
-                prev_account.email.as_str(),
-            ));
+            idx_prev_keys.push(index_email_key(prev_account.email.as_str()));
             account.email = email.to_owned();
         }
 
@@ -165,10 +128,10 @@ impl Provider {
             .await
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(AccountError::AccountAlreadyExist(error::Account::new_with_id(
-                    account_id,
-                ))
-                    .into());
+                return Err(
+                    AccountError::AccountAlreadyExist(error::Account::new_with_id(account_id))
+                        .into(),
+                );
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -194,10 +157,7 @@ impl Provider {
 
         let data = serialize(&account)?;
         self.store
-            .put(
-                make_data_value_key(NAMESPACE, account.id),
-                &data,
-            )
+            .put(make_data_value_key(NAMESPACE, account.id), &data)
             .await?;
 
         self.idx
@@ -211,20 +171,10 @@ impl Provider {
         let _guard = self.guard.write().await;
         let account = self.get_by_id(id).await?;
         self.store
-            .delete(make_data_value_key(
-                NAMESPACE,
-                id,
-            ))
+            .delete(make_data_value_key(NAMESPACE, id))
             .await?;
 
-        self.idx
-            .delete(
-                index_keys(
-                    &account.email,
-                )
-                    .as_ref(),
-            )
-            .await?;
+        self.idx.delete(index_keys(&account.email).as_ref()).await?;
 
         Ok(account)
     }

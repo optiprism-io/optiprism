@@ -1,7 +1,7 @@
 use crate::events::types::UpdateEventRequest;
 use crate::events::CreateEventRequest;
 use crate::{Context, Result};
-use common::rbac::{ProjectPermission};
+use common::rbac::ProjectPermission;
 use metadata::events::{Event, Provider as EventsProvider};
 use metadata::metadata::ListResponse;
 use std::sync::Arc;

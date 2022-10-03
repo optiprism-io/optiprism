@@ -1,9 +1,8 @@
-use crate::store::{Store};
+use crate::store::Store;
 use crate::{
     accounts, custom_events, database, dictionaries, events, organizations, projects, properties,
     Result,
 };
-
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

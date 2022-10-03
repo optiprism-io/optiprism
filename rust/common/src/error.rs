@@ -13,4 +13,3 @@ pub enum CommonError {
     #[error("JWTError: {0:?}")]
     JWTError(#[from] JWTError),
 }
-

@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc};
 use common::rbac::{OrganizationRole, ProjectRole, Role};
 use serde::{Deserialize, Serialize};
 
-use common::types::OptionalProperty;
 use crate::PlatformError;
+use common::types::OptionalProperty;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Account {

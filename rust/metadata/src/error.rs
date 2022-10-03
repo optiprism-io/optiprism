@@ -125,10 +125,16 @@ pub struct Organization {
 
 impl Organization {
     pub fn new_with_id(id: u64) -> Self {
-        Self { id: Some(id), name: None }
+        Self {
+            id: Some(id),
+            name: None,
+        }
     }
     pub fn new_with_name(name: String) -> Self {
-        Self { id: None, name: Some(name) }
+        Self {
+            id: None,
+            name: Some(name),
+        }
     }
 }
 

@@ -2,7 +2,7 @@ use crate::custom_events::types::{
     CreateCustomEventRequest, CustomEvent, UpdateCustomEventRequest,
 };
 use crate::{Context, Result};
-use common::rbac::{ProjectPermission};
+use common::rbac::ProjectPermission;
 use metadata::custom_events;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
@@ -55,8 +55,7 @@ impl Provider {
         id: u64,
     ) -> Result<CustomEvent> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
-        self
-            .prov
+        self.prov
             .get_by_id(organization_id, project_id, id)
             .await?
             .try_into()
@@ -124,8 +123,7 @@ impl Provider {
     ) -> Result<CustomEvent> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
 
-        self
-            .prov
+        self.prov
             .delete(organization_id, project_id, id)
             .await?
             .try_into()

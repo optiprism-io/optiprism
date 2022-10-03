@@ -1,31 +1,26 @@
 use axum::http::HeaderValue;
-use axum::{AddExtensionLayer, http, Router, Server};
-use chrono::{Duration, Utc};
-use metadata::metadata::ListResponse;
-use metadata::store::Store;
-use platform::error::Result;
+use axum::{http, AddExtensionLayer, Router, Server};
+use chrono::Duration;
 
-use metadata::custom_events::Provider;
-use platform::custom_events::types::{
-    CreateCustomEventRequest, CustomEvent, Event, Status, UpdateCustomEventRequest,
-};
-use platform::http::{auth, custom_events, events};
-use platform::queries::types::EventRef;
-use platform::{AccountsProvider, AuthProvider, CustomEventsProvider, EventsProvider};
+use metadata::store::Store;
+
+use platform::http::{auth, events};
+
+use platform::{AuthProvider, EventsProvider};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, StatusCode};
 use std::env::temp_dir;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use convert_case::Casing;
-use tokio::time::{sleep};
-use uuid::Uuid;
-use common::rbac::{OrganizationRole, ProjectRole, Role};
+
+use common::rbac::{OrganizationRole, ProjectRole};
 use metadata::accounts::UpdateAccountRequest;
-use platform::auth::token::{AccessClaims, make_access_token};
-use platform::auth::{SignUpRequest};
+use tokio::time::sleep;
+use uuid::Uuid;
+
 use platform::auth::password::make_password_hash;
 use platform::auth::types::TokensResponse;
+use platform::auth::SignUpRequest;
 use platform::http::auth::{LogInRequest, RefreshTokensRequest};
 
 #[tokio::test]
@@ -51,7 +46,6 @@ async fn test_auth() -> anyhow::Result<()> {
             refresh_token_secret,
         ));
 
-
         let mut router = events::attach_routes(Router::new(), events_prov);
         router = auth::attach_routes(router, auth_prov);
         router = router.layer(AddExtensionLayer::new(md_accs_clone2));
@@ -67,17 +61,19 @@ async fn test_auth() -> anyhow::Result<()> {
 
     let pwd = "password".to_string();
 
-    let admin = md_accs.create(metadata::accounts::CreateAccountRequest {
-        created_by: Some(1),
-        password_hash: make_password_hash(pwd.as_str())?.to_string(),
-        email: "admin@mail.com".to_string(),
-        first_name: None,
-        last_name: None,
-        role: None,
-        organizations: Some(vec![(1, OrganizationRole::Admin)]),
-        projects: None,
-        teams: None,
-    }).await?;
+    let admin = md_accs
+        .create(metadata::accounts::CreateAccountRequest {
+            created_by: Some(1),
+            password_hash: make_password_hash(pwd.as_str())?.to_string(),
+            email: "admin@mail.com".to_string(),
+            first_name: None,
+            last_name: None,
+            role: None,
+            organizations: Some(vec![(1, OrganizationRole::Admin)]),
+            projects: None,
+            teams: None,
+        })
+        .await?;
 
     let cl = Client::new();
 
@@ -107,7 +103,6 @@ async fn test_auth() -> anyhow::Result<()> {
         resp
     };
 
-
     let user_tokens = {
         let req = SignUpRequest {
             email: "user@gmail.com".to_string(),
@@ -135,17 +130,22 @@ async fn test_auth() -> anyhow::Result<()> {
         assert_eq!(resp.status(), StatusCode::CREATED);
         let resp: TokensResponse = serde_json::from_str(resp.text().await?.as_str())?;
 
-        md_accs.update(2, UpdateAccountRequest {
-            updated_by: 2,
-            password: None,
-            email: None,
-            first_name: None,
-            last_name: None,
-            role: None,
-            organizations: Some(Some(vec![(1, OrganizationRole::Member)])),
-            projects: Some(Some(vec![(1, ProjectRole::Reader)])),
-            teams: None,
-        }).await?;
+        md_accs
+            .update(
+                2,
+                UpdateAccountRequest {
+                    updated_by: 2,
+                    password: None,
+                    email: None,
+                    first_name: None,
+                    last_name: None,
+                    role: None,
+                    organizations: Some(Some(vec![(1, OrganizationRole::Member)])),
+                    projects: Some(Some(vec![(1, ProjectRole::Reader)])),
+                    teams: None,
+                },
+            )
+            .await?;
         resp
     };
 
@@ -174,10 +174,7 @@ async fn test_auth() -> anyhow::Result<()> {
             .await?;
 
         assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(
-            resp.text().await?,
-            r#"{"data":[],"meta":{"next":null}}"#
-        );
+        assert_eq!(resp.text().await?, r#"{"data":[],"meta":{"next":null}}"#);
     }
 
     let new_jwt_headers = {
@@ -215,10 +212,7 @@ async fn test_auth() -> anyhow::Result<()> {
             .await?;
 
         assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(
-            resp.text().await?,
-            r#"{"data":[],"meta":{"next":null}}"#
-        );
+        assert_eq!(resp.text().await?, r#"{"data":[],"meta":{"next":null}}"#);
     }
 
     Ok(())

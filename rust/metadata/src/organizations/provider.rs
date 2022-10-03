@@ -5,12 +5,12 @@ use crate::{error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use crate::metadata::ListResponse;
 use crate::organizations::types::UpdateOrganizationRequest;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 const NAMESPACE: &[u8] = b"organizations";
 const IDX_NAME: &[u8] = b"name";
@@ -38,31 +38,23 @@ impl Provider {
         }
     }
 
-    pub async fn create(
-        &self,
-        req: CreateOrganizationRequest,
-    ) -> Result<Organization> {
+    pub async fn create(&self, req: CreateOrganizationRequest) -> Result<Organization> {
         let _guard = self.guard.write().await;
 
-        let idx_keys = index_keys(
-            &req.name,
-        );
+        let idx_keys = index_keys(&req.name);
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(OrganizationError::OrganizationAlreadyExist(error::Organization::new_with_name(
-                    req.name,
-                ))
-                    .into());
+                return Err(OrganizationError::OrganizationAlreadyExist(
+                    error::Organization::new_with_name(req.name),
+                )
+                .into());
             }
             Err(other) => return Err(other),
             Ok(_) => {}
         }
 
         let created_at = Utc::now();
-        let id = self
-            .store
-            .next_seq(make_id_seq_key(NAMESPACE))
-            .await?;
+        let id = self.store.next_seq(make_id_seq_key(NAMESPACE)).await?;
 
         let org = Organization {
             id,
@@ -75,10 +67,7 @@ impl Provider {
 
         let data = serialize(&org)?;
         self.store
-            .put(
-                make_data_value_key(NAMESPACE, id),
-                &data,
-            )
+            .put(make_data_value_key(NAMESPACE, id), &data)
             .await?;
 
         self.idx.insert(idx_keys.as_ref(), &data).await?;
@@ -90,10 +79,10 @@ impl Provider {
         let key = make_data_value_key(NAMESPACE, id);
 
         match self.store.get(key).await? {
-            None => Err(OrganizationError::OrganizationNotFound(error::Organization::new_with_id(
-                id,
-            ))
-                .into()),
+            None => Err(
+                OrganizationError::OrganizationNotFound(error::Organization::new_with_id(id))
+                    .into(),
+            ),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
@@ -109,9 +98,7 @@ impl Provider {
     ) -> Result<Organization> {
         let _guard = self.guard.write().await;
 
-        let prev_org = self
-            .get_by_id(org_id)
-            .await?;
+        let prev_org = self.get_by_id(org_id).await?;
 
         let mut org = prev_org.clone();
 
@@ -119,9 +106,7 @@ impl Provider {
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
         if let Some(name) = &req.name {
             idx_keys.push(index_name_key(name.as_str()));
-            idx_prev_keys.push(index_name_key(
-                prev_org.name.as_str(),
-            ));
+            idx_prev_keys.push(index_name_key(prev_org.name.as_str()));
             org.name = name.to_owned();
         }
 
@@ -131,10 +116,10 @@ impl Provider {
             .await
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(OrganizationError::OrganizationAlreadyExist(error::Organization::new_with_id(
-                    org_id,
-                ))
-                    .into());
+                return Err(OrganizationError::OrganizationAlreadyExist(
+                    error::Organization::new_with_id(org_id),
+                )
+                .into());
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -145,10 +130,7 @@ impl Provider {
 
         let data = serialize(&org)?;
         self.store
-            .put(
-                make_data_value_key(NAMESPACE, org.id),
-                &data,
-            )
+            .put(make_data_value_key(NAMESPACE, org.id), &data)
             .await?;
 
         self.idx
@@ -162,20 +144,10 @@ impl Provider {
         let _guard = self.guard.write().await;
         let org = self.get_by_id(id).await?;
         self.store
-            .delete(make_data_value_key(
-                NAMESPACE,
-                id,
-            ))
+            .delete(make_data_value_key(NAMESPACE, id))
             .await?;
 
-        self.idx
-            .delete(
-                index_keys(
-                    &org.name,
-                )
-                    .as_ref(),
-            )
-            .await?;
+        self.idx.delete(index_keys(&org.name).as_ref()).await?;
 
         Ok(org)
     }

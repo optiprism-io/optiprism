@@ -1,13 +1,10 @@
 use crate::auth::types::TokensResponse;
-use crate::{
-    auth::types::{SignUpRequest},
-    AuthProvider, Result,
-};
+use crate::{auth::types::SignUpRequest, AuthProvider, Result};
 
 use axum::{extract::Extension, routing::post, AddExtensionLayer, Json, Router};
 use reqwest::StatusCode;
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

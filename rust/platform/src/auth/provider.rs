@@ -1,20 +1,14 @@
-use super::{SignUpRequest};
+use super::SignUpRequest;
 use crate::{PlatformError, Result};
-use chrono::{Duration};
-
+use chrono::Duration;
 
 use crate::auth::token::{make_access_token, make_refresh_token, parse_refresh_token};
 use crate::auth::types::TokensResponse;
 
-
-
-
-use metadata::{
-    accounts::CreateAccountRequest,
-};
-use password_hash::PasswordHash;
-use std::{sync::Arc};
 use crate::auth::password::{make_password_hash, verify_password};
+use metadata::accounts::CreateAccountRequest;
+use password_hash::PasswordHash;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Provider {
@@ -59,7 +53,9 @@ impl Provider {
             })
             .await?;
 
-        let tokens = self.make_tokens(account.id).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+        let tokens = self
+            .make_tokens(account.id)
+            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
 
         Ok(tokens)
     }
@@ -71,27 +67,38 @@ impl Provider {
             .await
             .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
 
-        verify_password(
-            password,
-            PasswordHash::new(account.password_hash.as_str())?,
-        ).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+        verify_password(password, PasswordHash::new(account.password_hash.as_str())?)
+            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
 
-        let tokens = self.make_tokens(account.id).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+        let tokens = self
+            .make_tokens(account.id)
+            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
 
         Ok(tokens)
     }
 
     pub async fn refresh_token(&self, refresh_token: &str) -> Result<TokensResponse> {
-        let refresh_claims = parse_refresh_token(refresh_token, self.refresh_token_key.as_str()).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
-        let tokens = self.make_tokens(refresh_claims.account_id).map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+        let refresh_claims = parse_refresh_token(refresh_token, self.refresh_token_key.as_str())
+            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+        let tokens = self
+            .make_tokens(refresh_claims.account_id)
+            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
 
         Ok(tokens)
     }
 
     fn make_tokens(&self, account_id: u64) -> Result<TokensResponse> {
         Ok(TokensResponse {
-            access_token: make_access_token(account_id, self.access_token_duration, self.access_token_key.as_str())?,
-            refresh_token: make_refresh_token(account_id, self.refresh_token_duration, self.refresh_token_key.as_str())?,
+            access_token: make_access_token(
+                account_id,
+                self.access_token_duration,
+                self.access_token_key.as_str(),
+            )?,
+            refresh_token: make_refresh_token(
+                account_id,
+                self.refresh_token_duration,
+                self.refresh_token_key.as_str(),
+            )?,
         })
     }
 }

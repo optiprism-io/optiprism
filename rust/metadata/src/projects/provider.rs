@@ -6,29 +6,32 @@ use chrono::Utc;
 use tokio::sync::RwLock;
 
 use crate::error::{MetadataError, ProjectError, StoreError};
-use crate::metadata::{ListResponse};
-use crate::store::index::hash_map::HashMap;
-use crate::store::{Store};
-use crate::{error, Result};
-use crate::projects::Project;
+use crate::metadata::ListResponse;
 use crate::projects::types::{CreateProjectRequest, UpdateProjectRequest};
-use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key, org_ns};
+use crate::projects::Project;
+use crate::store::index::hash_map::HashMap;
+use crate::store::path_helpers::{
+    list, make_data_value_key, make_id_seq_key, make_index_key, org_ns,
+};
+use crate::store::Store;
+use crate::{error, Result};
 
 const NAMESPACE: &[u8] = b"projects";
 const IDX_NAME: &[u8] = b"name";
 
-fn index_keys(
-    organization_id: u64,
-    name: &str,
-) -> Vec<Option<Vec<u8>>> {
-    [
-        index_name_key(organization_id, name),
-    ]
-        .to_vec()
+fn index_keys(organization_id: u64, name: &str) -> Vec<Option<Vec<u8>>> {
+    [index_name_key(organization_id, name)].to_vec()
 }
 
 fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
-    Some(make_index_key(org_ns(organization_id, NAMESPACE).as_slice(), IDX_NAME, name).to_vec())
+    Some(
+        make_index_key(
+            org_ns(organization_id, NAMESPACE).as_slice(),
+            IDX_NAME,
+            name,
+        )
+        .to_vec(),
+    )
 }
 
 pub struct Provider {
@@ -46,25 +49,20 @@ impl Provider {
         }
     }
 
-    pub async fn create(
-        &self,
-        organization_id: u64,
-        req: CreateProjectRequest,
-    ) -> Result<Project> {
+    pub async fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project> {
         let _guard = self.guard.write().await;
 
-        let idx_keys = index_keys(
-            organization_id,
-            &req.name,
-        );
+        let idx_keys = index_keys(organization_id, &req.name);
 
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(ProjectError::ProjectAlreadyExist(error::Project::new_with_name(
-                    organization_id,
-                    req.name,
-                ))
-                    .into());
+                return Err(
+                    ProjectError::ProjectAlreadyExist(error::Project::new_with_name(
+                        organization_id,
+                        req.name,
+                    ))
+                    .into(),
+                );
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -73,7 +71,9 @@ impl Provider {
         let created_at = Utc::now();
         let id = self
             .store
-            .next_seq(make_id_seq_key(org_ns(organization_id, NAMESPACE).as_slice()))
+            .next_seq(make_id_seq_key(
+                org_ns(organization_id, NAMESPACE).as_slice(),
+            ))
             .await?;
 
         let project = Project {
@@ -106,13 +106,17 @@ impl Provider {
                 organization_id,
                 project_id,
             ))
-                .into()),
+            .into()),
             Some(value) => Ok(deserialize(&value)?),
         }
     }
 
     pub async fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
-        list(self.store.clone(), org_ns(organization_id, NAMESPACE).as_slice()).await
+        list(
+            self.store.clone(),
+            org_ns(organization_id, NAMESPACE).as_slice(),
+        )
+        .await
     }
 
     pub async fn update(
@@ -123,19 +127,14 @@ impl Provider {
     ) -> Result<Project> {
         let _guard = self.guard.write().await;
 
-        let prev_project = self
-            .get_by_id(organization_id, project_id)
-            .await?;
+        let prev_project = self.get_by_id(organization_id, project_id).await?;
         let mut project = prev_project.clone();
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
         if let Some(name) = &req.name {
             idx_keys.push(index_name_key(organization_id, name.as_str()));
-            idx_prev_keys.push(index_name_key(
-                organization_id,
-                prev_project.name.as_str(),
-            ));
+            idx_prev_keys.push(index_name_key(organization_id, prev_project.name.as_str()));
             project.name = name.to_owned();
         }
 
@@ -145,11 +144,13 @@ impl Provider {
             .await
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(ProjectError::ProjectAlreadyExist(error::Project::new_with_id(
-                    organization_id,
-                    project_id,
-                ))
-                    .into());
+                return Err(
+                    ProjectError::ProjectAlreadyExist(error::Project::new_with_id(
+                        organization_id,
+                        project_id,
+                    ))
+                    .into(),
+                );
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -176,9 +177,16 @@ impl Provider {
     pub async fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
         let _guard = self.guard.write().await;
         let project = self.get_by_id(organization_id, project_id).await?;
-        self.store.delete(make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id)).await?;
+        self.store
+            .delete(make_data_value_key(
+                org_ns(organization_id, NAMESPACE).as_slice(),
+                project_id,
+            ))
+            .await?;
 
-        self.idx.delete(index_keys(organization_id, &project.name).as_ref()).await?;
+        self.idx
+            .delete(index_keys(organization_id, &project.name).as_ref())
+            .await?;
 
         Ok(project)
     }

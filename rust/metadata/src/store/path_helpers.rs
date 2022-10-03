@@ -1,21 +1,30 @@
-use std::sync::Arc;
-use bincode::deserialize;
-use serde::de::DeserializeOwned;
 use crate::metadata::{ListResponse, ResponseMetadata};
 use crate::store::Store;
 use crate::Result;
+use bincode::deserialize;
+use serde::de::DeserializeOwned;
+use std::sync::Arc;
 
 pub fn org_proj_ns(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
     [
-        b"organizations/", organization_id.to_le_bytes().as_ref(),
-        b"/projects/", project_id.to_le_bytes().as_ref(),
-        b"/", ns
+        b"organizations/",
+        organization_id.to_le_bytes().as_ref(),
+        b"/projects/",
+        project_id.to_le_bytes().as_ref(),
+        b"/",
+        ns,
     ]
-        .concat()
+    .concat()
 }
 
 pub fn org_ns(organization_id: u64, ns: &[u8]) -> Vec<u8> {
-    [b"organizations/", organization_id.to_le_bytes().as_ref(), b"/", ns].concat()
+    [
+        b"organizations/",
+        organization_id.to_le_bytes().as_ref(),
+        b"/",
+        ns,
+    ]
+    .concat()
 }
 
 pub fn make_data_value_key(ns: &[u8], id: u64) -> Vec<u8> {
@@ -26,11 +35,7 @@ pub fn make_data_key(ns: &[u8]) -> Vec<u8> {
     [ns, b"/data"].concat()
 }
 
-pub fn make_index_key(
-    ns: &[u8],
-    idx_name: &[u8],
-    key: &str,
-) -> Vec<u8> {
+pub fn make_index_key(ns: &[u8], idx_name: &[u8], key: &str) -> Vec<u8> {
     [ns, b"/idx/", idx_name, b"/", key.as_bytes()].concat()
 }
 
@@ -38,12 +43,9 @@ pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {
     [ns, b"/id_seq"].concat()
 }
 
-pub async fn list<'a, T>(
-    store: Arc<Store>,
-    ns: &[u8],
-) -> Result<ListResponse<T>>
-    where
-        T: DeserializeOwned,
+pub async fn list<'a, T>(store: Arc<Store>, ns: &[u8]) -> Result<ListResponse<T>>
+where
+    T: DeserializeOwned,
 {
     let prefix = make_data_key(ns);
 

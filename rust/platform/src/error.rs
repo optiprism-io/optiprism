@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::{result};
+use std::result;
 
 use axum::{
     http::StatusCode,
@@ -11,7 +11,10 @@ use common::error::CommonError;
 use serde::Serialize;
 use thiserror::Error;
 
-use metadata::error::{AccountError, CustomEventError, DatabaseError, DictionaryError, EventError, MetadataError, OrganizationError, ProjectError, PropertyError, StoreError, TeamError};
+use metadata::error::{
+    AccountError, CustomEventError, DatabaseError, DictionaryError, EventError, MetadataError,
+    OrganizationError, ProjectError, PropertyError, StoreError, TeamError,
+};
 use query::error::QueryError;
 
 pub type Result<T> = result::Result<T, PlatformError>;
@@ -53,7 +56,7 @@ pub enum PlatformError {
     #[error("axum: {0:?}")]
     Axum(#[from] axum::http::Error),
     #[error("other: {0:?}")]
-    Other(#[from] anyhow::Error)
+    Other(#[from] anyhow::Error),
 }
 
 #[derive(Serialize, Debug)]
@@ -109,7 +112,6 @@ impl ErrorResponse {
             },
         )
     }
-
 }
 
 impl IntoResponse for PlatformError {
@@ -119,13 +121,23 @@ impl IntoResponse for PlatformError {
             PlatformError::Decimal(err) => ErrorResponse::bad_request(format!("{:?}", err)),
             PlatformError::Metadata(err) => match err {
                 MetadataError::Database(err) => match err {
-                    DatabaseError::ColumnAlreadyExists(_) => ErrorResponse::conflict(format!("{:?}", err)),
-                    DatabaseError::TableNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
-                    DatabaseError::TableAlreadyExists(_) => ErrorResponse::conflict(format!("{:?}", err)),
+                    DatabaseError::ColumnAlreadyExists(_) => {
+                        ErrorResponse::conflict(format!("{:?}", err))
+                    }
+                    DatabaseError::TableNotFound(_) => {
+                        ErrorResponse::not_found(format!("{:?}", err))
+                    }
+                    DatabaseError::TableAlreadyExists(_) => {
+                        ErrorResponse::conflict(format!("{:?}", err))
+                    }
                 },
                 MetadataError::Account(err) => match err {
-                    AccountError::AccountNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
-                    AccountError::AccountAlreadyExist(_) => ErrorResponse::conflict(format!("{:?}", err)),
+                    AccountError::AccountNotFound(_) => {
+                        ErrorResponse::not_found(format!("{:?}", err))
+                    }
+                    AccountError::AccountAlreadyExist(_) => {
+                        ErrorResponse::conflict(format!("{:?}", err))
+                    }
                 },
                 MetadataError::Organization(err) => match err {
                     OrganizationError::OrganizationNotFound(_) => {
@@ -136,27 +148,45 @@ impl IntoResponse for PlatformError {
                     }
                 },
                 MetadataError::Project(err) => match err {
-                    ProjectError::ProjectNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
-                    ProjectError::ProjectAlreadyExist(_) => ErrorResponse::conflict(format!("{:?}", err)),
+                    ProjectError::ProjectNotFound(_) => {
+                        ErrorResponse::not_found(format!("{:?}", err))
+                    }
+                    ProjectError::ProjectAlreadyExist(_) => {
+                        ErrorResponse::conflict(format!("{:?}", err))
+                    }
                 },
                 MetadataError::Event(err) => match err {
                     EventError::EventNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
-                    EventError::EventAlreadyExist(_) => ErrorResponse::conflict(format!("{:?}", err)),
-                    EventError::PropertyNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
-                    EventError::PropertyAlreadyExist(_) => ErrorResponse::conflict(format!("{:?}", err)),
+                    EventError::EventAlreadyExist(_) => {
+                        ErrorResponse::conflict(format!("{:?}", err))
+                    }
+                    EventError::PropertyNotFound(_) => {
+                        ErrorResponse::not_found(format!("{:?}", err))
+                    }
+                    EventError::PropertyAlreadyExist(_) => {
+                        ErrorResponse::conflict(format!("{:?}", err))
+                    }
                 },
                 MetadataError::Property(err) => match err {
-                    PropertyError::PropertyNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
+                    PropertyError::PropertyNotFound(_) => {
+                        ErrorResponse::not_found(format!("{:?}", err))
+                    }
                     PropertyError::PropertyAlreadyExist(_) => {
                         ErrorResponse::conflict(format!("{:?}", err))
                     }
                 },
                 MetadataError::Dictionary(err) => match err {
-                    DictionaryError::KeyNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
-                    DictionaryError::ValueNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
+                    DictionaryError::KeyNotFound(_) => {
+                        ErrorResponse::not_found(format!("{:?}", err))
+                    }
+                    DictionaryError::ValueNotFound(_) => {
+                        ErrorResponse::not_found(format!("{:?}", err))
+                    }
                 },
                 MetadataError::Store(err) => match err {
-                    StoreError::KeyAlreadyExists(_) => ErrorResponse::conflict(format!("{:?}", err)),
+                    StoreError::KeyAlreadyExists(_) => {
+                        ErrorResponse::conflict(format!("{:?}", err))
+                    }
                     StoreError::KeyNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
                 },
                 MetadataError::RocksDb(err) => ErrorResponse::internal(format!("{:?}", err)),
@@ -165,20 +195,26 @@ impl IntoResponse for PlatformError {
                 MetadataError::Io(err) => ErrorResponse::internal(format!("{:?}", err)),
                 MetadataError::Other(_) => ErrorResponse::internal(format!("{:?}", err)),
                 MetadataError::CustomEvent(err) => match err {
-                    CustomEventError::EventNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
+                    CustomEventError::EventNotFound(_) => {
+                        ErrorResponse::not_found(format!("{:?}", err))
+                    }
                     CustomEventError::EventAlreadyExist(_) => {
                         ErrorResponse::conflict(format!("{:?}", err))
                     }
                     CustomEventError::RecursionLevelExceeded(_) => {
                         ErrorResponse::bad_request(format!("{:?}", err))
                     }
-                    CustomEventError::DuplicateEvent => ErrorResponse::conflict(format!("{:?}", err)),
-                    CustomEventError::EmptyEvents => ErrorResponse::bad_request(format!("{:?}", err)),
+                    CustomEventError::DuplicateEvent => {
+                        ErrorResponse::conflict(format!("{:?}", err))
+                    }
+                    CustomEventError::EmptyEvents => {
+                        ErrorResponse::bad_request(format!("{:?}", err))
+                    }
                 },
                 MetadataError::Team(err) => match err {
                     TeamError::TeamNotFound(_) => ErrorResponse::not_found(format!("{:?}", err)),
                     TeamError::TeamAlreadyExist(_) => ErrorResponse::conflict(format!("{:?}", err)),
-                }
+                },
             },
             PlatformError::Query(err) => match err {
                 QueryError::Internal(err) => ErrorResponse::internal(err),
@@ -196,7 +232,7 @@ impl IntoResponse for PlatformError {
             },
             PlatformError::Auth(err) => match err {
                 AuthError::InvalidCredentials => ErrorResponse::forbidden(format!("{:?}", err)),
-                AuthError::InvalidToken => ErrorResponse::forbidden(format!("{:?}", err))
+                AuthError::InvalidToken => ErrorResponse::forbidden(format!("{:?}", err)),
             },
             PlatformError::Unauthorized(err) => ErrorResponse::unauthorized(err),
             PlatformError::Forbidden(err) => ErrorResponse::forbidden(err),

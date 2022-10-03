@@ -1,9 +1,9 @@
 use crate::error::{DictionaryError, DictionaryKey, DictionaryValue, Result};
-use crate::store::{Store};
+use crate::store::path_helpers::{make_id_seq_key, org_proj_ns};
+use crate::store::Store;
 use byteorder::{ByteOrder, LittleEndian};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::store::path_helpers::{make_id_seq_key, org_proj_ns};
 
 const NAMESPACE: &[u8] = b"dictinaries";
 
@@ -16,15 +16,17 @@ fn make_key_key(organization_id: u64, project_id: u64, dict: &str, key: u64) -> 
         org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice()).as_slice(),
         b"keys/",
         key.to_le_bytes().as_ref(),
-    ].concat()
+    ]
+    .concat()
 }
 
 fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str) -> Vec<u8> {
     [
         org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice()).as_slice(),
         b"values/",
-        value.as_bytes()
-    ].concat()
+        value.as_bytes(),
+    ]
+    .concat()
 }
 
 pub struct Provider {
@@ -56,7 +58,10 @@ impl Provider {
             None => {
                 let id = self
                     .store
-                    .next_seq(make_id_seq_key(org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice()).as_slice()))
+                    .next_seq(make_id_seq_key(
+                        org_proj_ns(organization_id, project_id, dict_ns(dict).as_slice())
+                            .as_slice(),
+                    ))
                     .await?;
                 self.store
                     .put(
@@ -92,7 +97,7 @@ impl Provider {
                 dict.to_string(),
                 key,
             ))
-                .into()),
+            .into()),
             Some(value) => Ok(String::from_utf8(value)?),
         }
     }
@@ -112,7 +117,7 @@ impl Provider {
                 dict.to_string(),
                 value.to_string(),
             ))
-                .into()),
+            .into()),
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
         }
     }

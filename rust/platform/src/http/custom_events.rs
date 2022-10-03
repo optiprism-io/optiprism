@@ -8,7 +8,6 @@ use axum::{extract::Extension, routing, AddExtensionLayer, Json, Router};
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
 
-
 async fn create(
     ctx: Context,
     Extension(provider): Extension<Arc<custom_events::Provider>>,

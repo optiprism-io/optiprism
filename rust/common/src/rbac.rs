@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Permission {
@@ -51,43 +51,44 @@ pub enum ProjectRole {
 }
 
 lazy_static! {
-    pub static ref PERMISSIONS:Vec<(Role,Vec<Permission>)> = vec![
-        (Role::Admin,vec![
-            Permission::All
-        ]),
+    pub static ref PERMISSIONS: Vec<(Role, Vec<Permission>)> =
+        vec![(Role::Admin, vec![Permission::All]),];
+    pub static ref ORGANIZATION_PERMISSIONS: Vec<(OrganizationRole, Vec<OrganizationPermission>)> = vec![
+        (OrganizationRole::Owner, vec![OrganizationPermission::All]),
+        (
+            OrganizationRole::Admin,
+            vec![OrganizationPermission::ManageProjects]
+        )
     ];
-
-    pub static ref ORGANIZATION_PERMISSIONS:Vec<(OrganizationRole,Vec<OrganizationPermission>)> = vec![
-        (OrganizationRole::Owner,vec![
-            OrganizationPermission::All
-        ]),
-        (OrganizationRole::Admin,vec![
-            OrganizationPermission::ManageProjects
-        ])
-    ];
-
-        pub static ref PROJECT_PERMISSIONS:Vec<(ProjectRole,Vec<ProjectPermission>)> = vec![
-        (ProjectRole::Owner,vec![
-            ProjectPermission::All
-        ]),
-        (ProjectRole::Admin,vec![
-            ProjectPermission::ManageProject,
-            ProjectPermission::InviteMembers,
-            ProjectPermission::ManageMembers,
-            ProjectPermission::ExploreReports,
-            ProjectPermission::ManageReports,
-            ProjectPermission::ViewSchema,
-            ProjectPermission::ManageSchema,
-        ]),
-        (ProjectRole::Member,vec![
-            ProjectPermission::ExploreReports,
-            ProjectPermission::ManageReports,
-            ProjectPermission::ViewSchema,
-            ProjectPermission::ManageSchema,
-        ]),
-        (ProjectRole::Reader,vec![
-            ProjectPermission::ExploreReports,
-            ProjectPermission::ViewSchema,
-        ])
+    pub static ref PROJECT_PERMISSIONS: Vec<(ProjectRole, Vec<ProjectPermission>)> = vec![
+        (ProjectRole::Owner, vec![ProjectPermission::All]),
+        (
+            ProjectRole::Admin,
+            vec![
+                ProjectPermission::ManageProject,
+                ProjectPermission::InviteMembers,
+                ProjectPermission::ManageMembers,
+                ProjectPermission::ExploreReports,
+                ProjectPermission::ManageReports,
+                ProjectPermission::ViewSchema,
+                ProjectPermission::ManageSchema,
+            ]
+        ),
+        (
+            ProjectRole::Member,
+            vec![
+                ProjectPermission::ExploreReports,
+                ProjectPermission::ManageReports,
+                ProjectPermission::ViewSchema,
+                ProjectPermission::ManageSchema,
+            ]
+        ),
+        (
+            ProjectRole::Reader,
+            vec![
+                ProjectPermission::ExploreReports,
+                ProjectPermission::ViewSchema,
+            ]
+        )
     ];
 }

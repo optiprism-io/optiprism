@@ -1,6 +1,5 @@
 use crate::error::Result;
 
-
 use argon2::Argon2;
 use password_hash::PasswordHash;
 

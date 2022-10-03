@@ -1,10 +1,10 @@
 use crate::accounts::types::{Account, CreateAccountRequest, UpdateAccountRequest};
+use crate::auth::password::make_password_hash;
 use crate::{Context, Result};
 use common::rbac::Permission;
 use metadata::accounts;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
-use crate::auth::password::make_password_hash;
 
 pub struct Provider {
     prov: Arc<accounts::Provider>,
