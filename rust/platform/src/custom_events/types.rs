@@ -6,13 +6,21 @@ use common::types::OptionalProperty;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Status {
     Enabled,
     Disabled,
 }
 
+impl From<metadata::custom_events::Status> for Status {
+    fn from(s: metadata::custom_events::Status) -> Self {
+        match s {
+            metadata::custom_events::Status::Enabled => Status::Enabled,
+            metadata::custom_events::Status::Disabled => Status::Disabled,
+        }
+    }
+}
 impl Into<Status> for metadata::custom_events::Status {
     fn into(self) -> Status {
         match self {
@@ -22,16 +30,16 @@ impl Into<Status> for metadata::custom_events::Status {
     }
 }
 
-impl Into<metadata::custom_events::Status> for Status {
-    fn into(self) -> metadata::custom_events::Status {
-        match self {
+impl From<Status> for metadata::custom_events::Status {
+    fn from(s: Status) -> Self {
+        match s {
             Status::Enabled => metadata::custom_events::Status::Enabled,
             Status::Disabled => metadata::custom_events::Status::Disabled,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
     pub event: EventRef,

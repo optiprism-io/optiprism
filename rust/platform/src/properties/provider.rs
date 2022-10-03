@@ -9,21 +9,18 @@ use std::sync::Arc;
 
 pub struct Provider {
     prov: Arc<PropertiesProvider>,
-    ns: metadata::properties::provider::Namespace,
 }
 
 impl Provider {
     pub fn new_user(prov: Arc<PropertiesProvider>) -> Self {
         Self {
             prov,
-            ns: Namespace::User,
         }
     }
 
     pub fn new_event(prov: Arc<PropertiesProvider>) -> Self {
         Self {
             prov,
-            ns: Namespace::Event,
         }
     }
 
@@ -77,11 +74,11 @@ impl Provider {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
         let mut md_req = metadata::properties::UpdatePropertyRequest::default();
-        let _ = md_req.updated_by = ctx.account_id.unwrap();
-        let _ = md_req.tags.insert(req.tags);
-        let _ = md_req.display_name.insert(req.display_name);
-        let _ = md_req.description.insert(req.description);
-        let _ = md_req.status.insert(req.status);
+        md_req.updated_by = ctx.account_id.unwrap();
+        md_req.tags.insert(req.tags);
+        md_req.display_name.insert(req.display_name);
+        md_req.description.insert(req.description);
+        md_req.status.insert(req.status);
         let prop = self
             .prov
             .update(organization_id, project_id, property_id, md_req)

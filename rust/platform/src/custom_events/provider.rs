@@ -44,7 +44,7 @@ impl Provider {
             .create(organization_id, project_id, md_req)
             .await?;
 
-        Ok(event.try_into()?)
+        event.try_into()
     }
 
     pub async fn get_by_id(
@@ -55,11 +55,11 @@ impl Provider {
         id: u64,
     ) -> Result<CustomEvent> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
-        Ok(self
+        self
             .prov
             .get_by_id(organization_id, project_id, id)
             .await?
-            .try_into()?)
+            .try_into()
     }
 
     pub async fn list(
@@ -92,9 +92,9 @@ impl Provider {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
         let mut md_req = metadata::custom_events::UpdateCustomEventRequest::default();
-        let _ = md_req.updated_by = ctx.account_id.unwrap();
-        let _ = md_req.tags = req.tags;
-        let _ = md_req.name = req.name;
+        md_req.updated_by = ctx.account_id.unwrap();
+        md_req.tags = req.tags;
+        md_req.name = req.name;
         let _ = md_req.description = req.description;
         if let Some(status) = req.status {
             md_req.status.insert(status.into());
@@ -112,7 +112,7 @@ impl Provider {
             .update(organization_id, project_id, event_id, md_req)
             .await?;
 
-        Ok(event.try_into()?)
+        event.try_into()
     }
 
     pub async fn delete(
@@ -124,10 +124,10 @@ impl Provider {
     ) -> Result<CustomEvent> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
 
-        Ok(self
+        self
             .prov
             .delete(organization_id, project_id, id)
             .await?
-            .try_into()?)
+            .try_into()
     }
 }

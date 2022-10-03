@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Permission {
     All,
     ManageAccounts,
@@ -9,26 +9,26 @@ pub enum Permission {
     DeleteAccounts,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Role {
     Admin,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum OrganizationPermission {
     ManageProjects,
     DeleteOrganization,
     All,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum OrganizationRole {
     Owner,
     Admin,
     Member,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ProjectPermission {
     ManageProject,
     DeleteProject,
@@ -42,7 +42,7 @@ pub enum ProjectPermission {
     All,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ProjectRole {
     Owner,
     Admin,

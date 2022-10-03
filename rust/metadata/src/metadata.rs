@@ -36,7 +36,7 @@ impl Metadata {
         let events = Arc::new(events::Provider::new(store.clone()));
         Ok(Metadata {
             events: events.clone(),
-            custom_events: Arc::new(custom_events::Provider::new(store.clone(), events.clone())),
+            custom_events: Arc::new(custom_events::Provider::new(store.clone(), events)),
             event_properties: Arc::new(properties::Provider::new_event(store.clone())),
             user_properties: Arc::new(properties::Provider::new_user(store.clone())),
             organizations: Arc::new(organizations::Provider::new(store.clone())),

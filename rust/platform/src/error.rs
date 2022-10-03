@@ -110,19 +110,6 @@ impl ErrorResponse {
         )
     }
 
-    pub fn new_inner(status: StatusCode, msg: String) -> (StatusCode, Self) {
-        (
-            status,
-            Self {
-                error: InnerError {
-                    status: status.as_u16(),
-                    code: status.to_string(),
-                    message: msg.to_string(),
-                },
-                fields: None,
-            },
-        )
-    }
 }
 
 impl IntoResponse for PlatformError {

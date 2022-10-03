@@ -96,11 +96,11 @@ impl Provider {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
         let mut md_req = metadata::events::UpdateEventRequest::default();
-        let _ = md_req.updated_by = ctx.account_id.unwrap();
-        let _ = md_req.tags.insert(req.tags);
-        let _ = md_req.display_name.insert(req.display_name);
-        let _ = md_req.description.insert(req.description);
-        let _ = md_req.status.insert(req.status);
+        md_req.updated_by = ctx.account_id.unwrap();
+        md_req.tags.insert(req.tags);
+        md_req.display_name.insert(req.display_name);
+        md_req.description.insert(req.description);
+        md_req.status.insert(req.status);
         let event = self
             .prov
             .update(organization_id, project_id, event_id, md_req)

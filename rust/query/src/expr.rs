@@ -139,15 +139,7 @@ pub async fn event_filters_expression(
                     property,
                     operation,
                     value
-                        .clone()
-                        .and_then(|v| {
-                            Some(
-                                v.iter()
-                                    .map(|v| v.clone().into())
-                                    .collect::<Vec<ScalarValue>>(),
-                            )
-                        })
-                        .to_owned(),
+                        .to_owned().map(|v| v.iter().map(|v| v.clone().into()).collect::<Vec<ScalarValue>>()),
                 )),
             }
         })
@@ -189,7 +181,7 @@ pub async fn encode_property_dict_values(
                         return Err(QueryError::Plan(format!(
                             "unsupported dictionary type \"{:?}\"",
                             dict_type
-                        )))
+                        )));
                     }
                 };
 
@@ -237,7 +229,7 @@ pub async fn property_expression(
                     col_name.as_str(),
                     &values.unwrap(),
                 )
-                .await?;
+                    .await?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)
@@ -263,7 +255,7 @@ pub async fn property_expression(
                     col_name.as_str(),
                     &values.unwrap(),
                 )
-                .await?;
+                    .await?;
                 named_property_expression(col, operation, Some(dict_values))
             } else {
                 named_property_expression(col, operation, values)

@@ -3,7 +3,7 @@ use crate::{PlatformError, Result};
 use chrono::{Duration};
 
 
-use crate::auth::auth::{make_access_token, make_password_hash, verify_password, make_refresh_token, parse_refresh_token};
+use crate::auth::token::{make_access_token, make_password_hash, verify_password, make_refresh_token, parse_refresh_token};
 use crate::auth::types::TokensResponse;
 
 

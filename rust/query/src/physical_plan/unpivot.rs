@@ -364,9 +364,7 @@ pub fn unpivot(
                         }
                     } else {
                         for _ in 0..=unpivot_cols_len {
-                            if let Err(err) = result.append_value(src_arr_typed.value(row_idx)) {
-                                return Err(err);
-                            }
+                            result.append_value(src_arr_typed.value(row_idx))?;
                         }
                     }
                 }

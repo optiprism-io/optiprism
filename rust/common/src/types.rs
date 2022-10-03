@@ -53,7 +53,7 @@ impl PropertyRef {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum EventRef {
     RegularName(String),
     Regular(u64),
@@ -70,7 +70,7 @@ impl EventRef {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum PropValueOperation {
     Eq,
     Neq,

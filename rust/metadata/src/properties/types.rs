@@ -5,13 +5,13 @@ use common::types::OptionalProperty;
 use convert_case::{Case, Casing};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Status {
     Enabled,
     Disabled,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Property {
     pub id: u64,
     pub created_at: DateTime<Utc>,
@@ -51,7 +51,7 @@ impl Property {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CreatePropertyRequest {
     pub created_by: u64,
     pub tags: Option<Vec<String>>,
@@ -67,7 +67,7 @@ pub struct CreatePropertyRequest {
     pub dictionary_type: Option<DataType>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct UpdatePropertyRequest {
     pub updated_by: u64,
     pub tags: OptionalProperty<Option<Vec<String>>>,

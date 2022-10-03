@@ -10,7 +10,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum PropValueOperation {
     Eq,
@@ -278,7 +278,7 @@ pub fn scalar_to_json_value(v: &ScalarValue) -> Result<Value> {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "eventType", rename_all = "camelCase")]
 pub enum EventRef {
     #[serde(rename_all = "camelCase")]
@@ -298,9 +298,9 @@ impl EventRef {
     }
 }
 
-impl Into<common::types::EventRef> for EventRef {
-    fn into(self) -> common::types::EventRef {
-        match self {
+impl From<EventRef> for common::types::EventRef {
+    fn from(e: EventRef) -> Self {
+        match e {
             EventRef::Regular { event_name } => common::types::EventRef::RegularName(event_name),
             EventRef::Custom { event_id } => common::types::EventRef::Custom(event_id),
         }

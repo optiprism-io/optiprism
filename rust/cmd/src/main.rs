@@ -111,6 +111,6 @@ async fn main() -> Result<()> {
     Server::bind(&addr)
         .serve(router.into_make_service())
         .await
-        .map_err(|e| Error::ExternalError(e.to_string()))?;
+        .map_err(|e| Error::External(e.to_string()))?;
     Ok(())
 }

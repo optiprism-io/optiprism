@@ -3,19 +3,19 @@ use serde::{Deserialize, Serialize};
 
 use common::types::{EventFilter, EventRef, OptionalProperty};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Status {
     Enabled,
     Disabled,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
     pub event: EventRef,
     pub filters: Option<Vec<EventFilter>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CustomEvent {
     pub id: u64,
     pub created_at: DateTime<Utc>,
@@ -31,7 +31,7 @@ pub struct CustomEvent {
     pub events: Vec<Event>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CreateCustomEventRequest {
     pub created_by: u64,
     pub tags: Option<Vec<String>>,
@@ -42,7 +42,7 @@ pub struct CreateCustomEventRequest {
     pub events: Vec<Event>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct UpdateCustomEventRequest {
     pub updated_by: u64,
     pub tags: OptionalProperty<Option<Vec<String>>>,

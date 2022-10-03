@@ -1,10 +1,11 @@
 use crate::accounts::types::{Account, CreateAccountRequest, UpdateAccountRequest};
-use crate::auth::auth::make_password_hash;
+use crate::auth::token::make_password_hash;
 use crate::{Context, Result};
 use common::rbac::Permission;
 use metadata::accounts;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
+use crate::auth::password::make_password_hash;
 
 pub struct Provider {
     prov: Arc<accounts::Provider>,
@@ -20,7 +21,7 @@ impl Provider {
 
         let md_req = metadata::accounts::CreateAccountRequest {
             created_by: ctx.account_id,
-            password_hash: make_password_hash(req.password.as_str())?.to_string(),
+            password_hash: make_password_hash(req.password.as_str())?,
             email: req.email,
             first_name: req.first_name,
             last_name: req.last_name,
@@ -32,12 +33,13 @@ impl Provider {
 
         let account = self.prov.create(md_req).await?;
 
-        Ok(account.try_into()?)
+        account.try_into()
     }
 
     pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
-        Ok(self.prov.get_by_id(id).await?.try_into()?)
+
+        self.prov.get_by_id(id).await?.try_into()
     }
 
     pub async fn list(&self, ctx: Context) -> Result<ListResponse<Account>> {
@@ -91,12 +93,12 @@ impl Provider {
         }
         let account = self.prov.update(account_id, md_req).await?;
 
-        Ok(account.try_into()?)
+        account.try_into()
     }
 
     pub async fn delete(&self, ctx: Context, id: u64) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
 
-        Ok(self.prov.delete(id).await?.try_into()?)
+        self.prov.delete(id).await?.try_into()
     }
 }
