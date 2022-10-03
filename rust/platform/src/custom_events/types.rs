@@ -21,14 +21,6 @@ impl From<metadata::custom_events::Status> for Status {
         }
     }
 }
-impl Into<Status> for metadata::custom_events::Status {
-    fn into(self) -> Status {
-        match self {
-            metadata::custom_events::Status::Enabled => Status::Enabled,
-            metadata::custom_events::Status::Disabled => Status::Disabled,
-        }
-    }
-}
 
 impl From<Status> for metadata::custom_events::Status {
     fn from(s: Status) -> Self {
