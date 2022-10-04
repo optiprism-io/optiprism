@@ -1494,11 +1494,9 @@ components:
         message:
           type: string
         fields:
-          type: array
-          items:
-            type: object
-            additionalProperties:
-              type: string
+          type: object
+          additionalProperties:
+            type: string
     JWTToken:
       type: object
       required: [ 'accountId','organizationId','iss','exp','nbf','iat','jti' ]

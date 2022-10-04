@@ -266,17 +266,17 @@ onBeforeMount(async () => {
                         id: item.eventId
                     },
                     filters: item.filters ? await Promise.all(item.filters.map(async filter => {
-                        let valuesList: string[] = []
+                        let valuesList: Array<boolean> | Array<number> | Array<string> = []
 
                         try {
-                            const res = await schemaService.propertyValues({
-                                event_name: item.eventName,
-                                event_type: item.eventType,
-                                property_name: filter.propertyName || '',
-                                property_type: filter.propertyType,
+                            const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
+                                eventName: item.eventName,
+                                eventType: item.eventType,
+                                propertyName: filter.propertyName || '',
+                                propertyType: filter.propertyType,
                             })
-                            if (res) {
-                                valuesList = res
+                            if (res.data.values) {
+                                valuesList = res.data.values
                             }
                         } catch (error) {
                             throw new Error('error get events values')

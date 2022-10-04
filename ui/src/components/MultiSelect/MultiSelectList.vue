@@ -15,9 +15,9 @@
             <ul class="pf-c-menu__list">
                 <MultiSelectListItem
                     v-for="item in items"
-                    :key="item.name"
+                    :key="String(item.name)"
                     :item="item.item"
-                    :text="item.name"
+                    :text="String(item.name)"
                     :selected="isSelected(item.item)"
                     @select="select"
                     @deselect="deselect"

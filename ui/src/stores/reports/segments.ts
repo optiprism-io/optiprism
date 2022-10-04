@@ -2,7 +2,8 @@ import {defineStore} from 'pinia';
 import {Condition, ConditionFilter, PropertyRef,} from '@/types/events';
 import {OperationId, Value} from '@/types';
 import schemaService from '@/api/services/schema.service';
-import {useLexiconStore} from '@/stores/lexicon';
+import { useLexiconStore } from '@/stores/lexicon';
+import { useCommonStore } from '@/stores/common'
 import {
     ChangeEventCondition,
     ChangeFilterOperation,
@@ -54,6 +55,8 @@ import {
     QueryAggregate,
     EventFilterByProperty,
     EventFilterByPropertyTypeEnum,
+    PropertyValuesList200ResponseValues,
+    PropertyValuesListRequestEventTypeEnum,
 } from '@/api'
 
 interface Segment {
@@ -338,20 +341,21 @@ export const useSegmentsStore = defineStore('segments', {
 
                 if (condition && condition.event) {
                     const eventRef = condition.event.ref;
-                    let valuesList: string[] = []
+                    let valuesList: PropertyValuesList200ResponseValues = []
 
                     try {
                         const lexiconStore = useLexiconStore()
+                        const commonStore = useCommonStore()
 
-                        const res = await schemaService.propertyValues({
-                            event_name: lexiconStore.eventName(eventRef),
-                            event_type: eventRef.type,
-                            property_name: lexiconStore.propertyName(payload.propRef),
-                            property_type: payload.propRef.type
+                        const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
+                            eventName: lexiconStore.eventName(eventRef),
+                            eventType: eventRef.type as PropertyValuesListRequestEventTypeEnum,
+                            propertyName: lexiconStore.propertyName(payload.propRef),
+                            propertyType: payload.propRef.type
                         })
 
-                        if (res) {
-                            valuesList = res
+                        if (res.data.values) {
+                            valuesList = res.data.values
                         }
                     } catch (error) {
                         throw new Error('error getEventsValues')
@@ -454,16 +458,17 @@ export const useSegmentsStore = defineStore('segments', {
 
                 if (condition) {
                     const lexiconStore = useLexiconStore()
+                    const commonStore = useCommonStore()
 
                     try {
-                        const res = await schemaService.propertyValues({
+                        const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
                             // TODO integration with backand
                             // check condition type
-                            property_name: lexiconStore.propertyName(ref),
+                            propertyName: lexiconStore.propertyName(ref),
                         })
 
-                        if (res) {
-                            condition.valuesList = res
+                        if (res.data.values) {
+                            condition.valuesList = res.data.values
                         }
                     } catch (error) {
                         throw new Error('error getEventsValues')

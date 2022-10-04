@@ -24,7 +24,7 @@ const emit = defineEmits<{
 
 const lexiconStore = useLexiconStore();
 
-let items = computed(() => {
+const items = computed(() => {
     const ret: Item<number, null>[] = [];
 
     if (lexiconStore.cohorts) {
@@ -34,7 +34,7 @@ let items = computed(() => {
     return ret;
 });
 
-let selectedItem = computed(() => {
+const selectedItem = computed(() => {
     if (props.selected) {
         return props.selected;
     } else {

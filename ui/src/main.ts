@@ -25,7 +25,6 @@ app.use(uikitPlugin);
 app.use(i18nPlugin, lang.en);
 app.use(router);
 
-
 app.directive('click-outside', {
     mounted(el, binding, vnode) {
         el.clickOutsideEvent = function(event: Event) {

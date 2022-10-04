@@ -1,4 +1,20 @@
 {
+  "login": {
+    "keep": "Keep me logged in for 30 days.",
+    "password": "Password",
+    "text": "Log in to your account",
+    "logIn": "Log in"
+  },
+
+  "errors": {
+    "unauthorized": "We're sorry, but we can't authenticate you. You must be logged in to access these pages.",
+    "internal": "Whoops! Something went wrong. Try refreshing the page"
+  },
+
+  "userMenu": {
+    "logout": "Logout"
+  },
+
   "common": {
     "ok": "Ok",
     "types": {

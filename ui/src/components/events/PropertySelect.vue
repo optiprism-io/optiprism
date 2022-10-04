@@ -22,7 +22,7 @@ import {
 import Select from '@/components/Select/Select.vue';
 import { Group, Item } from '@/components/Select/SelectTypes';
 import { useLexiconStore } from '@/stores/lexicon';
-import { PropertyType, EventType, Property } from '@/api'
+import { PropertyType, EventType, Property, CustomProperty } from '@/api'
 
 const lexiconStore = useLexiconStore();
 
@@ -51,7 +51,7 @@ const getEventProperties = (eventRef: EventRef) => {
         const eventProperties = lexiconStore.findEventProperties(eventRef.id)
 
         if (eventProperties.length) {
-            let items: Item<PropertyRef, null>[] = [];
+            const items: Item<PropertyRef, null>[] = [];
             eventProperties.forEach((prop: Property): void => {
                 const propertyRef: PropertyRef = {
                     type: PropertyType.Event,
@@ -70,19 +70,21 @@ const getEventProperties = (eventRef: EventRef) => {
         const eventCustomProperties = lexiconStore.findEventCustomProperties(eventRef.id);
 
         if (eventCustomProperties.length) {
-            let items: Item<PropertyRef, null>[] = [];
+            const items: Item<PropertyRef, null>[] = [];
 
-            eventCustomProperties.forEach((prop: EventCustomProperty): void => {
-                const propertyRef: PropertyRef = {
-                    type: PropertyType.Custom,
-                    id: prop.id
-                };
+            eventCustomProperties.forEach((prop: CustomProperty): void => {
+                if (prop.id) {
+                    const propertyRef: PropertyRef = {
+                        type: PropertyType.Custom,
+                        id: prop.id
+                    }
 
-                items.push({
-                    item: propertyRef,
-                    name: prop.name,
-                    disabled: checkDisable(propertyRef),
-                });
+                    items.push({
+                        item: propertyRef,
+                        name: prop.name || '',
+                        disabled: checkDisable(propertyRef),
+                    })
+                }
             });
             properties.push({
                 name: 'Event Custom Properties',
@@ -98,7 +100,7 @@ const items = computed(() => {
     let ret: Group<Item<PropertyRef, null>[]>[] = [];
 
     if (lexiconStore.eventProperties.length) {
-        let items: Item<PropertyRef, null>[] = [];
+        const items: Item<PropertyRef, null>[] = [];
         lexiconStore.eventProperties.forEach((prop: Property): void => {
             const propertyRef: PropertyRef = {
                 type: PropertyType.Event,
@@ -116,7 +118,7 @@ const items = computed(() => {
     }
 
     if (lexiconStore.userProperties.length) {
-        let items: Item<PropertyRef, null>[] = [];
+        const items: Item<PropertyRef, null>[] = [];
         lexiconStore.userProperties.forEach((prop: Property): void => {
             const propertyRef: PropertyRef = {
                 type: PropertyType.User,

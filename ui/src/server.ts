@@ -1,7 +1,7 @@
-import {createServer} from 'miragejs'
-import {DataType} from '@/api'
-import {BASE_PATH} from '@/api/base'
-import {EventStatus, UserCustomProperty} from '@/types/events';
+import { createServer, Response } from 'miragejs'
+import { DataType, BasicLogin200Response } from '@/api'
+import { BASE_PATH } from '@/api/base'
+import { EventStatus, UserCustomProperty } from '@/types/events';
 import splineChartMocks from '@/mocks/splineChart.json';
 import liveStreamMocks from '@/mocks/reports/liveStream.json'
 import funnelsMocks from '@/mocks/reports/funnels.json'
@@ -10,6 +10,10 @@ import eventSegmentationsMocks from '@/mocks/eventSegmentations/eventSegmentatio
 import eventMocks from '@/mocks/eventSegmentations/events.json';
 import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
 import customEventsMocks from '@/mocks/eventSegmentations/customEvents.json';
+
+const accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
+const refreshToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Im5pa28ga3VzaCIsImlhdCI6MTUxNjIzOTAyMn0.FzpmXmStgiYEO15ZbwwPafVRQSOCO_xidYjrjRvVIbQ'
+const csrfToken = 'CIwNZNlR4XbisJF39I8yWnWX9wX4WFoz'
 
 export default function ({ environment = 'development' } = {}) {
     return createServer({
@@ -26,8 +30,8 @@ export default function ({ environment = 'development' } = {}) {
             this.namespace = 'api'
             this.timing = 110
 
-            this.get('/schema/events', (schema) => {
-                return schema.db.events
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/events`, (schema) => {
+                return { events: schema.db.events }
             });
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id`, (schema, request) => {
@@ -65,17 +69,17 @@ export default function ({ environment = 'development' } = {}) {
                 return funnelsMocks
             })
 
-            this.get('/schema/event-properties', (schema) => {
-                return schema.db.eventProperties
-            });
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/event_properties`, (schema) => {
+                return { events: schema.db.eventProperties }
+            })
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/event_properties/:property_id`, (schema, request) => {
                 const property = JSON.parse(request.requestBody)
                 return schema.db.eventProperties.update(request.params.property_id, property)
             })
 
-            this.get('/schema/user-properties', (schema) => {
-                return schema.db.userProperties
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user_properties`, (schema) => {
+                return { events: schema.db.userProperties }
             })
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user_properties/:property_id`, (schema, request) => {
@@ -83,8 +87,8 @@ export default function ({ environment = 'development' } = {}) {
                 return schema.db.userProperties.update(request.params.property_id, property)
             })
 
-            this.get('/schema/event-custom-properties', () => {
-                return [
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-properties`, () => {
+                return { events: [
                     {
                         id: 1,
                         eventId: 1,
@@ -111,7 +115,7 @@ export default function ({ environment = 'development' } = {}) {
                         nullable: false,
                         isDictionary: false
                     }
-                ];
+                ]};
             });
 
             this.get('/schema/user-custom-properties', (): UserCustomProperty[] => {
@@ -142,14 +146,17 @@ export default function ({ environment = 'development' } = {}) {
                 ];
             });
 
-            this.get('/data/property-values', (_, request): string[] => {
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/data/property-values`, (_, request) => {
                 const propertyName = request.queryParams?.property_name
+                let values = []
 
                 if (propertyName === 'Country') {
-                    return ['Spain', 'USA', 'United Kingdom', 'Poland']
+                    values = ['Spain', 'USA', 'United Kingdom', 'Poland']
                 } else {
-                    return ['Furniture', 'Doors', 'Lamp', 'Tables', 'Shelves']
+                    values = ['Furniture', 'Doors', 'Lamp', 'Tables', 'Shelves']
                 }
+
+                return { values }
             });
 
             this.get('/chart', (): any[] => {
@@ -167,6 +174,34 @@ export default function ({ environment = 'development' } = {}) {
                     };
                 }
             });
+
+            this.post(`${BASE_PATH}/v1/auth/basic/login`, (_, request) => {
+                const property = JSON.parse(request.requestBody)
+
+                if (property.email.length <= 5 || property.password.length < 5) {
+                    return new Response(400, { some: 'header' }, {
+                        'code': '1000_invalid_token',
+                        'message': 'string',
+                        'fields': {
+                            'email': 'Email is too short',
+                        }
+                    });
+                } else {
+                    return {
+                        accessToken,
+                        refreshToken,
+                        csrfToken,
+                    }
+                }
+            })
+
+            this.post(`${BASE_PATH}/v1/auth/access`, (): BasicLogin200Response => {
+                return {
+                    accessToken,
+                    refreshToken,
+                    csrfToken,
+                }
+            })
         }
     });
 }

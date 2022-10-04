@@ -48,13 +48,15 @@ const editHoldingProperty = (index: number, property: PropertyRef) => {
             ? lexiconStore.findEventCustomPropertyById(Number(property.id))
             : lexiconStore.findEventPropertyById(Number(property.id));
 
-    stepsStore.editHoldingProperty({
-        index,
-        property: {
-            id,
-            name
-        }
-    })
+    if (id && name) {
+        stepsStore.editHoldingProperty({
+            index,
+            property: {
+                id,
+                name
+            }
+        })
+    }
 }
 
 const deleteHoldingProperty = (index: number) : void => {

@@ -13,10 +13,10 @@
  */
 
 
-import {Configuration} from "./configuration";
+import { Configuration } from "./configuration";
 // Some imports not used depending on template conditions
 // @ts-ignore
-import globalAxios, {AxiosInstance, AxiosPromise, AxiosRequestConfig} from 'axios';
+import globalAxios, { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
 
 export const BASE_PATH = "https://virtserver.swaggerhub.com/optiprism/optiprism/1.0.0".replace(/\/+$/, "");
 

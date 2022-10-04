@@ -166,8 +166,15 @@ import Query from '@/components/events/Events/Query.vue';
 import {Group, Item} from '@/components/Select/SelectTypes';
 import schemaService from '@/api/services/schema.service'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
-import {EventType} from '@/api'
+import {
+    EventType,
+    PropertyValuesList200ResponseValues,
+    PropertyValuesListRequestEventTypeEnum
+} from '@/api'
 import CommonIdentifier from '@/components/common/identifier/CommonIdentifier.vue';
+import { useCommonStore } from '@/stores/common'
+
+const commonStore = useCommonStore()
 
 type Props = {
   eventRef: EventRef
@@ -251,8 +258,8 @@ const removeFilter = (filterIdx: number): void => {
 }
 
 const addFilter = (): void => {
-    let event = props.event
-    let emptyFilter = event.filters.find((filter): boolean => filter.propRef === undefined)
+    const event = props.event
+    const emptyFilter = event.filters.find((filter): boolean => filter.propRef === undefined)
 
     if (emptyFilter) {
         return
@@ -271,20 +278,21 @@ const addFilter = (): void => {
 };
 
 const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => {
-    let event = props.event
-    let valuesList: string[] = []
+    const event = props.event
+    let valuesList: PropertyValuesList200ResponseValues = []
 
     try {
-        const res = await schemaService.propertyValues({
-            event_name: lexiconStore.eventName(props.event.ref),
-            event_type: props.event.ref.type,
-            property_name: lexiconStore.propertyName(propRef),
-            property_type: propRef.type
-        });
-        if (res) {
-            valuesList = res
+        const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
+            eventName: lexiconStore.eventName(props.event.ref),
+            eventType: props.event.ref.type as PropertyValuesListRequestEventTypeEnum,
+            propertyName: lexiconStore.propertyName(propRef),
+            propertyType: propRef.type
+        })
+
+        if (res.data.values) {
+            valuesList = res.data.values
         }
-    } catch (error) {
+    } catch (e) {
         throw new Error('error getEventsValues')
     }
 
@@ -297,20 +305,20 @@ const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => 
 }
 
 const changeFilterOperation = (filterIdx: number, opId: OperationId) => {
-    let event = props.event
+    const event = props.event
 
     event.filters[filterIdx].opId = opId
     event.filters[filterIdx].values = []
 }
 
 const addFilterValue = (filterIdx: number, value: Value): void => {
-    let event = props.event
+    const event = props.event
 
     event.filters[filterIdx].values.push(value)
 }
 
 const removeFilterValue = (filterIdx: number, value: Value): void => {
-    let event = props.event
+    const event = props.event
 
     event.filters[filterIdx].values = props.event.filters[filterIdx].values.filter(v => v !== value)
 };
@@ -334,7 +342,7 @@ const removeBreakdown = (breakdownIdx: number): void => {
 };
 
 const eventName = (ref: EventRef): string => {
-    let event = lexiconStore.findEventById(ref.id)
+    const event = lexiconStore.findEventById(ref.id)
 
     switch (ref.type) {
         case EventType.Regular:

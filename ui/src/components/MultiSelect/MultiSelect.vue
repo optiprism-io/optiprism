@@ -27,7 +27,7 @@ import MultiSelectList from '@/components/MultiSelect/MultiSelectList.vue'
 
 export interface Item {
     item: any;
-    name: string;
+    name: string | boolean | number;
 }
 
 const emit = defineEmits<{
@@ -42,7 +42,7 @@ const props = defineProps<{
     popperContainer?: string
 }>();
 
-let key = ref(0);
+const key = ref(0);
 const searchRef = ref('');
 
 const itemsSelect = computed(() => {

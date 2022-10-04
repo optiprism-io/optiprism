@@ -1,9 +1,9 @@
 [
   {
     "name": "events.live_stream.title",
-    "value": "events_live_stream",
+    "value": "eventsLiveStream",
     "link": {
-        "name": "events_live_stream"
+        "name": "eventsLiveStream"
     }
   },
   {

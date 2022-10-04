@@ -38,7 +38,7 @@ import EventPropertyPopup, { ApplyPayload } from '@/components/events/EventPrope
 import EventManagementPopup, { ApplyPayload as ApplyPayloadEvent } from '@/components/events/EventManagementPopup.vue'
 import { Action } from '@/components/uikit/UiTable/UiTable'
 import navPagesConfig from '@/configs/events/navPages.json'
-
+import { pagesMap } from '@/router'
 const i18n = inject<any>('i18n')
 const route = useRoute()
 const lexiconStore = useLexiconStore()
@@ -128,7 +128,7 @@ const propertyPopupApply = async (payload: ApplyPayload) => {
     propertyPopupLoading.value = false
     commonStore.showEventPropertyPopup = false
 
-    if (route.name === 'events_live_stream') {
+    if (route.name === pagesMap.eventsLiveStream.name) {
         liveStreamStore.getReportLiveStream()
     }
 }
