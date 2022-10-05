@@ -19,9 +19,11 @@ type Reports = {
     loading: boolean
     saveLoading: boolean
     reportId: number
+    reportDump: string
+    reportDumpType: ReportReportTypeEnum
 }
 
-const getReport = (type: ReportReportTypeEnum): ReportReport => {
+export const getReport = (type: ReportReportTypeEnum): ReportReport => {
     const eventsStore = useEventsStore()
     const funnelsStore = useFunnelsStore()
     const breakdownsStore = useBreakdownsStore()
@@ -52,8 +54,13 @@ export const useReportsStore = defineStore('reports', {
         loading: true,
         reportId: 0,
         saveLoading: false,
+        reportDump: '',
+        reportDumpType: ReportReportTypeEnum.EventSegmentation,
     }),
     getters: {
+        isChangedReport(): boolean {
+            return !this.reportId || JSON.stringify(getReport(this.reportDumpType)) !== this.reportDump
+        },
         activeReport(): null | Report {
             const report = this.list.find(item => item.id && Number(item.id) === Number(this.reportId))
 
@@ -64,6 +71,10 @@ export const useReportsStore = defineStore('reports', {
         },
     },
     actions: {
+        updateDump(type: ReportReportTypeEnum) {
+            this.reportDumpType = type
+            this.reportDump = JSON.stringify(getReport(type))
+        },
         async getList() {
             const commonStore = useCommonStore()
 

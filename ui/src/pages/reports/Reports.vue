@@ -50,7 +50,9 @@
                     />
                 </div>
                 <UiButton
+                    v-if="isChangedReport"
                     class="pf-m-primary pf-u-ml-lg"
+                    :progress="reportsStore.saveLoading"
                     @click="onSaveReport"
                 >
                     {{ $t('reports.save') }}
@@ -129,6 +131,13 @@ const reportSelectText = computed(() => {
     return reportsStore.activeReport ? reportsStore.activeReport.name : t('reports.selectReport')
 })
 
+const isChangedReport = computed(() => {
+    return reportsStore.saveLoading || reportsStore.isChangedReport || reportsStore?.activeReport?.name !== reportName.value
+})
+
+const reportType = computed(() => pagesMap.reportsEventSegmentation.name === route.name ?
+    ReportReportTypeEnum.EventSegmentation : ReportReportTypeEnum.Funnel)
+
 const itemsReports = computed(() => {
     return reportsStore.list.map(item => {
         const id = Number(item.id)
@@ -162,14 +171,10 @@ const onDeleteReport = async () => {
 }
 
 const onSaveReport = async () => {
-    const reportType = pagesMap.reportsEventSegmentation.name === route.name ?
-        ReportReportTypeEnum.EventSegmentation :
-        ReportReportTypeEnum.Funnel
-
     if (reportsStore.reportId) {
-        await reportsStore.editReport(reportName.value, reportType)
+        await reportsStore.editReport(reportName.value, reportType.value)
     } else {
-        await reportsStore.createReport(reportName.value, reportType)
+        await reportsStore.createReport(reportName.value, reportType.value)
 
         router.push({
             params: {
@@ -178,6 +183,7 @@ const onSaveReport = async () => {
         })
     }
     await reportsStore.getList()
+    reportsStore.updateDump(reportType.value)
 }
 
 const setEmptyReport = () => {
@@ -197,8 +203,9 @@ const onSelectTab = () => {
 }
 
 const updateReport = async (id: number) => {
-    reportToStores(Number(id))
+    await reportToStores(Number(id))
     reportName.value = reportsStore.activeReport?.name ?? t('reports.untitledReport')
+    reportsStore.updateDump(reportType.value)
 }
 
 const onSelectReport = (id: number) => {
