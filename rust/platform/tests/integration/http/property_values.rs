@@ -30,7 +30,6 @@ mod tests {
 
             let _ctx = Context {
                 organization_id: org_id,
-                account_id: 1,
                 project_id: proj_id,
             };
 

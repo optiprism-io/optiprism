@@ -214,7 +214,7 @@ impl Scenario {
                                 action = Action::EndSession;
                                 continue;
                             }
-                            let _ = state.selected_product.insert(sp);
+                            state.selected_product.insert(sp);
                         }
                         (_, Action::AddProductToCart, _) => {
                             state.cart.push(state.selected_product.unwrap());
@@ -231,7 +231,7 @@ impl Scenario {
                                 action = Action::EndSession;
                                 continue;
                             }
-                            let _ = state.selected_product.insert(sp);
+                            state.selected_product.insert(sp);
                             *state
                                 .products_viewed
                                 .entry(state.selected_product.unwrap().id)

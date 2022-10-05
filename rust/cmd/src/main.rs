@@ -3,13 +3,14 @@ extern crate log;
 
 use std::env::temp_dir;
 use std::path::PathBuf;
-use std::{env::set_var, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{Router, Server};
 use bytesize::ByteSize;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use datafusion::datasource::MemTable;
 use log::info;
+use tower_cookies::CookieManagerLayer;
 use uuid::Uuid;
 
 use error::Result;
@@ -24,14 +25,6 @@ mod error;
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
-    // test env
-    {
-        set_var("FNP_COMMON_SALT", "FNP_COMMON_SALT");
-        set_var("FNP_EMAIL_TOKEN_KEY", "FNP_EMAIL_TOKEN_KEY");
-        set_var("FNP_ACCESS_TOKEN_KEY", "FNP_ACCESS_TOKEN_KEY");
-        set_var("FNP_REFRESH_TOKEN_KEY", "FNP_REFRESH_TOKEN_KEY");
-    }
-
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
     let store = Arc::new(Store::new(path));
@@ -89,20 +82,32 @@ async fn main() -> Result<()> {
     );
     println!("total size: {}", ByteSize::b(data_size_bytes as u64));
 
-    let provider = Arc::new(MemTable::try_new(batches[0][0].schema(), batches)?);
-    let query_provider = Arc::new(QueryProvider::try_new_from_provider(md.clone(), provider)?);
+    let data_provider = Arc::new(MemTable::try_new(batches[0][0].schema(), batches)?);
+    let query_provider = Arc::new(QueryProvider::try_new_from_provider(
+        md.clone(),
+        data_provider,
+    )?);
     let platform_query_provider = Arc::new(platform::queries::provider::QueryProvider::new(
         query_provider,
     ));
-    let platform = platform::PlatformProvider::new(md.clone(), platform_query_provider);
+
+    let platform = platform::PlatformProvider::new(
+        md.clone(),
+        platform_query_provider,
+        Duration::days(1),
+        "key".to_string(),
+        Duration::days(1),
+        "key".to_string(),
+    );
 
     let mut router = Router::new();
-    router = platform::http::attach_routes(router, platform);
+    router = platform::http::attach_routes(router, platform, md);
+    router = router.layer(CookieManagerLayer::new());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     Server::bind(&addr)
         .serve(router.into_make_service())
         .await
-        .map_err(|e| Error::ExternalError(e.to_string()))?;
+        .map_err(|e| Error::External(e.to_string()))?;
     Ok(())
 }

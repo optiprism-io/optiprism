@@ -14,17 +14,17 @@ pub type Result<T> = result::Result<T, Error>;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("PlatformError: {0:?}")]
-    PlatformError(#[from] PlatformError),
+    Platform(#[from] PlatformError),
     #[error("QueryError: {0:?}")]
-    QueryError(#[from] QueryError),
+    Query(#[from] QueryError),
     #[error("CommonError: {0:?}")]
-    CommonError(#[from] CommonError),
+    Common(#[from] CommonError),
     #[error("MetadataError: {0:?}")]
-    MetadataError(#[from] MetadataError),
+    Metadata(#[from] MetadataError),
     #[error("EventsGenError: {0:?}")]
-    EventsGenError(#[from] EventsGenError),
+    EventsGen(#[from] EventsGenError),
     #[error("DataFusionError: {0:?}")]
-    DataFusionError(#[from] DataFusionError),
+    DataFusion(#[from] DataFusionError),
     #[error("ExternalError: {0:?}")]
-    ExternalError(String),
+    External(String),
 }

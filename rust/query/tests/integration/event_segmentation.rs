@@ -8,7 +8,7 @@ mod tests {
 
     use arrow::util::pretty::print_batches;
 
-    use datafusion::physical_plan::{collect, PhysicalPlanner};
+    use datafusion::physical_plan::collect;
     use datafusion::prelude::{SessionConfig, SessionContext};
 
     use datafusion::execution::runtime_env::RuntimeEnv;
@@ -158,7 +158,6 @@ mod tests {
 
         let _ctx = Context {
             organization_id: org_id,
-            account_id: 1,
             project_id: proj_id,
         };
 
@@ -274,7 +273,6 @@ mod tests {
 
         let ctx = Context {
             organization_id: org_id,
-            account_id: 1,
             project_id: proj_id,
         };
 
@@ -386,7 +384,6 @@ mod tests {
 
         let ctx = Context {
             organization_id: org_id,
-            account_id: 1,
             project_id: proj_id,
         };
 

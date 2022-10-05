@@ -28,9 +28,9 @@ impl Provider {
     pub async fn create_table(&self, table: Table) -> Result<()> {
         let mut tables = self.tables.write().await;
         if tables.iter().any(|t| t.typ == table.typ) {
-            return Err(
-                MetadataError::Database(DatabaseError::TableAlreadyExists(table.typ)).into(),
-            );
+            return Err(MetadataError::Database(DatabaseError::TableAlreadyExists(
+                table.typ,
+            )));
         }
 
         tables.push(table.clone());
@@ -43,20 +43,27 @@ impl Provider {
         let table = tables.iter().find(|t| t.typ == table_type);
 
         match table {
-            None => Err(MetadataError::Database(DatabaseError::TableNotFound(table_type)).into()),
+            None => Err(MetadataError::Database(DatabaseError::TableNotFound(
+                table_type,
+            ))),
             Some(table) => Ok(table.clone()),
         }
     }
 
     pub async fn add_column(&self, table_type: TableRef, col: Column) -> Result<()> {
         let mut tables = self.tables.write().await;
-        let table = tables
-            .iter_mut()
-            .find(|t| t.typ == table_type)
-            .ok_or_else(|| MetadataError::Database(DatabaseError::TableNotFound(table_type)))?;
+        let table =
+            tables
+                .iter_mut()
+                .find(|t| t.typ == table_type)
+                .ok_or(MetadataError::Database(DatabaseError::TableNotFound(
+                    table_type,
+                )))?;
 
         if table.columns.iter().any(|c| c.name == col.name) {
-            return Err(MetadataError::Database(DatabaseError::ColumnAlreadyExists(col)).into());
+            return Err(MetadataError::Database(DatabaseError::ColumnAlreadyExists(
+                col,
+            )));
         }
 
         table.columns.push(col.clone());

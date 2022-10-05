@@ -119,12 +119,22 @@ pub enum OrganizationError {
 
 #[derive(Debug)]
 pub struct Organization {
-    id: u64,
+    id: Option<u64>,
+    name: Option<String>,
 }
 
 impl Organization {
-    pub fn new(id: u64) -> Self {
-        Self { id }
+    pub fn new_with_id(id: u64) -> Self {
+        Self {
+            id: Some(id),
+            name: None,
+        }
+    }
+    pub fn new_with_name(name: String) -> Self {
+        Self {
+            id: None,
+            name: Some(name),
+        }
     }
 }
 
@@ -139,14 +149,57 @@ pub enum ProjectError {
 #[derive(Debug)]
 pub struct Project {
     organization_id: u64,
-    project_id: u64,
+    id: Option<u64>,
+    name: Option<String>,
 }
 
 impl Project {
-    pub fn new(organization_id: u64, project_id: u64) -> Self {
+    pub fn new_with_name(organization_id: u64, name: String) -> Self {
         Self {
             organization_id,
-            project_id,
+            id: None,
+            name: Some(name),
+        }
+    }
+
+    pub fn new_with_id(organization_id: u64, id: u64) -> Self {
+        Self {
+            organization_id,
+            id: Some(id),
+            name: None,
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum TeamError {
+    #[error("team not found: {0:?}")]
+    TeamNotFound(Team),
+    #[error("team already exist: {0:?}")]
+    TeamAlreadyExist(Team),
+}
+
+#[derive(Debug)]
+pub struct Team {
+    organization_id: u64,
+    id: Option<u64>,
+    name: Option<String>,
+}
+
+impl Team {
+    pub fn new_with_name(organization_id: u64, name: String) -> Self {
+        Self {
+            organization_id,
+            id: None,
+            name: Some(name),
+        }
+    }
+
+    pub fn new_with_id(organization_id: u64, id: u64) -> Self {
+        Self {
+            organization_id,
+            id: Some(id),
+            name: None,
         }
     }
 }
@@ -253,6 +306,8 @@ pub enum MetadataError {
     Organization(#[from] OrganizationError),
     #[error("project {0:?}")]
     Project(#[from] ProjectError),
+    #[error("team {0:?}")]
+    Team(#[from] TeamError),
     #[error("event {0:?}")]
     Event(#[from] EventError),
     #[error("custom event {0:?}")]

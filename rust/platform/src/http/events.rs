@@ -2,7 +2,8 @@ use crate::events::{CreateEventRequest, UpdateEventRequest};
 use crate::{Context, EventsProvider, Result};
 use axum::extract::Path;
 
-use axum::{extract::Extension, routing, AddExtensionLayer, Json, Router};
+use axum::http::StatusCode;
+use axum::{extract::Extension, routing, Json, Router};
 use metadata::events::Event;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
@@ -12,11 +13,14 @@ async fn create(
     Extension(provider): Extension<Arc<EventsProvider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<CreateEventRequest>,
-) -> Result<Json<Event>> {
-    Ok(Json(
-        provider
-            .create(ctx, organization_id, project_id, request)
-            .await?,
+) -> Result<(StatusCode, Json<Event>)> {
+    Ok((
+        StatusCode::CREATED,
+        Json(
+            provider
+                .create(ctx, organization_id, project_id, request)
+                .await?,
+        ),
     ))
 }
 
@@ -124,5 +128,5 @@ pub fn attach_routes(router: Router, events: Arc<EventsProvider>) -> Router {
             "/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id/properties/:property_id",
             routing::delete(detach_property),
         )
-        .layer(AddExtensionLayer::new(events))
+        .layer(Extension(events))
 }

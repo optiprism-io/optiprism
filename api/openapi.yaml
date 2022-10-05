@@ -26,7 +26,7 @@ externalDocs:
   url: https://dev.optiprism.io/api
 
 paths:
-  /v1/auth/basic/login:
+  /v1/auth/login:
     post:
       summary: Basic login
       operationId: basicLogin
@@ -52,14 +52,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  accessToken:
-                    type: string
-                  refreshToken:
-                    type: string
-                  csrfToken:
-                    type: string
+                $ref: '#/components/schemas/TokensResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -68,7 +61,34 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/auth/access:
+  /v1/auth/signup:
+    post:
+      summary: Basic signup
+      operationId: basicSignup
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        201:
+          description: tokens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokensResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/auth/refresh-token:
     post:
       summary: Refresh access token
       operationId: authAccess
@@ -79,24 +99,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [ 'refreshToken']
-              properties:
-                refreshToken:
-                  type: string
+              $ref: '#/components/schemas/RefreshTokenRequest'
       responses:
         200:
           description: tokens
           content:
             application/json:
               schema:
-                properties:
-                  accessToken:
-                    type: string
-                  refreshToken:
-                    type: string
-                  csrfToken:
-                    type: string
+                $ref: '#/components/schemas/TokensResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1484,6 +1494,35 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
 
   schemas:
+    SignupRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+          format: password
+        password_repeat:
+          type: string
+          format: password
+        first_name:
+          type: string
+        last_name:
+          type: string
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+    TokensResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        csrfToken:
+          type: string
     ErrorResponse:
       type: object
       properties:

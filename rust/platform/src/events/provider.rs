@@ -1,7 +1,7 @@
 use crate::events::types::UpdateEventRequest;
 use crate::events::CreateEventRequest;
 use crate::{Context, Result};
-use common::rbac::Permission;
+use common::rbac::ProjectPermission;
 use metadata::events::{Event, Provider as EventsProvider};
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
@@ -22,7 +22,7 @@ impl Provider {
         project_id: u64,
         request: CreateEventRequest,
     ) -> Result<Event> {
-        ctx.check_permission(organization_id, project_id, Permission::CreateEvent)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
         let event = self
             .prov
@@ -30,7 +30,7 @@ impl Provider {
                 organization_id,
                 project_id,
                 metadata::events::CreateEventRequest {
-                    created_by: ctx.account_id,
+                    created_by: ctx.account_id.unwrap(),
                     tags: request.tags,
                     name: request.name,
                     display_name: request.display_name,
@@ -53,7 +53,8 @@ impl Provider {
         project_id: u64,
         id: u64,
     ) -> Result<Event> {
-        ctx.check_permission(organization_id, project_id, Permission::GetEventById)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+
         Ok(self.prov.get_by_id(organization_id, project_id, id).await?)
     }
 
@@ -64,7 +65,8 @@ impl Provider {
         project_id: u64,
         name: &str,
     ) -> Result<Event> {
-        ctx.check_permission(organization_id, project_id, Permission::GetEventByName)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+
         let event = self
             .prov
             .get_by_name(organization_id, project_id, name)
@@ -78,7 +80,8 @@ impl Provider {
         organization_id: u64,
         project_id: u64,
     ) -> Result<ListResponse<Event>> {
-        ctx.check_permission(organization_id, project_id, Permission::ListEvents)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+
         Ok(self.prov.list(organization_id, project_id).await?)
     }
 
@@ -90,13 +93,14 @@ impl Provider {
         event_id: u64,
         req: UpdateEventRequest,
     ) -> Result<Event> {
-        ctx.check_permission(organization_id, project_id, Permission::UpdateEvent)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+
         let mut md_req = metadata::events::UpdateEventRequest::default();
-        let _ = md_req.updated_by = ctx.account_id;
-        let _ = md_req.tags.insert(req.tags);
-        let _ = md_req.display_name.insert(req.display_name);
-        let _ = md_req.description.insert(req.description);
-        let _ = md_req.status.insert(req.status);
+        md_req.updated_by = ctx.account_id.unwrap();
+        md_req.tags = req.tags;
+        md_req.display_name = req.display_name;
+        md_req.description = req.description;
+        md_req.status = req.status;
         let event = self
             .prov
             .update(organization_id, project_id, event_id, md_req)
@@ -113,11 +117,8 @@ impl Provider {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        ctx.check_permission(
-            organization_id,
-            project_id,
-            Permission::AttachPropertyToEvent,
-        )?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+
         Ok(self
             .prov
             .attach_property(organization_id, project_id, event_id, prop_id)
@@ -132,11 +133,8 @@ impl Provider {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event> {
-        ctx.check_permission(
-            organization_id,
-            project_id,
-            Permission::DetachPropertyFromEvent,
-        )?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+
         Ok(self
             .prov
             .detach_property(organization_id, project_id, event_id, prop_id)
@@ -150,7 +148,8 @@ impl Provider {
         project_id: u64,
         id: u64,
     ) -> Result<Event> {
-        ctx.check_permission(organization_id, project_id, Permission::DeleteEvent)?;
+        ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
+
         Ok(self.prov.delete(organization_id, project_id, id).await?)
     }
 }

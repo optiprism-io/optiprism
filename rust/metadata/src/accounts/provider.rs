@@ -1,35 +1,28 @@
-use super::{Account, CreateRequest, UpdateRequest};
-use crate::error::{AccountError, MetadataError, StoreError};
-use crate::metadata::{ListResponse, ResponseMetadata};
-use crate::store::index::hash_map::HashMap;
-use crate::store::Store;
-use crate::{error, Result};
+use std::sync::Arc;
+
 use bincode::{deserialize, serialize};
 use chrono::Utc;
-use std::sync::Arc;
+
 use tokio::sync::RwLock;
+
+use crate::accounts::types::UpdateAccountRequest;
+use crate::accounts::{Account, CreateAccountRequest};
+use crate::error::{AccountError, MetadataError, StoreError};
+use crate::metadata::ListResponse;
+use crate::store::index::hash_map::HashMap;
+use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key};
+use crate::store::Store;
+use crate::{error, Result};
 
 const NAMESPACE: &[u8] = b"accounts";
 const IDX_EMAIL: &[u8] = b"email";
 
-pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {
-    [ns, b"/id_seq"].concat()
-}
-
-fn make_index_key(ns: &[u8], idx_name: &[u8], key: &str) -> Vec<u8> {
-    [ns, b"/idx/", idx_name, b"/", key.as_bytes()].concat()
-}
-
-pub fn make_data_key(ns: &[u8]) -> Vec<u8> {
-    [ns, b"/data/"].concat()
-}
-
-pub fn make_data_value_key(ns: &[u8], id: u64) -> Vec<u8> {
-    [make_data_key(ns).as_slice(), id.to_le_bytes().as_ref()].concat()
-}
-
 fn index_keys(email: &str) -> Vec<Option<Vec<u8>>> {
-    [Some(make_index_key(NAMESPACE, IDX_EMAIL, email).to_vec())].to_vec()
+    [index_email_key(email)].to_vec()
+}
+
+fn index_email_key(email: &str) -> Option<Vec<u8>> {
+    Some(make_index_key(NAMESPACE, IDX_EMAIL, email).to_vec())
 }
 
 pub struct Provider {
@@ -47,39 +40,55 @@ impl Provider {
         }
     }
 
-    pub async fn create(&self, req: CreateRequest) -> Result<Account> {
+    pub async fn create(&self, req: CreateAccountRequest) -> Result<Account> {
         let _guard = self.guard.write().await;
-        let idx_keys = index_keys(req.email.as_str());
+        self._create(req).await
+    }
+
+    pub async fn _create(&self, req: CreateAccountRequest) -> Result<Account> {
+        let idx_keys = index_keys(&req.email);
+
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(
                     AccountError::AccountAlreadyExist(error::Account::new_with_email(req.email))
                         .into(),
-                )
+                );
             }
             Err(other) => return Err(other),
             Ok(_) => {}
         }
+
         let created_at = Utc::now();
         let id = self.store.next_seq(make_id_seq_key(NAMESPACE)).await?;
+
         let account = req.into_account(id, created_at);
+
         let data = serialize(&account)?;
         self.store
             .put(make_data_value_key(NAMESPACE, account.id), &data)
             .await?;
+
         self.idx.insert(idx_keys.as_ref(), &data).await?;
+
         Ok(account)
     }
 
     pub async fn get_by_id(&self, id: u64) -> Result<Account> {
-        match self.store.get(make_data_value_key(NAMESPACE, id)).await? {
+        let key = make_data_value_key(NAMESPACE, id);
+
+        match self.store.get(key).await? {
             None => Err(AccountError::AccountNotFound(error::Account::new_with_id(id)).into()),
-            Some(value) => Ok(deserialize(value.as_slice())?),
+            Some(value) => Ok(deserialize(&value)?),
         }
     }
 
     pub async fn get_by_email(&self, email: &str) -> Result<Account> {
         let _guard = self.guard.read().await;
+        self._get_by_email(email).await
+    }
+
+    pub async fn _get_by_email(&self, email: &str) -> Result<Account> {
         match self
             .idx
             .get(make_index_key(NAMESPACE, IDX_EMAIL, email))
@@ -95,34 +104,24 @@ impl Provider {
     }
 
     pub async fn list(&self) -> Result<ListResponse<Account>> {
-        let prefix = make_data_key(NAMESPACE);
-
-        let list = self
-            .store
-            .list_prefix("")
-            .await?
-            .iter()
-            .filter_map(|x| {
-                if x.0.len() < prefix.len() || !prefix.as_slice().cmp(&x.0[..prefix.len()]).is_eq()
-                {
-                    return None;
-                }
-
-                Some(deserialize(x.1.as_ref()))
-            })
-            .collect::<bincode::Result<_>>()?;
-
-        Ok(ListResponse {
-            data: list,
-            meta: ResponseMetadata { next: None },
-        })
+        list(self.store.clone(), NAMESPACE).await
     }
 
-    pub async fn update(&self, req: UpdateRequest) -> Result<Account> {
+    pub async fn update(&self, account_id: u64, req: UpdateAccountRequest) -> Result<Account> {
         let _guard = self.guard.write().await;
-        let prev_account = self.get_by_id(req.id).await?;
-        let idx_keys = index_keys(req.email.as_str());
-        let idx_prev_keys = index_keys(prev_account.email.as_str());
+
+        let prev_account = self.get_by_id(account_id).await?;
+
+        let mut account = prev_account.clone();
+
+        let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
+        let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
+        if let Some(email) = &req.email {
+            idx_keys.push(index_email_key(email.as_str()));
+            idx_prev_keys.push(index_email_key(prev_account.email.as_str()));
+            account.email = email.to_owned();
+        }
+
         match self
             .idx
             .check_update_constraints(idx_keys.as_ref(), idx_prev_keys.as_ref())
@@ -130,18 +129,37 @@ impl Provider {
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
                 return Err(
-                    AccountError::AccountAlreadyExist(error::Account::new_with_id(req.id)).into(),
-                )
+                    AccountError::AccountAlreadyExist(error::Account::new_with_id(account_id))
+                        .into(),
+                );
             }
             Err(other) => return Err(other),
             Ok(_) => {}
         }
-        let updated_at = Utc::now(); // TODO add updated_by
-        let account = req.into_account(prev_account, updated_at, None);
+
+        account.updated_at = Some(Utc::now());
+        account.updated_by = Some(req.updated_by);
+        if let Some(first_name) = req.first_name {
+            account.first_name = first_name;
+        }
+        if let Some(last_name) = req.last_name {
+            account.last_name = last_name;
+        }
+        if let Some(organizations) = req.organizations {
+            account.organizations = organizations;
+        }
+        if let Some(projects) = req.projects {
+            account.projects = projects;
+        }
+        if let Some(teams) = req.teams {
+            account.teams = teams;
+        }
+
         let data = serialize(&account)?;
         self.store
             .put(make_data_value_key(NAMESPACE, account.id), &data)
             .await?;
+
         self.idx
             .update(idx_keys.as_ref(), idx_prev_keys.as_ref(), &data)
             .await?;
@@ -155,9 +173,8 @@ impl Provider {
         self.store
             .delete(make_data_value_key(NAMESPACE, id))
             .await?;
-        self.idx
-            .delete(index_keys(account.email.as_str()).as_ref())
-            .await?;
+
+        self.idx.delete(index_keys(&account.email).as_ref()).await?;
 
         Ok(account)
     }

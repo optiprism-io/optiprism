@@ -6,32 +6,32 @@ use common::types::OptionalProperty;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Status {
     Enabled,
     Disabled,
 }
 
-impl Into<Status> for metadata::custom_events::Status {
-    fn into(self) -> Status {
-        match self {
+impl From<metadata::custom_events::Status> for Status {
+    fn from(s: metadata::custom_events::Status) -> Self {
+        match s {
             metadata::custom_events::Status::Enabled => Status::Enabled,
             metadata::custom_events::Status::Disabled => Status::Disabled,
         }
     }
 }
 
-impl Into<metadata::custom_events::Status> for Status {
-    fn into(self) -> metadata::custom_events::Status {
-        match self {
+impl From<Status> for metadata::custom_events::Status {
+    fn from(s: Status) -> Self {
+        match s {
             Status::Enabled => metadata::custom_events::Status::Enabled,
             Status::Disabled => metadata::custom_events::Status::Disabled,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
     pub event: EventRef,
@@ -66,7 +66,7 @@ impl TryInto<Event> for metadata::custom_events::Event {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomEvent {
     pub id: u64,
@@ -108,7 +108,7 @@ impl TryInto<CustomEvent> for metadata::custom_events::CustomEvent {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCustomEventRequest {
     pub tags: Option<Vec<String>>,
@@ -119,7 +119,7 @@ pub struct CreateCustomEventRequest {
     pub events: Vec<Event>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCustomEventRequest {
     pub tags: OptionalProperty<Option<Vec<String>>>,

@@ -1,3 +1,4 @@
+mod auth;
 mod custom_events;
 mod event_segmentation;
 mod events;

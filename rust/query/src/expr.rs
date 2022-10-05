@@ -138,16 +138,7 @@ pub async fn event_filters_expression(
                     metadata,
                     property,
                     operation,
-                    value
-                        .clone()
-                        .and_then(|v| {
-                            Some(
-                                v.iter()
-                                    .map(|v| v.clone().into())
-                                    .collect::<Vec<ScalarValue>>(),
-                            )
-                        })
-                        .to_owned(),
+                    value.clone(),
                 )),
             }
         })
@@ -189,7 +180,7 @@ pub async fn encode_property_dict_values(
                         return Err(QueryError::Plan(format!(
                             "unsupported dictionary type \"{:?}\"",
                             dict_type
-                        )))
+                        )));
                     }
                 };
 

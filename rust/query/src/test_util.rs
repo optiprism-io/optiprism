@@ -32,7 +32,7 @@ pub async fn events_provider(
     let target_partitions = 1;
     let listing_options = options.to_listing_options(target_partitions);
 
-    let config = ListingTableConfig::new(table_path.clone())
+    let config = ListingTableConfig::new(table_path)
         .with_listing_options(listing_options)
         .with_schema(Arc::new(schema));
     let provider = ListingTable::try_new(config)?;

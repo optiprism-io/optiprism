@@ -1,97 +1,112 @@
-use crate::PlatformError;
 use crate::Result;
+use crate::{auth, PlatformError};
 use axum::{
     async_trait,
     extract::{FromRequest, RequestParts, TypedHeader},
     headers::{authorization::Bearer, Authorization},
 };
 
-use common::{
-    auth::parse_access_token,
-    rbac::{Permission, Role, Scope},
+use common::rbac::{Permission, Role};
+
+use crate::auth::token::parse_access_token;
+use axum::extract::Extension;
+use common::rbac::{
+    OrganizationPermission, OrganizationRole, ProjectPermission, ProjectRole,
+    ORGANIZATION_PERMISSIONS, PERMISSIONS, PROJECT_PERMISSIONS,
 };
-use std::collections::HashMap;
+use std::sync::Arc;
+
+#[derive(Default, Clone)]
+pub struct AuthContext {
+    pub account_id: u64,
+}
 
 #[derive(Default, Clone)]
 pub struct Context {
-    pub organization_id: u64,
-    pub account_id: u64,
-    pub roles: Option<HashMap<Scope, Role>>,
-    pub permissions: Option<HashMap<Scope, Vec<Permission>>>,
+    pub account_id: Option<u64>,
+    pub role: Option<Role>,
+    pub organizations: Option<Vec<(u64, OrganizationRole)>>,
+    pub projects: Option<Vec<(u64, ProjectRole)>>,
+    pub teams: Option<Vec<(u64, Role)>>,
 }
 
 impl Context {
-    pub fn with_permission(organization_id: u64, permission: Permission) -> Self {
-        let mut permissions = HashMap::new();
-        let _ = permissions.insert(Scope::Organization, vec![permission]);
-
-        Context {
-            organization_id,
-            permissions: Some(permissions),
-            ..Context::default()
-        }
-    }
-
-    pub fn check_permission(&self, _: u64, _: u64, _: Permission) -> Result<()> {
-        Ok(())
-        /*if organization_id != self.organization_id {
-            return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));
-        }
-        if let Some(roles) = &self.roles {
-            for (scope, role) in roles {
-                if let Scope::Project(id) = scope {
-                    if *id != project_id {
-                        continue;
-                    }
-                }
-                match role {
-                    Role::Owner => return Ok(()),
-                    Role::Manager => {
-                        if check_permissions(&MANAGER_PERMISSIONS, &permission) {
-                            return Ok(());
-                        }
-                    }
-                    Role::Reader => {
-                        if check_permissions(&READER_PERMISSIONS, &permission) {
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-        }
-        if let Some(permissions) = &self.permissions {
-            for (scope, permissions) in permissions {
-                if let Scope::Project(id) = scope {
-                    if *id != project_id {
-                        continue;
-                    }
-                }
-                if check_permissions(permissions, &permission) {
+    pub fn check_permission(&self, permission: Permission) -> Result<()> {
+        if let Some(role) = &self.role {
+            for (root_role, role_permission) in PERMISSIONS.iter() {
+                if root_role == role && role_permission.contains(&permission) {
                     return Ok(());
                 }
             }
         }
 
-        return Err(Error::Internal(InternalError::new("code", StatusCode::FORBIDDEN)));*/
+        Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 
-    pub fn into_query_context(self, project_id: u64) -> query::Context {
-        query::Context {
-            organization_id: self.organization_id,
-            account_id: self.account_id,
-            project_id,
+    pub fn check_organization_permission(
+        &self,
+        organization_id: u64,
+        permission: OrganizationPermission,
+    ) -> Result<()> {
+        let role = self.get_organization_role(organization_id)?;
+        for (org_role, role_permission) in ORGANIZATION_PERMISSIONS.iter() {
+            if *org_role == role && role_permission.contains(&permission) {
+                return Ok(());
+            }
         }
+
+        Err(PlatformError::Forbidden("forbidden".to_string()))
+    }
+
+    pub fn check_project_permission(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        permission: ProjectPermission,
+    ) -> Result<()> {
+        if let Ok(role) = self.get_organization_role(organization_id) {
+            match role {
+                OrganizationRole::Owner => return Ok(()),
+                OrganizationRole::Admin => return Ok(()),
+                OrganizationRole::Member => {}
+            }
+        }
+
+        let role = self.get_project_role(project_id)?;
+
+        for (proj_role, role_permission) in PROJECT_PERMISSIONS.iter() {
+            if *proj_role == role && role_permission.contains(&permission) {
+                return Ok(());
+            }
+        }
+
+        Err(PlatformError::Forbidden("forbidden".to_string()))
+    }
+
+    fn get_organization_role(&self, organization_id: u64) -> Result<OrganizationRole> {
+        if let Some(organizations) = &self.organizations {
+            for (org_id, role) in organizations.iter() {
+                if *org_id == organization_id {
+                    return Ok(role.to_owned());
+                }
+            }
+        }
+
+        Err(PlatformError::Forbidden("forbidden".to_string()))
+    }
+
+    fn get_project_role(&self, project_id: u64) -> Result<ProjectRole> {
+        if let Some(projects) = &self.projects {
+            for (proj_id, role) in projects.iter() {
+                if *proj_id == project_id {
+                    return Ok(role.to_owned());
+                }
+            }
+        }
+
+        Err(PlatformError::Forbidden("forbidden".to_string()))
     }
 }
-
-/*fn check_permissions(permissions: &[Permission], permission: &Permission) -> bool {
-    for p in permissions {
-        if *p == *permission {
-            return true;
-        }
-    }
-    false
-}*/
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
@@ -101,26 +116,36 @@ where
     type Rejection = PlatformError;
 
     async fn from_request(
-        request: &mut RequestParts<B>,
+        req: &mut RequestParts<B>,
     ) -> core::result::Result<Self, Self::Rejection> {
-        let mut ctx = Context {
-            organization_id: 1,
-            account_id: 0,
-            roles: None,
-            permissions: None,
+        let TypedHeader(Authorization(bearer)) =
+            TypedHeader::<Authorization<Bearer>>::from_request(req)
+                .await
+                .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+
+        let Extension(auth_prov) = Extension::<Arc<auth::Provider>>::from_request(req)
+            .await
+            .map_err(|err| PlatformError::Internal(err.to_string()))?;
+
+        let claims = parse_access_token(bearer.token(), &auth_prov.access_token_key)
+            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+        let Extension(md_acc_prov) =
+            Extension::<Arc<metadata::accounts::Provider>>::from_request(req)
+                .await
+                .map_err(|err| PlatformError::Internal(err.to_string()))?;
+
+        let acc = md_acc_prov
+            .get_by_id(claims.account_id)
+            .await
+            .map_err(|err| PlatformError::Internal(err.to_string()))?;
+        let ctx = Context {
+            account_id: Some(acc.id),
+            role: acc.role,
+            organizations: acc.organizations,
+            projects: acc.projects,
+            teams: acc.teams,
         };
-        if let Ok(TypedHeader(Authorization(bearer))) =
-            TypedHeader::<Authorization<Bearer>>::from_request(request).await
-        {
-            if let Some(token) = bearer.token().strip_prefix("Bearer ") {
-                if let Ok(claims) = parse_access_token(token) {
-                    ctx.organization_id = claims.organization_id;
-                    ctx.account_id = claims.account_id;
-                    ctx.roles = claims.roles;
-                    ctx.permissions = claims.permissions;
-                }
-            }
-        }
+
         Ok(ctx)
     }
 }

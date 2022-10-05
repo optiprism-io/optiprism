@@ -2,7 +2,7 @@ use arrow::datatypes::{DataType, Field, IntervalUnit, TimeUnit};
 use datafusion_common::{DataFusionError, ScalarValue as DFScalarValue};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ScalarValue {
     /// represents `DataType::Null` (castable to/from any other type)
     Null,

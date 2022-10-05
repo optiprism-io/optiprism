@@ -2,14 +2,14 @@ use chrono::{DateTime, Utc};
 use common::types::OptionalProperty;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Status {
     Enabled,
     Disabled,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
     pub id: u64,
@@ -28,7 +28,7 @@ pub struct Event {
     pub custom_properties: Option<Vec<u64>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CreateEventRequest {
     pub created_by: u64,
     pub tags: Option<Vec<String>>,
@@ -41,7 +41,7 @@ pub struct CreateEventRequest {
     pub custom_properties: Option<Vec<u64>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct UpdateEventRequest {
     pub updated_by: u64,
     pub tags: OptionalProperty<Option<Vec<String>>>,

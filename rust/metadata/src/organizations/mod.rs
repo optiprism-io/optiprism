@@ -2,4 +2,4 @@ pub mod provider;
 pub mod types;
 
 pub use provider::Provider;
-pub use types::{CreateRequest, ListRequest, Organization, UpdateRequest};
+pub use types::{CreateOrganizationRequest, Organization};
