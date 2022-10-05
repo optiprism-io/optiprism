@@ -143,10 +143,10 @@ async fn test_events() -> Result<()> {
         event1.status = Status::Disabled;
 
         let req = UpdateEventRequest {
-            tags: event1.tags.clone(),
-            display_name: event1.display_name.clone(),
-            description: event1.description.clone(),
-            status: event1.status.clone(),
+            tags: Some(event1.tags.clone()),
+            display_name: Some(event1.display_name.clone()),
+            description: Some(event1.description.clone()),
+            status: Some(event1.status.clone()),
         };
 
         let body = serde_json::to_string(&req).unwrap();

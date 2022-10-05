@@ -1,5 +1,5 @@
 use axum::extract::{Extension, Path};
-use axum::{routing, AddExtensionLayer, Json, Router};
+use axum::{routing, Json, Router};
 use std::sync::Arc;
 
 use crate::data_table::DataTable;
@@ -46,5 +46,5 @@ pub fn attach_routes(router: Router, prov: Arc<QueryProvider>) -> Router {
             "/v1/organizations/:organization_id/projects/:project_id/queries/property-values",
             routing::post(property_values),
         )
-        .layer(AddExtensionLayer::new(prov))
+        .layer(Extension(prov))
 }

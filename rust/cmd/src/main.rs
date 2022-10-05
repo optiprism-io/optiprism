@@ -10,6 +10,7 @@ use bytesize::ByteSize;
 use chrono::{DateTime, Duration, Utc};
 use datafusion::datasource::MemTable;
 use log::info;
+use tower_cookies::CookieManagerLayer;
 use uuid::Uuid;
 
 use error::Result;
@@ -101,6 +102,7 @@ async fn main() -> Result<()> {
 
     let mut router = Router::new();
     router = platform::http::attach_routes(router, platform, md);
+    router = router.layer(CookieManagerLayer::new());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     Server::bind(&addr)

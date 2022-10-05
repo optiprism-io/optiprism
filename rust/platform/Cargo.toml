@@ -17,6 +17,8 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
+time = "0.3.15"
+tower-cookies = { version = "0.7.0", features = ["axum-core"] }
 serde_with = "2.0.1"
 password-hash = { version = "0.4.2", features = ["std"] }
 tower = "0.4.13"
@@ -29,11 +31,11 @@ anyhow = "1.0"
 datafusion = "11.0.0"
 datafusion-common = "11.0.0"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "cookies"] }
 common = { path = "../common" }
 metadata = { path = "../metadata" }
 query = { path = "../query" }
-axum = { version = "0.4.3", features = ["headers"] }
+axum = { version = "0.5.16", features = ["headers"] }
 axum-debug = { version = "0.3.2" }
 tokio = { version = "1.15.0", features = ["full"] }
 serde = { version = "1.0.133", features = ["derive"] }

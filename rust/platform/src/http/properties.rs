@@ -1,7 +1,7 @@
 use crate::properties::UpdatePropertyRequest;
 use crate::{properties, Context, PropertiesProvider, Result};
 use axum::extract::Path;
-use axum::{extract::Extension, routing, AddExtensionLayer, Json, Router};
+use axum::{extract::Extension, routing, Json, Router};
 use metadata::metadata::ListResponse;
 use metadata::properties::Property;
 use std::sync::Arc;
@@ -75,7 +75,7 @@ pub fn attach_user_routes(router: Router, prop: Arc<properties::Provider>) -> Ro
             format!("{}/name/:prop_name", path).as_str(),
             routing::get(get_by_name),
         )
-        .layer(AddExtensionLayer::new(prop))
+        .layer(Extension(prop))
 }
 
 pub fn attach_event_routes(router: Router, prop: Arc<properties::Provider>) -> Router {
@@ -90,5 +90,5 @@ pub fn attach_event_routes(router: Router, prop: Arc<properties::Provider>) -> R
             format!("{}/name/:prop_name", path).as_str(),
             routing::get(get_by_name),
         )
-        .layer(AddExtensionLayer::new(prop))
+        .layer(Extension(prop))
 }

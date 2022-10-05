@@ -1,5 +1,5 @@
 use axum::http::HeaderValue;
-use axum::{http, AddExtensionLayer, Router, Server};
+use axum::{http, Extension, Router, Server};
 use chrono::Duration;
 
 use metadata::store::Store;
@@ -16,12 +16,13 @@ use std::sync::Arc;
 use common::rbac::{OrganizationRole, ProjectRole};
 use metadata::accounts::UpdateAccountRequest;
 use tokio::time::sleep;
+use tower_cookies::CookieManagerLayer;
 use uuid::Uuid;
 
 use platform::auth::password::make_password_hash;
 use platform::auth::types::TokensResponse;
 use platform::auth::SignUpRequest;
-use platform::http::auth::{LogInRequest, RefreshTokensRequest};
+use platform::http::auth::{LogInRequest, RefreshTokenRequest, COOKIE_NAME_REFRESH_TOKEN};
 
 #[tokio::test]
 async fn test_auth() -> anyhow::Result<()> {
@@ -48,7 +49,8 @@ async fn test_auth() -> anyhow::Result<()> {
 
         let mut router = events::attach_routes(Router::new(), events_prov);
         router = auth::attach_routes(router, auth_prov);
-        router = router.layer(AddExtensionLayer::new(md_accs_clone2));
+        router = router.layer(Extension(md_accs_clone2));
+        router = router.layer(CookieManagerLayer::new());
 
         let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
         Server::bind(&addr)
@@ -97,7 +99,14 @@ async fn test_auth() -> anyhow::Result<()> {
             .headers(headers.clone())
             .send()
             .await?;
+
         assert_eq!(resp.status(), StatusCode::OK);
+        let _a = resp.headers().get(http::header::SET_COOKIE).unwrap();
+        assert!(resp
+            .cookies()
+            .find(|c| c.name() == COOKIE_NAME_REFRESH_TOKEN)
+            .is_some());
+
         let resp: TokensResponse = serde_json::from_str(resp.text().await?.as_str())?;
 
         resp
@@ -178,8 +187,8 @@ async fn test_auth() -> anyhow::Result<()> {
     }
 
     let new_jwt_headers = {
-        let req = RefreshTokensRequest {
-            refresh_token: user_tokens.refresh_token,
+        let req = RefreshTokenRequest {
+            refresh_token: Some(user_tokens.refresh_token),
         };
 
         let body = serde_json::to_string(&req)?;

@@ -2,16 +2,18 @@ use crate::accounts::{Account, CreateAccountRequest, UpdateAccountRequest};
 use crate::{AccountsProvider, Context, Result};
 use axum::extract::Path;
 
-use axum::{extract::Extension, routing, AddExtensionLayer, Json, Router};
+use axum::{extract::Extension, routing, Json, Router};
+
+use axum::http::StatusCode;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
 
 async fn create(
     ctx: Context,
     Extension(provider): Extension<Arc<AccountsProvider>>,
-    Json(request): Json<CreateAccountRequest>,
-) -> Result<Json<Account>> {
-    Ok(Json(provider.create(ctx, request).await?))
+    Json(req): Json<CreateAccountRequest>,
+) -> Result<(StatusCode, Json<Account>)> {
+    Ok((StatusCode::CREATED, Json(provider.create(ctx, req).await?)))
 }
 
 async fn get_by_id(
@@ -57,6 +59,6 @@ pub fn attach_routes(
             "/v1/accounts/:id",
             routing::get(get_by_id).delete(delete).put(update),
         )
-        .layer(AddExtensionLayer::new(md_accounts))
-        .layer(AddExtensionLayer::new(accounts))
+        .layer(Extension(md_accounts))
+        .layer(Extension(accounts))
 }

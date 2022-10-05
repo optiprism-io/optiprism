@@ -6,13 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+tower-cookies = "0.7.0"
 common = { path = "../common" }
 events-gen = { path = "../events-gen" }
 datafusion = "11.0.0"
 query = { path = "../query" }
 metadata = { path = "../metadata" }
 platform = { path = "../platform" }
-axum = { version = "0.4.3", features = ["headers"] }
+axum = { version = "0.5.16", features = ["headers"] }
 tokio = { version = "1.15.0", features = ["full"] }
 tower = { version = "0.4.11", features = ["util"] }
 tower-http = { version = "0.2.0", features = ["add-extension"] }
