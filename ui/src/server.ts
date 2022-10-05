@@ -1,7 +1,7 @@
 import { createServer, Response } from 'miragejs'
 import { customAlphabet } from 'nanoid'
 
-import { DataType, BasicLogin200Response } from '@/api'
+import { DataType, TokensResponse } from '@/api'
 import { BASE_PATH } from '@/api/base'
 import { EventStatus, UserCustomProperty } from '@/types/events';
 import splineChartMocks from '@/mocks/splineChart.json';
@@ -207,7 +207,7 @@ export default function ({ environment = 'development' } = {}) {
                 }
             });
 
-            this.post(`${BASE_PATH}/v1/auth/basic/login`, (_, request) => {
+            this.post(`${BASE_PATH}/v1/auth/login`, (_, request) => {
                 const property = JSON.parse(request.requestBody)
 
                 if (property.email.length <= 5 || property.password.length < 5) {
@@ -227,7 +227,7 @@ export default function ({ environment = 'development' } = {}) {
                 }
             })
 
-            this.post(`${BASE_PATH}/v1/auth/access`, (): BasicLogin200Response => {
+            this.post(`${BASE_PATH}/v1/auth/refresh-token`, (): TokensResponse => {
                 return {
                     accessToken,
                     refreshToken,
