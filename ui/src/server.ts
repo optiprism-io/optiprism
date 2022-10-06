@@ -37,13 +37,13 @@ export default function ({ environment = 'development' } = {}) {
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/events`, (schema) => {
                 return { events: schema.db.events }
-            }, { timing: 160 })
+            }, { timing: 100 })
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id`, (schema, request) => {
                 const customEvent = JSON.parse(request.requestBody)
 
                 return schema.db.events.update(request.params.event_id, customEvent)
-            }, { timing: 360 })
+            }, { timing: 160 })
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events`, (schema) => {
                 return schema.db.customEvents.map(item => ({...item, id: Number(item.id)}))
@@ -57,7 +57,7 @@ export default function ({ environment = 'development' } = {}) {
                 const customEvents = JSON.parse(request.requestBody)
 
                 return schema.db.customEvents.insert(customEvents)
-            }, { timing: 700 })
+            }, { timing: 130 })
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events/:event_id`, (schema, request) => {
                 const customEvent = JSON.parse(request.requestBody)
@@ -85,12 +85,12 @@ export default function ({ environment = 'development' } = {}) {
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user_properties`, (schema) => {
                 return { events: schema.db.userProperties }
-            }, { timing: 700 })
+            }, { timing: 140 })
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user_properties/:property_id`, (schema, request) => {
                 const property = JSON.parse(request.requestBody)
                 return schema.db.userProperties.update(request.params.property_id, property)
-            }, { timing: 400 })
+            }, { timing: 200 })
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-properties`, () => {
                 return { events: [
@@ -183,12 +183,12 @@ export default function ({ environment = 'development' } = {}) {
                     id: nanoid(),
                     ...body,
                 })
-            }, { timing: 1400 })
+            }, { timing: 1100 })
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
                 const body = JSON.parse(request.requestBody);
                 return schema.db.reports.update(request.params.report_id, body)
-            }, { timing: 1400 })
+            }, { timing: 1200 })
 
             this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
                 schema.db.reports.remove(request.params.report_id)

@@ -22,7 +22,6 @@
                 <UiButton
                     v-show="reportsStore.reportId"
                     class="pf-u-ml-auto pf-m-link pf-m-danger"
-                    :progress="reportsStore.saveLoading"
                     :before-icon="'fas fa-trash'"
                     @click="onDeleteReport"
                 >
