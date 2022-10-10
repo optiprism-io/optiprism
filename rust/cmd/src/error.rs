@@ -25,6 +25,4 @@ pub enum Error {
     EventsGen(#[from] EventsGenError),
     #[error("DataFusionError: {0:?}")]
     DataFusion(#[from] DataFusionError),
-    #[error("ExternalError: {0:?}")]
-    External(String),
 }

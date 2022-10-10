@@ -107,12 +107,15 @@ impl Provider {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
-        let mut md_req = metadata::events::UpdateEventRequest::default();
-        md_req.updated_by = ctx.account_id.unwrap();
-        md_req.tags = req.tags;
-        md_req.display_name = req.display_name;
-        md_req.description = req.description;
-        md_req.status = req.status.into();
+        let md_req = metadata::events::UpdateEventRequest {
+            updated_by: ctx.account_id.unwrap(),
+            tags: req.tags,
+            display_name: req.display_name,
+            description: req.description,
+            status: req.status.into(),
+            ..Default::default()
+        };
+
         let event = self
             .prov
             .update(organization_id, project_id, event_id, md_req)

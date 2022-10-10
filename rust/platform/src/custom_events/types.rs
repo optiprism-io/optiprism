@@ -132,7 +132,5 @@ pub struct UpdateCustomEventRequest {
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub status: OptionalProperty<Status>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
-    pub is_system: OptionalProperty<bool>,
-    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub events: OptionalProperty<Vec<Event>>,
 }

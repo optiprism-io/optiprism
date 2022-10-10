@@ -177,7 +177,6 @@ async fn test_custom_events() -> Result<()> {
             name: OptionalProperty::Some(ce1.name.clone()),
             description: OptionalProperty::Some(ce1.description.clone()),
             status: OptionalProperty::Some(ce1.status.clone()),
-            is_system: OptionalProperty::None,
             events: OptionalProperty::Some(vec![Event {
                 event: EventRef::Regular {
                     event_name: event2.name,

@@ -63,21 +63,22 @@ impl Provider {
     ) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
 
-        let mut md_req = metadata::accounts::UpdateAccountRequest::default();
-        md_req.updated_by = ctx.account_id.unwrap();
+        let mut md_req = metadata::accounts::UpdateAccountRequest {
+            updated_by: ctx.account_id.unwrap(),
+            email: req.email,
+            first_name: req.first_name,
+            last_name: req.last_name,
+            role: req.role,
+            organizations: req.organizations,
+            projects: req.projects,
+            teams: req.teams,
+            ..Default::default()
+        };
         if let OptionalProperty::Some(password) = req.password {
             md_req
                 .password
                 .insert(make_password_hash(password.as_str())?);
         }
-
-        md_req.email = req.email;
-        md_req.first_name = req.first_name;
-        md_req.last_name = req.last_name;
-        md_req.role = req.role;
-        md_req.organizations = req.organizations;
-        md_req.projects = req.projects;
-        md_req.teams = req.teams;
 
         let account = self.prov.update(account_id, md_req).await?;
 

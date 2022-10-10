@@ -90,12 +90,15 @@ impl Provider {
         req: UpdateCustomEventRequest,
     ) -> Result<CustomEvent> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
-        let mut md_req = metadata::custom_events::UpdateCustomEventRequest::default();
-        md_req.updated_by = ctx.account_id.unwrap();
-        md_req.tags = req.tags;
-        md_req.name = req.name;
-        md_req.description = req.description;
-        md_req.status = req.status.into();
+        let mut md_req = metadata::custom_events::UpdateCustomEventRequest {
+            updated_by: ctx.account_id.unwrap(),
+            tags: req.tags,
+            name: req.name,
+            description: req.description,
+            status: req.status.into(),
+            ..Default::default()
+        };
+
         if let OptionalProperty::Some(events) = req.events {
             md_req.events.insert(
                 events

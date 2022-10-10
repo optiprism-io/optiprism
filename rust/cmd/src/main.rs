@@ -5,20 +5,16 @@ use std::env::temp_dir;
 use std::path::PathBuf;
 use std::{net::SocketAddr, sync::Arc};
 
-use axum::{Router, Server};
 use bytesize::ByteSize;
 use chrono::{DateTime, Duration, Utc};
 use datafusion::datasource::MemTable;
 use log::info;
-use tower_cookies::CookieManagerLayer;
 use uuid::Uuid;
 
 use error::Result;
 use metadata::store::Store;
 use metadata::MetadataProvider;
 use query::QueryProvider;
-
-use crate::error::Error;
 
 mod error;
 

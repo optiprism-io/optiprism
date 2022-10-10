@@ -81,12 +81,17 @@ impl Provider {
     ) -> Result<Property> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
-        let mut md_req = metadata::properties::UpdatePropertyRequest::default();
-        md_req.updated_by = ctx.account_id.unwrap();
-        md_req.tags = req.tags;
-        md_req.display_name = req.display_name;
-        md_req.description = req.description;
-        md_req.status = req.status.into();
+        let md_req = metadata::properties::UpdatePropertyRequest {
+            updated_by: ctx.account_id.unwrap(),
+            tags: req.tags,
+            description: req.description,
+            display_name: req.display_name,
+            status: req.status.into(),
+            is_dictionary: Default::default(),
+            dictionary_type: Default::default(),
+            ..Default::default()
+        };
+
         let prop = self
             .prov
             .update(organization_id, project_id, property_id, md_req)

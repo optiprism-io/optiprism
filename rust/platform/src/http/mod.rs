@@ -6,7 +6,7 @@ pub mod properties;
 pub mod queries;
 
 use crate::error::Result;
-use crate::{PlatformError, PlatformProvider};
+use crate::PlatformProvider;
 use axum::{Extension, Router, Server};
 use metadata::MetadataProvider;
 use std::net::SocketAddr;
@@ -62,7 +62,7 @@ impl Service {
 
     pub async fn serve_test(&self) {
         let router = self.router.clone();
-        let addr = self.addr.clone();
+        let addr = self.addr;
         tokio::spawn(async move {
             Server::bind(&addr)
                 .serve(router.into_make_service())
