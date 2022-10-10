@@ -49,8 +49,7 @@ impl Provider {
         dict: &str,
         value: &str,
     ) -> Result<u64> {
-        // TODO: does stuck with release build while generating events
-        // self.guard.write().await;
+        self.guard.write().await;
         match self
             .store
             .get(make_value_key(organization_id, project_id, dict, value))

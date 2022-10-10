@@ -31,10 +31,10 @@ pub enum EventError {
 
 #[derive(Debug)]
 pub struct Event {
-    organization_id: u64,
-    project_id: u64,
-    event_id: Option<u64>,
-    event_name: Option<String>,
+    _organization_id: u64,
+    _project_id: u64,
+    _event_id: Option<u64>,
+    _event_name: Option<String>,
 }
 
 #[derive(Error, Debug)]
@@ -89,22 +89,22 @@ pub enum AccountError {
 
 #[derive(Debug)]
 pub struct Account {
-    account_id: Option<u64>,
-    email: Option<String>,
+    _account_id: Option<u64>,
+    _email: Option<String>,
 }
 
 impl Account {
     pub fn new_with_email(email: String) -> Self {
         Self {
-            account_id: None,
-            email: Some(email),
+            _account_id: None,
+            _email: Some(email),
         }
     }
 
     pub fn new_with_id(account_id: u64) -> Self {
         Self {
-            account_id: Some(account_id),
-            email: None,
+            _account_id: Some(account_id),
+            _email: None,
         }
     }
 }
@@ -119,21 +119,21 @@ pub enum OrganizationError {
 
 #[derive(Debug)]
 pub struct Organization {
-    id: Option<u64>,
-    name: Option<String>,
+    _id: Option<u64>,
+    _name: Option<String>,
 }
 
 impl Organization {
     pub fn new_with_id(id: u64) -> Self {
         Self {
-            id: Some(id),
-            name: None,
+            _id: Some(id),
+            _name: None,
         }
     }
     pub fn new_with_name(name: String) -> Self {
         Self {
-            id: None,
-            name: Some(name),
+            _id: None,
+            _name: Some(name),
         }
     }
 }
@@ -148,25 +148,25 @@ pub enum ProjectError {
 
 #[derive(Debug)]
 pub struct Project {
-    organization_id: u64,
-    id: Option<u64>,
-    name: Option<String>,
+    _organization_id: u64,
+    _id: Option<u64>,
+    _name: Option<String>,
 }
 
 impl Project {
     pub fn new_with_name(organization_id: u64, name: String) -> Self {
         Self {
-            organization_id,
-            id: None,
-            name: Some(name),
+            _organization_id: organization_id,
+            _id: None,
+            _name: Some(name),
         }
     }
 
     pub fn new_with_id(organization_id: u64, id: u64) -> Self {
         Self {
-            organization_id,
-            id: Some(id),
-            name: None,
+            _organization_id: organization_id,
+            _id: Some(id),
+            _name: None,
         }
     }
 }
@@ -181,25 +181,25 @@ pub enum TeamError {
 
 #[derive(Debug)]
 pub struct Team {
-    organization_id: u64,
-    id: Option<u64>,
-    name: Option<String>,
+    _organization_id: u64,
+    _id: Option<u64>,
+    _name: Option<String>,
 }
 
 impl Team {
     pub fn new_with_name(organization_id: u64, name: String) -> Self {
         Self {
-            organization_id,
-            id: None,
-            name: Some(name),
+            _organization_id: organization_id,
+            _id: None,
+            _name: Some(name),
         }
     }
 
     pub fn new_with_id(organization_id: u64, id: u64) -> Self {
         Self {
-            organization_id,
-            id: Some(id),
-            name: None,
+            _organization_id: organization_id,
+            _id: Some(id),
+            _name: None,
         }
     }
 }
@@ -217,19 +217,19 @@ pub struct Property {
 impl Event {
     pub fn new_with_name(organization_id: u64, project_id: u64, event_name: String) -> Self {
         Self {
-            organization_id,
-            project_id,
-            event_id: None,
-            event_name: Some(event_name),
+            _organization_id: organization_id,
+            _project_id: project_id,
+            _event_id: None,
+            _event_name: Some(event_name),
         }
     }
 
     pub fn new_with_id(organization_id: u64, project_id: u64, event_id: u64) -> Self {
         Self {
-            organization_id,
-            project_id,
-            event_id: Some(event_id),
-            event_name: None,
+            _organization_id: organization_id,
+            _project_id: project_id,
+            _event_id: Some(event_id),
+            _event_name: None,
         }
     }
 }
@@ -252,38 +252,38 @@ pub enum DictionaryError {
 
 #[derive(Debug)]
 pub struct DictionaryKey {
-    organization_id: u64,
-    project_id: u64,
-    dict: String,
-    key: u64,
+    _organization_id: u64,
+    _project_id: u64,
+    _dict: String,
+    _key: u64,
 }
 
 impl DictionaryKey {
     pub fn new(organization_id: u64, project_id: u64, dict: String, key: u64) -> Self {
         Self {
-            organization_id,
-            project_id,
-            dict,
-            key,
+            _organization_id: organization_id,
+            _project_id: project_id,
+            _dict: dict,
+            _key: key,
         }
     }
 }
 
 #[derive(Debug)]
 pub struct DictionaryValue {
-    organization_id: u64,
-    project_id: u64,
-    dict: String,
-    value: String,
+    _organization_id: u64,
+    _project_id: u64,
+    _dict: String,
+    _value: String,
 }
 
 impl DictionaryValue {
     pub fn new(organization_id: u64, project_id: u64, dict: String, value: String) -> Self {
         Self {
-            organization_id,
-            project_id,
-            dict,
-            value,
+            _organization_id: organization_id,
+            _project_id: project_id,
+            _dict: dict,
+            _value: value,
         }
     }
 }
