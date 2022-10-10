@@ -2,15 +2,6 @@
     <header class="app-header">
         <div class="pf-l-flex">
             <div class="pf-l-flex__item">
-                <div class="app-header__menu">
-                    <UiDropdown
-                        :items="items"
-                        :text-button="'Dashboard'"
-                        :transparent="true"
-                    />
-                </div>
-            </div>
-            <div class="pf-l-flex__item">
                 <Nav />
             </div>
             <div class="pf-l-flex__item pf-m-align-right">

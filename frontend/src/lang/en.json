@@ -254,5 +254,9 @@
       "and": "Any",
       "or": "All"
     }
+  },
+
+  "dashboards": {
+    "title": "Dashboards"
   }
 }
