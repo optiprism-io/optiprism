@@ -34,7 +34,7 @@ fn assert(l: &Property, r: &Property) {
 
 #[tokio::test]
 async fn test_event_properties() -> Result<()> {
-    let (md, pp) = run_http_service(false).await?;
+    let (base_url, md, pp) = run_http_service(false).await?;
     let cl = Client::new();
     let headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
 
@@ -60,7 +60,7 @@ async fn test_event_properties() -> Result<()> {
 
     // list without props should be empty
     {
-        cl.get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties")
+        cl.get(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties"))
             .headers(headers.clone())
             .send()
             .await
@@ -70,7 +70,7 @@ async fn test_event_properties() -> Result<()> {
     // get of unexisting event prop 1 should return 404 not found error
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
             .headers(headers.clone())
             .send()
             .await
@@ -81,7 +81,7 @@ async fn test_event_properties() -> Result<()> {
     // delete of unexisting event prop 1 should return 404 not found error
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
             .headers(headers.clone())
             .send()
             .await
@@ -127,7 +127,7 @@ async fn test_event_properties() -> Result<()> {
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .put("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .put(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
             .body(body)
             .headers(headers.clone())
             .send()
@@ -142,7 +142,7 @@ async fn test_event_properties() -> Result<()> {
     // get should return event prop
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
             .headers(headers.clone())
             .send()
             .await
@@ -155,7 +155,7 @@ async fn test_event_properties() -> Result<()> {
     // list events should return list with one event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties")
+            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties"))
             .headers(headers.clone())
             .send()
             .await
@@ -170,7 +170,7 @@ async fn test_event_properties() -> Result<()> {
     // delete request should delete event
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
             .headers(headers.clone())
             .send()
             .await
@@ -178,7 +178,7 @@ async fn test_event_properties() -> Result<()> {
         assert_eq!(resp.status(), StatusCode::OK);
 
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
             .headers(headers.clone())
             .send()
             .await

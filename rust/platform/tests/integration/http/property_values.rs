@@ -23,7 +23,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {
-        let (md, pp) = run_http_service(true).await?;
+        let (base_url, md, pp) = run_http_service(true).await?;
         let cl = Client::new();
         let headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
 
@@ -43,7 +43,7 @@ mod tests {
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .post("http://127.0.0.1:8080/v1/organizations/1/projects/1/queries/property-values")
+            .post(format!("{base_url}/v1/organizations/1/projects/1/queries/property-values"))
             .body(body)
             .headers(headers.clone())
             .send()

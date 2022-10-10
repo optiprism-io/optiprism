@@ -6,6 +6,7 @@ use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 use uuid::Uuid;
+use common::types::OptionalProperty;
 
 #[tokio::test]
 async fn test_properties() -> Result<()> {
@@ -31,17 +32,17 @@ async fn test_properties() -> Result<()> {
 
     let update_prop_req = UpdatePropertyRequest {
         updated_by: 1,
-        tags: None,
-        name: None,
-        description: None,
-        display_name: None,
-        typ: None,
-        status: None,
-        is_system: None,
-        nullable: None,
-        is_array: None,
-        is_dictionary: None,
-        dictionary_type: None,
+        tags: OptionalProperty::None,
+        name: OptionalProperty::None,
+        description: OptionalProperty::None,
+        display_name: OptionalProperty::None,
+        typ: OptionalProperty::None,
+        status: OptionalProperty::None,
+        is_system: OptionalProperty::None,
+        nullable: OptionalProperty::None,
+        is_array: OptionalProperty::None,
+        is_dictionary: OptionalProperty::None,
+        dictionary_type: OptionalProperty::None,
     };
 
     // try to get, delete, update unexisting event prop

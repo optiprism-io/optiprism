@@ -34,7 +34,8 @@ fn assert(l: &CustomEvent, r: &CustomEvent) {
 
 #[tokio::test]
 async fn test_custom_events() -> Result<()> {
-    let (md, pp) = run_http_service(false).await?;
+    let (base_url, md, pp) = run_http_service(false).await?;
+    println!("{base_url}");
     let cl = Client::new();
     let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
 
@@ -97,7 +98,7 @@ async fn test_custom_events() -> Result<()> {
     // list without events should be empty
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events")
+            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/custom-events"))
             .headers(admin_headers.clone())
             .send()
             .await
@@ -113,7 +114,7 @@ async fn test_custom_events() -> Result<()> {
     // get of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
+            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"))
             .headers(admin_headers.clone())
             .send()
             .await
@@ -124,7 +125,7 @@ async fn test_custom_events() -> Result<()> {
     // delete of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
+            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"))
             .headers(admin_headers.clone())
             .send()
             .await
@@ -145,7 +146,7 @@ async fn test_custom_events() -> Result<()> {
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .post("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events")
+            .post(format!("{base_url}/v1/organizations/1/projects/1/schema/custom-events"))
             .body(body)
             .headers(admin_headers.clone())
             .send()
@@ -188,7 +189,7 @@ async fn test_custom_events() -> Result<()> {
         println!("{body}");
 
         let resp = cl
-            .put("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
+            .put(format!("{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"))
             .body(body)
             .headers(admin_headers.clone())
             .send()
@@ -204,7 +205,7 @@ async fn test_custom_events() -> Result<()> {
     // get should return event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
+            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"))
             .headers(admin_headers.clone())
             .send()
             .await
@@ -217,7 +218,7 @@ async fn test_custom_events() -> Result<()> {
     // list events should return list with one event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events")
+            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/custom-events"))
             .headers(admin_headers.clone())
             .send()
             .await
@@ -232,7 +233,7 @@ async fn test_custom_events() -> Result<()> {
     // delete request should delete event
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
+            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"))
             .headers(admin_headers.clone())
             .send()
             .await
@@ -240,7 +241,7 @@ async fn test_custom_events() -> Result<()> {
         assert_eq!(resp.status(), StatusCode::OK);
 
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
+            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"))
             .headers(admin_headers.clone())
             .send()
             .await

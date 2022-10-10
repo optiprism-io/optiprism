@@ -30,7 +30,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_event_segmentation() -> Result<()> {
-        let (md, pp) = run_http_service(true).await?;
+        let (base_url, md, pp) = run_http_service(true).await?;
         let cl = Client::new();
         let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
 
@@ -107,7 +107,7 @@ mod tests {
         let body = serde_json::to_string(&es).unwrap();
 
         let resp = cl
-            .post("http://127.0.0.1:8080/v1/organizations/1/projects/1/queries/event-segmentation")
+            .post(format!("{base_url}/v1/organizations/1/projects/1/queries/event-segmentation"))
             .body(body)
             .headers(admin_headers.clone())
             .send()
