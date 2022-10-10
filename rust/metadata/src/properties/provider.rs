@@ -9,9 +9,9 @@ use crate::store::Store;
 use crate::{error, Result};
 use bincode::{deserialize, serialize};
 use chrono::Utc;
+use common::types::OptionalProperty;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use common::types::OptionalProperty;
 
 #[derive(Clone, Debug)]
 pub enum Namespace {

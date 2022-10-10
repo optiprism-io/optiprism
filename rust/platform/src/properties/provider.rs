@@ -3,9 +3,9 @@ use crate::{Context, Result};
 use common::rbac::ProjectPermission;
 use metadata::metadata::ListResponse;
 
+use crate::properties::types::Property;
 use metadata::properties::provider::Provider as PropertiesProvider;
 use std::sync::Arc;
-use crate::properties::types::Property;
 
 pub struct Provider {
     prov: Arc<PropertiesProvider>,
@@ -29,7 +29,10 @@ impl Provider {
     ) -> Result<Property> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
 
-        self.prov.get_by_id(organization_id, project_id, id).await?.try_into()
+        self.prov
+            .get_by_id(organization_id, project_id, id)
+            .await?
+            .try_into()
     }
 
     pub async fn get_by_name(
@@ -101,6 +104,9 @@ impl Provider {
     ) -> Result<Property> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
 
-        self.prov.delete(organization_id, project_id, id).await?.try_into()
+        self.prov
+            .delete(organization_id, project_id, id)
+            .await?
+            .try_into()
     }
 }

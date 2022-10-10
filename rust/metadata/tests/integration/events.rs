@@ -3,10 +3,10 @@ use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 
+use common::types::OptionalProperty;
 use metadata::events::types::CreateEventRequest;
 use metadata::events::{Provider, Status, UpdateEventRequest};
 use uuid::Uuid;
-use common::types::OptionalProperty;
 
 #[tokio::test]
 async fn test_events() -> Result<()> {
@@ -85,7 +85,10 @@ async fn test_events() -> Result<()> {
     assert!(events.get_by_name(1, 1, "event1").await.is_err());
     let res = events.get_by_name(1, 1, "event1_new").await?;
     assert_eq!(res.id, 1);
-    assert_eq!(OptionalProperty::Some(res.description), update_event1.description);
+    assert_eq!(
+        OptionalProperty::Some(res.description),
+        update_event1.description
+    );
 
     update_event1.display_name.insert(Some("e".to_string()));
     assert_eq!(

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 
-use tokio::sync::RwLock;
 use common::types::OptionalProperty;
+use tokio::sync::RwLock;
 
 use crate::accounts::types::UpdateAccountRequest;
 use crate::accounts::{Account, CreateAccountRequest};

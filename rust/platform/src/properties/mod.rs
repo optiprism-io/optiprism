@@ -2,4 +2,4 @@ mod provider;
 mod types;
 
 pub use provider::Provider;
-pub use types::{UpdatePropertyRequest,Property,Status};
+pub use types::{Property, Status, UpdatePropertyRequest};

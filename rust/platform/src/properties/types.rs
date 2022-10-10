@@ -1,8 +1,8 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use common::DataType;
-use common::types::{DictionaryDataType, OptionalProperty};
 use crate::PlatformError;
+use chrono::{DateTime, Utc};
+use common::types::{DictionaryDataType, OptionalProperty};
+use common::DataType;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -29,7 +29,6 @@ impl From<Status> for metadata::properties::Status {
         }
     }
 }
-
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

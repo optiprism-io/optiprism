@@ -13,5 +13,5 @@ pub enum CommonError {
     #[error("JWTError: {0:?}")]
     JWTError(#[from] JWTError),
     #[error("EntityMapping")]
-    EntityMapping
+    EntityMapping,
 }

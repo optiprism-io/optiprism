@@ -7,27 +7,26 @@ mod property_values;
 
 #[cfg(test)]
 mod tests {
+    use axum::headers::{HeaderMap, HeaderValue};
+    use axum::http;
     use std::env::temp_dir;
     use std::net::SocketAddr;
     use std::sync::Arc;
-    use axum::headers::{HeaderMap, HeaderValue};
-    use axum::http;
-    
+
     use chrono::Duration;
-    
+
+    use common::rbac::OrganizationRole;
     use lazy_static::lazy_static;
+    use metadata::store::Store;
+    use metadata::MetadataProvider;
+    use platform::auth::password::make_password_hash;
     use reqwest::Client;
     use uuid::Uuid;
-    use common::rbac::OrganizationRole;
-    use metadata::MetadataProvider;
-    use metadata::store::Store;
-    use platform::auth::password::make_password_hash;
-    
-    
+
     use platform::PlatformProvider;
-    use query::QueryProvider;
     use query::test_util::{create_entities, empty_provider, events_provider};
-    use std::sync::atomic::{Ordering, AtomicU16};
+    use query::QueryProvider;
+    use std::sync::atomic::{AtomicU16, Ordering};
 
     lazy_static! {
         static ref HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
@@ -74,12 +73,17 @@ mod tests {
         Ok(headers)
     }
 
-    pub async fn run_http_service(create_test_data: bool) -> anyhow::Result<(String, Arc<metadata::MetadataProvider>, Arc<platform::PlatformProvider>)> {
+    pub async fn run_http_service(
+        create_test_data: bool,
+    ) -> anyhow::Result<(
+        String,
+        Arc<metadata::MetadataProvider>,
+        Arc<platform::PlatformProvider>,
+    )> {
         let md = Arc::new(MetadataProvider::try_new(tmp_store())?);
         let input = if create_test_data {
             create_entities(md.clone(), 1, 1).await?;
-            events_provider(md.database.clone(), 1, 1)
-                .await?
+            events_provider(md.database.clone(), 1, 1).await?
         } else {
             empty_provider()?
         };

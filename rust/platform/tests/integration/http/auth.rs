@@ -1,48 +1,31 @@
+use axum::http;
 use axum::http::HeaderValue;
-use axum::{http};
-
-
-
-
-
-
 
 use reqwest::header::HeaderMap;
 use reqwest::{Client, StatusCode};
 
-
-
-
 use common::rbac::{OrganizationRole, ProjectRole};
 use metadata::accounts::UpdateAccountRequest;
 
-
-
 use common::types::OptionalProperty;
-
-
-
 
 use platform::auth::types::TokensResponse;
 use platform::auth::SignUpRequest;
-use platform::http::auth::{RefreshTokenRequest};
-
+use platform::http::auth::RefreshTokenRequest;
 
 use crate::http::tests::{create_admin_acc_and_login, run_http_service};
 
 #[tokio::test]
 async fn test_auth() -> anyhow::Result<()> {
-    let (base_addr,md, pp) = run_http_service(false).await?;
+    let (base_addr, md, pp) = run_http_service(false).await?;
     let cl = Client::new();
     let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
-
 
     let mut headers = HeaderMap::new();
     headers.insert(
         http::header::CONTENT_TYPE,
         HeaderValue::from_str("application/json")?,
     );
-
 
     let user_tokens = {
         let pwd = "password".to_string();
@@ -76,7 +59,10 @@ async fn test_auth() -> anyhow::Result<()> {
                     first_name: OptionalProperty::None,
                     last_name: OptionalProperty::None,
                     role: OptionalProperty::None,
-                    organizations: OptionalProperty::Some(Some(vec![(1, OrganizationRole::Member)])),
+                    organizations: OptionalProperty::Some(Some(vec![(
+                        1,
+                        OrganizationRole::Member,
+                    )])),
                     projects: OptionalProperty::Some(Some(vec![(1, ProjectRole::Reader)])),
                     teams: OptionalProperty::None,
                 },
@@ -87,7 +73,9 @@ async fn test_auth() -> anyhow::Result<()> {
 
     {
         let resp = cl
-            .get(format!("{base_addr}/v1/organizations/1/projects/1/schema/events"))
+            .get(format!(
+                "{base_addr}/v1/organizations/1/projects/1/schema/events"
+            ))
             .headers(headers.clone())
             .send()
             .await?;
@@ -104,7 +92,9 @@ async fn test_auth() -> anyhow::Result<()> {
         );
 
         let resp = cl
-            .get(format!("{base_addr}/v1/organizations/1/projects/1/schema/events"))
+            .get(format!(
+                "{base_addr}/v1/organizations/1/projects/1/schema/events"
+            ))
             .headers(jwt_headers.clone())
             .send()
             .await?;
@@ -142,7 +132,9 @@ async fn test_auth() -> anyhow::Result<()> {
     // list without events should be empty
     {
         let resp = cl
-            .get(format!("{base_addr}/v1/organizations/1/projects/1/schema/events"))
+            .get(format!(
+                "{base_addr}/v1/organizations/1/projects/1/schema/events"
+            ))
             .headers(new_jwt_headers.clone())
             .send()
             .await?;

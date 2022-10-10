@@ -1,22 +1,15 @@
-
-
 use chrono::Utc;
 
 use metadata::metadata::ListResponse;
 
 use platform::error::Result;
-use platform::events::{Event, Status};
 use platform::events::{CreateEventRequest, UpdateEventRequest};
-
+use platform::events::{Event, Status};
 
 use reqwest::{Client, StatusCode};
 
-
-
-
-
-use common::types::OptionalProperty;
 use crate::http::tests::{create_admin_acc_and_login, run_http_service};
+use common::types::OptionalProperty;
 
 fn assert(l: &Event, r: &Event) {
     assert_eq!(l.id, 1);
@@ -56,7 +49,9 @@ async fn test_events() -> Result<()> {
     // list without events should be empty
     {
         let resp = cl
-            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/events"))
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -72,7 +67,9 @@ async fn test_events() -> Result<()> {
     // get of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/events/1"))
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -83,7 +80,9 @@ async fn test_events() -> Result<()> {
     // delete of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/events/1"))
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -105,7 +104,9 @@ async fn test_events() -> Result<()> {
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .post(format!("{base_url}/v1/organizations/1/projects/1/schema/events"))
+            .post(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events"
+            ))
             .body(body)
             .headers(headers.clone())
             .send()
@@ -134,7 +135,9 @@ async fn test_events() -> Result<()> {
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .put(format!("{base_url}/v1/organizations/1/projects/1/schema/events/1"))
+            .put(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .body(body)
             .headers(headers.clone())
             .send()
@@ -149,7 +152,9 @@ async fn test_events() -> Result<()> {
     // get should return event
     {
         let resp = cl
-            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/events/1"))
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -162,7 +167,9 @@ async fn test_events() -> Result<()> {
     // list events should return list with one event
     {
         let resp = cl
-            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/events"))
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -177,7 +184,9 @@ async fn test_events() -> Result<()> {
     // delete request should delete event
     {
         let resp = cl
-            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/events/1"))
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -185,7 +194,9 @@ async fn test_events() -> Result<()> {
         assert_eq!(resp.status(), StatusCode::OK);
 
         let resp = cl
-            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/events/1"))
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .headers(headers.clone())
             .send()
             .await

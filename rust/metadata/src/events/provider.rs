@@ -3,8 +3,8 @@ use std::sync::Arc;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 
-use tokio::sync::RwLock;
 use common::types::OptionalProperty;
+use tokio::sync::RwLock;
 
 use crate::error::{EventError, MetadataError, StoreError};
 use crate::events::types::{CreateEventRequest, UpdateEventRequest};

@@ -1,8 +1,6 @@
-
-
 use chrono::Utc;
 use metadata::metadata::ListResponse;
-use metadata::properties::{CreatePropertyRequest};
+use metadata::properties::CreatePropertyRequest;
 
 use platform::error::Result;
 
@@ -10,13 +8,9 @@ use platform::properties::{Property, Status, UpdatePropertyRequest};
 
 use reqwest::{Client, StatusCode};
 
-
-
-
-
-use common::DataType;
-use common::types::{DictionaryDataType, OptionalProperty};
 use crate::http::tests::{create_admin_acc_and_login, run_http_service};
+use common::types::{DictionaryDataType, OptionalProperty};
+use common::DataType;
 
 fn assert(l: &Property, r: &Property) {
     assert_eq!(l.id, r.id);
@@ -60,17 +54,21 @@ async fn test_event_properties() -> Result<()> {
 
     // list without props should be empty
     {
-        cl.get(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties"))
-            .headers(headers.clone())
-            .send()
-            .await
-            .unwrap();
+        cl.get(format!(
+            "{base_url}/v1/organizations/1/projects/1/schema/event_properties"
+        ))
+        .headers(headers.clone())
+        .send()
+        .await
+        .unwrap();
     }
 
     // get of unexisting event prop 1 should return 404 not found error
     {
         let resp = cl
-            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -81,7 +79,9 @@ async fn test_event_properties() -> Result<()> {
     // delete of unexisting event prop 1 should return 404 not found error
     {
         let resp = cl
-            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -102,7 +102,11 @@ async fn test_event_properties() -> Result<()> {
             nullable: prop1.nullable.clone(),
             is_array: prop1.is_array.clone(),
             is_dictionary: prop1.is_dictionary.clone(),
-            dictionary_type: prop1.dictionary_type.clone().map(|v|v.try_into()).transpose()?,
+            dictionary_type: prop1
+                .dictionary_type
+                .clone()
+                .map(|v| v.try_into())
+                .transpose()?,
             is_system: false,
         };
 
@@ -127,7 +131,9 @@ async fn test_event_properties() -> Result<()> {
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .put(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
+            .put(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .body(body)
             .headers(headers.clone())
             .send()
@@ -142,7 +148,9 @@ async fn test_event_properties() -> Result<()> {
     // get should return event prop
     {
         let resp = cl
-            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -155,7 +163,9 @@ async fn test_event_properties() -> Result<()> {
     // list events should return list with one event
     {
         let resp = cl
-            .get(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties"))
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -170,7 +180,9 @@ async fn test_event_properties() -> Result<()> {
     // delete request should delete event
     {
         let resp = cl
-            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -178,7 +190,9 @@ async fn test_event_properties() -> Result<()> {
         assert_eq!(resp.status(), StatusCode::OK);
 
         let resp = cl
-            .delete(format!("{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"))
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .headers(headers.clone())
             .send()
             .await

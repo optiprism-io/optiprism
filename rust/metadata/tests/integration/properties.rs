@@ -1,4 +1,5 @@
 use arrow::datatypes::DataType;
+use common::types::OptionalProperty;
 use metadata::error::Result;
 use metadata::properties::provider::Namespace;
 use metadata::properties::{CreatePropertyRequest, Provider, Status, UpdatePropertyRequest};
@@ -6,7 +7,6 @@ use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 use uuid::Uuid;
-use common::types::OptionalProperty;
 
 #[tokio::test]
 async fn test_properties() -> Result<()> {

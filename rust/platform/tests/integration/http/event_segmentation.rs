@@ -1,19 +1,10 @@
 #[cfg(test)]
 mod tests {
-    
 
     use platform::error::Result;
-    
-    
-
-    
-    
-    
-    
 
     use chrono::{DateTime, Utc};
 
-    
     use axum::http::StatusCode;
 
     use platform::queries::event_segmentation::{
@@ -23,10 +14,10 @@ mod tests {
         AggregateFunction, EventFilter, EventRef, PartitionedAggregateFunction, PropValueOperation,
         PropertyRef, QueryTime, TimeUnit,
     };
-    
+
+    use crate::http::tests::{create_admin_acc_and_login, run_http_service};
     use reqwest::Client;
     use serde_json::Value;
-    use crate::http::tests::{create_admin_acc_and_login, run_http_service};
 
     #[tokio::test]
     async fn test_event_segmentation() -> Result<()> {
@@ -107,7 +98,9 @@ mod tests {
         let body = serde_json::to_string(&es).unwrap();
 
         let resp = cl
-            .post(format!("{base_url}/v1/organizations/1/projects/1/queries/event-segmentation"))
+            .post(format!(
+                "{base_url}/v1/organizations/1/projects/1/queries/event-segmentation"
+            ))
             .body(body)
             .headers(admin_headers.clone())
             .send()

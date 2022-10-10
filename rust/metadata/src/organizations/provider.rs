@@ -9,9 +9,9 @@ use crate::metadata::ListResponse;
 use crate::organizations::types::UpdateOrganizationRequest;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key};
+use common::types::OptionalProperty;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use common::types::OptionalProperty;
 
 const NAMESPACE: &[u8] = b"organizations";
 const IDX_NAME: &[u8] = b"name";

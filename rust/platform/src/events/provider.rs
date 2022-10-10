@@ -2,10 +2,9 @@ use crate::events::types::{Event, UpdateEventRequest};
 use crate::events::CreateEventRequest;
 use crate::{Context, Result};
 use common::rbac::ProjectPermission;
-use metadata::events::{Provider as EventsProvider};
+use metadata::events::Provider as EventsProvider;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
-
 
 pub struct Provider {
     prov: Arc<EventsProvider>,
@@ -56,7 +55,10 @@ impl Provider {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
 
-        self.prov.get_by_id(organization_id, project_id, id).await?.try_into()
+        self.prov
+            .get_by_id(organization_id, project_id, id)
+            .await?
+            .try_into()
     }
 
     pub async fn get_by_name(
@@ -129,10 +131,10 @@ impl Provider {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
-        self
-            .prov
+        self.prov
             .attach_property(organization_id, project_id, event_id, prop_id)
-            .await?.try_into()
+            .await?
+            .try_into()
     }
 
     pub async fn detach_property(
@@ -145,10 +147,10 @@ impl Provider {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
-        self
-            .prov
+        self.prov
             .detach_property(organization_id, project_id, event_id, prop_id)
-            .await?.try_into()
+            .await?
+            .try_into()
     }
 
     pub async fn delete(
@@ -160,6 +162,9 @@ impl Provider {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
 
-        self.prov.delete(organization_id, project_id, id).await?.try_into()
+        self.prov
+            .delete(organization_id, project_id, id)
+            .await?
+            .try_into()
     }
 }

@@ -1,25 +1,16 @@
 #[cfg(test)]
 mod tests {
-    
 
     use platform::error::Result;
-    
-    
 
-    
-    
-    
-    
-
-    
     use axum::http::StatusCode;
 
     use platform::queries::property_values::{Filter, PropertyValues};
     use platform::queries::types::{EventRef, PropValueOperation, PropertyRef};
-    
+
+    use crate::http::tests::{create_admin_acc_and_login, run_http_service};
     use reqwest::Client;
     use serde_json::Value;
-    use crate::http::tests::{create_admin_acc_and_login, run_http_service};
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {
@@ -43,7 +34,9 @@ mod tests {
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .post(format!("{base_url}/v1/organizations/1/projects/1/queries/property-values"))
+            .post(format!(
+                "{base_url}/v1/organizations/1/projects/1/queries/property-values"
+            ))
             .body(body)
             .headers(headers.clone())
             .send()

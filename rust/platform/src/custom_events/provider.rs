@@ -3,10 +3,10 @@ use crate::custom_events::types::{
 };
 use crate::{Context, Result};
 use common::rbac::ProjectPermission;
+use common::types::OptionalProperty;
 use metadata::custom_events;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
-use common::types::OptionalProperty;
 
 pub struct Provider {
     prov: Arc<custom_events::Provider>,
@@ -95,7 +95,7 @@ impl Provider {
         md_req.tags = req.tags;
         md_req.name = req.name;
         md_req.description = req.description;
-        md_req.status=req.status.into();
+        md_req.status = req.status.into();
         if let OptionalProperty::Some(events) = req.events {
             md_req.events.insert(
                 events

@@ -1,7 +1,7 @@
+use crate::PlatformError;
 use chrono::{DateTime, Utc};
 use common::types::OptionalProperty;
 use serde::{Deserialize, Serialize};
-use crate::PlatformError;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -51,7 +51,7 @@ impl TryInto<metadata::events::Event> for Event {
     type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<metadata::events::Event, Self::Error> {
-        Ok(metadata::events::Event{
+        Ok(metadata::events::Event {
             id: self.id,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -65,7 +65,7 @@ impl TryInto<metadata::events::Event> for Event {
             status: self.status.into(),
             is_system: self.is_system,
             properties: self.properties,
-            custom_properties: self.custom_properties
+            custom_properties: self.custom_properties,
         })
     }
 }
@@ -74,7 +74,7 @@ impl TryInto<Event> for metadata::events::Event {
     type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<Event, Self::Error> {
-        Ok(Event{
+        Ok(Event {
             id: self.id,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -88,7 +88,7 @@ impl TryInto<Event> for metadata::events::Event {
             status: self.status.into(),
             is_system: self.is_system,
             properties: self.properties,
-            custom_properties: self.custom_properties
+            custom_properties: self.custom_properties,
         })
     }
 }
@@ -107,12 +107,12 @@ pub struct CreateEventRequest {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateEventRequest {
-    #[serde(default,skip_serializing_if = "OptionalProperty::is_none")]
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub tags: OptionalProperty<Option<Vec<String>>>,
-    #[serde(default,skip_serializing_if = "OptionalProperty::is_none")]
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub display_name: OptionalProperty<Option<String>>,
-    #[serde(default,skip_serializing_if = "OptionalProperty::is_none")]
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub description: OptionalProperty<Option<String>>,
-    #[serde(default,skip_serializing_if = "OptionalProperty::is_none")]
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub status: OptionalProperty<Status>,
 }

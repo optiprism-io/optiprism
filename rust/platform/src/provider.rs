@@ -6,7 +6,6 @@ use chrono::Duration;
 use metadata::MetadataProvider;
 use std::sync::Arc;
 
-
 pub struct PlatformProvider {
     pub events: Arc<EventsProvider>,
     pub custom_events: Arc<CustomEventsProvider>,

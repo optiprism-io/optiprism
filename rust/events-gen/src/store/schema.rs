@@ -91,7 +91,11 @@ async fn create_property(
     Ok(prop)
 }
 
-pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<MetadataProvider>) -> Result<Schema> {
+pub async fn create_entities(
+    org_id: u64,
+    proj_id: u64,
+    md: &Arc<MetadataProvider>,
+) -> Result<Schema> {
     let mut cols: Vec<Column> = Vec::new();
 
     create_property(
