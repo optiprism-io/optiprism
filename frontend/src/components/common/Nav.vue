@@ -36,18 +36,22 @@ const configNav = [
     {
         name: 'dashboards.title',
         to: pagesMap.dashboards.name,
+        activeKey: 'dashboards',
     },
     {
         name: 'reports.title',
         to: pagesMap.reportsEventSegmentation.name,
+        activeKey: 'reports',
     },
     {
         name: 'events.events',
         to: pagesMap.eventsLiveStream.name,
+        activeKey: 'events',
     },
     {
         name: i18n.$t('users.title'),
         to: 'users',
+        activeKey: 'users',
     },
 ]
 
@@ -58,7 +62,7 @@ const items = computed(() => {
             to: {
                 name: item.to,
             },
-            active: route.name === item.to,
+            active: route.name === item.to || (typeof route.name === 'string' && route.name.includes(item.activeKey)),
         }
     })
 })

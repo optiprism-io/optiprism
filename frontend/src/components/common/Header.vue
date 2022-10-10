@@ -50,19 +50,6 @@ const router = useRouter()
 const i18n = inject<any>('i18n')
 const UiDropdown = GenericUiDropdown<string>()
 
-const items = [
-    {
-        key: 1,
-        value: '1',
-        nameDisplay: 'Menu Item 1'
-    },
-    {
-        key: 2,
-        value: '2',
-        nameDisplay: 'Menu Item 2'
-    }
-];
-
 const userMenuMap = {
     LOGOUT: 'logout'
 }
