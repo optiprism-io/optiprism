@@ -11,7 +11,7 @@ use datafusion_expr::{col, lit, or, Expr, Operator};
 use futures::executor;
 
 use metadata::properties::provider::Namespace;
-use metadata::{dictionaries, Metadata};
+use metadata::{dictionaries, MetadataProvider};
 
 use crate::error::QueryError;
 use crate::logical_plan::expr::{lit_timestamp, multi_and, multi_or};
@@ -44,7 +44,7 @@ pub fn time_expression<S: ExprSchema>(
 /// builds expression for event
 pub async fn event_expression(
     ctx: &Context,
-    metadata: &Arc<Metadata>,
+    metadata: &Arc<MetadataProvider>,
     event: &EventRef,
 ) -> Result<Expr> {
     Ok(match &event {
@@ -120,7 +120,7 @@ pub async fn event_expression(
 /// builds event filters expression
 pub async fn event_filters_expression(
     ctx: &Context,
-    metadata: &Arc<Metadata>,
+    metadata: &Arc<MetadataProvider>,
     filters: &[EventFilter],
 ) -> Result<Expr> {
     // iterate over filters
@@ -202,7 +202,7 @@ pub async fn encode_property_dict_values(
 /// builds name [property] [operation] [value] expression
 pub async fn property_expression(
     ctx: &Context,
-    md: &Arc<Metadata>,
+    md: &Arc<MetadataProvider>,
     property: &PropertyRef,
     operation: &PropValueOperation,
     values: Option<Vec<ScalarValue>>,
@@ -266,7 +266,7 @@ pub async fn property_expression(
 
 pub async fn property_col(
     ctx: &Context,
-    md: &Arc<Metadata>,
+    md: &Arc<MetadataProvider>,
     property: &PropertyRef,
 ) -> Result<Expr> {
     Ok(match property {

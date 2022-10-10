@@ -6,7 +6,7 @@ use metadata::store::Store;
 
 use platform::http::{auth, events};
 
-use platform::{AuthProvider, EventsProvider};
+use platform::{AuthProvider, EventsProvider, PlatformProvider};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, StatusCode};
 use std::env::temp_dir;
@@ -18,66 +18,24 @@ use metadata::accounts::UpdateAccountRequest;
 use tokio::time::sleep;
 use tower_cookies::CookieManagerLayer;
 use uuid::Uuid;
+use common::types::OptionalProperty;
+use metadata::metadata::ListResponse;
+use metadata::MetadataProvider;
 
 use platform::auth::password::make_password_hash;
 use platform::auth::types::TokensResponse;
 use platform::auth::SignUpRequest;
 use platform::http::auth::{LogInRequest, RefreshTokenRequest, COOKIE_NAME_REFRESH_TOKEN};
+use query::QueryProvider;
+use query::test_util::events_provider;
+use crate::http::tests::{create_admin_acc_and_login, run_http_service, tmp_store};
 
 #[tokio::test]
 async fn test_auth() -> anyhow::Result<()> {
-    let mut path = temp_dir();
-    path.push(format!("{}.db", Uuid::new_v4()));
-    let store = Arc::new(Store::new(path));
-    let md_accs = Arc::new(metadata::accounts::Provider::new(store.clone()));
-    let md_accs_clone1 = md_accs.clone();
-    let md_accs_clone2 = md_accs.clone();
-    let md_events = Arc::new(metadata::events::Provider::new(store.clone()));
-    let md_events_clone = md_events.clone();
-
-    let access_token_secret = "access_secret".to_string();
-    let refresh_token_secret = "refresh_secret".to_string();
-    tokio::spawn(async {
-        let events_prov = Arc::new(EventsProvider::new(md_events_clone));
-        let auth_prov = Arc::new(AuthProvider::new(
-            md_accs_clone1,
-            Duration::days(1),
-            access_token_secret,
-            Duration::weeks(1),
-            refresh_token_secret,
-        ));
-
-        let mut router = events::attach_routes(Router::new(), events_prov);
-        router = auth::attach_routes(router, auth_prov);
-        router = router.layer(Extension(md_accs_clone2));
-        router = router.layer(CookieManagerLayer::new());
-
-        let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-        Server::bind(&addr)
-            .serve(router.into_make_service())
-            .await
-            .unwrap();
-    });
-
-    sleep(tokio::time::Duration::from_millis(100)).await;
-
-    let pwd = "password".to_string();
-
-    let admin = md_accs
-        .create(metadata::accounts::CreateAccountRequest {
-            created_by: Some(1),
-            password_hash: make_password_hash(pwd.as_str())?.to_string(),
-            email: "admin@mail.com".to_string(),
-            first_name: None,
-            last_name: None,
-            role: None,
-            organizations: Some(vec![(1, OrganizationRole::Admin)]),
-            projects: None,
-            teams: None,
-        })
-        .await?;
-
+    let (base_addr,md, pp) = run_http_service(false).await?;
     let cl = Client::new();
+    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
+
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -85,34 +43,9 @@ async fn test_auth() -> anyhow::Result<()> {
         HeaderValue::from_str("application/json")?,
     );
 
-    let admin_tokens = {
-        let req = LogInRequest {
-            email: admin.email.clone(),
-            password: pwd.clone(),
-        };
-
-        let body = serde_json::to_string(&req)?;
-
-        let resp = cl
-            .post("http://127.0.0.1:8080/v1/auth/login")
-            .body(body)
-            .headers(headers.clone())
-            .send()
-            .await?;
-
-        assert_eq!(resp.status(), StatusCode::OK);
-        let _a = resp.headers().get(http::header::SET_COOKIE).unwrap();
-        assert!(resp
-            .cookies()
-            .find(|c| c.name() == COOKIE_NAME_REFRESH_TOKEN)
-            .is_some());
-
-        let resp: TokensResponse = serde_json::from_str(resp.text().await?.as_str())?;
-
-        resp
-    };
 
     let user_tokens = {
+        let pwd = "password".to_string();
         let req = SignUpRequest {
             email: "user@gmail.com".to_string(),
             password: pwd.clone(),
@@ -123,14 +56,8 @@ async fn test_auth() -> anyhow::Result<()> {
 
         let body = serde_json::to_string(&req)?;
 
-        let mut admin_headers = headers.clone();
-        admin_headers.insert(
-            http::header::AUTHORIZATION,
-            HeaderValue::from_str(format!("Bearer {}", admin_tokens.access_token).as_str())?,
-        );
-
         let resp = cl
-            .post("http://127.0.0.1:8080/v1/auth/signup")
+            .post(format!("{base_addr}/v1/auth/signup"))
             .body(body)
             .headers(admin_headers.clone())
             .send()
@@ -139,19 +66,19 @@ async fn test_auth() -> anyhow::Result<()> {
         assert_eq!(resp.status(), StatusCode::CREATED);
         let resp: TokensResponse = serde_json::from_str(resp.text().await?.as_str())?;
 
-        md_accs
+        md.accounts
             .update(
                 2,
                 UpdateAccountRequest {
                     updated_by: 2,
-                    password: None,
-                    email: None,
-                    first_name: None,
-                    last_name: None,
-                    role: None,
-                    organizations: Some(Some(vec![(1, OrganizationRole::Member)])),
-                    projects: Some(Some(vec![(1, ProjectRole::Reader)])),
-                    teams: None,
+                    password: OptionalProperty::None,
+                    email: OptionalProperty::None,
+                    first_name: OptionalProperty::None,
+                    last_name: OptionalProperty::None,
+                    role: OptionalProperty::None,
+                    organizations: OptionalProperty::Some(Some(vec![(1, OrganizationRole::Member)])),
+                    projects: OptionalProperty::Some(Some(vec![(1, ProjectRole::Reader)])),
+                    teams: OptionalProperty::None,
                 },
             )
             .await?;
@@ -160,7 +87,7 @@ async fn test_auth() -> anyhow::Result<()> {
 
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events")
+            .get(format!("{base_addr}/v1/organizations/1/projects/1/schema/events"))
             .headers(headers.clone())
             .send()
             .await?;
@@ -177,7 +104,7 @@ async fn test_auth() -> anyhow::Result<()> {
         );
 
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events")
+            .get(format!("{base_addr}/v1/organizations/1/projects/1/schema/events"))
             .headers(jwt_headers.clone())
             .send()
             .await?;
@@ -193,7 +120,7 @@ async fn test_auth() -> anyhow::Result<()> {
 
         let body = serde_json::to_string(&req)?;
         let resp = cl
-            .post("http://127.0.0.1:8080/v1/auth/refresh-token")
+            .post(format!("{base_addr}/v1/auth/refresh-token"))
             .body(body)
             .headers(headers.clone())
             .send()
@@ -215,7 +142,7 @@ async fn test_auth() -> anyhow::Result<()> {
     // list without events should be empty
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events")
+            .get(format!("{base_addr}/v1/organizations/1/projects/1/schema/events"))
             .headers(new_jwt_headers.clone())
             .send()
             .await?;

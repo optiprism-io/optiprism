@@ -3,8 +3,9 @@ use crate::{
     AccountsProvider, AuthProvider, CustomEventsProvider, EventsProvider, PropertiesProvider,
 };
 use chrono::Duration;
-use metadata::Metadata;
+use metadata::MetadataProvider;
 use std::sync::Arc;
+use crate::error::{PlatformError, Result};
 
 pub struct PlatformProvider {
     pub events: Arc<EventsProvider>,
@@ -18,7 +19,7 @@ pub struct PlatformProvider {
 
 impl PlatformProvider {
     pub fn new(
-        md: Arc<Metadata>,
+        md: Arc<MetadataProvider>,
         query: Arc<QueryProvider>,
         access_token_duration: Duration,
         access_token_key: String,

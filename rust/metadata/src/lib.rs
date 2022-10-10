@@ -11,5 +11,5 @@ pub mod properties;
 pub mod store;
 pub mod teams;
 
-pub use crate::metadata::Metadata;
+pub use crate::metadata::{MetadataProvider};
 pub use error::Result;

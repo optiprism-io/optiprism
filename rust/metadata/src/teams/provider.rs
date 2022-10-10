@@ -4,6 +4,7 @@ use bincode::{deserialize, serialize};
 use chrono::Utc;
 
 use tokio::sync::RwLock;
+use common::types::OptionalProperty;
 
 use crate::error::{MetadataError, StoreError, TeamError};
 use crate::metadata::ListResponse;
@@ -129,7 +130,7 @@ impl Provider {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let Some(name) = &req.name {
+        if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(organization_id, name.as_str()));
             idx_prev_keys.push(index_name_key(organization_id, prev_team.name.as_str()));
             team.name = name.to_owned();

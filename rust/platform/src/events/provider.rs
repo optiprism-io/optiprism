@@ -1,10 +1,11 @@
-use crate::events::types::UpdateEventRequest;
+use crate::events::types::{Event, UpdateEventRequest};
 use crate::events::CreateEventRequest;
 use crate::{Context, Result};
 use common::rbac::ProjectPermission;
-use metadata::events::{Event, Provider as EventsProvider};
+use metadata::events::{Provider as EventsProvider};
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
+use metadata::store::path_helpers::{list, org_proj_ns};
 
 pub struct Provider {
     prov: Arc<EventsProvider>,
@@ -35,7 +36,7 @@ impl Provider {
                     name: request.name,
                     display_name: request.display_name,
                     description: request.description,
-                    status: request.status,
+                    status: request.status.into(),
                     is_system: request.is_system,
                     properties: None,
                     custom_properties: None,
@@ -43,7 +44,7 @@ impl Provider {
             )
             .await?;
 
-        Ok(event)
+        event.try_into()
     }
 
     pub async fn get_by_id(
@@ -55,7 +56,7 @@ impl Provider {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
 
-        Ok(self.prov.get_by_id(organization_id, project_id, id).await?)
+        self.prov.get_by_id(organization_id, project_id, id).await?.try_into()
     }
 
     pub async fn get_by_name(
@@ -71,7 +72,8 @@ impl Provider {
             .prov
             .get_by_name(organization_id, project_id, name)
             .await?;
-        Ok(event)
+
+        event.try_into()
     }
 
     pub async fn list(
@@ -81,8 +83,16 @@ impl Provider {
         project_id: u64,
     ) -> Result<ListResponse<Event>> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+        let resp = self.prov.list(organization_id, project_id).await?;
 
-        Ok(self.prov.list(organization_id, project_id).await?)
+        Ok(ListResponse {
+            data: resp
+                .data
+                .iter()
+                .map(|v| v.to_owned().try_into())
+                .collect::<Result<_>>()?,
+            meta: resp.meta,
+        })
     }
 
     pub async fn update(
@@ -100,13 +110,13 @@ impl Provider {
         md_req.tags = req.tags;
         md_req.display_name = req.display_name;
         md_req.description = req.description;
-        md_req.status = req.status;
+        md_req.status = req.status.into();
         let event = self
             .prov
             .update(organization_id, project_id, event_id, md_req)
             .await?;
 
-        Ok(event)
+        event.try_into()
     }
 
     pub async fn attach_property(
@@ -119,10 +129,10 @@ impl Provider {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
-        Ok(self
+        self
             .prov
             .attach_property(organization_id, project_id, event_id, prop_id)
-            .await?)
+            .await?.try_into()
     }
 
     pub async fn detach_property(
@@ -135,10 +145,10 @@ impl Provider {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
-        Ok(self
+        self
             .prov
             .detach_property(organization_id, project_id, event_id, prop_id)
-            .await?)
+            .await?.try_into()
     }
 
     pub async fn delete(
@@ -150,6 +160,6 @@ impl Provider {
     ) -> Result<Event> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
 
-        Ok(self.prov.delete(organization_id, project_id, id).await?)
+        self.prov.delete(organization_id, project_id, id).await?.try_into()
     }
 }

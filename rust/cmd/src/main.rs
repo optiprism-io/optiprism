@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use error::Result;
 use metadata::store::Store;
-use metadata::Metadata;
+use metadata::MetadataProvider;
 use query::QueryProvider;
 
 use crate::error::Error;
@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
     let store = Arc::new(Store::new(path));
-    let md = Arc::new(Metadata::try_new(store)?);
+    let md = Arc::new(MetadataProvider::try_new(store)?);
 
     info!("starting sample data generation");
     let batches = {

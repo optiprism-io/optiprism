@@ -1,10 +1,9 @@
-use crate::events::{CreateEventRequest, UpdateEventRequest};
+use crate::events::{CreateEventRequest, Event, UpdateEventRequest};
 use crate::{Context, EventsProvider, Result};
 use axum::extract::Path;
 
 use axum::http::StatusCode;
 use axum::{extract::Extension, routing, Json, Router};
-use metadata::events::Event;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
 

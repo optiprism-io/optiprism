@@ -9,7 +9,9 @@ pub mod http;
 pub mod properties;
 pub mod provider;
 pub mod queries;
+pub mod types;
 
+use std::sync::Arc;
 use rust_decimal::prelude::ToPrimitive;
 
 pub use accounts::Provider as AccountsProvider;
@@ -19,15 +21,17 @@ use arrow::array::{
 };
 use arrow::array::{ArrayRef, Decimal128Array};
 use arrow::datatypes::DataType;
+use chrono::Duration;
 pub use auth::Provider as AuthProvider;
 pub use context::Context;
 pub use custom_events::Provider as CustomEventsProvider;
 pub use error::{PlatformError, Result};
 pub use events::Provider as EventsProvider;
 pub use properties::Provider as PropertiesProvider;
-pub use provider::PlatformProvider;
+pub use provider::{PlatformProvider};
 use rust_decimal::Decimal;
 use serde_json::{json, Number, Value};
+use crate::queries::provider::QueryProvider;
 
 #[macro_export]
 macro_rules! arr_to_json_values {

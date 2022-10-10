@@ -7,4 +7,5 @@ members = [
     "platform",
     "cmd",
     "events-gen",
+    "sosi"
 ]

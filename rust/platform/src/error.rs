@@ -229,6 +229,7 @@ impl IntoResponse for PlatformError {
             PlatformError::Common(err) => match err {
                 CommonError::DataFusionError(err) => ErrorResponse::internal(format!("{:?}", err)),
                 CommonError::JWTError(err) => ErrorResponse::internal(format!("{:?}", err)),
+                CommonError::EntityMapping => ErrorResponse::internal(format!("{:?}", err)),
             },
             PlatformError::Auth(err) => match err {
                 AuthError::InvalidCredentials => ErrorResponse::forbidden(format!("{:?}", err)),

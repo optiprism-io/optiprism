@@ -19,40 +19,13 @@ mod tests {
     use query::test_util::{create_entities, create_md, events_provider};
     use reqwest::Client;
     use serde_json::Value;
+    use crate::http::tests::{create_admin_acc_and_login, run_http_service};
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {
-        tokio::spawn(async {
-            let md = create_md().unwrap();
-
-            let org_id = 1;
-            let proj_id = 1;
-
-            let _ctx = Context {
-                organization_id: org_id,
-                project_id: proj_id,
-            };
-
-            create_entities(md.clone(), org_id, proj_id).await.unwrap();
-            let input = events_provider(md.database.clone(), org_id, proj_id)
-                .await
-                .unwrap();
-            let query = QueryProvider::new_from_logical_plan(md, input);
-            let app = queries::attach_routes(
-                Router::new(),
-                Arc::new(platform::queries::provider::QueryProvider::new(Arc::new(
-                    query,
-                ))),
-            );
-
-            let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-            Server::bind(&addr)
-                .serve(app.into_make_service())
-                .await
-                .unwrap();
-        });
-
-        sleep(Duration::from_millis(100)).await;
+        let (md, pp) = run_http_service(true).await?;
+        let cl = Client::new();
+        let headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
 
         let req = PropertyValues {
             property: PropertyRef::Event {
@@ -66,12 +39,6 @@ mod tests {
                 value: Some(vec![Value::String("goo%".to_string())]),
             }),
         };
-        let cl = Client::new();
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "Content-Type",
-            HeaderValue::from_str("application/json").unwrap(),
-        );
 
         let body = serde_json::to_string(&req).unwrap();
 
@@ -85,7 +52,6 @@ mod tests {
 
         let status = resp.status();
         let txt = resp.text().await.unwrap();
-        println!("{}", &txt);
         assert_eq!(status, StatusCode::OK);
 
         Ok(())

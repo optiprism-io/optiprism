@@ -4,6 +4,7 @@ use bincode::{deserialize, serialize};
 use chrono::Utc;
 
 use tokio::sync::RwLock;
+use common::types::OptionalProperty;
 
 use crate::error::{EventError, MetadataError, StoreError};
 use crate::events::types::{CreateEventRequest, UpdateEventRequest};
@@ -249,7 +250,7 @@ impl Provider {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let Some(name) = &req.name {
+        if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(organization_id, project_id, name.as_str()));
             idx_prev_keys.push(index_name_key(
                 organization_id,
@@ -258,7 +259,7 @@ impl Provider {
             ));
             event.name = name.to_owned();
         }
-        if let Some(display_name) = &req.display_name {
+        if let OptionalProperty::Some(display_name) = &req.display_name {
             idx_keys.push(index_display_name_key(
                 organization_id,
                 project_id,
@@ -290,22 +291,22 @@ impl Provider {
 
         event.updated_at = Some(Utc::now());
         event.updated_by = Some(req.updated_by);
-        if let Some(tags) = req.tags {
+        if let OptionalProperty::Some(tags) = req.tags {
             event.tags = tags;
         }
-        if let Some(description) = req.description {
+        if let OptionalProperty::Some(description) = req.description {
             event.description = description;
         }
-        if let Some(status) = req.status {
+        if let OptionalProperty::Some(status) = req.status {
             event.status = status;
         }
-        if let Some(is_system) = req.is_system {
+        if let OptionalProperty::Some(is_system) = req.is_system {
             event.is_system = is_system;
         }
-        if let Some(properties) = req.properties {
+        if let OptionalProperty::Some(properties) = req.properties {
             event.properties = properties;
         }
-        if let Some(custom_properties) = req.custom_properties {
+        if let OptionalProperty::Some(custom_properties) = req.custom_properties {
             event.custom_properties = custom_properties;
         }
 

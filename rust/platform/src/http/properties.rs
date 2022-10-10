@@ -1,9 +1,8 @@
-use crate::properties::UpdatePropertyRequest;
+use crate::properties::{Property, UpdatePropertyRequest};
 use crate::{properties, Context, PropertiesProvider, Result};
 use axum::extract::Path;
 use axum::{extract::Extension, routing, Json, Router};
 use metadata::metadata::ListResponse;
-use metadata::properties::Property;
 use std::sync::Arc;
 
 async fn get_by_id(

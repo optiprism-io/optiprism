@@ -11,6 +11,7 @@ use bincode::{deserialize, serialize};
 use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use common::types::OptionalProperty;
 
 #[derive(Clone, Debug)]
 pub enum Namespace {
@@ -297,7 +298,7 @@ impl Provider {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let Some(name) = &req.name {
+        if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(
                 organization_id,
                 project_id,
@@ -312,7 +313,7 @@ impl Provider {
             ));
             prop.name = name.to_owned();
         }
-        if let Some(display_name) = &req.display_name {
+        if let OptionalProperty::Some(display_name) = &req.display_name {
             idx_keys.push(index_display_name_key(
                 organization_id,
                 project_id,
@@ -349,31 +350,31 @@ impl Provider {
 
         prop.updated_at = Some(Utc::now());
         prop.updated_by = Some(req.updated_by);
-        if let Some(tags) = req.tags {
+        if let OptionalProperty::Some(tags) = req.tags {
             prop.tags = tags;
         }
-        if let Some(description) = req.description {
+        if let OptionalProperty::Some(description) = req.description {
             prop.description = description;
         }
-        if let Some(typ) = req.typ {
+        if let OptionalProperty::Some(typ) = req.typ {
             prop.typ = typ;
         }
-        if let Some(status) = req.status {
+        if let OptionalProperty::Some(status) = req.status {
             prop.status = status;
         }
-        if let Some(is_system) = req.is_system {
+        if let OptionalProperty::Some(is_system) = req.is_system {
             prop.is_system = is_system;
         }
-        if let Some(nullable) = req.nullable {
+        if let OptionalProperty::Some(nullable) = req.nullable {
             prop.nullable = nullable;
         }
-        if let Some(is_array) = req.is_array {
+        if let OptionalProperty::Some(is_array) = req.is_array {
             prop.is_array = is_array;
         }
-        if let Some(is_dictionary) = req.is_dictionary {
+        if let OptionalProperty::Some(is_dictionary) = req.is_dictionary {
             prop.is_dictionary = is_dictionary;
         }
-        if let Some(dictionary_type) = req.dictionary_type {
+        if let OptionalProperty::Some(dictionary_type) = req.dictionary_type {
             prop.dictionary_type = dictionary_type;
         }
 
