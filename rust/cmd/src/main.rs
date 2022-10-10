@@ -91,23 +91,18 @@ async fn main() -> Result<()> {
         query_provider,
     ));
 
-    let platform = platform::PlatformProvider::new(
+    let pp = Arc::new(platform::PlatformProvider::new(
         md.clone(),
         platform_query_provider,
         Duration::days(1),
         "key".to_string(),
         Duration::days(1),
         "key".to_string(),
-    );
-
-    let mut router = Router::new();
-    router = platform::http::attach_routes(router, platform, md);
-    router = router.layer(CookieManagerLayer::new());
+    ));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-    Server::bind(&addr)
-        .serve(router.into_make_service())
-        .await
-        .map_err(|e| Error::External(e.to_string()))?;
+    let svc = platform::http::Service::new(&md, &pp, addr);
+
+    svc.serve().await?;
     Ok(())
 }

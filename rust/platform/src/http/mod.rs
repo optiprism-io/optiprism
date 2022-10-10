@@ -8,10 +8,13 @@ pub mod queries;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use axum::{Extension, Router, Server};
+use tokio::select;
+use tokio::signal::unix::SignalKind;
 use tokio::time::sleep;
 use tower_cookies::CookieManagerLayer;
 use metadata::MetadataProvider;
-use crate::PlatformProvider;
+use crate::{PlatformError, PlatformProvider};
+use crate::error::Result;
 
 pub struct Service {
     router: Router,
@@ -40,7 +43,23 @@ impl Service {
         }
     }
 
-    pub async fn run(&self) {
+    pub async fn serve(&self) -> Result<()> {
+        let server = Server::bind(&self.addr)
+            .serve(self.router.clone().into_make_service());
+        let graceful = server.with_graceful_shutdown(async {
+            let mut sig_int = tokio::signal::unix::signal(SignalKind::interrupt()).expect("failed to install signal");
+            let mut sig_term = tokio::signal::unix::signal(SignalKind::terminate()).expect("failed to install signal");
+            select! {
+                _=sig_int.recv()=>println!("SIGINT received"),
+                _=sig_term.recv()=>println!("SIGTERM received"),
+            }
+        });
+
+        Ok(graceful.await?)
+    }
+
+
+    pub async fn serve_test(&self) {
         let router = self.router.clone();
         let addr = self.addr.clone();
         tokio::spawn(async move {

@@ -1,20 +1,20 @@
-use axum::http::HeaderValue;
-use axum::{Router, Server};
+
+
 use chrono::Utc;
 
 use metadata::metadata::ListResponse;
-use metadata::store::Store;
+
 use platform::error::Result;
-use platform::events::{Event, Provider as EventsProvider, Status};
+use platform::events::{Event, Status};
 use platform::events::{CreateEventRequest, UpdateEventRequest};
-use platform::http::events;
-use reqwest::header::HeaderMap;
+
+
 use reqwest::{Client, StatusCode};
-use std::env::temp_dir;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::time::{sleep, Duration};
-use uuid::Uuid;
+
+
+
+
+
 use common::types::OptionalProperty;
 use crate::http::tests::{create_admin_acc_and_login, run_http_service};
 

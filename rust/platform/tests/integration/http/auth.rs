@@ -1,34 +1,34 @@
 use axum::http::HeaderValue;
-use axum::{http, Extension, Router, Server};
-use chrono::Duration;
+use axum::{http};
 
-use metadata::store::Store;
 
-use platform::http::{auth, events};
 
-use platform::{AuthProvider, EventsProvider, PlatformProvider};
+
+
+
+
 use reqwest::header::HeaderMap;
 use reqwest::{Client, StatusCode};
-use std::env::temp_dir;
-use std::net::SocketAddr;
-use std::sync::Arc;
+
+
+
 
 use common::rbac::{OrganizationRole, ProjectRole};
 use metadata::accounts::UpdateAccountRequest;
-use tokio::time::sleep;
-use tower_cookies::CookieManagerLayer;
-use uuid::Uuid;
-use common::types::OptionalProperty;
-use metadata::metadata::ListResponse;
-use metadata::MetadataProvider;
 
-use platform::auth::password::make_password_hash;
+
+
+use common::types::OptionalProperty;
+
+
+
+
 use platform::auth::types::TokensResponse;
 use platform::auth::SignUpRequest;
-use platform::http::auth::{LogInRequest, RefreshTokenRequest, COOKIE_NAME_REFRESH_TOKEN};
-use query::QueryProvider;
-use query::test_util::events_provider;
-use crate::http::tests::{create_admin_acc_and_login, run_http_service, tmp_store};
+use platform::http::auth::{RefreshTokenRequest};
+
+
+use crate::http::tests::{create_admin_acc_and_login, run_http_service};
 
 #[tokio::test]
 async fn test_auth() -> anyhow::Result<()> {

@@ -1,22 +1,22 @@
 #[cfg(test)]
 mod tests {
-    use axum::{Router, Server};
+    
 
     use platform::error::Result;
-    use platform::http::queries;
-    use query::{Context, QueryProvider};
+    
+    
 
-    use std::net::SocketAddr;
-    use std::sync::Arc;
-    use std::time::Duration;
-    use tokio::time::sleep;
+    
+    
+    
+    
 
-    use axum::headers::{HeaderMap, HeaderValue};
+    
     use axum::http::StatusCode;
 
     use platform::queries::property_values::{Filter, PropertyValues};
     use platform::queries::types::{EventRef, PropValueOperation, PropertyRef};
-    use query::test_util::{create_entities, create_md, events_provider};
+    
     use reqwest::Client;
     use serde_json::Value;
     use crate::http::tests::{create_admin_acc_and_login, run_http_service};
@@ -51,7 +51,7 @@ mod tests {
             .unwrap();
 
         let status = resp.status();
-        let txt = resp.text().await.unwrap();
+        let _txt = resp.text().await.unwrap();
         assert_eq!(status, StatusCode::OK);
 
         Ok(())

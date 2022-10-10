@@ -12,9 +12,9 @@ mod tests {
     use std::sync::Arc;
     use axum::headers::{HeaderMap, HeaderValue};
     use axum::http;
-    use axum::http::StatusCode;
+    
     use chrono::Duration;
-    use datafusion::datasource::{MemTable, TableProvider};
+    
     use lazy_static::lazy_static;
     use reqwest::Client;
     use uuid::Uuid;
@@ -22,15 +22,15 @@ mod tests {
     use metadata::MetadataProvider;
     use metadata::store::Store;
     use platform::auth::password::make_password_hash;
-    use platform::auth::types::TokensResponse;
-    use platform::http::auth::{COOKIE_NAME_REFRESH_TOKEN, LogInRequest};
+    
+    
     use platform::PlatformProvider;
     use query::QueryProvider;
     use query::test_util::{create_entities, empty_provider, events_provider};
     use std::sync::atomic::{Ordering, AtomicU16};
 
     lazy_static! {
-        static ref HTTP_PORT:AtomicU16 = AtomicU16::new(8080);
+        static ref HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
     }
 
     pub fn tmp_store() -> Arc<Store> {
@@ -42,7 +42,7 @@ mod tests {
     pub async fn create_admin_acc_and_login(
         auth: &Arc<platform::auth::Provider>,
         md_acc: &Arc<metadata::accounts::Provider>,
-        cl: &Client,
+        _cl: &Client,
     ) -> anyhow::Result<HeaderMap> {
         let pwd = "password";
 
@@ -98,7 +98,7 @@ mod tests {
 
         let addr = SocketAddr::from(([127, 0, 0, 1], HTTP_PORT.fetch_add(1, Ordering::SeqCst)));
         let svc = platform::http::Service::new(&md, &pp, addr.clone());
-        svc.run().await;
+        svc.serve_test().await;
 
         let base_addr = format!("http://{:?}:{:?}", addr.ip(), addr.port());
 

@@ -3,8 +3,8 @@ use crate::ScalarValue;
 use arrow::datatypes::DataType as ArrowDataType;
 use datafusion::logical_plan::Operator;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use sha3::digest::generic_array::arr;
-use crate::error::Result;
+
+
 
 pub const DECIMAL_PRECISION: usize = 19;
 pub const DECIMAL_SCALE: usize = 10;

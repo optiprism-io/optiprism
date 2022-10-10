@@ -5,7 +5,7 @@ use common::rbac::ProjectPermission;
 use metadata::events::{Provider as EventsProvider};
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
-use metadata::store::path_helpers::{list, org_proj_ns};
+
 
 pub struct Provider {
     prov: Arc<EventsProvider>,
