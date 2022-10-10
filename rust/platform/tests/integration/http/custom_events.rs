@@ -1,24 +1,18 @@
-use axum::http::HeaderValue;
-use axum::{Router, Server};
 use chrono::Utc;
 use metadata::metadata::ListResponse;
-use metadata::store::Store;
+
 use platform::error::Result;
 
-use metadata::custom_events::Provider;
 use platform::custom_events::types::{
     CreateCustomEventRequest, CustomEvent, Event, Status, UpdateCustomEventRequest,
 };
-use platform::http::custom_events;
+
 use platform::queries::types::EventRef;
-use platform::CustomEventsProvider;
-use reqwest::header::HeaderMap;
+
 use reqwest::{Client, StatusCode};
-use std::env::temp_dir;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::time::{sleep, Duration};
-use uuid::Uuid;
+
+use crate::http::tests::{create_admin_acc_and_login, run_http_service};
+use common::types::OptionalProperty;
 
 fn assert(l: &CustomEvent, r: &CustomEvent) {
     assert_eq!(l.id, 1);
@@ -32,24 +26,13 @@ fn assert(l: &CustomEvent, r: &CustomEvent) {
 
 #[tokio::test]
 async fn test_custom_events() -> Result<()> {
-    let mut path = temp_dir();
-    path.push(format!("{}.db", Uuid::new_v4()));
-    let store = Arc::new(Store::new(path));
-    let md_events = Arc::new(metadata::events::Provider::new(store.clone()));
-    let md_custom_events = Arc::new(Provider::new(store.clone(), md_events.clone()));
-    let custom_events_prov = Arc::new(CustomEventsProvider::new(md_custom_events));
-    tokio::spawn(async {
-        let app = custom_events::attach_routes(Router::new(), custom_events_prov);
-        let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-        Server::bind(&addr)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
-    });
+    let (base_url, md, pp) = run_http_service(false).await?;
+    println!("{base_url}");
+    let cl = Client::new();
+    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
 
-    sleep(Duration::from_millis(100)).await;
-
-    let event1 = md_events
+    let event1 = md
+        .events
         .create(
             1,
             1,
@@ -67,7 +50,8 @@ async fn test_custom_events() -> Result<()> {
         )
         .await?;
 
-    let event2 = md_events
+    let event2 = md
+        .events
         .create(
             1,
             1,
@@ -105,17 +89,13 @@ async fn test_custom_events() -> Result<()> {
         }],
     };
 
-    let cl = Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        "Content-Type",
-        HeaderValue::from_str("application/json").unwrap(),
-    );
     // list without events should be empty
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events")
-            .headers(headers.clone())
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/custom-events"
+            ))
+            .headers(admin_headers.clone())
             .send()
             .await
             .unwrap();
@@ -130,8 +110,10 @@ async fn test_custom_events() -> Result<()> {
     // get of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
-            .headers(headers.clone())
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+            ))
+            .headers(admin_headers.clone())
             .send()
             .await
             .unwrap();
@@ -141,8 +123,10 @@ async fn test_custom_events() -> Result<()> {
     // delete of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
-            .headers(headers.clone())
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+            ))
+            .headers(admin_headers.clone())
             .send()
             .await
             .unwrap();
@@ -162,16 +146,17 @@ async fn test_custom_events() -> Result<()> {
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .post("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events")
+            .post(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/custom-events"
+            ))
             .body(body)
-            .headers(headers.clone())
+            .headers(admin_headers.clone())
             .send()
             .await
             .unwrap();
         let status = resp.status();
-        assert_eq!(status, StatusCode::OK);
+        assert_eq!(status, StatusCode::CREATED);
         let resp: CustomEvent = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
-        println!("resp {:?}\n", resp);
         assert(&resp, &ce1)
     }
 
@@ -188,12 +173,11 @@ async fn test_custom_events() -> Result<()> {
         }];
 
         let req = UpdateCustomEventRequest {
-            tags: Some(ce1.tags.clone()),
-            name: Some(ce1.name.clone()),
-            description: Some(ce1.description.clone()),
-            status: Some(ce1.status.clone()),
-            is_system: None,
-            events: Some(vec![Event {
+            tags: OptionalProperty::Some(ce1.tags.clone()),
+            name: OptionalProperty::Some(ce1.name.clone()),
+            description: OptionalProperty::Some(ce1.description.clone()),
+            status: OptionalProperty::Some(ce1.status.clone()),
+            events: OptionalProperty::Some(vec![Event {
                 event: EventRef::Regular {
                     event_name: event2.name,
                 },
@@ -203,10 +187,14 @@ async fn test_custom_events() -> Result<()> {
 
         let body = serde_json::to_string(&req).unwrap();
 
+        println!("{body}");
+
         let resp = cl
-            .put("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
+            .put(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+            ))
             .body(body)
-            .headers(headers.clone())
+            .headers(admin_headers.clone())
             .send()
             .await
             .unwrap();
@@ -220,8 +208,10 @@ async fn test_custom_events() -> Result<()> {
     // get should return event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
-            .headers(headers.clone())
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+            ))
+            .headers(admin_headers.clone())
             .send()
             .await
             .unwrap();
@@ -233,8 +223,10 @@ async fn test_custom_events() -> Result<()> {
     // list events should return list with one event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events")
-            .headers(headers.clone())
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/custom-events"
+            ))
+            .headers(admin_headers.clone())
             .send()
             .await
             .unwrap();
@@ -248,16 +240,20 @@ async fn test_custom_events() -> Result<()> {
     // delete request should delete event
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/custom-events/1")
-            .headers(headers.clone())
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+            ))
+            .headers(admin_headers.clone())
             .send()
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
 
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events/1")
-            .headers(headers.clone())
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+            ))
+            .headers(admin_headers.clone())
             .send()
             .await
             .unwrap();

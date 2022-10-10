@@ -15,7 +15,7 @@ use futures::executor;
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use metadata::properties::provider::Namespace;
-use metadata::Metadata;
+use metadata::MetadataProvider;
 
 use crate::error::Result;
 use crate::expr::{event_expression, property_col, property_expression, time_expression};
@@ -37,7 +37,7 @@ const COL_DATE: &str = "date";
 pub struct LogicalPlanBuilder {
     ctx: Context,
     cur_time: DateTime<Utc>,
-    metadata: Arc<Metadata>,
+    metadata: Arc<MetadataProvider>,
     es: EventSegmentation,
 }
 
@@ -106,7 +106,7 @@ impl LogicalPlanBuilder {
     pub async fn build(
         ctx: Context,
         cur_time: DateTime<Utc>,
-        metadata: Arc<Metadata>,
+        metadata: Arc<MetadataProvider>,
         input: LogicalPlan,
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {

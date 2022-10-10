@@ -7,13 +7,13 @@ use metadata::database::{Column, Table, TableRef};
 use metadata::events::Event as MDEvent;
 use metadata::properties::provider::Namespace;
 use metadata::properties::{CreatePropertyRequest, Property};
-use metadata::{events, properties, Metadata};
+use metadata::{events, properties, MetadataProvider};
 
 use metadata::error::DatabaseError;
 use std::sync::Arc;
 
 async fn create_event(
-    md: &Arc<Metadata>,
+    md: &Arc<MetadataProvider>,
     org_id: u64,
     proj_id: u64,
     name: String,
@@ -46,7 +46,7 @@ pub struct CreatePropertyMainRequest {
 }
 
 async fn create_property(
-    md: &Arc<Metadata>,
+    md: &Arc<MetadataProvider>,
     ns: Namespace,
     org_id: u64,
     proj_id: u64,
@@ -91,7 +91,11 @@ async fn create_property(
     Ok(prop)
 }
 
-pub async fn create_entities(org_id: u64, proj_id: u64, md: &Arc<Metadata>) -> Result<Schema> {
+pub async fn create_entities(
+    org_id: u64,
+    proj_id: u64,
+    md: &Arc<MetadataProvider>,
+) -> Result<Schema> {
     let mut cols: Vec<Column> = Vec::new();
 
     create_property(

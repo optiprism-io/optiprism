@@ -89,8 +89,8 @@ async fn refresh_token(
         tokens.refresh_token.as_str(),
         OffsetDateTime::now_utc() + provider.refresh_token_duration.to_std().unwrap(),
     );
-    let result = Ok(Json(tokens));
-    result
+
+    Ok(Json(tokens))
 }
 
 pub fn attach_routes(router: Router, auth: Arc<AuthProvider>) -> Router {

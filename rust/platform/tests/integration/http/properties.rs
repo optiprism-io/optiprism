@@ -1,21 +1,16 @@
-use arrow::datatypes::DataType;
-use axum::http::HeaderValue;
-use axum::{Router, Server};
 use chrono::Utc;
 use metadata::metadata::ListResponse;
-use metadata::properties::Provider;
-use metadata::properties::{CreatePropertyRequest, Property, Status};
-use metadata::store::Store;
+use metadata::properties::CreatePropertyRequest;
+
 use platform::error::Result;
-use platform::http::properties;
-use platform::properties::{Provider as PropertiesProvider, UpdatePropertyRequest};
-use reqwest::header::HeaderMap;
+
+use platform::properties::{Property, Status, UpdatePropertyRequest};
+
 use reqwest::{Client, StatusCode};
-use std::env::temp_dir;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::time::{sleep, Duration};
-use uuid::Uuid;
+
+use crate::http::tests::{create_admin_acc_and_login, run_http_service};
+use common::types::{DictionaryDataType, OptionalProperty};
+use common::DataType;
 
 fn assert(l: &Property, r: &Property) {
     assert_eq!(l.id, r.id);
@@ -33,23 +28,9 @@ fn assert(l: &Property, r: &Property) {
 
 #[tokio::test]
 async fn test_event_properties() -> Result<()> {
-    let mut path = temp_dir();
-    path.push(format!("{}.db", Uuid::new_v4()));
-
-    let store = Arc::new(Store::new(path));
-    let prov = Arc::new(Provider::new_event(store));
-    let props_provider = Arc::new(PropertiesProvider::new_event(prov.clone()));
-    tokio::spawn(async {
-        let app = properties::attach_event_routes(Router::new(), props_provider);
-
-        let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-        Server::bind(&addr)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
-    });
-
-    sleep(Duration::from_millis(100)).await;
+    let (base_url, md, pp) = run_http_service(false).await?;
+    let cl = Client::new();
+    let headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
 
     let mut prop1 = Property {
         id: 1,
@@ -61,35 +42,33 @@ async fn test_event_properties() -> Result<()> {
         tags: Some(vec!["sdf".to_string()]),
         name: "qwe".to_string(),
         display_name: Some("dname".to_string()),
-        typ: DataType::Utf8,
+        typ: DataType::String,
         description: Some("desc".to_string()),
         status: Status::Enabled,
         nullable: true,
         is_array: true,
         is_dictionary: true,
-        dictionary_type: Some(DataType::Utf8),
+        dictionary_type: Some(DictionaryDataType::UInt8),
         is_system: false,
     };
 
-    let cl = Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        "Content-Type",
-        HeaderValue::from_str("application/json").unwrap(),
-    );
     // list without props should be empty
     {
-        cl.get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties")
-            .headers(headers.clone())
-            .send()
-            .await
-            .unwrap();
+        cl.get(format!(
+            "{base_url}/v1/organizations/1/projects/1/schema/event_properties"
+        ))
+        .headers(headers.clone())
+        .send()
+        .await
+        .unwrap();
     }
 
     // get of unexisting event prop 1 should return 404 not found error
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -100,7 +79,9 @@ async fn test_event_properties() -> Result<()> {
     // delete of unexisting event prop 1 should return 404 not found error
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -116,16 +97,20 @@ async fn test_event_properties() -> Result<()> {
             name: prop1.name.clone(),
             description: prop1.description.clone(),
             display_name: prop1.display_name.clone(),
-            typ: prop1.typ.clone(),
-            status: prop1.status.clone(),
+            typ: prop1.typ.clone().try_into()?,
+            status: prop1.status.clone().into(),
             nullable: prop1.nullable.clone(),
             is_array: prop1.is_array.clone(),
             is_dictionary: prop1.is_dictionary.clone(),
-            dictionary_type: prop1.dictionary_type.clone(),
+            dictionary_type: prop1
+                .dictionary_type
+                .clone()
+                .map(|v| v.try_into())
+                .transpose()?,
             is_system: false,
         };
 
-        let resp = prov.create(1, 1, req).await?;
+        let resp = md.event_properties.create(1, 1, req).await?;
         assert_eq!(resp.id, 1);
     }
 
@@ -137,16 +122,18 @@ async fn test_event_properties() -> Result<()> {
         prop1.status = Status::Disabled;
 
         let req = UpdatePropertyRequest {
-            tags: prop1.tags.clone(),
-            display_name: prop1.display_name.clone(),
-            description: prop1.description.clone(),
-            status: prop1.status.clone(),
+            tags: OptionalProperty::Some(prop1.tags.clone()),
+            display_name: OptionalProperty::Some(prop1.display_name.clone()),
+            description: OptionalProperty::Some(prop1.description.clone()),
+            status: OptionalProperty::Some(prop1.status.clone()),
         };
 
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .put("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .put(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .body(body)
             .headers(headers.clone())
             .send()
@@ -161,7 +148,9 @@ async fn test_event_properties() -> Result<()> {
     // get should return event prop
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -174,7 +163,9 @@ async fn test_event_properties() -> Result<()> {
     // list events should return list with one event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties")
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -189,7 +180,9 @@ async fn test_event_properties() -> Result<()> {
     // delete request should delete event
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -197,7 +190,9 @@ async fn test_event_properties() -> Result<()> {
         assert_eq!(resp.status(), StatusCode::OK);
 
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/event_properties/1")
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+            ))
             .headers(headers.clone())
             .send()
             .await

@@ -2,6 +2,7 @@ use crate::accounts::types::{Account, CreateAccountRequest, UpdateAccountRequest
 use crate::auth::password::make_password_hash;
 use crate::{Context, Result};
 use common::rbac::Permission;
+use common::types::OptionalProperty;
 use metadata::accounts;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
@@ -62,34 +63,23 @@ impl Provider {
     ) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
 
-        let mut md_req = metadata::accounts::UpdateAccountRequest::default();
-        md_req.updated_by = ctx.account_id.unwrap();
-        if let Some(password) = req.password {
+        let mut md_req = metadata::accounts::UpdateAccountRequest {
+            updated_by: ctx.account_id.unwrap(),
+            email: req.email,
+            first_name: req.first_name,
+            last_name: req.last_name,
+            role: req.role,
+            organizations: req.organizations,
+            projects: req.projects,
+            teams: req.teams,
+            ..Default::default()
+        };
+        if let OptionalProperty::Some(password) = req.password {
             md_req
                 .password
                 .insert(make_password_hash(password.as_str())?);
         }
-        if let Some(email) = req.email {
-            md_req.email.insert(email);
-        }
-        if let Some(first_name) = req.first_name {
-            md_req.first_name.insert(first_name);
-        }
-        if let Some(last_name) = req.last_name {
-            md_req.last_name.insert(last_name);
-        }
-        if let Some(role) = req.role {
-            md_req.role.insert(role);
-        }
-        if let Some(organizations) = req.organizations {
-            md_req.organizations.insert(organizations);
-        }
-        if let Some(projects) = req.projects {
-            md_req.projects.insert(projects);
-        }
-        if let Some(teams) = req.teams {
-            md_req.teams.insert(teams);
-        }
+
         let account = self.prov.update(account_id, md_req).await?;
 
         account.try_into()

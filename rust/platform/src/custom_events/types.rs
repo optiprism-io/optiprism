@@ -122,10 +122,15 @@ pub struct CreateCustomEventRequest {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCustomEventRequest {
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
+    // TODO move to container macro
     pub tags: OptionalProperty<Option<Vec<String>>>,
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub name: OptionalProperty<String>,
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub description: OptionalProperty<Option<String>>,
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub status: OptionalProperty<Status>,
-    pub is_system: OptionalProperty<bool>,
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub events: OptionalProperty<Vec<Event>>,
 }

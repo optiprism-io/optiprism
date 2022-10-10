@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use common::types::{EventFilter, EventRef, OptionalProperty};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub enum Status {
+    #[default]
     Enabled,
     Disabled,
 }

@@ -5,8 +5,9 @@ use common::types::OptionalProperty;
 use convert_case::{Case, Casing};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub enum Status {
+    #[default]
     Enabled,
     Disabled,
 }

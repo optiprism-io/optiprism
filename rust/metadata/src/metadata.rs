@@ -18,7 +18,7 @@ pub struct ListResponse<T> {
     pub meta: ResponseMetadata,
 }
 
-pub struct Metadata {
+pub struct MetadataProvider {
     pub events: Arc<events::Provider>,
     pub custom_events: Arc<custom_events::Provider>,
     pub event_properties: Arc<properties::Provider>,
@@ -30,10 +30,10 @@ pub struct Metadata {
     pub dictionaries: Arc<dictionaries::Provider>,
 }
 
-impl Metadata {
+impl MetadataProvider {
     pub fn try_new(store: Arc<Store>) -> Result<Self> {
         let events = Arc::new(events::Provider::new(store.clone()));
-        Ok(Metadata {
+        Ok(MetadataProvider {
             events: events.clone(),
             custom_events: Arc::new(custom_events::Provider::new(store.clone(), events)),
             event_properties: Arc::new(properties::Provider::new_event(store.clone())),

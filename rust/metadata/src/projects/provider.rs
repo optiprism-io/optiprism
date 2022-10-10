@@ -3,6 +3,7 @@ use std::sync::Arc;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 
+use common::types::OptionalProperty;
 use tokio::sync::RwLock;
 
 use crate::error::{MetadataError, ProjectError, StoreError};
@@ -132,7 +133,7 @@ impl Provider {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let Some(name) = &req.name {
+        if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(organization_id, name.as_str()));
             idx_prev_keys.push(index_name_key(organization_id, prev_project.name.as_str()));
             project.name = name.to_owned();

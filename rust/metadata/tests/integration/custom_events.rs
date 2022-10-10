@@ -3,7 +3,7 @@ use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use common::types::EventRef;
+use common::types::{EventRef, OptionalProperty};
 use metadata::custom_events::types::Event;
 use metadata::custom_events::{
     CreateCustomEventRequest, Provider, Status, UpdateCustomEventRequest,
@@ -32,12 +32,12 @@ async fn non_exist() -> Result<()> {
 
     let update_event_req = UpdateCustomEventRequest {
         updated_by: 1,
-        tags: None,
-        name: None,
-        description: None,
-        status: None,
-        is_system: None,
-        events: None,
+        tags: OptionalProperty::None,
+        name: OptionalProperty::None,
+        description: OptionalProperty::None,
+        status: OptionalProperty::None,
+        is_system: OptionalProperty::None,
+        events: OptionalProperty::None,
     };
 
     assert!(custom_events
@@ -279,12 +279,12 @@ async fn test_duplicate() -> Result<()> {
 
     let req = UpdateCustomEventRequest {
         updated_by: 0,
-        tags: None,
-        name: None,
-        description: None,
-        status: None,
-        is_system: None,
-        events: Some(vec![Event {
+        tags: OptionalProperty::None,
+        name: OptionalProperty::None,
+        description: OptionalProperty::None,
+        status: OptionalProperty::None,
+        is_system: OptionalProperty::None,
+        events: OptionalProperty::Some(vec![Event {
             event: EventRef::Custom(2),
             filters: None,
         }]),
@@ -298,12 +298,12 @@ async fn test_duplicate() -> Result<()> {
     // self-pointing
     let req = UpdateCustomEventRequest {
         updated_by: 0,
-        tags: None,
-        name: None,
-        description: None,
-        status: None,
-        is_system: None,
-        events: Some(vec![Event {
+        tags: OptionalProperty::None,
+        name: OptionalProperty::None,
+        description: OptionalProperty::None,
+        status: OptionalProperty::None,
+        is_system: OptionalProperty::None,
+        events: OptionalProperty::Some(vec![Event {
             event: EventRef::Custom(1),
             filters: None,
         }]),
@@ -356,12 +356,12 @@ async fn update_event() -> Result<()> {
 
     let req = UpdateCustomEventRequest {
         updated_by: 0,
-        tags: None,
-        name: Some("name 2".to_string()),
-        description: None,
-        status: None,
-        is_system: None,
-        events: None,
+        tags: OptionalProperty::None,
+        name: OptionalProperty::Some("name 2".to_string()),
+        description: OptionalProperty::None,
+        status: OptionalProperty::None,
+        is_system: OptionalProperty::None,
+        events: OptionalProperty::None,
     };
 
     let resp = prov.update(1, 1, 1, req).await?;

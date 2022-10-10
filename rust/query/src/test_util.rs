@@ -14,7 +14,7 @@ use metadata::database::{Column, Table, TableRef};
 use metadata::properties::provider::Namespace;
 use metadata::properties::{CreatePropertyRequest, Property};
 use metadata::store::Store;
-use metadata::{database, events, properties, Metadata};
+use metadata::{database, events, properties, MetadataProvider};
 
 use crate::error::Result;
 use crate::event_fields;
@@ -42,8 +42,11 @@ pub async fn events_provider(
     )
 }
 
+pub fn empty_provider() -> Result<LogicalPlan> {
+    Ok(LogicalPlanBuilder::empty(false).build()?)
+}
 pub async fn create_property(
-    md: &Arc<Metadata>,
+    md: &Arc<MetadataProvider>,
     ns: Namespace,
     org_id: u64,
     proj_id: u64,
@@ -69,7 +72,7 @@ pub async fn create_property(
     Ok(prop)
 }
 
-pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Result<()> {
+pub async fn create_entities(md: Arc<MetadataProvider>, org_id: u64, proj_id: u64) -> Result<()> {
     md.database
         .create_table(Table {
             typ: TableRef::Events(org_id, proj_id),
@@ -280,10 +283,10 @@ pub async fn create_entities(md: Arc<Metadata>, org_id: u64, proj_id: u64) -> Re
     Ok(())
 }
 
-pub fn create_md() -> Result<Arc<Metadata>> {
+pub fn create_md() -> Result<Arc<MetadataProvider>> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let store = Arc::new(Store::new(path));
-    Ok(Arc::new(Metadata::try_new(store)?))
+    Ok(Arc::new(MetadataProvider::try_new(store)?))
 }

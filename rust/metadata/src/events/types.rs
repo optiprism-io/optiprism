@@ -2,15 +2,14 @@ use chrono::{DateTime, Utc};
 use common::types::OptionalProperty;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub enum Status {
+    #[default]
     Enabled,
     Disabled,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
 pub struct Event {
     pub id: u64,
     pub created_at: DateTime<Utc>,

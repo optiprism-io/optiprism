@@ -3,7 +3,7 @@ use crate::{
     AccountsProvider, AuthProvider, CustomEventsProvider, EventsProvider, PropertiesProvider,
 };
 use chrono::Duration;
-use metadata::Metadata;
+use metadata::MetadataProvider;
 use std::sync::Arc;
 
 pub struct PlatformProvider {
@@ -18,7 +18,7 @@ pub struct PlatformProvider {
 
 impl PlatformProvider {
     pub fn new(
-        md: Arc<Metadata>,
+        md: Arc<MetadataProvider>,
         query: Arc<QueryProvider>,
         access_token_duration: Duration,
         access_token_key: String,

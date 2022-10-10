@@ -9,6 +9,7 @@ use crate::metadata::ListResponse;
 use crate::organizations::types::UpdateOrganizationRequest;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key};
+use common::types::OptionalProperty;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -104,7 +105,7 @@ impl Provider {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let Some(name) = &req.name {
+        if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(name.as_str()));
             idx_prev_keys.push(index_name_key(prev_org.name.as_str()));
             org.name = name.to_owned();

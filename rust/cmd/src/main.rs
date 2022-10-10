@@ -5,20 +5,16 @@ use std::env::temp_dir;
 use std::path::PathBuf;
 use std::{net::SocketAddr, sync::Arc};
 
-use axum::{Router, Server};
 use bytesize::ByteSize;
 use chrono::{DateTime, Duration, Utc};
 use datafusion::datasource::MemTable;
 use log::info;
-use tower_cookies::CookieManagerLayer;
 use uuid::Uuid;
 
 use error::Result;
 use metadata::store::Store;
-use metadata::Metadata;
+use metadata::MetadataProvider;
 use query::QueryProvider;
-
-use crate::error::Error;
 
 mod error;
 
@@ -28,7 +24,7 @@ async fn main() -> Result<()> {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
     let store = Arc::new(Store::new(path));
-    let md = Arc::new(Metadata::try_new(store)?);
+    let md = Arc::new(MetadataProvider::try_new(store)?);
 
     info!("starting sample data generation");
     let batches = {
@@ -91,23 +87,18 @@ async fn main() -> Result<()> {
         query_provider,
     ));
 
-    let platform = platform::PlatformProvider::new(
+    let pp = Arc::new(platform::PlatformProvider::new(
         md.clone(),
         platform_query_provider,
         Duration::days(1),
         "key".to_string(),
         Duration::days(1),
         "key".to_string(),
-    );
-
-    let mut router = Router::new();
-    router = platform::http::attach_routes(router, platform, md);
-    router = router.layer(CookieManagerLayer::new());
+    ));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-    Server::bind(&addr)
-        .serve(router.into_make_service())
-        .await
-        .map_err(|e| Error::External(e.to_string()))?;
+    let svc = platform::http::Service::new(&md, &pp, addr);
+
+    svc.serve().await?;
     Ok(())
 }

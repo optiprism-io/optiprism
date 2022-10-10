@@ -1,20 +1,15 @@
-use axum::http::HeaderValue;
-use axum::{Router, Server};
 use chrono::Utc;
-use metadata::events::{Event, Provider, Status};
+
 use metadata::metadata::ListResponse;
-use metadata::store::Store;
+
 use platform::error::Result;
-use platform::events::Provider as EventsProvider;
 use platform::events::{CreateEventRequest, UpdateEventRequest};
-use platform::http::events;
-use reqwest::header::HeaderMap;
+use platform::events::{Event, Status};
+
 use reqwest::{Client, StatusCode};
-use std::env::temp_dir;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::time::{sleep, Duration};
-use uuid::Uuid;
+
+use crate::http::tests::{create_admin_acc_and_login, run_http_service};
+use common::types::OptionalProperty;
 
 fn assert(l: &Event, r: &Event) {
     assert_eq!(l.id, 1);
@@ -30,23 +25,9 @@ fn assert(l: &Event, r: &Event) {
 
 #[tokio::test]
 async fn test_events() -> Result<()> {
-    tokio::spawn(async {
-        let mut path = temp_dir();
-        path.push(format!("{}.db", Uuid::new_v4()));
-        let store = Arc::new(Store::new(path));
-        let prov = Provider::new(store);
-        let events_provider = Arc::new(EventsProvider::new(Arc::new(prov)));
-
-        let app = events::attach_routes(Router::new(), events_provider);
-
-        let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-        Server::bind(&addr)
-            .serve(app.into_make_service())
-            .await
-            .unwrap();
-    });
-
-    sleep(Duration::from_millis(100)).await;
+    let (base_url, md, pp) = run_http_service(false).await?;
+    let cl = Client::new();
+    let headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
 
     let mut event1 = Event {
         id: 1,
@@ -65,16 +46,12 @@ async fn test_events() -> Result<()> {
         is_system: false,
     };
 
-    let cl = Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        "Content-Type",
-        HeaderValue::from_str("application/json").unwrap(),
-    );
     // list without events should be empty
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events")
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -90,7 +67,9 @@ async fn test_events() -> Result<()> {
     // get of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events/1")
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -101,7 +80,9 @@ async fn test_events() -> Result<()> {
     // delete of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events/1")
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -116,21 +97,23 @@ async fn test_events() -> Result<()> {
             name: event1.name.clone(),
             display_name: event1.display_name.clone(),
             description: event1.description.clone(),
-            status: event1.status.clone(),
+            status: event1.status.clone().into(),
             is_system: false,
         };
 
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .post("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events")
+            .post(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events"
+            ))
             .body(body)
             .headers(headers.clone())
             .send()
             .await
             .unwrap();
         let status = resp.status();
-        assert_eq!(status, StatusCode::OK);
+        assert_eq!(status, StatusCode::CREATED);
         let resp: Event = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
         assert(&resp, &event1)
     }
@@ -143,16 +126,18 @@ async fn test_events() -> Result<()> {
         event1.status = Status::Disabled;
 
         let req = UpdateEventRequest {
-            tags: Some(event1.tags.clone()),
-            display_name: Some(event1.display_name.clone()),
-            description: Some(event1.description.clone()),
-            status: Some(event1.status.clone()),
+            tags: OptionalProperty::Some(event1.tags.clone()),
+            display_name: OptionalProperty::Some(event1.display_name.clone()),
+            description: OptionalProperty::Some(event1.description.clone()),
+            status: OptionalProperty::Some(event1.status.clone().into()),
         };
 
         let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .put("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events/1")
+            .put(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .body(body)
             .headers(headers.clone())
             .send()
@@ -167,7 +152,9 @@ async fn test_events() -> Result<()> {
     // get should return event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events/1")
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -180,7 +167,9 @@ async fn test_events() -> Result<()> {
     // list events should return list with one event
     {
         let resp = cl
-            .get("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events")
+            .get(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -195,7 +184,9 @@ async fn test_events() -> Result<()> {
     // delete request should delete event
     {
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events/1")
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .headers(headers.clone())
             .send()
             .await
@@ -203,7 +194,9 @@ async fn test_events() -> Result<()> {
         assert_eq!(resp.status(), StatusCode::OK);
 
         let resp = cl
-            .delete("http://127.0.0.1:8080/v1/organizations/1/projects/1/schema/events/1")
+            .delete(format!(
+                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+            ))
             .headers(headers.clone())
             .send()
             .await

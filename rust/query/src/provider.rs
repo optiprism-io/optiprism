@@ -14,7 +14,7 @@ use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::{collect, displayable};
 use datafusion::prelude::{SessionConfig, SessionContext};
 
-use metadata::Metadata;
+use metadata::MetadataProvider;
 
 use crate::data_table::DataTable;
 use crate::physical_plan::planner::QueryPlanner;
@@ -26,13 +26,13 @@ use crate::Result;
 use crate::{data_table, Context};
 
 pub struct QueryProvider {
-    metadata: Arc<Metadata>,
+    metadata: Arc<MetadataProvider>,
     input: LogicalPlan,
 }
 
 impl QueryProvider {
     pub fn try_new_from_provider(
-        metadata: Arc<Metadata>,
+        metadata: Arc<MetadataProvider>,
         table_provider: Arc<dyn TableProvider>,
     ) -> Result<Self> {
         let table_source = Arc::new(DefaultTableSource::new(table_provider));
@@ -42,7 +42,7 @@ impl QueryProvider {
         Ok(Self { metadata, input })
     }
 
-    pub fn new_from_logical_plan(metadata: Arc<Metadata>, input: LogicalPlan) -> Self {
+    pub fn new_from_logical_plan(metadata: Arc<MetadataProvider>, input: LogicalPlan) -> Self {
         Self { metadata, input }
     }
 }

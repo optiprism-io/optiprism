@@ -4,7 +4,7 @@ use bincode::{deserialize, serialize};
 use chrono::Utc;
 use futures::future::{BoxFuture, FutureExt};
 
-use common::types::EventRef;
+use common::types::{EventRef, OptionalProperty};
 use tokio::sync::RwLock;
 
 use crate::custom_events::types::{CreateCustomEventRequest, Event, UpdateCustomEventRequest};
@@ -212,7 +212,7 @@ impl Provider {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let Some(name) = &req.name {
+        if let OptionalProperty::Some(name) = &req.name {
             idx_keys.push(index_name_key(organization_id, project_id, name.as_str()));
             idx_prev_keys.push(index_name_key(
                 organization_id,
@@ -243,20 +243,20 @@ impl Provider {
 
         event.updated_at = Some(Utc::now());
         event.updated_by = Some(req.updated_by);
-        if let Some(tags) = req.tags {
+        if let OptionalProperty::Some(tags) = req.tags {
             event.tags = tags;
         }
-        if let Some(description) = req.description {
+        if let OptionalProperty::Some(description) = req.description {
             event.description = description;
         }
-        if let Some(status) = req.status {
+        if let OptionalProperty::Some(status) = req.status {
             event.status = status;
         }
-        if let Some(is_system) = req.is_system {
+        if let OptionalProperty::Some(is_system) = req.is_system {
             event.is_system = is_system;
         }
 
-        if let Some(events) = req.events {
+        if let OptionalProperty::Some(events) = req.events {
             if events.is_empty() {
                 return Err(CustomEventError::EmptyEvents.into());
             }

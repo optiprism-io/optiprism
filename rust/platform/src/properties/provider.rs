@@ -3,8 +3,8 @@ use crate::{Context, Result};
 use common::rbac::ProjectPermission;
 use metadata::metadata::ListResponse;
 
+use crate::properties::types::Property;
 use metadata::properties::provider::Provider as PropertiesProvider;
-use metadata::properties::Property;
 use std::sync::Arc;
 
 pub struct Provider {
@@ -29,7 +29,10 @@ impl Provider {
     ) -> Result<Property> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
 
-        Ok(self.prov.get_by_id(organization_id, project_id, id).await?)
+        self.prov
+            .get_by_id(organization_id, project_id, id)
+            .await?
+            .try_into()
     }
 
     pub async fn get_by_name(
@@ -45,7 +48,8 @@ impl Provider {
             .prov
             .get_by_name(organization_id, project_id, name)
             .await?;
-        Ok(event)
+
+        event.try_into()
     }
 
     pub async fn list(
@@ -55,8 +59,16 @@ impl Provider {
         project_id: u64,
     ) -> Result<ListResponse<Property>> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
+        let resp = self.prov.list(organization_id, project_id).await?;
 
-        Ok(self.prov.list(organization_id, project_id).await?)
+        Ok(ListResponse {
+            data: resp
+                .data
+                .iter()
+                .map(|v| v.to_owned().try_into())
+                .collect::<Result<_>>()?,
+            meta: resp.meta,
+        })
     }
 
     pub async fn update(
@@ -69,18 +81,23 @@ impl Provider {
     ) -> Result<Property> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
 
-        let mut md_req = metadata::properties::UpdatePropertyRequest::default();
-        md_req.updated_by = ctx.account_id.unwrap();
-        md_req.tags.insert(req.tags);
-        md_req.display_name.insert(req.display_name);
-        md_req.description.insert(req.description);
-        md_req.status.insert(req.status);
+        let md_req = metadata::properties::UpdatePropertyRequest {
+            updated_by: ctx.account_id.unwrap(),
+            tags: req.tags,
+            description: req.description,
+            display_name: req.display_name,
+            status: req.status.into(),
+            is_dictionary: Default::default(),
+            dictionary_type: Default::default(),
+            ..Default::default()
+        };
+
         let prop = self
             .prov
             .update(organization_id, project_id, property_id, md_req)
             .await?;
 
-        Ok(prop)
+        prop.try_into()
     }
 
     pub async fn delete(
@@ -92,6 +109,9 @@ impl Provider {
     ) -> Result<Property> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::DeleteSchema)?;
 
-        Ok(self.prov.delete(organization_id, project_id, id).await?)
+        self.prov
+            .delete(organization_id, project_id, id)
+            .await?
+            .try_into()
     }
 }

@@ -12,4 +12,6 @@ pub enum CommonError {
     DataFusionError(#[from] DataFusionError),
     #[error("JWTError: {0:?}")]
     JWTError(#[from] JWTError),
+    #[error("EntityMapping")]
+    EntityMapping,
 }

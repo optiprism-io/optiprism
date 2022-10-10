@@ -9,6 +9,7 @@ pub mod http;
 pub mod properties;
 pub mod provider;
 pub mod queries;
+pub mod types;
 
 use rust_decimal::prelude::ToPrimitive;
 
@@ -19,6 +20,7 @@ use arrow::array::{
 };
 use arrow::array::{ArrayRef, Decimal128Array};
 use arrow::datatypes::DataType;
+
 pub use auth::Provider as AuthProvider;
 pub use context::Context;
 pub use custom_events::Provider as CustomEventsProvider;

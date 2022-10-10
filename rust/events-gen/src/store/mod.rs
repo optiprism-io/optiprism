@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use enum_iterator::all;
 
 use log::info;
-use metadata::Metadata;
+use metadata::MetadataProvider;
 use rand::thread_rng;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -30,7 +30,7 @@ mod transitions;
 pub struct Config {
     pub org_id: u64,
     pub project_id: u64,
-    pub md: Arc<Metadata>,
+    pub md: Arc<MetadataProvider>,
     pub from: DateTime<Utc>,
     pub to: DateTime<Utc>,
     pub products_path: PathBuf,

@@ -3,6 +3,7 @@ use crate::custom_events::types::{
 };
 use crate::{Context, Result};
 use common::rbac::ProjectPermission;
+use common::types::OptionalProperty;
 use metadata::custom_events;
 use metadata::metadata::ListResponse;
 use std::sync::Arc;
@@ -68,8 +69,8 @@ impl Provider {
         project_id: u64,
     ) -> Result<ListResponse<CustomEvent>> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
-
         let resp = self.prov.list(organization_id, project_id).await?;
+
         Ok(ListResponse {
             data: resp
                 .data
@@ -89,16 +90,16 @@ impl Provider {
         req: UpdateCustomEventRequest,
     ) -> Result<CustomEvent> {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+        let mut md_req = metadata::custom_events::UpdateCustomEventRequest {
+            updated_by: ctx.account_id.unwrap(),
+            tags: req.tags,
+            name: req.name,
+            description: req.description,
+            status: req.status.into(),
+            ..Default::default()
+        };
 
-        let mut md_req = metadata::custom_events::UpdateCustomEventRequest::default();
-        md_req.updated_by = ctx.account_id.unwrap();
-        md_req.tags = req.tags;
-        md_req.name = req.name;
-        md_req.description = req.description;
-        if let Some(status) = req.status {
-            md_req.status.insert(status.into());
-        }
-        if let Some(events) = req.events {
+        if let OptionalProperty::Some(events) = req.events {
             md_req.events.insert(
                 events
                     .iter()

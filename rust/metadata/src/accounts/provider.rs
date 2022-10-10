@@ -3,6 +3,7 @@ use std::sync::Arc;
 use bincode::{deserialize, serialize};
 use chrono::Utc;
 
+use common::types::OptionalProperty;
 use tokio::sync::RwLock;
 
 use crate::accounts::types::UpdateAccountRequest;
@@ -116,7 +117,7 @@ impl Provider {
 
         let mut idx_keys: Vec<Option<Vec<u8>>> = Vec::new();
         let mut idx_prev_keys: Vec<Option<Vec<u8>>> = Vec::new();
-        if let Some(email) = &req.email {
+        if let OptionalProperty::Some(email) = &req.email {
             idx_keys.push(index_email_key(email.as_str()));
             idx_prev_keys.push(index_email_key(prev_account.email.as_str()));
             account.email = email.to_owned();
@@ -139,19 +140,19 @@ impl Provider {
 
         account.updated_at = Some(Utc::now());
         account.updated_by = Some(req.updated_by);
-        if let Some(first_name) = req.first_name {
+        if let OptionalProperty::Some(first_name) = req.first_name {
             account.first_name = first_name;
         }
-        if let Some(last_name) = req.last_name {
+        if let OptionalProperty::Some(last_name) = req.last_name {
             account.last_name = last_name;
         }
-        if let Some(organizations) = req.organizations {
+        if let OptionalProperty::Some(organizations) = req.organizations {
             account.organizations = organizations;
         }
-        if let Some(projects) = req.projects {
+        if let OptionalProperty::Some(projects) = req.projects {
             account.projects = projects;
         }
-        if let Some(teams) = req.teams {
+        if let OptionalProperty::Some(teams) = req.teams {
             account.teams = teams;
         }
 

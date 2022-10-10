@@ -12,7 +12,7 @@ use datafusion_expr::{col, Expr};
 
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use metadata::properties::provider::Namespace;
-use metadata::Metadata;
+use metadata::MetadataProvider;
 
 use crate::error::Result;
 use crate::expr::{event_expression, property_expression};
@@ -63,7 +63,7 @@ macro_rules! property_col {
 impl LogicalPlanBuilder {
     pub async fn build(
         ctx: Context,
-        metadata: Arc<Metadata>,
+        metadata: Arc<MetadataProvider>,
         input: LogicalPlan,
         req: PropertyValues,
     ) -> Result<LogicalPlan> {

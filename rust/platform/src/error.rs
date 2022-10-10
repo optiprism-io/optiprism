@@ -55,6 +55,8 @@ pub enum PlatformError {
     Auth(#[from] AuthError),
     #[error("axum: {0:?}")]
     Axum(#[from] axum::http::Error),
+    #[error("hyper: {0:?}")]
+    Hyper(#[from] hyper::Error),
     #[error("other: {0:?}")]
     Other(#[from] anyhow::Error),
 }
@@ -229,6 +231,7 @@ impl IntoResponse for PlatformError {
             PlatformError::Common(err) => match err {
                 CommonError::DataFusionError(err) => ErrorResponse::internal(format!("{:?}", err)),
                 CommonError::JWTError(err) => ErrorResponse::internal(format!("{:?}", err)),
+                CommonError::EntityMapping => ErrorResponse::internal(format!("{:?}", err)),
             },
             PlatformError::Auth(err) => match err {
                 AuthError::InvalidCredentials => ErrorResponse::forbidden(format!("{:?}", err)),
@@ -240,6 +243,7 @@ impl IntoResponse for PlatformError {
             PlatformError::JSONWebToken(err) => ErrorResponse::internal(format!("{:?}", err)),
             PlatformError::Axum(err) => ErrorResponse::internal(err.to_string()),
             PlatformError::Other(err) => ErrorResponse::internal(err.to_string()),
+            PlatformError::Hyper(err) => ErrorResponse::internal(err.to_string()),
         };
 
         (status_code, Json(error_response)).into_response()
