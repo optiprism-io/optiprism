@@ -166,7 +166,7 @@ const errorFields = ref<{ [key: string]: string }>({})
 
 const nextPath = computed(() => {
     const next = route.query.next
-    return next && typeof next === 'string' ? next : pagesMap.reportsEventSegmentation.path
+    return next && typeof next === 'string' ? next : pagesMap.dashboards.path
 })
 
 const login = async (): Promise<void | Error> => {

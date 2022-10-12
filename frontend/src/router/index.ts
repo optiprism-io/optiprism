@@ -31,7 +31,7 @@ const routes = [
         children: [
             {
                 path: '',
-                redirect: { name: pagesMap.reportsEventSegmentation.name }
+                redirect: { name: pagesMap.dashboards.name }
             },
             {
                 path: 'users',

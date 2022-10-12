@@ -1,6 +1,19 @@
 <template>
     <header class="app-header">
-        <div class="pf-l-flex">
+        <div class="pf-l-flex pf-u-align-items-center">
+            <div class="pf-l-flex__item pf-u-ml-md">
+                <router-link
+                    class="app-header__logo"
+                    to="/dashboards"
+                    aria-current="page"
+                >
+                    <img
+                        class="pf-c-brand"
+                        src="@/assets/img/logo-black.svg"
+                        alt="Optyprism"
+                    >
+                </router-link>
+            </div>
             <div class="pf-l-flex__item">
                 <Nav />
             </div>
@@ -83,6 +96,11 @@ const selectUserMenu = (item: UiDropdownItem<string>) => {
         margin-left: auto;
         display: flex;
         color: #fff;
+    }
+    &__logo {
+        display: inline-block;
+        width: 110px;
+        margin-top: 6px;
     }
 }
 </style>

@@ -38,8 +38,8 @@ Since TypeScript cannot handle type information for `.vue` imports, they are shi
 ### before push:
 
 ```
-$ npm run lint
-$ npm run build
+$ yarn lint
+$ yarn build
 ```
 
 ### For generate API client

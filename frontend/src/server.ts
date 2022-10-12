@@ -4,6 +4,7 @@ import { customAlphabet } from 'nanoid'
 import { DataType, TokensResponse } from '@/api'
 import { BASE_PATH } from '@/api/base'
 import { EventStatus, UserCustomProperty } from '@/types/events';
+
 import splineChartMocks from '@/mocks/splineChart.json';
 import liveStreamMocks from '@/mocks/reports/liveStream.json'
 import funnelsMocks from '@/mocks/reports/funnels.json'
@@ -13,6 +14,7 @@ import eventMocks from '@/mocks/eventSegmentations/events.json';
 import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
 import customEventsMocks from '@/mocks/eventSegmentations/customEvents.json';
 import reportsMocks from '@/mocks/reports/reports.json'
+import dashboardsMocks from '@/mocks/dashboards.json'
 
 const alphabet = '0123456789';
 const nanoid = customAlphabet(alphabet, 4);
@@ -29,6 +31,7 @@ export default function ({ environment = 'development' } = {}) {
                 eventProperties: eventPropertiesMocks,
                 userProperties: userPropertiesMocks,
                 reports: reportsMocks,
+                dashboards: dashboardsMocks,
             })
         },
 
@@ -234,6 +237,13 @@ export default function ({ environment = 'development' } = {}) {
                     csrfToken,
                 }
             }, { timing: 200 })
+
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards`, (schema) => {
+                return {
+                    dashboards: schema.db.dashboards,
+                    meta: {}
+                }
+            })
         }
     });
 }

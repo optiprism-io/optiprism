@@ -268,5 +268,59 @@
                 }
             ]
         }
+    },
+    {
+        "id": "1",
+        "name": "Report for Dashboard",
+        "report": {
+            "type": "eventSegmentation",
+            "time": {
+                "type": "last",
+                "n": 20,
+                "unit": "day"
+            },
+            "group": "user",
+            "intervalUnit": "day",
+            "chartType": "line",
+            "analysis": {
+                "type": "linear"
+            },
+            "events": [
+                {
+                    "eventName": "sign_up",
+                    "queries": [
+                        {
+                            "name": "countEvents",
+                            "query": {
+                                "type": "formula",
+                                "query": "countEvents"
+                            }
+                        },
+                        {
+                            "name": "aggregatePropertyPer",
+                            "query": {
+                                "type": "aggregatePropertyPerGroup",
+                                "propertyType": "event",
+                                "propertyId": "7",
+                                "aggregate": "75thPercentile",
+                                "aggregatePerGroup": "distinctCount"
+                            }
+                        },
+                        {
+                            "name": "aggregateProperty",
+                            "query": {
+                                "type": "aggregateProperty",
+                                "propertyType": "event",
+                                "propertyId": "6",
+                                "aggregate": "min"
+                            }
+                        }
+                    ],
+                    "eventType": "regular",
+                    "eventId": "1",
+                    "filters": []
+                }
+            ]
+        }
     }
 ]

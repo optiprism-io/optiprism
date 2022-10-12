@@ -257,6 +257,7 @@
   },
 
   "dashboards": {
-    "title": "Dashboards"
+    "title": "Dashboards",
+    "selectDashboard": "Select Dashboard"
   }
 }
