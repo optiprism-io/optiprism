@@ -17,6 +17,9 @@ export const pagesMap = {
         path: '/dashboards',
         name: 'dashboards',
     },
+    funnels: {
+        name: 'reports_funnels'
+    }
 }
 
 const routes = [

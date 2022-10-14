@@ -21,23 +21,8 @@
                 <div class="app-header__tools">
                     <div class="pf-c-page__header-tools-group">
                         <div class="pf-c-page__header-tools-item">
-                            <UiButton
-                                :icon="'fas fa-cog'"
-                                class="pf-m-base-light"
-                                aria-label="Settings"
-                            />
-                        </div>
-                        <div class="pf-c-page__header-tools-item">
-                            <UiButton
-                                :icon="'pf-icon pf-icon-help'"
-                                class="pf-m-base-light"
-                                aria-label="Help"
-                            />
-                        </div>
-                    </div>
-                    <div class="pf-c-page__header-tools-group">
-                        <div class="pf-c-page__header-tools-item">
                             <UiDropdown
+                                class="pf-u-mr-md"
                                 :items="userMenu"
                                 :text-button="'User'"
                                 :transparent="true"

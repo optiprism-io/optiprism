@@ -1,7 +1,15 @@
 <template>
     <UiCardContainer>
         <UiCardTitle>
-            {{ title }}
+            <router-link
+                v-if="link"
+                :to="link"
+            >
+                {{ title }}
+            </router-link>
+            <span v-else>
+                {{ title }}
+            </span>
         </UiCardTitle>
 
         <UiCardBody>
@@ -19,6 +27,7 @@ defineProps({
     title: {
         type: String,
         default: '',
-    }
+    },
+    link: [Object, String]
 })
 </script>

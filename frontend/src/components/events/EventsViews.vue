@@ -1,6 +1,13 @@
 <template>
-    <div class="pf-c-card pf-u-mb-md">
-        <div class="pf-c-toolbar">
+    <div
+        :class="{
+            'pf-c-card pf-u-mb-md': !props.onlyView
+        }"
+    >
+        <div
+            v-if="!props.onlyView"
+            class="pf-c-toolbar"
+        >
             <div class="pf-c-toolbar__content">
                 <div class="pf-c-toolbar__content-section pf-m-nowrap">
                     <div class="pf-c-toolbar__item">
@@ -68,7 +75,12 @@
                 </div>
             </div>
         </div>
-        <div class="pf-c-scroll-inner-wrapper pf-u-p-md">
+        <div
+            class="pf-c-scroll-inner-wrapper"
+            :class="{
+                'pf-u-p-md': !props.onlyView
+            }"
+        >
             <div
                 v-if="isNoData"
                 class="content-info"
@@ -94,7 +106,7 @@
     </div>
 
     <div
-        v-if="!isNoData"
+        v-if="!isNoData && !props.onlyView"
         class="pf-c-card"
     >
         <div class="pf-c-toolbar">
@@ -163,11 +175,13 @@ const eventsStore = useEventsStore();
 type Props = {
     eventSegmentation: DataTableResponse | undefined
     loading: boolean
+    onlyView: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     eventSegmentation: undefined,
     loading: false,
+    onlyView: false
 })
 
 const dataTable = computed(() => useDataTable(props.eventSegmentation))
