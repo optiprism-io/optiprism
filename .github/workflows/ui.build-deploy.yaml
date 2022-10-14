@@ -43,7 +43,7 @@ jobs:
 
       - name: Build and Push Container
         run: |-
-          docker build -f docker/ui.${{ github.event.inputs.build }}.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.sha }} .
+          DOCKER_BUILDKIT=1 docker build -f docker/ui.${{ github.event.inputs.build }}.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.sha }} .
           docker push eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.sha }}
 
       - uses: danielr1996/envsubst-action@1.0.0

@@ -118,15 +118,18 @@ impl Store {
     pub async fn list_prefix<K: AsRef<[u8]>>(&self, prefix: K) -> Result<Vec<KVBytes>> {
         let prefix = prefix.as_ref();
         let iter = self.db.prefix_iterator(prefix);
-        Ok(iter
-            .filter_map(|v| {
-                if v.0.len() > prefix.len() && v.0[..prefix.len()].eq(prefix) {
-                    Some((v.0.clone(), v.1))
-                } else {
-                    None
+        Ok(iterb
+            .filter_map(|v| match v {
+                Ok(kv) => {
+                    if kv.0.len() > prefix.len() && kv.0[..prefix.len()].eq(prefix) {
+                        Some(Ok(kv.clone()))
+                    } else {
+                        None
+                    }
                 }
+                Err(err) => Some(Err(err)),
             })
-            .collect())
+            .collect::<std::result::Result<_, _>>()?)
     }
 
     pub async fn next_seq<K: AsRef<[u8]>>(&self, key: K) -> Result<u64> {

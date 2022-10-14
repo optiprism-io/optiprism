@@ -1,5 +1,5 @@
 #build
-FROM node:lts-alpine3.16 as build
+FROM node:lts-alpine3.16
 WORKDIR /app
 COPY ui/src src/
 COPY ui/package.json .

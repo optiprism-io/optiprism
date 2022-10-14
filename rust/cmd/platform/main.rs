@@ -11,7 +11,7 @@ use datafusion::datasource::MemTable;
 use log::info;
 use uuid::Uuid;
 
-use error::Result;
+use crate::error::Result;
 use metadata::store::Store;
 use metadata::MetadataProvider;
 use query::QueryProvider;
@@ -96,7 +96,8 @@ async fn main() -> Result<()> {
         "key".to_string(),
     ));
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+    // let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     let svc = platform::http::Service::new(&md, &pp, addr);
 
     svc.serve().await?;
