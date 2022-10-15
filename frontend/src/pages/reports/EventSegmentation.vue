@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { onUnmounted, ref } from 'vue';
+import { onUnmounted, watch, ref } from 'vue';
 import Events from '@/components/events/Events/Events.vue';
 import Breakdowns from '@/components/events/Breakdowns.vue';
 import Segments from '@/components/events/Segments/Segments.vue';
@@ -88,6 +88,8 @@ const getEventSegmentation = async () => {
     }
     eventSegmentationLoading.value = false
 }
+
+watch(() => eventsStore.events, () => getEventSegmentation())
 </script>
 
 <style scoped lang="scss">

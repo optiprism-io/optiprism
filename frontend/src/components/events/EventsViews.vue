@@ -76,7 +76,6 @@
             </div>
         </div>
         <div
-            class="pf-c-scroll-inner-wrapper"
             :class="{
                 'pf-u-p-md': !props.onlyView
             }"
@@ -99,7 +98,7 @@
                 :is="chartEventsOptions.component"
                 v-else
                 :options="chartEventsOptions"
-                :type="eventsStore.chartType"
+                :type="chartTypeActive"
                 :loading="props.loading"
             />
         </div>
@@ -135,7 +134,7 @@
 
 <script lang="ts" setup>
 import { computed } from 'vue';
-import { useEventsStore } from '@/stores/eventSegmentation/events';
+import { useEventsStore, ChartType } from '@/stores/eventSegmentation/events';
 import { groupByMap, periodMap } from '@/configs/events/controls';
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 
@@ -175,13 +174,15 @@ const eventsStore = useEventsStore();
 type Props = {
     eventSegmentation: DataTableResponse | undefined
     loading: boolean
-    onlyView: boolean
+    onlyView?: boolean
+    chartType?: ChartType
+    heightChart?: number
+    liteChart?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     eventSegmentation: undefined,
     loading: false,
-    onlyView: false
 })
 
 const dataTable = computed(() => useDataTable(props.eventSegmentation))
@@ -191,20 +192,23 @@ const emit = defineEmits<{
 }>()
 
 const isNoData = computed(() => !props.loading && !dataTable.value.hasData)
+const chartTypeActive = computed(() => props.chartType ?? eventsStore.chartType)
+
 
 const chartEventsOptions = computed(() => {
-    switch(eventsStore.chartType) {
+    switch(chartTypeActive.value) {
         case 'line':
             return {
                 data: dataTable.value.lineChart,
+                height: props.heightChart ?? 350,
                 component: ChartLine,
                 xField: 'date',
                 yField: 'value',
                 seriesField: 'category',
-                xAxis: {
+                xAxis: props.liteChart ? false : {
                     type: 'time',
                 },
-                yAxis: {
+                yAxis: props.liteChart ? false : {
                     label: {
                         formatter: (v: number) => `${v}`.replace(/\d{1,3}(?=(\d{3})+$)/g, (s) => `${s},`),
                     },
@@ -213,6 +217,7 @@ const chartEventsOptions = computed(() => {
         case 'pie':
             return {
                 data: dataTable.value.pieChart,
+                height: props.heightChart ?? 350,
                 component: ChartPie,
                 appendPadding: 10,
                 angleField: 'value',
@@ -223,16 +228,21 @@ const chartEventsOptions = computed(() => {
                     content: '{name} {percentage}',
                 },
                 interactions: [{ type: 'pie-legend-active' }, { type: 'element-active' }],
+                xAxis: props.liteChart ? false : {},
+                yAxis: props.liteChart ? false : {}
             };
         case 'column':
             return {
                 data: dataTable.value.pieChart,
+                height: props.heightChart ?? 350,
                 component: ChartColumn,
                 xField: 'type',
                 yField: 'value',
                 seriesField: 'type',
                 intervalPadding: 15,
                 maxColumnWidth: 45,
+                xAxis: props.liteChart ? false : {},
+                yAxis: props.liteChart ? false : {}
             };
         default:
             return {};
@@ -259,7 +269,7 @@ const chartTypeItems = computed(() => {
             key: `${item.value}-${i}`,
             iconAfter: item.icon,
             nameDisplay: '',
-            selected: eventsStore.chartType === item.value,
+            selected: chartTypeActive.value === item.value,
             value: item.value,
         }
     })

@@ -53,7 +53,7 @@ import {
     EventFilterByPropertyPropertyTypeEnum,
 } from '@/api'
 
-import { useEventsStore, Event, EventQuery, EventBreakdown } from '@/stores/eventSegmentation/events'
+import { useEventsStore, Event, EventQuery, EventBreakdown, ChartType } from '@/stores/eventSegmentation/events'
 import { AggregateId } from '@/types/aggregate'
 import { Step } from '@/types/steps'
 import { EventRef, EventQueryRef, Condition, PropertyRef as PropertyRefEvent, UserCustomProperty } from '@/types/events'
@@ -435,4 +435,5 @@ export const reportToStores = async (id: number) => {
     breakdownsStore.breakdowns = report?.breakdowns ? mapReportToBreakdowns(report.breakdowns) : []
     stepsStore.steps = report?.steps ? await mapReportToSteps(report.steps) : []
     stepsStore.holdingProperties = report?.holdingConstants ? mapReportToHoldingConstants(report.holdingConstants) : []
+    eventsStore.chartType = report?.chartType as ChartType
 }

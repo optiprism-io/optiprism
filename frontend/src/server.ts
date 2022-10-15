@@ -14,7 +14,7 @@ import eventMocks from '@/mocks/eventSegmentations/events.json';
 import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
 import customEventsMocks from '@/mocks/eventSegmentations/customEvents.json';
 import reportsMocks from '@/mocks/reports/reports.json'
-import dashboardsMocks from '@/mocks/dashboards.json'
+import dashboardsMocks from '@/mocks/dashboards'
 
 const alphabet = '0123456789';
 const nanoid = customAlphabet(alphabet, 4);
@@ -170,7 +170,6 @@ export default function ({ environment = 'development' } = {}) {
             this.get('/chart', (): any[] => {
                 return splineChartMocks;
             });
-
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports`, (schema) => {
                 return {

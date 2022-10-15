@@ -1,18 +1,22 @@
 <template>
     <div class="dashboard-panel">
         <EventsViews
+            class="dashboard-panel__views"
             :event-segmentation="eventSegmentation"
             :loading="loading"
+            :chart-type="reportChartType"
             :only-view="true"
-            @get-event-segmentation="getEventSegmentation"
+            :lite-chart="true"
+            :height-chart="240"
         />
     </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
-import { Report, EventChartType, ReportReportTypeEnum, DataTableResponse } from '@/api'
+import { ref, computed, onMounted } from 'vue'
+import { Report, EventChartType, DataTableResponse } from '@/api'
 import reportsService from '@/api/services/reports.service'
+import { ChartType } from '@/stores/eventSegmentation/events';
 import { useCommonStore } from '@/stores/common'
 
 import EventsViews from '@/components/events/EventsViews.vue';
@@ -25,6 +29,7 @@ const props = defineProps<{
 
 const loading = ref(false)
 const eventSegmentation = ref<DataTableResponse>()
+const reportChartType = computed(() => props.report?.report?.chartType as ChartType || 'line')
 
 const getEventSegmentation = async () => {
     loading.value = true
