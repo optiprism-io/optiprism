@@ -1,6 +1,7 @@
 <template>
     <div class="dashboard-panel">
         <EventsViews
+            v-if="reportType === ReportReportTypeEnum.EventSegmentation"
             class="dashboard-panel__views"
             :event-segmentation="eventSegmentation"
             :loading="loading"
@@ -9,17 +10,27 @@
             :lite-chart="true"
             :height-chart="240"
         />
+        <FunnelsChart
+            v-else
+            :lite-chart="true"
+            :reports="funnelsReport"
+            :steps="steps"
+        />
     </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
-import { Report, EventChartType, DataTableResponse } from '@/api'
+import { Report, EventChartType, DataTableResponse, ReportReportTypeEnum, DataTableResponseColumnsInner } from '@/api'
 import reportsService from '@/api/services/reports.service'
 import { ChartType } from '@/stores/eventSegmentation/events';
 import { useCommonStore } from '@/stores/common'
+import dataService from '@/api/services/datas.service'
+import { Step } from '@/types/steps'
+import { mapReportToSteps } from '@/utils/reportsMappings'
 
 import EventsViews from '@/components/events/EventsViews.vue';
+import FunnelsChart from '@/components/funnels/view/FunnelsChart.vue';
 
 const commonStore = useCommonStore()
 
@@ -29,7 +40,10 @@ const props = defineProps<{
 
 const loading = ref(false)
 const eventSegmentation = ref<DataTableResponse>()
-const reportChartType = computed(() => props.report?.report?.chartType as ChartType || 'line')
+const funnelsReport = ref<DataTableResponseColumnsInner[]>()
+const steps = ref<Step[]>()
+const reportChartType = computed(() => props.report?.report?.chartType as ChartType ?? 'line')
+const reportType = computed(() => props.report?.report?.type ?? 'eventSegmentation')
 
 const getEventSegmentation = async () => {
     loading.value = true
@@ -50,8 +64,32 @@ const getEventSegmentation = async () => {
     loading.value = false
 }
 
-onMounted(() => {
-    getEventSegmentation()
+const getFunnelsReport = async () => {
+    loading.value = true
+    if (props.report?.report) {
+        try {
+            const res = await dataService.funnelQuery(commonStore.organizationId, commonStore.projectId, props.report.report)
+
+            if (res?.data?.columns) {
+                funnelsReport.value = res.data.columns as DataTableResponseColumnsInner[]
+            }
+        } catch (e) {
+            console.log(e);
+        }
+    }
+    loading.value = false
+}
+
+onMounted(async () => {
+    if (reportType.value === ReportReportTypeEnum.EventSegmentation) {
+        getEventSegmentation()
+    } else {
+        getFunnelsReport()
+
+        if (props.report?.report?.steps) {
+            steps.value = await mapReportToSteps(props.report?.report?.steps)
+        }
+    }
 })
 </script>
 

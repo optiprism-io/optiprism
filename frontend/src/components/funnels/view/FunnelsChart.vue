@@ -1,7 +1,7 @@
 <template>
     <div class="pf-l-flex pf-u-justify-content-center pf-u-flex-nowrap">
         <div
-            v-for="(item, i) in funnelsStore.dimensions"
+            v-for="(item, i) in dimensions"
             :key="i"
             class="pf-l-flex pf-l-flex__item pf-m-align-items-center"
         >
@@ -41,7 +41,9 @@ import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import FunnelChartStacked from '@/components/funnels/view/FunnelChartStacked.vue';
 import {useStepsStore} from '@/stores/funnels/steps';
 import {useEventName} from '@/helpers/useEventName';
-import {useFunnelsStore} from '@/stores/funnels/funnels';
+import { useFunnelsStore, convertColumns } from '@/stores/funnels/funnels'
+import { DataTableResponseColumnsInner } from '@/api'
+import { Step } from '@/types/steps'
 
 const container = ref<HTMLDivElement | null>(null)
 const containerWidth = ref(0)
@@ -50,9 +52,62 @@ const funnelsStore = useFunnelsStore();
 const eventName = useEventName()
 const stepsStore = useStepsStore()
 
+type Props = {
+    liteChart?: boolean
+    reports?: DataTableResponseColumnsInner[]
+    steps?: Step[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    liteChart: false,
+})
+
+const reports = computed(() => props.reports ?? funnelsStore.reports)
+
+const stepNumbers = computed((): number[] => {
+    const metricValueColumns = reports.value.filter(col => col.type === 'funnelMetricValue')
+    const stepNumbers = metricValueColumns.map(col => col.step) as number[]
+    return [...new Set(stepNumbers)]
+})
+
+const dimensions = computed((): string[] => {
+    const result: string[] = []
+    const columns = reports.value.filter(col => col.type === 'dimension')
+
+    for (let i = 0; i < (columns[0]?.values?.length ?? 0); i++) {
+        const row: string[] = []
+        columns.forEach(item => {
+            row.push(`${item.values?.[i] ?? ''}`)
+        })
+        result.push(row.join(' / '))
+    }
+
+    return result
+})
+
+const conversionCount = computed((): number[][] => {
+    const columns = reports.value.filter(col => col.name === 'conversionCount')
+    return convertColumns(columns, stepNumbers.value)
+})
+
+const conversionRatio = computed((): number[][] => {
+    const columns = reports.value.filter(col => col.name === 'conversionRatio')
+    return convertColumns(columns, stepNumbers.value)
+})
+
+const dropOffCount = computed((): number[][] => {
+    const columns = reports.value.filter(col => col.name === 'dropOffCount')
+    return convertColumns(columns, stepNumbers.value)
+})
+
+const dropOffRatio = computed((): number[][] => {
+    const columns = reports.value.filter(col => col.name === 'dropOffRatio')
+    return convertColumns(columns, stepNumbers.value)
+})
+
 const colors = ['#ee5253', '#2e86de', '#ff9f43', '#5f27cd', '#10ac84', '#f368e0', '#0abde3']
 const barsColors = computed(() => {
-    return colors.slice(0, funnelsStore.dimensions.length)
+    return colors.slice(0, dimensions.value.length)
 })
 
 const stepWidth = computed(() => {
@@ -61,26 +116,28 @@ const stepWidth = computed(() => {
 
 const stepIterator = computed(() => {
     return Array.from({
-        length: Math.min(stepNames.value.length, funnelsStore.stepNumbers.length)
+        length: Math.min(stepNames.value.length, stepNumbers.value.length)
     })
 })
 
+const steps = computed(() => props.steps ?? stepsStore.steps)
+
 const stepNames = computed<string[]>(() => {
-    const events = stepsStore.steps.map(step => step.events.map(event => event.event))
+    const events = steps.value.map(step => step.events.map(event => event.event))
     return events.map(items => {
         return items.map(eventName).join(' or ')
     })
 })
 
 const data = computed(() => {
-    return Array.from({ length: funnelsStore.stepNumbers.length }).map((_, i) => {
-        return Array.from({length: funnelsStore.dimensions.length}).map((_, j) => {
+    return Array.from({ length: stepNumbers.value.length }).map((_, i) => {
+        return Array.from({ length: dimensions.value.length }).map((_, j) => {
             return {
-                dimension: funnelsStore.dimensions[j],
-                conversionCount: funnelsStore.conversionCount[i]?.[j] ?? 0,
-                conversionRatio: funnelsStore.conversionRatio[i]?.[j] ?? 0,
-                dropOffCount: funnelsStore.dropOffCount[i]?.[j] ?? 0,
-                dropOffRatio: funnelsStore.dropOffRatio[i]?.[j] ?? 0,
+                dimension: dimensions.value[j],
+                conversionCount: conversionCount.value[i]?.[j] ?? 0,
+                conversionRatio: conversionRatio.value[i]?.[j] ?? 0,
+                dropOffCount: dropOffCount.value[i]?.[j] ?? 0,
+                dropOffRatio: dropOffRatio.value[i]?.[j] ?? 0,
             }
         })
     })

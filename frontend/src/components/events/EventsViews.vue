@@ -205,10 +205,10 @@ const chartEventsOptions = computed(() => {
                 xField: 'date',
                 yField: 'value',
                 seriesField: 'category',
-                xAxis: props.liteChart ? false : {
+                xAxis: {
                     type: 'time',
                 },
-                yAxis: props.liteChart ? false : {
+                yAxis: {
                     label: {
                         formatter: (v: number) => `${v}`.replace(/\d{1,3}(?=(\d{3})+$)/g, (s) => `${s},`),
                     },
@@ -228,8 +228,6 @@ const chartEventsOptions = computed(() => {
                     content: '{name} {percentage}',
                 },
                 interactions: [{ type: 'pie-legend-active' }, { type: 'element-active' }],
-                xAxis: props.liteChart ? false : {},
-                yAxis: props.liteChart ? false : {}
             };
         case 'column':
             return {
@@ -241,8 +239,6 @@ const chartEventsOptions = computed(() => {
                 seriesField: 'type',
                 intervalPadding: 15,
                 maxColumnWidth: 45,
-                xAxis: props.liteChart ? false : {},
-                yAxis: props.liteChart ? false : {}
             };
         default:
             return {};

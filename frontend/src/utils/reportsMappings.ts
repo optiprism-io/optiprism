@@ -347,7 +347,7 @@ const mapReportToBreakdowns = (items: BreakdownByProperty[]): EventBreakdown[] =
     })
 }
 
-const mapReportToSteps = async (items: FunnelQueryStepsInner[]): Promise<Step[]> => {
+export const mapReportToSteps = async (items: FunnelQueryStepsInner[]): Promise<Step[]> => {
     return await Promise.all(items.map(async (item): Promise<Step> => {
         return {
             events: item.events ? await Promise.all(item.events.map(async (event) => {

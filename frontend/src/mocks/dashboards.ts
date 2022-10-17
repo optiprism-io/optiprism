@@ -16,8 +16,8 @@ export default [
                     {
                         'span': '6',
                         'type': 'report',
-                        'reportId': '1',
-                        'report': reportsMocks[1]
+                        'reportId': '8747',
+                        'report': reportsMocks[5]
                     }
                 ]
             },

@@ -49,6 +49,7 @@ import { Dashboard, ReportReportTypeEnum } from '@/api'
 import { pagesMap } from '@/router'
 
 import { useCommonStore } from '@/stores/common'
+import { useLexiconStore } from '@/stores/lexicon'
 import usei18n from '@/hooks/useI18n'
 
 import UiSelect from '@/components/uikit/UiSelect.vue'
@@ -59,6 +60,7 @@ import DashboardPanel from '@/components/dashboards/DashboardPanel.vue'
 
 const { t } = usei18n()
 const commonStore = useCommonStore()
+const lexiconStore = useLexiconStore()
 
 const dashboards = ref<Dashboard[]>([])
 const activeDashboardId = ref<number | null>(null)
@@ -88,6 +90,9 @@ const onSelectDashboard = (id: number | string) => {
 }
 
 onMounted(async() => {
+    lexiconStore.getEvents()
+    lexiconStore.getEventProperties()
+    lexiconStore.getUserProperties()
     const res = await dashboardService.dashboardsList(commonStore.organizationId, commonStore.organizationId)
 
     if (res?.data?.dashboards) {
