@@ -73,11 +73,11 @@ async fn delete(
 pub fn attach_routes(router: Router, events: Arc<custom_events::Provider>) -> Router {
     router
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/schema/custom-events",
+            "/organizations/:organization_id/projects/:project_id/schema/custom-events",
             routing::post(create).get(list),
         )
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/schema/custom-events/:event_id",
+            "/organizations/:organization_id/projects/:project_id/schema/custom-events/:event_id",
             routing::get(get_by_id).delete(delete).put(update),
         )
         .layer(Extension(events))

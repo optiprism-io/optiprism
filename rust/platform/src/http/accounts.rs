@@ -54,9 +54,9 @@ pub fn attach_routes(
     md_accounts: Arc<metadata::accounts::Provider>,
 ) -> Router {
     router
-        .route("/v1/accounts", routing::post(create).get(list))
+        .route("/accounts", routing::post(create).get(list))
         .route(
-            "/v1/accounts/:id",
+            "/accounts/:id",
             routing::get(get_by_id).delete(delete).put(update),
         )
         .layer(Extension(md_accounts))

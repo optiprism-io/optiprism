@@ -78,7 +78,7 @@ pub fn attach_user_routes(router: Router, prop: Arc<properties::Provider>) -> Ro
 }
 
 pub fn attach_event_routes(router: Router, prop: Arc<properties::Provider>) -> Router {
-    let path = "/v1/organizations/:organization_id/projects/:project_id/schema/event_properties";
+    let path = "/organizations/:organization_id/projects/:project_id/schema/event_properties";
     router
         .route(path, routing::get(list))
         .route(

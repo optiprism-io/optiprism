@@ -39,11 +39,11 @@ async fn property_values(
 pub fn attach_routes(router: Router, prov: Arc<QueryProvider>) -> Router {
     router
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/queries/event-segmentation",
+            "/organizations/:organization_id/projects/:project_id/queries/event-segmentation",
             routing::post(event_segmentation),
         )
         .route(
-            "/v1/organizations/:organization_id/projects/:project_id/queries/property-values",
+            "/organizations/:organization_id/projects/:project_id/queries/property-values",
             routing::post(property_values),
         )
         .layer(Extension(prov))

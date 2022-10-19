@@ -14,6 +14,7 @@ use axum_extra::routing::SpaRouter;
 use log::info;
 use metadata::MetadataProvider;
 use std::convert::Infallible;
+use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -36,7 +37,6 @@ impl UiPath {
     pub fn new(path: PathBuf) -> Self {
         Self { path }
     }
-    pub fn root(self) -> PathBuf {}
 }
 
 impl Service {
@@ -46,6 +46,13 @@ impl Service {
         addr: SocketAddr,
         ui_path: Option<PathBuf>,
     ) -> Self {
+        let error_handler = |error: io::Error| async move {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Unhandled internal error: {}", error),
+            )
+        };
+
         let mut router = Router::new();
 
         info!("attaching api routes...");
@@ -56,14 +63,22 @@ impl Service {
         router = properties::attach_event_routes(router, platform.event_properties.clone());
         router = properties::attach_user_routes(router, platform.user_properties.clone());
         router = queries::attach_routes(router, platform.query.clone());
+        router = router.clone().nest("/api/v1", router);
 
         match ui_path {
             None => {}
             Some(path) => {
                 info!("attaching ui static files handler...");
-                let root = SpaRouter::new("/", path.join("index.html"));
-                let assets = SpaRouter::new("/public", path.join("public"));
-                router = router.merge(assets);
+                let index = get_service(ServeFile::new(path.join("index.html")))
+                    .handle_error(error_handler);
+                let favicon = get_service(ServeFile::new(path.join("favicon.ico")))
+                    .handle_error(error_handler);
+                let assets =
+                    get_service(ServeDir::new(path.join("assets"))).handle_error(error_handler);
+                // TODO resolve actual routes and distinguish them from 404s
+                router = router.fallback(index);
+                router = router.route("/favicon.ico", favicon);
+                router = router.nest("/assets", assets);
             }
         }
 

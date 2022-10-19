@@ -106,26 +106,23 @@ async fn detach_property(
 }
 
 pub fn attach_routes(router: Router, events: Arc<EventsProvider>) -> Router {
-    router
-        .route(
-            "/v1/organizations/:organization_id/projects/:project_id/schema/events",
-            routing::post(create).get(list),
-        )
-        .route(
-            "/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id",
-            routing::get(get_by_id).delete(delete).put(update),
-        )
-        .route(
-            "/v1/organizations/:organization_id/projects/:project_id/schema/events/name/:event_name",
-            routing::get(get_by_name),
-        )
-        .route(
-            "/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id/properties/:property_id",
-            routing::post(attach_property),
-        )
-        .route(
-            "/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id/properties/:property_id",
-            routing::delete(detach_property),
-        )
-        .layer(Extension(events))
+    router.clone().nest(
+        "/organizations/:organization_id/projects/:project_id/schema/events",
+        router
+            .route("/", routing::post(create).get(list))
+            .route(
+                "/:event_id",
+                routing::get(get_by_id).delete(delete).put(update),
+            )
+            .route("/name/:event_name", routing::get(get_by_name))
+            .route(
+                "/:event_id/properties/:property_id",
+                routing::post(attach_property),
+            )
+            .route(
+                "/:event_id/properties/:property_id",
+                routing::delete(detach_property),
+            )
+            .layer(Extension(events)),
+    )
 }
