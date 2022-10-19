@@ -1,9 +1,11 @@
-use crate::error::Result;
+use crate::error::{Error, Result};
 use chrono::{DateTime, Duration, Utc};
 use clap::{Parser, Subcommand};
 use dateparser::DateTimeUtc;
 use log::info;
+use std::borrow::BorrowMut;
 use std::env::temp_dir;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -24,13 +26,17 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     Demo {
-        #[arg(default_value = "127.0.0.1:25535")]
-        host: String,
-        md_path: Option<String>,
-        #[arg(default_value = "365 days")]
+        #[arg(long, default_value = "127.0.0.1:25535")]
+        host: SocketAddr,
+        #[arg(long)]
+        md_path: Option<PathBuf>,
+        #[arg(long, default_value = ".")]
+        ui_path: PathBuf,
+        #[arg(long, default_value = "365 days")]
         duration: Option<String>,
+        #[arg(long)]
         to_date: Option<String>,
-        #[arg(default_value = "100")]
+        #[arg(long, default_value = "100")]
         new_daily_users: usize,
     },
 }
@@ -43,6 +49,7 @@ async fn main() -> Result<()> {
         Cmd::Demo {
             host,
             md_path,
+            ui_path,
             duration,
             to_date,
             new_daily_users,
@@ -56,12 +63,24 @@ async fn main() -> Result<()> {
             let from_date = to_date - duration;
             let md_path = match md_path {
                 None => temp_dir().join(format!("{}.db", Uuid::new_v4())),
-                Some(v) => PathBuf::from(v),
+                Some(path) => {
+                    if !path.is_file() {
+                        return Err(Error::Internal("md path should point to file".to_string()));
+                    }
+
+                    let mut check = path.clone();
+                    check.pop();
+                    check.try_exists()?;
+                    path
+                }
             };
 
+            ui_path.try_exists()?;
+
             let cfg = demo::Config {
-                host: host.parse()?,
+                host,
                 md_path,
+                ui_path,
                 from_date,
                 to_date,
                 new_daily_users,

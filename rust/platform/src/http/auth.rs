@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use time::OffsetDateTime;
 
-use axum_debug::debug_handler;
 use tower_cookies::{Cookie, Cookies};
 
 pub const COOKIE_NAME_REFRESH_TOKEN: &str = "refresh_token";

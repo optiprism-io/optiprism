@@ -16,7 +16,7 @@ platform = { path = "../platform" }
 axum = { version = "0.5.16", features = ["headers"] }
 tokio = { version = "1.15.0", features = ["full"] }
 tower = { version = "0.4.11", features = ["util"] }
-tower-http = { version = "0.2.0", features = ["add-extension"] }
+tower-http = { version = "0.3.4", features = ["add-extension"] }
 num_cpus = "1.13.1"
 chrono = { version = "0.4.19" }
 log = "0.4.17"

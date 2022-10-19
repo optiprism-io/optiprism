@@ -1,4 +1,3 @@
-#build
 FROM node:lts-alpine3.16 as builder
 WORKDIR /app
 COPY ui/src src/
@@ -11,7 +10,6 @@ COPY ui/public public/
 RUN yarn install
 RUN yarn build
 
-#webserver
 FROM nginx:stable-alpine AS runtime
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY docker/ui/nginx.conf /etc/nginx/conf.d/default.conf

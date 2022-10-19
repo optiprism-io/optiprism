@@ -1,6 +1,7 @@
 extern crate bytesize;
 extern crate log;
 
+use axum::Router;
 use std::env::temp_dir;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -21,6 +22,7 @@ use rust_embed::RustEmbed;
 pub struct Config {
     pub host: SocketAddr,
     pub md_path: PathBuf,
+    pub ui_path: PathBuf,
     pub from_date: DateTime<Utc>,
     pub to_date: DateTime<Utc>,
     pub new_daily_users: usize,
@@ -30,19 +32,20 @@ pub async fn run(cfg: Config) -> Result<()> {
     let store = Arc::new(Store::new(cfg.md_path.clone()));
     let md = Arc::new(MetadataProvider::try_new(store)?);
 
-    info!("starting demo");
-    info!("metadata data path: {:?}", cfg.md_path);
-    info!("from date {}", cfg.from_date);
+    info!("starting demo instance...");
+    debug!("metadata path: {:?}", cfg.md_path);
+    debug!("ui path: {:?}", cfg.ui_path);
+    debug!("from date {}", cfg.from_date);
     let date_diff = cfg.to_date - cfg.from_date;
-    info!("to date {}", cfg.to_date);
-    info!(
+    debug!("to date {}", cfg.to_date);
+    debug!(
         "time range: {}",
         humantime::format_duration(date_diff.to_std()?)
     );
-    info!("new daily users: {}", cfg.new_daily_users);
+    debug!("new daily users: {}", cfg.new_daily_users);
     let total_users = cfg.new_daily_users as i64 * date_diff.num_days();
     info!("expecting total unique users: {total_users}");
-    info!("starting sample data generation");
+    info!("starting sample data generation...");
 
     let batches = {
         let sample_data_path = PathBuf::from(format!("{}/demo_data", env!("CARGO_MANIFEST_DIR")));
@@ -66,7 +69,7 @@ pub async fn run(cfg: Config) -> Result<()> {
         crate::store::gen(store_cfg).await?
     };
 
-    info!("successfully generated");
+    info!("successfully generated!");
     let mut rows: usize = 0;
     let mut data_size_bytes: usize = 0;
     for partition in batches.iter() {
@@ -77,13 +80,13 @@ pub async fn run(cfg: Config) -> Result<()> {
             }
         }
     }
-    info!(
-        "partitions: {}, batches: {}, rows: {rows}",
+    debug!(
+        "partitions: {}, batches: {}",
         batches.len(),
         batches[0].len()
     );
-    info!("average {} event(s) per 1 user", rows as i64 / total_users);
-    info!(
+    debug!("average {} event(s) per 1 user", rows as i64 / total_users);
+    debug!(
         "uncompressed dataset in-memory size: {}",
         ByteSize::b(data_size_bytes as u64)
     );
@@ -105,8 +108,10 @@ pub async fn run(cfg: Config) -> Result<()> {
         Duration::days(1),
         "key".to_string(),
     ));
-    let svc = platform::http::Service::new(&md, &pp, cfg.host.clone());
+
+    let svc = platform::http::Service::new(&md, &pp, cfg.host.clone(), Some(cfg.ui_path));
     info!("start listening on {}", cfg.host);
+    info!("http ui http://{}", cfg.host);
     svc.serve().await?;
     Ok(())
 }
