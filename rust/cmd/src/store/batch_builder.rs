@@ -1,5 +1,4 @@
 use crate::error::Result;
-use crate::profiles::Profile;
 use crate::store::events::Event;
 use crate::store::scenario::State;
 use arrow::array::{
@@ -8,6 +7,7 @@ use arrow::array::{
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+use events_gen::profiles::Profile;
 use rust_decimal::Decimal;
 use std::sync::Arc;
 

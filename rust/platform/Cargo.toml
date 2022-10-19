@@ -28,7 +28,7 @@ jsonwebtoken = "8.1.1"
 rand = "0.8.4"
 argon2 = "0.4.1"
 url = "2.2.2"
-anyhow = "1.0"
+anyhow = "1.0.65"
 datafusion = "11.0.0"
 datafusion-common = "11.0.0"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }

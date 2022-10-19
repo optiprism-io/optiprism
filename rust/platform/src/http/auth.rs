@@ -34,7 +34,6 @@ fn set_refresh_token_cookie(cookies: &Cookies, refresh_token: &str, expires: Off
     cookies.add(cookie);
 }
 
-#[debug_handler]
 async fn sign_up(
     cookies: Cookies,
     Extension(provider): Extension<Arc<AuthProvider>>,

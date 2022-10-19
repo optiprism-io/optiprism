@@ -1,14 +1,14 @@
-use crate::error::Result;
-use crate::store::events::Event;
 use arrow::datatypes::{DataType, Schema, TimeUnit};
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
 use enum_iterator::all;
+use events_gen::error::Result;
 use metadata::database::{Column, Table, TableRef};
 use metadata::events::Event as MDEvent;
 use metadata::properties::provider::Namespace;
 use metadata::properties::{CreatePropertyRequest, Property};
 use metadata::{events, properties, MetadataProvider};
 
+use crate::store::events::Event;
 use metadata::error::DatabaseError;
 use std::sync::Arc;
 

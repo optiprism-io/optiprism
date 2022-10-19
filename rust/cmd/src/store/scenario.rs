@@ -10,8 +10,14 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 
-use crate::generator::Generator;
+use events_gen::generator::Generator;
 use std::thread;
+
+use common::DECIMAL_SCALE;
+use crossbeam_channel::tick;
+use log::info;
+
+use rand::prelude::*;
 
 use crate::store::actions::Action;
 use crate::store::batch_builder::RecordBatchBuilder;
@@ -20,12 +26,6 @@ use crate::store::events::Event;
 use crate::store::intention::{select_intention, Intention};
 use crate::store::products::{Product, ProductProvider};
 use crate::store::transitions::make_transitions;
-use common::DECIMAL_SCALE;
-use crossbeam_channel::tick;
-use log::info;
-
-use rand::prelude::*;
-
 use rust_decimal::Decimal;
 
 pub struct State<'a> {
@@ -100,13 +100,13 @@ impl Scenario {
         thread::spawn(move || {
             let ticker = tick(StdDuration::from_secs(1));
             for _ in ticker {
-                if is_ended_cloned.load(Ordering::Relaxed) {
+                if is_ended_cloned.load(Ordering::SeqCst) {
                     break;
                 }
                 let ups = users_per_sec_clone.swap(0, Ordering::SeqCst);
                 let eps = events_per_sec_clone.swap(0, Ordering::SeqCst);
-                println!("users per second: {ups}");
-                println!("events per second: {eps}");
+                // println!("users per second: {ups}");
+                // println!("events per second: {eps}");
             }
         });
 
@@ -314,7 +314,7 @@ impl Scenario {
 
         is_ended.store(true, Ordering::Relaxed);
 
-        info!("overall events: {overall_events}");
+        info!("total events: {overall_events}");
 
         // flush the rest
         for (idx, builder) in batch_builders.iter_mut().enumerate() {

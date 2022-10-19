@@ -6,6 +6,7 @@ use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use serde::Deserialize;
+use std::io;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -54,18 +55,18 @@ pub struct ProfileProvider {
 }
 
 impl ProfileProvider {
-    pub fn try_new_from_csv<P: AsRef<Path>>(
+    pub fn try_new_from_csv<R: io::Read>(
         org_id: u64,
         proj_id: u64,
         dicts: &Arc<dictionaries::Provider>,
-        geo_path: P,
-        device_path: P,
+        geo_rdr: R,
+        device_rdr: R,
     ) -> Result<Self> {
         let mut geo_weights: Vec<i32> = Vec::with_capacity(1000);
         info!("loading geo");
         let geo = {
             let mut result = Vec::with_capacity(1000);
-            let mut rdr = csv::Reader::from_path(geo_path)?;
+            let mut rdr = csv::Reader::from_reader(geo_rdr);
             for res in rdr.deserialize() {
                 let rec: CSVGeo = res?;
 
@@ -107,7 +108,7 @@ impl ProfileProvider {
         let mut device_weights: Vec<i32> = Vec::with_capacity(1000);
         let device = {
             let mut result = Vec::with_capacity(1000);
-            let mut rdr = csv::Reader::from_path(device_path)?;
+            let mut rdr = csv::Reader::from_reader(device_rdr);
             for res in rdr.deserialize() {
                 let rec: CSVDevice = res?;
 

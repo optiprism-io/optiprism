@@ -1,4 +1,7 @@
+use arrow::error::ArrowError;
+use std::net::AddrParseError;
 use std::result;
+use time::OutOfRangeError;
 
 use datafusion::error::DataFusionError;
 use thiserror::Error;
@@ -15,6 +18,12 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum Error {
     #[error("PlatformError: {0:?}")]
     Platform(#[from] PlatformError),
+    #[error("Internal")]
+    Internal(String),
+    #[error("IP Address Parse Error: {0:?}")]
+    AddrParseError(#[from] AddrParseError),
+    #[error("StdIO: {0:?}")]
+    StdIO(#[from] std::io::Error),
     #[error("QueryError: {0:?}")]
     Query(#[from] QueryError),
     #[error("CommonError: {0:?}")]
@@ -25,4 +34,14 @@ pub enum Error {
     EventsGen(#[from] EventsGenError),
     #[error("DataFusionError: {0:?}")]
     DataFusion(#[from] DataFusionError),
+    #[error("ArrowError: {0:?}")]
+    ArrowError(#[from] ArrowError),
+    #[error("CSVError: {0:?}")]
+    CSVError(#[from] csv::Error),
+    #[error("ParseDuration: {0:?}")]
+    ParseDuration(#[from] parse_duration::parse::Error),
+    #[error("other: {0:?}")]
+    Other(#[from] anyhow::Error),
+    #[error("TimeDurationOutOfRange: {0:?}")]
+    TimeDurationOutOfRange(#[from] OutOfRangeError),
 }

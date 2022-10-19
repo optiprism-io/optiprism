@@ -27,7 +27,9 @@ crossbeam-channel = "0.3.9"
 arrow = { version = "20.0.0", features = ["prettyprint"] }
 metadata = { path = "../metadata" }
 tokio = { version = "1.15.0", features = ["full"] }
-enum-iterator = "1.2.0"
+
 futures = "0.3.21"
 log = "0.4.17"
 thiserror = "1.0.31"
+
+indicatif = "0.17.1"

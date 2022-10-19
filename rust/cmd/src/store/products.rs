@@ -1,6 +1,6 @@
-use crate::error::{EventsGenError, Result};
-use crate::probability;
+use crate::error::{Error, Result};
 use common::DECIMAL_SCALE;
+use events_gen::probability;
 use futures::executor::block_on;
 use metadata::dictionaries;
 use rand::distributions::WeightedIndex;
@@ -11,6 +11,7 @@ use rand::seq::SliceRandom;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::collections::HashSet;
+use std::io;
 
 use std::path::Path;
 use std::sync::Arc;
@@ -65,15 +66,14 @@ pub struct ProductProvider {
 }
 
 impl ProductProvider {
-    pub async fn try_new_from_csv<P: AsRef<Path>>(
+    pub async fn try_new_from_csv<R: io::Read>(
         org_id: u64,
         proj_id: u64,
         rng: &mut ThreadRng,
         dicts: Arc<dictionaries::Provider>,
-        path: P,
+        rdr: R,
     ) -> Result<Self> {
-        let mut rdr = csv::Reader::from_path(path)?;
-
+        let mut rdr = csv::Reader::from_reader(rdr);
         let mut products = Vec::with_capacity(1000);
         for (id, res) in rdr.deserialize().into_iter().enumerate() {
             let mut rec: CSVProduct = res?;
@@ -157,7 +157,7 @@ impl ProductProvider {
             categories.len(),
             vec![1., 0.5, 0.3, 0.1],
         )?)
-        .map_err(|err| EventsGenError::Internal(err.to_string()))?;
+        .map_err(|err| Error::Internal(err.to_string()))?;
 
         // make rating weights from 0 to 5 with 10 bins for each int value
         let rating_weights = probability::calc_cubic_spline(50, vec![0.01, 0.01, 0.1, 0.7, 1.])?;

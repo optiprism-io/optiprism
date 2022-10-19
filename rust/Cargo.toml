@@ -5,6 +5,6 @@ members = [
     "query",
     "store",
     "platform",
-    "cmd",
     "events-gen",
+    "cmd",
 ]
