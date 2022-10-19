@@ -89,7 +89,7 @@ import {PropertyRef} from '@/types/events';
 import {useStepsStore} from '@/stores/funnels/steps';
 import { FilterCondition, filterConditions, FilterGroup, useFilterGroupsStore } from '@/stores/reports/filters'
 import {useFilter} from '@/hooks/useFilter';
-import {I18N} from '@/plugins/i18n';
+import {I18N} from '@/utils/i18n';
 
 const UiSelectMatch = UiSelectGeneric<FilterCondition>();
 

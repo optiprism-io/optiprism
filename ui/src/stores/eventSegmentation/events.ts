@@ -250,9 +250,26 @@ export const useEventsStore = defineStore('events', {
                         }).filter(item => item as EventQuerySegmentation),
                         eventType: item.ref.type as EventRecordsListRequestEventsInnerEventTypeEnum,
                         eventId: item.ref.id,
-                        filters: item.filters.map((filter): EventFilterByProperty => {
+                        filters: item.filters.filter(item => item.propRef).map((filter): EventFilterByProperty => {
+                            const propertyId = filter.propRef?.id || 0;
+                            let name = '';
+
+                            switch (filter.propRef?.type || 'event') {
+                                case PropertyType.Event:
+                                    name = lexiconStore.findEventPropertyById(propertyId).name
+                                    break;
+                                case PropertyType.Custom:
+                                    name = lexiconStore.findEventCustomPropertyById(propertyId)?.name || ''
+                                    break;
+                                case PropertyType.User:
+                                    name = lexiconStore.findUserPropertyById(propertyId).name
+                                    break;
+                            }
+
                             return {
                                 type: 'property',
+                                propertyName: name,
+                                propertyId,
                                 propertyType: filter.propRef?.type || 'event',
                                 operation: filter.opId,
                                 value: filter.values,

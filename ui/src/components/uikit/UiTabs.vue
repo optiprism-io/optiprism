@@ -38,6 +38,7 @@
                 </component>
             </li>
         </ul>
+        <slot name="afterTabs" />
     </div>
 </template>
 

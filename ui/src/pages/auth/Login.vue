@@ -73,10 +73,10 @@
                             <UiInput
                                 v-model="email"
                                 name="login-email"
-                                :invalid="Boolean(errorFields.email)"
+                                :invalid="Boolean(errorFields?.email)"
                             />
                             <p
-                                v-if="errorFields.email"
+                                v-if="errorFields?.email"
                                 class="login-form__field-info pf-c-form__helper-text pf-m-error"
                                 aria-live="polite"
                             >
@@ -86,7 +86,7 @@
                                         aria-hidden="true"
                                     />
                                 </span>
-                                {{ errorFields.email }}
+                                {{ errorFields?.email }}
                             </p>
                         </div>
                         <div class="pf-c-form__group pf-u-mb-md login-form__field">
@@ -108,10 +108,10 @@
                                 v-model="password"
                                 name="login-password"
                                 type="password"
-                                :invalid="Boolean(errorFields.password)"
+                                :invalid="Boolean(errorFields?.password)"
                             />
                             <p
-                                v-if="errorFields.password"
+                                v-if="errorFields?.password"
                                 class="login-form__field-info pf-c-form__helper-text pf-m-error"
                                 aria-live="polite"
                             >
@@ -121,7 +121,7 @@
                                         aria-hidden="true"
                                     />
                                 </span>
-                                {{ errorFields.password }}
+                                {{ errorFields?.password }}
                             </p>
                         </div>
                         <div class="pf-c-form__group">

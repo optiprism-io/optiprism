@@ -1,5 +1,7 @@
 import { createServer, Response } from 'miragejs'
-import { DataType, BasicLogin200Response } from '@/api'
+import { customAlphabet } from 'nanoid'
+
+import { DataType, TokensResponse } from '@/api'
 import { BASE_PATH } from '@/api/base'
 import { EventStatus, UserCustomProperty } from '@/types/events';
 import splineChartMocks from '@/mocks/splineChart.json';
@@ -10,7 +12,10 @@ import eventSegmentationsMocks from '@/mocks/eventSegmentations/eventSegmentatio
 import eventMocks from '@/mocks/eventSegmentations/events.json';
 import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
 import customEventsMocks from '@/mocks/eventSegmentations/customEvents.json';
+import reportsMocks from '@/mocks/reports/reports.json'
 
+const alphabet = '0123456789';
+const nanoid = customAlphabet(alphabet, 4);
 const accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
 const refreshToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Im5pa28ga3VzaCIsImlhdCI6MTUxNjIzOTAyMn0.FzpmXmStgiYEO15ZbwwPafVRQSOCO_xidYjrjRvVIbQ'
 const csrfToken = 'CIwNZNlR4XbisJF39I8yWnWX9wX4WFoz'
@@ -23,22 +28,22 @@ export default function ({ environment = 'development' } = {}) {
                 customEvents: customEventsMocks,
                 eventProperties: eventPropertiesMocks,
                 userProperties: userPropertiesMocks,
+                reports: reportsMocks,
             })
         },
 
         routes() {
             this.namespace = 'api'
-            this.timing = 110
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/events`, (schema) => {
                 return { events: schema.db.events }
-            });
+            }, { timing: 100 })
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id`, (schema, request) => {
                 const customEvent = JSON.parse(request.requestBody)
 
                 return schema.db.events.update(request.params.event_id, customEvent)
-            })
+            }, { timing: 160 })
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events`, (schema) => {
                 return schema.db.customEvents.map(item => ({...item, id: Number(item.id)}))
@@ -52,7 +57,7 @@ export default function ({ environment = 'development' } = {}) {
                 const customEvents = JSON.parse(request.requestBody)
 
                 return schema.db.customEvents.insert(customEvents)
-            })
+            }, { timing: 130 })
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events/:event_id`, (schema, request) => {
                 const customEvent = JSON.parse(request.requestBody)
@@ -80,12 +85,12 @@ export default function ({ environment = 'development' } = {}) {
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user_properties`, (schema) => {
                 return { events: schema.db.userProperties }
-            })
+            }, { timing: 140 })
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user_properties/:property_id`, (schema, request) => {
                 const property = JSON.parse(request.requestBody)
                 return schema.db.userProperties.update(request.params.property_id, property)
-            })
+            }, { timing: 200 })
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-properties`, () => {
                 return { events: [
@@ -163,6 +168,33 @@ export default function ({ environment = 'development' } = {}) {
                 return splineChartMocks;
             });
 
+
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports`, (schema) => {
+                return {
+                    dashboards: schema.db.reports,
+                    meta: {}
+                }
+            })
+
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports`, (schema, request) => {
+                const body = JSON.parse(request.requestBody);
+
+                return schema.db.reports.insert({
+                    id: nanoid(),
+                    ...body,
+                })
+            }, { timing: 1100 })
+
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
+                const body = JSON.parse(request.requestBody);
+                return schema.db.reports.update(request.params.report_id, body)
+            }, { timing: 1200 })
+
+            this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
+                schema.db.reports.remove(request.params.report_id)
+                return request.params.report_id;
+            })
+
             this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/reports/event-segmentation`, (_, request) => {
                 const body = JSON.parse(request.requestBody);
 
@@ -175,7 +207,7 @@ export default function ({ environment = 'development' } = {}) {
                 }
             });
 
-            this.post(`${BASE_PATH}/v1/auth/basic/login`, (_, request) => {
+            this.post(`${BASE_PATH}/v1/auth/login`, (_, request) => {
                 const property = JSON.parse(request.requestBody)
 
                 if (property.email.length <= 5 || property.password.length < 5) {
@@ -195,13 +227,13 @@ export default function ({ environment = 'development' } = {}) {
                 }
             })
 
-            this.post(`${BASE_PATH}/v1/auth/access`, (): BasicLogin200Response => {
+            this.post(`${BASE_PATH}/v1/auth/refresh-token`, (): TokensResponse => {
                 return {
                     accessToken,
                     refreshToken,
                     csrfToken,
                 }
-            })
+            }, { timing: 200 })
         }
     });
 }

@@ -14,7 +14,7 @@
 import {computed, inject, PropType, ref, watch} from 'vue';
 import {Chart, getEngine} from '@antv/g2';
 import {lighten} from '@/helpers/colorHelper';
-import {I18N} from '@/plugins/i18n';
+import {I18N} from '@/utils/i18n';
 
 const {$t} = inject('i18n') as I18N
 const G = getEngine('canvas')

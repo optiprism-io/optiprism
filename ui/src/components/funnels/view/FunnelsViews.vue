@@ -66,7 +66,7 @@ import {useFunnelsStore} from '@/stores/funnels/funnels';
 import {getStringDateByFormat} from '@/helpers/getStringDates';
 import {ApplyPayload} from '@/components/uikit/UiCalendar/UiCalendar';
 import FunnelsChart from '@/components/funnels/view/FunnelsChart.vue';
-import {I18N} from '@/plugins/i18n';
+import {I18N} from '@/utils/i18n';
 import {UiDropdownItem} from '@/components/uikit/UiDropdown.vue';
 import FunnelsTable from '@/components/funnels/view/FunnelsTable.vue';
 import {useStepsStore} from '@/stores/funnels/steps';

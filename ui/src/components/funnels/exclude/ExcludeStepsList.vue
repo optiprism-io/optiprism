@@ -90,7 +90,7 @@ import {ExcludedEventSteps, useStepsStore} from '@/stores/funnels/steps';
 import {EventRef, PropertyRef} from '@/types/events';
 import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
 import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
-import {I18N} from '@/plugins/i18n';
+import {I18N} from '@/utils/i18n';
 import UiActionList from '@/components/uikit/UiActionList/UiActionList.vue';
 import UiActionListItem from '@/components/uikit/UiActionList/UiActionListItem.vue';
 import {useEventName} from '@/helpers/useEventName';

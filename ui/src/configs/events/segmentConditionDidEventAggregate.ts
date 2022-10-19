@@ -1,12 +1,18 @@
+import {
+    DidEventCountTypeEnum,
+    DidEventRelativeCountTypeEnum,
+    DidEventAggregatePropertyTypeEnum,
+} from '@/api'
+
 export const aggregates = [
     {
-        key: 'count',
+        key: DidEventCountTypeEnum.DidEventCount,
     },
     {
-        key: 'relativeCount',
+        key: DidEventRelativeCountTypeEnum.DidEventRelativeCount,
     },
     {
-        key: 'aggregateProperty',
+        key: DidEventAggregatePropertyTypeEnum.AggregateProperty,
         hasProperty: true,
     },
     // {

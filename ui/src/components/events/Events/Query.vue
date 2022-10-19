@@ -113,7 +113,7 @@
                 class="pf-c-action-list__item queries__control-item"
                 @click="removeQuery"
             >
-                <VTooltip theme="ui-hint">
+                <VTooltip popper-class="ui-hint">
                     <UiIcon icon="fas fa-times" />
                     <template #popper>
                         Remove query

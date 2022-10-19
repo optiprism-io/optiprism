@@ -2,6 +2,18 @@ import {defineStore} from 'pinia';
 import {Step} from '@/types/steps';
 import {EventProperty, EventRef} from '@/types/events';
 import {EventFilter} from '@/stores/eventSegmentation/events';
+import {
+    FunnelQueryStepsInner,
+    FunnelEvent,
+    PropertyRef,
+    FunnelQueryExcludeInner,
+    EventFilterByProperty,
+    FunnelEventEventTypeEnum,
+    EventFilterByPropertyPropertyTypeEnum,
+} from '@/api'
+
+import { useEventName } from '@/helpers/useEventName'
+import { useLexiconStore } from '@/stores/lexicon'
 
 export const stepUnits = ['second', 'minute', 'hour', 'day', 'week', 'month', 'year'] as const;
 export type StepUnit = typeof stepUnits[number];
@@ -17,7 +29,11 @@ export type ExcludedEventSteps = {
     to: number;
 }
 
-export type HoldingProperty = Pick<EventProperty, 'id' | 'name'>;
+export type HoldingProperty = {
+    id: number,
+    name: string,
+    type: EventFilterByPropertyPropertyTypeEnum
+};
 
 interface ExcludedEvent {
     event: EventRef;
@@ -94,7 +110,69 @@ export const useStepsStore = defineStore('steps', {
         holdingProperties: [],
         propsAvailableToHold: [],
     }),
-    getters: {},
+    getters: {
+        getSteps(): FunnelQueryStepsInner[] {
+            const eventName = useEventName()
+            const lexiconStore = useLexiconStore()
+
+            return this.steps.map(item => {
+                const events = item.events.map(event => {
+                    return {
+                        eventType: event.event.type,
+                        eventId: event.event.id,
+                        eventName: eventName(event.event),
+                        filters: event.filters.map(filter => {
+                            let property
+                            if (filter.propRef) {
+                                property = lexiconStore.property(filter.propRef)
+                            }
+
+                            return {
+                                propertyName: property ? property.name : '',
+                                propertyId: property ? property.id : filter.propRef?.id ?? 0,
+                                propertyType: filter.propRef?.type ?? '',
+                                type: 'property',
+                                operation: filter.opId,
+                                value: filter.values
+                            }
+                        })
+                    }
+                }) as FunnelEvent[]
+
+                return {
+                    events,
+                    order: 'any',
+                }
+            })
+        },
+        getHoldingProperties(): PropertyRef[] {
+            return this.holdingProperties.map(item => {
+                return {
+                    propertyType: item.type as any,
+                    propertyId: item.id,
+                    propertyName: item.name
+                }
+            })
+        },
+        getExcluded(): FunnelQueryExcludeInner[] {
+            const eventName = useEventName()
+
+            return this.excludedEvents.map(item => {
+                return {
+                    eventType: item.event.type as FunnelEventEventTypeEnum,
+                    eventName: eventName(item.event),
+                    filters: item.filters.map(filter => {
+                        return {
+                            propertyType: filter.propRef?.type ?? '',
+                            type: 'property',
+                            operation: filter.opId,
+                            value: filter.values
+                        }
+                    }) as EventFilterByProperty[],
+                }
+            })
+        },
+    },
     actions: {
         addStep(step: Step): void {
             this.steps.push(step);

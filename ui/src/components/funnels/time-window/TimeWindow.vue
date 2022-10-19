@@ -52,7 +52,7 @@
 <script setup lang="ts">
 import {StepOrder, stepOrders, StepUnit, stepUnits, useStepsStore} from '@/stores/funnels/steps';
 import {computed, inject, ref} from 'vue';
-import {I18N} from '@/plugins/i18n';
+import {I18N} from '@/utils/i18n';
 import {UiSelectItemInterface} from '@/components/uikit/UiSelect/types';
 import {UiSelectGeneric} from '@/components/uikit/UiSelect/UiSelectGeneric';
 

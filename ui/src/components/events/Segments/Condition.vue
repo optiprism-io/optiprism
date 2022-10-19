@@ -179,6 +179,7 @@
 import { inject, computed, ref, defineAsyncComponent } from 'vue'
 import { operationById, OperationId, Value } from '@/types'
 import { PropertyRef, Condition as ConditionType } from '@/types/events'
+import { DidEventRelativeCountTypeEnum } from '@/api'
 import {
     ChangeFilterPropertyCondition,
     RemoveFilterCondition,
@@ -306,7 +307,7 @@ const isShowSelectProp = computed(() => {
 
 const isShowSelectDate = computed(() => {
     if (isSelectedDidEvent.value) {
-        return Boolean(props.condition.valueItem)
+        return props.condition?.aggregate?.id === DidEventRelativeCountTypeEnum.DidEventRelativeCount || Boolean(props.condition.valueItem)
     } else {
         return conditionConfig.value && conditionConfig.value.hasSelectPeriod && props.condition.propRef && props.condition.values && props.condition.values.length
     }

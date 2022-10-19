@@ -68,12 +68,12 @@ const routes = [
                 component: () => import('@/pages/reports/Reports.vue'),
                 children: [
                     {
-                        path: '',
+                        path: ':id?',
                         name: pagesMap.reportsEventSegmentation.name,
                         component: () => import('@/pages/reports/EventSegmentation.vue'),
                     },
                     {
-                        path: 'funnels',
+                        path: 'funnels/:id?',
                         name: 'reports_funnels',
                         component: () => import('@/pages/reports/Funnels.vue'),
                     }

@@ -155,7 +155,10 @@ import Select from '@/components/Select/Select.vue'
 import PropertySelect from '@/components/events/PropertySelect.vue'
 import OperationSelect from '@/components/events/OperationSelect.vue'
 import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
-import { DataType } from '@/api'
+import {
+    DataType,
+    DidEventRelativeCountTypeEnum,
+} from '@/api'
 
 const lexiconStore = useLexiconStore()
 const { hoveredCustomEventDescription, hoveredCustomEventId, onHoverEvent } = useCustomEvent()
@@ -228,7 +231,7 @@ const changeCompareEvent = (ref: EventRef) => {
 }
 
 const isShowNextEventSelect = computed(() => {
-    return props.condition.aggregate?.id === 'relativeCount'
+    return props.condition.aggregate?.id === DidEventRelativeCountTypeEnum.DidEventRelativeCount
 })
 
 const compareEventItems = computed(() => {

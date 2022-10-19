@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import { BasicLoginRequest, BasicLogin200Response } from '@/api'
+import { BasicLoginRequest, TokensResponse } from '@/api'
 import { authService } from '@/api/services/auth.service'
 import { LocalStorageAccessor } from '@/utils/localStorageAccessor'
 import { getCookie, setCookie, removeCookie } from 'typescript-cookie'
@@ -54,7 +54,7 @@ export const useAuthStore = defineStore('auth', {
                 }
             }
         },
-        setToken(token: BasicLogin200Response, keepLogged?: boolean): void {
+        setToken(token: TokensResponse, keepLogged?: boolean): void {
             if (keepLogged && !getCookie(TOKEN_KEY)) {
                 setCookie(TOKEN_KEY, token?.accessToken ?? '', {
                     expires: EXPIRES_DAYS

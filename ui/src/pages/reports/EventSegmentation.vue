@@ -1,41 +1,37 @@
 <template>
-    <ToolsLayout>
-        <template #title>
-            <div class="pf-u-display-flex pf-u-justify-content-space-between pf-u-align-items-center">
-                <span>{{ $t('events.event_segmentation') }}</span>
-                <UiSwitch
-                    class="pf-u-ml-auto"
-                    :value="commonStore.syncReports"
-                    :label="$t('reports.sync')"
-                    @input="(value: boolean) => commonStore.syncReports = value"
-                />
-            </div>
+    <TemplateReport>
+        <template #content>
+            <GridContainer>
+                <GridItem :col-lg="6">
+                    <UiCard :title="$t('events.events')">
+                        <Events @get-event-segmentation="getEventSegmentation" />
+                    </UiCard>
+                </GridItem>
+                <GridItem :col-lg="6">
+                    <UiCard :title="$t('events.segments.label')">
+                        <Segments />
+                    </UiCard>
+                </GridItem>
+                <GridItem :col-lg="6">
+                    <UiCardContainer>
+                        <FilterReports />
+                    </UiCardContainer>
+                </GridItem>
+                <GridItem :col-lg="6">
+                    <UiCard :title="$t('events.breakdowns')">
+                        <Breakdowns />
+                    </UiCard>
+                </GridItem>
+            </GridContainer>
         </template>
-
-        <UiCard :title="$t('events.events')">
-            <Events @get-event-segmentation="getEventSegmentation" />
-        </UiCard>
-
-        <UiCard :title="$t('events.segments.label')">
-            <Segments />
-        </UiCard>
-
-        <UiCardContainer>
-            <FilterReports />
-        </UiCardContainer>
-
-        <UiCard :title="$t('events.breakdowns')">
-            <Breakdowns />
-        </UiCard>
-
-        <template #main>
+        <template #views>
             <EventsViews
                 :event-segmentation="eventSegmentation"
                 :loading="eventSegmentationLoading"
                 @get-event-segmentation="getEventSegmentation"
             />
         </template>
-    </ToolsLayout>
+    </TemplateReport>
 </template>
 
 <script setup lang="ts">
@@ -45,10 +41,11 @@ import Breakdowns from '@/components/events/Breakdowns.vue';
 import Segments from '@/components/events/Segments/Segments.vue';
 import EventsViews from '@/components/events/EventsViews.vue';
 import UiCard from '@/components/uikit/UiCard/UiCard.vue';
-import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
 import UiCardContainer from '@/components/uikit/UiCard/UiCardContainer.vue'
 import FilterReports from '@/components/events/FiltersReports.vue'
-import UiSwitch from '@/components/uikit/UiSwitch.vue'
+import TemplateReport from '@/components/events/TemplateReport.vue'
+import GridContainer from '@/components/grid/GridContainer.vue';
+import GridItem from '@/components/grid/GridItem.vue';
 import reportsService from '@/api/services/reports.service'
 import { DataTableResponse } from '@/api'
 import { eventsToFunnels } from '@/utils/reportsMappings'
@@ -85,6 +82,8 @@ const getEventSegmentation = async () => {
             eventSegmentation.value = res.data as DataTableResponse
         }
     } catch (error) {
+        console.log(error);
+
         throw new Error('error Get Event Segmentation')
     }
     eventSegmentationLoading.value = false

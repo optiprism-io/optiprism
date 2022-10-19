@@ -53,7 +53,8 @@ const editHoldingProperty = (index: number, property: PropertyRef) => {
             index,
             property: {
                 id,
-                name
+                name,
+                type: property.type,
             }
         })
     }

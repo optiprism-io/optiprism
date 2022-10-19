@@ -73,8 +73,14 @@
   },
 
   "reports": {
+    "untitledReport": "Untitled Report",
     "title": "Reports",
-    "sync": "Sync the query data between reports"
+    "sync": "Sync the query data between reports",
+    "save": "Save report",
+    "saved": "Report saved",
+    "selectReport": "Select Report",
+    "delete": "Delete report",
+    "deleteConfirm": "You definitely want to delete the report: :name?"
   },
 
   "events": {
@@ -172,7 +178,9 @@
       "count": "Count",
       "relativeCount": "Relative count",
       "aggregateProperty": "Aggregate property",
-      "historicalCount": "Historical count"
+      "historicalCount": "Historical count",
+      "didEventCount": "Count",
+      "didEventRelativeCount": "Relative count"
     },
     "aggregateProperty": {
       "sum": "Sum of property",
