@@ -29,7 +29,7 @@ async fn test_custom_events() -> Result<()> {
     let (base_url, md, pp) = run_http_service(false).await?;
     println!("{base_url}");
     let cl = Client::new();
-    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
+    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
     let event1 = md
         .events
@@ -93,7 +93,7 @@ async fn test_custom_events() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/custom-events"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events"
             ))
             .headers(admin_headers.clone())
             .send()
@@ -111,7 +111,7 @@ async fn test_custom_events() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
             ))
             .headers(admin_headers.clone())
             .send()
@@ -124,7 +124,7 @@ async fn test_custom_events() -> Result<()> {
     {
         let resp = cl
             .delete(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
             ))
             .headers(admin_headers.clone())
             .send()
@@ -147,7 +147,7 @@ async fn test_custom_events() -> Result<()> {
 
         let resp = cl
             .post(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/custom-events"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events"
             ))
             .body(body)
             .headers(admin_headers.clone())
@@ -191,7 +191,7 @@ async fn test_custom_events() -> Result<()> {
 
         let resp = cl
             .put(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
             ))
             .body(body)
             .headers(admin_headers.clone())
@@ -209,7 +209,7 @@ async fn test_custom_events() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
             ))
             .headers(admin_headers.clone())
             .send()
@@ -224,7 +224,7 @@ async fn test_custom_events() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/custom-events"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events"
             ))
             .headers(admin_headers.clone())
             .send()
@@ -241,7 +241,7 @@ async fn test_custom_events() -> Result<()> {
     {
         let resp = cl
             .delete(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
             ))
             .headers(admin_headers.clone())
             .send()
@@ -251,7 +251,7 @@ async fn test_custom_events() -> Result<()> {
 
         let resp = cl
             .delete(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/custom-events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
             ))
             .headers(admin_headers.clone())
             .send()

@@ -53,12 +53,12 @@ pub fn attach_routes(
     accounts: Arc<AccountsProvider>,
     md_accounts: Arc<metadata::accounts::Provider>,
 ) -> Router {
-    router
-        .route("/accounts", routing::post(create).get(list))
-        .route(
-            "/accounts/:id",
-            routing::get(get_by_id).delete(delete).put(update),
-        )
-        .layer(Extension(md_accounts))
-        .layer(Extension(accounts))
+    router.clone().nest(
+        "/accounts",
+        router
+            .route("/", routing::post(create).get(list))
+            .route("/:id", routing::get(get_by_id).delete(delete).put(update))
+            .layer(Extension(md_accounts))
+            .layer(Extension(accounts)),
+    )
 }

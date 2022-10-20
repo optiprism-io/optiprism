@@ -28,9 +28,7 @@ mod tests {
     use query::QueryProvider;
     use std::sync::atomic::{AtomicU16, Ordering};
 
-    lazy_static! {
-        static ref HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
-    }
+    static HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
 
     pub fn tmp_store() -> Arc<Store> {
         let mut path = temp_dir();
@@ -41,7 +39,6 @@ mod tests {
     pub async fn create_admin_acc_and_login(
         auth: &Arc<platform::auth::Provider>,
         md_acc: &Arc<metadata::accounts::Provider>,
-        _cl: &Client,
     ) -> anyhow::Result<HeaderMap> {
         let pwd = "password";
 
@@ -101,7 +98,7 @@ mod tests {
         ));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], HTTP_PORT.fetch_add(1, Ordering::SeqCst)));
-        let svc = platform::http::Service::new(&md, &pp, addr.clone());
+        let svc = platform::http::Service::new(&md, &pp, addr.clone(), None);
         svc.serve_test().await;
 
         let base_addr = format!("http://{:?}:{:?}", addr.ip(), addr.port());

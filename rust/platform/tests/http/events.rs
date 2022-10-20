@@ -27,7 +27,7 @@ fn assert(l: &Event, r: &Event) {
 async fn test_events() -> Result<()> {
     let (base_url, md, pp) = run_http_service(false).await?;
     let cl = Client::new();
-    let headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
+    let headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
     let mut event1 = Event {
         id: 1,
@@ -50,7 +50,7 @@ async fn test_events() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/events"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/events"
             ))
             .headers(headers.clone())
             .send()
@@ -68,7 +68,7 @@ async fn test_events() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
             ))
             .headers(headers.clone())
             .send()
@@ -81,7 +81,7 @@ async fn test_events() -> Result<()> {
     {
         let resp = cl
             .delete(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
             ))
             .headers(headers.clone())
             .send()
@@ -105,7 +105,7 @@ async fn test_events() -> Result<()> {
 
         let resp = cl
             .post(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/events"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/events"
             ))
             .body(body)
             .headers(headers.clone())
@@ -136,7 +136,7 @@ async fn test_events() -> Result<()> {
 
         let resp = cl
             .put(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
             ))
             .body(body)
             .headers(headers.clone())
@@ -153,7 +153,7 @@ async fn test_events() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
             ))
             .headers(headers.clone())
             .send()
@@ -168,7 +168,7 @@ async fn test_events() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/events"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/events"
             ))
             .headers(headers.clone())
             .send()
@@ -185,7 +185,7 @@ async fn test_events() -> Result<()> {
     {
         let resp = cl
             .delete(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
             ))
             .headers(headers.clone())
             .send()
@@ -195,7 +195,7 @@ async fn test_events() -> Result<()> {
 
         let resp = cl
             .delete(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/events/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
             ))
             .headers(headers.clone())
             .send()

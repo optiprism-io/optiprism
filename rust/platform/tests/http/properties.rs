@@ -30,7 +30,7 @@ fn assert(l: &Property, r: &Property) {
 async fn test_event_properties() -> Result<()> {
     let (base_url, md, pp) = run_http_service(false).await?;
     let cl = Client::new();
-    let headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
+    let headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
     let mut prop1 = Property {
         id: 1,
@@ -55,7 +55,7 @@ async fn test_event_properties() -> Result<()> {
     // list without props should be empty
     {
         cl.get(format!(
-            "{base_url}/v1/organizations/1/projects/1/schema/event_properties"
+            "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties"
         ))
         .headers(headers.clone())
         .send()
@@ -67,7 +67,7 @@ async fn test_event_properties() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
             ))
             .headers(headers.clone())
             .send()
@@ -80,7 +80,7 @@ async fn test_event_properties() -> Result<()> {
     {
         let resp = cl
             .delete(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
             ))
             .headers(headers.clone())
             .send()
@@ -132,7 +132,7 @@ async fn test_event_properties() -> Result<()> {
 
         let resp = cl
             .put(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
             ))
             .body(body)
             .headers(headers.clone())
@@ -149,7 +149,7 @@ async fn test_event_properties() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
             ))
             .headers(headers.clone())
             .send()
@@ -164,7 +164,7 @@ async fn test_event_properties() -> Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/event_properties"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties"
             ))
             .headers(headers.clone())
             .send()
@@ -181,7 +181,7 @@ async fn test_event_properties() -> Result<()> {
     {
         let resp = cl
             .delete(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
             ))
             .headers(headers.clone())
             .send()
@@ -191,7 +191,7 @@ async fn test_event_properties() -> Result<()> {
 
         let resp = cl
             .delete(format!(
-                "{base_url}/v1/organizations/1/projects/1/schema/event_properties/1"
+                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
             ))
             .headers(headers.clone())
             .send()

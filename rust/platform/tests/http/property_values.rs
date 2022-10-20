@@ -16,7 +16,7 @@ mod tests {
     async fn test_property_values() -> Result<()> {
         let (base_url, md, pp) = run_http_service(true).await?;
         let cl = Client::new();
-        let headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
+        let headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
         let req = PropertyValues {
             property: PropertyRef::Event {
@@ -35,7 +35,7 @@ mod tests {
 
         let resp = cl
             .post(format!(
-                "{base_url}/v1/organizations/1/projects/1/queries/property-values"
+                "{base_url}/api/v1/organizations/1/projects/1/queries/property-values"
             ))
             .body(body)
             .headers(headers.clone())

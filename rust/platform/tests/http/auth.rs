@@ -19,7 +19,7 @@ use crate::http::tests::{create_admin_acc_and_login, run_http_service};
 async fn test_auth() -> anyhow::Result<()> {
     let (base_addr, md, pp) = run_http_service(false).await?;
     let cl = Client::new();
-    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
+    let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -40,7 +40,7 @@ async fn test_auth() -> anyhow::Result<()> {
         let body = serde_json::to_string(&req)?;
 
         let resp = cl
-            .post(format!("{base_addr}/v1/auth/signup"))
+            .post(format!("{base_addr}/api/v1/auth/signup"))
             .body(body)
             .headers(admin_headers.clone())
             .send()
@@ -74,7 +74,7 @@ async fn test_auth() -> anyhow::Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_addr}/v1/organizations/1/projects/1/schema/events"
+                "{base_addr}/api/v1/organizations/1/projects/1/schema/events"
             ))
             .headers(headers.clone())
             .send()
@@ -93,7 +93,7 @@ async fn test_auth() -> anyhow::Result<()> {
 
         let resp = cl
             .get(format!(
-                "{base_addr}/v1/organizations/1/projects/1/schema/events"
+                "{base_addr}/api/v1/organizations/1/projects/1/schema/events"
             ))
             .headers(jwt_headers.clone())
             .send()
@@ -110,7 +110,7 @@ async fn test_auth() -> anyhow::Result<()> {
 
         let body = serde_json::to_string(&req)?;
         let resp = cl
-            .post(format!("{base_addr}/v1/auth/refresh-token"))
+            .post(format!("{base_addr}/api/v1/auth/refresh-token"))
             .body(body)
             .headers(headers.clone())
             .send()
@@ -133,7 +133,7 @@ async fn test_auth() -> anyhow::Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_addr}/v1/organizations/1/projects/1/schema/events"
+                "{base_addr}/api/v1/organizations/1/projects/1/schema/events"
             ))
             .headers(new_jwt_headers.clone())
             .send()

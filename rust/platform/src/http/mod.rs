@@ -46,13 +46,6 @@ impl Service {
         addr: SocketAddr,
         ui_path: Option<PathBuf>,
     ) -> Self {
-        let error_handler = |error: io::Error| async move {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Unhandled internal error: {}", error),
-            )
-        };
-
         let mut router = Router::new();
 
         info!("attaching api routes...");
@@ -65,23 +58,6 @@ impl Service {
         router = queries::attach_routes(router, platform.query.clone());
         router = router.clone().nest("/api/v1", router);
 
-        match ui_path {
-            None => {}
-            Some(path) => {
-                info!("attaching ui static files handler...");
-                let index = get_service(ServeFile::new(path.join("index.html")))
-                    .handle_error(error_handler);
-                let favicon = get_service(ServeFile::new(path.join("favicon.ico")))
-                    .handle_error(error_handler);
-                let assets =
-                    get_service(ServeDir::new(path.join("assets"))).handle_error(error_handler);
-                // TODO resolve actual routes and distinguish them from 404s
-                router = router.fallback(index);
-                router = router.route("/favicon.ico", favicon);
-                router = router.nest("/assets", assets);
-            }
-        }
-
         router = router.layer(CookieManagerLayer::new());
         router = router.layer(Extension(platform.auth.clone()));
         router = router.layer(Extension(md.accounts.clone()));
@@ -89,6 +65,31 @@ impl Service {
         Self { router, addr }
     }
 
+    pub fn with_ui(self, path: PathBuf) -> Self {
+        let error_handler = |error: io::Error| async move {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Unhandled internal error: {}", error),
+            )
+        };
+
+        let mut router = self.router;
+        info!("attaching ui static files handler...");
+        let index =
+            get_service(ServeFile::new(path.join("index.html"))).handle_error(error_handler);
+        let favicon =
+            get_service(ServeFile::new(path.join("favicon.ico"))).handle_error(error_handler);
+        let assets = get_service(ServeDir::new(path.join("assets"))).handle_error(error_handler);
+        // TODO resolve actual routes and distinguish them from 404s
+        router = router.fallback(index);
+        router = router.route("/favicon.ico", favicon);
+        router = router.nest("/assets", assets);
+
+        Self {
+            router,
+            addr: self.addr,
+        }
+    }
     pub async fn serve(self) -> Result<()> {
         let server = Server::bind(&self.addr).serve(self.router.into_make_service());
         let graceful = server.with_graceful_shutdown(async {

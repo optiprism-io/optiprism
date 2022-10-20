@@ -92,9 +92,12 @@ async fn refresh_token(
 }
 
 pub fn attach_routes(router: Router, auth: Arc<AuthProvider>) -> Router {
-    router
-        .route("/auth/signup", post(sign_up))
-        .route("/auth/login", post(log_in))
-        .route("/auth/refresh-token", post(refresh_token))
-        .layer(Extension(auth))
+    router.clone().nest(
+        "/auth",
+        router
+            .route("/signup", post(sign_up))
+            .route("/login", post(log_in))
+            .route("/refresh-token", post(refresh_token))
+            .layer(Extension(auth)),
+    )
 }

@@ -23,7 +23,7 @@ mod tests {
     async fn test_event_segmentation() -> Result<()> {
         let (base_url, md, pp) = run_http_service(true).await?;
         let cl = Client::new();
-        let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts, &cl).await?;
+        let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
         let from = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()
@@ -99,7 +99,7 @@ mod tests {
 
         let resp = cl
             .post(format!(
-                "{base_url}/v1/organizations/1/projects/1/queries/event-segmentation"
+                "{base_url}/api/v1/organizations/1/projects/1/queries/event-segmentation"
             ))
             .body(body)
             .headers(admin_headers.clone())

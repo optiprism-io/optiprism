@@ -80,12 +80,6 @@ impl Generator {
             self.cur_timestamp += Duration::days(1).num_seconds();
 
             self.pb.inc(1);
-
-            /*debug!(
-                "generated users: {}. {} days left",
-                self.total_users,
-                Duration::seconds(self.to_timestamp - self.cur_timestamp).num_days()
-            )*/
         }
 
         Some(sample)
