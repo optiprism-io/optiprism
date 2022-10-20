@@ -92,16 +92,16 @@ async fn test_event_properties() -> Result<()> {
     // create request should create event prop
     {
         let req = CreatePropertyRequest {
-            created_by: prop1.created_by.clone(),
+            created_by: prop1.created_by,
             tags: prop1.tags.clone(),
             name: prop1.name.clone(),
             description: prop1.description.clone(),
             display_name: prop1.display_name.clone(),
             typ: prop1.typ.clone().try_into()?,
             status: prop1.status.clone().into(),
-            nullable: prop1.nullable.clone(),
-            is_array: prop1.is_array.clone(),
-            is_dictionary: prop1.is_dictionary.clone(),
+            nullable: prop1.nullable,
+            is_array: prop1.is_array,
+            is_dictionary: prop1.is_dictionary,
             dictionary_type: prop1
                 .dictionary_type
                 .clone()

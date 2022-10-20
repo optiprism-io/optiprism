@@ -8,12 +8,12 @@ pub mod queries;
 use crate::error::Result;
 use crate::PlatformProvider;
 use axum::http::StatusCode;
-use axum::routing::{get, get_service};
+use axum::routing::get_service;
 use axum::{Extension, Router, Server};
-use axum_extra::routing::SpaRouter;
+
 use log::info;
 use metadata::MetadataProvider;
-use std::convert::Infallible;
+
 use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -29,22 +29,12 @@ pub struct Service {
     addr: SocketAddr,
 }
 
-struct UiPath {
-    path: PathBuf,
-}
-
-impl UiPath {
-    pub fn new(path: PathBuf) -> Self {
-        Self { path }
-    }
-}
-
 impl Service {
     pub fn new(
         md: &Arc<MetadataProvider>,
         platform: &Arc<PlatformProvider>,
         addr: SocketAddr,
-        ui_path: Option<PathBuf>,
+        _ui_path: Option<PathBuf>,
     ) -> Self {
         let mut router = Router::new();
 

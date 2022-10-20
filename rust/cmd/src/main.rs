@@ -1,9 +1,8 @@
 use crate::error::{Error, Result};
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use clap::{Parser, Subcommand};
 use dateparser::DateTimeUtc;
-use log::info;
-use std::borrow::BorrowMut;
+
 use std::env::temp_dir;
 use std::net::SocketAddr;
 use std::path::PathBuf;

@@ -75,8 +75,8 @@ mod tests {
         let spans = vec![
             false, false, true, false, false, true, false, false, false, true,
         ];
-        count_acc.update_batch(&spans, &[]);
-        count_acc.update_batch(&spans, &[]);
+        count_acc.update_batch(&spans, &[])?;
+        count_acc.update_batch(&spans, &[])?;
 
         let list = vec![2, 3, 4, 3, 3, 4, 1];
         let sum: i32 = Iterator::sum(list.iter());

@@ -122,7 +122,7 @@ impl Store {
             .filter_map(|v| match v {
                 Ok(kv) => {
                     if kv.0.len() > prefix.len() && kv.0[..prefix.len()].eq(prefix) {
-                        Some(Ok(kv.clone()))
+                        Some(Ok(kv))
                     } else {
                         None
                     }

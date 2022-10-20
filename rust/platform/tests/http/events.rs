@@ -97,7 +97,7 @@ async fn test_events() -> Result<()> {
             name: event1.name.clone(),
             display_name: event1.display_name.clone(),
             description: event1.description.clone(),
-            status: event1.status.clone().into(),
+            status: event1.status.clone(),
             is_system: false,
         };
 
@@ -129,7 +129,7 @@ async fn test_events() -> Result<()> {
             tags: OptionalProperty::Some(event1.tags.clone()),
             display_name: OptionalProperty::Some(event1.display_name.clone()),
             description: OptionalProperty::Some(event1.description.clone()),
-            status: OptionalProperty::Some(event1.status.clone().into()),
+            status: OptionalProperty::Some(event1.status.clone()),
         };
 
         let body = serde_json::to_string(&req).unwrap();

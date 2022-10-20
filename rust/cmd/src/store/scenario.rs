@@ -103,8 +103,8 @@ impl Scenario {
                 if is_ended_cloned.load(Ordering::SeqCst) {
                     break;
                 }
-                let ups = users_per_sec_clone.swap(0, Ordering::SeqCst);
-                let eps = events_per_sec_clone.swap(0, Ordering::SeqCst);
+                let _ups = users_per_sec_clone.swap(0, Ordering::SeqCst);
+                let _eps = events_per_sec_clone.swap(0, Ordering::SeqCst);
                 // println!("users per second: {ups}");
                 // println!("events per second: {eps}");
             }

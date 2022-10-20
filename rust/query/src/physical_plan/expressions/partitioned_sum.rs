@@ -119,7 +119,7 @@ mod tests {
     use crate::error::Result;
     use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAccumulator;
     use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
-    use arrow::array::{ArrayRef, DecimalBuilder, Int8Array};
+    use arrow::array::{ArrayRef, Decimal128Builder, Int8Array};
     use arrow::datatypes::DataType;
     use datafusion::physical_plan::expressions::AvgAccumulator;
 
@@ -142,8 +142,8 @@ mod tests {
         let vals = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         let arr = Arc::new(Int8Array::from(vals));
 
-        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
-        sum_acc.update_batch(&spans, &[arr as ArrayRef]);
+        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef])?;
+        sum_acc.update_batch(&spans, &[arr as ArrayRef])?;
 
         let list = vec![
             1 + 2,
@@ -173,16 +173,16 @@ mod tests {
         //                                  v              v                  v
         let vals: Vec<i128> = vec![123, 231, 314, 411, 523, 623, 713, 843, 91, 10];
         let arr = {
-            let mut builder = DecimalBuilder::new(10, 10, 2);
+            let mut builder = Decimal128Builder::new(10, 10, 2);
             for val in vals.iter() {
-                builder.append_value(*val);
+                builder.append_value(*val)?;
             }
 
             Arc::new(builder.finish())
         };
 
-        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef]);
-        sum_acc.update_batch(&spans, &[arr as ArrayRef]);
+        sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef])?;
+        sum_acc.update_batch(&spans, &[arr as ArrayRef])?;
 
         let list = vec![
             dec!(1.23) + dec!(2.31),

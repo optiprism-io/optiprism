@@ -2,8 +2,7 @@
 name = "common"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
 datafusion = "11.0.0"
@@ -16,7 +15,4 @@ serde_json = "1.0.74"
 lazy_static = "1.4.0"
 jsonwebtoken = "7.2.0"
 rand = "0.8.4"
-sha3 = "0.10.0"
-hex = "0.4.3"
-rust_decimal = { version = "1.22.0", features = ["serde-with-float"] }
 thiserror = "1.0.31"

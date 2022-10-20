@@ -13,7 +13,6 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::io;
 
-use std::path::Path;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -189,9 +188,12 @@ impl ProductProvider {
         &self.products[self.promoted_products[self.promoted_product_weight_idx.sample(rng)]]
     }
 
+    #[allow(dead_code)]
     pub fn get_product_by_id(&self, id: usize) -> &Product {
         &self.products[id]
     }
+
+    #[allow(dead_code)]
     pub fn rate_product(&mut self, id: usize, rating: f64) {
         let product = &mut self.products[id];
         product.rating_count += 1;

@@ -17,7 +17,7 @@ fn get_providers() -> (Arc<events::Provider>, Provider) {
     path.push(format!("{}.db", Uuid::new_v4()));
     let store = Arc::new(Store::new(path));
     let events_prov = Arc::new(events::Provider::new(store.clone()));
-    let custom_events = Provider::new(store.clone(), events_prov.clone());
+    let custom_events = Provider::new(store, events_prov.clone());
 
     (events_prov, custom_events)
 }

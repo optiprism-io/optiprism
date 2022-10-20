@@ -16,11 +16,11 @@ mod tests {
     use chrono::Duration;
 
     use common::rbac::OrganizationRole;
-    use lazy_static::lazy_static;
+
     use metadata::store::Store;
     use metadata::MetadataProvider;
     use platform::auth::password::make_password_hash;
-    use reqwest::Client;
+
     use uuid::Uuid;
 
     use platform::PlatformProvider;
@@ -98,7 +98,7 @@ mod tests {
         ));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], HTTP_PORT.fetch_add(1, Ordering::SeqCst)));
-        let svc = platform::http::Service::new(&md, &pp, addr.clone(), None);
+        let svc = platform::http::Service::new(&md, &pp, addr, None);
         svc.serve_test().await;
 
         let base_addr = format!("http://{:?}:{:?}", addr.ip(), addr.port());

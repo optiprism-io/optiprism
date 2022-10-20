@@ -31,14 +31,14 @@ fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str
 
 pub struct Provider {
     store: Arc<Store>,
-    guard: RwLock<()>,
+    _guard: RwLock<()>,
 }
 
 impl Provider {
     pub fn new(store: Arc<Store>) -> Self {
         Self {
             store,
-            guard: RwLock::new(()),
+            _guard: RwLock::new(()),
         }
     }
 

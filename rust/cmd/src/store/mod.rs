@@ -15,7 +15,7 @@ use metadata::MetadataProvider;
 use rand::thread_rng;
 use std::collections::HashMap;
 use std::io;
-use std::path::PathBuf;
+
 use std::sync::Arc;
 
 pub mod actions;

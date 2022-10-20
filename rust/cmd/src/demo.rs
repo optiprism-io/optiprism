@@ -1,23 +1,19 @@
 extern crate bytesize;
 extern crate log;
 
-use axum::Router;
-use std::env::temp_dir;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::{net::SocketAddr, sync::Arc};
 
 use bytesize::ByteSize;
 use chrono::{DateTime, Duration, Utc};
 use datafusion::datasource::MemTable;
-use log::{debug, error, info, warn};
-use uuid::Uuid;
+use log::{debug, info};
 
 use crate::error::{Error, Result};
 use metadata::store::Store;
 use metadata::MetadataProvider;
 use query::QueryProvider;
-use rust_embed::RustEmbed;
 
 pub struct Config {
     pub host: SocketAddr,
@@ -109,7 +105,7 @@ pub async fn run(cfg: Config) -> Result<()> {
         "key".to_string(),
     ));
 
-    let svc = platform::http::Service::new(&md, &pp, cfg.host.clone(), Some(cfg.ui_path));
+    let svc = platform::http::Service::new(&md, &pp, cfg.host, Some(cfg.ui_path));
     info!("start listening on {}", cfg.host);
     info!("http ui http://{}", cfg.host);
     svc.serve().await?;

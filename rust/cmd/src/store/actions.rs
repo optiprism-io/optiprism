@@ -23,11 +23,10 @@ pub enum Action {
     Bounce,
     AbandonCart,
     EndSession,
-    None, // special case
 }
 
 impl Action {
-    pub fn to_event(&self) -> Option<Event> {
+    pub fn to_event(self) -> Option<Event> {
         match self {
             Action::ViewIndex => Some(Event::IndexPageViewed),
             Action::ViewDeals => Some(Event::DealsViewed),

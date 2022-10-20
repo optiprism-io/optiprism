@@ -2,8 +2,7 @@
 name = "cmd"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
 tower-cookies = "0.7.0"
@@ -25,7 +24,6 @@ bytesize = "1.1.0"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
 thiserror = "1.0.31"
 clap = { version = "4.0.15", features = ["derive"] }
-rust-embed = "6.4.1"
 arrow = { version = "20.0.0", features = ["prettyprint"] }
 rust_decimal = { version = "1.22.0", features = ["serde-float"] }
 csv = "1.1"
