@@ -1,8 +1,6 @@
 name: Frontend Lint and Test
 on: ["push"]
 
-workdir:
-
 jobs:
   lint-prettier:
     runs-on: ubuntu-20.04
