@@ -1,7 +1,7 @@
 name: Frontend Lint and Test
-
 on: ["push"]
 
+workdir:
 
 jobs:
   lint-prettier:
