@@ -1,9 +1,7 @@
 name: Frontend Lint and Test
 
-on:
-  push:
-    paths:
-      - 'ui/**'
+on: ["push"]
+
 
 jobs:
   lint-prettier:
