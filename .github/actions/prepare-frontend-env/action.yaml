@@ -1,5 +1,5 @@
-name: Front-end environment
-description: Setup front-end environment
+name: Prepate front-end environment
+description:
 runs:
   using: composite
   steps:
@@ -15,4 +15,5 @@ runs:
         key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
     - run: yarn install --frozen-lockfile --prefer-offline
       shell: bash
-    - run: actions/generate-frontend-api
+    - name: Generate openapi
+      uses: ./.github/actions/generate-frontend-api

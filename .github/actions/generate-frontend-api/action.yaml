@@ -1,18 +1,14 @@
-name: Front-end environment
-description: Setup front-end environment
+name: Generate Frontend API
+description: Runs Openapi Generator and generates TS api from api/openapi.yaml
+inputs:
+  input:
+    description: 'input'
+    required: true
+  output:
+    description: 'output'
+    required: true
 runs:
-  using: "composite"
-  steps:
-    - name: Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 16.x
-        cache: 'yarn'
-    - name: Get node_modules cache
-      uses: actions/cache@v2
-      with:
-        path: node_modules
-        key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
-    - run: yarn install --frozen-lockfile --prefer-offline
-      shell: bash
-    - run:
+  using: docker
+  image: openapitools/openapi-generator-cli:v6.2.0
+  args:
+    - openapi-generator generate -i ${{ inputs.input }} -g typescript-axios -o ${{ inputs.output }}

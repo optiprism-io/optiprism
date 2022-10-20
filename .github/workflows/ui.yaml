@@ -1,4 +1,4 @@
-name: UI Lint
+name: Frontend Lint and Test
 
 on:
   push:
@@ -6,29 +6,30 @@ on:
       - 'ui/**'
 
 jobs:
-  lint:
-    strategy:
-      matrix:
-        node: [16]
+  lint-prettier:
+    runs-on: ubuntu-20.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare-frontend-env
+      - run: yarn run lint-prettier
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node }}
-          cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
+  lint-eslint:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare-frontend-env
+      - run: yarn run lint-eslint
 
-      - name: Install dependencies
-        working-directory: ./ui
-        run: npm ci
+  type-check:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare-frontend-env
+      - run: yarn type-check
 
-      - name: Lint
-        working-directory: ./ui
-        run: npm run lint
-
-      - name: Build
-        working-directory: ./ui
-        run: npm run build
+  fe-tests-unit:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare-frontend-env
+      - run: yarn run test-unit --coverage --silent
