@@ -1,5 +1,5 @@
 name: Prepate front-end environment
-description:
+description: Prepate front-end environment
 runs:
   using: composite
   steps:
@@ -15,10 +15,11 @@ runs:
         path: node_modules
         key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
       working-directory: ./ui
-    - run: yarn install --frozen-lockfile --prefer-offline
+    - name: Install
+      run: yarn install --frozen-lockfile --prefer-offline
       shell: bash
       working-directory: ./ui
-    - name: Generate openapi
+    - name: Generate TypeScript from OpenAPI
       uses: ./.github/actions/generate-frontend-api
       with:
         input: ./api/openapi.yaml
