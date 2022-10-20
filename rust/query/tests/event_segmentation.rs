@@ -12,7 +12,6 @@ mod tests {
     use datafusion::prelude::{SessionConfig, SessionContext};
 
     use datafusion::execution::runtime_env::RuntimeEnv;
-
     use datafusion::physical_plan::coalesce_batches::concat_batches;
 
     use datafusion_expr::AggregateFunction;

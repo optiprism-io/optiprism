@@ -1,4 +1,4 @@
-name: UI Quality Assurance
+name: UI Lint
 
 on:
   push:
@@ -6,13 +6,10 @@ on:
       - 'ui/**'
 
 jobs:
-  quality-assurance:
-    runs-on: self-hosted
-
+  lint:
     strategy:
       matrix:
         node: [16]
-
     steps:
       - name: Checkout
         uses: actions/checkout@v3
