@@ -1,6 +1,11 @@
 name: Frontend Lint and Test
 on: ["push"]
 
+defaults:
+  run:
+    shell: bash
+    working-directory: ui
+
 jobs:
   lint-prettier:
     runs-on: ubuntu-20.04
