@@ -15,6 +15,8 @@
             :lite-chart="true"
             :reports="funnelsReport"
             :steps="steps"
+            :height="190"
+            :min-width-step="100"
         />
     </div>
 </template>

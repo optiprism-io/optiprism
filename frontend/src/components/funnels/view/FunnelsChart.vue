@@ -26,6 +26,8 @@
                     :data="data[i]"
                     :width="stepWidth"
                     :colors="barsColors"
+                    :height="props.height"
+                    :lite-chart="props.liteChart"
                 >
                     <div class="pf-u-text-align-center">
                         {{ stepNames[i] }}
@@ -56,10 +58,14 @@ type Props = {
     liteChart?: boolean
     reports?: DataTableResponseColumnsInner[]
     steps?: Step[]
+    minWidthStep?: number
+    height?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
     liteChart: false,
+    minWidthStep: 550,
+    height: 500,
 })
 
 const reports = computed(() => props.reports ?? funnelsStore.reports)
@@ -111,7 +117,7 @@ const barsColors = computed(() => {
 })
 
 const stepWidth = computed(() => {
-    return Math.max(containerWidth.value / stepIterator.value.length, 550)
+    return Math.max(containerWidth.value / stepIterator.value.length, props.minWidthStep)
 })
 
 const stepIterator = computed(() => {

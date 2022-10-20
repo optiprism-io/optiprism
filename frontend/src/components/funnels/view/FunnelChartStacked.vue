@@ -4,7 +4,12 @@
             ref="container"
             class="pf-l-flex__item"
         />
-        <div class="pf-u-font-size-lg pf-u-font-weight-bold pf-l-flex__item pf-u-px-lg">
+        <div
+            class="pf-u-font-weight-bold pf-l-flex__item pf-u-px-lg"
+            :class="{
+                'pf-u-font-size-lg': !liteChart,
+            }"
+        >
             <slot />
         </div>
     </div>
@@ -30,10 +35,15 @@ const props = defineProps({
         type: Number,
         default: 400
     },
+    height: {
+        type: Number,
+        default: 500
+    },
     colors: {
         type: Array as PropType<string[]>,
         default: () => []
-    }
+    },
+    liteChart: Boolean
 })
 
 const xKey = 'dimension'
@@ -88,10 +98,10 @@ watch(() => [container.value, dataView.value], () => {
 
     chart.value = new Chart({
         container: container.value,
-        height: 500,
+        height: props.height,
         width: props.width,
         autoFit: false,
-        padding: [80, 50, 30, 50],
+        padding: props.liteChart ? [50, 5, 0, 5] : [80, 50, 30, 50],
         renderer: 'canvas'
     });
 
@@ -134,8 +144,8 @@ watch(() => [container.value, dataView.value], () => {
                 position: 'top',
                 offset: 0,
                 content: (data) => {
-                    const width = 64
-                    const size = 14
+                    const width = props.liteChart ? 40 : 64
+                    const size = props.liteChart ? 11 : 14
 
                     const commonProps = {
                         textAlign: 'left',
