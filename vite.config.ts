@@ -4,13 +4,14 @@ import vueJsx from '@vitejs/plugin-vue-jsx'
 import path from 'path'
 
 export default defineConfig({
+    root: 'frontend',
     plugins: [
         vue(),
         vueJsx(),
     ],
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, './src')
+            '@': path.resolve(__dirname, 'frontend', 'src')
         }
     },
 })

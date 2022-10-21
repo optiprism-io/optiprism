@@ -1,5 +1,5 @@
 {
-    "name": "analytics-frontend-vue",
+    "name": "optiprism",
     "version": "0.0.0",
     "scripts": {
         "dev": "vite",
