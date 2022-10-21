@@ -17,8 +17,9 @@ runs:
     - name: Install
       run: yarn install --frozen-lockfile --prefer-offline
       shell: bash
-    - name: Generate TypeScript from OpenAPI
+    - name: Generate openapi
       uses: ./.github/actions/generate-frontend-api
+    - name: Get node_modules cache
+      uses: actions/cache@v2
       with:
-        input: ./openapi.yaml
-        output: ./src/api
+        path: frontend

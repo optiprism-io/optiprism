@@ -3,20 +3,23 @@ SHELL = /bin/bash
 cargo-fix:
 	cargo fix --allow-dirty
 
-fmt:
+cargo-fmt:
 	cargo fmt --all
 
-lint:
+cargo-lint:
 	cargo clippy --workspace --all-targets -- -D warnings
 
-test:
+cargo-test:
 	cargo test
 
-build:
+cargo-build:
 	cargo build
 
-build-release:
-	cargo build --release --target=x86_64-unknown-linux-musl
+cargo-build-release:
+	cargo build --release
 
-build-optimized:
-	cargo build -Z "build-std=std"  --target x86_64-unknown
+cargo-build-optimized:
+	cargo build -Z "build-std=std"
+
+generate-openapi:
+	openapi-generator generate -i ./api/openapi.yaml -g typescript-axios -o frontend/src

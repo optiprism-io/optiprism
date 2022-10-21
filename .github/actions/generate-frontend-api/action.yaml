@@ -1,14 +1,7 @@
 name: Generate Frontend API
 description: Runs Openapi Generator and generates TS api from api/openapi.yaml
-inputs:
-  input:
-    description: 'input'
-    required: true
-  output:
-    description: 'output'
-    required: true
 runs:
   using: docker
   image: openapitools/openapi-generator-cli:v6.2.0
   args:
-    - openapi-generator generate -i ${{ inputs.input }} -g typescript-axios -o ${{ inputs.output }}
+    - openapi-generator generate -i ./api/openapi.yaml -g typescript-axios -o frontend/src
