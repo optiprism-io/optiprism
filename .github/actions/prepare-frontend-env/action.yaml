@@ -17,9 +17,7 @@ runs:
     - name: Install
       run: yarn install --frozen-lockfile --prefer-offline
       shell: bash
-    - name: Generate openapi
-      uses: ./.github/actions/generate-frontend-api
-    - name: Get node_modules cache
-      uses: actions/cache@v2
+    - name: Generate TypeScript Axum Client
+      uses: openapi-generators/openapitools-generator-action@v1
       with:
-        path: frontend
+        generator: typescript-axum
