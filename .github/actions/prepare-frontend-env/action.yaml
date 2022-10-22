@@ -22,3 +22,4 @@ runs:
       with:
         generator: typescript-axios
         openapi-file: ./api/openapi.yaml
+        command-args: -o ./frontend/src/api

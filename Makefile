@@ -22,4 +22,4 @@ cargo-build-optimized:
 	cargo build -Z "build-std=std"
 
 generate-openapi:
-	openapi-generator generate -i ./api/openapi.yaml -g typescript-axios -o frontend/src
+	openapi-generator generate -i ./api/openapi.yaml -g typescript-axios -o frontend/src/api

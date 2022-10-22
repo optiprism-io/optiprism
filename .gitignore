@@ -1,6 +1,7 @@
 .idea
 .vscode
 
+.actrc
 target
 Cargo.lock
 node_modules

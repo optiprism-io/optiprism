@@ -2,30 +2,16 @@ name: Frontend Lint and Test
 on: ["push"]
 
 jobs:
-  lint-prettier:
+  check-eslint:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-frontend-env
-      - run: yarn run lint-prettier
+      - run: yarn run check:eslint
 
-  lint-eslint:
+  check-vue-tsc:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-frontend-env
-      - run: yarn run lint-eslint
-
-  type-check:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/prepare-frontend-env
-      - run: yarn type-check
-
-  fe-tests-unit:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/prepare-frontend-env
-      - run: yarn run test-unit --coverage --silent
+      - run: yarn run check:vue-tsc
