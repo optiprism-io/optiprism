@@ -1,21 +1,22 @@
 name: Build and deploy backend
 
+on: push
 #on:
 #  push:
 #    paths:
 #      - '*Cargo.lock'
 #      - '*Cargo.toml'
 #      - 'src'
-on:
-  workflow_dispatch:
-    inputs:
-      build:
-        required: true
-        type: choice
-        options:
-          - release
-          - debug
-          -
+
+#on:
+#  workflow_dispatch:
+#    inputs:
+#      build:
+#        required: true
+#        type: choice
+#        options:
+#          - release
+#          - debug
 jobs:
   check-fmt:
     runs-on: ubuntu-20.04
