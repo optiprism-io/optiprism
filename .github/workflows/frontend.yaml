@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-frontend-env
-      - run: yarn r check:vue-tsc
+      - run: yarn check:vue-tsc
 
   test-coverage:
     runs-on: ubuntu-20.04
