@@ -8,7 +8,7 @@ on:
       - tsconfig.json*
       - vite.config.js*
       - yarn.lock*
-      - eslintrc.js*
+      - eslintrc.j*
 
 jobs:
   check-eslint:
