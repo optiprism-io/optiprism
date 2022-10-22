@@ -1,5 +1,14 @@
 name: Frontend Lint and Test
-on: ["push"]
+on:
+  push:
+    paths:
+      - frontend/**
+      - package.json
+      - package-lock.json
+      - tsconfig.json
+      - vite.config.js
+      - yarn.lock
+      - eslintrc.js
 
 jobs:
   check-eslint:
