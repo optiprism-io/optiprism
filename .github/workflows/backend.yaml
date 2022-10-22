@@ -1,0 +1,46 @@
+name: Build and deploy backend
+
+#on:
+#  push:
+#    paths:
+#      - '*Cargo.lock'
+#      - '*Cargo.toml'
+#      - 'src'
+on:
+  workflow_dispatch:
+    inputs:
+      build:
+        required: true
+        type: choice
+        options:
+          - release
+          - debug
+          -
+jobs:
+  check-fmt:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 50
+    name: Fmt and Clippy checks
+    steps:
+      - uses: ./.github/actions/prepare-backend-env
+      - run: cargo fmt --all -- --check
+
+  check-clippy:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 50
+    name: Fmt and Clippy checks
+    steps:
+      - uses: ./.github/actions/prepare-backend-env
+      - run: cargo clippy -- -D warnings
+
+  test:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 50
+    name: Unit Tests with caverage
+    steps:
+      - uses: ./.github/actions/prepare-backend-env
+      - uses: baptiste0928/cargo-install@v1
+        with:
+          crate: cargo-nextest
+          version: "v0.9.39"
+      - run: cargo nextest run
