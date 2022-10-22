@@ -21,16 +21,18 @@ jobs:
   check-fmt:
     runs-on: ubuntu-20.04
     timeout-minutes: 50
-    name: Fmt and Clippy checks
+    name: Fmt
     steps:
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-backend-env
       - run: cargo fmt --all -- --check
 
   check-clippy:
     runs-on: ubuntu-20.04
     timeout-minutes: 50
-    name: Fmt and Clippy checks
+    name: Clippy
     steps:
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-backend-env
       - run: cargo clippy -- -D warnings
 
@@ -39,9 +41,20 @@ jobs:
     timeout-minutes: 50
     name: Unit Tests with caverage
     steps:
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-backend-env
       - uses: baptiste0928/cargo-install@v1
         with:
           crate: cargo-nextest
           version: "v0.9.39"
       - run: cargo nextest run
+
+  build:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 50
+    steps:
+        - uses: actions/checkout@v3
+        - uses: actions-rs/cargo@v1
+          with:
+            command: build
+            args: --release
