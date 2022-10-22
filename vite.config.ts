@@ -1,4 +1,4 @@
-import {defineConfig} from 'vite'
+import {defineConfig} from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import path from 'path'
@@ -14,4 +14,7 @@ export default defineConfig({
             '@': path.resolve(__dirname, 'frontend', 'src')
         }
     },
+    test: {
+        root: 'frontend'
+    }
 })

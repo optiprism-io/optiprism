@@ -8,6 +8,8 @@
     "clean": "rm -rf frontend/dist && mkdir ./frontend/dist",
     "check:eslint": "eslint --ext .ts,vue ./frontend",
     "check:vue-tsc": "vue-tsc --noEmit",
+    "test": "vitest --run",
+    "test:coverage": "vitest --run --coverage",
     "build": "vite build"
   },
   "dependencies": {
@@ -31,6 +33,7 @@
     "@typescript-eslint/parser": "^5.37.0",
     "@vitejs/plugin-vue": "^3.1.0",
     "@vitejs/plugin-vue-jsx": "^2.0.1",
+    "@vitest/coverage-c8": "^0.24.3",
     "@vue/compiler-sfc": "^3.2.39",
     "@vue/eslint-config-prettier": "^7.0.0",
     "@vue/eslint-config-typescript": "^11.0.1",
@@ -43,6 +46,7 @@
     "typescript": "^4.8.3",
     "vite": "^3.1.1",
     "vite-plugin-eslint": "^1.8.1",
+    "vitest": "^0.24.3",
     "vue-tsc": "^0.40.13"
   }
 }
