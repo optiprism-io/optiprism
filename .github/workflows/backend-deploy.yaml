@@ -29,6 +29,6 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-          file: "{context}/docker/optiprism/Dockerfile"
+          file: ./docker/optiprism/Dockerfile
           push: true
           tags: optiprismio/optiprism:${{ steps.branch-name.outputs.current_branch }}
