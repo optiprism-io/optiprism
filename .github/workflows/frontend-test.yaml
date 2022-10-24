@@ -1,4 +1,5 @@
 name: Frontend Lint and Test
+on: push
 #on:
 #  push:
 #    paths:

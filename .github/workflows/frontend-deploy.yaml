@@ -1,4 +1,5 @@
 name: Build and push Docker image Test
+on: push
 #on:
 #  workflow_dispatch:
 #    inputs:
