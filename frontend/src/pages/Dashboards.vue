@@ -1,16 +1,30 @@
 <template>
     <div class="dashboards pf-u-p-md">
-        <div
-            v-if="dashboards.length"
-            class="pf-u-mb-md"
-        >
+        <div class="pf-u-mb-md pf-u-display-flex">
             <UiSelect
-                class="pf-u-w-25-on-md"
+                v-if="dashboards.length"
+                class="pf-u-w-25-on-md pf-u-mr-md"
                 :items="selectDashboards"
                 :text-button="selectDashboardsText"
                 :selections="selections"
                 @on-select="onSelectDashboard"
             />
+            <UiButton
+                v-show="activeDashboardId"
+                class="pf-m-primary"
+                :before-icon="'fas fa-plus'"
+                @click="newDashboard"
+            >
+                {{ $t('dashboards.newDashboard') }}
+            </UiButton>
+            <UiButton
+                v-show="activeDashboardId"
+                class="pf-u-ml-auto pf-m-link pf-m-danger"
+                :before-icon="'fas fa-trash'"
+                @click="onDeleteDashboard"
+            >
+                {{ $t('dashboards.delete') }}
+            </UiButton>
         </div>
         <GridContainer v-if="activeDashboardId">
             <template
@@ -39,6 +53,9 @@
                 </GridItem>
             </template>
         </GridContainer>
+        <div v-else>
+
+        </div>
     </div>
 </template>
 
@@ -47,6 +64,7 @@ import { ref, computed, onMounted } from 'vue'
 import dashboardService from '@/api/services/dashboards.service'
 import { Dashboard, ReportReportTypeEnum } from '@/api'
 import { pagesMap } from '@/router'
+import useConfirm from '@/hooks/useConfirm'
 
 import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
@@ -58,10 +76,12 @@ import GridItem from '@/components/grid/GridItem.vue'
 import UiCard from '@/components/uikit/UiCard/UiCard.vue'
 import DashboardPanel from '@/components/dashboards/DashboardPanel.vue'
 
+const { confirm } = useConfirm()
 const { t } = usei18n()
 const commonStore = useCommonStore()
 const lexiconStore = useLexiconStore()
 
+const errorDashboard = ref(false)
 const dashboards = ref<Dashboard[]>([])
 const activeDashboardId = ref<number | null>(null)
 
@@ -89,10 +109,29 @@ const onSelectDashboard = (id: number | string) => {
     activeDashboardId.value = Number(id);
 }
 
-onMounted(async() => {
-    lexiconStore.getEvents()
-    lexiconStore.getEventProperties()
-    lexiconStore.getUserProperties()
+const newDashboard = () => {
+    activeDashboardId.value = null
+}
+
+const onDeleteDashboard = async () => {
+    try {
+        if (activeDashboardId.value) {
+            await confirm(t('dashboards.deleteConfirm', { name: `<b>${activeDashboard.value?.name}</b>` || '' }), {
+                applyButton: t('common.apply'),
+                cancelButton: t('common.cancel'),
+                title: t('dashboards.delete'),
+                applyButtonClass: 'pf-m-danger',
+            })
+
+            await dashboardService.deleteDashboard(commonStore.organizationId, commonStore.organizationId, activeDashboardId.value)
+            getDashboardsList()
+        }
+    } catch(error) {
+        errorDashboard.value = true
+    }
+}
+
+const getDashboardsList = async () => {
     const res = await dashboardService.dashboardsList(commonStore.organizationId, commonStore.organizationId)
 
     if (res?.data?.dashboards) {
@@ -102,5 +141,12 @@ onMounted(async() => {
             onSelectDashboard(res.data.dashboards[0].id)
         }
     }
+}
+
+onMounted(() => {
+    lexiconStore.getEvents()
+    lexiconStore.getEventProperties()
+    lexiconStore.getUserProperties()
+    getDashboardsList()
 })
 </script>

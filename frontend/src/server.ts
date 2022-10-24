@@ -243,6 +243,11 @@ export default function ({ environment = 'development' } = {}) {
                     meta: {}
                 }
             })
+
+            this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards/:dashboard_id`, (schema, request) => {
+                schema.db.dashboards.remove(request.params.dashboard_id)
+                return request.params.dashboard_id;
+            }, { timing: 110 })
         }
     });
 }

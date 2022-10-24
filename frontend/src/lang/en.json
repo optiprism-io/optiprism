@@ -258,6 +258,9 @@
 
   "dashboards": {
     "title": "Dashboards",
-    "selectDashboard": "Select Dashboard"
+    "selectDashboard": "Select Dashboard",
+    "newDashboard": "New Dashboard",
+    "delete": "Delete Dashboard",
+    "deleteConfirm": "You definitely want to delete the dashboard: :name?"
   }
 }
