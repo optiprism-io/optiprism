@@ -26,7 +26,7 @@ jobs:
         id: branch-name
         uses: tj-actions/branch-names@v6
       - name: Build and push Docker image
-        uses: docker/build-push-action
+        uses: docker/build-push-action@v3
         with:
           context: .
           file: "{context}/docker/optiprism/Dockerfile"
