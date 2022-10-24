@@ -18,7 +18,7 @@ use query::QueryProvider;
 pub struct Config {
     pub host: SocketAddr,
     pub md_path: PathBuf,
-    pub ui_path: PathBuf,
+    pub ui_path: Option<PathBuf>,
     pub from_date: DateTime<Utc>,
     pub to_date: DateTime<Utc>,
     pub new_daily_users: usize,
@@ -30,7 +30,9 @@ pub async fn run(cfg: Config) -> Result<()> {
 
     info!("starting demo instance...");
     debug!("metadata path: {:?}", cfg.md_path);
-    debug!("ui path: {:?}", cfg.ui_path);
+    if cfg.ui_path.is_some() {
+        debug!("ui path: {:?}", cfg.ui_path);
+    }
     debug!("from date {}", cfg.from_date);
     let date_diff = cfg.to_date - cfg.from_date;
     debug!("to date {}", cfg.to_date);
@@ -105,9 +107,11 @@ pub async fn run(cfg: Config) -> Result<()> {
         "key".to_string(),
     ));
 
-    let svc = platform::http::Service::new(&md, &pp, cfg.host, Some(cfg.ui_path));
+    let svc = platform::http::Service::new(&md, &pp, cfg.host, cfg.ui_path.clone());
     info!("start listening on {}", cfg.host);
-    info!("http ui http://{}", cfg.host);
+    if cfg.ui_path.is_some() {
+        info!("http ui http://{}", cfg.host);
+    }
     svc.serve().await?;
     Ok(())
 }

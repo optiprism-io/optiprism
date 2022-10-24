@@ -1,6 +1,6 @@
-name: Build and deploy backend
+name: Lint and test backend
 
-on: push
+on: workflow_dispatch
 #on:
 #  push:
 #    paths:
@@ -8,15 +8,6 @@ on: push
 #      - '*Cargo.toml'
 #      - 'src'
 
-#on:
-#  workflow_dispatch:
-#    inputs:
-#      build:
-#        required: true
-#        type: choice
-#        options:
-#          - release
-#          - debug
 jobs:
   check-fmt:
     runs-on: ubuntu-20.04
@@ -43,18 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-backend-env
-      - uses: baptiste0928/cargo-install@v1
-        with:
-          crate: cargo-nextest
-          version: "v0.9.39"
-      - run: cargo nextest run
-
-  build:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 50
-    steps:
-        - uses: actions/checkout@v3
-        - uses: actions-rs/cargo@v1
+      - uses: taiki-e/install-action@v1
           with:
-            command: build
-            args: --release
+            tool: nextest
+      - run: cargo nextest run

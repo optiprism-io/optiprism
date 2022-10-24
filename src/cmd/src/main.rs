@@ -30,7 +30,7 @@ enum Cmd {
         #[arg(long)]
         md_path: Option<PathBuf>,
         #[arg(long, default_value = ".")]
-        ui_path: PathBuf,
+        ui_path: Option<PathBuf>,
         #[arg(long, default_value = "365 days")]
         duration: Option<String>,
         #[arg(long)]
@@ -63,18 +63,20 @@ async fn main() -> Result<()> {
             let md_path = match md_path {
                 None => temp_dir().join(format!("{}.db", Uuid::new_v4())),
                 Some(path) => {
-                    if !path.is_file() {
+                    if !path.is_dir() {
                         return Err(Error::Internal("md path should point to file".to_string()));
                     }
 
                     let mut check = path.clone();
-                    check.pop();
-                    check.try_exists()?;
+                    check.pop(); // pop the filename
+                    check.try_exists()?; // check the path
                     path
                 }
             };
 
-            ui_path.try_exists()?;
+            if let Some(ui_path) = &ui_path {
+                ui_path.try_exists()?;
+            }
 
             let cfg = demo::Config {
                 host,

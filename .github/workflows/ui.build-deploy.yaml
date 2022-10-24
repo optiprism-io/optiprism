@@ -14,13 +14,6 @@ on:
         type: choice
         options:
           - nikolai-kushner
-      build:
-        description: 'release - static files, debug - node server'
-        required: true
-        type: choice
-        options:
-          - release
-          - debug
 
 jobs:
   docker:
@@ -40,6 +33,7 @@ jobs:
       - name: Authorize Docker
         run: gcloud session configure-docker
 
+
       - name: Build and Push Container
         run: |-
           DOCKER_BUILDKIT=1 docker build -f docker/ui.${{ github.event.inputs.build }}.Dockerfile -t eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.sha }} .
@@ -52,10 +46,10 @@ jobs:
           SEAT: ${{ github.event.inputs.seat }}
         with:
           input: cloud/kubernetes/ui/deployment.tpl.yaml
-          output: cloud/kubernetes/ui/deployment.yaml
+          output: cloud/kubernetes/ui/deployment.tpl.yaml
 
       - uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: apply -f cloud/kubernetes/ui/deployment.yaml
+          args: apply -f cloud/kubernetes/ui/deployment.tpl.yaml
