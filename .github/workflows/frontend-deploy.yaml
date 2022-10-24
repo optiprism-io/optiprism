@@ -38,6 +38,7 @@ jobs:
   delopy-on-k8s:
     runs-on: ubuntu-20.04
     steps:
+      - uses: actions/checkout@v3
       - uses: danielr1996/envsubst-action@1.0.0
         env:
           IMAGE_REPO: registry.hub.docker.com/optiprismio/ui
