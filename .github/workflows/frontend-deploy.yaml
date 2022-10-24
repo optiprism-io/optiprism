@@ -43,7 +43,7 @@ jobs:
         env:
           IMAGE_REPO: registry.hub.docker.com/optiprismio/ui
           IMAGE_TAG: ${{ steps.branch-name.outputs.current_branch }}
-          SEAT: ${{ github.event.inputs.seat }}
+          SEAT: sdf
         with:
           input: cloud/kubernetes/ui/deployment.tpl.yaml
           output: cloud/kubernetes/ui/deployment.yaml
