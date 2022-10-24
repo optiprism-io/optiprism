@@ -1,12 +1,12 @@
 FROM node:lts-alpine3.16 as builder
 WORKDIR /app
-COPY ui/src src/
-COPY ui/package.json .
-COPY ui/tsconfig.json .
-COPY ui/vite.config.ts .
-COPY ui/yarn.lock .
-COPY ui/index.html .
-COPY ui/public public/
+COPY frontend/src src/
+COPY package.json .
+COPY tsconfig.json .
+COPY vite.config.ts .
+COPY yarn.lock .
+COPY index.html .
+COPY public public/
 RUN yarn install
 RUN yarn build
 
