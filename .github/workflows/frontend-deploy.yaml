@@ -34,16 +34,18 @@ jobs:
           push: true
           tags: optiprismio/ui:${{ steps.branch-name.outputs.current_branch }}
 
-
   delopy-on-k8s:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+      - name: Get branch name
+        id: branch-name
+        uses: tj-actions/branch-names@v6
       - uses: danielr1996/envsubst-action@1.0.0
         env:
           IMAGE_REPO: registry.hub.docker.com/optiprismio/ui
           IMAGE_TAG: ${{ steps.branch-name.outputs.current_branch }}
-          SEAT: sdf
+          SEAT: main
         with:
           input: cloud/kubernetes/ui/deployment.tpl.yaml
           output: cloud/kubernetes/ui/deployment.yaml
