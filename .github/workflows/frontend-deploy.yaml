@@ -1,13 +1,13 @@
 name: Build and push Docker image Test
-on:
-  workflow_dispatch:
-    inputs:
-      seat:
-        description: 'Seat on cluster'
-        required: true
-        type: choice
-        options:
-          - nikolai-kushner
+#on:
+#  workflow_dispatch:
+#    inputs:
+#      seat:
+#        description: 'Seat on cluster'
+#        required: true
+#        type: choice
+#        options:
+#          - nikolai-kushner
 jobs:
   build-and-push-docker:
     runs-on: ubuntu-20.04
