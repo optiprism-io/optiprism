@@ -1,0 +1,14 @@
+extends: default
+ignore: |
+  build/
+  target/
+  node_modules/
+rules:
+  line-length:
+    max: 150
+    level: warning
+  braces: disable
+  brackets: disable
+  document-start: disable
+  truthy:
+    check-keys: false

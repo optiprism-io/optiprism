@@ -1,0 +1,37 @@
+name: Lint and test backend
+on: workflow_dispatch
+# on:
+#   push:
+#     paths:
+#       - '*Cargo.lock'
+#       - '*Cargo.toml'
+#       - 'src'
+
+jobs:
+  check-fmt:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 50
+    name: Fmt
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare-backend-env
+      - run: cargo fmt --all -- --check
+  check-clippy:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 50
+    name: Clippy
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare-backend-env
+      - run: cargo clippy -- -D warnings
+  test:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 50
+    name: Unit Tests with caverage
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare-backend-env
+      - uses: taiki-e/install-action@v1
+        with:
+          tool: nextest
+      - run: cargo nextest run

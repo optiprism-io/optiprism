@@ -1,0 +1,54 @@
+[package]
+name = "platform"
+version = "0.1.0"
+authors = ["Optiprism <dev@optiprism.io>"]
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["lib"]
+
+[dependencies]
+anyhow = "1.0.65"
+argon2 = "0.4.1"
+arrow = { version = "20.0.0" }
+axum = { version = "0.5.16", features = ["headers"] }
+bytes = "1.2.1"
+chrono = { version = "0.4.19", features = ["serde"] }
+common = { path = "../common" }
+convert_case = "0.5.0"
+datafusion = "11.0.0"
+datafusion-common = "11.0.0"
+hyper = "0.14.20"
+jsonwebtoken = "8.1.1"
+lazy_static = "1.4.0"
+metadata = { path = "../metadata" }
+num-traits = "0.2.15"
+password-hash = { version = "0.4.2", features = ["std"] }
+query = { path = "../query" }
+rand = "0.8.4"
+reqwest = { version = "0.11", features = ["json", "cookies"] }
+rust_decimal = { version = "1.22.0", features = ["serde-with-float"] }
+serde = { version = "1.0.133", features = ["derive"] }
+serde_json = "1.0.74"
+serde_with = "2.0.1"
+thiserror = "1.0.31"
+time = "0.3.15"
+tokio = { version = "1.15.0", features = ["full"] }
+tower = "0.4.13"
+tower-cookies = { version = "0.7.0", features = ["axum-core"] }
+tower-http = { version = "0.3.4", features = ["fs"] }
+tracing = "0.1.37"
+url = "2.2.2"
+uuid = { version = "0.8.2", features = ["serde", "v4"] }
+
+[dev-dependencies]
+#criterion = "0.3.5"
+
+# [[bench]]
+# name = "count"
+# harness = false
+
+#[[bench]]
+#name = "dictionary"
+#harness = false

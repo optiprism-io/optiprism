@@ -1,0 +1,32 @@
+name: Frontend Lint and Test
+on: push
+# on:
+#   push:
+#      paths:
+#       - 'frontend/**'
+#       - '*package.json'
+#       - '*package-lock.json'
+#       - '*tsconfig.json'
+#       - '*vite.config.js'
+#       - '*yarn.lock'
+#       - '*eslintrc.js'
+
+jobs:
+  lint:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare-frontend-env
+      - run: yarn check:eslint
+  check-vue-tsc:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare-frontend-env
+      - run: yarn check:vue-tsc
+  test-coverage:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/prepare-frontend-env
+      - run: yarn test:coverage

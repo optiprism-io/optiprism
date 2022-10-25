@@ -1,5 +1,13 @@
 .idea
 .vscode
+.DS_Store
 
+.actrc
 target
 Cargo.lock
+
+node_modules
+dist
+dist-ssr
+*.local
+frontend/coverage

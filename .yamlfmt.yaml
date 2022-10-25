@@ -1,0 +1,9 @@
+include:
+  - "**/*.{yaml,yml}"
+exclude:
+  - build/**
+  - target/**
+  - node_modules/**
+formatter:
+  type: basic
+  indent: 4
