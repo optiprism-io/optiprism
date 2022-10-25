@@ -10,11 +10,11 @@ use crate::store::schema::create_entities;
 use events_gen::generator;
 use events_gen::generator::Generator;
 use events_gen::profiles::ProfileProvider;
-use log::info;
 use metadata::MetadataProvider;
 use rand::thread_rng;
 use std::collections::HashMap;
 use std::io;
+use tracing::info;
 
 use std::sync::Arc;
 

@@ -1,5 +1,4 @@
 extern crate bytesize;
-extern crate log;
 
 use std::fs::File;
 use std::path::PathBuf;
@@ -8,15 +7,19 @@ use std::{net::SocketAddr, sync::Arc};
 use bytesize::ByteSize;
 use chrono::{DateTime, Duration, Utc};
 use datafusion::datasource::MemTable;
-use log::{debug, info};
+use tracing::{debug, info};
 
-use crate::error::{Error, Result};
+use crate::error::{DemoError, Result};
 use metadata::store::Store;
 use metadata::MetadataProvider;
 use query::QueryProvider;
 
+pub mod error;
+mod store;
+
 pub struct Config {
     pub host: SocketAddr,
+    pub demo_data_path: PathBuf,
     pub md_path: PathBuf,
     pub ui_path: Option<PathBuf>,
     pub from_date: DateTime<Utc>,
@@ -46,19 +49,18 @@ pub async fn run(cfg: Config) -> Result<()> {
     info!("starting sample data generation...");
 
     let batches = {
-        let sample_data_path = PathBuf::from(format!("{}/demo_data", env!("CARGO_MANIFEST_DIR")));
         let store_cfg = crate::store::Config {
             org_id: 1,
             project_id: 1,
             md: md.clone(),
             from_date: cfg.from_date,
             to_date: cfg.to_date,
-            products_rdr: File::open(sample_data_path.join("products.csv"))
-                .map_err(|err| Error::Internal(format!("can't open products.csv: {err}")))?,
-            geo_rdr: File::open(sample_data_path.join("geo.csv"))
-                .map_err(|err| Error::Internal(format!("can't open geo.csv: {err}")))?,
-            device_rdr: File::open(sample_data_path.join("device.csv"))
-                .map_err(|err| Error::Internal(format!("can't open device.csv: {err}")))?,
+            products_rdr: File::open(cfg.demo_data_path.join("products.csv"))
+                .map_err(|err| DemoError::Internal(format!("can't open products.csv: {err}")))?,
+            geo_rdr: File::open(cfg.demo_data_path.join("geo.csv"))
+                .map_err(|err| DemoError::Internal(format!("can't open geo.csv: {err}")))?,
+            device_rdr: File::open(cfg.demo_data_path.join("device.csv"))
+                .map_err(|err| DemoError::Internal(format!("can't open device.csv: {err}")))?,
             new_daily_users: cfg.new_daily_users,
             batch_size: 4096,
             partitions: num_cpus::get(),

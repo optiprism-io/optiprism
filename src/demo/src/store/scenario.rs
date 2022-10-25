@@ -15,7 +15,7 @@ use std::thread;
 
 use common::DECIMAL_SCALE;
 use crossbeam_channel::tick;
-use log::info;
+use tracing::info;
 
 use rand::prelude::*;
 

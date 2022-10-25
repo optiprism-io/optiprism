@@ -12,6 +12,9 @@ cargo-lint:
 cargo-test:
 	cargo test
 
+cargo-udeps:
+	cargo +nightly udeps --all-targets
+
 cargo-build:
 	cargo build
 

@@ -1,0 +1,32 @@
+[package]
+name = "demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+events-gen = { path = "../events-gen" }
+common = { path = "../common" }
+bytesize = "1.1.0"
+datafusion = "11.0.0"
+chrono = { version = "0.4.19" }
+tracing = "0.1.37"
+metadata = { path = "../metadata" }
+query = { path = "../query" }
+num_cpus = "1.13.1"
+platform = { path = "../platform" }
+thiserror = "1.0.31"
+humantime = "2.1.0"
+arrow = { version = "20.0.0", features = ["prettyprint"] }
+enum-iterator = "1.2.0"
+rand = "0.8.0"
+rust_decimal = { version = "1.22.0", features = ["serde-float"] }
+crossbeam-channel = "0.3.9"
+strum = "0.24"
+strum_macros = "0.24"
+futures = "0.3.21"
+serde = { version = "1.0.133", features = ["derive"] }
+dateparser = "0.1.7"
+parse_duration = "2.1.1"
+anyhow = "1.0.65"
+time = "0.1.44"
+csv = "1.1"

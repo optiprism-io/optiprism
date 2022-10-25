@@ -11,8 +11,8 @@ use axum::http::StatusCode;
 use axum::routing::get_service;
 use axum::{Extension, Router, Server};
 
-use log::info;
 use metadata::MetadataProvider;
+use tracing::info;
 
 use std::io;
 use std::net::SocketAddr;

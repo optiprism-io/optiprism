@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{DemoError, Result};
 use common::DECIMAL_SCALE;
 use events_gen::probability;
 use futures::executor::block_on;
@@ -156,7 +156,7 @@ impl ProductProvider {
             categories.len(),
             vec![1., 0.5, 0.3, 0.1],
         )?)
-        .map_err(|err| Error::Internal(err.to_string()))?;
+        .map_err(|err| DemoError::Internal(err.to_string()))?;
 
         // make rating weights from 0 to 5 with 10 bins for each int value
         let rating_weights = probability::calc_cubic_spline(50, vec![0.01, 0.01, 0.1, 0.7, 1.])?;

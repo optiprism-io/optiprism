@@ -1,23 +1,49 @@
 use crate::error::{Error, Result};
 use chrono::{Duration, Utc};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use dateparser::DateTimeUtc;
 
 use std::env::temp_dir;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use tracing::metadata::LevelFilter;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;
 
 extern crate parse_duration;
 
-mod demo;
+use demo;
 mod error;
-mod store;
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl Into<LevelFilter> for LogLevel {
+    fn into(self) -> LevelFilter {
+        match self {
+            LogLevel::Trace => Level::TRACE,
+            LogLevel::Debug => Level::DEBUG,
+            LogLevel::Info => Level::INFO,
+            LogLevel::Warn => Level::WARN,
+            LogLevel::Error => Level::ERROR,
+        }
+        .into()
+    }
+}
 
 #[derive(Parser)]
 #[command(propagate_version = true)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
+    #[arg(value_enum, default_value = "debug")]
+    log_level: LogLevel,
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -27,6 +53,8 @@ enum Cmd {
     Demo {
         #[arg(long, default_value = "127.0.0.1:25535")]
         host: SocketAddr,
+        #[arg(long)]
+        demo_data_path: PathBuf,
         #[arg(long)]
         md_path: Option<PathBuf>,
         #[arg(long, default_value = ".")]
@@ -42,11 +70,22 @@ enum Cmd {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    env_logger::builder().format_target(false).init();
-    let cmd = Cli::parse();
-    match cmd.cmd {
+    let cli = Cli::parse();
+
+    // a builder for `FmtSubscriber`.
+    let subscriber = FmtSubscriber::builder()
+        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
+        // will be written to stdout.
+        .with_max_level(cli.log_level)
+        // completes the builder.
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+    match cli.cmd {
         Cmd::Demo {
             host,
+            demo_data_path,
             md_path,
             ui_path,
             duration,
@@ -64,12 +103,11 @@ async fn main() -> Result<()> {
                 None => temp_dir().join(format!("{}.db", Uuid::new_v4())),
                 Some(path) => {
                     if !path.is_dir() {
-                        return Err(Error::Internal("md path should point to file".to_string()));
+                        return Err(Error::Internal(
+                            "md path should point to directory".to_string(),
+                        ));
                     }
 
-                    let mut check = path.clone();
-                    check.pop(); // pop the filename
-                    check.try_exists()?; // check the path
                     path
                 }
             };
@@ -80,6 +118,7 @@ async fn main() -> Result<()> {
 
             let cfg = demo::Config {
                 host,
+                demo_data_path,
                 md_path,
                 ui_path,
                 from_date,

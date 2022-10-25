@@ -1,12 +1,12 @@
 use crate::error::{EventsGenError, Result};
 use futures::executor::block_on;
-use log::info;
 use metadata::dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use serde::Deserialize;
 use std::io;
+use tracing::info;
 
 use std::sync::Arc;
 
