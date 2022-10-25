@@ -1,10 +1,17 @@
-use crate::profiles::{Profile, ProfileProvider};
-use chrono::{DateTime, Duration, Utc};
-use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use std::fmt::Write;
+
+use chrono::DateTime;
+use chrono::Duration;
+use chrono::Utc;
+use indicatif::ProgressBar;
+use indicatif::ProgressState;
+use indicatif::ProgressStyle;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
-use std::fmt::Write;
+
+use crate::profiles::Profile;
+use crate::profiles::ProfileProvider;
 
 pub struct Generator {
     rng: ThreadRng,

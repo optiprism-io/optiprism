@@ -1,9 +1,18 @@
-use crate::properties::{Property, UpdatePropertyRequest};
-use crate::{properties, Context, PropertiesProvider, Result};
-use axum::extract::Path;
-use axum::{extract::Extension, routing, Json, Router};
-use metadata::metadata::ListResponse;
 use std::sync::Arc;
+
+use axum::extract::Extension;
+use axum::extract::Path;
+use axum::routing;
+use axum::Json;
+use axum::Router;
+use metadata::metadata::ListResponse;
+
+use crate::properties;
+use crate::properties::Property;
+use crate::properties::UpdatePropertyRequest;
+use crate::Context;
+use crate::PropertiesProvider;
+use crate::Result;
 
 async fn get_by_id(
     ctx: Context,

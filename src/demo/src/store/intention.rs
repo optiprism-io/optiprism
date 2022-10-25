@@ -1,7 +1,9 @@
-use crate::store::products::{Product, ProductProvider};
-use crate::store::scenario::State;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
+
+use crate::store::products::Product;
+use crate::store::products::ProductProvider;
+use crate::store::scenario::State;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Intention<'a> {

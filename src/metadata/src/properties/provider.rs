@@ -1,17 +1,27 @@
-use crate::error::{MetadataError, PropertyError, StoreError};
-use crate::metadata::ListResponse;
-use crate::properties::types::{CreatePropertyRequest, Property, UpdatePropertyRequest};
-use crate::store::index::hash_map::HashMap;
-use crate::store::path_helpers::{
-    list, make_data_value_key, make_id_seq_key, make_index_key, org_proj_ns,
-};
-use crate::store::Store;
-use crate::{error, Result};
-use bincode::{deserialize, serialize};
+use std::sync::Arc;
+
+use bincode::deserialize;
+use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
-use std::sync::Arc;
 use tokio::sync::RwLock;
+
+use crate::error;
+use crate::error::MetadataError;
+use crate::error::PropertyError;
+use crate::error::StoreError;
+use crate::metadata::ListResponse;
+use crate::properties::types::CreatePropertyRequest;
+use crate::properties::types::Property;
+use crate::properties::types::UpdatePropertyRequest;
+use crate::store::index::hash_map::HashMap;
+use crate::store::path_helpers::list;
+use crate::store::path_helpers::make_data_value_key;
+use crate::store::path_helpers::make_id_seq_key;
+use crate::store::path_helpers::make_index_key;
+use crate::store::path_helpers::org_proj_ns;
+use crate::store::Store;
+use crate::Result;
 
 #[derive(Clone, Debug)]
 pub enum Namespace {
@@ -136,7 +146,7 @@ impl Provider {
                     property_id: None,
                     property_name: Some(req.name),
                 })
-                .into())
+                .into());
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -342,7 +352,7 @@ impl Provider {
                     property_id: Some(property_id),
                     property_name: None,
                 })
-                .into())
+                .into());
             }
             Err(other) => return Err(other),
             Ok(_) => {}

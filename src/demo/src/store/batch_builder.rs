@@ -1,15 +1,21 @@
+use std::sync::Arc;
+
+use arrow::array::ArrayRef;
+use arrow::array::Decimal128Builder;
+use arrow::array::TimestampSecondBuilder;
+use arrow::array::UInt16Builder;
+use arrow::array::UInt64Builder;
+use arrow::array::UInt8Builder;
+use arrow::datatypes::SchemaRef;
+use arrow::record_batch::RecordBatch;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
+use events_gen::profiles::Profile;
+use rust_decimal::Decimal;
+
 use crate::error::Result;
 use crate::store::events::Event;
 use crate::store::scenario::State;
-use arrow::array::{
-    ArrayRef, Decimal128Builder, TimestampSecondBuilder, UInt16Builder, UInt64Builder, UInt8Builder,
-};
-use arrow::datatypes::SchemaRef;
-use arrow::record_batch::RecordBatch;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use events_gen::profiles::Profile;
-use rust_decimal::Decimal;
-use std::sync::Arc;
 
 pub struct RecordBatchBuilder {
     user_id: UInt64Builder,

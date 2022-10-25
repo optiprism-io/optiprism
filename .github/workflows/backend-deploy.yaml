@@ -1,11 +1,11 @@
 name: Deploy backend
 
-#on:
-#  push:
-#    paths:
-#      - '*Cargo.lock'
-#      - '*Cargo.toml'
-#      - 'src'
+# on:
+#   push:
+#     paths:
+#       - '*Cargo.lock'
+#       - '*Cargo.toml'
+#       - 'src'
 
 on: workflow_dispatch
 
@@ -32,4 +32,4 @@ jobs:
           context: .
           file: docker/optiprism/Dockerfile
           push: true
-          tags: optiprismio/optiprism:${{ steps.branch-name.outputs.current_branch }}
+          tags: optiprismio/optiprism:${{ steps.branch-name.outputs.current_branch }}-$${{ GITHUB_RUN_ID }}

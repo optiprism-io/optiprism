@@ -1,8 +1,12 @@
-use crate::PlatformError;
-use chrono::{DateTime, Utc};
-use common::types::{DictionaryDataType, OptionalProperty};
+use chrono::DateTime;
+use chrono::Utc;
+use common::types::DictionaryDataType;
+use common::types::OptionalProperty;
 use common::DataType;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::PlatformError;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]

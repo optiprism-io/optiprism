@@ -1,9 +1,13 @@
-use arrow::datatypes::DataType;
-use metadata::database::{Column, Provider, Table, TableRef};
-use metadata::error::Result;
-use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
+
+use arrow::datatypes::DataType;
+use metadata::database::Column;
+use metadata::database::Provider;
+use metadata::database::Table;
+use metadata::database::TableRef;
+use metadata::error::Result;
+use metadata::store::Store;
 use uuid::Uuid;
 
 #[tokio::test]
@@ -25,10 +29,11 @@ async fn test_database() -> Result<()> {
     assert!(db.create_table(table.clone()).await.is_err());
 
     // un-existent table
-    assert!(db
-        .get_table(TableRef::System("nx".to_string()))
-        .await
-        .is_err());
+    assert!(
+        db.get_table(TableRef::System("nx".to_string()))
+            .await
+            .is_err()
+    );
     // get table by name
     assert_eq!(db.get_table(table.typ.clone()).await?, table);
 
@@ -40,19 +45,22 @@ async fn test_database() -> Result<()> {
     };
 
     // add column, non-existent table
-    assert!(db
-        .add_column(TableRef::System("nx".to_string()), col.clone())
-        .await
-        .is_err());
+    assert!(
+        db.add_column(TableRef::System("nx".to_string()), col.clone())
+            .await
+            .is_err()
+    );
     // add column
-    assert!(db
-        .add_column(TableRef::System("t1".to_string()), col.clone())
-        .await
-        .is_ok());
+    assert!(
+        db.add_column(TableRef::System("t1".to_string()), col.clone())
+            .await
+            .is_ok()
+    );
     // column already exist
-    assert!(db
-        .add_column(TableRef::System("t1".to_string()), col.clone())
-        .await
-        .is_err());
+    assert!(
+        db.add_column(TableRef::System("t1".to_string()), col.clone())
+            .await
+            .is_err()
+    );
     Ok(())
 }

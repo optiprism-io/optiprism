@@ -1299,7 +1299,9 @@ paths:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
         required: true
-        description: property type and property id/name must be specified. Event is optional and works as a filter for values
+        description: >
+          property type and property id/name must be specified. Event is optional and 
+          works as a filter for values
         content:
           application/json:
             schema:
@@ -1539,7 +1541,7 @@ components:
     JWTToken:
       type: object
       required: [ 'accountId','organizationId','iss','exp','nbf','iat','jti' ]
-      description: see  https://datatracker.ietf.org/doc/html/rfc7519
+      description: see https://datatracker.ietf.org/doc/html/rfc7519
       properties:
         accountId:
           type: integer

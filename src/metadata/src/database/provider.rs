@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
-use crate::database::types::{Column, Table, TableRef};
 use bincode::serialize;
-
 use tokio::sync::RwLock;
 
-use crate::error::{DatabaseError, MetadataError};
-
+use crate::database::types::Column;
+use crate::database::types::Table;
+use crate::database::types::TableRef;
+use crate::error::DatabaseError;
+use crate::error::MetadataError;
 use crate::store::Store;
 use crate::Result;
 

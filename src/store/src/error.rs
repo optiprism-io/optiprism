@@ -1,6 +1,9 @@
+use std::fmt;
+use std::fmt::Display;
+use std::fmt::Formatter;
+use std::result;
+
 use datafusion::error::DataFusionError;
-use std::fmt::{Display, Formatter};
-use std::{fmt, result};
 
 pub type Result<T> = result::Result<T, StoreError>;
 

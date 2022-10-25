@@ -1,6 +1,7 @@
-use demo::error::DemoError;
 use std::net::AddrParseError;
 use std::result;
+
+use demo::error::DemoError;
 use thiserror::Error;
 use time::OutOfRangeError;
 

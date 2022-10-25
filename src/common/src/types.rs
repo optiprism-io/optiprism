@@ -1,8 +1,12 @@
-use crate::error::CommonError;
-use crate::ScalarValue;
 use arrow::datatypes::DataType as ArrowDataType;
 use datafusion::logical_plan::Operator;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::Serialize;
+use serde::Serializer;
+
+use crate::error::CommonError;
+use crate::ScalarValue;
 
 pub const DECIMAL_PRECISION: usize = 19;
 pub const DECIMAL_SCALE: usize = 10;
@@ -245,9 +249,7 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn into<X>(self) -> OptionalProperty<X>
-    where
-        T: Into<X>,
-    {
+    where T: Into<X> {
         match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(v.into()),
@@ -255,9 +257,7 @@ impl<T> OptionalProperty<T> {
     }
 
     pub fn try_into<X>(self) -> std::result::Result<OptionalProperty<X>, <T as TryInto<X>>::Error>
-    where
-        T: TryInto<X>,
-    {
+    where T: TryInto<X> {
         Ok(match self {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(v.try_into()?),
@@ -266,13 +266,10 @@ impl<T> OptionalProperty<T> {
 }
 
 impl<T> Serialize for OptionalProperty<T>
-where
-    T: Serialize,
+where T: Serialize
 {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
+    where S: Serializer {
         match self {
             OptionalProperty::None => panic!("!"),
             OptionalProperty::Some(v) => serializer.serialize_some(v),
@@ -281,13 +278,10 @@ where
 }
 
 impl<'de, T> Deserialize<'de> for OptionalProperty<T>
-where
-    T: Deserialize<'de>,
+where T: Deserialize<'de>
 {
     fn deserialize<D>(de: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         let a = Deserialize::deserialize(de);
         a.map(OptionalProperty::Some)
     }
@@ -295,9 +289,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::types::OptionalProperty;
     use serde::Deserialize;
     use serde_json;
+
+    use crate::types::OptionalProperty;
 
     #[test]
     fn test_optional_property_with_option() -> Result<(), serde_json::Error> {

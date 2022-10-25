@@ -1,7 +1,8 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
+use chrono::DateTime;
+use chrono::Utc;
 use common::types::OptionalProperty;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Project {

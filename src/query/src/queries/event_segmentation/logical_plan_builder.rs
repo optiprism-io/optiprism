@@ -2,32 +2,50 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::prelude::*;
-use chrono::{DateTime, Duration, Utc};
+use chrono::DateTime;
+use chrono::Duration;
+use chrono::Utc;
 use chronoutil::DateRule;
-use common::types::{EventFilter, PropertyRef};
-use datafusion::logical_plan::plan::{Aggregate, Extension, Filter};
-use datafusion::logical_plan::{Column, DFSchema, LogicalPlan};
+use common::types::EventFilter;
+use common::types::PropertyRef;
+use datafusion::logical_plan::plan::Aggregate;
+use datafusion::logical_plan::plan::Extension;
+use datafusion::logical_plan::plan::Filter;
+use datafusion::logical_plan::Column;
+use datafusion::logical_plan::DFSchema;
+use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::aggregates::AggregateFunction;
+use datafusion_expr::col;
 use datafusion_expr::expr_fn::and;
+use datafusion_expr::lit;
 use datafusion_expr::utils::exprlist_to_fields;
-use datafusion_expr::{col, lit, BuiltinScalarFunction, Expr};
+use datafusion_expr::BuiltinScalarFunction;
+use datafusion_expr::Expr;
 use futures::executor;
-
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use metadata::properties::provider::Namespace;
 use metadata::MetadataProvider;
 
 use crate::error::Result;
-use crate::expr::{event_expression, property_col, property_expression, time_expression};
+use crate::event_fields;
+use crate::expr::event_expression;
+use crate::expr::property_col;
+use crate::expr::property_expression;
+use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
-use crate::logical_plan::expr::{aggregate_partitioned, multi_and, sorted_distinct_count};
+use crate::logical_plan::expr::aggregate_partitioned;
+use crate::logical_plan::expr::multi_and;
+use crate::logical_plan::expr::sorted_distinct_count;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-use crate::queries::event_segmentation::types::{Breakdown, Event, EventSegmentation, Query};
+use crate::queries::event_segmentation::types::Breakdown;
+use crate::queries::event_segmentation::types::Event;
+use crate::queries::event_segmentation::types::EventSegmentation;
+use crate::queries::event_segmentation::types::Query;
 use crate::queries::types::TimeUnit;
-use crate::{event_fields, Context};
+use crate::Context;
 
 pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
@@ -240,7 +258,7 @@ impl LogicalPlanBuilder {
             expr = and(expr.clone(), self.event_filters_expression(filters).await?);
         }
 
-        //global filter
+        // global filter
         Ok(LogicalPlan::Filter(Filter {
             predicate: expr,
             input: Arc::new(input),

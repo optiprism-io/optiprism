@@ -1,12 +1,15 @@
-use crate::custom_events::types::{
-    CreateCustomEventRequest, CustomEvent, UpdateCustomEventRequest,
-};
-use crate::{Context, Result};
+use std::sync::Arc;
+
 use common::rbac::ProjectPermission;
 use common::types::OptionalProperty;
 use metadata::custom_events;
 use metadata::metadata::ListResponse;
-use std::sync::Arc;
+
+use crate::custom_events::types::CreateCustomEventRequest;
+use crate::custom_events::types::CustomEvent;
+use crate::custom_events::types::UpdateCustomEventRequest;
+use crate::Context;
+use crate::Result;
 
 pub struct Provider {
     prov: Arc<custom_events::Provider>,

@@ -1,6 +1,10 @@
-use axum::extract::{Extension, Path};
-use axum::{routing, Json, Router};
 use std::sync::Arc;
+
+use axum::extract::Extension;
+use axum::extract::Path;
+use axum::routing;
+use axum::Json;
+use axum::Router;
 
 use crate::data_table::DataTable;
 use crate::queries::event_segmentation::EventSegmentation;

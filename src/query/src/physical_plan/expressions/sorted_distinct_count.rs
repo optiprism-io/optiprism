@@ -1,18 +1,36 @@
-use arrow::array::{
-    Array, ArrayRef, BooleanArray, Date32Array, Date64Array, Int16Array, Int32Array, Int64Array,
-    Int8Array, StringArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array,
-    UInt8Array,
-};
-use arrow::compute;
-use arrow::datatypes::{DataType, TimeUnit};
-use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion::physical_plan::Accumulator;
-use datafusion_common::ScalarValue;
-use datafusion_common::{DataFusionError, Result};
-use datafusion_expr::{AccumulatorFunctionImplementation, ReturnTypeFunction, StateTypeFunction};
-use datafusion_expr::{AggregateState, Signature, TypeSignature, Volatility};
 use std::fmt::Debug;
 use std::sync::Arc;
+
+use arrow::array::Array;
+use arrow::array::ArrayRef;
+use arrow::array::BooleanArray;
+use arrow::array::Date32Array;
+use arrow::array::Date64Array;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
+use arrow::array::StringArray;
+use arrow::array::TimestampSecondArray;
+use arrow::array::UInt16Array;
+use arrow::array::UInt32Array;
+use arrow::array::UInt64Array;
+use arrow::array::UInt8Array;
+use arrow::compute;
+use arrow::datatypes::DataType;
+use arrow::datatypes::TimeUnit;
+use datafusion::physical_plan::udaf::AggregateUDF;
+use datafusion::physical_plan::Accumulator;
+use datafusion_common::DataFusionError;
+use datafusion_common::Result;
+use datafusion_common::ScalarValue;
+use datafusion_expr::AccumulatorFunctionImplementation;
+use datafusion_expr::AggregateState;
+use datafusion_expr::ReturnTypeFunction;
+use datafusion_expr::Signature;
+use datafusion_expr::StateTypeFunction;
+use datafusion_expr::TypeSignature;
+use datafusion_expr::Volatility;
 
 #[derive(Debug)]
 pub struct SortedDistinctCount {

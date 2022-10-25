@@ -1,31 +1,42 @@
-use crate::Result;
-use ahash::RandomState;
-use arrow::array::{Array, ArrayRef, StringArray};
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-use arrow::error::Result as ArrowResult;
-use arrow::record_batch::RecordBatch;
-
-use axum::async_trait;
-use datafusion_common::Result as DFResult;
-
-use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
-use datafusion::physical_plan::hash_utils::create_hashes;
-use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
-use datafusion::physical_plan::{
-    DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
-    Statistics,
-};
-use datafusion_common::ScalarValue;
-use fnv::FnvHashMap;
-use futures::{Stream, StreamExt};
 use std::any::Any;
-
-use crate::error::QueryError;
-use datafusion::execution::context::TaskContext;
 use std::fmt;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::task::Context;
+use std::task::Poll;
+
+use ahash::RandomState;
+use arrow::array::Array;
+use arrow::array::ArrayRef;
+use arrow::array::StringArray;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
+use arrow::error::Result as ArrowResult;
+use arrow::record_batch::RecordBatch;
+use axum::async_trait;
+use datafusion::execution::context::TaskContext;
+use datafusion::physical_plan::expressions::Column;
+use datafusion::physical_plan::expressions::PhysicalSortExpr;
+use datafusion::physical_plan::hash_utils::create_hashes;
+use datafusion::physical_plan::metrics::BaselineMetrics;
+use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
+use datafusion::physical_plan::metrics::MetricsSet;
+use datafusion::physical_plan::DisplayFormatType;
+use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::RecordBatchStream;
+use datafusion::physical_plan::SendableRecordBatchStream;
+use datafusion::physical_plan::Statistics;
+use datafusion_common::Result as DFResult;
+use datafusion_common::ScalarValue;
+use fnv::FnvHashMap;
+use futures::Stream;
+use futures::StreamExt;
+
+use crate::error::QueryError;
+use crate::Result;
 
 #[derive(Debug)]
 pub struct PivotExec {
@@ -137,10 +148,10 @@ impl ExecutionPlan for PivotExec {
 
         let mut result_map: FnvHashMap<String, Vec<ScalarValue>> = FnvHashMap::default();
         for result_col in self.result_cols.clone() {
-            result_map.insert(
-                result_col,
-                vec![ScalarValue::try_from(&self.value_type)?; BUFFER_LENGTH],
-            );
+            result_map.insert(result_col, vec![
+                ScalarValue::try_from(&self.value_type)?;
+                BUFFER_LENGTH
+            ]);
         }
         Ok(Box::pin(PivotStream {
             stream,
@@ -258,7 +269,7 @@ impl PivotStream {
                         "unknown name column \"{:?}\"",
                         col_name
                     ))
-                    .into())
+                    .into());
                 }
                 Some(values) => {
                     if values.len() - 1 < group_idx {
@@ -335,17 +346,21 @@ impl Stream for PivotStream {
 
 #[cfg(test)]
 mod tests {
-    use crate::physical_plan::pivot::PivotExec;
-    use arrow::array::{ArrayRef, Float64Array, Int32Array, StringArray};
-    use arrow::record_batch::RecordBatch;
-    pub use datafusion_common::Result;
+    use std::sync::Arc;
 
+    use arrow::array::ArrayRef;
+    use arrow::array::Float64Array;
+    use arrow::array::Int32Array;
+    use arrow::array::StringArray;
+    use arrow::record_batch::RecordBatch;
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::expressions::Column;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
-    use std::sync::Arc;
+    pub use datafusion_common::Result;
+
+    use crate::physical_plan::pivot::PivotExec;
 
     #[tokio::test]
     async fn test() -> Result<()> {

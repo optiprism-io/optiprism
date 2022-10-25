@@ -1,36 +1,69 @@
-use crate::Result;
-use arrow::array::{
-    Array, ArrayAccessor, ArrayRef, BooleanArray, BooleanBuilder, Decimal128Array,
-    Decimal128Builder, Float32Builder, Float64Builder, Int16Array, Int16Builder, Int32Array,
-    Int32Builder, Int64Array, Int64Builder, Int8Array, Int8Builder, StringBuilder,
-    TimestampNanosecondArray, TimestampNanosecondBuilder, UInt16Builder, UInt32Builder,
-    UInt64Builder, UInt8Builder,
-};
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use std::any::Any;
+use std::fmt;
+use std::fmt::Debug;
+use std::fmt::Formatter;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::Context;
+use std::task::Poll;
+
+use arrow::array::Array;
+use arrow::array::ArrayAccessor;
+use arrow::array::ArrayRef;
+use arrow::array::BooleanArray;
+use arrow::array::BooleanBuilder;
+use arrow::array::Decimal128Array;
+use arrow::array::Decimal128Builder;
+use arrow::array::Float32Builder;
+use arrow::array::Float64Builder;
+use arrow::array::Int16Array;
+use arrow::array::Int16Builder;
+use arrow::array::Int32Array;
+use arrow::array::Int32Builder;
+use arrow::array::Int64Array;
+use arrow::array::Int64Builder;
+use arrow::array::Int8Array;
+use arrow::array::Int8Builder;
+use arrow::array::StringBuilder;
+use arrow::array::TimestampNanosecondArray;
+use arrow::array::TimestampNanosecondBuilder;
+use arrow::array::UInt16Builder;
+use arrow::array::UInt32Builder;
+use arrow::array::UInt64Builder;
+use arrow::array::UInt8Builder;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use datafusion::arrow::array::{
-    Float32Array, Float64Array, StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
-};
-
-use crate::error::QueryError;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
+use datafusion::arrow::array::Float32Array;
+use datafusion::arrow::array::Float64Array;
+use datafusion::arrow::array::StringArray;
+use datafusion::arrow::array::UInt16Array;
+use datafusion::arrow::array::UInt32Array;
+use datafusion::arrow::array::UInt64Array;
+use datafusion::arrow::array::UInt8Array;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
-use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
-use datafusion::physical_plan::{
-    DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
-    Statistics,
-};
+use datafusion::physical_plan::metrics::BaselineMetrics;
+use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
+use datafusion::physical_plan::metrics::MetricsSet;
+use datafusion::physical_plan::DisplayFormatType;
+use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::RecordBatchStream;
+use datafusion::physical_plan::SendableRecordBatchStream;
+use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
-use futures::{Stream, StreamExt};
-use std::any::Any;
-use std::fmt;
-use std::fmt::{Debug, Formatter};
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use futures::Stream;
+use futures::StreamExt;
+
+use crate::error::QueryError;
+use crate::Result;
 
 /// `UNPIVOT` execution plan operator. Unpivot transforms columns into rows. E.g.
 pub struct UnpivotExec {
@@ -445,16 +478,21 @@ pub fn unpivot(
 
 #[cfg(test)]
 mod tests {
-    use crate::physical_plan::unpivot::UnpivotExec;
-    use arrow::array::{ArrayRef, Float32Array, Float64Array, Int32Array, StringArray};
-    use arrow::record_batch::RecordBatch;
-    pub use datafusion_common::Result;
+    use std::sync::Arc;
 
+    use arrow::array::ArrayRef;
+    use arrow::array::Float32Array;
+    use arrow::array::Float64Array;
+    use arrow::array::Int32Array;
+    use arrow::array::StringArray;
+    use arrow::record_batch::RecordBatch;
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
-    use std::sync::Arc;
+    pub use datafusion_common::Result;
+
+    use crate::physical_plan::unpivot::UnpivotExec;
 
     #[tokio::test]
     async fn test() -> Result<()> {

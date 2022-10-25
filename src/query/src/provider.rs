@@ -6,24 +6,28 @@ use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
 use chrono::Utc;
-use datafusion::datasource::{DefaultTableSource, TableProvider};
+use datafusion::datasource::DefaultTableSource;
+use datafusion::datasource::TableProvider;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
-use datafusion::physical_plan::{collect, displayable};
-use datafusion::prelude::{SessionConfig, SessionContext};
-
+use datafusion::physical_plan::collect;
+use datafusion::physical_plan::displayable;
+use datafusion::prelude::SessionConfig;
+use datafusion::prelude::SessionContext;
 use metadata::MetadataProvider;
 
+use crate::data_table;
 use crate::data_table::DataTable;
 use crate::physical_plan::planner::QueryPlanner;
+use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::queries::event_segmentation::types::EventSegmentation;
+use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
-use crate::queries::{event_segmentation, property_values};
+use crate::Context;
 use crate::Result;
-use crate::{data_table, Context};
 
 pub struct QueryProvider {
     metadata: Arc<MetadataProvider>,

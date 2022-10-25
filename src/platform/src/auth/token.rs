@@ -1,9 +1,16 @@
+use chrono::Duration;
+use chrono::Utc;
+use jsonwebtoken::decode;
+use jsonwebtoken::encode;
+use jsonwebtoken::Algorithm;
+use jsonwebtoken::DecodingKey;
+use jsonwebtoken::EncodingKey;
+use jsonwebtoken::Header;
+use jsonwebtoken::Validation;
+use serde::Deserialize;
+use serde::Serialize;
+
 use crate::error::Result;
-
-use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

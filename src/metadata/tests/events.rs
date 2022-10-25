@@ -1,11 +1,13 @@
-use metadata::error::Result;
-use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 
 use common::types::OptionalProperty;
+use metadata::error::Result;
 use metadata::events::types::CreateEventRequest;
-use metadata::events::{Provider, Status, UpdateEventRequest};
+use metadata::events::Provider;
+use metadata::events::Status;
+use metadata::events::UpdateEventRequest;
+use metadata::store::Store;
 use uuid::Uuid;
 
 #[tokio::test]
@@ -43,10 +45,12 @@ async fn test_events() -> Result<()> {
     assert!(events.get_by_id(1, 1, 1).await.is_err());
     assert!(events.get_by_name(1, 1, "test").await.is_err());
     assert!(events.delete(1, 1, 1).await.is_err());
-    assert!(events
-        .update(1, 1, 1, update_event_req.clone())
-        .await
-        .is_err());
+    assert!(
+        events
+            .update(1, 1, 1, update_event_req.clone())
+            .await
+            .is_err()
+    );
     // assert_eq!(events.list_events().await?, vec![]);
     // create two events
 

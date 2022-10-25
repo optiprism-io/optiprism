@@ -5,20 +5,19 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
-common = { path = "../common" }
+arrow = { version = "20.0.0", features = ["prettyprint"] }
 chrono = { version = "0.4.19" }
-rand = "0.8.0"
+common = { path = "../common" }
+csv = "1.1"
+cubic_spline = "1.0.0"
+futures = "0.3.21"
+indicatif = "0.17.1"
 lazy_static = "1.4.0"
+metadata = { path = "../metadata" }
+rand = "0.8.0"
+serde = { version = "1.0.133", features = ["derive"] }
 strum = "0.24"
 strum_macros = "0.24"
-csv = "1.1"
-serde = { version = "1.0.133", features = ["derive"] }
-cubic_spline = "1.0.0"
-arrow = { version = "20.0.0", features = ["prettyprint"] }
-metadata = { path = "../metadata" }
-tokio = { version = "1.15.0", features = ["full"] }
-futures = "0.3.21"
 thiserror = "1.0.31"
-indicatif = "0.17.1"
+tokio = { version = "1.15.0", features = ["full"] }
 tracing = "0.1.37"
-tracing-subscriber = "0.3.16"

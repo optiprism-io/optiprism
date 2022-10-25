@@ -1,11 +1,13 @@
-use crate::properties::UpdatePropertyRequest;
-use crate::{Context, Result};
+use std::sync::Arc;
+
 use common::rbac::ProjectPermission;
 use metadata::metadata::ListResponse;
+use metadata::properties::provider::Provider as PropertiesProvider;
 
 use crate::properties::types::Property;
-use metadata::properties::provider::Provider as PropertiesProvider;
-use std::sync::Arc;
+use crate::properties::UpdatePropertyRequest;
+use crate::Context;
+use crate::Result;
 
 pub struct Provider {
     prov: Arc<PropertiesProvider>,

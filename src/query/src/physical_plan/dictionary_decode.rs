@@ -1,34 +1,44 @@
-use arrow::array::{
-    Array, ArrayRef, StringBuilder, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
-};
-
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-use arrow::error::{ArrowError, Result as ArrowResult};
-use arrow::record_batch::RecordBatch;
-
-use axum::async_trait;
-use datafusion_common::Result as DFResult;
-
-use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
-
-use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
-use datafusion::physical_plan::{
-    DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
-    Statistics,
-};
-
-use futures::executor::block_on;
-use futures::{Stream, StreamExt};
-
-use metadata::dictionaries::provider::SingleDictionaryProvider;
 use std::any::Any;
-
-use datafusion::execution::context::TaskContext;
 use std::fmt;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::task::Context;
+use std::task::Poll;
+
+use arrow::array::Array;
+use arrow::array::ArrayRef;
+use arrow::array::StringBuilder;
+use arrow::array::UInt16Array;
+use arrow::array::UInt32Array;
+use arrow::array::UInt64Array;
+use arrow::array::UInt8Array;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
+use arrow::error::ArrowError;
+use arrow::error::Result as ArrowResult;
+use arrow::record_batch::RecordBatch;
+use axum::async_trait;
+use datafusion::execution::context::TaskContext;
+use datafusion::physical_plan::expressions::Column;
+use datafusion::physical_plan::expressions::PhysicalSortExpr;
+use datafusion::physical_plan::metrics::BaselineMetrics;
+use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
+use datafusion::physical_plan::metrics::MetricsSet;
+use datafusion::physical_plan::DisplayFormatType;
+use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::RecordBatchStream;
+use datafusion::physical_plan::SendableRecordBatchStream;
+use datafusion::physical_plan::Statistics;
+use datafusion_common::Result as DFResult;
+use futures::executor::block_on;
+use futures::Stream;
+use futures::StreamExt;
+use metadata::dictionaries::provider::SingleDictionaryProvider;
 
 pub struct DictionaryDecodeExec {
     input: Arc<dyn ExecutionPlan>,

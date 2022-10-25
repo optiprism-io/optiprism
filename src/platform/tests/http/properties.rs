@@ -1,16 +1,18 @@
 use chrono::Utc;
+use common::types::DictionaryDataType;
+use common::types::OptionalProperty;
+use common::DataType;
 use metadata::metadata::ListResponse;
 use metadata::properties::CreatePropertyRequest;
-
 use platform::error::Result;
+use platform::properties::Property;
+use platform::properties::Status;
+use platform::properties::UpdatePropertyRequest;
+use reqwest::Client;
+use reqwest::StatusCode;
 
-use platform::properties::{Property, Status, UpdatePropertyRequest};
-
-use reqwest::{Client, StatusCode};
-
-use crate::http::tests::{create_admin_acc_and_login, run_http_service};
-use common::types::{DictionaryDataType, OptionalProperty};
-use common::DataType;
+use crate::http::tests::create_admin_acc_and_login;
+use crate::http::tests::run_http_service;
 
 fn assert(l: &Property, r: &Property) {
     assert_eq!(l.id, r.id);

@@ -1,18 +1,23 @@
 extern crate bytesize;
 
 use std::fs::File;
+use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::{net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 
 use bytesize::ByteSize;
-use chrono::{DateTime, Duration, Utc};
+use chrono::DateTime;
+use chrono::Duration;
+use chrono::Utc;
 use datafusion::datasource::MemTable;
-use tracing::{debug, info};
-
-use crate::error::{DemoError, Result};
 use metadata::store::Store;
 use metadata::MetadataProvider;
 use query::QueryProvider;
+use tracing::debug;
+use tracing::info;
+
+use crate::error::DemoError;
+use crate::error::Result;
 
 pub mod error;
 mod store;

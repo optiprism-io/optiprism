@@ -1,15 +1,16 @@
 use chrono::Utc;
-
-use metadata::metadata::ListResponse;
-
-use platform::error::Result;
-use platform::events::{CreateEventRequest, UpdateEventRequest};
-use platform::events::{Event, Status};
-
-use reqwest::{Client, StatusCode};
-
-use crate::http::tests::{create_admin_acc_and_login, run_http_service};
 use common::types::OptionalProperty;
+use metadata::metadata::ListResponse;
+use platform::error::Result;
+use platform::events::CreateEventRequest;
+use platform::events::Event;
+use platform::events::Status;
+use platform::events::UpdateEventRequest;
+use reqwest::Client;
+use reqwest::StatusCode;
+
+use crate::http::tests::create_admin_acc_and_login;
+use crate::http::tests::run_http_service;
 
 fn assert(l: &Event, r: &Event) {
     assert_eq!(l.id, 1);

@@ -5,24 +5,27 @@ pub mod events;
 pub mod properties;
 pub mod queries;
 
-use crate::error::Result;
-use crate::PlatformProvider;
-use axum::http::StatusCode;
-use axum::routing::get_service;
-use axum::{Extension, Router, Server};
-
-use metadata::MetadataProvider;
-use tracing::info;
-
 use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use axum::http::StatusCode;
+use axum::routing::get_service;
+use axum::Extension;
+use axum::Router;
+use axum::Server;
+use metadata::MetadataProvider;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tokio::time::sleep;
 use tower_cookies::CookieManagerLayer;
-use tower_http::services::{ServeDir, ServeFile};
+use tower_http::services::ServeDir;
+use tower_http::services::ServeFile;
+use tracing::info;
+
+use crate::error::Result;
+use crate::PlatformProvider;
 
 pub struct Service {
     router: Router,

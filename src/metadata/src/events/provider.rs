@@ -1,22 +1,28 @@
 use std::sync::Arc;
 
-use bincode::{deserialize, serialize};
+use bincode::deserialize;
+use bincode::serialize;
 use chrono::Utc;
-
 use common::types::OptionalProperty;
 use tokio::sync::RwLock;
 
-use crate::error::{EventError, MetadataError, StoreError};
-use crate::events::types::{CreateEventRequest, UpdateEventRequest};
+use crate::error;
+use crate::error::EventError;
+use crate::error::MetadataError;
+use crate::error::StoreError;
+use crate::events::types::CreateEventRequest;
+use crate::events::types::UpdateEventRequest;
 use crate::events::Event;
 use crate::metadata::ListResponse;
 use crate::properties::provider::Namespace;
 use crate::store::index::hash_map::HashMap;
-use crate::store::path_helpers::{
-    list, make_data_value_key, make_id_seq_key, make_index_key, org_proj_ns,
-};
+use crate::store::path_helpers::list;
+use crate::store::path_helpers::make_data_value_key;
+use crate::store::path_helpers::make_id_seq_key;
+use crate::store::path_helpers::make_index_key;
+use crate::store::path_helpers::org_proj_ns;
 use crate::store::Store;
-use crate::{error, Result};
+use crate::Result;
 
 const NAMESPACE: &[u8] = b"events";
 const IDX_NAME: &[u8] = b"name";
@@ -106,7 +112,7 @@ impl Provider {
                     project_id,
                     req.name,
                 ))
-                .into())
+                .into());
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -283,7 +289,7 @@ impl Provider {
                     project_id,
                     event_id,
                 ))
-                .into())
+                .into());
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -351,7 +357,7 @@ impl Provider {
                         property_id: Some(prop_id),
                         property_name: None,
                     })
-                    .into())
+                    .into());
                 }
             },
         };
@@ -389,7 +395,7 @@ impl Provider {
                     property_id: Some(prop_id),
                     property_name: None,
                 })
-                .into())
+                .into());
             }
             Some(props) => match props.iter().find(|x| prop_id == **x) {
                 None => {
@@ -401,7 +407,7 @@ impl Provider {
                         property_id: Some(prop_id),
                         property_name: None,
                     })
-                    .into())
+                    .into());
                 }
                 Some(_) => Some(props.into_iter().filter(|x| prop_id != *x).collect()),
             },

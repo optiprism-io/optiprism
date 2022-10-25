@@ -1,9 +1,12 @@
+use std::error;
+use std::result;
 use std::string::FromUtf8Error;
-use std::{error, result};
 
-use crate::database::{Column, TableRef};
-use crate::properties;
 use thiserror::Error;
+
+use crate::database::Column;
+use crate::database::TableRef;
+use crate::properties;
 
 pub type Result<T> = result::Result<T, MetadataError>;
 

@@ -1,8 +1,11 @@
-use chrono::{DateTime, Utc};
-use common::rbac::{OrganizationRole, ProjectRole, Role};
-use serde::{Deserialize, Serialize};
-
+use chrono::DateTime;
+use chrono::Utc;
+use common::rbac::OrganizationRole;
+use common::rbac::ProjectRole;
+use common::rbac::Role;
 use common::types::OptionalProperty;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Account {

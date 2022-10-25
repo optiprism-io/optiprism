@@ -2,20 +2,25 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::result;
 
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-    Json,
-};
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::response::Response;
+use axum::Json;
 use common::error::CommonError;
+use metadata::error::AccountError;
+use metadata::error::CustomEventError;
+use metadata::error::DatabaseError;
+use metadata::error::DictionaryError;
+use metadata::error::EventError;
+use metadata::error::MetadataError;
+use metadata::error::OrganizationError;
+use metadata::error::ProjectError;
+use metadata::error::PropertyError;
+use metadata::error::StoreError;
+use metadata::error::TeamError;
+use query::error::QueryError;
 use serde::Serialize;
 use thiserror::Error;
-
-use metadata::error::{
-    AccountError, CustomEventError, DatabaseError, DictionaryError, EventError, MetadataError,
-    OrganizationError, ProjectError, PropertyError, StoreError, TeamError,
-};
-use query::error::QueryError;
 
 pub type Result<T> = result::Result<T, PlatformError>;
 
@@ -102,17 +107,14 @@ impl ErrorResponse {
     }
 
     pub fn new(err: String, status: StatusCode) -> (StatusCode, Self) {
-        (
-            status,
-            Self {
-                error: InnerError {
-                    status: status.as_u16(),
-                    code: status.to_string(),
-                    message: err,
-                },
-                fields: None,
+        (status, Self {
+            error: InnerError {
+                status: status.as_u16(),
+                code: status.to_string(),
+                message: err,
             },
-        )
+            fields: None,
+        })
     }
 }
 

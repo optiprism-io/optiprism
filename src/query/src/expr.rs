@@ -1,23 +1,37 @@
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
-use chrono::{DateTime, Utc};
-use common::types::{EventFilter, EventRef, PropValueOperation, PropertyRef};
+use chrono::DateTime;
+use chrono::Utc;
+use common::types::EventFilter;
+use common::types::EventRef;
+use common::types::PropValueOperation;
+use common::types::PropertyRef;
 use common::ScalarValue;
 use datafusion::logical_plan::ExprSchemable;
-use datafusion_common::{Column, ExprSchema, ScalarValue as DFScalarValue};
-use datafusion_expr::expr_fn::{and, binary_expr};
-use datafusion_expr::{col, lit, or, Expr, Operator};
+use datafusion_common::Column;
+use datafusion_common::ExprSchema;
+use datafusion_common::ScalarValue as DFScalarValue;
+use datafusion_expr::col;
+use datafusion_expr::expr_fn::and;
+use datafusion_expr::expr_fn::binary_expr;
+use datafusion_expr::lit;
+use datafusion_expr::or;
+use datafusion_expr::Expr;
+use datafusion_expr::Operator;
 use futures::executor;
-
+use metadata::dictionaries;
 use metadata::properties::provider::Namespace;
-use metadata::{dictionaries, MetadataProvider};
+use metadata::MetadataProvider;
 
 use crate::error::QueryError;
-use crate::logical_plan::expr::{lit_timestamp, multi_and, multi_or};
+use crate::event_fields;
+use crate::logical_plan::expr::lit_timestamp;
+use crate::logical_plan::expr::multi_and;
+use crate::logical_plan::expr::multi_or;
 use crate::queries::types::QueryTime;
 use crate::Context;
-use crate::{event_fields, Result};
+use crate::Result;
 
 /// builds expression on timestamp
 pub fn time_expression<S: ExprSchema>(

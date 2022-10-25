@@ -1,14 +1,18 @@
-use super::SignUpRequest;
-use crate::{PlatformError, Result};
+use std::sync::Arc;
+
 use chrono::Duration;
-
-use crate::auth::token::{make_access_token, make_refresh_token, parse_refresh_token};
-use crate::auth::types::TokensResponse;
-
-use crate::auth::password::{make_password_hash, verify_password};
 use metadata::accounts::CreateAccountRequest;
 use password_hash::PasswordHash;
-use std::sync::Arc;
+
+use super::SignUpRequest;
+use crate::auth::password::make_password_hash;
+use crate::auth::password::verify_password;
+use crate::auth::token::make_access_token;
+use crate::auth::token::make_refresh_token;
+use crate::auth::token::parse_refresh_token;
+use crate::auth::types::TokensResponse;
+use crate::PlatformError;
+use crate::Result;
 
 #[derive(Clone)]
 pub struct Provider {

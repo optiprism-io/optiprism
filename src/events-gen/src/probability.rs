@@ -1,5 +1,8 @@
-use crate::error::{EventsGenError, Result};
-use cubic_spline::{Points, SplineOpts};
+use cubic_spline::Points;
+use cubic_spline::SplineOpts;
+
+use crate::error::EventsGenError;
+use crate::error::Result;
 
 pub fn calc_cubic_spline(total_points: usize, key_points: Vec<f64>) -> Result<Vec<f64>> {
     assert!(key_points.len() <= total_points);

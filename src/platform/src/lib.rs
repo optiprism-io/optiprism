@@ -11,25 +11,36 @@ pub mod provider;
 pub mod queries;
 pub mod types;
 
-use rust_decimal::prelude::ToPrimitive;
-
 pub use accounts::Provider as AccountsProvider;
-use arrow::array::{
-    Array, BooleanArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
-    StringArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
-};
-use arrow::array::{ArrayRef, Decimal128Array};
+use arrow::array::Array;
+use arrow::array::ArrayRef;
+use arrow::array::BooleanArray;
+use arrow::array::Decimal128Array;
+use arrow::array::Float32Array;
+use arrow::array::Float64Array;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
+use arrow::array::StringArray;
+use arrow::array::UInt16Array;
+use arrow::array::UInt32Array;
+use arrow::array::UInt64Array;
+use arrow::array::UInt8Array;
 use arrow::datatypes::DataType;
-
 pub use auth::Provider as AuthProvider;
 pub use context::Context;
 pub use custom_events::Provider as CustomEventsProvider;
-pub use error::{PlatformError, Result};
+pub use error::PlatformError;
+pub use error::Result;
 pub use events::Provider as EventsProvider;
 pub use properties::Provider as PropertiesProvider;
 pub use provider::PlatformProvider;
+use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
-use serde_json::{json, Number, Value};
+use serde_json::json;
+use serde_json::Number;
+use serde_json::Value;
 
 #[macro_export]
 macro_rules! arr_to_json_values {

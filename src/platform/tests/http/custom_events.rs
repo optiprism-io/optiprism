@@ -1,18 +1,18 @@
 use chrono::Utc;
-use metadata::metadata::ListResponse;
-
-use platform::error::Result;
-
-use platform::custom_events::types::{
-    CreateCustomEventRequest, CustomEvent, Event, Status, UpdateCustomEventRequest,
-};
-
-use platform::queries::types::EventRef;
-
-use reqwest::{Client, StatusCode};
-
-use crate::http::tests::{create_admin_acc_and_login, run_http_service};
 use common::types::OptionalProperty;
+use metadata::metadata::ListResponse;
+use platform::custom_events::types::CreateCustomEventRequest;
+use platform::custom_events::types::CustomEvent;
+use platform::custom_events::types::Event;
+use platform::custom_events::types::Status;
+use platform::custom_events::types::UpdateCustomEventRequest;
+use platform::error::Result;
+use platform::queries::types::EventRef;
+use reqwest::Client;
+use reqwest::StatusCode;
+
+use crate::http::tests::create_admin_acc_and_login;
+use crate::http::tests::run_http_service;
 
 fn assert(l: &CustomEvent, r: &CustomEvent) {
     assert_eq!(l.id, 1);
@@ -33,40 +33,32 @@ async fn test_custom_events() -> Result<()> {
 
     let event1 = md
         .events
-        .create(
-            1,
-            1,
-            metadata::events::CreateEventRequest {
-                created_by: 0,
-                tags: None,
-                name: "e1".to_string(),
-                display_name: None,
-                description: None,
-                status: metadata::events::Status::Enabled,
-                is_system: false,
-                properties: None,
-                custom_properties: None,
-            },
-        )
+        .create(1, 1, metadata::events::CreateEventRequest {
+            created_by: 0,
+            tags: None,
+            name: "e1".to_string(),
+            display_name: None,
+            description: None,
+            status: metadata::events::Status::Enabled,
+            is_system: false,
+            properties: None,
+            custom_properties: None,
+        })
         .await?;
 
     let event2 = md
         .events
-        .create(
-            1,
-            1,
-            metadata::events::CreateEventRequest {
-                created_by: 0,
-                tags: None,
-                name: "e2".to_string(),
-                display_name: None,
-                description: None,
-                status: metadata::events::Status::Enabled,
-                is_system: false,
-                properties: None,
-                custom_properties: None,
-            },
-        )
+        .create(1, 1, metadata::events::CreateEventRequest {
+            created_by: 0,
+            tags: None,
+            name: "e2".to_string(),
+            display_name: None,
+            description: None,
+            status: metadata::events::Status::Enabled,
+            is_system: false,
+            properties: None,
+            custom_properties: None,
+        })
         .await?;
 
     let mut ce1 = CustomEvent {

@@ -1,9 +1,16 @@
-use crate::error::{DictionaryError, DictionaryKey, DictionaryValue, Result};
-use crate::store::path_helpers::{make_id_seq_key, org_proj_ns};
-use crate::store::Store;
-use byteorder::{ByteOrder, LittleEndian};
 use std::sync::Arc;
+
+use byteorder::ByteOrder;
+use byteorder::LittleEndian;
 use tokio::sync::RwLock;
+
+use crate::error::DictionaryError;
+use crate::error::DictionaryKey;
+use crate::error::DictionaryValue;
+use crate::error::Result;
+use crate::store::path_helpers::make_id_seq_key;
+use crate::store::path_helpers::org_proj_ns;
+use crate::store::Store;
 
 const NAMESPACE: &[u8] = b"dictinaries";
 

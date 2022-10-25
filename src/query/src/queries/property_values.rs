@@ -1,21 +1,27 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::types::{EventRef, PropValueOperation, PropertyRef};
+use common::types::EventRef;
+use common::types::PropValueOperation;
+use common::types::PropertyRef;
 use common::ScalarValue;
-use datafusion::logical_plan::plan::{Aggregate, Extension, Filter as PlanFilter, Sort};
+use datafusion::logical_plan::plan::Aggregate;
+use datafusion::logical_plan::plan::Extension;
+use datafusion::logical_plan::plan::Filter as PlanFilter;
+use datafusion::logical_plan::plan::Sort;
 use datafusion::logical_plan::DFSchema;
 use datafusion::logical_plan::LogicalPlan;
 use datafusion_common::Column;
+use datafusion_expr::col;
 use datafusion_expr::utils::exprlist_to_fields;
-use datafusion_expr::{col, Expr};
-
+use datafusion_expr::Expr;
 use metadata::dictionaries::provider::SingleDictionaryProvider;
 use metadata::properties::provider::Namespace;
 use metadata::MetadataProvider;
 
 use crate::error::Result;
-use crate::expr::{event_expression, property_expression};
+use crate::expr::event_expression;
+use crate::expr::property_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::Context;
 
@@ -49,10 +55,10 @@ macro_rules! property_col {
                 );
 
                 LogicalPlan::Extension(Extension {
-                    node: Arc::new(DictionaryDecodeNode::try_new(
-                        $input,
-                        vec![(Column::from_name(col_name), Arc::new(dict))],
-                    )?),
+                    node: Arc::new(DictionaryDecodeNode::try_new($input, vec![(
+                        Column::from_name(col_name),
+                        Arc::new(dict),
+                    )])?),
                 })
             }
             None => expr,

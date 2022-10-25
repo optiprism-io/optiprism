@@ -1,9 +1,17 @@
-use datafusion::execution::context::{QueryPlanner as DFQueryPlanner, SessionState};
-use datafusion::physical_plan::planner::{
-    DefaultPhysicalPlanner, ExtensionPlanner as DFExtensionPlanner,
-};
-
 use std::sync::Arc;
+
+use axum::async_trait;
+use datafusion::execution::context::QueryPlanner as DFQueryPlanner;
+use datafusion::execution::context::SessionState;
+use datafusion::logical_plan::LogicalPlan;
+use datafusion::logical_plan::UserDefinedLogicalNode;
+use datafusion::physical_plan::expressions;
+use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
+use datafusion::physical_plan::planner::ExtensionPlanner as DFExtensionPlanner;
+use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::PhysicalPlanner;
+use datafusion_common::DataFusionError;
+use datafusion_common::Result;
 
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
@@ -13,10 +21,6 @@ use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::unpivot::UnpivotExec;
-use axum::async_trait;
-use datafusion::logical_plan::{LogicalPlan, UserDefinedLogicalNode};
-use datafusion::physical_plan::{expressions, ExecutionPlan, PhysicalPlanner};
-use datafusion_common::{DataFusionError, Result};
 
 pub struct QueryPlanner {}
 

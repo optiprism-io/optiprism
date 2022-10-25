@@ -24,19 +24,26 @@ pub mod test_util {
     use std::sync::Arc;
 
     use arrow::datatypes::DataType;
-    use datafusion::datasource::listing::{ListingTable, ListingTableConfig, ListingTableUrl};
+    use datafusion::datasource::listing::ListingTable;
+    use datafusion::datasource::listing::ListingTableConfig;
+    use datafusion::datasource::listing::ListingTableUrl;
     use datafusion::datasource::provider_as_source;
     use datafusion::logical_plan::LogicalPlan;
     use datafusion::prelude::CsvReadOptions;
     use datafusion_expr::logical_plan::builder::UNNAMED_TABLE;
     use datafusion_expr::LogicalPlanBuilder;
-    use uuid::Uuid;
-
-    use metadata::database::{Column, Table, TableRef};
+    use metadata::database;
+    use metadata::database::Column;
+    use metadata::database::Table;
+    use metadata::database::TableRef;
+    use metadata::events;
+    use metadata::properties;
     use metadata::properties::provider::Namespace;
-    use metadata::properties::{CreatePropertyRequest, Property};
+    use metadata::properties::CreatePropertyRequest;
+    use metadata::properties::Property;
     use metadata::store::Store;
-    use metadata::{database, events, properties, MetadataProvider};
+    use metadata::MetadataProvider;
+    use uuid::Uuid;
 
     use crate::error::Result;
     use crate::event_fields;
@@ -227,39 +234,31 @@ pub mod test_util {
 
         // create events
         md.events
-            .create(
-                org_id,
-                proj_id,
-                events::CreateEventRequest {
-                    created_by: 0,
-                    tags: None,
-                    name: "View Product".to_string(),
-                    display_name: None,
-                    description: None,
-                    status: events::Status::Enabled,
-                    properties: None,
-                    custom_properties: None,
-                    is_system: false,
-                },
-            )
+            .create(org_id, proj_id, events::CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name: "View Product".to_string(),
+                display_name: None,
+                description: None,
+                status: events::Status::Enabled,
+                properties: None,
+                custom_properties: None,
+                is_system: false,
+            })
             .await?;
 
         md.events
-            .create(
-                org_id,
-                proj_id,
-                events::CreateEventRequest {
-                    created_by: 0,
-                    tags: None,
-                    name: "Buy Product".to_string(),
-                    display_name: None,
-                    description: None,
-                    status: events::Status::Enabled,
-                    properties: None,
-                    custom_properties: None,
-                    is_system: false,
-                },
-            )
+            .create(org_id, proj_id, events::CreateEventRequest {
+                created_by: 0,
+                tags: None,
+                name: "Buy Product".to_string(),
+                display_name: None,
+                description: None,
+                status: events::Status::Enabled,
+                properties: None,
+                custom_properties: None,
+                is_system: false,
+            })
             .await?;
 
         // create event props

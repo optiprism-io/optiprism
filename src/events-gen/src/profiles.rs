@@ -1,14 +1,16 @@
-use crate::error::{EventsGenError, Result};
+use std::io;
+use std::sync::Arc;
+
 use futures::executor::block_on;
 use metadata::dictionaries;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use serde::Deserialize;
-use std::io;
 use tracing::info;
 
-use std::sync::Arc;
+use crate::error::EventsGenError;
+use crate::error::Result;
 
 #[derive(Clone)]
 pub struct Geo {

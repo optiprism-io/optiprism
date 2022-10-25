@@ -1,17 +1,26 @@
-use super::{CreateOrganizationRequest, Organization};
-use crate::error::{MetadataError, OrganizationError, StoreError};
-use crate::store::Store;
-use crate::{error, Result};
-use bincode::{deserialize, serialize};
-use chrono::Utc;
+use std::sync::Arc;
 
+use bincode::deserialize;
+use bincode::serialize;
+use chrono::Utc;
+use common::types::OptionalProperty;
+use tokio::sync::RwLock;
+
+use super::CreateOrganizationRequest;
+use super::Organization;
+use crate::error;
+use crate::error::MetadataError;
+use crate::error::OrganizationError;
+use crate::error::StoreError;
 use crate::metadata::ListResponse;
 use crate::organizations::types::UpdateOrganizationRequest;
 use crate::store::index::hash_map::HashMap;
-use crate::store::path_helpers::{list, make_data_value_key, make_id_seq_key, make_index_key};
-use common::types::OptionalProperty;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use crate::store::path_helpers::list;
+use crate::store::path_helpers::make_data_value_key;
+use crate::store::path_helpers::make_id_seq_key;
+use crate::store::path_helpers::make_index_key;
+use crate::store::Store;
+use crate::Result;
 
 const NAMESPACE: &[u8] = b"organizations";
 const IDX_NAME: &[u8] = b"name";

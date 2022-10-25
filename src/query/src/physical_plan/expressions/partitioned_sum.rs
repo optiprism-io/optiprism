@@ -1,20 +1,27 @@
 use std::fmt::Debug;
 
-use crate::error::Result;
-use crate::physical_plan::expressions::partitioned_aggregate::{
-    Buffer, PartitionedAccumulator, Value,
-};
-use crate::DEFAULT_BATCH_SIZE;
-use arrow::array::{
-    ArrayRef, Decimal128Array, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array,
-    Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
-};
-
+use arrow::array::ArrayRef;
+use arrow::array::Decimal128Array;
+use arrow::array::Float32Array;
+use arrow::array::Float64Array;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
+use arrow::array::UInt16Array;
+use arrow::array::UInt32Array;
+use arrow::array::UInt64Array;
+use arrow::array::UInt8Array;
 use arrow::datatypes::DataType;
-
 use datafusion::physical_plan::Accumulator;
 use datafusion_common::ScalarValue;
 use datafusion_expr::AggregateState;
+
+use crate::error::Result;
+use crate::physical_plan::expressions::partitioned_aggregate::Buffer;
+use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAccumulator;
+use crate::physical_plan::expressions::partitioned_aggregate::Value;
+use crate::DEFAULT_BATCH_SIZE;
 
 #[derive(Debug)]
 pub struct PartitionedSumAccumulator {
@@ -116,19 +123,21 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
 
 #[cfg(test)]
 mod tests {
-    use crate::error::Result;
-    use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAccumulator;
-    use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
-    use arrow::array::{ArrayRef, Decimal128Builder, Int8Array};
+    use std::sync::Arc;
+
+    use arrow::array::ArrayRef;
+    use arrow::array::Decimal128Builder;
+    use arrow::array::Int8Array;
     use arrow::datatypes::DataType;
     use datafusion::physical_plan::expressions::AvgAccumulator;
-
     use datafusion_common::ScalarValue as DFScalarValue;
-
     use datafusion_expr::Accumulator;
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
-    use std::sync::Arc;
+
+    use crate::error::Result;
+    use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAccumulator;
+    use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
 
     #[test]
     fn test_int64() -> Result<()> {

@@ -1,19 +1,23 @@
-use crate::error::{Error, Result};
-use chrono::{Duration, Utc};
-use clap::{Parser, Subcommand, ValueEnum};
-use dateparser::DateTimeUtc;
-
 use std::env::temp_dir;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+
+use chrono::Duration;
+use chrono::Utc;
+use clap::Parser;
+use clap::Subcommand;
+use clap::ValueEnum;
+use dateparser::DateTimeUtc;
 use tracing::metadata::LevelFilter;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;
 
+use crate::error::Error;
+use crate::error::Result;
+
 extern crate parse_duration;
 
-use demo;
 mod error;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -25,9 +29,9 @@ enum LogLevel {
     Error,
 }
 
-impl Into<LevelFilter> for LogLevel {
-    fn into(self) -> LevelFilter {
-        match self {
+impl From<LogLevel> for LevelFilter {
+    fn from(l: LogLevel) -> Self {
+        match l {
             LogLevel::Trace => Level::TRACE,
             LogLevel::Debug => Level::DEBUG,
             LogLevel::Info => Level::INFO,

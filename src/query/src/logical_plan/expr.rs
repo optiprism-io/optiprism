@@ -1,23 +1,31 @@
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use datafusion::logical_plan::ExprSchemable;
+use datafusion_common::DFSchema;
 use datafusion_common::Result as DFResult;
-use datafusion_common::{DFSchema, ScalarValue};
+use datafusion_common::ScalarValue;
 use datafusion_expr::aggregate_function::return_type;
-use datafusion_expr::expr_fn::{and, or};
-pub use datafusion_expr::{lit, lit_timestamp_nano, Literal};
-use datafusion_expr::{
-    AccumulatorFunctionImplementation, AggregateFunction, AggregateUDF, Expr, ReturnTypeFunction,
-    Signature, StateTypeFunction, Volatility,
-};
+use datafusion_expr::expr_fn::and;
+use datafusion_expr::expr_fn::or;
+pub use datafusion_expr::lit;
+pub use datafusion_expr::lit_timestamp_nano;
+use datafusion_expr::AccumulatorFunctionImplementation;
+use datafusion_expr::AggregateFunction;
+use datafusion_expr::AggregateUDF;
+use datafusion_expr::Expr;
+pub use datafusion_expr::Literal;
+use datafusion_expr::ReturnTypeFunction;
+use datafusion_expr::Signature;
+use datafusion_expr::StateTypeFunction;
+use datafusion_expr::Volatility;
 
 use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate::state_types;
-use crate::physical_plan::expressions::partitioned_aggregate::{
-    PartitionedAggregate, PartitionedAggregateFunction,
-};
+use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregate;
+use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
 use crate::Result;
 
@@ -58,7 +66,7 @@ pub fn lit_timestamp(data_type: DataType, date_time: &DateTime<Utc>) -> Result<E
             return Err(QueryError::Plan(format!(
                 "unsupported \"{:?}\" timestamp data type",
                 data_type
-            )))
+            )));
         }
     }))
 }

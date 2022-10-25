@@ -2,9 +2,8 @@ use std::result;
 
 use arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
-use thiserror::Error;
-
 use metadata::error::MetadataError;
+use thiserror::Error;
 
 pub type Result<T> = result::Result<T, QueryError>;
 

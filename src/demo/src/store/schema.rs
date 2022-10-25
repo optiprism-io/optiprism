@@ -1,16 +1,25 @@
-use arrow::datatypes::{DataType, Schema, TimeUnit};
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+use std::sync::Arc;
+
+use arrow::datatypes::DataType;
+use arrow::datatypes::Schema;
+use arrow::datatypes::TimeUnit;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use enum_iterator::all;
 use events_gen::error::Result;
-use metadata::database::{Column, Table, TableRef};
+use metadata::database::Column;
+use metadata::database::Table;
+use metadata::database::TableRef;
+use metadata::error::DatabaseError;
+use metadata::events;
 use metadata::events::Event as MDEvent;
+use metadata::properties;
 use metadata::properties::provider::Namespace;
-use metadata::properties::{CreatePropertyRequest, Property};
-use metadata::{events, properties, MetadataProvider};
+use metadata::properties::CreatePropertyRequest;
+use metadata::properties::Property;
+use metadata::MetadataProvider;
 
 use crate::store::events::Event;
-use metadata::error::DatabaseError;
-use std::sync::Arc;
 
 async fn create_event(
     md: &Arc<MetadataProvider>,
@@ -20,21 +29,17 @@ async fn create_event(
 ) -> Result<MDEvent> {
     Ok(md
         .events
-        .get_or_create(
-            org_id,
-            proj_id,
-            events::CreateEventRequest {
-                created_by: 0,
-                tags: None,
-                name,
-                display_name: None,
-                description: None,
-                status: events::Status::Enabled,
-                properties: None,
-                custom_properties: None,
-                is_system: false,
-            },
-        )
+        .get_or_create(org_id, proj_id, events::CreateEventRequest {
+            created_by: 0,
+            tags: None,
+            name,
+            display_name: None,
+            description: None,
+            status: events::Status::Enabled,
+            properties: None,
+            custom_properties: None,
+            is_system: false,
+        })
         .await?)
 }
 

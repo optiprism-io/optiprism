@@ -1,6 +1,11 @@
-use arrow::datatypes::{DataType, Field, IntervalUnit, TimeUnit};
-use datafusion_common::{DataFusionError, ScalarValue as DFScalarValue};
-use serde::{Deserialize, Serialize};
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::IntervalUnit;
+use arrow::datatypes::TimeUnit;
+use datafusion_common::DataFusionError;
+use datafusion_common::ScalarValue as DFScalarValue;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ScalarValue {

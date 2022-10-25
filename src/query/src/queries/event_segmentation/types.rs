@@ -1,9 +1,13 @@
-use chrono::{DateTime, Utc};
-use common::types::{EventFilter, EventRef, PropertyRef};
+use chrono::DateTime;
+use chrono::Utc;
+use common::types::EventFilter;
+use common::types::EventRef;
+use common::types::PropertyRef;
 use datafusion_expr::AggregateFunction;
 
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-use crate::queries::types::{QueryTime, TimeUnit};
+use crate::queries::types::QueryTime;
+use crate::queries::types::TimeUnit;
 
 #[derive(Clone, Debug)]
 pub enum SegmentTime {
@@ -171,18 +175,27 @@ pub struct EventSegmentation {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{DateTime, Utc};
-    use common::types::{EventRef, PropValueOperation, PropertyRef};
+    use chrono::DateTime;
+    use chrono::Utc;
+    use common::types::EventRef;
+    use common::types::PropValueOperation;
+    use common::types::PropertyRef;
     use common::ScalarValue;
     use datafusion_expr::AggregateFunction;
 
     use crate::event_fields;
     use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-    use crate::queries::event_segmentation::types::{
-        Analysis, Breakdown, ChartType, Compare, Event, EventFilter, EventSegmentation, NamedQuery,
-        Query,
-    };
-    use crate::queries::types::{QueryTime, TimeUnit};
+    use crate::queries::event_segmentation::types::Analysis;
+    use crate::queries::event_segmentation::types::Breakdown;
+    use crate::queries::event_segmentation::types::ChartType;
+    use crate::queries::event_segmentation::types::Compare;
+    use crate::queries::event_segmentation::types::Event;
+    use crate::queries::event_segmentation::types::EventFilter;
+    use crate::queries::event_segmentation::types::EventSegmentation;
+    use crate::queries::event_segmentation::types::NamedQuery;
+    use crate::queries::event_segmentation::types::Query;
+    use crate::queries::types::QueryTime;
+    use crate::queries::types::TimeUnit;
 
     #[test]
     fn test_serialize() {
@@ -273,7 +286,7 @@ mod tests {
             ))]),
         };
 
-        /*let j = serde_json::to_string_pretty(&es).unwrap();
-        println!("{}", j);*/
+        // let j = serde_json::to_string_pretty(&es).unwrap();
+        // println!("{}", j);
     }
 }

@@ -1,15 +1,19 @@
-use metadata::error::{CustomEventError, MetadataError, Result};
-use metadata::store::Store;
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use common::types::{EventRef, OptionalProperty};
+use common::types::EventRef;
+use common::types::OptionalProperty;
 use metadata::custom_events::types::Event;
-use metadata::custom_events::{
-    CreateCustomEventRequest, Provider, Status, UpdateCustomEventRequest,
-};
+use metadata::custom_events::CreateCustomEventRequest;
+use metadata::custom_events::Provider;
+use metadata::custom_events::Status;
+use metadata::custom_events::UpdateCustomEventRequest;
+use metadata::error::CustomEventError;
+use metadata::error::MetadataError;
+use metadata::error::Result;
 use metadata::events;
 use metadata::events::types::CreateEventRequest;
+use metadata::store::Store;
 use uuid::Uuid;
 
 fn get_providers() -> (Arc<events::Provider>, Provider) {
@@ -40,10 +44,12 @@ async fn non_exist() -> Result<()> {
         events: OptionalProperty::None,
     };
 
-    assert!(custom_events
-        .update(1, 1, 1, update_event_req.clone())
-        .await
-        .is_err());
+    assert!(
+        custom_events
+            .update(1, 1, 1, update_event_req.clone())
+            .await
+            .is_err()
+    );
     Ok(())
 }
 
@@ -52,21 +58,17 @@ async fn create_event() -> Result<()> {
     let (event_prov, prov) = get_providers();
 
     let event = event_prov
-        .create(
-            1,
-            1,
-            CreateEventRequest {
-                created_by: 0,
-                tags: None,
-                name: "e1".to_string(),
-                display_name: None,
-                description: None,
-                status: events::Status::Enabled,
-                is_system: false,
-                properties: None,
-                custom_properties: None,
-            },
-        )
+        .create(1, 1, CreateEventRequest {
+            created_by: 0,
+            tags: None,
+            name: "e1".to_string(),
+            display_name: None,
+            description: None,
+            status: events::Status::Enabled,
+            is_system: false,
+            properties: None,
+            custom_properties: None,
+        })
         .await?;
 
     let req = CreateCustomEventRequest {
@@ -116,21 +118,17 @@ async fn create_event_duplicate_name() -> Result<()> {
     let (event_prov, prov) = get_providers();
 
     event_prov
-        .create(
-            1,
-            1,
-            CreateEventRequest {
-                created_by: 0,
-                tags: None,
-                name: "e1".to_string(),
-                display_name: None,
-                description: None,
-                status: events::Status::Enabled,
-                is_system: false,
-                properties: None,
-                custom_properties: None,
-            },
-        )
+        .create(1, 1, CreateEventRequest {
+            created_by: 0,
+            tags: None,
+            name: "e1".to_string(),
+            display_name: None,
+            description: None,
+            status: events::Status::Enabled,
+            is_system: false,
+            properties: None,
+            custom_properties: None,
+        })
         .await?;
 
     let req = CreateCustomEventRequest {
@@ -159,21 +157,17 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
     let prov = prov.with_max_events_level(1);
 
     event_prov
-        .create(
-            1,
-            1,
-            CreateEventRequest {
-                created_by: 0,
-                tags: None,
-                name: "e1".to_string(),
-                display_name: None,
-                description: None,
-                status: events::Status::Enabled,
-                is_system: false,
-                properties: None,
-                custom_properties: None,
-            },
-        )
+        .create(1, 1, CreateEventRequest {
+            created_by: 0,
+            tags: None,
+            name: "e1".to_string(),
+            display_name: None,
+            description: None,
+            status: events::Status::Enabled,
+            is_system: false,
+            properties: None,
+            custom_properties: None,
+        })
         .await?;
 
     let req = CreateCustomEventRequest {
@@ -232,21 +226,17 @@ async fn test_duplicate() -> Result<()> {
     let prov = prov.with_max_events_level(5);
 
     event_prov
-        .create(
-            1,
-            1,
-            CreateEventRequest {
-                created_by: 0,
-                tags: None,
-                name: "e1".to_string(),
-                display_name: None,
-                description: None,
-                status: events::Status::Enabled,
-                is_system: false,
-                properties: None,
-                custom_properties: None,
-            },
-        )
+        .create(1, 1, CreateEventRequest {
+            created_by: 0,
+            tags: None,
+            name: "e1".to_string(),
+            display_name: None,
+            description: None,
+            status: events::Status::Enabled,
+            is_system: false,
+            properties: None,
+            custom_properties: None,
+        })
         .await?;
 
     let req = CreateCustomEventRequest {
@@ -321,21 +311,17 @@ async fn update_event() -> Result<()> {
     let (event_prov, prov) = get_providers();
 
     let _event = event_prov
-        .create(
-            1,
-            1,
-            CreateEventRequest {
-                created_by: 0,
-                tags: None,
-                name: "e1".to_string(),
-                display_name: None,
-                description: None,
-                status: events::Status::Enabled,
-                is_system: false,
-                properties: None,
-                custom_properties: None,
-            },
-        )
+        .create(1, 1, CreateEventRequest {
+            created_by: 0,
+            tags: None,
+            name: "e1".to_string(),
+            display_name: None,
+            description: None,
+            status: events::Status::Enabled,
+            is_system: false,
+            properties: None,
+            custom_properties: None,
+        })
         .await?;
 
     let req = CreateCustomEventRequest {

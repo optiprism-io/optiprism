@@ -1,7 +1,7 @@
-use crate::error::Result;
-
 use argon2::Argon2;
 use password_hash::PasswordHash;
+
+use crate::error::Result;
 
 pub fn make_password_hash(password: &str) -> Result<String> {
     let salt = password_hash::SaltString::generate(rand::thread_rng());

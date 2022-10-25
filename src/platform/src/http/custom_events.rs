@@ -1,13 +1,19 @@
-use crate::{custom_events, Context, Result};
-use axum::extract::Path;
-
-use crate::custom_events::types::{
-    CreateCustomEventRequest, CustomEvent, UpdateCustomEventRequest,
-};
-use axum::http::StatusCode;
-use axum::{extract::Extension, routing, Json, Router};
-use metadata::metadata::ListResponse;
 use std::sync::Arc;
+
+use axum::extract::Extension;
+use axum::extract::Path;
+use axum::http::StatusCode;
+use axum::routing;
+use axum::Json;
+use axum::Router;
+use metadata::metadata::ListResponse;
+
+use crate::custom_events;
+use crate::custom_events::types::CreateCustomEventRequest;
+use crate::custom_events::types::CustomEvent;
+use crate::custom_events::types::UpdateCustomEventRequest;
+use crate::Context;
+use crate::Result;
 
 async fn create(
     ctx: Context,

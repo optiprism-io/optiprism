@@ -1,7 +1,8 @@
+use std::sync::Arc;
+
 use crate::error::StoreError;
 use crate::store::Store;
 use crate::Result;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct HashMap {
@@ -77,9 +78,7 @@ impl HashMap {
     }
 
     pub async fn get<K>(&self, key: K) -> Result<Vec<u8>>
-    where
-        K: AsRef<[u8]>,
-    {
+    where K: AsRef<[u8]> {
         match self.store.get(key.as_ref()).await? {
             None => {
                 Err(StoreError::KeyNotFound(String::from_utf8(key.as_ref().to_owned())?).into())

@@ -1,5 +1,8 @@
-use arrow::datatypes::{DataType, Field, Schema};
-use serde::{Deserialize, Serialize};
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum TableRef {

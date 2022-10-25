@@ -1,22 +1,23 @@
+use std::collections::HashMap;
+use std::io;
+use std::sync::Arc;
+
 use arrow::record_batch::RecordBatch;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use enum_iterator::all;
+use events_gen::generator;
+use events_gen::generator::Generator;
+use events_gen::profiles::ProfileProvider;
+use metadata::MetadataProvider;
+use rand::thread_rng;
+use tracing::info;
 
 use crate::error::Result;
 use crate::store::events::Event;
 use crate::store::products::ProductProvider;
 use crate::store::scenario::Scenario;
 use crate::store::schema::create_entities;
-use events_gen::generator;
-use events_gen::generator::Generator;
-use events_gen::profiles::ProfileProvider;
-use metadata::MetadataProvider;
-use rand::thread_rng;
-use std::collections::HashMap;
-use std::io;
-use tracing::info;
-
-use std::sync::Arc;
 
 pub mod actions;
 mod batch_builder;
@@ -43,9 +44,7 @@ pub struct Config<R> {
 }
 
 pub async fn gen<R>(cfg: Config<R>) -> Result<Vec<Vec<RecordBatch>>>
-where
-    R: io::Read,
-{
+where R: io::Read {
     let mut rng = thread_rng();
 
     info!("loading profiles...");

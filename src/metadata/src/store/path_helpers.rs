@@ -1,9 +1,12 @@
-use crate::metadata::{ListResponse, ResponseMetadata};
-use crate::store::Store;
-use crate::Result;
+use std::sync::Arc;
+
 use bincode::deserialize;
 use serde::de::DeserializeOwned;
-use std::sync::Arc;
+
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
+use crate::store::Store;
+use crate::Result;
 
 pub fn org_proj_ns(organization_id: u64, project_id: u64, ns: &[u8]) -> Vec<u8> {
     [
@@ -44,9 +47,7 @@ pub fn make_id_seq_key(ns: &[u8]) -> Vec<u8> {
 }
 
 pub async fn list<'a, T>(store: Arc<Store>, ns: &[u8]) -> Result<ListResponse<T>>
-where
-    T: DeserializeOwned,
-{
+where T: DeserializeOwned {
     let prefix = make_data_key(ns);
 
     let list = store

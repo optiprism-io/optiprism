@@ -1,9 +1,11 @@
-use crate::error::{PlatformError, Result};
 use arrow::datatypes::DataType;
+use serde::Deserialize;
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::array_ref_to_json_values;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use crate::error::PlatformError;
+use crate::error::Result;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

@@ -1,12 +1,12 @@
 name: Lint and test backend
 
 on: workflow_dispatch
-#on:
-#  push:
-#    paths:
-#      - '*Cargo.lock'
-#      - '*Cargo.toml'
-#      - 'src'
+# on:
+#   push:
+#     paths:
+#       - '*Cargo.lock'
+#       - '*Cargo.toml'
+#       - 'src'
 
 jobs:
   check-fmt:

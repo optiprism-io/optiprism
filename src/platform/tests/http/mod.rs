@@ -7,26 +7,26 @@ mod property_values;
 
 #[cfg(test)]
 mod tests {
-    use axum::headers::{HeaderMap, HeaderValue};
-    use axum::http;
     use std::env::temp_dir;
     use std::net::SocketAddr;
+    use std::sync::atomic::AtomicU16;
+    use std::sync::atomic::Ordering;
     use std::sync::Arc;
 
+    use axum::headers::HeaderMap;
+    use axum::headers::HeaderValue;
+    use axum::http;
     use chrono::Duration;
-
     use common::rbac::OrganizationRole;
-
     use metadata::store::Store;
     use metadata::MetadataProvider;
     use platform::auth::password::make_password_hash;
-
-    use uuid::Uuid;
-
     use platform::PlatformProvider;
-    use query::test_util::{create_entities, empty_provider, events_provider};
+    use query::test_util::create_entities;
+    use query::test_util::empty_provider;
+    use query::test_util::events_provider;
     use query::QueryProvider;
-    use std::sync::atomic::{AtomicU16, Ordering};
+    use uuid::Uuid;
 
     static HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
 

@@ -1,9 +1,15 @@
 pub mod index;
 pub mod path_helpers;
 
-use crate::Result;
-use rocksdb::{ColumnFamilyDescriptor, Options, SliceTransform, WriteBatch, DB};
 use std::path::Path;
+
+use rocksdb::ColumnFamilyDescriptor;
+use rocksdb::Options;
+use rocksdb::SliceTransform;
+use rocksdb::WriteBatch;
+use rocksdb::DB;
+
+use crate::Result;
 
 type KVBytes = (Box<[u8]>, Box<[u8]>);
 
@@ -74,9 +80,7 @@ impl Store {
     }
 
     pub async fn get<K>(&self, key: K) -> Result<Option<Vec<u8>>>
-    where
-        K: AsRef<[u8]>,
-    {
+    where K: AsRef<[u8]> {
         Ok(self.db.get(key)?)
     }
 
@@ -88,16 +92,12 @@ impl Store {
     }
 
     pub async fn delete<K>(&self, key: K) -> Result<()>
-    where
-        K: AsRef<[u8]> + Clone,
-    {
+    where K: AsRef<[u8]> + Clone {
         Ok(self.db.delete(key)?)
     }
 
     pub async fn delete_checked<K>(&self, key: K) -> Result<Option<Vec<u8>>>
-    where
-        K: AsRef<[u8]> + Clone,
-    {
+    where K: AsRef<[u8]> + Clone {
         match self.db.get(key.as_ref())? {
             None => Ok(None),
             Some(v) => {

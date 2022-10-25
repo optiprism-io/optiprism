@@ -1,13 +1,18 @@
-use crate::queries::types::{
-    AggregateFunction, EventFilter, EventRef, PartitionedAggregateFunction, PropertyRef, QueryTime,
-    TimeUnit,
-};
-use crate::PlatformError;
-
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use query::queries::event_segmentation::types as query_es_types;
 use query::queries::event_segmentation::types::NamedQuery;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::queries::types::AggregateFunction;
+use crate::queries::types::EventFilter;
+use crate::queries::types::EventRef;
+use crate::queries::types::PartitionedAggregateFunction;
+use crate::queries::types::PropertyRef;
+use crate::queries::types::QueryTime;
+use crate::queries::types::TimeUnit;
+use crate::PlatformError;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -107,17 +112,16 @@ pub struct Compare {
     pub unit: TimeUnit,
 }
 
-/*impl TryFrom<Option<Compare>> for Option<query_es_types::Compare> {
-    type Error = Error;
-
-    fn try_from(value: Option<Compare>) -> std::result::Result<Self, Self::Error> {
-        Ok(match value {
-            None => None,
-            Some(v) => v.try_into()?
-        })
-    }
-}
-*/
+// impl TryFrom<Option<Compare>> for Option<query_es_types::Compare> {
+// type Error = Error;
+//
+// fn try_from(value: Option<Compare>) -> std::result::Result<Self, Self::Error> {
+// Ok(match value {
+// None => None,
+// Some(v) => v.try_into()?
+// })
+// }
+// }
 impl TryInto<query_es_types::Compare> for Compare {
     type Error = PlatformError;
 
@@ -417,17 +421,28 @@ impl TryInto<query_es_types::EventSegmentation> for EventSegmentation {
 
 #[cfg(test)]
 mod tests {
-    use crate::error::Result;
-    use crate::queries::event_segmentation::{
-        AggregateFunction, Analysis, Breakdown, ChartType, Compare, Event, EventFilter,
-        EventSegmentation, PartitionedAggregateFunction, Query, QueryTime, TimeUnit,
-    };
-    use chrono::{DateTime, Utc};
-
-    use crate::queries::types::{EventRef, PropValueOperation, PropertyRef};
+    use chrono::DateTime;
+    use chrono::Utc;
     use query::event_fields;
     use query::queries::event_segmentation::types::EventSegmentation as QueryEventSegmentation;
     use serde_json::json;
+
+    use crate::error::Result;
+    use crate::queries::event_segmentation::AggregateFunction;
+    use crate::queries::event_segmentation::Analysis;
+    use crate::queries::event_segmentation::Breakdown;
+    use crate::queries::event_segmentation::ChartType;
+    use crate::queries::event_segmentation::Compare;
+    use crate::queries::event_segmentation::Event;
+    use crate::queries::event_segmentation::EventFilter;
+    use crate::queries::event_segmentation::EventSegmentation;
+    use crate::queries::event_segmentation::PartitionedAggregateFunction;
+    use crate::queries::event_segmentation::Query;
+    use crate::queries::event_segmentation::QueryTime;
+    use crate::queries::event_segmentation::TimeUnit;
+    use crate::queries::types::EventRef;
+    use crate::queries::types::PropValueOperation;
+    use crate::queries::types::PropertyRef;
 
     #[test]
     fn test_serialize() -> Result<()> {

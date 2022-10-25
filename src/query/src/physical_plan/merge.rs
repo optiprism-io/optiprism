@@ -1,26 +1,34 @@
 use std::any::Any;
 use std::fmt;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::task::Context;
+use std::task::Poll;
 
 use arrow::array::ArrayRef;
-use arrow::datatypes::{Schema, SchemaRef};
+use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
-use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet};
-use datafusion::physical_plan::{
-    DisplayFormatType, ExecutionPlan, Partitioning, RecordBatchStream, SendableRecordBatchStream,
-    Statistics,
-};
+use datafusion::physical_plan::metrics::BaselineMetrics;
+use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
+use datafusion::physical_plan::metrics::MetricsSet;
+use datafusion::physical_plan::DisplayFormatType;
+use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::RecordBatchStream;
+use datafusion::physical_plan::SendableRecordBatchStream;
+use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
-use futures::{Stream, StreamExt};
+use futures::Stream;
+use futures::StreamExt;
 
 use crate::error::QueryError;
 use crate::Result;
@@ -188,7 +196,11 @@ impl Stream for MergeStream {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{ArrayRef, BooleanArray, Int32Array, Int8Array, StringArray};
+    use arrow::array::ArrayRef;
+    use arrow::array::BooleanArray;
+    use arrow::array::Int32Array;
+    use arrow::array::Int8Array;
+    use arrow::array::StringArray;
     use arrow::record_batch::RecordBatch;
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;

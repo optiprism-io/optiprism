@@ -1,16 +1,18 @@
 #[cfg(test)]
 mod tests {
 
-    use platform::error::Result;
-
     use axum::http::StatusCode;
-
-    use platform::queries::property_values::{Filter, PropertyValues};
-    use platform::queries::types::{EventRef, PropValueOperation, PropertyRef};
-
-    use crate::http::tests::{create_admin_acc_and_login, run_http_service};
+    use platform::error::Result;
+    use platform::queries::property_values::Filter;
+    use platform::queries::property_values::PropertyValues;
+    use platform::queries::types::EventRef;
+    use platform::queries::types::PropValueOperation;
+    use platform::queries::types::PropertyRef;
     use reqwest::Client;
     use serde_json::Value;
+
+    use crate::http::tests::create_admin_acc_and_login;
+    use crate::http::tests::run_http_service;
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {

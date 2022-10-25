@@ -1,5 +1,6 @@
 use arrow::array::ArrayRef;
-use arrow::datatypes::{DataType, SchemaRef};
+use arrow::datatypes::DataType;
+use arrow::datatypes::SchemaRef;
 
 pub struct Column {
     pub name: String,

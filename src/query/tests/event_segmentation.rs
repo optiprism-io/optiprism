@@ -1,38 +1,45 @@
 #[cfg(test)]
 mod tests {
-    use query::error::Result;
-
     use std::env::temp_dir;
-
-    use chrono::{DateTime, Duration, Utc};
+    use std::ops::Sub;
+    use std::sync::Arc;
 
     use arrow::util::pretty::print_batches;
-
-    use datafusion::physical_plan::collect;
-    use datafusion::prelude::{SessionConfig, SessionContext};
-
+    use chrono::DateTime;
+    use chrono::Duration;
+    use chrono::Utc;
+    use common::types::EventFilter;
+    use common::types::EventRef;
+    use common::types::PropValueOperation;
+    use common::types::PropertyRef;
+    use common::ScalarValue;
+    use datafusion::execution::context::SessionState;
     use datafusion::execution::runtime_env::RuntimeEnv;
     use datafusion::physical_plan::coalesce_batches::concat_batches;
-
+    use datafusion::physical_plan::collect;
+    use datafusion::prelude::SessionConfig;
+    use datafusion::prelude::SessionContext;
     use datafusion_expr::AggregateFunction;
-
+    use metadata::custom_events;
+    use metadata::custom_events::CreateCustomEventRequest;
+    use query::error::Result;
+    use query::event_fields;
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
-    use query::queries::event_segmentation::types::{
-        Analysis, Breakdown, ChartType, Event, EventSegmentation, NamedQuery, Query,
-    };
-    use query::queries::types::{QueryTime, TimeUnit};
-    use query::{event_fields, Context};
-
-    use common::types::{EventFilter, EventRef, PropValueOperation, PropertyRef};
-    use common::ScalarValue;
-    use datafusion::execution::context::SessionState;
-    use metadata::custom_events;
-    use metadata::custom_events::CreateCustomEventRequest;
-    use query::test_util::{create_entities, create_md, events_provider};
-    use std::ops::Sub;
-    use std::sync::Arc;
+    use query::queries::event_segmentation::types::Analysis;
+    use query::queries::event_segmentation::types::Breakdown;
+    use query::queries::event_segmentation::types::ChartType;
+    use query::queries::event_segmentation::types::Event;
+    use query::queries::event_segmentation::types::EventSegmentation;
+    use query::queries::event_segmentation::types::NamedQuery;
+    use query::queries::event_segmentation::types::Query;
+    use query::queries::types::QueryTime;
+    use query::queries::types::TimeUnit;
+    use query::test_util::create_entities;
+    use query::test_util::create_md;
+    use query::test_util::events_provider;
+    use query::Context;
     use uuid::Uuid;
 
     #[tokio::test]
@@ -163,17 +170,17 @@ mod tests {
         create_entities(md.clone(), org_id, proj_id).await?;
         let _input = Arc::new(events_provider(md.database.clone(), org_id, proj_id).await?);
 
-        /*let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
-        let df_plan = plan.to_df_plan()?;
-
-        let mut ctx_state = ExecutionContextState::new();
-        ctx_state.config.target_partitions = 1;
-        let planner = DefaultPhysicalPlanner::default();
-        let physical_plan = planner.create_physical_plan(&df_plan, &ctx_state).await?;
-
-        let result = collect(physical_plan, Arc::new(RuntimeEnv::new(RuntimeConfig::new()).unwrap())).await?;
-
-        print_batches(&result)?;*/
+        // let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
+        // let df_plan = plan.to_df_plan()?;
+        //
+        // let mut ctx_state = ExecutionContextState::new();
+        // ctx_state.config.target_partitions = 1;
+        // let planner = DefaultPhysicalPlanner::default();
+        // let physical_plan = planner.create_physical_plan(&df_plan, &ctx_state).await?;
+        //
+        // let result = collect(physical_plan, Arc::new(RuntimeEnv::new(RuntimeConfig::new()).unwrap())).await?;
+        //
+        // print_batches(&result)?;
         Ok(())
     }
 
@@ -186,10 +193,10 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
         let es = EventSegmentation {
-            /*time: QueryTime::Between {
-                from,
-                to,
-            },*/
+            // time: QueryTime::Between {
+            // from,
+            // to,
+            // },
             time: QueryTime::Last {
                 last: 30,
                 unit: TimeUnit::Day,
@@ -228,7 +235,7 @@ mod tests {
                 Event::new(
                     EventRef::RegularName("Buy Product".to_string()),
                     None,
-                    None, //Some(vec![Breakdown::Property(PropertyRef::Event("Product Name".to_string()))]),
+                    None, /* Some(vec![Breakdown::Property(PropertyRef::Event("Product Name".to_string()))]), */
                     vec![
                         NamedQuery::new(Query::CountEvents, Some("count2".to_string())),
                         NamedQuery::new(
@@ -309,42 +316,38 @@ mod tests {
 
         let custom_event = md
             .custom_events
-            .create(
-                1,
-                1,
-                CreateCustomEventRequest {
-                    created_by: 0,
-                    tags: None,
-                    name: "".to_string(),
-                    description: None,
-                    status: custom_events::Status::Enabled,
-                    is_system: false,
-                    events: vec![
-                        custom_events::types::Event {
-                            event: EventRef::RegularName("View Product".to_string()),
-                            filters: Some(vec![
-                                EventFilter::Property {
-                                    property: PropertyRef::User("Is Premium".to_string()),
-                                    operation: PropValueOperation::Eq,
-                                    value: Some(vec![ScalarValue::Boolean(Some(true))]),
-                                },
-                                EventFilter::Property {
-                                    property: PropertyRef::User("Country".to_string()),
-                                    operation: PropValueOperation::Eq,
-                                    value: Some(vec![
-                                        ScalarValue::Utf8(Some("spain".to_string())),
-                                        ScalarValue::Utf8(Some("german".to_string())),
-                                    ]),
-                                },
-                            ]),
-                        },
-                        custom_events::types::Event {
-                            event: EventRef::RegularName("Buy Product".to_string()),
-                            filters: None,
-                        },
-                    ],
-                },
-            )
+            .create(1, 1, CreateCustomEventRequest {
+                created_by: 0,
+                tags: None,
+                name: "".to_string(),
+                description: None,
+                status: custom_events::Status::Enabled,
+                is_system: false,
+                events: vec![
+                    custom_events::types::Event {
+                        event: EventRef::RegularName("View Product".to_string()),
+                        filters: Some(vec![
+                            EventFilter::Property {
+                                property: PropertyRef::User("Is Premium".to_string()),
+                                operation: PropValueOperation::Eq,
+                                value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                            },
+                            EventFilter::Property {
+                                property: PropertyRef::User("Country".to_string()),
+                                operation: PropValueOperation::Eq,
+                                value: Some(vec![
+                                    ScalarValue::Utf8(Some("spain".to_string())),
+                                    ScalarValue::Utf8(Some("german".to_string())),
+                                ]),
+                            },
+                        ]),
+                    },
+                    custom_events::types::Event {
+                        event: EventRef::RegularName("Buy Product".to_string()),
+                        filters: None,
+                    },
+                ],
+            })
             .await
             .unwrap();
 

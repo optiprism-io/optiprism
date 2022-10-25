@@ -1,23 +1,29 @@
 #[cfg(test)]
 mod tests {
 
-    use platform::error::Result;
-
-    use chrono::{DateTime, Utc};
-
     use axum::http::StatusCode;
-
-    use platform::queries::event_segmentation::{
-        Analysis, Breakdown, ChartType, Event, EventSegmentation, Query,
-    };
-    use platform::queries::types::{
-        AggregateFunction, EventFilter, EventRef, PartitionedAggregateFunction, PropValueOperation,
-        PropertyRef, QueryTime, TimeUnit,
-    };
-
-    use crate::http::tests::{create_admin_acc_and_login, run_http_service};
+    use chrono::DateTime;
+    use chrono::Utc;
+    use platform::error::Result;
+    use platform::queries::event_segmentation::Analysis;
+    use platform::queries::event_segmentation::Breakdown;
+    use platform::queries::event_segmentation::ChartType;
+    use platform::queries::event_segmentation::Event;
+    use platform::queries::event_segmentation::EventSegmentation;
+    use platform::queries::event_segmentation::Query;
+    use platform::queries::types::AggregateFunction;
+    use platform::queries::types::EventFilter;
+    use platform::queries::types::EventRef;
+    use platform::queries::types::PartitionedAggregateFunction;
+    use platform::queries::types::PropValueOperation;
+    use platform::queries::types::PropertyRef;
+    use platform::queries::types::QueryTime;
+    use platform::queries::types::TimeUnit;
     use reqwest::Client;
     use serde_json::Value;
+
+    use crate::http::tests::create_admin_acc_and_login;
+    use crate::http::tests::run_http_service;
 
     #[tokio::test]
     async fn test_event_segmentation() -> Result<()> {

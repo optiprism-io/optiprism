@@ -1,14 +1,13 @@
 name: Build and push Docker image Test
-on: push
-#on:
-#  workflow_dispatch:
-#    inputs:
-#      seat:
-#        description: 'Seat on cluster'
-#        required: true
-#        type: choice
-#        options:
-#          - nikolai-kushner
+on:
+  workflow_dispatch:
+    inputs:
+      seat:
+        description: 'Seat on cluster'
+        required: true
+        type: choice
+        options:
+          - nikolai-kushner
 jobs:
   build-and-push-docker:
     runs-on: ubuntu-20.04
@@ -32,7 +31,7 @@ jobs:
           context: .
           file: docker/ui/Dockerfile
           push: true
-          tags: optiprismio/ui:${{ steps.branch-name.outputs.current_branch }}
+          tags: optiprismio/ui:${{ steps.branch-name.outputs.current_branch }}-$${{ GITHUB_RUN_ID }}
 
   delopy-on-k8s:
     runs-on: ubuntu-20.04
@@ -44,8 +43,8 @@ jobs:
       - uses: danielr1996/envsubst-action@1.0.0
         env:
           IMAGE_REPO: registry.hub.docker.com/optiprismio/ui
-          IMAGE_TAG: ${{ steps.branch-name.outputs.current_branch }}
-          SEAT: main
+          IMAGE_TAG: ${{ steps.branch-name.outputs.current_branch }}-$${{ GITHUB_RUN_ID }}
+          SEAT: ${{ github.event.inputs.seat }}
         with:
           input: cloud/kubernetes/ui/deployment.tpl.yaml
           output: cloud/kubernetes/ui/deployment.yaml

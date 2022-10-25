@@ -1,20 +1,26 @@
-use crate::Result;
-use crate::{auth, PlatformError};
-use axum::{
-    async_trait,
-    extract::{FromRequest, RequestParts, TypedHeader},
-    headers::{authorization::Bearer, Authorization},
-};
-
-use common::rbac::{Permission, Role};
-
-use crate::auth::token::parse_access_token;
-use axum::extract::Extension;
-use common::rbac::{
-    OrganizationPermission, OrganizationRole, ProjectPermission, ProjectRole,
-    ORGANIZATION_PERMISSIONS, PERMISSIONS, PROJECT_PERMISSIONS,
-};
 use std::sync::Arc;
+
+use axum::async_trait;
+use axum::extract::Extension;
+use axum::extract::FromRequest;
+use axum::extract::RequestParts;
+use axum::extract::TypedHeader;
+use axum::headers::authorization::Bearer;
+use axum::headers::Authorization;
+use common::rbac::OrganizationPermission;
+use common::rbac::OrganizationRole;
+use common::rbac::Permission;
+use common::rbac::ProjectPermission;
+use common::rbac::ProjectRole;
+use common::rbac::Role;
+use common::rbac::ORGANIZATION_PERMISSIONS;
+use common::rbac::PERMISSIONS;
+use common::rbac::PROJECT_PERMISSIONS;
+
+use crate::auth;
+use crate::auth::token::parse_access_token;
+use crate::PlatformError;
+use crate::Result;
 
 #[derive(Default, Clone)]
 pub struct AuthContext {
@@ -110,8 +116,7 @@ impl Context {
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
-where
-    B: Send,
+where B: Send
 {
     type Rejection = PlatformError;
 

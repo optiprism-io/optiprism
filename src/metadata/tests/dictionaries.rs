@@ -1,8 +1,9 @@
+use std::env::temp_dir;
+use std::sync::Arc;
+
 use metadata::dictionaries::Provider;
 use metadata::error::Result;
 use metadata::store::Store;
-use std::env::temp_dir;
-use std::sync::Arc;
 use uuid::Uuid;
 
 #[tokio::test]

@@ -17,28 +17,39 @@
 
 //! Defines physical expressions that can evaluated at runtime during query execution
 
-use crate::error::{QueryError, Result};
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::Debug;
+use std::sync::Arc;
+use std::sync::Mutex;
 
-use std::sync::{Arc, Mutex};
-
-use arrow::array::{
-    Array, ArrayRef, Decimal128Builder, Float64Array, Int16Array, Int32Array, Int64Array,
-    Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
-};
+use arrow::array::Array;
+use arrow::array::ArrayRef;
+use arrow::array::Decimal128Builder;
+use arrow::array::Float64Array;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
+use arrow::array::UInt16Array;
+use arrow::array::UInt32Array;
+use arrow::array::UInt64Array;
+use arrow::array::UInt8Array;
 use arrow::datatypes::DataType;
+use datafusion::physical_plan::expressions::AvgAccumulator;
+use datafusion::physical_plan::expressions::MaxAccumulator;
+use datafusion::physical_plan::expressions::MinAccumulator;
+use datafusion::physical_plan::Accumulator;
 use datafusion_common::Result as DFResult;
+use datafusion_common::ScalarValue;
+use datafusion_expr::AggregateFunction;
+use datafusion_expr::AggregateState;
 
+use crate::error::QueryError;
+use crate::error::Result;
 use crate::physical_plan::expressions::partitioned_count::PartitionedCountAccumulator;
 use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulator;
-
-use datafusion::physical_plan::expressions::{AvgAccumulator, MaxAccumulator, MinAccumulator};
-use datafusion::physical_plan::Accumulator;
-use datafusion_common::ScalarValue;
-use datafusion_expr::{AggregateFunction, AggregateState};
 
 // PartitionedAccumulator extends Accumulator trait with reset
 pub trait PartitionedAccumulator: Debug + Send + Sync {

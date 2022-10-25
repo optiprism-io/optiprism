@@ -1,7 +1,10 @@
-use crate::PlatformError;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use common::types::OptionalProperty;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::PlatformError;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

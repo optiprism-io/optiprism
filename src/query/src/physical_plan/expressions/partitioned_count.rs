@@ -1,15 +1,15 @@
 use std::fmt::Debug;
 
-use crate::error::Result;
-use crate::physical_plan::expressions::partitioned_aggregate::{Buffer, PartitionedAccumulator};
-use crate::DEFAULT_BATCH_SIZE;
 use arrow::array::ArrayRef;
-
 use arrow::datatypes::DataType;
-
 use datafusion::physical_plan::Accumulator;
 use datafusion_common::ScalarValue;
 use datafusion_expr::AggregateState;
+
+use crate::error::Result;
+use crate::physical_plan::expressions::partitioned_aggregate::Buffer;
+use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAccumulator;
+use crate::DEFAULT_BATCH_SIZE;
 
 #[derive(Debug)]
 pub struct PartitionedCountAccumulator {
@@ -56,16 +56,14 @@ impl PartitionedAccumulator for PartitionedCountAccumulator {
 
 #[cfg(test)]
 mod tests {
+    use arrow::datatypes::DataType;
+    use datafusion::physical_plan::expressions::AvgAccumulator;
+    use datafusion_common::ScalarValue as DFScalarValue;
+    use datafusion_expr::Accumulator;
+
     use crate::error::Result;
     use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAccumulator;
     use crate::physical_plan::expressions::partitioned_count::PartitionedCountAccumulator;
-
-    use arrow::datatypes::DataType;
-    use datafusion::physical_plan::expressions::AvgAccumulator;
-
-    use datafusion_common::ScalarValue as DFScalarValue;
-
-    use datafusion_expr::Accumulator;
 
     #[test]
     fn test() -> Result<()> {

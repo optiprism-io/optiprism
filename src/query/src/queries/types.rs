@@ -1,4 +1,5 @@
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use chronoutil::RelativeDuration;
 
 #[derive(Clone, Debug)]

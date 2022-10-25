@@ -1,16 +1,15 @@
-use arrow::error::ArrowError;
 use std::net::AddrParseError;
 use std::result;
-use time::OutOfRangeError;
 
-use datafusion::error::DataFusionError;
-use thiserror::Error;
-
+use arrow::error::ArrowError;
 use common::error::CommonError;
+use datafusion::error::DataFusionError;
 use events_gen::error::EventsGenError;
 use metadata::error::MetadataError;
 use platform::PlatformError;
 use query::error::QueryError;
+use thiserror::Error;
+use time::OutOfRangeError;
 
 pub type Result<T> = result::Result<T, DemoError>;
 

@@ -1,7 +1,10 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
-use common::types::{EventFilter, EventRef, OptionalProperty};
+use chrono::DateTime;
+use chrono::Utc;
+use common::types::EventFilter;
+use common::types::EventRef;
+use common::types::OptionalProperty;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub enum Status {

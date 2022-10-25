@@ -1,32 +1,34 @@
-use crate::error::Result;
-use arrow::datatypes::SchemaRef;
-use arrow::record_batch::RecordBatch;
-use chrono::{DateTime, Duration, Utc};
-
-use rand::rngs::ThreadRng;
 use std::collections::HashMap;
-
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration as StdDuration;
 
-use events_gen::generator::Generator;
-use std::thread;
-
+use arrow::datatypes::SchemaRef;
+use arrow::record_batch::RecordBatch;
+use chrono::DateTime;
+use chrono::Duration;
+use chrono::Utc;
 use common::DECIMAL_SCALE;
 use crossbeam_channel::tick;
+use events_gen::generator::Generator;
+use rand::prelude::*;
+use rand::rngs::ThreadRng;
+use rust_decimal::Decimal;
 use tracing::info;
 
-use rand::prelude::*;
-
+use crate::error::Result;
 use crate::store::actions::Action;
 use crate::store::batch_builder::RecordBatchBuilder;
 use crate::store::coefficients::make_coefficients;
 use crate::store::events::Event;
-use crate::store::intention::{select_intention, Intention};
-use crate::store::products::{Product, ProductProvider};
+use crate::store::intention::select_intention;
+use crate::store::intention::Intention;
+use crate::store::products::Product;
+use crate::store::products::ProductProvider;
 use crate::store::transitions::make_transitions;
-use rust_decimal::Decimal;
 
 pub struct State<'a> {
     pub session_id: usize,

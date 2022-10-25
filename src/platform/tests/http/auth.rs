@@ -1,19 +1,18 @@
 use axum::http;
 use axum::http::HeaderValue;
-
-use reqwest::header::HeaderMap;
-use reqwest::{Client, StatusCode};
-
-use common::rbac::{OrganizationRole, ProjectRole};
-use metadata::accounts::UpdateAccountRequest;
-
+use common::rbac::OrganizationRole;
+use common::rbac::ProjectRole;
 use common::types::OptionalProperty;
-
+use metadata::accounts::UpdateAccountRequest;
 use platform::auth::types::TokensResponse;
 use platform::auth::SignUpRequest;
 use platform::http::auth::RefreshTokenRequest;
+use reqwest::header::HeaderMap;
+use reqwest::Client;
+use reqwest::StatusCode;
 
-use crate::http::tests::{create_admin_acc_and_login, run_http_service};
+use crate::http::tests::create_admin_acc_and_login;
+use crate::http::tests::run_http_service;
 
 #[tokio::test]
 async fn test_auth() -> anyhow::Result<()> {
@@ -50,23 +49,17 @@ async fn test_auth() -> anyhow::Result<()> {
         let resp: TokensResponse = serde_json::from_str(resp.text().await?.as_str())?;
 
         md.accounts
-            .update(
-                2,
-                UpdateAccountRequest {
-                    updated_by: 2,
-                    password: OptionalProperty::None,
-                    email: OptionalProperty::None,
-                    first_name: OptionalProperty::None,
-                    last_name: OptionalProperty::None,
-                    role: OptionalProperty::None,
-                    organizations: OptionalProperty::Some(Some(vec![(
-                        1,
-                        OrganizationRole::Member,
-                    )])),
-                    projects: OptionalProperty::Some(Some(vec![(1, ProjectRole::Reader)])),
-                    teams: OptionalProperty::None,
-                },
-            )
+            .update(2, UpdateAccountRequest {
+                updated_by: 2,
+                password: OptionalProperty::None,
+                email: OptionalProperty::None,
+                first_name: OptionalProperty::None,
+                last_name: OptionalProperty::None,
+                role: OptionalProperty::None,
+                organizations: OptionalProperty::Some(Some(vec![(1, OrganizationRole::Member)])),
+                projects: OptionalProperty::Some(Some(vec![(1, ProjectRole::Reader)])),
+                teams: OptionalProperty::None,
+            })
             .await?;
         resp
     };

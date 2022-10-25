@@ -1,14 +1,21 @@
-use crate::auth::types::TokensResponse;
-use crate::{auth::types::SignUpRequest, AuthProvider, PlatformError, Result};
-
-use axum::{extract::Extension, routing::post, Json, Router};
-use reqwest::StatusCode;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use axum::extract::Extension;
+use axum::routing::post;
+use axum::Json;
+use axum::Router;
+use reqwest::StatusCode;
+use serde::Deserialize;
+use serde::Serialize;
 use time::OffsetDateTime;
+use tower_cookies::Cookie;
+use tower_cookies::Cookies;
 
-use tower_cookies::{Cookie, Cookies};
+use crate::auth::types::SignUpRequest;
+use crate::auth::types::TokensResponse;
+use crate::AuthProvider;
+use crate::PlatformError;
+use crate::Result;
 
 pub const COOKIE_NAME_REFRESH_TOKEN: &str = "refresh_token";
 

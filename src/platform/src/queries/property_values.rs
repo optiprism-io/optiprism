@@ -1,8 +1,15 @@
-use crate::queries::types::{json_value_to_scalar, EventRef, PropValueOperation, PropertyRef};
-use crate::{array_ref_to_json_values, PlatformError, Result};
 use arrow::array::ArrayRef;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use serde_json::Value;
+
+use crate::array_ref_to_json_values;
+use crate::queries::types::json_value_to_scalar;
+use crate::queries::types::EventRef;
+use crate::queries::types::PropValueOperation;
+use crate::queries::types::PropertyRef;
+use crate::PlatformError;
+use crate::Result;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Filter {

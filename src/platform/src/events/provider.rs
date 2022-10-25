@@ -1,10 +1,14 @@
-use crate::events::types::{Event, UpdateEventRequest};
-use crate::events::CreateEventRequest;
-use crate::{Context, Result};
+use std::sync::Arc;
+
 use common::rbac::ProjectPermission;
 use metadata::events::Provider as EventsProvider;
 use metadata::metadata::ListResponse;
-use std::sync::Arc;
+
+use crate::events::types::Event;
+use crate::events::types::UpdateEventRequest;
+use crate::events::CreateEventRequest;
+use crate::Context;
+use crate::Result;
 
 pub struct Provider {
     prov: Arc<EventsProvider>,

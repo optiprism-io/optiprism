@@ -1,22 +1,32 @@
 use std::sync::Arc;
 
-use bincode::{deserialize, serialize};
+use bincode::deserialize;
+use bincode::serialize;
 use chrono::Utc;
-use futures::future::{BoxFuture, FutureExt};
-
-use common::types::{EventRef, OptionalProperty};
+use common::types::EventRef;
+use common::types::OptionalProperty;
+use futures::future::BoxFuture;
+use futures::future::FutureExt;
 use tokio::sync::RwLock;
 
-use crate::custom_events::types::{CreateCustomEventRequest, Event, UpdateCustomEventRequest};
+use crate::custom_events::types::CreateCustomEventRequest;
+use crate::custom_events::types::Event;
+use crate::custom_events::types::UpdateCustomEventRequest;
 use crate::custom_events::CustomEvent;
-use crate::error::{CustomEventError, MetadataError, StoreError};
+use crate::error;
+use crate::error::CustomEventError;
+use crate::error::MetadataError;
+use crate::error::StoreError;
+use crate::events;
 use crate::metadata::ListResponse;
 use crate::store::index::hash_map::HashMap;
-use crate::store::path_helpers::{
-    list, make_data_value_key, make_id_seq_key, make_index_key, org_proj_ns,
-};
+use crate::store::path_helpers::list;
+use crate::store::path_helpers::make_data_value_key;
+use crate::store::path_helpers::make_id_seq_key;
+use crate::store::path_helpers::make_index_key;
+use crate::store::path_helpers::org_proj_ns;
 use crate::store::Store;
-use crate::{error, events, Result};
+use crate::Result;
 
 const NAMESPACE: &[u8] = b"custom_events";
 const IDX_NAME: &[u8] = b"name";

@@ -15,6 +15,9 @@ cargo-test:
 cargo-udeps:
 	cargo +nightly udeps --all-targets
 
+cargo-sort:
+	cargo-sort -w
+
 cargo-build:
 	cargo build
 
@@ -23,6 +26,9 @@ cargo-build-release:
 
 cargo-build-release-optimized:
 	cargo build -Z "build-std=std" --release
+
+yaml-lint:
+	yamllint -c .yamllint.yaml .
 
 generate-openapi:
 	openapi-generator generate -i ./api/openapi.yaml -g typescript-axios -o frontend/src/api

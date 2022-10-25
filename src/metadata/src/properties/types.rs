@@ -1,9 +1,13 @@
-use crate::properties::provider::Namespace;
 use arrow::datatypes::DataType;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use common::types::OptionalProperty;
-use convert_case::{Case, Casing};
-use serde::{Deserialize, Serialize};
+use convert_case::Case;
+use convert_case::Casing;
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::properties::provider::Namespace;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub enum Status {

@@ -1,19 +1,27 @@
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use arrow::util::pretty::print_batches;
-    use common::types::{EventRef, PropValueOperation, PropertyRef};
+    use common::types::EventRef;
+    use common::types::PropValueOperation;
+    use common::types::PropertyRef;
     use common::ScalarValue;
     use datafusion::execution::context::SessionState;
     use datafusion::execution::runtime_env::RuntimeEnv;
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use datafusion::physical_plan::collect;
-    use datafusion::prelude::{SessionConfig, SessionContext};
+    use datafusion::prelude::SessionConfig;
+    use datafusion::prelude::SessionContext;
     use query::error::Result;
     use query::physical_plan::planner::QueryPlanner;
-    use query::queries::property_values::{Filter, LogicalPlanBuilder, PropertyValues};
-    use query::test_util::{create_entities, create_md, events_provider};
+    use query::queries::property_values::Filter;
+    use query::queries::property_values::LogicalPlanBuilder;
+    use query::queries::property_values::PropertyValues;
+    use query::test_util::create_entities;
+    use query::test_util::create_md;
+    use query::test_util::events_provider;
     use query::Context;
-    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_property_values() -> Result<()> {

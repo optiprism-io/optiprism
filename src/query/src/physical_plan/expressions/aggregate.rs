@@ -1,8 +1,7 @@
-use crate::error::Result;
-
 use arrow::datatypes::DataType;
-
 use datafusion_expr::AggregateFunction;
+
+use crate::error::Result;
 
 pub fn state_types(data_type: DataType, agg: &AggregateFunction) -> Result<Vec<DataType>> {
     Ok(match agg {

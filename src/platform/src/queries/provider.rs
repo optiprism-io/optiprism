@@ -1,11 +1,13 @@
+use std::sync::Arc;
+
+use common::rbac::ProjectPermission;
+
 use crate::data_table::DataTable;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
 use crate::Context;
 use crate::Result;
-use common::rbac::ProjectPermission;
-use std::sync::Arc;
 
 pub struct QueryProvider {
     query: Arc<query::QueryProvider>,
