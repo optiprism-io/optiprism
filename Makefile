@@ -35,6 +35,7 @@ yaml-fmt:
 
 validate-openapi:
 	swagger-cli validate ./api/openapi.yaml
+	openapi-generator validate -i ./api/openapi.yaml
 
 generate-openapi:
 	openapi-generator generate -i ./api/openapi.yaml -g typescript-axios -o frontend/src/api
