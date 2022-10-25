@@ -18,14 +18,12 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-frontend-env
       - run: yarn check:eslint
-
   check-vue-tsc:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-frontend-env
       - run: yarn check:vue-tsc
-
   test-coverage:
     runs-on: ubuntu-20.04
     steps:

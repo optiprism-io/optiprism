@@ -30,6 +30,12 @@ cargo-build-release-optimized:
 yaml-lint:
 	yamllint -c .yamllint.yaml .
 
+yaml-fmt:
+	yamlfmt
+
+validate-openapi:
+	swagger-cli validate ./api/openapi.yaml
+
 generate-openapi:
 	openapi-generator generate -i ./api/openapi.yaml -g typescript-axios -o frontend/src/api
 

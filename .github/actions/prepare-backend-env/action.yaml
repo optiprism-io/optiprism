@@ -1,6 +1,5 @@
 name: Prepate backend environment
 description: Prepate backend environment
-
 runs:
   using: composite
   steps:

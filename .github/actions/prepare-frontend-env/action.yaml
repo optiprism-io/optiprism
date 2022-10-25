@@ -1,6 +1,5 @@
 name: Prepate front-end environment
 description: Prepate front-end environment
-
 runs:
   using: composite
   steps:

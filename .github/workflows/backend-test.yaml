@@ -1,5 +1,4 @@
 name: Lint and test backend
-
 on: workflow_dispatch
 # on:
 #   push:
@@ -17,7 +16,6 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-backend-env
       - run: cargo fmt --all -- --check
-
   check-clippy:
     runs-on: ubuntu-20.04
     timeout-minutes: 50
@@ -26,7 +24,6 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/prepare-backend-env
       - run: cargo clippy -- -D warnings
-
   test:
     runs-on: ubuntu-20.04
     timeout-minutes: 50
