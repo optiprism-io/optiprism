@@ -58,10 +58,9 @@ const getEventSegmentation = async () => {
             if (res) {
                 eventSegmentation.value = res.data as DataTableResponse
             }
-        } catch (e) {
-            console.log(e);
+        } catch (error) {
+            throw Error(JSON.stringify(error))
         }
-
     }
     loading.value = false
 }
@@ -75,8 +74,8 @@ const getFunnelsReport = async () => {
             if (res?.data?.columns) {
                 funnelsReport.value = res.data.columns as DataTableResponseColumnsInner[]
             }
-        } catch (e) {
-            console.log(e);
+        } catch (error) {
+            throw Error(JSON.stringify(error))
         }
     }
     loading.value = false

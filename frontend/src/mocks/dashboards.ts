@@ -52,25 +52,25 @@ export default [
             {
                 'panels': [
                     {
-                        'span': '2',
+                        'span': '3',
                         'type': 'report',
                         'reportId': '1',
                         'report': reportsMocks[1]
                     },
                     {
-                        'span': '2',
+                        'span': '3',
                         'type': 'report',
                         'reportId': '2',
                         'report': reportsMocks[2]
                     },
                     {
-                        'span': '2',
+                        'span': '3',
                         'type': 'report',
                         'reportId': '3',
                         'report': reportsMocks[3]
                     },
                     {
-                        'span': '2',
+                        'span': '3',
                         'type': 'report',
                         'reportId': '4',
                         'report': reportsMocks[4]
