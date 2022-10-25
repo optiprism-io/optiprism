@@ -38,6 +38,7 @@ pub async fn run(cfg: Config) -> Result<()> {
 
     info!("starting demo instance...");
     debug!("metadata path: {:?}", cfg.md_path);
+    debug!("demo data path: {:?}", cfg.demo_data_path);
     if cfg.ui_path.is_some() {
         debug!("ui path: {:?}", cfg.ui_path);
     }

@@ -13,7 +13,6 @@ use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;
 
-use crate::error::Error;
 use crate::error::Result;
 
 extern crate parse_duration;
@@ -55,13 +54,13 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     Demo {
-        #[arg(long, default_value = "127.0.0.1:25535")]
+        #[arg(long, default_value = "0.0.0.0:8080")]
         host: SocketAddr,
         #[arg(long)]
         demo_data_path: PathBuf,
         #[arg(long)]
         md_path: Option<PathBuf>,
-        #[arg(long, default_value = ".")]
+        #[arg(long)]
         ui_path: Option<PathBuf>,
         #[arg(long, default_value = "365 days")]
         duration: Option<String>,
@@ -76,12 +75,8 @@ enum Cmd {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // a builder for `FmtSubscriber`.
     let subscriber = FmtSubscriber::builder()
-        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
-        // will be written to stdout.
         .with_max_level(cli.log_level)
-        // completes the builder.
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
@@ -105,20 +100,16 @@ async fn main() -> Result<()> {
             let from_date = to_date - duration;
             let md_path = match md_path {
                 None => temp_dir().join(format!("{}.db", Uuid::new_v4())),
-                Some(path) => {
-                    if !path.is_dir() {
-                        return Err(Error::Internal(
-                            "md path should point to directory".to_string(),
-                        ));
-                    }
-
-                    path
-                }
+                Some(path) => path,
             };
+
+            md_path.try_exists()?;
 
             if let Some(ui_path) = &ui_path {
                 ui_path.try_exists()?;
             }
+
+            demo_data_path.try_exists()?;
 
             let cfg = demo::Config {
                 host,

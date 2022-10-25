@@ -11,8 +11,6 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum Error {
     #[error("Demo")]
     Demo(#[from] DemoError),
-    #[error("Internal")]
-    Internal(String),
     #[error("IP Address Parse Error: {0:?}")]
     AddrParseError(#[from] AddrParseError),
     #[error("StdIO: {0:?}")]
