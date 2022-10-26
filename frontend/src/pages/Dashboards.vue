@@ -87,7 +87,7 @@
                     </div>
                     <GridContainer>
                         <GridItem
-                            v-for="panel in item?.panels"
+                            v-for="(panel, j) in item?.panels"
                             :key="panel.reportId"
                             :col-lg="panel.span ?? 6"
                         >
@@ -95,6 +95,30 @@
                                 v-if="panel?.report"
                                 :title="panel?.report?.name"
                             >
+                                <template #rightTitle>
+                                    <UiDropdown
+                                        class="pf-u-mr-md"
+                                        :items="menuCardReport"
+                                        :has-icon-arrow-button="false"
+                                        :transparent="true"
+                                        :placement-menu="'bottom-end'"
+                                        @select-value="(paylaod) => selectReportDropdown(paylaod, i, j)"
+                                    >
+                                        <template #button>
+                                            <button
+                                                class="pf-c-dropdown__toggle pf-m-plain"
+                                                aria-expanded="true"
+                                                type="button"
+                                                aria-label="Actions"
+                                            >
+                                                <i
+                                                    class="fas fa-ellipsis-v"
+                                                    aria-hidden="true"
+                                                />
+                                            </button>
+                                        </template>
+                                    </UiDropdown>
+                                </template>
                                 <DashboardPanel
                                     :report="panel.report"
                                 />
@@ -159,11 +183,13 @@ import UiCard from '@/components/uikit/UiCard/UiCard.vue'
 import DashboardPanel from '@/components/dashboards/DashboardPanel.vue'
 import DashboardReportsPopup from '@/components/dashboards/DashboardReportsPopup.vue'
 import UiInlineEdit from '@/components/uikit/UiInlineEdit.vue'
+import { GenericUiDropdown, UiDropdownItem } from '@/components/uikit/UiDropdown.vue'
 
 const { confirm } = useConfirm()
 const { t } = usei18n()
 const commonStore = useCommonStore()
 const lexiconStore = useLexiconStore()
+const UiDropdown = GenericUiDropdown<string>()
 
 interface DashboardPanelType {
     span: number,
@@ -188,6 +214,16 @@ const activeDashboardId = ref<number | null>(null)
 const selections = computed(() => activeDashboardId.value ? [activeDashboardId.value] : [])
 const activeDashboard = computed(() => {
     return dashboards.value.find(item => Number(item.id) === activeDashboardId.value) ?? null
+})
+
+const menuCardReport = computed<UiDropdownItem<string>[]>(() => {
+    return [
+        {
+            key: 1,
+            value: 'delete',
+            nameDisplay: t('common.delete'),
+        }
+    ]
 })
 
 const selectDashboards = computed(() => {
@@ -261,13 +297,8 @@ const getDashboardsList = async () => {
     }
 }
 
-const onSelectReport = (payload: number) => {
-    newDashboardRows.value[addReportPanels.value].panels.push({
-        span: 6,
-        reportId: payload,
-        report: reports.value.find(item => Number(item.id) === payload)
-    })
-    newDashboardRows.value = newDashboardRows.value.map(item => {
+const updateDashboardSpan = (dashboard: DashboardRows[]) => {
+    return dashboard.map(item => {
         return {
             panels: item.panels.map(panel => {
                 return {
@@ -277,6 +308,15 @@ const onSelectReport = (payload: number) => {
             })
         }
     })
+}
+
+const onSelectReport = (payload: number) => {
+    newDashboardRows.value[addReportPanels.value].panels.push({
+        span: 6,
+        reportId: payload,
+        report: reports.value.find(item => Number(item.id) === payload)
+    })
+    newDashboardRows.value = updateDashboardSpan(newDashboardRows.value)
     closeDashboardReportsPopup()
 }
 
@@ -293,6 +333,20 @@ const addReport = (index: number) => {
 const addPanel = () => {
     newDashboardRows.value.push({panels: []})
     addReport(newDashboardRows.value.length - 1)
+}
+
+const selectReportDropdown = (payload: UiDropdownItem<string>, indexRow: number, indexPanel: number) => {
+    if (payload.value === 'delete') {
+        const dashboard = [...newDashboardRows.value]
+        const row = dashboard[indexRow]
+        if (row.panels.length === 1 && indexRow) {
+            dashboard.splice(indexRow, 1);
+        } else {
+            row.panels.splice(indexPanel, 1)
+            dashboard[indexRow] = row
+        }
+        newDashboardRows.value = updateDashboardSpan(dashboard)
+    }
 }
 
 onMounted(() => {

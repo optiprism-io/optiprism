@@ -1,11 +1,15 @@
 <template>
     <div class="pf-l-flex">
-        <span class="pf-c-card__title pf-u-mr-0">
+        <div class="pf-c-card__title pf-u-mr-0">
             <slot />
-        </span>
-
+        </div>
         <div class="pf-l-flex__item">
             <slot name="extra" />
         </div>
+        <template v-if="$slots.right">
+            <div class="pf-l-flex__item pf-u-ml-auto">
+                <slot name="right" />
+            </div>
+        </template>
     </div>
 </template>

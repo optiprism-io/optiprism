@@ -10,6 +10,12 @@
             <span v-else>
                 {{ title }}
             </span>
+            <template
+                v-if="$slots.rightTitle"
+                #right
+            >
+                <slot name="rightTitle" />
+            </template>
         </UiCardTitle>
 
         <UiCardBody>
