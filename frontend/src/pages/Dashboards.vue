@@ -72,11 +72,11 @@
                 >
                     <div
                         v-if="item?.panels.length < 4"
-                        @click="addReport(i)"
                         class="dashboards__new"
                         :class="{
                             'dashboards__new_small': item?.panels.length >= 1
                         }"
+                        @click="addReport(i)"
                     >
                         <div class="dashboards__new-item pf-u-box-shadow-sm pf-u-background-color-success pf-l-flex pf-m-align-items-center pf-m-justify-content-center">
                             <UiIcon
@@ -109,8 +109,8 @@
                 >
                     <GridContainer>
                         <div
-                            @click="addPanel"
                             class="dashboards__new"
+                            @click="addPanel"
                         >
                             <div class="dashboards__new-item pf-u-box-shadow-sm pf-u-background-color-success pf-l-flex pf-m-align-items-center pf-m-justify-content-center">
                                 <UiIcon
@@ -159,21 +159,20 @@ import UiCard from '@/components/uikit/UiCard/UiCard.vue'
 import DashboardPanel from '@/components/dashboards/DashboardPanel.vue'
 import DashboardReportsPopup from '@/components/dashboards/DashboardReportsPopup.vue'
 import UiInlineEdit from '@/components/uikit/UiInlineEdit.vue'
-import { log } from '@antv/g2plot/lib/utils'
 
 const { confirm } = useConfirm()
 const { t } = usei18n()
 const commonStore = useCommonStore()
 const lexiconStore = useLexiconStore()
 
-interface DashboardPanel {
+interface DashboardPanelType {
     span: number,
     reportId?: number
     report?: Report,
 }
 
 interface DashboardRows {
-    panels: DashboardPanel[]
+    panels: DashboardPanelType[]
 }
 
 const loadingReports = ref(false)

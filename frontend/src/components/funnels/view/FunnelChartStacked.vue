@@ -20,6 +20,7 @@ import {computed, inject, PropType, ref, watch} from 'vue';
 import {Chart, getEngine} from '@antv/g2';
 import {lighten} from '@/helpers/colorHelper';
 import {I18N} from '@/utils/i18n';
+import iconArrow from '@/assets/img/arrow-down.png';
 
 const {$t} = inject('i18n') as I18N
 const G = getEngine('canvas')
@@ -240,7 +241,7 @@ watch(() => [container.value, dataView.value], () => {
                                 y: 3 * size,
                                 width: size,
                                 height: size,
-                                img: '/img/png/arrow-down.png'
+                                img: iconArrow,
                             }
                         })
                     }
