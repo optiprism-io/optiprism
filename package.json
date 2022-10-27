@@ -8,8 +8,9 @@
     "clean": "rm -rf frontend/dist && mkdir ./frontend/dist",
     "check:eslint": "eslint --ext .ts,vue ./frontend",
     "check:vue-tsc": "vue-tsc --noEmit",
-    "test": "vitest --run",
+    "test:unit": "vitest --run",
     "test:coverage": "vitest --run --coverage",
+    "test:e2e": "playwright test",
     "build": "vite build"
   },
   "dependencies": {
@@ -27,6 +28,7 @@
     "vue-virtualised": "^0.1.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.27.1",
     "@types/lodash": "^4.14.185",
     "@types/node": "^18.7.18",
     "@typescript-eslint/eslint-plugin": "^5.37.0",
