@@ -1,5 +1,5 @@
 <template>
-    <div class="dashboards pf-u-p-md">
+    <div class="dashboards pf-u-p-md pf-u-pb-3xl">
         <div class="pf-u-mb-md pf-u-display-flex">
             <UiSelect
                 v-if="dashboards.length"
@@ -13,7 +13,7 @@
                 v-show="activeDashboardId"
                 class="pf-m-primary"
                 :before-icon="'fas fa-plus'"
-                @click="newDashboard"
+                @click="setNew"
             >
                 {{ $t('dashboards.newDashboard') }}
             </UiButton>
@@ -26,34 +26,7 @@
                 {{ $t('dashboards.delete') }}
             </UiButton>
         </div>
-        <GridContainer v-if="activeDashboardId">
-            <template
-                v-for="(item, i) in activeDashboard?.rows"
-                :key="i"
-            >
-                <GridItem
-                    v-for="panel in item?.panels"
-                    :key="panel.reportId"
-                    :col-lg="panel.span ?? 6"
-                >
-                    <UiCard
-                        v-if="panel?.report"
-                        :title="panel?.report?.name"
-                        :link="{
-                            name: panel.report?.report?.type === ReportReportTypeEnum.EventSegmentation ? pagesMap.reportsEventSegmentation.name : pagesMap.funnels.name,
-                            params: {
-                                id: panel?.report?.id
-                            }
-                        }"
-                    >
-                        <DashboardPanel
-                            :report="panel.report"
-                        />
-                    </UiCard>
-                </GridItem>
-            </template>
-        </GridContainer>
-        <div v-else>
+        <div>
             <div class="dashboards__name pf-u-mb-md">
                 <UiInlineEdit
                     :value="dashboardName"
@@ -78,10 +51,10 @@
                         }"
                         @click="addReport(i)"
                     >
-                        <div class="dashboards__new-item pf-u-box-shadow-sm pf-u-background-color-success pf-l-flex pf-m-align-items-center pf-m-justify-content-center">
+                        <div class="dashboards__new-item pf-u-box-shadow-sm pf-l-flex pf-m-align-items-center pf-m-justify-content-center">
                             <UiIcon
-                                class="pf-u-font-size-3xl dashboards__new-item-icon"
-                                :icon="'fas fa-plus-circle'"
+                                class="pf-u-font-size-xl dashboards__new-item-icon"
+                                :icon="'fas fa-plus'"
                             />
                         </div>
                     </div>
@@ -94,6 +67,12 @@
                             <UiCard
                                 v-if="panel?.report"
                                 :title="panel?.report?.name"
+                                :link="{
+                                    name: panel.report?.report?.type === ReportReportTypeEnum.EventSegmentation ? pagesMap.reportsEventSegmentation.name : pagesMap.funnels.name,
+                                    params: {
+                                        id: panel?.report?.id
+                                    }
+                                }"
                             >
                                 <template #rightTitle>
                                     <UiDropdown
@@ -136,10 +115,10 @@
                             class="dashboards__new"
                             @click="addPanel"
                         >
-                            <div class="dashboards__new-item pf-u-box-shadow-sm pf-u-background-color-success pf-l-flex pf-m-align-items-center pf-m-justify-content-center">
+                            <div class="dashboards__new-item dashboards__new-item_small pf-u-box-shadow-sm pf-l-flex pf-m-align-items-center pf-m-justify-content-center">
                                 <UiIcon
-                                    class="pf-u-font-size-3xl dashboards__new-item-icon"
-                                    :icon="'fas fa-plus-circle'"
+                                    class="pf-u-font-size-xl dashboards__new-item-icon"
+                                    :icon="'fas fa-plus'"
                                 />
                             </div>
                         </div>
@@ -159,6 +138,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import dashboardService from '@/api/services/dashboards.service'
 import reportsService from '@/api/services/reports.service'
 import {
@@ -187,6 +167,8 @@ import { GenericUiDropdown, UiDropdownItem } from '@/components/uikit/UiDropdown
 
 const { confirm } = useConfirm()
 const { t } = usei18n()
+const route = useRoute()
+const router = useRouter()
 const commonStore = useCommonStore()
 const lexiconStore = useLexiconStore()
 const UiDropdown = GenericUiDropdown<string>()
@@ -203,13 +185,16 @@ interface DashboardRows {
 
 const loadingReports = ref(false)
 const reports = ref<Report[]>([])
-const dashboardName = ref(t('dashboards.untitledDashboard'))
 const dashboardReportsPopup = ref(false)
 const addReportPanels = ref(0)
+const dashboardName = ref(t('dashboards.untitledDashboard'))
 const newDashboardRows = ref<DashboardRows[]>([])
 const errorDashboard = ref(false)
 const dashboards = ref<Dashboard[]>([])
 const activeDashboardId = ref<number | null>(null)
+const dashboardsId = computed((): number[] => {
+    return dashboards.value.map(item => Number(item.id))
+});
 
 const selections = computed(() => activeDashboardId.value ? [activeDashboardId.value] : [])
 const activeDashboard = computed(() => {
@@ -243,8 +228,21 @@ const selectDashboardsText = computed(() => {
 
 const onSelectDashboard = (id: number | string) => {
     activeDashboardId.value = Number(id);
-    dashboardName.value = t('dashboards.untitledDashboard')
-    newDashboardRows.value = []
+    router.push({ query: { id } })
+    if (activeDashboard.value) {
+        dashboardName.value = activeDashboard.value?.name || t('dashboards.untitledDashboard')
+        newDashboardRows.value = activeDashboard.value.rows?.map((item): DashboardRows => {
+            return {
+                panels: item.panels?.map((panel): DashboardPanelType => {
+                    return {
+                        span: panel.span || 6,
+                        reportId: panel.reportId,
+                        report: panel.report
+                    }
+                }) || []
+            }
+        }) || []
+    }
 }
 
 const getReportsList = async () => {
@@ -258,13 +256,6 @@ const getReportsList = async () => {
         throw Error(JSON.stringify(error))
     }
     loadingReports.value = false
-}
-
-const newDashboard = () => {
-    activeDashboardId.value = null
-    newDashboardRows.value = [{
-        panels: []
-    }]
 }
 
 const onDeleteDashboard = async () => {
@@ -290,10 +281,6 @@ const getDashboardsList = async () => {
 
     if (res?.data?.dashboards) {
         dashboards.value = res.data.dashboards
-
-        if (res.data.dashboards[0]?.id) {
-            onSelectDashboard(res.data.dashboards[0].id)
-        }
     }
 }
 
@@ -349,11 +336,39 @@ const selectReportDropdown = (payload: UiDropdownItem<string>, indexRow: number,
     }
 }
 
-onMounted(() => {
+const setNew = () => {
+    newDashboardRows.value = [{
+        panels: []
+    }]
+    activeDashboardId.value = null
+    dashboardName.value = t('dashboards.untitledDashboard')
+    router.push({
+        query: {
+            id: null,
+        }
+    })
+}
+
+onMounted(async () => {
     lexiconStore.getEvents()
     lexiconStore.getEventProperties()
     lexiconStore.getUserProperties()
-    getDashboardsList()
+    await getDashboardsList()
+    const dashboardId = route.query.id;
+
+    if (dashboardId) {
+        if (dashboardsId.value.includes(Number(dashboardId))) {
+            onSelectDashboard(Number(dashboardId))
+        } else {
+            setNew()
+        }
+    } else {
+        if (dashboards.value.length && dashboards.value[0].id) {
+            onSelectDashboard(Number(dashboards.value[0].id))
+        } else {
+            setNew()
+        }
+    }
 })
 </script>
 
@@ -361,10 +376,15 @@ onMounted(() => {
 .dashboards {
     &__new-item {
         min-height: 250px;
+        height: 100%;
         cursor: pointer;
+        background-color: var(--pf-global--palette--green-50);
+        &_small {
+            min-height: 50px;
+        }
     }
     &__new-item-icon {
-        color: var(--pf-global--success-color--100);
+        color: var(--pf-global--Color--300);
     }
     &__name {
         max-width: 300px;
@@ -374,10 +394,10 @@ onMounted(() => {
     }
     &__panel {
         position: relative;
-        min-height: 250px !important;
+        min-height: 250px;
         width: 100%;
         &_padding {
-            padding-left: 120px;
+            padding-left: 65px;
         }
     }
     &__new {
@@ -385,13 +405,10 @@ onMounted(() => {
         top: 0;
         left: 0;
         height: 100%;
-        min-width: 250px;
+        width: 100%;
         &_small {
-            min-width: 108px;
+            max-width: 50px;
         }
-    }
-    &__new-item {
-        height: 100%;
     }
 }
 </style>
