@@ -12,10 +12,9 @@ import {router} from '@/router'
 import uikitPlugin from '@/plugins/uikit';
 import i18nPlugin from '@/plugins/i18n';
 
-if (typeof makeServer === 'function') {
+if (import.meta.env.VITE_MOCK_API) {
     makeServer();
 }
-
 const app = createApp(App);
 
 app.use(createPinia());

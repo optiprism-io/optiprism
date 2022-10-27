@@ -652,10 +652,10 @@
   "resolved" "https://registry.npmjs.org/@types/lodash/-/lodash-4.14.185.tgz"
   "version" "4.14.185"
 
-"@types/node@*", "@types/node@^18.7.18":
-  "integrity" "sha512-m+6nTEOadJZuTPkKR/SYK3A2d7FZrgElol9UP1Kae90VVU4a6mxnPuLiIW1m4Cq4gZ/nWb9GrdVXJCoCazDAbg=="
-  "resolved" "https://registry.npmjs.org/@types/node/-/node-18.7.18.tgz"
-  "version" "18.7.18"
+"@types/node@*", "@types/node@^18.11.7":
+  "integrity" "sha512-LhFTglglr63mNXUSRYD8A+ZAIu5sFqNJ4Y2fPuY7UlrySJH87rRRlhtVmMHplmfk5WkoJGmDjE9oiTfyX94CpQ=="
+  "resolved" "https://registry.npmjs.org/@types/node/-/node-18.11.7.tgz"
+  "version" "18.11.7"
 
 "@typescript-eslint/eslint-plugin@^5.0.0", "@typescript-eslint/eslint-plugin@^5.37.0":
   "integrity" "sha512-Fde6W0IafXktz1UlnhGkrrmnnGpAo1kyX7dnyHHVrmwJOn72Oqm3eYtddrpOwwel2W8PAK9F3pIL5S+lfoM0og=="

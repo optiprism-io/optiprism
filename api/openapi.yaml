@@ -9,11 +9,8 @@ info:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
 servers:
-  # Added by API Auto Mocking Plugin
-  - description: SwaggerHub API Auto Mocking
-    url: https://virtserver.swaggerhub.com/optiprism/optiprism/1.0.0
   - description: OptiPrism API server
-    url: /df
+    url: /
 tags:
   - name: events
     description: Events

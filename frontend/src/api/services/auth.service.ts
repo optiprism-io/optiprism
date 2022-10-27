@@ -1,6 +1,6 @@
-import { AuthApi } from '@/api'
+import { AuthApi, Configuration } from '@/api'
 
-const api = new AuthApi()
+const api = new AuthApi(new Configuration({ basePath: import.meta.env.VITE_API_BASE_PATH }));
 
 export const authService = {
     login: (email: string, password: string) => api.basicLogin({ email, password }),

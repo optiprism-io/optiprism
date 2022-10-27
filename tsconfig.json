@@ -1,21 +1,36 @@
 {
-    "compilerOptions": {
-        "baseUrl": "frontend",
-        "target": "esnext",
-        "useDefineForClassFields": true,
-        "module": "esnext",
-        "moduleResolution": "node",
-        "strict": true,
-        "jsx": "preserve",
-        "sourceMap": true,
-        "resolveJsonModule": true,
-        "esModuleInterop": true,
-        "lib": ["esnext", "dom"],
-        "paths": {
-            "@/*": ["src/*"]
-        },
-        "types": ["vite/client"]
-    },
-    "include": ["frontend/src/**/*.ts", "frontend/src/**/*.d.ts", "frontend/src/**/*.vue"],
-    "exclude": ["node_modules/**/*", "frontend/dist/**/*"]
+	"compilerOptions": {
+		"baseUrl": "frontend",
+		"target": "esnext",
+		"useDefineForClassFields": true,
+		"module": "esnext",
+		"moduleResolution": "node",
+		"strict": true,
+		"jsx": "preserve",
+		"sourceMap": true,
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"lib": [
+			"esnext",
+			"dom"
+		],
+		"paths": {
+			"@/*": [
+				"src/*"
+			]
+		},
+		"types": [
+			"vite/client",
+			"node"
+		]
+	},
+	"include": [
+		"frontend/src/**/*.ts",
+		"frontend/src/**/*.d.ts",
+		"frontend/src/**/*.vue"
+	],
+	"exclude": [
+		"node_modules/**/*",
+		"frontend/dist/**/*"
+	]
 }

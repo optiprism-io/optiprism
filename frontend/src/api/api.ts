@@ -276,7 +276,7 @@ export const BreakdownByPropertyPropertyTypeEnum = {
 export type BreakdownByPropertyPropertyTypeEnum = typeof BreakdownByPropertyPropertyTypeEnum[keyof typeof BreakdownByPropertyPropertyTypeEnum];
 
 /**
- * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
+ * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties. 
  * @export
  * @interface CreateCustomEventRequest
  */
@@ -414,7 +414,7 @@ export interface CreateReportRequest {
     'report'?: ReportReport;
 }
 /**
- * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
+ * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties. 
  * @export
  * @interface CustomEvent
  */
@@ -1231,7 +1231,7 @@ export const ErrorResponseCodeEnum = {
 export type ErrorResponseCodeEnum = typeof ErrorResponseCodeEnum[keyof typeof ErrorResponseCodeEnum];
 
 /**
- * Event describes user event. User event is an action which user (client) might do on a product site/app. For instance, user might do a signup and it might be a \"Sign up\" event. Event Also has a properties. <br/><br/> Name must be unique among project events, including custom ones. E.g. you can\'t have multiple \"Sign up\" events. <br/><br/> Normally events are created and updated by admin in a project scope, but there are also system events, which can\'t be deleted or modified.
+ * Event describes user event. User event is an action which user (client) might do on a product site/app. For instance, user might do a signup and it might be a \"Sign up\" event. Event Also has a properties. <br/><br/> Name must be unique among project events, including custom ones. E.g. you can\'t have multiple \"Sign up\" events. <br/><br/> Normally events are created and updated by admin in a project scope, but there are also system events, which can\'t be deleted or modified. 
  * @export
  * @interface Event
  */
@@ -2819,7 +2819,7 @@ export interface GroupRecordsListRequestSearch {
     'inUserProperties'?: Array<EventRecordsListRequestSearchInEventPropertiesInner>;
 }
 /**
- * see  https://datatracker.ietf.org/doc/html/rfc7519
+ * see https://datatracker.ietf.org/doc/html/rfc7519
  * @export
  * @interface JWTToken
  */
@@ -2999,7 +2999,7 @@ export interface Project {
     'users'?: Array<number>;
 }
 /**
- * property defines event or user property. For example, event \"Buy product\" may contains next properties like \"Product name\" and \"Price.\"
+ * Property defines event or user property. For example, event \"Buy product\" may contains next properties like \"Product name\" and \"Price.\" 
  * @export
  * @interface Property
  */
@@ -4322,7 +4322,7 @@ export interface TokensResponse {
     'csrfToken'?: string;
 }
 /**
- * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties.
+ * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties. 
  * @export
  * @interface UpdateCustomEventRequest
  */
@@ -6796,7 +6796,7 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and works as a filter for values
+         * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -7024,7 +7024,7 @@ export const PropertiesApiFp = function(configuration?: Configuration) {
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and works as a filter for values
+         * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -7109,7 +7109,7 @@ export const PropertiesApiFactory = function (configuration?: Configuration, bas
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and works as a filter for values
+         * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -7194,7 +7194,7 @@ export class PropertiesApi extends BaseAPI {
      * @summary List of property values
      * @param {number} organizationId 
      * @param {number} projectId 
-     * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and works as a filter for values
+     * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof PropertiesApi
