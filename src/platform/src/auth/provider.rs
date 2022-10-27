@@ -59,7 +59,7 @@ impl Provider {
 
         let tokens = self
             .make_tokens(account.id)
-            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
 
         Ok(tokens)
     }
@@ -69,24 +69,24 @@ impl Provider {
             .accounts
             .get_by_email(email)
             .await
-            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
 
         verify_password(password, PasswordHash::new(account.password_hash.as_str())?)
-            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
 
         let tokens = self
             .make_tokens(account.id)
-            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
 
         Ok(tokens)
     }
 
     pub async fn refresh_token(&self, refresh_token: &str) -> Result<TokensResponse> {
         let refresh_claims = parse_refresh_token(refresh_token, self.refresh_token_key.as_str())
-            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
         let tokens = self
             .make_tokens(refresh_claims.account_id)
-            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
 
         Ok(tokens)
     }

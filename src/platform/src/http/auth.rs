@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use axum::extract::Extension;
+use axum::http::Response;
 use axum::routing::post;
-use axum::Json;
 use axum::Router;
+use axum_macros::debug_handler;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
@@ -13,10 +14,10 @@ use tower_cookies::Cookies;
 
 use crate::auth::types::SignUpRequest;
 use crate::auth::types::TokensResponse;
+use crate::http::json::Json;
 use crate::AuthProvider;
 use crate::PlatformError;
 use crate::Result;
-
 pub const COOKIE_NAME_REFRESH_TOKEN: &str = "refresh_token";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -40,6 +41,7 @@ fn set_refresh_token_cookie(cookies: &Cookies, refresh_token: &str, expires: Off
     cookies.add(cookie);
 }
 
+#[debug_handler]
 async fn sign_up(
     cookies: Cookies,
     Extension(provider): Extension<Arc<AuthProvider>>,

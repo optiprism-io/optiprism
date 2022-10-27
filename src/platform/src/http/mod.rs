@@ -1,7 +1,9 @@
 pub mod accounts;
 pub mod auth;
 pub mod custom_events;
+pub mod debug;
 pub mod events;
+pub mod json;
 pub mod properties;
 pub mod queries;
 
@@ -9,22 +11,32 @@ use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
+use axum::error_handling::HandleErrorLayer;
+use axum::extract::FromRequest;
 use axum::http::StatusCode;
+use axum::middleware;
 use axum::routing::get_service;
+use axum::BoxError;
 use axum::Extension;
 use axum::Router;
 use axum::Server;
+use axum_macros::debug_handler;
 use metadata::MetadataProvider;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tokio::time::sleep;
+use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use tower_http::services::ServeDir;
 use tower_http::services::ServeFile;
+use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::error::Result;
+use crate::http::debug::print_request_response;
+use crate::PlatformError;
 use crate::PlatformProvider;
 
 pub struct Service {
@@ -52,6 +64,8 @@ impl Service {
         router = router.clone().nest("/api/v1", router);
 
         router = router.layer(CookieManagerLayer::new());
+        router = router.layer(TraceLayer::new_for_http());
+        router = router.layer(middleware::from_fn(print_request_response));
         router = router.layer(Extension(platform.auth.clone()));
         router = router.layer(Extension(md.accounts.clone()));
 
