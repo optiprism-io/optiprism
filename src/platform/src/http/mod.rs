@@ -11,23 +11,17 @@ use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
-use axum::error_handling::HandleErrorLayer;
-use axum::extract::FromRequest;
 use axum::http::StatusCode;
 use axum::middleware;
 use axum::routing::get_service;
-use axum::BoxError;
 use axum::Extension;
 use axum::Router;
 use axum::Server;
-use axum_macros::debug_handler;
 use metadata::MetadataProvider;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tokio::time::sleep;
-use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use tower_http::services::ServeDir;
 use tower_http::services::ServeFile;
@@ -36,7 +30,6 @@ use tracing::info;
 
 use crate::error::Result;
 use crate::http::debug::print_request_response;
-use crate::PlatformError;
 use crate::PlatformProvider;
 
 pub struct Service {

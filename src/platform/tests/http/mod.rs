@@ -21,6 +21,7 @@ mod tests {
     use metadata::store::Store;
     use metadata::MetadataProvider;
     use platform::auth::password::make_password_hash;
+    use platform::auth::types::LogInRequest;
     use platform::PlatformProvider;
     use query::test_util::create_entities;
     use query::test_util::empty_provider;
@@ -56,7 +57,12 @@ mod tests {
             })
             .await?;
 
-        let tokens = auth.log_in(admin.email.as_str(), pwd).await?;
+        let tokens = auth
+            .log_in(LogInRequest {
+                email: admin.email,
+                password: pwd.to_string(),
+            })
+            .await?;
         let mut headers = HeaderMap::new();
         headers.insert(
             http::header::CONTENT_TYPE,

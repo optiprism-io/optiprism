@@ -5,7 +5,6 @@ use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::IntoResponse;
 use axum::response::Response;
-use axum::routing::post;
 
 pub async fn print_request_response(
     req: Request<Body>,

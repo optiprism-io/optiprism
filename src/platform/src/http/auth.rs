@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use axum::extract::Extension;
-use axum::http::Response;
 use axum::routing::post;
 use axum::Router;
 use axum_macros::debug_handler;
@@ -12,20 +11,15 @@ use time::OffsetDateTime;
 use tower_cookies::Cookie;
 use tower_cookies::Cookies;
 
+use crate::auth::types::LogInRequest;
 use crate::auth::types::SignUpRequest;
 use crate::auth::types::TokensResponse;
 use crate::http::json::Json;
 use crate::AuthProvider;
 use crate::PlatformError;
 use crate::Result;
-pub const COOKIE_NAME_REFRESH_TOKEN: &str = "refresh_token";
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct LogInRequest {
-    pub email: String,
-    pub password: String,
-}
+pub const COOKIE_NAME_REFRESH_TOKEN: &str = "refresh_token";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -62,9 +56,7 @@ async fn log_in(
     Extension(provider): Extension<Arc<AuthProvider>>,
     Json(req): Json<LogInRequest>,
 ) -> Result<Json<TokensResponse>> {
-    let tokens = provider
-        .log_in(req.email.as_str(), req.password.as_str())
-        .await?;
+    let tokens = provider.log_in(req).await?;
     set_refresh_token_cookie(
         &cookies,
         tokens.refresh_token.as_str(),
@@ -86,7 +78,7 @@ async fn refresh_token(
         cookie
     } else {
         return Err(PlatformError::BadRequest(
-            "refresh token doesn't not provided".to_string(),
+            "refresh token hasn't provided".to_string(),
         ));
     };
 

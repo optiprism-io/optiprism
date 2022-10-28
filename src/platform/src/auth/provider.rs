@@ -10,8 +10,9 @@ use crate::auth::password::verify_password;
 use crate::auth::token::make_access_token;
 use crate::auth::token::make_refresh_token;
 use crate::auth::token::parse_refresh_token;
+use crate::auth::types::LogInRequest;
 use crate::auth::types::TokensResponse;
-use crate::PlatformError;
+use crate::error::AuthError;
 use crate::Result;
 
 #[derive(Clone)]
@@ -42,11 +43,14 @@ impl Provider {
     }
 
     pub async fn sign_up(&self, req: SignUpRequest) -> Result<TokensResponse> {
+        let password_hash = make_password_hash(req.password.as_str())
+            .map_err(|err| err.wrap_into(AuthError::InvalidPasswordHashing))?;
+
         let account = self
             .accounts
             .create(CreateAccountRequest {
                 created_by: None,
-                password_hash: make_password_hash(req.password.as_str())?.to_string(),
+                password_hash,
                 email: req.email,
                 first_name: req.first_name,
                 last_name: req.last_name,
@@ -57,36 +61,34 @@ impl Provider {
             })
             .await?;
 
-        let tokens = self
-            .make_tokens(account.id)
-            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
+        let tokens = self.make_tokens(account.id)?;
 
         Ok(tokens)
     }
 
-    pub async fn log_in(&self, email: &str, password: &str) -> Result<TokensResponse> {
+    pub async fn log_in(&self, req: LogInRequest) -> Result<TokensResponse> {
+        req.validate()?;
+
         let account = self
             .accounts
-            .get_by_email(email)
+            .get_by_email(&req.email)
             .await
-            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
+            .map_err(|_err| AuthError::InvalidCredentials)?;
 
-        verify_password(password, PasswordHash::new(account.password_hash.as_str())?)
-            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
-
-        let tokens = self
-            .make_tokens(account.id)
-            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
+        verify_password(
+            req.password,
+            PasswordHash::new(account.password_hash.as_str())?,
+        )
+        .map_err(|_err| AuthError::InvalidCredentials)?;
+        let tokens = self.make_tokens(account.id)?;
 
         Ok(tokens)
     }
 
     pub async fn refresh_token(&self, refresh_token: &str) -> Result<TokensResponse> {
         let refresh_claims = parse_refresh_token(refresh_token, self.refresh_token_key.as_str())
-            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
-        let tokens = self
-            .make_tokens(refresh_claims.account_id)
-            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
+            .map_err(|err| err.wrap_into(AuthError::InvalidRefreshToken))?;
+        let tokens = self.make_tokens(refresh_claims.account_id)?;
 
         Ok(tokens)
     }
@@ -97,12 +99,14 @@ impl Provider {
                 account_id,
                 self.access_token_duration,
                 self.access_token_key.as_str(),
-            )?,
+            )
+            .map_err(|err| err.wrap_into(AuthError::CantMakeAccessToken))?,
             refresh_token: make_refresh_token(
                 account_id,
                 self.refresh_token_duration,
                 self.refresh_token_key.as_str(),
-            )?,
+            )
+            .map_err(|err| err.wrap_into(AuthError::CantMakeRefreshToken))?,
         })
     }
 }
