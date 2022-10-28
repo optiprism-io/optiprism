@@ -237,13 +237,26 @@ export default function ({ environment = 'development' } = {}) {
                 }
             }, { timing: 200 })
 
+            /**
+             * dashboards
+             */
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards`, (schema) => {
                 return {
                     dashboards: schema.db.dashboards,
                     meta: {}
                 }
             })
-
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards`, (schema, request) => {
+                const body = JSON.parse(request.requestBody)
+                return schema.db.dashboards.insert({
+                    id: nanoid(),
+                    ...body,
+                })
+            }, { timing: 130 })
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards/:dashboard_id`, (schema, request) => {
+                const property = JSON.parse(request.requestBody)
+                return schema.db.dashboards.update(request.params.dashboard_id, property)
+            }, { timing: 135 })
             this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards/:dashboard_id`, (schema, request) => {
                 schema.db.dashboards.remove(request.params.dashboard_id)
                 return request.params.dashboard_id;

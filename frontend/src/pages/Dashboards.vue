@@ -30,7 +30,7 @@
             <div class="dashboards__name pf-u-mb-md">
                 <UiInlineEdit
                     :value="dashboardName"
-                    @on-input="(payload: string) => dashboardName = payload"
+                    @on-input="updateName"
                 />
             </div>
             <GridContainer>
@@ -145,9 +145,6 @@ import {
     Dashboard,
     ReportReportTypeEnum,
     Report,
-    CreateDashboardRequest,
-    CreateDashboardRequestRowsInner,
-    CreateDashboardRequestRowsInnerPanelsInner,
 } from '@/api'
 import { pagesMap } from '@/router'
 import useConfirm from '@/hooks/useConfirm'
@@ -269,7 +266,6 @@ const onDeleteDashboard = async () => {
             })
 
             await dashboardService.deleteDashboard(commonStore.organizationId, commonStore.organizationId, activeDashboardId.value)
-            getDashboardsList()
         }
     } catch(error) {
         errorDashboard.value = true
@@ -297,6 +293,29 @@ const updateDashboardSpan = (dashboard: DashboardRows[]) => {
     })
 }
 
+const updateCreateDashboard = async () => {
+    const dataForRequest = {
+        name: dashboardName.value,
+        rows: newDashboardRows.value.map(item => {
+            return {
+                panels: item.panels.map((item) => {
+                    return {
+                        span: item.span,
+                        reportId: Number(item.reportId),
+                        report: item.report,
+                    };
+                })
+            };
+        }),
+    }
+    if (activeDashboardId.value) {
+        await dashboardService.updateDashboard(commonStore.organizationId, commonStore.projectId, String(activeDashboardId.value), dataForRequest)
+    } else {
+        await dashboardService.createDashboard(commonStore.organizationId, commonStore.projectId, dataForRequest)
+    }
+    getDashboardsList()
+}
+
 const onSelectReport = (payload: number) => {
     newDashboardRows.value[addReportPanels.value].panels.push({
         span: 6,
@@ -305,6 +324,7 @@ const onSelectReport = (payload: number) => {
     })
     newDashboardRows.value = updateDashboardSpan(newDashboardRows.value)
     closeDashboardReportsPopup()
+    updateCreateDashboard()
 }
 
 const closeDashboardReportsPopup = () => {
@@ -334,6 +354,7 @@ const selectReportDropdown = (payload: UiDropdownItem<string>, indexRow: number,
         }
         newDashboardRows.value = updateDashboardSpan(dashboard)
     }
+    updateCreateDashboard()
 }
 
 const setNew = () => {
@@ -347,6 +368,11 @@ const setNew = () => {
             id: null,
         }
     })
+}
+
+const updateName = (payload: string) => {
+    dashboardName.value = payload
+    updateCreateDashboard()
 }
 
 onMounted(async () => {
