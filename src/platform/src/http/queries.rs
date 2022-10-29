@@ -40,12 +40,11 @@ async fn property_values(
     ))
 }
 
-pub fn attach_routes(router: Router, prov: Arc<QueryProvider>) -> Router {
+pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
         "/organizations/:organization_id/projects/:project_id/queries",
         router
             .route("/event-segmentation", routing::post(event_segmentation))
-            .route("/property-values", routing::post(property_values))
-            .layer(Extension(prov)),
+            .route("/property-values", routing::post(property_values)),
     )
 }

@@ -55,17 +55,11 @@ async fn delete(
     Ok(Json(provider.delete(ctx, id).await?))
 }
 
-pub fn attach_routes(
-    router: Router,
-    accounts: Arc<AccountsProvider>,
-    md_accounts: Arc<metadata::accounts::Provider>,
-) -> Router {
+pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
         "/accounts",
         router
             .route("/", routing::post(create).get(list))
-            .route("/:id", routing::get(get_by_id).delete(delete).put(update))
-            .layer(Extension(md_accounts))
-            .layer(Extension(accounts)),
+            .route("/:id", routing::get(get_by_id).delete(delete).put(update)),
     )
 }

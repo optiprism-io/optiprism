@@ -113,7 +113,7 @@ async fn detach_property(
     ))
 }
 
-pub fn attach_routes(router: Router, events: Arc<EventsProvider>) -> Router {
+pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
         "/organizations/:organization_id/projects/:project_id/schema/events",
         router
@@ -130,7 +130,6 @@ pub fn attach_routes(router: Router, events: Arc<EventsProvider>) -> Router {
             .route(
                 "/:event_id/properties/:property_id",
                 routing::delete(detach_property),
-            )
-            .layer(Extension(events)),
+            ),
     )
 }

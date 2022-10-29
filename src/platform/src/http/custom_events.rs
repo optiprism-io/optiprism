@@ -76,15 +76,12 @@ async fn delete(
     ))
 }
 
-pub fn attach_routes(router: Router, events: Arc<custom_events::Provider>) -> Router {
+pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
         "/organizations/:organization_id/projects/:project_id/schema/custom-events",
-        router
-            .route("/", routing::post(create).get(list))
-            .route(
-                "/:event_id",
-                routing::get(get_by_id).delete(delete).put(update),
-            )
-            .layer(Extension(events)),
+        router.route("/", routing::post(create).get(list)).route(
+            "/:event_id",
+            routing::get(get_by_id).delete(delete).put(update),
+        ),
     )
 }

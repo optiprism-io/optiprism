@@ -6,7 +6,6 @@ use axum::routing;
 use axum::Json;
 use axum::Router;
 
-use crate::properties;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::types::ListResponse;
@@ -71,7 +70,7 @@ async fn delete(
     ))
 }
 
-pub fn attach_user_routes(router: Router, prop: Arc<properties::Provider>) -> Router {
+pub fn attach_user_routes(router: Router) -> Router {
     let path = "/v1/organizations/:organization_id/projects/:project_id/schema/user-properties";
     router
         .route(path, routing::get(list))
@@ -83,10 +82,9 @@ pub fn attach_user_routes(router: Router, prop: Arc<properties::Provider>) -> Ro
             format!("{}/name/:prop_name", path).as_str(),
             routing::get(get_by_name),
         )
-        .layer(Extension(prop))
 }
 
-pub fn attach_event_routes(router: Router, prop: Arc<properties::Provider>) -> Router {
+pub fn attach_event_routes(router: Router) -> Router {
     router.clone().nest(
         "/organizations/:organization_id/projects/:project_id/schema/event-properties",
         router
@@ -95,7 +93,6 @@ pub fn attach_event_routes(router: Router, prop: Arc<properties::Provider>) -> R
                 "/:prop_id",
                 routing::get(get_by_id).delete(delete).put(update),
             )
-            .route("/name/:prop_name", routing::get(get_by_name))
-            .layer(Extension(prop)),
+            .route("/name/:prop_name", routing::get(get_by_name)),
     )
 }
