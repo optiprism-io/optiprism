@@ -4,6 +4,7 @@ use common::rbac::Permission;
 use common::types::OptionalProperty;
 use metadata::accounts;
 
+use crate::accounts::provider::Provider;
 use crate::accounts::types::Account;
 use crate::accounts::types::CreateAccountRequest;
 use crate::accounts::types::UpdateAccountRequest;
@@ -12,16 +13,18 @@ use crate::types::ListResponse;
 use crate::Context;
 use crate::Result;
 
-pub struct Provider {
+pub struct ProviderImpl {
     prov: Arc<accounts::Provider>,
 }
 
-impl Provider {
+impl ProviderImpl {
     pub fn new(prov: Arc<accounts::Provider>) -> Self {
         Self { prov }
     }
+}
 
-    pub async fn create(&self, ctx: Context, req: CreateAccountRequest) -> Result<Account> {
+impl Provider for ProviderImpl {
+    async fn create(&self, ctx: Context, req: CreateAccountRequest) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
 
         let md_req = metadata::accounts::CreateAccountRequest {
@@ -41,19 +44,19 @@ impl Provider {
         account.try_into()
     }
 
-    pub async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Account> {
+    async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
 
         self.prov.get_by_id(id).await?.try_into()
     }
 
-    pub async fn list(&self, ctx: Context) -> Result<ListResponse<Account>> {
+    async fn list(&self, ctx: Context) -> Result<ListResponse<Account>> {
         ctx.check_permission(Permission::ManageAccounts)?;
         let resp = self.prov.list().await?;
         resp.try_into()
     }
 
-    pub async fn update(
+    async fn update(
         &self,
         ctx: Context,
         account_id: u64,
@@ -83,7 +86,7 @@ impl Provider {
         account.try_into()
     }
 
-    pub async fn delete(&self, ctx: Context, id: u64) -> Result<Account> {
+    async fn delete(&self, ctx: Context, id: u64) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;
 
         self.prov.delete(id).await?.try_into()

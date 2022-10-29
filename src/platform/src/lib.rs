@@ -2,6 +2,7 @@ extern crate core;
 
 pub mod accounts;
 pub mod auth;
+pub mod auth;
 pub mod context;
 pub mod custom_events;
 pub mod data_table;
@@ -13,7 +14,7 @@ pub mod provider;
 pub mod queries;
 pub mod types;
 
-pub use accounts::Provider as AccountsProvider;
+pub use accounts::ProviderImpl as AccountsProvider;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
