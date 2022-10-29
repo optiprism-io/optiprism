@@ -3,12 +3,12 @@ use std::sync::Arc;
 use common::rbac::Permission;
 use common::types::OptionalProperty;
 use metadata::accounts;
-use metadata::metadata::ListResponse;
 
 use crate::accounts::types::Account;
 use crate::accounts::types::CreateAccountRequest;
 use crate::accounts::types::UpdateAccountRequest;
 use crate::auth::password::make_password_hash;
+use crate::types::ListResponse;
 use crate::Context;
 use crate::Result;
 
@@ -50,14 +50,7 @@ impl Provider {
     pub async fn list(&self, ctx: Context) -> Result<ListResponse<Account>> {
         ctx.check_permission(Permission::ManageAccounts)?;
         let resp = self.prov.list().await?;
-        Ok(ListResponse {
-            data: resp
-                .data
-                .iter()
-                .map(|v| v.to_owned().try_into())
-                .collect::<Result<_>>()?,
-            meta: resp.meta,
-        })
+        resp.try_into()
     }
 
     pub async fn update(

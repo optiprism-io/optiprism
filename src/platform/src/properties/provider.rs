@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use common::rbac::ProjectPermission;
-use metadata::metadata::ListResponse;
 use metadata::properties::provider::Provider as PropertiesProvider;
 
 use crate::properties::types::Property;
 use crate::properties::UpdatePropertyRequest;
+use crate::types::ListResponse;
 use crate::Context;
 use crate::Result;
 
@@ -63,14 +63,7 @@ impl Provider {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
         let resp = self.prov.list(organization_id, project_id).await?;
 
-        Ok(ListResponse {
-            data: resp
-                .data
-                .iter()
-                .map(|v| v.to_owned().try_into())
-                .collect::<Result<_>>()?,
-            meta: resp.meta,
-        })
+        resp.try_into()
     }
 
     pub async fn update(

@@ -5,11 +5,11 @@ use axum::extract::Path;
 use axum::routing;
 use axum::Json;
 use axum::Router;
-use metadata::metadata::ListResponse;
 
 use crate::properties;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
+use crate::types::ListResponse;
 use crate::Context;
 use crate::PropertiesProvider;
 use crate::Result;
@@ -72,7 +72,7 @@ async fn delete(
 }
 
 pub fn attach_user_routes(router: Router, prop: Arc<properties::Provider>) -> Router {
-    let path = "/v1/organizations/:organization_id/projects/:project_id/schema/user_properties";
+    let path = "/v1/organizations/:organization_id/projects/:project_id/schema/user-properties";
     router
         .route(path, routing::get(list))
         .route(
@@ -88,7 +88,7 @@ pub fn attach_user_routes(router: Router, prop: Arc<properties::Provider>) -> Ro
 
 pub fn attach_event_routes(router: Router, prop: Arc<properties::Provider>) -> Router {
     router.clone().nest(
-        "/organizations/:organization_id/projects/:project_id/schema/event_properties",
+        "/organizations/:organization_id/projects/:project_id/schema/event-properties",
         router
             .route("/", routing::get(list))
             .route(

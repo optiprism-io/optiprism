@@ -6,11 +6,11 @@ use axum::http::StatusCode;
 use axum::routing;
 use axum::Json;
 use axum::Router;
-use metadata::metadata::ListResponse;
 
 use crate::events::CreateEventRequest;
 use crate::events::Event;
 use crate::events::UpdateEventRequest;
+use crate::types::ListResponse;
 use crate::Context;
 use crate::EventsProvider;
 use crate::Result;

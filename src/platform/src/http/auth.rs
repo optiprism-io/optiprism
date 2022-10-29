@@ -22,7 +22,7 @@ use crate::Result;
 pub const COOKIE_NAME_REFRESH_TOKEN: &str = "refresh_token";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RefreshTokenRequest {
     pub refresh_token: Option<String>,
 }

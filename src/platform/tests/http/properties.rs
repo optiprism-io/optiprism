@@ -4,13 +4,13 @@ use common::types::OptionalProperty;
 use common::DataType;
 use metadata::metadata::ListResponse;
 use metadata::properties::CreatePropertyRequest;
-use platform::error::Result;
 use platform::properties::Property;
 use platform::properties::Status;
 use platform::properties::UpdatePropertyRequest;
 use reqwest::Client;
 use reqwest::StatusCode;
 
+use crate::assert_response_status;
 use crate::http::tests::create_admin_acc_and_login;
 use crate::http::tests::run_http_service;
 
@@ -29,8 +29,9 @@ fn assert(l: &Property, r: &Property) {
 }
 
 #[tokio::test]
-async fn test_event_properties() -> Result<()> {
+async fn test_event_properties() -> anyhow::Result<()> {
     let (base_url, md, pp) = run_http_service(false).await?;
+    let prop_url = format!("{base_url}/organizations/1/projects/1/schema/event-properties");
     let cl = Client::new();
     let headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
@@ -56,39 +57,27 @@ async fn test_event_properties() -> Result<()> {
 
     // list without props should be empty
     {
-        cl.get(format!(
-            "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties"
-        ))
-        .headers(headers.clone())
-        .send()
-        .await
-        .unwrap();
+        cl.get(&prop_url).headers(headers.clone()).send().await?;
     }
 
     // get of unexisting event prop 1 should return 404 not found error
     {
         let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
-            ))
+            .get(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+            .await?;
+        assert_response_status!(resp, StatusCode::NOT_FOUND);
     }
 
     // delete of unexisting event prop 1 should return 404 not found error
     {
         let resp = cl
-            .delete(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
-            ))
+            .delete(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+            .await?;
+        assert_response_status!(resp, StatusCode::NOT_FOUND);
     }
 
     // create request should create event prop
@@ -130,51 +119,35 @@ async fn test_event_properties() -> Result<()> {
             status: OptionalProperty::Some(prop1.status.clone()),
         };
 
-        let body = serde_json::to_string(&req).unwrap();
-
         let resp = cl
-            .put(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
-            ))
-            .body(body)
+            .put(format!("{prop_url}/1"))
+            .body(serde_json::to_string(&req)?)
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
+            .await?;
         let status = resp.status();
         assert_eq!(status, StatusCode::OK);
-        let p: Property = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+        let p: Property = serde_json::from_str(resp.text().await?.as_str())?;
         assert(&p, &prop1)
     }
 
     // get should return event prop
     {
         let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
-            ))
+            .get(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
+            .await?;
         let status = resp.status();
         assert_eq!(status, StatusCode::OK);
-        let p: Property = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+        let p: Property = serde_json::from_str(resp.text().await?.as_str())?;
         assert(&p, &prop1)
     }
     // list events should return list with one event
     {
-        let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties"
-            ))
-            .headers(headers.clone())
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let resp: ListResponse<Property> =
-            serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+        let resp = cl.get(&prop_url).headers(headers.clone()).send().await?;
+        assert_response_status!(resp, StatusCode::OK);
+        let resp: ListResponse<Property> = serde_json::from_str(resp.text().await?.as_str())?;
         assert_eq!(resp.data.len(), 1);
         assert(&resp.data[0], &prop1);
     }
@@ -182,24 +155,18 @@ async fn test_event_properties() -> Result<()> {
     // delete request should delete event
     {
         let resp = cl
-            .delete(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
-            ))
+            .delete(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
+            .await?;
+        assert_response_status!(resp, StatusCode::OK);
 
         let resp = cl
-            .delete(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/event_properties/1"
-            ))
+            .delete(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+            .await?;
+        assert_response_status!(resp, StatusCode::NOT_FOUND);
     }
     Ok(())
 }

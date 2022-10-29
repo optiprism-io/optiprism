@@ -43,11 +43,7 @@ pub enum AuthError {
 
 impl Display for ApiError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.message.clone().unwrap_or_else(|| String::new())
-        )
+        write!(f, "{}", self.message.clone().unwrap_or_default())
     }
 }
 
@@ -186,7 +182,7 @@ impl PlatformError {
             PlatformError::Axum(err) => ApiError::internal(err.to_string()),
             PlatformError::Other(err) => ApiError::internal(err.to_string()),
             PlatformError::Hyper(err) => ApiError::internal(err.to_string()),
-            PlatformError::Wrapped(_inner, outer) => outer.into_api_error(),
+            PlatformError::Wrapped(_, outer) => outer.into_api_error(),
             PlatformError::InvalidFields(fields) => {
                 ApiError::new(StatusCode::BAD_REQUEST).with_fields(fields)
             }
@@ -206,16 +202,23 @@ pub struct ApiError {
     pub fields: BTreeMap<String, String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiErrorWrapper {
+    pub error: ApiError,
+}
+
+#[derive(Default)]
 pub struct ValidationError {
     fields: BTreeMap<String, String>,
-    message: Option<String>,
+    _message: Option<String>,
 }
 
 impl ValidationError {
     pub fn new() -> Self {
         Self {
             fields: BTreeMap::new(),
-            message: None,
+            _message: None,
         }
     }
 
@@ -228,7 +231,7 @@ impl ValidationError {
             .insert(field.into(), "invalid field value".into());
     }
 
-    pub fn validate(self) -> Result<()> {
+    pub fn result(self) -> Result<()> {
         if self.fields.is_empty() {
             Ok(())
         } else {
@@ -299,7 +302,7 @@ impl ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (self.status, Json(self)).into_response()
+        (self.status, Json(ApiErrorWrapper { error: self })).into_response()
     }
 }
 

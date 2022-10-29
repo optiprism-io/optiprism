@@ -1,18 +1,20 @@
 use chrono::Utc;
 use common::types::OptionalProperty;
-use metadata::metadata::ListResponse;
 use platform::custom_events::types::CreateCustomEventRequest;
 use platform::custom_events::types::CustomEvent;
 use platform::custom_events::types::Event;
 use platform::custom_events::types::Status;
 use platform::custom_events::types::UpdateCustomEventRequest;
-use platform::error::Result;
 use platform::queries::types::EventRef;
+use platform::types::ListResponse;
 use reqwest::Client;
 use reqwest::StatusCode;
 
+use crate::assert_response_body;
+use crate::assert_response_status;
 use crate::http::tests::create_admin_acc_and_login;
 use crate::http::tests::run_http_service;
+use crate::http::tests::EMPTY_LIST;
 
 fn assert(l: &CustomEvent, r: &CustomEvent) {
     assert_eq!(l.id, 1);
@@ -25,9 +27,9 @@ fn assert(l: &CustomEvent, r: &CustomEvent) {
 }
 
 #[tokio::test]
-async fn test_custom_events() -> Result<()> {
+async fn test_custom_events() -> anyhow::Result<()> {
     let (base_url, md, pp) = run_http_service(false).await?;
-    println!("{base_url}");
+    let events_url = format!("{base_url}/organizations/1/projects/1/schema/custom-events");
     let cl = Client::new();
     let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
@@ -61,7 +63,7 @@ async fn test_custom_events() -> Result<()> {
         })
         .await?;
 
-    let mut ce1 = CustomEvent {
+    let mut custom_event1 = CustomEvent {
         id: 1,
         created_at: Utc::now(),
         updated_at: None,
@@ -84,80 +86,65 @@ async fn test_custom_events() -> Result<()> {
     // list without events should be empty
     {
         let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events"
-            ))
+            .get(format!("{events_url}/"))
             .headers(admin_headers.clone())
             .send()
-            .await
-            .unwrap();
+            .await?;
 
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(
-            resp.text().await.unwrap(),
-            r#"{"data":[],"meta":{"next":null}}"#
-        );
+        assert_response_status!(resp, StatusCode::OK);
+        assert_response_body!(resp, EMPTY_LIST.to_string());
     }
 
     // get of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
-            ))
+            .get(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+            .await?;
+
+        assert_response_status!(resp, StatusCode::NOT_FOUND);
     }
 
     // delete of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .delete(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
-            ))
+            .delete(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+            .await?;
+
+        assert_response_status!(resp, StatusCode::NOT_FOUND);
     }
 
     // create request should create event
     {
         let req = CreateCustomEventRequest {
-            tags: ce1.tags.clone(),
-            name: ce1.name.clone(),
-            description: ce1.description.clone(),
-            status: ce1.status.clone(),
+            tags: custom_event1.tags.clone(),
+            name: custom_event1.name.clone(),
+            description: custom_event1.description.clone(),
+            status: custom_event1.status.clone(),
             is_system: false,
-            events: ce1.events.clone(),
+            events: custom_event1.events.clone(),
         };
-        let body = serde_json::to_string(&req).unwrap();
 
         let resp = cl
-            .post(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events"
-            ))
-            .body(body)
+            .post(&events_url)
+            .body(serde_json::to_string(&req)?)
             .headers(admin_headers.clone())
             .send()
-            .await
-            .unwrap();
-        let status = resp.status();
-        assert_eq!(status, StatusCode::CREATED);
-        let resp: CustomEvent = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
-        assert(&resp, &ce1)
+            .await?;
+        assert_response_status!(resp, StatusCode::CREATED);
+        let resp: CustomEvent = serde_json::from_str(resp.text().await?.as_str())?;
+        assert(&resp, &custom_event1)
     }
 
     // update request should update event
     {
-        ce1.tags = Some(vec!["ert".to_string()]);
-        ce1.description = Some("xcv".to_string());
-        ce1.status = Status::Disabled;
-        ce1.events = vec![Event {
+        custom_event1.tags = Some(vec!["ert".to_string()]);
+        custom_event1.description = Some("xcv".to_string());
+        custom_event1.status = Status::Disabled;
+        custom_event1.events = vec![Event {
             event: EventRef::Regular {
                 event_name: event2.name.clone(),
             },
@@ -165,10 +152,10 @@ async fn test_custom_events() -> Result<()> {
         }];
 
         let req = UpdateCustomEventRequest {
-            tags: OptionalProperty::Some(ce1.tags.clone()),
-            name: OptionalProperty::Some(ce1.name.clone()),
-            description: OptionalProperty::Some(ce1.description.clone()),
-            status: OptionalProperty::Some(ce1.status.clone()),
+            tags: OptionalProperty::Some(custom_event1.tags.clone()),
+            name: OptionalProperty::Some(custom_event1.name.clone()),
+            description: OptionalProperty::Some(custom_event1.description.clone()),
+            status: OptionalProperty::Some(custom_event1.status.clone()),
             events: OptionalProperty::Some(vec![Event {
                 event: EventRef::Regular {
                     event_name: event2.name,
@@ -177,79 +164,57 @@ async fn test_custom_events() -> Result<()> {
             }]),
         };
 
-        let body = serde_json::to_string(&req).unwrap();
-
-        println!("{body}");
-
         let resp = cl
-            .put(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
-            ))
-            .body(body)
+            .put(format!("{events_url}/1"))
+            .body(serde_json::to_string(&req)?)
             .headers(admin_headers.clone())
             .send()
-            .await
-            .unwrap();
-        let status = resp.status();
-        assert_eq!(status, StatusCode::OK);
-        let e: CustomEvent = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+            .await?;
+        assert_response_status!(resp, StatusCode::OK);
+        let e: CustomEvent = serde_json::from_str(resp.text().await?.as_str())?;
 
-        assert(&e, &ce1);
+        assert(&e, &custom_event1);
     }
 
     // get should return event
     {
         let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
-            ))
+            .get(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await
-            .unwrap();
-        let status = resp.status();
-        assert_eq!(status, StatusCode::OK);
-        let e: CustomEvent = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
-        assert(&e, &ce1);
+            .await?;
+        assert_response_status!(resp, StatusCode::OK);
+        let e: CustomEvent = serde_json::from_str(resp.text().await?.as_str())?;
+        assert(&e, &custom_event1);
     }
     // list events should return list with one event
     {
         let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events"
-            ))
+            .get(&events_url)
             .headers(admin_headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let resp: ListResponse<CustomEvent> =
-            serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+            .await?;
+        assert_response_status!(resp, StatusCode::OK);
+        let resp: ListResponse<CustomEvent> = serde_json::from_str(resp.text().await?.as_str())?;
         assert_eq!(resp.data.len(), 1);
-        assert(&resp.data[0], &ce1);
+        assert(&resp.data[0], &custom_event1);
     }
 
     // delete request should delete event
     {
         let resp = cl
-            .delete(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
-            ))
+            .delete(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
+            .await?;
+        assert_response_status!(resp, StatusCode::OK);
 
         let resp = cl
-            .delete(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/custom-events/1"
-            ))
+            .delete(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+            .await?;
+        assert_response_status!(resp, StatusCode::NOT_FOUND);
     }
     Ok(())
 }

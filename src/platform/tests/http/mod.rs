@@ -18,6 +18,7 @@ mod tests {
     use axum::http;
     use chrono::Duration;
     use common::rbac::OrganizationRole;
+    use lazy_static::lazy_static;
     use metadata::store::Store;
     use metadata::MetadataProvider;
     use platform::auth::password::make_password_hash;
@@ -27,8 +28,12 @@ mod tests {
     use query::test_util::empty_provider;
     use query::test_util::events_provider;
     use query::QueryProvider;
+    use serde_json::json;
     use uuid::Uuid;
 
+    lazy_static! {
+        pub static ref EMPTY_LIST: serde_json::Value = json!({"data":[],"meta":{"next":null}});
+    }
     static HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
 
     pub fn tmp_store() -> Arc<Store> {
@@ -107,8 +112,18 @@ mod tests {
         let svc = platform::http::Service::new(&md, &pp, addr, None);
         svc.serve_test().await;
 
-        let base_addr = format!("http://{:?}:{:?}", addr.ip(), addr.port());
+        let base_addr = format!("http://{:?}:{:?}/api/v1", addr.ip(), addr.port());
 
         Ok((base_addr, md, pp))
+    }
+
+    #[macro_export]
+    macro_rules! assert_response_status {
+        ($resp:expr,$status:expr) => {{ assert_eq!($resp.status(), $status, "{}", $resp.text().await?.as_str()) }};
+    }
+
+    #[macro_export]
+    macro_rules! assert_response_body {
+        ($resp:expr,$body:expr) => {{ assert_eq!($resp.text().await?, $body) }};
     }
 }

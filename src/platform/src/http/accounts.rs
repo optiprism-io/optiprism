@@ -6,11 +6,11 @@ use axum::http::StatusCode;
 use axum::routing;
 use axum::Json;
 use axum::Router;
-use metadata::metadata::ListResponse;
 
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
 use crate::accounts::UpdateAccountRequest;
+use crate::types::ListResponse;
 use crate::AccountsProvider;
 use crate::Context;
 use crate::Result;

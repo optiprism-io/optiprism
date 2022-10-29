@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod accounts;
 pub mod auth;
 pub mod context;
@@ -10,7 +12,6 @@ pub mod properties;
 pub mod provider;
 pub mod queries;
 pub mod types;
-pub mod validator;
 
 pub use accounts::Provider as AccountsProvider;
 use arrow::array::Array;

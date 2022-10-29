@@ -3,11 +3,11 @@ use std::sync::Arc;
 use common::rbac::ProjectPermission;
 use common::types::OptionalProperty;
 use metadata::custom_events;
-use metadata::metadata::ListResponse;
 
 use crate::custom_events::types::CreateCustomEventRequest;
 use crate::custom_events::types::CustomEvent;
 use crate::custom_events::types::UpdateCustomEventRequest;
+use crate::types::ListResponse;
 use crate::Context;
 use crate::Result;
 
@@ -74,14 +74,7 @@ impl Provider {
         ctx.check_project_permission(organization_id, project_id, ProjectPermission::ViewSchema)?;
         let resp = self.prov.list(organization_id, project_id).await?;
 
-        Ok(ListResponse {
-            data: resp
-                .data
-                .iter()
-                .map(|v| v.to_owned().try_into())
-                .collect::<Result<_>>()?,
-            meta: resp.meta,
-        })
+        resp.try_into()
     }
 
     pub async fn update(

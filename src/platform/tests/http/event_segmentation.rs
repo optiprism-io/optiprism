@@ -1,10 +1,8 @@
 #[cfg(test)]
 mod tests {
-
     use axum::http::StatusCode;
     use chrono::DateTime;
     use chrono::Utc;
-    use platform::error::Result;
     use platform::queries::event_segmentation::Analysis;
     use platform::queries::event_segmentation::Breakdown;
     use platform::queries::event_segmentation::ChartType;
@@ -22,21 +20,20 @@ mod tests {
     use reqwest::Client;
     use serde_json::Value;
 
+    use crate::assert_response_status;
     use crate::http::tests::create_admin_acc_and_login;
     use crate::http::tests::run_http_service;
 
     #[tokio::test]
-    async fn test_event_segmentation() -> Result<()> {
+    async fn test_event_segmentation() -> anyhow::Result<()> {
         let (base_url, md, pp) = run_http_service(true).await?;
         let cl = Client::new();
         let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
-        let from = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
-            .unwrap()
-            .with_timezone(&Utc);
-        let to = DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")
-            .unwrap()
-            .with_timezone(&Utc);
+        let from =
+            DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")?.with_timezone(&Utc);
+        let to =
+            DateTime::parse_from_rfc3339("2021-09-08T13:48:00.000000+00:00")?.with_timezone(&Utc);
 
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
@@ -101,22 +98,18 @@ mod tests {
             segments: None,
         };
 
-        let body = serde_json::to_string(&es).unwrap();
-
         let resp = cl
             .post(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/queries/event-segmentation"
+                "{base_url}/organizations/1/projects/1/queries/event-segmentation"
             ))
-            .body(body)
+            .body(serde_json::to_string(&es)?)
             .headers(admin_headers.clone())
             .send()
-            .await
-            .unwrap();
+            .await?;
 
-        let status = resp.status();
-        let txt = resp.text().await.unwrap();
+        assert_response_status!(resp, StatusCode::OK);
+        let txt = resp.text().await?;
         println!("{}", &txt);
-        assert_eq!(status, StatusCode::OK);
 
         Ok(())
     }

@@ -128,7 +128,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/dashboards:
+  /v1/organizations/{organizationId}/projects/{projectId}/dashboards:
     get:
       summary: Dashboards list
       operationId: dashboardsList
@@ -200,7 +200,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/dashboards/{dashboardId}:
     get:
       summary: Get dashboard
       operationId: getDashboard
@@ -211,7 +211,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: dashboard_id
+        - name: dashboardId
           in: path
           description: Dashboard ID
           required: true
@@ -246,7 +246,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: dashboard_id
+        - name: dashboardId
           in: path
           description: Dashboard ID
           required: true
@@ -287,7 +287,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: dashboard_id
+        - name: dashboardId
           in: path
           description: Dashboard ID
           required: true
@@ -308,7 +308,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/reports:
+  /v1/organizations/{organizationId}/projects/{projectId}/reports:
     get:
       summary: Reports list
       operationId: reportsList
@@ -380,7 +380,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/reports/{report_id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/reports/{reportId}:
     get:
       summary: Get report
       operationId: getReport
@@ -391,7 +391,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: report_id
+        - name: reportId
           in: path
           description: Report ID
           required: true
@@ -426,7 +426,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: report_id
+        - name: reportId
           in: path
           description: Report ID
           required: true
@@ -467,7 +467,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: report_id
+        - name: reportId
           in: path
           description: Report ID
           required: true
@@ -488,7 +488,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/schema/events:
+  /v1/organizations/{organizationId}/projects/{projectId}/schema/events:
     get:
       summary: Events list
       operationId: eventsList
@@ -525,7 +525,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/schema/events/{event_id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/schema/events/{eventId}:
     get:
       summary: Get event
       operationId: getEvent
@@ -536,7 +536,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: event_id
+        - name: eventId
           in: path
           description: Event ID
           required: true
@@ -571,7 +571,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: event_id
+        - name: eventId
           in: path
           description: Event ID
           required: true
@@ -602,7 +602,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events:
+  /v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events:
     get:
       summary: Custom events list
       operationId: customEventsList
@@ -674,7 +674,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events/{event_id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}:
     get:
       summary: Get custom event
       operationId: getCustomEvent
@@ -685,7 +685,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: event_id
+        - name: eventId
           in: path
           description: Event ID
           required: true
@@ -720,7 +720,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: event_id
+        - name: eventId
           in: path
           description: Event ID
           required: true
@@ -751,7 +751,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: event_id
+        - name: eventId
           in: path
           description: Custom Event ID
           required: true
@@ -782,7 +782,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties:
+  /v1/organizations/{organizationId}/projects/{projectId}/schema/user-proerties:
     get:
       summary: User properties list
       operationId: userPropertiesList
@@ -819,7 +819,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties:
+  /v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties:
     get:
       summary: Event properties list
       operationId: eventPropertiesList
@@ -856,7 +856,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties/{property_id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/schema/user-proerties/{propertyId}:
     get:
       summary: Get user property
       operationId: getUserProperty
@@ -867,7 +867,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: property_id
+        - name: propertyId
           in: path
           description: Property ID
           required: true
@@ -902,7 +902,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: property_id
+        - name: propertyId
           in: path
           description: Property ID
           required: true
@@ -933,7 +933,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties/{property_id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties/{propertyId}:
     get:
       summary: Get event property
       operationId: getEventProperty
@@ -944,7 +944,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: property_id
+        - name: propertyId
           in: path
           description: Property ID
           required: true
@@ -979,7 +979,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: property_id
+        - name: propertyId
           in: path
           description: Property ID
           required: true
@@ -1010,7 +1010,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-properties:
+  /v1/organizations/{organizationId}/projects/{projectId}/schema/custom-properties:
     get:
       summary: Event custom properties list
       operationId: customPropertiesList
@@ -1047,7 +1047,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/data/event-records/{id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/data/event-records/{id}:
     get:
       summary: Get event record
       operationId: getEventRecord
@@ -1084,7 +1084,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/data/event-records:
+  /v1/organizations/{organizationId}/projects/{projectId}/data/event-records:
     post:
       summary: Get events
       operationId: eventRecordsList
@@ -1127,7 +1127,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/data/group-records/{id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/data/group-records/{id}:
     get:
       summary: Get group record
       operationId: getGroupRecord
@@ -1210,7 +1210,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/data/group-records:
+  /v1/organizations/{organizationId}/projects/{projectId}/data/group-records:
     post:
       summary: Get group records
       operationId: groupEventsList
@@ -1253,7 +1253,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organization_id}/projects/{project_id}/data/property-values:
+  /v1/organizations/{organizationId}/projects/{projectId}/data/property-values:
     post:
       summary: List of property values
       operationId: PropertyValuesList
@@ -1329,7 +1329,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /organizations/{organization_id}/projects/{project_id}/reports/event-segmentation:
+  /organizations/{organizationId}/projects/{projectId}/reports/event-segmentation:
     post:
       summary: Event segmentation query
       operationId: eventSegmentationQuery
@@ -1364,7 +1364,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /organizations/{organization_id}/projects/{project_id}/reports/funnel:
+  /organizations/{organizationId}/projects/{projectId}/reports/funnel:
     post:
       summary: Funnel query
       operationId: funnelQuery
@@ -1407,13 +1407,13 @@ components:
       bearerFormat: JWT
   parameters:
     OrganizationID:
-      name: organization_id
+      name: organizationId
       in: path
       required: true
       schema:
         type: number
     ProjectID:
-      name: project_id
+      name: projectId
       in: path
       required: true
       schema:
@@ -1464,17 +1464,17 @@ components:
         password:
           type: string
           format: password
-        password_repeat:
+        passwordRepeat:
           type: string
           format: password
-        first_name:
+        firstName:
           type: string
-        last_name:
+        lastName:
           type: string
     RefreshTokenRequest:
       type: object
       properties:
-        refresh_token:
+        refreshToken:
           type: string
     TokensResponse:
       type: object
@@ -2765,7 +2765,7 @@ components:
                   "queryType": "aggregatePropertyPerGroup",
                   "propertyName": "revenue",
                   "propertyType": "event",
-                  "aggregate_per_group": "sum",
+                  "aggregatePerGroup": "sum",
                   "aggregate": "avg"
                 },
                 {
@@ -3472,9 +3472,9 @@ components:
         - "false"
         - "exists"
         - "empty"
-        - "arr_all"
-        - "arr_any"
-        - "arr_none"
+        - "arrAll"
+        - "arrAny"
+        - "arrNone"
         - "regex"
     PropertyRef:
       type: object
