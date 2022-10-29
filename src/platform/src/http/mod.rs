@@ -6,6 +6,7 @@ pub mod events;
 pub mod json;
 pub mod properties;
 pub mod queries;
+pub mod stub;
 
 use std::io;
 use std::net::SocketAddr;

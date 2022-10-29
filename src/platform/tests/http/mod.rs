@@ -29,12 +29,15 @@ mod tests {
     use query::test_util::events_provider;
     use query::QueryProvider;
     use serde_json::json;
+    use tokio::time::sleep;
     use uuid::Uuid;
 
     lazy_static! {
         pub static ref EMPTY_LIST: serde_json::Value = json!({"data":[],"meta":{"next":null}});
     }
     static HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
+    static ACCESS_TOKEN: &str = "access_secret";
+    static REFRESH_TOKEN: &str = "refresh_secret";
 
     pub fn tmp_store() -> Arc<Store> {
         let mut path = temp_dir();
@@ -103,14 +106,19 @@ mod tests {
             md.clone(),
             p_query.clone(),
             Duration::days(1),
-            "access_secret".to_string(),
+            ACCESS_TOKEN.to_string(),
             Duration::days(1),
-            "refresh_secret".to_string(),
+            REFRESH_TOKEN.to_string(),
         ));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], HTTP_PORT.fetch_add(1, Ordering::SeqCst)));
         let svc = platform::http::Service::new(&md, &pp, addr, None);
-        svc.serve_test().await;
+
+        tokio::spawn(async move {
+            svc.serve().await.unwrap();
+        });
+
+        sleep(tokio::time::Duration::from_millis(100)).await;
 
         let base_addr = format!("http://{:?}:{:?}/api/v1", addr.ip(), addr.port());
 

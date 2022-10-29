@@ -10,6 +10,7 @@ mod tests {
     use reqwest::Client;
     use serde_json::Value;
 
+    use crate::assert_response_status;
     use crate::http::tests::create_admin_acc_and_login;
     use crate::http::tests::run_http_service;
 
@@ -34,16 +35,15 @@ mod tests {
 
         let resp = cl
             .post(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/queries/property-values"
+                "{base_url}/organizations/1/projects/1/queries/property-values"
             ))
             .body(serde_json::to_string(&req)?)
             .headers(headers.clone())
             .send()
             .await?;
 
-        let status = resp.status();
+        assert_response_status!(resp, StatusCode::OK);
         let _txt = resp.text().await?;
-        assert_eq!(status, StatusCode::OK);
 
         Ok(())
     }
