@@ -4,15 +4,16 @@ use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::types::OptionalProperty;
 use metadata::accounts::UpdateAccountRequest;
-use platform::auth::types::TokensResponse;
 use platform::auth::SignUpRequest;
+use platform::auth::TokensResponse;
 use platform::http::auth::RefreshTokenRequest;
+use platform::ListResponse;
 use reqwest::header::HeaderMap;
 use reqwest::Client;
 use reqwest::StatusCode;
 
-use crate::assert_response_body;
-use crate::assert_response_status;
+use crate::assert_response_json_eq;
+use crate::assert_response_status_eq;
 use crate::http::tests::create_admin_acc_and_login;
 use crate::http::tests::run_http_service;
 use crate::http::tests::EMPTY_LIST;
@@ -30,7 +31,7 @@ async fn test_auth() -> anyhow::Result<()> {
         HeaderValue::from_str("application/json")?,
     );
 
-    let user_tokens = {
+    let user_tokens: TokensResponse = {
         let pwd = "password".to_string();
         let req = SignUpRequest {
             email: "user@gmail.com".to_string(),
@@ -47,8 +48,7 @@ async fn test_auth() -> anyhow::Result<()> {
             .send()
             .await?;
 
-        assert_response_status!(resp, StatusCode::CREATED);
-        let resp: TokensResponse = serde_json::from_str(resp.text().await?.as_str())?;
+        assert_response_status_eq!(resp, StatusCode::CREATED);
 
         md.accounts
             .update(2, UpdateAccountRequest {
@@ -63,7 +63,8 @@ async fn test_auth() -> anyhow::Result<()> {
                 teams: OptionalProperty::None,
             })
             .await?;
-        resp
+
+        resp.json().await?
     };
 
     {
@@ -75,7 +76,7 @@ async fn test_auth() -> anyhow::Result<()> {
             .send()
             .await?;
 
-        assert_response_status!(resp, StatusCode::UNAUTHORIZED);
+        assert_response_status_eq!(resp, StatusCode::UNAUTHORIZED);
     }
 
     // list without events should be empty
@@ -94,8 +95,8 @@ async fn test_auth() -> anyhow::Result<()> {
             .send()
             .await?;
 
-        assert_response_status!(resp, StatusCode::OK);
-        assert_response_body!(resp, EMPTY_LIST.to_string());
+        assert_response_status_eq!(resp, StatusCode::OK);
+        assert_response_json_eq!(resp, EMPTY_LIST);
     }
 
     let new_jwt_headers = {
@@ -110,7 +111,7 @@ async fn test_auth() -> anyhow::Result<()> {
             .send()
             .await?;
 
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         let new_user_tokens: TokensResponse = serde_json::from_str(resp.text().await?.as_str())?;
 
         // todo: check for tokens revocation here
@@ -134,8 +135,8 @@ async fn test_auth() -> anyhow::Result<()> {
             .send()
             .await?;
 
-        assert_response_status!(resp, StatusCode::OK);
-        assert_response_body!(resp, EMPTY_LIST.to_string());
+        assert_response_status_eq!(resp, StatusCode::OK);
+        assert_response_json_eq!(resp, EMPTY_LIST.to_string());
     }
 
     Ok(())

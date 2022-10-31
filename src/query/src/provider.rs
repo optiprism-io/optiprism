@@ -23,7 +23,7 @@ use crate::data_table::DataTable;
 use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
-use crate::queries::event_segmentation::types::EventSegmentation;
+use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
 use crate::Context;

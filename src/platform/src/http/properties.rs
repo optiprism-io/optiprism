@@ -3,19 +3,19 @@ use std::sync::Arc;
 use axum::extract::Extension;
 use axum::extract::Path;
 use axum::routing;
-use axum::Json;
 use axum::Router;
 
+use crate::http::Json;
+use crate::properties;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
-use crate::types::ListResponse;
 use crate::Context;
-use crate::PropertiesProvider;
+use crate::ListResponse;
 use crate::Result;
 
 async fn get_by_id(
     ctx: Context,
-    Extension(provider): Extension<Arc<PropertiesProvider>>,
+    Extension(provider): Extension<Arc<dyn properties::Provider>>,
     Path((organization_id, project_id, property_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
@@ -27,7 +27,7 @@ async fn get_by_id(
 
 async fn get_by_name(
     ctx: Context,
-    Extension(provider): Extension<Arc<PropertiesProvider>>,
+    Extension(provider): Extension<Arc<dyn properties::Provider>>,
     Path((organization_id, project_id, prop_name)): Path<(u64, u64, String)>,
 ) -> Result<Json<Property>> {
     Ok(Json(
@@ -39,7 +39,7 @@ async fn get_by_name(
 
 async fn list(
     ctx: Context,
-    Extension(provider): Extension<Arc<PropertiesProvider>>,
+    Extension(provider): Extension<Arc<dyn properties::Provider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<Property>>> {
     Ok(Json(provider.list(ctx, organization_id, project_id).await?))
@@ -47,7 +47,7 @@ async fn list(
 
 async fn update(
     ctx: Context,
-    Extension(provider): Extension<Arc<PropertiesProvider>>,
+    Extension(provider): Extension<Arc<dyn properties::Provider>>,
     Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
     Json(request): Json<UpdatePropertyRequest>,
 ) -> Result<Json<Property>> {
@@ -60,7 +60,7 @@ async fn update(
 
 async fn delete(
     ctx: Context,
-    Extension(provider): Extension<Arc<PropertiesProvider>>,
+    Extension(provider): Extension<Arc<dyn properties::Provider>>,
     Path((organization_id, project_id, prop_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<Property>> {
     Ok(Json(

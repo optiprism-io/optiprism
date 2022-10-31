@@ -4,20 +4,20 @@ use axum::extract::Extension;
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::routing;
-use axum::Json;
 use axum::Router;
 
+use crate::accounts;
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
 use crate::accounts::UpdateAccountRequest;
-use crate::types::ListResponse;
-use crate::AccountsProvider;
+use crate::http::Json;
 use crate::Context;
+use crate::ListResponse;
 use crate::Result;
 
 async fn create(
     ctx: Context,
-    Extension(provider): Extension<Arc<AccountsProvider>>,
+    Extension(provider): Extension<Arc<dyn accounts::Provider>>,
     Json(req): Json<CreateAccountRequest>,
 ) -> Result<(StatusCode, Json<Account>)> {
     Ok((StatusCode::CREATED, Json(provider.create(ctx, req).await?)))
@@ -25,7 +25,7 @@ async fn create(
 
 async fn get_by_id(
     ctx: Context,
-    Extension(provider): Extension<Arc<AccountsProvider>>,
+    Extension(provider): Extension<Arc<dyn accounts::Provider>>,
     Path(id): Path<u64>,
 ) -> Result<Json<Account>> {
     Ok(Json(provider.get_by_id(ctx, id).await?))
@@ -33,14 +33,14 @@ async fn get_by_id(
 
 async fn list(
     ctx: Context,
-    Extension(provider): Extension<Arc<AccountsProvider>>,
+    Extension(provider): Extension<Arc<dyn accounts::Provider>>,
 ) -> Result<Json<ListResponse<Account>>> {
     Ok(Json(provider.list(ctx).await?))
 }
 
 async fn update(
     ctx: Context,
-    Extension(provider): Extension<Arc<AccountsProvider>>,
+    Extension(provider): Extension<Arc<dyn accounts::Provider>>,
     Path(id): Path<u64>,
     Json(request): Json<UpdateAccountRequest>,
 ) -> Result<Json<Account>> {
@@ -49,7 +49,7 @@ async fn update(
 
 async fn delete(
     ctx: Context,
-    Extension(provider): Extension<Arc<AccountsProvider>>,
+    Extension(provider): Extension<Arc<dyn accounts::Provider>>,
     Path(id): Path<u64>,
 ) -> Result<Json<Account>> {
     Ok(Json(provider.delete(ctx, id).await?))

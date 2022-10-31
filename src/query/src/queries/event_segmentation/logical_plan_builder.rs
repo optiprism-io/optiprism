@@ -40,11 +40,11 @@ use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-use crate::queries::event_segmentation::types::Breakdown;
-use crate::queries::event_segmentation::types::Event;
-use crate::queries::event_segmentation::types::EventSegmentation;
-use crate::queries::event_segmentation::types::Query;
-use crate::queries::types::TimeUnit;
+use crate::queries::event_segmentation::Breakdown;
+use crate::queries::event_segmentation::Event;
+use crate::queries::event_segmentation::EventSegmentation;
+use crate::queries::event_segmentation::Query;
+use crate::queries::TimeIntervalUnit;
 use crate::Context;
 
 pub const COL_AGG_NAME: &str = "agg_name";
@@ -429,17 +429,21 @@ impl EventSegmentation {
     }
 }
 
-pub fn time_columns(from: DateTime<Utc>, to: DateTime<Utc>, granularity: &TimeUnit) -> Vec<String> {
+pub fn time_columns(
+    from: DateTime<Utc>,
+    to: DateTime<Utc>,
+    granularity: &TimeIntervalUnit,
+) -> Vec<String> {
     let from = date_trunc(granularity, from).unwrap();
     let to = date_trunc(granularity, to).unwrap();
     let rule = match granularity {
-        TimeUnit::Second => DateRule::secondly(from),
-        TimeUnit::Minute => DateRule::minutely(from),
-        TimeUnit::Hour => DateRule::hourly(from),
-        TimeUnit::Day => DateRule::daily(from),
-        TimeUnit::Week => DateRule::weekly(from),
-        TimeUnit::Month => DateRule::monthly(from),
-        TimeUnit::Year => DateRule::yearly(from),
+        TimeIntervalUnit::Second => DateRule::secondly(from),
+        TimeIntervalUnit::Minute => DateRule::minutely(from),
+        TimeIntervalUnit::Hour => DateRule::hourly(from),
+        TimeIntervalUnit::Day => DateRule::daily(from),
+        TimeIntervalUnit::Week => DateRule::weekly(from),
+        TimeIntervalUnit::Month => DateRule::monthly(from),
+        TimeIntervalUnit::Year => DateRule::yearly(from),
     };
 
     rule.with_end(to + granularity.relative_duration(1))
@@ -447,29 +451,29 @@ pub fn time_columns(from: DateTime<Utc>, to: DateTime<Utc>, granularity: &TimeUn
         .collect()
 }
 
-pub fn date_trunc(granularity: &TimeUnit, value: DateTime<Utc>) -> Result<DateTime<Utc>> {
+pub fn date_trunc(granularity: &TimeIntervalUnit, value: DateTime<Utc>) -> Result<DateTime<Utc>> {
     let value = Some(value);
     let value = match granularity {
-        TimeUnit::Second => value,
-        TimeUnit::Minute => value.and_then(|d| d.with_second(0)),
-        TimeUnit::Hour => value
+        TimeIntervalUnit::Second => value,
+        TimeIntervalUnit::Minute => value.and_then(|d| d.with_second(0)),
+        TimeIntervalUnit::Hour => value
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0)),
-        TimeUnit::Day => value
+        TimeIntervalUnit::Day => value
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0))
             .and_then(|d| d.with_hour(0)),
-        TimeUnit::Week => value
+        TimeIntervalUnit::Week => value
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0))
             .and_then(|d| d.with_hour(0))
             .map(|d| d - Duration::seconds(60 * 60 * 24 * d.weekday() as i64)),
-        TimeUnit::Month => value
+        TimeIntervalUnit::Month => value
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0))
             .and_then(|d| d.with_hour(0))
             .and_then(|d| d.with_day0(0)),
-        TimeUnit::Year => value
+        TimeIntervalUnit::Year => value
             .and_then(|d| d.with_second(0))
             .and_then(|d| d.with_minute(0))
             .and_then(|d| d.with_hour(0))

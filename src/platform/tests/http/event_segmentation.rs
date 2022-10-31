@@ -9,18 +9,18 @@ mod tests {
     use platform::queries::event_segmentation::Event;
     use platform::queries::event_segmentation::EventSegmentation;
     use platform::queries::event_segmentation::Query;
-    use platform::queries::types::AggregateFunction;
-    use platform::queries::types::EventFilter;
-    use platform::queries::types::EventRef;
-    use platform::queries::types::PartitionedAggregateFunction;
-    use platform::queries::types::PropValueOperation;
-    use platform::queries::types::PropertyRef;
-    use platform::queries::types::QueryTime;
-    use platform::queries::types::TimeUnit;
+    use platform::queries::AggregateFunction;
+    use platform::queries::PartitionedAggregateFunction;
+    use platform::queries::QueryTime;
+    use platform::queries::TimeIntervalUnit;
+    use platform::EventFilter;
+    use platform::EventRef;
+    use platform::PropValueOperation;
+    use platform::PropertyRef;
     use reqwest::Client;
     use serde_json::Value;
 
-    use crate::assert_response_status;
+    use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;
     use crate::http::tests::run_http_service;
 
@@ -38,7 +38,7 @@ mod tests {
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
             group: "event_user_id".to_string(),
-            interval_unit: TimeUnit::Minute,
+            interval_unit: TimeIntervalUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
@@ -107,7 +107,7 @@ mod tests {
             .send()
             .await?;
 
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         let txt = resp.text().await?;
         println!("{}", &txt);
 

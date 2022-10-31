@@ -1,25 +1,30 @@
 use std::sync::Arc;
 
+use axum::async_trait;
 use common::rbac::ProjectPermission;
 use metadata::events::Provider as EventsProvider;
 
-use crate::events::types::Event;
-use crate::events::types::UpdateEventRequest;
 use crate::events::CreateEventRequest;
-use crate::types::ListResponse;
+use crate::events::Event;
+use crate::events::Provider;
+use crate::events::UpdateEventRequest;
 use crate::Context;
+use crate::ListResponse;
 use crate::Result;
 
-pub struct Provider {
+pub struct ProviderImpl {
     prov: Arc<EventsProvider>,
 }
 
-impl Provider {
+impl ProviderImpl {
     pub fn new(prov: Arc<EventsProvider>) -> Self {
         Self { prov }
     }
+}
 
-    pub async fn create(
+#[async_trait]
+impl Provider for ProviderImpl {
+    async fn create(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -50,7 +55,7 @@ impl Provider {
         event.try_into()
     }
 
-    pub async fn get_by_id(
+    async fn get_by_id(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -65,7 +70,7 @@ impl Provider {
             .try_into()
     }
 
-    pub async fn get_by_name(
+    async fn get_by_name(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -82,7 +87,7 @@ impl Provider {
         event.try_into()
     }
 
-    pub async fn list(
+    async fn list(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -94,7 +99,7 @@ impl Provider {
         resp.try_into()
     }
 
-    pub async fn update(
+    async fn update(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -121,7 +126,7 @@ impl Provider {
         event.try_into()
     }
 
-    pub async fn attach_property(
+    async fn attach_property(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -137,7 +142,7 @@ impl Provider {
             .try_into()
     }
 
-    pub async fn detach_property(
+    async fn detach_property(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -153,7 +158,7 @@ impl Provider {
             .try_into()
     }
 
-    pub async fn delete(
+    async fn delete(
         &self,
         ctx: Context,
         organization_id: u64,

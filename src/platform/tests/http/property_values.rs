@@ -4,13 +4,13 @@ mod tests {
     use axum::http::StatusCode;
     use platform::queries::property_values::Filter;
     use platform::queries::property_values::PropertyValues;
-    use platform::queries::types::EventRef;
-    use platform::queries::types::PropValueOperation;
-    use platform::queries::types::PropertyRef;
+    use platform::EventRef;
+    use platform::PropValueOperation;
+    use platform::PropertyRef;
     use reqwest::Client;
     use serde_json::Value;
 
-    use crate::assert_response_status;
+    use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;
     use crate::http::tests::run_http_service;
 
@@ -42,7 +42,7 @@ mod tests {
             .send()
             .await?;
 
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         let _txt = resp.text().await?;
 
         Ok(())

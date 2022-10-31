@@ -1,26 +1,31 @@
 use std::sync::Arc;
 
+use axum::async_trait;
 use common::rbac::ProjectPermission;
 use common::types::OptionalProperty;
 use metadata::custom_events;
 
-use crate::custom_events::types::CreateCustomEventRequest;
-use crate::custom_events::types::CustomEvent;
-use crate::custom_events::types::UpdateCustomEventRequest;
-use crate::types::ListResponse;
+use super::CreateCustomEventRequest;
+use super::CustomEvent;
+use super::Provider;
+use crate::custom_events::UpdateCustomEventRequest;
 use crate::Context;
+use crate::ListResponse;
 use crate::Result;
 
-pub struct Provider {
+pub struct ProviderImpl {
     prov: Arc<custom_events::Provider>,
 }
 
-impl Provider {
+impl ProviderImpl {
     pub fn new(prov: Arc<custom_events::Provider>) -> Self {
         Self { prov }
     }
+}
 
-    pub async fn create(
+#[async_trait]
+impl Provider for ProviderImpl {
+    async fn create(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -51,7 +56,7 @@ impl Provider {
         event.try_into()
     }
 
-    pub async fn get_by_id(
+    async fn get_by_id(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -65,7 +70,7 @@ impl Provider {
             .try_into()
     }
 
-    pub async fn list(
+    async fn list(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -77,7 +82,7 @@ impl Provider {
         resp.try_into()
     }
 
-    pub async fn update(
+    async fn update(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -111,7 +116,7 @@ impl Provider {
         event.try_into()
     }
 
-    pub async fn delete(
+    async fn delete(
         &self,
         ctx: Context,
         organization_id: u64,

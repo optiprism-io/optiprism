@@ -1,17 +1,17 @@
 use chrono::Utc;
 use common::types::OptionalProperty;
-use platform::custom_events::types::CreateCustomEventRequest;
-use platform::custom_events::types::CustomEvent;
-use platform::custom_events::types::Event;
-use platform::custom_events::types::Status;
-use platform::custom_events::types::UpdateCustomEventRequest;
-use platform::queries::types::EventRef;
-use platform::types::ListResponse;
+use platform::custom_events::CreateCustomEventRequest;
+use platform::custom_events::CustomEvent;
+use platform::custom_events::Event;
+use platform::custom_events::Status;
+use platform::custom_events::UpdateCustomEventRequest;
+use platform::EventRef;
+use platform::ListResponse;
 use reqwest::Client;
 use reqwest::StatusCode;
 
-use crate::assert_response_body;
-use crate::assert_response_status;
+use crate::assert_response_json_eq;
+use crate::assert_response_status_eq;
 use crate::http::tests::create_admin_acc_and_login;
 use crate::http::tests::run_http_service;
 use crate::http::tests::EMPTY_LIST;
@@ -91,8 +91,8 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .send()
             .await?;
 
-        assert_response_status!(resp, StatusCode::OK);
-        assert_response_body!(resp, EMPTY_LIST.to_string());
+        assert_response_status_eq!(resp, StatusCode::OK);
+        assert_response_json_eq!(resp, EMPTY_LIST.to_string());
     }
 
     // get of unexisting event 1 should return 404 not found error
@@ -103,7 +103,7 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .send()
             .await?;
 
-        assert_response_status!(resp, StatusCode::NOT_FOUND);
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
 
     // delete of unexisting event 1 should return 404 not found error
@@ -114,7 +114,7 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .send()
             .await?;
 
-        assert_response_status!(resp, StatusCode::NOT_FOUND);
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
 
     // create request should create event
@@ -134,7 +134,7 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .headers(admin_headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::CREATED);
+        assert_response_status_eq!(resp, StatusCode::CREATED);
         let resp: CustomEvent = serde_json::from_str(resp.text().await?.as_str())?;
         assert(&resp, &custom_event1)
     }
@@ -170,7 +170,7 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .headers(admin_headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         let e: CustomEvent = serde_json::from_str(resp.text().await?.as_str())?;
 
         assert(&e, &custom_event1);
@@ -183,7 +183,7 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .headers(admin_headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         let e: CustomEvent = serde_json::from_str(resp.text().await?.as_str())?;
         assert(&e, &custom_event1);
     }
@@ -194,7 +194,7 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .headers(admin_headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         let resp: ListResponse<CustomEvent> = serde_json::from_str(resp.text().await?.as_str())?;
         assert_eq!(resp.data.len(), 1);
         assert(&resp.data[0], &custom_event1);
@@ -207,14 +207,14 @@ async fn test_custom_events() -> anyhow::Result<()> {
             .headers(admin_headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
 
         let resp = cl
             .delete(format!("{events_url}/1"))
             .headers(admin_headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::NOT_FOUND);
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
     Ok(())
 }

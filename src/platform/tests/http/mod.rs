@@ -21,8 +21,9 @@ mod tests {
     use lazy_static::lazy_static;
     use metadata::store::Store;
     use metadata::MetadataProvider;
+    use platform::auth;
     use platform::auth::password::make_password_hash;
-    use platform::auth::types::LogInRequest;
+    use platform::auth::LogInRequest;
     use platform::PlatformProvider;
     use query::test_util::create_entities;
     use query::test_util::empty_provider;
@@ -34,10 +35,14 @@ mod tests {
 
     lazy_static! {
         pub static ref EMPTY_LIST: serde_json::Value = json!({"data":[],"meta":{"next":null}});
+        pub static ref AUTH_CFG: auth::Config = auth::Config {
+            access_token_duration: Duration::days(1),
+            access_token_key: "access_secret".to_string(),
+            refresh_token_duration: Duration::days(1),
+            refresh_token_key: "refresh_secret".to_string(),
+        };
     }
     static HTTP_PORT: AtomicU16 = AtomicU16::new(8080);
-    static ACCESS_TOKEN: &str = "access_secret";
-    static REFRESH_TOKEN: &str = "refresh_secret";
 
     pub fn tmp_store() -> Arc<Store> {
         let mut path = temp_dir();
@@ -46,7 +51,7 @@ mod tests {
     }
 
     pub async fn create_admin_acc_and_login(
-        auth: &Arc<platform::auth::Provider>,
+        auth: &Arc<dyn platform::auth::Provider>,
         md_acc: &Arc<metadata::accounts::Provider>,
     ) -> anyhow::Result<HeaderMap> {
         let pwd = "password";
@@ -100,19 +105,13 @@ mod tests {
         };
 
         let query = Arc::new(QueryProvider::new_from_logical_plan(md.clone(), input));
-        let p_query = Arc::new(platform::queries::provider::QueryProvider::new(query));
 
-        let pp = Arc::new(PlatformProvider::new(
-            md.clone(),
-            p_query.clone(),
-            Duration::days(1),
-            ACCESS_TOKEN.to_string(),
-            Duration::days(1),
-            REFRESH_TOKEN.to_string(),
-        ));
+        let platform_provider =
+            Arc::new(PlatformProvider::new(md.clone(), query, AUTH_CFG.clone()));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], HTTP_PORT.fetch_add(1, Ordering::SeqCst)));
-        let svc = platform::http::Service::new(&md, &pp, addr, None);
+        let svc =
+            platform::http::Service::new(&md, &platform_provider, AUTH_CFG.clone(), addr, None);
 
         tokio::spawn(async move {
             svc.serve().await.unwrap();
@@ -122,16 +121,16 @@ mod tests {
 
         let base_addr = format!("http://{:?}:{:?}/api/v1", addr.ip(), addr.port());
 
-        Ok((base_addr, md, pp))
+        Ok((base_addr, md, platform_provider))
     }
 
     #[macro_export]
-    macro_rules! assert_response_status {
+    macro_rules! assert_response_status_eq {
         ($resp:expr,$status:expr) => {{ assert_eq!($resp.status(), $status, "{}", $resp.text().await?.as_str()) }};
     }
 
     #[macro_export]
-    macro_rules! assert_response_body {
-        ($resp:expr,$body:expr) => {{ assert_eq!($resp.text().await?, $body) }};
+    macro_rules! assert_response_json_eq {
+        ($resp:expr, $body:expr) => {{ assert_eq!($resp.text().await?, $body.to_string()) }};
     }
 }

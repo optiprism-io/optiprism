@@ -1,18 +1,18 @@
 use chrono::DateTime;
 use chrono::Utc;
-use query::queries::event_segmentation::types as query_es_types;
-use query::queries::event_segmentation::types::NamedQuery;
+use query::queries::event_segmentation as query_es_types;
+use query::queries::event_segmentation::NamedQuery;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::queries::types::AggregateFunction;
-use crate::queries::types::EventFilter;
-use crate::queries::types::EventRef;
-use crate::queries::types::PartitionedAggregateFunction;
-use crate::queries::types::PropertyRef;
-use crate::queries::types::QueryTime;
-use crate::queries::types::TimeUnit;
+use crate::queries::AggregateFunction;
+use crate::queries::PartitionedAggregateFunction;
+use crate::queries::QueryTime;
+use crate::queries::TimeIntervalUnit;
+use crate::EventFilter;
+use crate::EventRef;
 use crate::PlatformError;
+use crate::PropertyRef;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -24,14 +24,14 @@ pub enum SegmentTime {
     From(DateTime<Utc>),
     Last {
         n: i64,
-        unit: TimeUnit,
+        unit: TimeIntervalUnit,
     },
     AfterFirstUse {
         within: i64,
-        unit: TimeUnit,
+        unit: TimeIntervalUnit,
     },
     WindowEach {
-        unit: TimeUnit,
+        unit: TimeIntervalUnit,
     },
 }
 
@@ -81,8 +81,14 @@ impl TryInto<query_es_types::ChartType> for ChartType {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Analysis {
     Linear,
-    RollingAverage { window: usize, unit: TimeUnit },
-    WindowAverage { window: usize, unit: TimeUnit },
+    RollingAverage {
+        window: usize,
+        unit: TimeIntervalUnit,
+    },
+    WindowAverage {
+        window: usize,
+        unit: TimeIntervalUnit,
+    },
     Cumulative,
 }
 
@@ -109,7 +115,7 @@ impl TryInto<query_es_types::Analysis> for Analysis {
 #[serde(rename_all = "camelCase")]
 pub struct Compare {
     pub offset: usize,
-    pub unit: TimeUnit,
+    pub unit: TimeIntervalUnit,
 }
 
 // impl TryFrom<Option<Compare>> for Option<query_es_types::Compare> {
@@ -369,7 +375,7 @@ pub struct Segment {
 pub struct EventSegmentation {
     pub time: QueryTime,
     pub group: String,
-    pub interval_unit: TimeUnit,
+    pub interval_unit: TimeIntervalUnit,
     pub chart_type: ChartType,
     pub analysis: Analysis,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -424,7 +430,7 @@ mod tests {
     use chrono::DateTime;
     use chrono::Utc;
     use query::event_fields;
-    use query::queries::event_segmentation::types::EventSegmentation as QueryEventSegmentation;
+    use query::queries::event_segmentation::EventSegmentation as QueryEventSegmentation;
     use serde_json::json;
 
     use crate::error::Result;
@@ -439,10 +445,10 @@ mod tests {
     use crate::queries::event_segmentation::PartitionedAggregateFunction;
     use crate::queries::event_segmentation::Query;
     use crate::queries::event_segmentation::QueryTime;
-    use crate::queries::event_segmentation::TimeUnit;
-    use crate::queries::types::EventRef;
-    use crate::queries::types::PropValueOperation;
-    use crate::queries::types::PropertyRef;
+    use crate::queries::event_segmentation::TimeIntervalUnit;
+    use crate::EventRef;
+    use crate::PropValueOperation;
+    use crate::PropertyRef;
 
     #[test]
     fn test_serialize() -> Result<()> {
@@ -455,12 +461,12 @@ mod tests {
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
             group: event_fields::USER_ID.to_string(),
-            interval_unit: TimeUnit::Minute,
+            interval_unit: TimeIntervalUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: Some(Compare {
                 offset: 1,
-                unit: TimeUnit::Second,
+                unit: TimeIntervalUnit::Second,
             }),
             events: vec![Event {
                 event: EventRef::Regular {

@@ -1,12 +1,22 @@
-pub mod provider;
 pub mod provider_impl;
-pub mod types;
 
+use axum::async_trait;
+use chrono::DateTime;
+use chrono::Utc;
+use common::rbac::OrganizationRole;
+use common::rbac::ProjectRole;
+use common::rbac::Role;
+use common::types::OptionalProperty;
 pub use provider_impl::ProviderImpl;
-pub use types::Account;
-pub use types::CreateAccountRequest;
-pub use types::UpdateAccountRequest;
+use serde::Deserialize;
+use serde::Serialize;
 
+use crate::Context;
+use crate::ListResponse;
+use crate::PlatformError;
+use crate::Result;
+
+#[async_trait]
 pub trait Provider: Sync + Send {
     async fn create(&self, ctx: Context, req: CreateAccountRequest) -> Result<Account>;
     async fn get_by_id(&self, ctx: Context, id: u64) -> Result<Account>;
@@ -20,7 +30,7 @@ pub trait Provider: Sync + Send {
     async fn delete(&self, ctx: Context, id: u64) -> Result<Account>;
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Account {
     pub id: u64,
     pub created_at: DateTime<Utc>,

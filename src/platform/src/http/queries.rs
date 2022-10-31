@@ -3,20 +3,20 @@ use std::sync::Arc;
 use axum::extract::Extension;
 use axum::extract::Path;
 use axum::routing;
-use axum::Json;
 use axum::Router;
 
-use crate::data_table::DataTable;
+use crate::http::Json;
+use crate::queries;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
-use crate::queries::provider::QueryProvider;
 use crate::Context;
+use crate::DataTable;
 use crate::Result;
 
 async fn event_segmentation(
     ctx: Context,
-    Extension(provider): Extension<Arc<QueryProvider>>,
+    Extension(provider): Extension<Arc<dyn queries::Provider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<EventSegmentation>,
 ) -> Result<Json<DataTable>> {
@@ -29,7 +29,7 @@ async fn event_segmentation(
 
 async fn property_values(
     ctx: Context,
-    Extension(provider): Extension<Arc<QueryProvider>>,
+    Extension(provider): Extension<Arc<dyn queries::Provider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<PropertyValues>,
 ) -> Result<Json<property_values::ListResponse>> {

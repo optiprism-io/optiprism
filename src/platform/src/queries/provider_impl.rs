@@ -1,24 +1,28 @@
 use std::sync::Arc;
 
+use axum::async_trait;
 use common::rbac::ProjectPermission;
 
-use crate::data_table::DataTable;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
+use crate::queries::Provider;
 use crate::Context;
+use crate::DataTable;
 use crate::Result;
 
-pub struct QueryProvider {
+pub struct ProviderImpl {
     query: Arc<query::QueryProvider>,
 }
 
-impl QueryProvider {
+impl ProviderImpl {
     pub fn new(query: Arc<query::QueryProvider>) -> Self {
         Self { query }
     }
-
-    pub async fn event_segmentation(
+}
+#[async_trait]
+impl Provider for ProviderImpl {
+    async fn event_segmentation(
         &self,
         ctx: Context,
         organization_id: u64,
@@ -40,7 +44,7 @@ impl QueryProvider {
         result.try_into()
     }
 
-    pub async fn property_values(
+    async fn property_values(
         &self,
         ctx: Context,
         organization_id: u64,

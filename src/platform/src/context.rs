@@ -128,11 +128,11 @@ where B: Send
                 .await
                 .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
 
-        let Extension(auth_prov) = Extension::<Arc<auth::Provider>>::from_request(req)
+        let Extension(auth_cfg) = Extension::<auth::Config>::from_request(req)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
-        let claims = parse_access_token(bearer.token(), &auth_prov.access_token_key)
+        let claims = parse_access_token(bearer.token(), &auth_cfg.access_token_key)
             .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
         let Extension(md_acc_prov) =
             Extension::<Arc<metadata::accounts::Provider>>::from_request(req)

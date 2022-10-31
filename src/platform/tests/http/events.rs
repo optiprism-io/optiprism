@@ -8,7 +8,7 @@ use platform::events::UpdateEventRequest;
 use reqwest::Client;
 use reqwest::StatusCode;
 
-use crate::assert_response_status;
+use crate::assert_response_status_eq;
 use crate::http::tests::create_admin_acc_and_login;
 use crate::http::tests::run_http_service;
 
@@ -52,7 +52,7 @@ async fn test_events() -> anyhow::Result<()> {
     {
         let resp = cl.get(&events_url).headers(headers.clone()).send().await?;
 
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         assert_eq!(resp.text().await?, r#"{"data":[],"meta":{"next":null}}"#);
     }
 
@@ -63,7 +63,7 @@ async fn test_events() -> anyhow::Result<()> {
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::NOT_FOUND);
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
 
     // delete of unexisting event 1 should return 404 not found error
@@ -73,7 +73,7 @@ async fn test_events() -> anyhow::Result<()> {
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::NOT_FOUND);
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
 
     // create request should create event
@@ -93,7 +93,7 @@ async fn test_events() -> anyhow::Result<()> {
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::CREATED);
+        assert_response_status_eq!(resp, StatusCode::CREATED);
         let resp: Event = serde_json::from_str(resp.text().await?.as_str())?;
         assert(&resp, &event1)
     }
@@ -120,7 +120,7 @@ async fn test_events() -> anyhow::Result<()> {
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         let e: Event = serde_json::from_str(resp.text().await?.as_str())?;
         assert(&e, &event1);
     }
@@ -132,14 +132,14 @@ async fn test_events() -> anyhow::Result<()> {
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         let e: Event = serde_json::from_str(resp.text().await?.as_str())?;
         assert(&e, &event1);
     }
     // list events should return list with one event
     {
         let resp = cl.get(&events_url).headers(headers.clone()).send().await?;
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         let resp: ListResponse<Event> = serde_json::from_str(resp.text().await?.as_str())?;
         assert_eq!(resp.data.len(), 1);
         assert(&resp.data[0], &event1);
@@ -152,14 +152,14 @@ async fn test_events() -> anyhow::Result<()> {
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
 
         let resp = cl
             .delete(format!("{events_url}/1"))
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::NOT_FOUND);
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
     Ok(())
 }

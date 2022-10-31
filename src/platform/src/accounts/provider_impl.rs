@@ -1,16 +1,17 @@
 use std::sync::Arc;
 
+use axum::async_trait;
 use common::rbac::Permission;
 use common::types::OptionalProperty;
 use metadata::accounts;
 
-use crate::accounts::provider::Provider;
-use crate::accounts::types::Account;
-use crate::accounts::types::CreateAccountRequest;
-use crate::accounts::types::UpdateAccountRequest;
+use super::Account;
+use super::CreateAccountRequest;
+use super::Provider;
+use super::UpdateAccountRequest;
 use crate::auth::password::make_password_hash;
-use crate::types::ListResponse;
 use crate::Context;
+use crate::ListResponse;
 use crate::Result;
 
 pub struct ProviderImpl {
@@ -22,7 +23,7 @@ impl ProviderImpl {
         Self { prov }
     }
 }
-
+#[async_trait]
 impl Provider for ProviderImpl {
     async fn create(&self, ctx: Context, req: CreateAccountRequest) -> Result<Account> {
         ctx.check_permission(Permission::ManageAccounts)?;

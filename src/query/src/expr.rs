@@ -29,7 +29,7 @@ use crate::event_fields;
 use crate::logical_plan::expr::lit_timestamp;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
-use crate::queries::types::QueryTime;
+use crate::queries::QueryTime;
 use crate::Context;
 use crate::Result;
 

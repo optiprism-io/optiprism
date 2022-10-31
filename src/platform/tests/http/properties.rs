@@ -10,7 +10,7 @@ use platform::properties::UpdatePropertyRequest;
 use reqwest::Client;
 use reqwest::StatusCode;
 
-use crate::assert_response_status;
+use crate::assert_response_status_eq;
 use crate::http::tests::create_admin_acc_and_login;
 use crate::http::tests::run_http_service;
 
@@ -67,7 +67,7 @@ async fn test_event_properties() -> anyhow::Result<()> {
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::NOT_FOUND);
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
 
     // delete of unexisting event prop 1 should return 404 not found error
@@ -77,7 +77,7 @@ async fn test_event_properties() -> anyhow::Result<()> {
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::NOT_FOUND);
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
 
     // create request should create event prop
@@ -146,7 +146,7 @@ async fn test_event_properties() -> anyhow::Result<()> {
     // list events should return list with one event
     {
         let resp = cl.get(&prop_url).headers(headers.clone()).send().await?;
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
         let resp: ListResponse<Property> = serde_json::from_str(resp.text().await?.as_str())?;
         assert_eq!(resp.data.len(), 1);
         assert(&resp.data[0], &prop1);
@@ -159,14 +159,14 @@ async fn test_event_properties() -> anyhow::Result<()> {
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
 
         let resp = cl
             .delete(format!("{prop_url}/1"))
             .headers(headers.clone())
             .send()
             .await?;
-        assert_response_status!(resp, StatusCode::NOT_FOUND);
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
     Ok(())
 }
