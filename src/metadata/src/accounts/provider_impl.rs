@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -9,6 +10,8 @@ use tokio::sync::RwLock;
 use crate::accounts::types::UpdateAccountRequest;
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
+use crate::accounts::Provider;
+use crate::accounts::UpdateAccountRequest;
 use crate::error;
 use crate::error::AccountError;
 use crate::error::MetadataError;
@@ -33,27 +36,22 @@ fn index_email_key(email: &str) -> Option<Vec<u8>> {
     Some(make_index_key(NAMESPACE, IDX_EMAIL, email).to_vec())
 }
 
-pub struct Provider {
+pub struct ProviderImpl {
     store: Arc<Store>,
     idx: HashMap,
     guard: RwLock<()>,
 }
 
-impl Provider {
+impl ProviderImpl {
     pub fn new(kv: Arc<Store>) -> Self {
-        Provider {
+        ProviderImpl {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
         }
     }
 
-    pub async fn create(&self, req: CreateAccountRequest) -> Result<Account> {
-        let _guard = self.guard.write().await;
-        self._create(req).await
-    }
-
-    pub async fn _create(&self, req: CreateAccountRequest) -> Result<Account> {
+    async fn _create(&self, req: CreateAccountRequest) -> Result<Account> {
         let idx_keys = index_keys(&req.email);
 
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
@@ -82,21 +80,7 @@ impl Provider {
         Ok(account)
     }
 
-    pub async fn get_by_id(&self, id: u64) -> Result<Account> {
-        let key = make_data_value_key(NAMESPACE, id);
-
-        match self.store.get(key).await? {
-            None => Err(AccountError::AccountNotFound(error::Account::new_with_id(id)).into()),
-            Some(value) => Ok(deserialize(&value)?),
-        }
-    }
-
-    pub async fn get_by_email(&self, email: &str) -> Result<Account> {
-        let _guard = self.guard.read().await;
-        self._get_by_email(email).await
-    }
-
-    pub async fn _get_by_email(&self, email: &str) -> Result<Account> {
+    async fn _get_by_email(&self, email: &str) -> Result<Account> {
         match self
             .idx
             .get(make_index_key(NAMESPACE, IDX_EMAIL, email))
@@ -110,12 +94,34 @@ impl Provider {
             Ok(data) => Ok(deserialize(&data)?),
         }
     }
+}
 
-    pub async fn list(&self) -> Result<ListResponse<Account>> {
+#[async_trait]
+impl Provider for ProviderImpl {
+    async fn create(&self, req: CreateAccountRequest) -> Result<Account> {
+        let _guard = self.guard.write().await;
+        self._create(req).await
+    }
+
+    async fn get_by_id(&self, id: u64) -> Result<Account> {
+        let key = make_data_value_key(NAMESPACE, id);
+
+        match self.store.get(key).await? {
+            None => Err(AccountError::AccountNotFound(error::Account::new_with_id(id)).into()),
+            Some(value) => Ok(deserialize(&value)?),
+        }
+    }
+
+    async fn get_by_email(&self, email: &str) -> Result<Account> {
+        let _guard = self.guard.read().await;
+        self._get_by_email(email).await
+    }
+
+    async fn list(&self) -> Result<ListResponse<Account>> {
         list(self.store.clone(), NAMESPACE).await
     }
 
-    pub async fn update(&self, account_id: u64, req: UpdateAccountRequest) -> Result<Account> {
+    async fn update(&self, account_id: u64, req: UpdateAccountRequest) -> Result<Account> {
         let _guard = self.guard.write().await;
 
         let prev_account = self.get_by_id(account_id).await?;
@@ -175,7 +181,7 @@ impl Provider {
         Ok(account)
     }
 
-    pub async fn delete(&self, id: u64) -> Result<Account> {
+    async fn delete(&self, id: u64) -> Result<Account> {
         let _guard = self.guard.write().await;
         let account = self.get_by_id(id).await?;
         self.store

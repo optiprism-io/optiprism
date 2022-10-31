@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -14,6 +15,10 @@ use crate::metadata::ListResponse;
 use crate::properties::types::CreatePropertyRequest;
 use crate::properties::types::Property;
 use crate::properties::types::UpdatePropertyRequest;
+use crate::properties::CreatePropertyRequest;
+use crate::properties::Property;
+use crate::properties::Provider;
+use crate::properties::UpdatePropertyRequest;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
@@ -87,16 +92,17 @@ fn index_display_name_key(
     })
 }
 
-pub struct Provider {
+pub struct ProviderImpl {
     store: Arc<Store>,
     idx: HashMap,
     guard: RwLock<()>,
     ns: Namespace,
 }
 
-impl Provider {
+#[async_trait]
+impl ProviderImpl {
     pub fn new_user(kv: Arc<Store>) -> Self {
-        Provider {
+        ProviderImpl {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
@@ -105,7 +111,7 @@ impl Provider {
     }
 
     pub fn new_event(kv: Arc<Store>) -> Self {
-        Provider {
+        ProviderImpl {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
@@ -113,17 +119,38 @@ impl Provider {
         }
     }
 
-    pub async fn create(
+    async fn _get_by_name(
         &self,
         organization_id: u64,
         project_id: u64,
-        req: CreatePropertyRequest,
+        name: &str,
     ) -> Result<Property> {
-        let _guard = self.guard.write().await;
-        self._create(organization_id, project_id, req).await
+        match self
+            .idx
+            .get(make_index_key(
+                org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
+                IDX_NAME,
+                name,
+            ))
+            .await
+        {
+            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => {
+                Err(PropertyError::PropertyNotFound(error::Property {
+                    organization_id,
+                    project_id,
+                    namespace: self.ns.clone(),
+                    event_id: None,
+                    property_id: None,
+                    property_name: Some(name.to_string()),
+                })
+                .into())
+            }
+            Err(other) => Err(other),
+            Ok(data) => Ok(deserialize(&data)?),
+        }
     }
 
-    pub async fn _create(
+    async fn _create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -194,8 +221,20 @@ impl Provider {
         self.idx.insert(idx_keys.as_ref(), &data).await?;
         Ok(prop)
     }
+}
 
-    pub async fn get_or_create(
+impl Provider for ProviderImpl {
+    async fn create(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        req: CreatePropertyRequest,
+    ) -> Result<Property> {
+        let _guard = self.guard.write().await;
+        self._create(organization_id, project_id, req).await
+    }
+
+    async fn get_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -214,12 +253,7 @@ impl Provider {
         self._create(organization_id, project_id, req).await
     }
 
-    pub async fn get_by_id(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<Property> {
+    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let key = make_data_value_key(
             org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
             id,
@@ -239,7 +273,7 @@ impl Provider {
         }
     }
 
-    pub async fn get_by_name(
+    async fn get_by_name(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -249,42 +283,7 @@ impl Provider {
         self._get_by_name(organization_id, project_id, name).await
     }
 
-    pub async fn _get_by_name(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<Property> {
-        match self
-            .idx
-            .get(make_index_key(
-                org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
-                IDX_NAME,
-                name,
-            ))
-            .await
-        {
-            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => {
-                Err(PropertyError::PropertyNotFound(error::Property {
-                    organization_id,
-                    project_id,
-                    namespace: self.ns.clone(),
-                    event_id: None,
-                    property_id: None,
-                    property_name: Some(name.to_string()),
-                })
-                .into())
-            }
-            Err(other) => Err(other),
-            Ok(data) => Ok(deserialize(&data)?),
-        }
-    }
-
-    pub async fn list(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-    ) -> Result<ListResponse<Property>> {
+    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>> {
         list(
             self.store.clone(),
             org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
@@ -292,7 +291,7 @@ impl Provider {
         .await
     }
 
-    pub async fn update(
+    async fn update(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -406,7 +405,7 @@ impl Provider {
         Ok(prop)
     }
 
-    pub async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
+    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let _guard = self.guard.write().await;
         let prop = self.get_by_id(organization_id, project_id, id).await?;
         self.store

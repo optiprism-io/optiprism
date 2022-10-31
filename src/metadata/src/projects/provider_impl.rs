@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -13,7 +14,9 @@ use crate::error::StoreError;
 use crate::metadata::ListResponse;
 use crate::projects::types::CreateProjectRequest;
 use crate::projects::types::UpdateProjectRequest;
+use crate::projects::CreateProjectRequest;
 use crate::projects::Project;
+use crate::projects::Provider;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
@@ -22,7 +25,6 @@ use crate::store::path_helpers::make_index_key;
 use crate::store::path_helpers::org_ns;
 use crate::store::Store;
 use crate::Result;
-
 const NAMESPACE: &[u8] = b"projects";
 const IDX_NAME: &[u8] = b"name";
 
@@ -41,22 +43,25 @@ fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
     )
 }
 
-pub struct Provider {
+pub struct ProviderImpl {
     store: Arc<Store>,
     idx: HashMap,
     guard: RwLock<()>,
 }
 
-impl Provider {
+impl ProviderImpl {
     pub fn new(kv: Arc<Store>) -> Self {
-        Provider {
+        ProviderImpl {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
         }
     }
+}
 
-    pub async fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project> {
+#[async_trait]
+impl Provider for ProviderImpl {
+    async fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project> {
         let _guard = self.guard.write().await;
 
         let idx_keys = index_keys(organization_id, &req.name);
@@ -105,7 +110,7 @@ impl Provider {
         Ok(project)
     }
 
-    pub async fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project> {
+    async fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project> {
         let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id);
 
         match self.store.get(key).await? {
@@ -118,7 +123,7 @@ impl Provider {
         }
     }
 
-    pub async fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
+    async fn list(&self, organization_id: u64) -> Result<ListResponse<Project>> {
         list(
             self.store.clone(),
             org_ns(organization_id, NAMESPACE).as_slice(),
@@ -126,7 +131,7 @@ impl Provider {
         .await
     }
 
-    pub async fn update(
+    async fn update(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -181,7 +186,7 @@ impl Provider {
         Ok(project)
     }
 
-    pub async fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
+    async fn delete(&self, organization_id: u64, project_id: u64) -> Result<Project> {
         let _guard = self.guard.write().await;
         let project = self.get_by_id(organization_id, project_id).await?;
         self.store

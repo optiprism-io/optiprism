@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -21,6 +22,10 @@ use crate::store::Store;
 use crate::teams::types::CreateTeamRequest;
 use crate::teams::types::Team;
 use crate::teams::types::UpdateTeamRequest;
+use crate::teams::CreateTeamRequest;
+use crate::teams::Provider;
+use crate::teams::Team;
+use crate::teams::UpdateTeamRequest;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"teams";
@@ -41,22 +46,24 @@ fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
     )
 }
 
-pub struct Provider {
+pub struct ProviderImpl {
     store: Arc<Store>,
     idx: HashMap,
     guard: RwLock<()>,
 }
 
-impl Provider {
+#[async_trait]
+impl ProviderImpl {
     pub fn new(kv: Arc<Store>) -> Self {
-        Provider {
+        ProviderImpl {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
         }
     }
-
-    pub async fn create(&self, organization_id: u64, req: CreateTeamRequest) -> Result<Team> {
+}
+impl Provider for ProviderImpl {
+    async fn create(&self, organization_id: u64, req: CreateTeamRequest) -> Result<Team> {
         let _guard = self.guard.write().await;
 
         let idx_keys = index_keys(organization_id, &req.name);
@@ -103,7 +110,7 @@ impl Provider {
         Ok(team)
     }
 
-    pub async fn get_by_id(&self, organization_id: u64, team_id: u64) -> Result<Team> {
+    async fn get_by_id(&self, organization_id: u64, team_id: u64) -> Result<Team> {
         let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), team_id);
 
         match self.store.get(key).await? {
@@ -116,7 +123,7 @@ impl Provider {
         }
     }
 
-    pub async fn list(&self, organization_id: u64) -> Result<ListResponse<Team>> {
+    async fn list(&self, organization_id: u64) -> Result<ListResponse<Team>> {
         list(
             self.store.clone(),
             org_ns(organization_id, NAMESPACE).as_slice(),
@@ -124,7 +131,7 @@ impl Provider {
         .await
     }
 
-    pub async fn update(
+    async fn update(
         &self,
         organization_id: u64,
         team_id: u64,
@@ -177,7 +184,7 @@ impl Provider {
         Ok(team)
     }
 
-    pub async fn delete(&self, organization_id: u64, team_id: u64) -> Result<Team> {
+    async fn delete(&self, organization_id: u64, team_id: u64) -> Result<Team> {
         let _guard = self.guard.write().await;
         let team = self.get_by_id(organization_id, team_id).await?;
         self.store

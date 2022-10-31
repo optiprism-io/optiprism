@@ -21,7 +21,7 @@ use datafusion_expr::Expr;
 use datafusion_expr::Operator;
 use futures::executor;
 use metadata::dictionaries;
-use metadata::properties::provider::Namespace;
+use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
 
 use crate::error::QueryError;

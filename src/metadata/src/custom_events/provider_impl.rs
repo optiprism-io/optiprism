@@ -12,7 +12,11 @@ use tokio::sync::RwLock;
 use crate::custom_events::types::CreateCustomEventRequest;
 use crate::custom_events::types::Event;
 use crate::custom_events::types::UpdateCustomEventRequest;
+use crate::custom_events::CreateCustomEventRequest;
 use crate::custom_events::CustomEvent;
+use crate::custom_events::Event;
+use crate::custom_events::Provider;
+use crate::custom_events::UpdateCustomEventRequest;
 use crate::error;
 use crate::error::CustomEventError;
 use crate::error::MetadataError;
@@ -47,17 +51,17 @@ fn index_name_key(organization_id: u64, project_id: u64, name: &str) -> Option<V
     )
 }
 
-pub struct Provider {
+pub struct ProviderImpl {
     store: Arc<Store>,
-    events: Arc<events::Provider>,
+    events: Arc<dyn events::Provider>,
     idx: HashMap,
     guard: RwLock<()>,
     max_events_level: usize,
 }
 
-impl Provider {
-    pub fn new(kv: Arc<Store>, events: Arc<events::Provider>) -> Self {
-        Provider {
+impl ProviderImpl {
+    pub fn new(kv: Arc<Store>, events: Arc<dyn events::Provider>) -> Self {
+        ProviderImpl {
             store: kv.clone(),
             events,
             idx: HashMap::new(kv),
@@ -75,7 +79,57 @@ impl Provider {
             max_events_level,
         }
     }
-    pub async fn create(
+
+    fn validate_events<'a>(
+        &'a self,
+        organization_id: u64,
+        project_id: u64,
+        events: &'a [Event],
+        level: usize,
+        ids: &'a mut Vec<u64>,
+    ) -> BoxFuture<'a, Result<()>> {
+        async move {
+            if level > self.max_events_level {
+                return Err(CustomEventError::RecursionLevelExceeded(self.max_events_level).into());
+            }
+
+            for event in events.iter() {
+                match &event.event {
+                    EventRef::RegularName(name) => {
+                        self.events
+                            .get_by_name(organization_id, project_id, name.as_str())
+                            .await?;
+                    }
+                    EventRef::Regular(id) => {
+                        self.events
+                            .get_by_id(organization_id, project_id, *id)
+                            .await?;
+                    }
+                    EventRef::Custom(id) => {
+                        if ids.contains(id) {
+                            return Err(CustomEventError::DuplicateEvent.into());
+                        }
+                        let custom_event = self.get_by_id(organization_id, project_id, *id).await?;
+                        ids.push(custom_event.id);
+                        self.validate_events(
+                            organization_id,
+                            project_id,
+                            &custom_event.events,
+                            level + 1,
+                            ids,
+                        )
+                        .await?;
+                    }
+                }
+            }
+
+            Ok(())
+        }
+        .boxed()
+    }
+}
+impl Provider for ProviderImpl {
+    async fn create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -142,7 +196,7 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn get_by_id(
+    async fn get_by_id(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -166,7 +220,7 @@ impl Provider {
         }
     }
 
-    pub async fn get_by_name(
+    async fn get_by_name(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -194,7 +248,7 @@ impl Provider {
         }
     }
 
-    pub async fn list(
+    async fn list(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -206,7 +260,7 @@ impl Provider {
         .await
     }
 
-    pub async fn update(
+    async fn update(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -295,12 +349,7 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn delete(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
-    ) -> Result<CustomEvent> {
+    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<CustomEvent> {
         let _guard = self.guard.write().await;
         let event = self.get_by_id(organization_id, project_id, id).await?;
         self.store
@@ -315,53 +364,5 @@ impl Provider {
             .await?;
 
         Ok(event)
-    }
-
-    fn validate_events<'a>(
-        &'a self,
-        organization_id: u64,
-        project_id: u64,
-        events: &'a [Event],
-        level: usize,
-        ids: &'a mut Vec<u64>,
-    ) -> BoxFuture<'a, Result<()>> {
-        async move {
-            if level > self.max_events_level {
-                return Err(CustomEventError::RecursionLevelExceeded(self.max_events_level).into());
-            }
-
-            for event in events.iter() {
-                match &event.event {
-                    EventRef::RegularName(name) => {
-                        self.events
-                            .get_by_name(organization_id, project_id, name.as_str())
-                            .await?;
-                    }
-                    EventRef::Regular(id) => {
-                        self.events
-                            .get_by_id(organization_id, project_id, *id)
-                            .await?;
-                    }
-                    EventRef::Custom(id) => {
-                        if ids.contains(id) {
-                            return Err(CustomEventError::DuplicateEvent.into());
-                        }
-                        let custom_event = self.get_by_id(organization_id, project_id, *id).await?;
-                        ids.push(custom_event.id);
-                        self.validate_events(
-                            organization_id,
-                            project_id,
-                            &custom_event.events,
-                            level + 1,
-                            ids,
-                        )
-                        .await?;
-                    }
-                }
-            }
-
-            Ok(())
-        }
-        .boxed()
     }
 }

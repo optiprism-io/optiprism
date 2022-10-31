@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -14,6 +15,8 @@ use crate::error::OrganizationError;
 use crate::error::StoreError;
 use crate::metadata::ListResponse;
 use crate::organizations::types::UpdateOrganizationRequest;
+use crate::organizations::Provider;
+use crate::organizations::UpdateOrganizationRequest;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
@@ -21,7 +24,6 @@ use crate::store::path_helpers::make_id_seq_key;
 use crate::store::path_helpers::make_index_key;
 use crate::store::Store;
 use crate::Result;
-
 const NAMESPACE: &[u8] = b"organizations";
 const IDX_NAME: &[u8] = b"name";
 
@@ -33,22 +35,25 @@ fn index_name_key(name: &str) -> Option<Vec<u8>> {
     Some(make_index_key(NAMESPACE, IDX_NAME, name).to_vec())
 }
 
-pub struct Provider {
+pub struct ProviderImpl {
     store: Arc<Store>,
     idx: HashMap,
     guard: RwLock<()>,
 }
 
-impl Provider {
+impl ProviderImpl {
     pub fn new(kv: Arc<Store>) -> Self {
-        Provider {
+        ProviderImpl {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
         }
     }
+}
 
-    pub async fn create(&self, req: CreateOrganizationRequest) -> Result<Organization> {
+#[async_trait]
+impl Provider for ProviderImpl {
+    async fn create(&self, req: CreateOrganizationRequest) -> Result<Organization> {
         let _guard = self.guard.write().await;
 
         let idx_keys = index_keys(&req.name);
@@ -85,7 +90,7 @@ impl Provider {
         Ok(org)
     }
 
-    pub async fn get_by_id(&self, id: u64) -> Result<Organization> {
+    async fn get_by_id(&self, id: u64) -> Result<Organization> {
         let key = make_data_value_key(NAMESPACE, id);
 
         match self.store.get(key).await? {
@@ -97,15 +102,11 @@ impl Provider {
         }
     }
 
-    pub async fn list(&self) -> Result<ListResponse<Organization>> {
+    async fn list(&self) -> Result<ListResponse<Organization>> {
         list(self.store.clone(), NAMESPACE).await
     }
 
-    pub async fn update(
-        &self,
-        org_id: u64,
-        req: UpdateOrganizationRequest,
-    ) -> Result<Organization> {
+    async fn update(&self, org_id: u64, req: UpdateOrganizationRequest) -> Result<Organization> {
         let _guard = self.guard.write().await;
 
         let prev_org = self.get_by_id(org_id).await?;
@@ -150,7 +151,7 @@ impl Provider {
         Ok(org)
     }
 
-    pub async fn delete(&self, id: u64) -> Result<Organization> {
+    async fn delete(&self, id: u64) -> Result<Organization> {
         let _guard = self.guard.write().await;
         let org = self.get_by_id(id).await?;
         self.store

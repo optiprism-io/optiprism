@@ -1,32 +1,39 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bincode::serialize;
 use tokio::sync::RwLock;
 
 use crate::database::types::Column;
 use crate::database::types::Table;
 use crate::database::types::TableRef;
+use crate::database::Column;
+use crate::database::Provider;
+use crate::database::Table;
+use crate::database::TableRef;
 use crate::error::DatabaseError;
 use crate::error::MetadataError;
 use crate::store::Store;
 use crate::Result;
-
 const NAMESPACE: &[u8] = b"database";
 
-pub struct Provider {
+pub struct ProviderImpl {
     store: Arc<Store>,
     tables: RwLock<Vec<Table>>,
 }
 
-impl Provider {
+impl ProviderImpl {
     pub fn new(store: Arc<Store>) -> Self {
-        Provider {
+        ProviderImpl {
             store,
             tables: RwLock::new(vec![]),
         }
     }
+}
 
-    pub async fn create_table(&self, table: Table) -> Result<()> {
+#[async_trait]
+impl Provider for ProviderImpl {
+    async fn create_table(&self, table: Table) -> Result<()> {
         let mut tables = self.tables.write().await;
         if tables.iter().any(|t| t.typ == table.typ) {
             return Err(MetadataError::Database(DatabaseError::TableAlreadyExists(
@@ -39,7 +46,7 @@ impl Provider {
         self.persist(&table).await
     }
 
-    pub async fn get_table(&self, table_type: TableRef) -> Result<Table> {
+    async fn get_table(&self, table_type: TableRef) -> Result<Table> {
         let tables = self.tables.read().await;
         let table = tables.iter().find(|t| t.typ == table_type);
 
@@ -51,7 +58,7 @@ impl Provider {
         }
     }
 
-    pub async fn add_column(&self, table_type: TableRef, col: Column) -> Result<()> {
+    async fn add_column(&self, table_type: TableRef, col: Column) -> Result<()> {
         let mut tables = self.tables.write().await;
         let table =
             tables

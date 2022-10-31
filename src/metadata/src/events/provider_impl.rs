@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -12,9 +13,12 @@ use crate::error::MetadataError;
 use crate::error::StoreError;
 use crate::events::types::CreateEventRequest;
 use crate::events::types::UpdateEventRequest;
+use crate::events::CreateEventRequest;
 use crate::events::Event;
+use crate::events::Provider;
+use crate::events::UpdateEventRequest;
 use crate::metadata::ListResponse;
-use crate::properties::provider::Namespace;
+use crate::properties::provider_impl::Namespace;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
@@ -23,7 +27,6 @@ use crate::store::path_helpers::make_index_key;
 use crate::store::path_helpers::org_proj_ns;
 use crate::store::Store;
 use crate::Result;
-
 const NAMESPACE: &[u8] = b"events";
 const IDX_NAME: &[u8] = b"name";
 const IDX_DISPLAY_NAME: &[u8] = b"display_name";
@@ -67,32 +70,22 @@ fn index_display_name_key(
     })
 }
 
-pub struct Provider {
+pub struct ProviderImpl {
     store: Arc<Store>,
     idx: HashMap,
     guard: RwLock<()>,
 }
 
-impl Provider {
+impl ProviderImpl {
     pub fn new(kv: Arc<Store>) -> Self {
-        Provider {
+        ProviderImpl {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
         }
     }
 
-    pub async fn create(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        req: CreateEventRequest,
-    ) -> Result<Event> {
-        let _guard = self.guard.write().await;
-        self._create(organization_id, project_id, req).await
-    }
-
-    pub async fn _create(
+    async fn _create(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -158,53 +151,7 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn get_or_create(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        req: CreateEventRequest,
-    ) -> Result<Event> {
-        let _guard = self.guard.write().await;
-        match self
-            ._get_by_name(organization_id, project_id, req.name.as_str())
-            .await
-        {
-            Ok(event) => return Ok(event),
-            Err(MetadataError::Event(EventError::EventNotFound(_))) => {}
-            other => return other,
-        }
-
-        self._create(organization_id, project_id, req).await
-    }
-
-    pub async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
-        let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
-            id,
-        );
-
-        match self.store.get(key).await? {
-            None => Err(EventError::EventNotFound(error::Event::new_with_id(
-                organization_id,
-                project_id,
-                id,
-            ))
-            .into()),
-            Some(value) => Ok(deserialize(&value)?),
-        }
-    }
-
-    pub async fn get_by_name(
-        &self,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
-    ) -> Result<Event> {
-        let _guard = self.guard.read().await;
-        self._get_by_name(organization_id, project_id, name).await
-    }
-
-    pub async fn _get_by_name(
+    async fn _get_by_name(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -231,8 +178,67 @@ impl Provider {
             Ok(data) => Ok(deserialize(&data)?),
         }
     }
+}
 
-    pub async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
+#[async_trait]
+impl Provider for ProviderImpl {
+    async fn create(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        req: CreateEventRequest,
+    ) -> Result<Event> {
+        let _guard = self.guard.write().await;
+        self._create(organization_id, project_id, req).await
+    }
+
+    async fn get_or_create(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        req: CreateEventRequest,
+    ) -> Result<Event> {
+        let _guard = self.guard.write().await;
+        match self
+            ._get_by_name(organization_id, project_id, req.name.as_str())
+            .await
+        {
+            Ok(event) => return Ok(event),
+            Err(MetadataError::Event(EventError::EventNotFound(_))) => {}
+            other => return other,
+        }
+
+        self._create(organization_id, project_id, req).await
+    }
+
+    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
+        let key = make_data_value_key(
+            org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
+            id,
+        );
+
+        match self.store.get(key).await? {
+            None => Err(EventError::EventNotFound(error::Event::new_with_id(
+                organization_id,
+                project_id,
+                id,
+            ))
+            .into()),
+            Some(value) => Ok(deserialize(&value)?),
+        }
+    }
+
+    async fn get_by_name(
+        &self,
+        organization_id: u64,
+        project_id: u64,
+        name: &str,
+    ) -> Result<Event> {
+        let _guard = self.guard.read().await;
+        self._get_by_name(organization_id, project_id, name).await
+    }
+
+    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>> {
         list(
             self.store.clone(),
             org_proj_ns(organization_id, project_id, NAMESPACE).as_slice(),
@@ -240,7 +246,7 @@ impl Provider {
         .await
     }
 
-    pub async fn update(
+    async fn update(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -333,7 +339,7 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn attach_property(
+    async fn attach_property(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -374,7 +380,7 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn detach_property(
+    async fn detach_property(
         &self,
         organization_id: u64,
         project_id: u64,
@@ -425,7 +431,7 @@ impl Provider {
         Ok(event)
     }
 
-    pub async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
+    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event> {
         let _guard = self.guard.write().await;
         let event = self.get_by_id(organization_id, project_id, id).await?;
         self.store

@@ -21,6 +21,7 @@ pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
 pub mod test_util {
     use std::env::temp_dir;
+    use std::path::PathBuf;
     use std::sync::Arc;
 
     use arrow::datatypes::DataType;
@@ -38,7 +39,7 @@ pub mod test_util {
     use metadata::database::TableRef;
     use metadata::events;
     use metadata::properties;
-    use metadata::properties::provider::Namespace;
+    use metadata::properties::provider_impl::Namespace;
     use metadata::properties::CreatePropertyRequest;
     use metadata::properties::Property;
     use metadata::store::Store;
@@ -57,7 +58,12 @@ pub mod test_util {
         let schema = table.arrow_schema();
 
         let options = CsvReadOptions::new();
-        let table_path = ListingTableUrl::parse("../tests/events.csv")?;
+        let table_path = ListingTableUrl::parse(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("resources/test/events.csv")
+                .to_str()
+                .unwrap(),
+        )?;
         let target_partitions = 1;
         let listing_options = options.to_listing_options(target_partitions);
 

@@ -12,7 +12,7 @@ use datafusion_common::Column;
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_expr::Expr;
-use metadata::dictionaries::provider::SingleDictionaryProvider;
+use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 
 use crate::Result;
 

@@ -14,6 +14,35 @@ use crate::properties;
 use crate::store::Store;
 use crate::Result;
 
+pub struct MetadataProvider {
+    pub events: Arc<dyn events::Provider>,
+    pub custom_events: Arc<dyn custom_events::Provider>,
+    pub event_properties: Arc<dyn properties::Provider>,
+    pub user_properties: Arc<dyn properties::Provider>,
+    pub organizations: Arc<dyn organizations::Provider>,
+    pub projects: Arc<dyn projects::Provider>,
+    pub accounts: Arc<dyn accounts::Provider>,
+    pub database: Arc<dyn database::Provider>,
+    pub dictionaries: Arc<dyn dictionaries::Provider>,
+}
+
+impl MetadataProvider {
+    pub fn try_new(store: Arc<Store>) -> Result<Self> {
+        let events = Arc::new(events::ProviderImpl::new(store.clone()));
+        Ok(MetadataProvider {
+            events: events.clone(),
+            custom_events: Arc::new(custom_events::ProviderImpl::new(store.clone(), events)),
+            event_properties: Arc::new(properties::ProviderImpl::new_event(store.clone())),
+            user_properties: Arc::new(properties::ProviderImpl::new_user(store.clone())),
+            organizations: Arc::new(organizations::ProviderImpl::new(store.clone())),
+            projects: Arc::new(projects::ProviderImpl::new(store.clone())),
+            accounts: Arc::new(accounts::ProviderImpl::new(store.clone())),
+            database: Arc::new(database::ProviderImpl::new(store.clone())),
+            dictionaries: Arc::new(dictionaries::ProviderImpl::new(store)),
+        })
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ResponseMetadata {
     pub next: Option<String>,
@@ -23,33 +52,4 @@ pub struct ResponseMetadata {
 pub struct ListResponse<T> {
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
-}
-
-pub struct MetadataProvider {
-    pub events: Arc<events::Provider>,
-    pub custom_events: Arc<custom_events::Provider>,
-    pub event_properties: Arc<properties::Provider>,
-    pub user_properties: Arc<properties::Provider>,
-    pub organizations: Arc<organizations::Provider>,
-    pub projects: Arc<projects::Provider>,
-    pub accounts: Arc<accounts::Provider>,
-    pub database: Arc<database::Provider>,
-    pub dictionaries: Arc<dictionaries::Provider>,
-}
-
-impl MetadataProvider {
-    pub fn try_new(store: Arc<Store>) -> Result<Self> {
-        let events = Arc::new(events::Provider::new(store.clone()));
-        Ok(MetadataProvider {
-            events: events.clone(),
-            custom_events: Arc::new(custom_events::Provider::new(store.clone(), events)),
-            event_properties: Arc::new(properties::Provider::new_event(store.clone())),
-            user_properties: Arc::new(properties::Provider::new_user(store.clone())),
-            organizations: Arc::new(organizations::Provider::new(store.clone())),
-            projects: Arc::new(projects::Provider::new(store.clone())),
-            accounts: Arc::new(accounts::Provider::new(store.clone())),
-            database: Arc::new(database::Provider::new(store.clone())),
-            dictionaries: Arc::new(dictionaries::Provider::new(store)),
-        })
-    }
 }

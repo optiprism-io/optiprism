@@ -15,8 +15,8 @@ use datafusion_common::Column;
 use datafusion_expr::col;
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Expr;
-use metadata::dictionaries::provider::SingleDictionaryProvider;
-use metadata::properties::provider::Namespace;
+use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
+use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
 
 use crate::error::Result;

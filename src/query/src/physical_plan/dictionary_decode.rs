@@ -38,7 +38,7 @@ use datafusion_common::Result as DFResult;
 use futures::executor::block_on;
 use futures::Stream;
 use futures::StreamExt;
-use metadata::dictionaries::provider::SingleDictionaryProvider;
+use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 
 pub struct DictionaryDecodeExec {
     input: Arc<dyn ExecutionPlan>,

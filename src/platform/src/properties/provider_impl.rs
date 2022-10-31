@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use common::rbac::ProjectPermission;
-use metadata::properties::provider::Provider as PropertiesProvider;
+use metadata::properties::provider_impl::ProviderImpl as PropertiesProvider;
 
 use crate::properties::Property;
 use crate::properties::Provider;

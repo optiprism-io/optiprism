@@ -13,4 +13,5 @@ members = [
 	"src/platform",
 	"src/query",
 	"src/store",
+	"src/contract-test"
 ]
