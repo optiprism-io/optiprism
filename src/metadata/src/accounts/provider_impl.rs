@@ -7,7 +7,6 @@ use chrono::Utc;
 use common::types::OptionalProperty;
 use tokio::sync::RwLock;
 
-use crate::accounts::types::UpdateAccountRequest;
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
 use crate::accounts::Provider;

@@ -28,7 +28,7 @@ mod tests {
     use query::test_util::create_entities;
     use query::test_util::empty_provider;
     use query::test_util::events_provider;
-    use query::QueryProvider;
+    use query::ProviderImpl;
     use serde_json::json;
     use tokio::time::sleep;
     use uuid::Uuid;
@@ -52,7 +52,7 @@ mod tests {
 
     pub async fn create_admin_acc_and_login(
         auth: &Arc<dyn platform::auth::Provider>,
-        md_acc: &Arc<metadata::accounts::Provider>,
+        md_acc: &Arc<dyn metadata::accounts::Provider>,
     ) -> anyhow::Result<HeaderMap> {
         let pwd = "password";
 
@@ -104,7 +104,7 @@ mod tests {
             empty_provider()?
         };
 
-        let query = Arc::new(QueryProvider::new_from_logical_plan(md.clone(), input));
+        let query = Arc::new(ProviderImpl::new_from_logical_plan(md.clone(), input));
 
         let platform_provider =
             Arc::new(PlatformProvider::new(md.clone(), query, AUTH_CFG.clone()));

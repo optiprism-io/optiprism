@@ -1,14 +1,19 @@
+use arrow::array::ArrayRef;
+use arrow::datatypes::DataType;
+use arrow::datatypes::SchemaRef;
+use async_trait::async_trait;
 pub use context::Context;
 pub use error::Result;
-pub use provider::QueryProvider;
+pub use provider_impl::ProviderImpl;
 
+use crate::queries::event_segmentation::EventSegmentation;
+use crate::queries::property_values::PropertyValues;
 pub mod context;
-pub mod data_table;
 pub mod error;
 pub mod expr;
 pub mod logical_plan;
 pub mod physical_plan;
-pub mod provider;
+pub mod provider_impl;
 pub mod queries;
 
 pub mod event_fields {
@@ -18,6 +23,53 @@ pub mod event_fields {
 }
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
+
+#[async_trait]
+pub trait Provider: Sync + Send {
+    async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef>;
+    async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable>;
+}
+
+pub struct Column {
+    pub name: String,
+    pub group: String,
+    pub is_nullable: bool,
+    pub data_type: DataType,
+    pub data: ArrayRef,
+}
+
+impl Column {
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    pub fn group(&self) -> &str {
+        self.group.as_str()
+    }
+
+    pub fn is_nullable(&self) -> bool {
+        self.is_nullable
+    }
+
+    pub fn data_type(&self) -> &DataType {
+        &self.data_type
+    }
+
+    pub fn data(&self) -> &ArrayRef {
+        &self.data
+    }
+}
+
+pub struct DataTable {
+    pub schema: SchemaRef,
+    pub columns: Vec<Column>,
+}
+
+impl DataTable {
+    pub fn new(schema: SchemaRef, columns: Vec<Column>) -> Self {
+        Self { schema, columns }
+    }
+}
 
 pub mod test_util {
     use std::env::temp_dir;
@@ -50,7 +102,7 @@ pub mod test_util {
     use crate::event_fields;
 
     pub async fn events_provider(
-        db: Arc<database::Provider>,
+        db: Arc<dyn database::Provider>,
         org_id: u64,
         proj_id: u64,
     ) -> Result<LogicalPlan> {

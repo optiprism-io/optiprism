@@ -5,6 +5,7 @@ use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
+use async_trait::async_trait;
 use chrono::Utc;
 use datafusion::datasource::DefaultTableSource;
 use datafusion::datasource::TableProvider;
@@ -18,23 +19,24 @@ use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use metadata::MetadataProvider;
 
-use crate::data_table;
-use crate::data_table::DataTable;
 use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
+use crate::Column;
 use crate::Context;
+use crate::DataTable;
+use crate::Provider;
 use crate::Result;
 
-pub struct QueryProvider {
+pub struct ProviderImpl {
     metadata: Arc<MetadataProvider>,
     input: LogicalPlan,
 }
 
-impl QueryProvider {
+impl ProviderImpl {
     pub fn try_new_from_provider(
         metadata: Arc<MetadataProvider>,
         table_provider: Arc<dyn TableProvider>,
@@ -51,8 +53,9 @@ impl QueryProvider {
     }
 }
 
-impl QueryProvider {
-    pub async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
+#[async_trait]
+impl Provider for ProviderImpl {
+    async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
         let plan = property_values::LogicalPlanBuilder::build(
             ctx,
             self.metadata.clone(),
@@ -68,11 +71,7 @@ impl QueryProvider {
         Ok(result.column(0).to_owned())
     }
 
-    pub async fn event_segmentation(
-        &self,
-        ctx: Context,
-        es: EventSegmentation,
-    ) -> Result<DataTable> {
+    async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable> {
         let cur_time = Utc::now();
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx,
@@ -105,7 +104,7 @@ impl QueryProvider {
                     }
                 };
 
-                data_table::Column {
+                Column {
                     name: field.name().to_owned(),
                     group: group.to_string(),
                     is_nullable: field.is_nullable(),

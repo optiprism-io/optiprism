@@ -7,7 +7,6 @@ use common::types::OptionalProperty;
 pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
-pub use types::Project;
 
 use crate::metadata::ListResponse;
 use crate::Result;

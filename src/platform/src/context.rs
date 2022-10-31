@@ -135,7 +135,7 @@ where B: Send
         let claims = parse_access_token(bearer.token(), &auth_cfg.access_token_key)
             .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
         let Extension(md_acc_prov) =
-            Extension::<Arc<metadata::accounts::Provider>>::from_request(req)
+            Extension::<Arc<dyn metadata::accounts::Provider>>::from_request(req)
                 .await
                 .map_err(|err| PlatformError::Internal(err.to_string()))?;
 

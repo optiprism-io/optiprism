@@ -12,11 +12,11 @@ use crate::DataTable;
 use crate::Result;
 
 pub struct ProviderImpl {
-    query: Arc<query::QueryProvider>,
+    query: Arc<dyn query::Provider>,
 }
 
 impl ProviderImpl {
-    pub fn new(query: Arc<query::QueryProvider>) -> Self {
+    pub fn new(query: Arc<dyn query::Provider>) -> Self {
         Self { query }
     }
 }

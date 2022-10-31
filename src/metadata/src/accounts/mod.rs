@@ -1,7 +1,6 @@
 pub mod provider_impl;
 
 use async_trait::async_trait;
-use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use common::rbac::OrganizationRole;

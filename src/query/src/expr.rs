@@ -167,7 +167,7 @@ pub async fn event_filters_expression(
 
 pub async fn encode_property_dict_values(
     ctx: &Context,
-    dictionaries: &Arc<dictionaries::Provider>,
+    dictionaries: &Arc<dyn dictionaries::Provider>,
     dict_type: &DataType,
     col_name: &str,
     values: &[ScalarValue],

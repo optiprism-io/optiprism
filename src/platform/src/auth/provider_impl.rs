@@ -20,7 +20,7 @@ use crate::Result;
 
 #[derive(Clone)]
 pub struct ProviderImpl {
-    accounts: Arc<metadata::accounts::Provider>,
+    accounts: Arc<dyn metadata::accounts::Provider>,
     access_token_duration: Duration,
     access_token_key: String,
     refresh_token_duration: Duration,
@@ -28,7 +28,7 @@ pub struct ProviderImpl {
 }
 
 impl ProviderImpl {
-    pub fn new(accounts: Arc<metadata::accounts::Provider>, cfg: Config) -> Self {
+    pub fn new(accounts: Arc<dyn metadata::accounts::Provider>, cfg: Config) -> Self {
         Self {
             accounts,
             access_token_duration: cfg.access_token_duration,

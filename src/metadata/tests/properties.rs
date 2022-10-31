@@ -6,6 +6,7 @@ use common::types::OptionalProperty;
 use metadata::error::Result;
 use metadata::properties::provider_impl::Namespace;
 use metadata::properties::CreatePropertyRequest;
+use metadata::properties::Provider;
 use metadata::properties::ProviderImpl;
 use metadata::properties::Status;
 use metadata::properties::UpdatePropertyRequest;
@@ -18,7 +19,7 @@ async fn test_properties() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let store = Arc::new(Store::new(path));
-    let event_properties = ProviderImpl::new_event(store.clone());
+    let event_properties: Box<dyn Provider> = Box::new(ProviderImpl::new_event(store.clone()));
     let create_prop_req = CreatePropertyRequest {
         created_by: 0,
         tags: Some(vec![]),

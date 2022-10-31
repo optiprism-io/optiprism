@@ -19,9 +19,6 @@ use crate::store::path_helpers::make_id_seq_key;
 use crate::store::path_helpers::make_index_key;
 use crate::store::path_helpers::org_ns;
 use crate::store::Store;
-use crate::teams::types::CreateTeamRequest;
-use crate::teams::types::Team;
-use crate::teams::types::UpdateTeamRequest;
 use crate::teams::CreateTeamRequest;
 use crate::teams::Provider;
 use crate::teams::Team;
@@ -52,7 +49,6 @@ pub struct ProviderImpl {
     guard: RwLock<()>,
 }
 
-#[async_trait]
 impl ProviderImpl {
     pub fn new(kv: Arc<Store>) -> Self {
         ProviderImpl {
@@ -62,6 +58,8 @@ impl ProviderImpl {
         }
     }
 }
+
+#[async_trait]
 impl Provider for ProviderImpl {
     async fn create(&self, organization_id: u64, req: CreateTeamRequest) -> Result<Team> {
         let _guard = self.guard.write().await;

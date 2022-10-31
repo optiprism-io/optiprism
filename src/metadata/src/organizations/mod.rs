@@ -1,5 +1,4 @@
 pub mod provider_impl;
-pub mod types;
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -8,8 +7,6 @@ use common::types::OptionalProperty;
 pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
-pub use types::CreateOrganizationRequest;
-pub use types::Organization;
 
 use crate::metadata::ListResponse;
 use crate::Result;

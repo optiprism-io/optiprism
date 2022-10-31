@@ -15,11 +15,11 @@ use crate::ListResponse;
 use crate::Result;
 
 pub struct ProviderImpl {
-    prov: Arc<accounts::Provider>,
+    prov: Arc<dyn accounts::Provider>,
 }
 
 impl ProviderImpl {
-    pub fn new(prov: Arc<accounts::Provider>) -> Self {
+    pub fn new(prov: Arc<dyn accounts::Provider>) -> Self {
         Self { prov }
     }
 }

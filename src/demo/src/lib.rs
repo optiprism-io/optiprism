@@ -13,7 +13,7 @@ use datafusion::datasource::MemTable;
 use metadata::store::Store;
 use metadata::MetadataProvider;
 use platform::auth;
-use query::QueryProvider;
+use query::ProviderImpl;
 use tracing::debug;
 use tracing::info;
 
@@ -99,7 +99,7 @@ pub async fn run(cfg: Config) -> Result<()> {
     );
 
     let data_provider = Arc::new(MemTable::try_new(batches[0][0].schema(), batches)?);
-    let query_provider = Arc::new(QueryProvider::try_new_from_provider(
+    let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
         md.clone(),
         data_provider,
     )?);

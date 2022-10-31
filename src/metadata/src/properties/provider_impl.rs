@@ -12,9 +12,6 @@ use crate::error::MetadataError;
 use crate::error::PropertyError;
 use crate::error::StoreError;
 use crate::metadata::ListResponse;
-use crate::properties::types::CreatePropertyRequest;
-use crate::properties::types::Property;
-use crate::properties::types::UpdatePropertyRequest;
 use crate::properties::CreatePropertyRequest;
 use crate::properties::Property;
 use crate::properties::Provider;
@@ -99,7 +96,6 @@ pub struct ProviderImpl {
     ns: Namespace,
 }
 
-#[async_trait]
 impl ProviderImpl {
     pub fn new_user(kv: Arc<Store>) -> Self {
         ProviderImpl {
@@ -223,6 +219,7 @@ impl ProviderImpl {
     }
 }
 
+#[async_trait]
 impl Provider for ProviderImpl {
     async fn create(
         &self,

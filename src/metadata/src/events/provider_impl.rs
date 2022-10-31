@@ -11,8 +11,6 @@ use crate::error;
 use crate::error::EventError;
 use crate::error::MetadataError;
 use crate::error::StoreError;
-use crate::events::types::CreateEventRequest;
-use crate::events::types::UpdateEventRequest;
 use crate::events::CreateEventRequest;
 use crate::events::Event;
 use crate::events::Provider;
@@ -27,6 +25,7 @@ use crate::store::path_helpers::make_index_key;
 use crate::store::path_helpers::org_proj_ns;
 use crate::store::Store;
 use crate::Result;
+
 const NAMESPACE: &[u8] = b"events";
 const IDX_NAME: &[u8] = b"name";
 const IDX_DISPLAY_NAME: &[u8] = b"display_name";

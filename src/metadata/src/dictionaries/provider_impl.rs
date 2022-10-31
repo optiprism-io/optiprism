@@ -157,7 +157,7 @@ impl SingleDictionaryProvider {
         }
     }
 
-    async fn get_key_or_create(&self, value: &str) -> Result<u64> {
+    pub async fn get_key_or_create(&self, value: &str) -> Result<u64> {
         self.provider
             .get_key_or_create(
                 self.organization_id,
@@ -168,7 +168,7 @@ impl SingleDictionaryProvider {
             .await
     }
 
-    async fn get_value(&self, key: u64) -> Result<String> {
+    pub async fn get_value(&self, key: u64) -> Result<String> {
         self.provider
             .get_value(
                 self.organization_id,
@@ -179,7 +179,7 @@ impl SingleDictionaryProvider {
             .await
     }
 
-    async fn get_key(
+    pub async fn get_key(
         &self,
         _organization_id: u64,
         _project_id: u64,

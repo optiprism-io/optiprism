@@ -14,7 +14,6 @@ use crate::error::MetadataError;
 use crate::error::OrganizationError;
 use crate::error::StoreError;
 use crate::metadata::ListResponse;
-use crate::organizations::types::UpdateOrganizationRequest;
 use crate::organizations::Provider;
 use crate::organizations::UpdateOrganizationRequest;
 use crate::store::index::hash_map::HashMap;

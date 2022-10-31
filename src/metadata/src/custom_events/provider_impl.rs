@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
@@ -9,9 +10,6 @@ use futures::future::BoxFuture;
 use futures::future::FutureExt;
 use tokio::sync::RwLock;
 
-use crate::custom_events::types::CreateCustomEventRequest;
-use crate::custom_events::types::Event;
-use crate::custom_events::types::UpdateCustomEventRequest;
 use crate::custom_events::CreateCustomEventRequest;
 use crate::custom_events::CustomEvent;
 use crate::custom_events::Event;
@@ -34,7 +32,7 @@ use crate::Result;
 
 const NAMESPACE: &[u8] = b"custom_events";
 const IDX_NAME: &[u8] = b"name";
-const MAX_EVENTS_LEVEL: usize = 3;
+pub const MAX_EVENTS_LEVEL: usize = 3;
 
 fn index_keys(organization_id: u64, project_id: u64, name: &str) -> Vec<Option<Vec<u8>>> {
     [index_name_key(organization_id, project_id, name)].to_vec()
@@ -128,6 +126,8 @@ impl ProviderImpl {
         .boxed()
     }
 }
+
+#[async_trait]
 impl Provider for ProviderImpl {
     async fn create(
         &self,

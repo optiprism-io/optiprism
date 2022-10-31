@@ -1,20 +1,18 @@
 mod provider_impl;
 
-pub use provider_impl::ProviderImpl;
-pub use types::Column;
-pub use types::Table;
-pub use types::TableRef;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
+use async_trait::async_trait;
+pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
-use async_trait::async_trait;
+
 use crate::Result;
 
 #[async_trait]
 pub trait Provider: Sync + Send {
-    async fn create_table(&self, table: Table) -> Result<();
+    async fn create_table(&self, table: Table) -> Result<()>;
     async fn get_table(&self, table_type: TableRef) -> Result<Table>;
     async fn add_column(&self, table_type: TableRef, col: Column) -> Result<()>;
     async fn persist(&self, table: &Table) -> Result<()>;

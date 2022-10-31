@@ -58,7 +58,7 @@ pub struct PlatformProvider {
 impl PlatformProvider {
     pub fn new(
         md: Arc<MetadataProvider>,
-        query_prov: Arc<query::QueryProvider>,
+        query_prov: Arc<query::ProviderImpl>,
         auth_cfg: auth::Config,
     ) -> Self {
         Self {
@@ -431,10 +431,10 @@ impl DataTable {
     }
 }
 
-impl TryFrom<query::data_table::DataTable> for DataTable {
+impl TryFrom<query::DataTable> for DataTable {
     type Error = PlatformError;
 
-    fn try_from(value: query::data_table::DataTable) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: query::DataTable) -> std::result::Result<Self, Self::Error> {
         let cols = value
             .columns
             .iter()

@@ -2,6 +2,7 @@ use std::env::temp_dir;
 use std::sync::Arc;
 
 use metadata::dictionaries::Provider;
+use metadata::dictionaries::ProviderImpl;
 use metadata::error::Result;
 use metadata::store::Store;
 use uuid::Uuid;
@@ -12,7 +13,7 @@ async fn test_dictionaries() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let store = Arc::new(Store::new(path));
-    let dicts = Provider::new(store.clone());
+    let dicts: Box<dyn Provider> = Box::new(ProviderImpl::new(store.clone()));
 
     assert!(dicts.get_key(1, 1, "d1", "v1").await.is_err());
     assert!(dicts.get_value(1, 1, "d1", 1).await.is_err());

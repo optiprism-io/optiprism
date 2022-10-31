@@ -4,9 +4,6 @@ use async_trait::async_trait;
 use bincode::serialize;
 use tokio::sync::RwLock;
 
-use crate::database::types::Column;
-use crate::database::types::Table;
-use crate::database::types::TableRef;
 use crate::database::Column;
 use crate::database::Provider;
 use crate::database::Table;

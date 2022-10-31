@@ -3,8 +3,9 @@ use std::sync::Arc;
 
 use common::types::OptionalProperty;
 use metadata::error::Result;
-use metadata::events::types::CreateEventRequest;
+use metadata::events::CreateEventRequest;
 use metadata::events::Provider;
+use metadata::events::ProviderImpl;
 use metadata::events::Status;
 use metadata::events::UpdateEventRequest;
 use metadata::store::Store;
@@ -16,7 +17,7 @@ async fn test_events() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let store = Arc::new(Store::new(path));
-    let events = Provider::new(store.clone());
+    let events: Box<dyn Provider> = Box::new(ProviderImpl::new(store.clone()));
     let create_event_req = CreateEventRequest {
         created_by: 0,
         tags: Some(vec![]),

@@ -9,11 +9,6 @@ use common::types::OptionalProperty;
 pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
-pub use types::CreateCustomEventRequest;
-pub use types::CustomEvent;
-pub use types::Event;
-pub use types::Status;
-pub use types::UpdateCustomEventRequest;
 
 use crate::metadata::ListResponse;
 use crate::Result;

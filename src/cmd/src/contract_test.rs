@@ -11,7 +11,5 @@ pub struct Config {
 }
 
 pub async fn run(cfg: Config) -> Result<()> {
-    let cfg = contract_test::Config { host: cfg.host };
-
-    Ok(contract_test::run(cfg).await?)
+    Ok(contract_test::run(cfg.host).await?)
 }

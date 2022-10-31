@@ -324,7 +324,7 @@ mod tests {
                 status: custom_events::Status::Enabled,
                 is_system: false,
                 events: vec![
-                    custom_events::types::Event {
+                    custom_events::Event {
                         event: EventRef::RegularName("View Product".to_string()),
                         filters: Some(vec![
                             EventFilter::Property {
@@ -342,7 +342,7 @@ mod tests {
                             },
                         ]),
                     },
-                    custom_events::types::Event {
+                    custom_events::Event {
                         event: EventRef::RegularName("Buy Product".to_string()),
                         filters: None,
                     },

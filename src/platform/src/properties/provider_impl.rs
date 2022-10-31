@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use common::rbac::ProjectPermission;
-use metadata::properties::provider_impl::ProviderImpl as PropertiesProvider;
 
 use crate::properties::Property;
 use crate::properties::Provider;
@@ -10,16 +9,17 @@ use crate::properties::UpdatePropertyRequest;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;
+
 pub struct ProviderImpl {
-    prov: Arc<PropertiesProvider>,
+    prov: Arc<dyn metadata::properties::Provider>,
 }
 
 impl ProviderImpl {
-    pub fn new_user(prov: Arc<PropertiesProvider>) -> Self {
+    pub fn new_user(prov: Arc<dyn metadata::properties::Provider>) -> Self {
         Self { prov }
     }
 
-    pub fn new_event(prov: Arc<PropertiesProvider>) -> Self {
+    pub fn new_event(prov: Arc<dyn metadata::properties::Provider>) -> Self {
         Self { prov }
     }
 }

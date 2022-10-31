@@ -14,11 +14,11 @@ use crate::ListResponse;
 use crate::Result;
 
 pub struct ProviderImpl {
-    prov: Arc<custom_events::Provider>,
+    prov: Arc<dyn custom_events::Provider>,
 }
 
 impl ProviderImpl {
-    pub fn new(prov: Arc<custom_events::Provider>) -> Self {
+    pub fn new(prov: Arc<dyn custom_events::Provider>) -> Self {
         Self { prov }
     }
 }
