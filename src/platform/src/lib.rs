@@ -29,7 +29,6 @@ use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::DataType;
-use chrono::Duration;
 use common::ScalarValue;
 use common::DECIMAL_PRECISION;
 pub use context::Context;
@@ -310,7 +309,7 @@ impl TryInto<EventRef> for common::types::EventRef {
     fn try_into(self) -> std::result::Result<EventRef, Self::Error> {
         Ok(match self {
             common::types::EventRef::RegularName(name) => EventRef::Regular { event_name: name },
-            common::types::EventRef::Regular(id) => unimplemented!(),
+            common::types::EventRef::Regular(_id) => unimplemented!(),
             common::types::EventRef::Custom(id) => EventRef::Custom { event_id: id },
         })
     }

@@ -1,7 +1,6 @@
 use chrono::DateTime;
 use chrono::Utc;
 
-use crate::queries;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::PropertyValues;
 use crate::Context;

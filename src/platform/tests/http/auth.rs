@@ -7,7 +7,6 @@ use metadata::accounts::UpdateAccountRequest;
 use platform::auth::SignUpRequest;
 use platform::auth::TokensResponse;
 use platform::http::auth::RefreshTokenRequest;
-use platform::ListResponse;
 use reqwest::header::HeaderMap;
 use reqwest::Client;
 use reqwest::StatusCode;
