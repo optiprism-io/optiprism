@@ -80,7 +80,8 @@
     "saved": "Report saved",
     "selectReport": "Select Report",
     "delete": "Delete report",
-    "deleteConfirm": "You definitely want to delete the report: :name?"
+    "deleteConfirm": "You definitely want to delete the report: :name?",
+    "deleteDashboardConfirm": "Deleting is permanent. Doing so will not delete any related cards. Are you sure you want to delete?"
   },
 
   "events": {

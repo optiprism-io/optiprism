@@ -342,10 +342,17 @@ const addPanel = () => {
     addReport(newDashboardRows.value.length - 1)
 }
 
-const selectReportDropdown = (payload: UiDropdownItem<string>, indexRow: number, indexPanel: number) => {
+const selectReportDropdown = async (payload: UiDropdownItem<string>, indexRow: number, indexPanel: number) => {
     if (payload.value === 'delete') {
         const dashboard = [...newDashboardRows.value]
         const row = dashboard[indexRow]
+        await confirm(t('reports.deleteDashboardConfirm'), {
+            applyButton: t('common.apply'),
+            cancelButton: t('common.cancel'),
+            title: t('reports.delete'),
+            applyButtonClass: 'pf-m-danger',
+        })
+
         if (row.panels.length === 1 && indexRow) {
             dashboard.splice(indexRow, 1);
         } else {
