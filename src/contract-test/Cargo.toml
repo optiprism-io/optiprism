@@ -1,8 +1,0 @@
-[package]
-name = "contract-test"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-datafusion = "11.0.0"
-anyhow = "1.0.65"

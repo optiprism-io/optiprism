@@ -5,6 +5,7 @@ pub mod events;
 pub mod properties;
 pub mod queries;
 
+use std::any::Any;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::io;
@@ -193,26 +194,32 @@ where
         match axum::Json::<T>::from_request(req).await {
             Ok(v) => Ok(Json(v.0)),
             Err(err) => {
-                let src_err = err.source().unwrap().source().unwrap();
-                let mut api_err = ApiError::bad_request(format!("{err}: {src_err}"));
-                // add field information
-                match &err {
-                    JsonRejection::JsonDataError(_) => {
-                        lazy_static! {
-                            static ref FIELD_RX: Regex =
-                                Regex::new(r"(\w+?) field `(.+?)`").unwrap();
-                        }
-                        if let Some(captures) = FIELD_RX.captures(src_err.to_string().as_str()) {
-                            api_err = api_err.with_fields(BTreeMap::from([(
-                                captures[2].to_string(),
-                                captures[1].to_string(),
-                            )]));
+                let mut api_err = ApiError::bad_request(err.to_string());
+
+                if let Some(inner) = err.source() {
+                    if let Some(inner) = inner.source() {
+                        api_err = api_err.append_inner_message(inner.to_string());
+                        match err {
+                            JsonRejection::JsonDataError(_) => {
+                                lazy_static! {
+                                    static ref FIELD_RX: Regex =
+                                        Regex::new(r"(\w+?) field `(.+?)`").unwrap();
+                                }
+                                if let Some(captures) =
+                                    FIELD_RX.captures(inner.to_string().as_str())
+                                {
+                                    api_err = api_err.with_fields(BTreeMap::from([(
+                                        captures[2].to_string(),
+                                        captures[1].to_string(),
+                                    )]));
+                                }
+                            }
+                            JsonRejection::JsonSyntaxError(_) => {}
+                            JsonRejection::MissingJsonContentType(_) => {}
+                            JsonRejection::BytesRejection(_) => {}
+                            _ => unreachable!(),
                         }
                     }
-                    JsonRejection::JsonSyntaxError(_) => {}
-                    JsonRejection::MissingJsonContentType(_) => {}
-                    JsonRejection::BytesRejection(_) => {}
-                    _ => panic!(),
                 }
 
                 Err(api_err)

@@ -298,6 +298,15 @@ impl ApiError {
             fields: self.fields,
         }
     }
+
+    pub fn append_inner_message(self, inner: String) -> Self {
+        Self {
+            status: self.status,
+            code: self.code,
+            message: self.message.map(|msg| format!("{}: {}", msg, inner)),
+            fields: self.fields,
+        }
+    }
 }
 
 impl IntoResponse for ApiError {

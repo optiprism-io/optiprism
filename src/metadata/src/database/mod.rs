@@ -15,7 +15,6 @@ pub trait Provider: Sync + Send {
     async fn create_table(&self, table: Table) -> Result<()>;
     async fn get_table(&self, table_type: TableRef) -> Result<Table>;
     async fn add_column(&self, table_type: TableRef, col: Column) -> Result<()>;
-    async fn persist(&self, table: &Table) -> Result<()>;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

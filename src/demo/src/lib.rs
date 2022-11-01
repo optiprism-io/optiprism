@@ -128,6 +128,6 @@ pub async fn run(cfg: Config) -> Result<()> {
     if cfg.ui_path.is_some() {
         info!("http ui http://{}", cfg.host);
     }
-    svc.serve().await?;
-    Ok(())
+
+    Ok(svc.serve().await?)
 }

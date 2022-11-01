@@ -7,8 +7,9 @@ authors = ["Optiprism <dev@optiprism.io>"]
 [dependencies]
 ahash = { version = "0.7", default-features = false }
 arrow = { version = "20.0.0", features = ["prettyprint"] }
+async-trait = "0.1.58"
 axum = { version = "0.5.16", features = ["headers"] }
-chrono = "0.4"
+chrono = "0.4.19"
 chronoutil = "0.2.3"
 common = { path = "../common" }
 datafusion = "11.0.0"
@@ -30,7 +31,6 @@ tokio = { version = "1.15.1", features = [
     "sync",
 ] }
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
-async-trait = "0.1.58"
 
 [dev-dependencies]
 #criterion = { version = "0.3.5", features = ["html_reports"] }

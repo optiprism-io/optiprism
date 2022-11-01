@@ -32,6 +32,12 @@ pub struct ListResponse {
     values: Vec<Value>,
 }
 
+impl ListResponse {
+    pub fn new(values: Vec<Value>) -> Self {
+        Self { values }
+    }
+}
+
 impl TryInto<query::queries::property_values::PropertyValues> for PropertyValues {
     type Error = PlatformError;
 

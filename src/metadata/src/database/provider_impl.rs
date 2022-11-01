@@ -26,6 +26,11 @@ impl ProviderImpl {
             tables: RwLock::new(vec![]),
         }
     }
+
+    pub async fn persist(&self, table: &Table) -> Result<()> {
+        let data = serialize(table)?;
+        self.store.put(NAMESPACE, data).await
+    }
 }
 
 #[async_trait]
@@ -74,10 +79,5 @@ impl Provider for ProviderImpl {
         table.columns.push(col.clone());
 
         self.persist(table).await
-    }
-
-    async fn persist(&self, table: &Table) -> Result<()> {
-        let data = serialize(table)?;
-        self.store.put(NAMESPACE, data).await
     }
 }
