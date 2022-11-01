@@ -5,7 +5,6 @@ pub mod events;
 pub mod properties;
 pub mod queries;
 
-use std::any::Any;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::io;

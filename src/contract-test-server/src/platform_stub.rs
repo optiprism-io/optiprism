@@ -1,13 +1,9 @@
 use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::NaiveDateTime;
-use chrono::Utc;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
 use common::types::DictionaryDataType;
 use common::DataType;
-use lazy_static::lazy_static;
 use platform::accounts;
 use platform::accounts::Account;
 use platform::accounts::CreateAccountRequest;
@@ -66,15 +62,15 @@ impl Accounts {
 
 #[async_trait]
 impl accounts::Provider for Accounts {
-    async fn create(&self, ctx: Context, req: CreateAccountRequest) -> platform::Result<Account> {
+    async fn create(&self, _ctx: Context, _req: CreateAccountRequest) -> platform::Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn get_by_id(&self, ctx: Context, id: u64) -> platform::Result<Account> {
+    async fn get_by_id(&self, _ctx: Context, _id: u64) -> platform::Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn list(&self, ctx: Context) -> platform::Result<ListResponse<Account>> {
+    async fn list(&self, _ctx: Context) -> platform::Result<ListResponse<Account>> {
         Ok(ListResponse {
             data: vec![Accounts::account()],
             meta: ResponseMetadata { next: None },
@@ -83,14 +79,14 @@ impl accounts::Provider for Accounts {
 
     async fn update(
         &self,
-        ctx: Context,
-        account_id: u64,
-        req: UpdateAccountRequest,
+        _ctx: Context,
+        _account_id: u64,
+        _req: UpdateAccountRequest,
     ) -> platform::Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn delete(&self, ctx: Context, id: u64) -> platform::Result<Account> {
+    async fn delete(&self, _ctx: Context, _id: u64) -> platform::Result<Account> {
         Ok(Accounts::account())
     }
 }
@@ -107,15 +103,15 @@ impl Auth {
 }
 #[async_trait]
 impl auth::Provider for Auth {
-    async fn sign_up(&self, req: SignUpRequest) -> platform::Result<TokensResponse> {
+    async fn sign_up(&self, _req: SignUpRequest) -> platform::Result<TokensResponse> {
         Ok(Auth::token_response())
     }
 
-    async fn log_in(&self, req: LogInRequest) -> platform::Result<TokensResponse> {
+    async fn log_in(&self, _req: LogInRequest) -> platform::Result<TokensResponse> {
         Ok(Auth::token_response())
     }
 
-    async fn refresh_token(&self, refresh_token: &str) -> platform::Result<TokensResponse> {
+    async fn refresh_token(&self, _refresh_token: &str) -> platform::Result<TokensResponse> {
         Ok(Auth::token_response())
     }
 }
@@ -153,53 +149,53 @@ impl CustomEvents {
 impl custom_events::Provider for CustomEvents {
     async fn create(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        req: CreateCustomEventRequest,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _req: CreateCustomEventRequest,
     ) -> platform::Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
     async fn get_by_id(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
     ) -> platform::Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
     async fn list(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
     ) -> platform::Result<ListResponse<CustomEvent>> {
-        (Ok(ListResponse {
+        Ok(ListResponse {
             data: vec![CustomEvents::custom_event()],
             meta: ResponseMetadata { next: None },
-        }))
+        })
     }
 
     async fn update(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        event_id: u64,
-        req: UpdateCustomEventRequest,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _event_id: u64,
+        _req: UpdateCustomEventRequest,
     ) -> platform::Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
     async fn delete(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
     ) -> platform::Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
@@ -231,39 +227,39 @@ impl Events {
 impl events::Provider for Events {
     async fn create(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        request: CreateEventRequest,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _request: CreateEventRequest,
     ) -> platform::Result<Event> {
         Ok(Events::event())
     }
 
     async fn get_by_id(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
     ) -> platform::Result<Event> {
         Ok(Events::event())
     }
 
     async fn get_by_name(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _name: &str,
     ) -> platform::Result<Event> {
         Ok(Events::event())
     }
 
     async fn list(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
     ) -> platform::Result<ListResponse<Event>> {
         Ok(ListResponse {
             data: vec![Events::event()],
@@ -273,43 +269,43 @@ impl events::Provider for Events {
 
     async fn update(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        event_id: u64,
-        req: UpdateEventRequest,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _event_id: u64,
+        _req: UpdateEventRequest,
     ) -> platform::Result<Event> {
         Ok(Events::event())
     }
 
     async fn attach_property(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        event_id: u64,
-        prop_id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _event_id: u64,
+        _prop_id: u64,
     ) -> platform::Result<Event> {
         Ok(Events::event())
     }
 
     async fn detach_property(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        event_id: u64,
-        prop_id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _event_id: u64,
+        _prop_id: u64,
     ) -> platform::Result<Event> {
         Ok(Events::event())
     }
 
     async fn delete(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
     ) -> platform::Result<Event> {
         Ok(Events::event())
     }
@@ -344,29 +340,29 @@ impl Properties {
 impl properties::Provider for Properties {
     async fn get_by_id(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
     ) -> platform::Result<Property> {
         Ok(Properties::property())
     }
 
     async fn get_by_name(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        name: &str,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _name: &str,
     ) -> platform::Result<Property> {
         Ok(Properties::property())
     }
 
     async fn list(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
     ) -> platform::Result<ListResponse<Property>> {
         Ok(ListResponse {
             data: vec![Properties::property()],
@@ -376,21 +372,21 @@ impl properties::Provider for Properties {
 
     async fn update(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        property_id: u64,
-        req: UpdatePropertyRequest,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _property_id: u64,
+        _req: UpdatePropertyRequest,
     ) -> platform::Result<Property> {
         Ok(Properties::property())
     }
 
     async fn delete(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        id: u64,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
     ) -> platform::Result<Property> {
         Ok(Properties::property())
     }
@@ -401,10 +397,10 @@ pub struct Queries {}
 impl queries::Provider for Queries {
     async fn event_segmentation(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        req: EventSegmentation,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _req: EventSegmentation,
     ) -> platform::Result<DataTable> {
         Ok(DataTable::new(vec![Column {
             name: "name".to_string(),
@@ -417,10 +413,10 @@ impl queries::Provider for Queries {
 
     async fn property_values(
         &self,
-        ctx: Context,
-        organization_id: u64,
-        project_id: u64,
-        req: PropertyValues,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _req: PropertyValues,
     ) -> platform::Result<queries::property_values::ListResponse> {
         Ok(queries::property_values::ListResponse::new(vec![
             Value::from("value"),
