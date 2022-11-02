@@ -9,7 +9,7 @@ import {
     TimeLast,
 } from '@/api'
 import {Event} from '@/stores/eventSegmentation/events'
-import dataService from '@/api/services/datas.service'
+import queriesService from '@/api/services/queries.service'
 import {useCommonStore} from '@/stores/common'
 import {useLexiconStore} from '@/stores/lexicon'
 
@@ -189,7 +189,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
             const commonStore = useCommonStore()
 
             try {
-                const res = await dataService.createEventsStream(commonStore.organizationId, commonStore.projectId, {
+                const res = await queriesService.createEventsStream(commonStore.organizationId, commonStore.projectId, {
                     time: this.timeRequest,
                     events: this.eventsRequest,
                 })

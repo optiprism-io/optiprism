@@ -19,6 +19,7 @@ use common::rbac::PROJECT_PERMISSIONS;
 
 use crate::auth;
 use crate::auth::token::parse_access_token;
+use crate::error::AuthError;
 use crate::PlatformError;
 use crate::Result;
 
@@ -126,14 +127,14 @@ where B: Send
         let TypedHeader(Authorization(bearer)) =
             TypedHeader::<Authorization<Bearer>>::from_request(req)
                 .await
-                .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
+                .map_err(|err| AuthError::CantParseBearerHeader)?;
 
         let Extension(auth_cfg) = Extension::<auth::Config>::from_request(req)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
         let claims = parse_access_token(bearer.token(), &auth_cfg.access_token_key)
-            .map_err(|err| PlatformError::Unauthorized(err.to_string()))?;
+            .map_err(|err| AuthError::CantParseAccessToken)?;
         let Extension(md_acc_prov) =
             Extension::<Arc<dyn metadata::accounts::Provider>>::from_request(req)
                 .await

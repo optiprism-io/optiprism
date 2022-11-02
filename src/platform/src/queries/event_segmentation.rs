@@ -118,16 +118,6 @@ pub struct Compare {
     pub unit: TimeIntervalUnit,
 }
 
-// impl TryFrom<Option<Compare>> for Option<query_es_types::Compare> {
-// type Error = Error;
-//
-// fn try_from(value: Option<Compare>) -> std::result::Result<Self, Self::Error> {
-// Ok(match value {
-// None => None,
-// Some(v) => v.try_into()?
-// })
-// }
-// }
 impl TryInto<query_es_types::Compare> for Compare {
     type Error = PlatformError;
 

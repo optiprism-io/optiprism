@@ -4,5 +4,5 @@ const api = new AuthApi(new Configuration({ basePath: import.meta.env.VITE_API_B
 
 export const authService = {
     login: (email: string, password: string) => api.basicLogin({ email, password }),
-    refreshToken: (refreshToken: string) => api.authAccess({ refresh_token: refreshToken })
+    refreshToken: (refreshToken: string) => api.authAccess({ refreshToken })
 }

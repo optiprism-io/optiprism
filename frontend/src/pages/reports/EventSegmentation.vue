@@ -46,7 +46,6 @@ import FilterReports from '@/components/events/FiltersReports.vue'
 import TemplateReport from '@/components/events/TemplateReport.vue'
 import GridContainer from '@/components/grid/GridContainer.vue';
 import GridItem from '@/components/grid/GridItem.vue';
-import reportsService from '@/api/services/reports.service'
 import { DataTableResponse } from '@/api'
 import { eventsToFunnels } from '@/utils/reportsMappings'
 
@@ -54,6 +53,7 @@ import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useFilterGroupsStore } from '@/stores/reports/filters'
 import { useCommonStore } from '@/stores/common'
 import { useSegmentsStore } from '@/stores/reports/segments'
+import queriesService from '@/api/services/queries.service'
 
 const eventsStore = useEventsStore();
 const filterGroupsStore = useFilterGroupsStore()
@@ -76,7 +76,7 @@ onUnmounted(() => {
 const getEventSegmentation = async () => {
     eventSegmentationLoading.value = true
     try {
-        const res = await reportsService.eventSegmentation(commonStore.organizationId, commonStore.projectId,  eventsStore.propsForEventSegmentationResult)
+        const res = await queriesService.eventSegmentation(commonStore.organizationId, commonStore.projectId,  eventsStore.propsForEventSegmentationResult)
 
         if (res) {
             eventSegmentation.value = res.data as DataTableResponse

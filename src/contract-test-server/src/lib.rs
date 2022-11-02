@@ -56,6 +56,5 @@ pub async fn run(cfg: Config) -> anyhow::Result<()> {
     });
     let svc = platform::http::Service::new(&md, &platform_provider, auth_cfg, cfg.host, None);
     info!("start listening on {}", cfg.host);
-    svc.serve().await?;
-    Ok(())
+    Ok(svc.serve().await?)
 }

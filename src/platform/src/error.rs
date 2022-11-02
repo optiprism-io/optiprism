@@ -39,6 +39,10 @@ pub enum AuthError {
     CantMakeAccessToken,
     #[error("can't make refresh token")]
     CantMakeRefreshToken,
+    #[error("can't parse bearer header")]
+    CantParseBearerHeader,
+    #[error("can't parse access token")]
+    CantParseAccessToken,
 }
 
 impl Display for ApiError {
@@ -174,6 +178,8 @@ impl PlatformError {
                 AuthError::InvalidPasswordHashing => ApiError::internal(err),
                 AuthError::CantMakeAccessToken => ApiError::internal(err),
                 AuthError::CantMakeRefreshToken => ApiError::internal(err),
+                AuthError::CantParseBearerHeader => ApiError::bad_request(err),
+                AuthError::CantParseAccessToken => ApiError::unauthorized(err),
             },
             PlatformError::Unauthorized(err) => ApiError::unauthorized(err),
             PlatformError::Forbidden(err) => ApiError::forbidden(err),

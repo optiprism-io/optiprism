@@ -69,7 +69,7 @@ pub fn make_refresh_token(
 }
 
 pub fn parse_access_token(value: &str, token_key: impl AsRef<[u8]>) -> Result<AccessClaims> {
-    let token = decode(
+    let token = decode::<AccessClaims>(
         value,
         &DecodingKey::from_secret(token_key.as_ref()),
         &Validation::new(Algorithm::HS512),

@@ -87,7 +87,7 @@ paths:
   /v1/auth/refresh-token:
     post:
       summary: Refresh access token
-      operationId: authAccess
+      operationId: refreshToken
       tags:
         - auth
       requestBody:
@@ -1329,14 +1329,14 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /organizations/{organizationId}/projects/{projectId}/reports/event-segmentation:
+  /v1/organizations/{organizationId}/projects/{projectId}/queries/event-segmentation:
     post:
       summary: Event segmentation query
       operationId: eventSegmentationQuery
       security:
         - bearerAuth: []
       tags:
-        - reports
+        - query
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -1364,7 +1364,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /organizations/{organizationId}/projects/{projectId}/reports/funnel:
+  /organizations/{organizationId}/projects/{projectId}/queries/funnel:
     post:
       summary: Funnel query
       operationId: funnelQuery
@@ -1500,16 +1500,10 @@ components:
             type: string
     JWTToken:
       type: object
-      required: ['accountId', 'organizationId', 'iss', 'exp', 'nbf', 'iat', 'jti']
+      required: ['accountId', 'iss', 'exp', 'nbf', 'iat', 'jti']
       description: see https://datatracker.ietf.org/doc/html/rfc7519
       properties:
         accountId:
-          type: integer
-          format: int64
-        organizationId:
-          type: integer
-          format: int64
-        projectId:
           type: integer
           format: int64
         iss:
@@ -2908,6 +2902,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
+          additionalProperties: true
           properties:
             filters:
               type: array
@@ -2978,13 +2973,13 @@ components:
       description: filter by property
       required: ["filterType", "propertyType", "operation"]
       allOf:
+        - $ref: '#/components/schemas/PropertyRef'
         - type: object
           properties:
             type:
               type: string
               enum:
                 - property
-        - $ref: '#/components/schemas/PropertyRef'
         - type: object
           properties:
             operation:
@@ -3476,49 +3471,34 @@ components:
         - "arrAny"
         - "arrNone"
         - "regex"
+
     PropertyRef:
       type: object
       description: reference to a property by id or name, depends on property type
-      oneOf:
-        - type: object
-          properties:
-            propertyName:
-              type: string
-            propertyType:
-              type: string
-              enum:
-                - event
-                - user
-        - type: object
-          properties:
-            propertyId:
-              type: number
-            propertyType:
-              type: string
-              enum:
-                - custom
-                - event
-                - user
+      properties:
+        propertyName:
+          type: string
+        propertyId:
+          type: number
+        propertyType:
+          type: string
+          enum:
+            - event
+            - user
+            - custom
     EventRef:
       type: object
       description: reference to event by its name and type
-      oneOf:
-        - type: object
-          properties:
-            eventName:
-              type: string
-            eventType:
-              type: string
-              enum:
-                - regular
-        - type: object
-          properties:
-            eventId:
-              type: number
-            eventType:
-              type: string
-              enum:
-                - custom
+      properties:
+        eventName:
+          type: string
+        eventId:
+          type: number
+        eventType:
+          type: string
+          enum:
+            - custom
+            - regular
     EventType:
       type: string
       description: possible event type
