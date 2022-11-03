@@ -12,19 +12,16 @@
  * Do not edit the class manually.
  */
 import { GroupRecord } from './group-record';
-import { ListGroupRecordsResponse } from './list-group-records-response';
-import { ListResponseMetadata } from './list-response-metadata';
-import { ListResponseMetadataMeta } from './list-response-metadata-meta';
 /**
  * 
  * @export
- * @interface InlineResponse2007
+ * @interface ListGroupRecordsResponse
  */
-export interface InlineResponse2007 extends ListGroupRecordsResponse {
+export interface ListGroupRecordsResponse {
     /**
      * 
-     * @type {ListResponseMetadataMeta}
-     * @memberof InlineResponse2007
+     * @type {Array<GroupRecord>}
+     * @memberof ListGroupRecordsResponse
      */
-    meta?: ListResponseMetadataMeta;
+    data?: Array<GroupRecord>;
 }

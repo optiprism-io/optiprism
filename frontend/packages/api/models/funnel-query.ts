@@ -55,7 +55,7 @@ export interface FunnelQuery {
      * @type {FunnelQueryTimeWindow}
      * @memberof FunnelQuery
      */
-    timeWindow?: FunnelQueryTimeWindow;
+    timeWindow: FunnelQueryTimeWindow;
     /**
      * 
      * @type {FunnelConversionStepsChartType | FunnelConversionOverTimeChartType | FunnelTimeToConvertChartType | FunnelFrequencyChartType}

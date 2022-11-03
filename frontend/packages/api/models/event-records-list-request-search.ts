@@ -11,6 +11,7 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
+import { Value } from './value';
 /**
  * search in results
  * @export
@@ -25,14 +26,14 @@ export interface EventRecordsListRequestSearch {
     term?: string;
     /**
      * 
-     * @type {Array<string | number>}
+     * @type {Array<Value>}
      * @memberof EventRecordsListRequestSearch
      */
-    inEventProperties?: Array<string | number>;
+    inEventProperties?: Array<Value>;
     /**
      * 
-     * @type {Array<string | number>}
+     * @type {Array<Value>}
      * @memberof EventRecordsListRequestSearch
      */
-    inUserProperties?: Array<string | number>;
+    inUserProperties?: Array<Value>;
 }

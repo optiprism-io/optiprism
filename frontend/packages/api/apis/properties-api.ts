@@ -16,11 +16,11 @@ import { Configuration } from '../configuration';
 // Some imports not used depending on template conditions
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, RequestArgs, BaseAPI, RequiredError } from '../base';
-import { DataPropertyvaluesBody } from '../models';
 import { ErrorResponse } from '../models';
 import { InlineResponse2004 } from '../models';
 import { InlineResponse2005 } from '../models';
 import { InlineResponse2008 } from '../models';
+import { ListPropertyValuesRequest } from '../models';
 import { Property } from '../models';
 import { UpdatePropertyRequest } from '../models';
 /**
@@ -128,7 +128,7 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
         /**
          * 
          * @summary List of property values
-         * @param {DataPropertyvaluesBody} body property type and property id/name must be specified. Event is optional
+         * @param {ListPropertyValuesRequest} body property type and property id/name must be specified. Event is optional
 and  works as a filter for values
 
          * @param {number} organizationId 
@@ -136,7 +136,7 @@ and  works as a filter for values
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        propertyValuesList: async (body: DataPropertyvaluesBody, organizationId: number, projectId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        propertyValuesList: async (body: ListPropertyValuesRequest, organizationId: number, projectId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'body' is not null or undefined
             if (body === null || body === undefined) {
                 throw new RequiredError('body','Required parameter body was null or undefined when calling propertyValuesList.');
@@ -274,7 +274,7 @@ and  works as a filter for values
             if (propertyId === null || propertyId === undefined) {
                 throw new RequiredError('propertyId','Required parameter propertyId was null or undefined when calling updateUserProperty.');
             }
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-proerties/{propertyId}`
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties/{propertyId}`
                 .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
                 .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
                 .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
@@ -327,7 +327,7 @@ and  works as a filter for values
             if (projectId === null || projectId === undefined) {
                 throw new RequiredError('projectId','Required parameter projectId was null or undefined when calling userPropertiesList.');
             }
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-proerties`
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties`
                 .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
                 .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -400,7 +400,7 @@ export const PropertiesApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary List of property values
-         * @param {DataPropertyvaluesBody} body property type and property id/name must be specified. Event is optional
+         * @param {ListPropertyValuesRequest} body property type and property id/name must be specified. Event is optional
 and  works as a filter for values
 
          * @param {number} organizationId 
@@ -408,7 +408,7 @@ and  works as a filter for values
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async propertyValuesList(body: DataPropertyvaluesBody, organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => Promise<AxiosResponse<InlineResponse2008>>> {
+        async propertyValuesList(body: ListPropertyValuesRequest, organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => Promise<AxiosResponse<InlineResponse2008>>> {
             const localVarAxiosArgs = await PropertiesApiAxiosParamCreator(configuration).propertyValuesList(body, organizationId, projectId, options);
             return (axios: AxiosInstance = globalAxios, basePath: string = BASE_PATH) => {
                 const axiosRequestArgs :AxiosRequestConfig = {...localVarAxiosArgs.options, url: basePath + localVarAxiosArgs.url};
@@ -498,7 +498,7 @@ export const PropertiesApiFactory = function (configuration?: Configuration, bas
         /**
          * 
          * @summary List of property values
-         * @param {DataPropertyvaluesBody} body property type and property id/name must be specified. Event is optional
+         * @param {ListPropertyValuesRequest} body property type and property id/name must be specified. Event is optional
 and  works as a filter for values
 
          * @param {number} organizationId 
@@ -506,7 +506,7 @@ and  works as a filter for values
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async propertyValuesList(body: DataPropertyvaluesBody, organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<AxiosResponse<InlineResponse2008>> {
+        async propertyValuesList(body: ListPropertyValuesRequest, organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<AxiosResponse<InlineResponse2008>> {
             return PropertiesApiFp(configuration).propertyValuesList(body, organizationId, projectId, options).then((request) => request(axios, basePath));
         },
         /**
@@ -583,7 +583,7 @@ export class PropertiesApi extends BaseAPI {
     /**
      * 
      * @summary List of property values
-     * @param {DataPropertyvaluesBody} body property type and property id/name must be specified. Event is optional
+     * @param {ListPropertyValuesRequest} body property type and property id/name must be specified. Event is optional
 and  works as a filter for values
 
      * @param {number} organizationId 
@@ -592,7 +592,7 @@ and  works as a filter for values
      * @throws {RequiredError}
      * @memberof PropertiesApi
      */
-    public async propertyValuesList(body: DataPropertyvaluesBody, organizationId: number, projectId: number, options?: AxiosRequestConfig) : Promise<AxiosResponse<InlineResponse2008>> {
+    public async propertyValuesList(body: ListPropertyValuesRequest, organizationId: number, projectId: number, options?: AxiosRequestConfig) : Promise<AxiosResponse<InlineResponse2008>> {
         return PropertiesApiFp(this.configuration).propertyValuesList(body, organizationId, projectId, options).then((request) => request(this.axios, this.basePath));
     }
     /**

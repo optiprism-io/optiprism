@@ -19,8 +19,8 @@ import { BASE_PATH, COLLECTION_FORMATS, RequestArgs, BaseAPI, RequiredError } fr
 import { ErrorResponse } from '../models';
 import { GroupRecord } from '../models';
 import { GroupRecordsListRequest } from '../models';
-import { GrouprecordsIdBody } from '../models';
 import { InlineResponse2007 } from '../models';
+import { UpdateGroupRecordRequest } from '../models';
 /**
  * GroupsApi - axios parameter creator
  * @export
@@ -141,14 +141,14 @@ export const GroupsApiAxiosParamCreator = function (configuration?: Configuratio
         /**
          * 
          * @summary Update group record
-         * @param {GrouprecordsIdBody} body 
+         * @param {UpdateGroupRecordRequest} body 
          * @param {number} organizationId 
          * @param {number} projectId 
          * @param {number} id Group Record ID
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        updateGroupRecord: async (body: GrouprecordsIdBody, organizationId: number, projectId: number, id: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        updateGroupRecord: async (body: UpdateGroupRecordRequest, organizationId: number, projectId: number, id: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'body' is not null or undefined
             if (body === null || body === undefined) {
                 throw new RequiredError('body','Required parameter body was null or undefined when calling updateGroupRecord.');
@@ -245,14 +245,14 @@ export const GroupsApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary Update group record
-         * @param {GrouprecordsIdBody} body 
+         * @param {UpdateGroupRecordRequest} body 
          * @param {number} organizationId 
          * @param {number} projectId 
          * @param {number} id Group Record ID
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async updateGroupRecord(body: GrouprecordsIdBody, organizationId: number, projectId: number, id: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => Promise<AxiosResponse<GroupRecord>>> {
+        async updateGroupRecord(body: UpdateGroupRecordRequest, organizationId: number, projectId: number, id: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => Promise<AxiosResponse<GroupRecord>>> {
             const localVarAxiosArgs = await GroupsApiAxiosParamCreator(configuration).updateGroupRecord(body, organizationId, projectId, id, options);
             return (axios: AxiosInstance = globalAxios, basePath: string = BASE_PATH) => {
                 const axiosRequestArgs :AxiosRequestConfig = {...localVarAxiosArgs.options, url: basePath + localVarAxiosArgs.url};
@@ -295,14 +295,14 @@ export const GroupsApiFactory = function (configuration?: Configuration, basePat
         /**
          * 
          * @summary Update group record
-         * @param {GrouprecordsIdBody} body 
+         * @param {UpdateGroupRecordRequest} body 
          * @param {number} organizationId 
          * @param {number} projectId 
          * @param {number} id Group Record ID
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async updateGroupRecord(body: GrouprecordsIdBody, organizationId: number, projectId: number, id: number, options?: AxiosRequestConfig): Promise<AxiosResponse<GroupRecord>> {
+        async updateGroupRecord(body: UpdateGroupRecordRequest, organizationId: number, projectId: number, id: number, options?: AxiosRequestConfig): Promise<AxiosResponse<GroupRecord>> {
             return GroupsApiFp(configuration).updateGroupRecord(body, organizationId, projectId, id, options).then((request) => request(axios, basePath));
         },
     };
@@ -344,7 +344,7 @@ export class GroupsApi extends BaseAPI {
     /**
      * 
      * @summary Update group record
-     * @param {GrouprecordsIdBody} body 
+     * @param {UpdateGroupRecordRequest} body 
      * @param {number} organizationId 
      * @param {number} projectId 
      * @param {number} id Group Record ID
@@ -352,7 +352,7 @@ export class GroupsApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof GroupsApi
      */
-    public async updateGroupRecord(body: GrouprecordsIdBody, organizationId: number, projectId: number, id: number, options?: AxiosRequestConfig) : Promise<AxiosResponse<GroupRecord>> {
+    public async updateGroupRecord(body: UpdateGroupRecordRequest, organizationId: number, projectId: number, id: number, options?: AxiosRequestConfig) : Promise<AxiosResponse<GroupRecord>> {
         return GroupsApiFp(this.configuration).updateGroupRecord(body, organizationId, projectId, id, options).then((request) => request(this.axios, this.basePath));
     }
 }

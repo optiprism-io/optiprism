@@ -11,19 +11,22 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
-import { ListPropertyValuesResponse } from './list-property-values-response';
-import { ListResponseMetadata } from './list-response-metadata';
-import { ListResponseMetadataMeta } from './list-response-metadata-meta';
 /**
  * 
  * @export
- * @interface InlineResponse2008
+ * @interface LoginRequest
  */
-export interface InlineResponse2008 extends ListPropertyValuesResponse {
+export interface LoginRequest {
     /**
      * 
-     * @type {ListResponseMetadataMeta}
-     * @memberof InlineResponse2008
+     * @type {string}
+     * @memberof LoginRequest
      */
-    meta?: ListResponseMetadataMeta;
+    email: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof LoginRequest
+     */
+    password: string;
 }

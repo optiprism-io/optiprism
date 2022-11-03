@@ -11,16 +11,17 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
+import { Value } from './value';
 /**
- * search in results
+ * 
  * @export
- * @interface GroupRecordsListRequestSearch
+ * @interface UpdateGroupRecordRequest
  */
-export interface GroupRecordsListRequestSearch {
+export interface UpdateGroupRecordRequest {
     /**
-     * 
-     * @type {string}
-     * @memberof GroupRecordsListRequestSearch
+     * map of group property name and property value pairs
+     * @type {{ [key: string]: Value; }}
+     * @memberof UpdateGroupRecordRequest
      */
-    term?: string;
+    properties?: { [key: string]: Value; };
 }

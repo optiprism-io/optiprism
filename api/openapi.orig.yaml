@@ -9,8 +9,11 @@ info:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
 servers:
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/optiprism/optiprism/1.0.0
   - description: OptiPrism API server
-    url: /
+    url: /df
 tags:
   - name: events
     description: Events
@@ -33,7 +36,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              type: object
+              required: ['email', 'password']
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
       responses:
         200:
           description: tokens
@@ -79,7 +90,7 @@ paths:
   /v1/auth/refresh-token:
     post:
       summary: Refresh access token
-      operationId: refreshToken
+      operationId: authAccess
       tags:
         - auth
       requestBody:
@@ -120,12 +131,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/dashboards:
+  /v1/organizations/{organization_id}/projects/{project_id}/dashboards:
     get:
       summary: Dashboards list
       operationId: dashboardsList
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - dashboards
       parameters:
@@ -161,7 +172,7 @@ paths:
       summary: Create dashboard
       operationId: createDashboard
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - dashboards
       parameters:
@@ -192,18 +203,18 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/dashboards/{dashboardId}:
+  /v1/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}:
     get:
       summary: Get dashboard
       operationId: getDashboard
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - dashboards
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: dashboardId
+        - name: dashboard_id
           in: path
           description: Dashboard ID
           required: true
@@ -232,13 +243,13 @@ paths:
       summary: Update dashboard
       operationId: updateDashboard
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - dashboards
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: dashboardId
+        - name: dashboard_id
           in: path
           description: Dashboard ID
           required: true
@@ -273,13 +284,13 @@ paths:
       summary: Delete dashboard
       operationId: deleteDashboard
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - dashboards
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: dashboardId
+        - name: dashboard_id
           in: path
           description: Dashboard ID
           required: true
@@ -300,12 +311,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/reports:
+  /v1/organizations/{organization_id}/projects/{project_id}/reports:
     get:
       summary: Reports list
       operationId: reportsList
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - reports
       parameters:
@@ -341,7 +352,7 @@ paths:
       summary: Create report
       operationId: createReport
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - reports
       parameters:
@@ -372,18 +383,18 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/reports/{reportId}:
+  /v1/organizations/{organization_id}/projects/{project_id}/reports/{report_id}:
     get:
       summary: Get report
       operationId: getReport
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - reports
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: reportId
+        - name: report_id
           in: path
           description: Report ID
           required: true
@@ -412,13 +423,13 @@ paths:
       summary: Update report
       operationId: updateReport
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - reports
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: reportId
+        - name: report_id
           in: path
           description: Report ID
           required: true
@@ -453,13 +464,13 @@ paths:
       summary: Delete report
       operationId: deleteReport
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - reports
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: reportId
+        - name: report_id
           in: path
           description: Report ID
           required: true
@@ -480,12 +491,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/schema/events:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/events:
     get:
       summary: Events list
       operationId: eventsList
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
@@ -517,18 +528,18 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/schema/events/{eventId}:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/events/{event_id}:
     get:
       summary: Get event
       operationId: getEvent
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: eventId
+        - name: event_id
           in: path
           description: Event ID
           required: true
@@ -557,13 +568,13 @@ paths:
       summary: Update event
       operationId: updateEvent
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: eventId
+        - name: event_id
           in: path
           description: Event ID
           required: true
@@ -594,12 +605,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events:
     get:
       summary: Custom events list
       operationId: customEventsList
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
@@ -635,7 +646,7 @@ paths:
       summary: Create custom event
       operationId: createCustomEvent
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
@@ -666,18 +677,18 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events/{event_id}:
     get:
       summary: Get custom event
       operationId: getCustomEvent
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: eventId
+        - name: event_id
           in: path
           description: Event ID
           required: true
@@ -706,13 +717,13 @@ paths:
       summary: Delete custom event
       operationId: deleteCustomEvent
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: eventId
+        - name: event_id
           in: path
           description: Event ID
           required: true
@@ -737,13 +748,13 @@ paths:
       summary: Update custom event
       operationId: updateCustomEvent
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: eventId
+        - name: event_id
           in: path
           description: Custom Event ID
           required: true
@@ -774,12 +785,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties:
     get:
       summary: User properties list
       operationId: userPropertiesList
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - properties
       parameters:
@@ -793,7 +804,11 @@ paths:
               schema:
                 type: object
                 allOf:
-                  - $ref: '#/components/schemas/ListPropertiesResponse'
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Property'
                   - $ref: '#/components/schemas/ListResponseMetadata'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -807,12 +822,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties:
     get:
       summary: Event properties list
       operationId: eventPropertiesList
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - properties
       parameters:
@@ -826,7 +841,11 @@ paths:
               schema:
                 type: object
                 allOf:
-                  - $ref: '#/components/schemas/ListPropertiesResponse'
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Property'
                   - $ref: '#/components/schemas/ListResponseMetadata'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -840,18 +859,18 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties/{propertyId}:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties/{property_id}:
     get:
       summary: Get user property
       operationId: getUserProperty
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: propertyId
+        - name: property_id
           in: path
           description: Property ID
           required: true
@@ -880,13 +899,13 @@ paths:
       summary: Update user property
       operationId: updateUserProperty
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - properties
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: propertyId
+        - name: property_id
           in: path
           description: Property ID
           required: true
@@ -917,18 +936,18 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties/{propertyId}:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties/{property_id}:
     get:
       summary: Get event property
       operationId: getEventProperty
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: propertyId
+        - name: property_id
           in: path
           description: Property ID
           required: true
@@ -957,13 +976,13 @@ paths:
       summary: Update event property
       operationId: updateEventProperty
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - properties
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
-        - name: propertyId
+        - name: property_id
           in: path
           description: Property ID
           required: true
@@ -994,12 +1013,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/schema/custom-properties:
+  /v1/organizations/{organization_id}/projects/{project_id}/schema/custom-properties:
     get:
       summary: Event custom properties list
       operationId: customPropertiesList
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - properties
       parameters:
@@ -1013,7 +1032,11 @@ paths:
               schema:
                 type: object
                 allOf:
-                  - $ref: '#/components/schemas/ListCustomPropertiesResponse'
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CustomProperty'
                   - $ref: '#/components/schemas/ListResponseMetadata'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1027,12 +1050,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/data/event-records/{id}:
+  /v1/organizations/{organization_id}/projects/{project_id}/data/event-records/{id}:
     get:
       summary: Get event record
       operationId: getEventRecord
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
@@ -1064,12 +1087,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/data/event-records:
+  /v1/organizations/{organization_id}/projects/{project_id}/data/event-records:
     post:
       summary: Get events
       operationId: eventRecordsList
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - events
       parameters:
@@ -1089,7 +1112,11 @@ paths:
               schema:
                 type: object
                 allOf:
-                  - $ref: '#/components/schemas/ListEventRecordsResponse'
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EventRecord'
                   - $ref: '#/components/schemas/ListResponseMetadata'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1103,12 +1130,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/data/group-records/{id}:
+  /v1/organizations/{organization_id}/projects/{project_id}/data/group-records/{id}:
     get:
       summary: Get group record
       operationId: getGroupRecord
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - groups
       parameters:
@@ -1144,7 +1171,7 @@ paths:
       summary: Update group record
       operationId: updateGroupRecord
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - groups
       parameters:
@@ -1162,7 +1189,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateGroupRecordRequest'
+              type: object
+              properties:
+                properties:
+                  type: object
+                  description: map of group property name and property value pairs
       responses:
         200:
           description: event
@@ -1182,12 +1213,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/data/group-records:
+  /v1/organizations/{organization_id}/projects/{project_id}/data/group-records:
     post:
       summary: Get group records
       operationId: groupEventsList
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - groups
       parameters:
@@ -1207,7 +1238,11 @@ paths:
               schema:
                 type: object
                 allOf:
-                  - $ref: '#/components/schemas/ListGroupRecordsResponse'
+                  - properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/GroupRecord'
                   - $ref: '#/components/schemas/ListResponseMetadata'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1221,12 +1256,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/data/property-values:
+  /v1/organizations/{organization_id}/projects/{project_id}/data/property-values:
     post:
       summary: List of property values
       operationId: PropertyValuesList
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - properties
       parameters:
@@ -1240,16 +1275,51 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/parameters/ListPropertyValuesRequest'
+              type: object
+              properties:
+                eventName:
+                  type: string
+                  description: use event name only with eventType=event|user
+                eventId:
+                  type: number
+                  description: use event id only with eventType=custom
+                eventType:
+                  type: string
+                  enum:
+                    - event
+                    - user
+                    - custom
+                propertyName:
+                  type: string
+                  description: use property name only with propertyType=event|user
+                propertyId:
+                  type: number
+                  description: use property id only with propertyType=custom
+                propertyType:
+                  type: string
+                  enum:
+                    - event
+                    - user
+                    - custom
       responses:
         '200':
           description: list property values
           content:
             application/json:
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ListPropertyValuesResponse'
-                  - $ref: '#/components/schemas/ListResponseMetadata'
+                type: object
+                properties:
+                  values:
+                    oneOf:
+                      - type: array
+                        items:
+                          type: string
+                      - type: array
+                        items:
+                          type: number
+                      - type: array
+                        items:
+                          type: boolean
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1262,14 +1332,14 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/queries/event-segmentation:
+  /organizations/{organization_id}/projects/{project_id}/reports/event-segmentation:
     post:
       summary: Event segmentation query
       operationId: eventSegmentationQuery
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
-        - query
+        - reports
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -1297,12 +1367,12 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /organizations/{organizationId}/projects/{projectId}/queries/funnel:
+  /organizations/{organization_id}/projects/{project_id}/reports/funnel:
     post:
       summary: Funnel query
       operationId: funnelQuery
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       tags:
         - query
       parameters:
@@ -1340,13 +1410,13 @@ components:
       bearerFormat: JWT
   parameters:
     OrganizationID:
-      name: organizationId
+      name: organization_id
       in: path
       required: true
       schema:
         type: number
     ProjectID:
-      name: projectId
+      name: project_id
       in: path
       required: true
       schema:
@@ -1389,76 +1459,26 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
-    LoginRequest:
-      type: object
-      required: [ 'email', 'password','passwordRepeat' ]
-      properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          format: password
     SignupRequest:
       type: object
-      required: ['email','password','passwordRepeat']
       properties:
         email:
           type: string
         password:
           type: string
           format: password
-        passwordRepeat:
+        password_repeat:
           type: string
           format: password
-        firstName:
+        first_name:
           type: string
-        lastName:
+        last_name:
           type: string
     RefreshTokenRequest:
       type: object
-      required: [ 'refreshToken' ]
       properties:
-        refreshToken:
+        refresh_token:
           type: string
-    ListPropertyValuesRequest:
-      type: object
-      oneOf:
-        - $ref: '#/components/schemas/ListEventPropertyValues'
-        - $ref: '#/components/schemas/ListCustomEventPropertyValues'
-    ListEventPropertyValues:
-      type: object
-      allOf:
-        - $ref: '#/components/schemas/PropertyRef'
-        - type: object
-          required: ['eventName']
-          properties:
-            eventName:
-              type: string
-    ListCustomEventPropertyValues:
-      type: object
-      allOf:
-        - $ref: '#/components/schemas/PropertyRef'
-        - type: object
-          required: ['eventId']
-          properties:
-            eventId:
-              type: number
-
-    ListPropertyValuesResponse:
-      type: object
-      properties:
-        data:
-          oneOf:
-            - type: array
-              items:
-                type: string
-            - type: array
-              items:
-                type: number
-            - type: array
-              items:
-                type: boolean
     TokensResponse:
       type: object
       properties:
@@ -1468,12 +1488,6 @@ components:
           type: string
         csrfToken:
           type: string
-    ListGroupRecordsResponse:
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/GroupRecord'
     ErrorResponse:
       type: object
       properties:
@@ -1489,10 +1503,16 @@ components:
             type: string
     JWTToken:
       type: object
-      required: [ 'accountId', 'iss', 'exp', 'nbf', 'iat', 'jti' ]
+      required: ['accountId', 'organizationId', 'iss', 'exp', 'nbf', 'iat', 'jti']
       description: see https://datatracker.ietf.org/doc/html/rfc7519
       properties:
         accountId:
+          type: integer
+          format: int64
+        organizationId:
+          type: integer
+          format: int64
+        projectId:
           type: integer
           format: int64
         iss:
@@ -1554,27 +1574,6 @@ components:
                   - type: array
                     items:
                       type: boolean
-    ListPropertiesResponse:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Property'
-    ListCustomPropertiesResponse:
-      type: object
-      properties:
-        events:
-          type: array
-          items:
-            $ref: '#/components/schemas/CustomProperty'
-    ListEventRecordsResponse:
-      type: object
-      properties:
-        events:
-          type: array
-          items:
-            $ref: '#/components/schemas/EventRecord'
     ListResponseMetadata:
       description: list response metadata
       type: object
@@ -1728,7 +1727,6 @@ components:
                 type: integer
     CreateDashboardRequest:
       type: object
-      required: [ 'name','rows' ]
       properties:
         tags:
           type: array
@@ -1745,13 +1743,11 @@ components:
           type: array
           items:
             type: object
-            required: [ 'panels' ]
             properties:
               panels:
                 type: array
                 items:
                   type: object
-                  required: [ 'span','type','reportId' ]
                   properties:
                     span:
                       type: integer
@@ -1759,7 +1755,7 @@ components:
                       description: span
                     type:
                       type: string
-                      enum: [ 'report' ]
+                      enum: ['report']
                     reportId:
                       type: integer
                       format: int64
@@ -1781,13 +1777,11 @@ components:
           type: array
           items:
             type: object
-            required: [ 'panels' ]
             properties:
               panels:
                 type: array
                 items:
                   type: object
-                  required: [ 'span','type','reportId' ]
                   properties:
                     span:
                       type: integer
@@ -1795,7 +1789,7 @@ components:
                       description: span
                     type:
                       type: string
-                      enum: [ 'report' ]
+                      enum: ['report']
                     reportId:
                       type: integer
                       format: int64
@@ -1853,7 +1847,7 @@ components:
                       description: project id
                     type:
                       type: string
-                      enum: [ 'report' ]
+                      enum: ['report']
                     reportId:
                       type: integer
                       format: int64
@@ -1908,7 +1902,6 @@ components:
                 - $ref: '#/components/schemas/FunnelQuery'
     CreateReportRequest:
       type: object
-      required: [ 'name','report' ]
       properties:
         tags:
           type: array
@@ -1922,7 +1915,6 @@ components:
           description: description
         report:
           type: object
-          required: [ 'type' ]
           allOf:
             - type: object
               properties:
@@ -1950,7 +1942,6 @@ components:
           description: description
         report:
           type: object
-          required: [ 'type' ]
           allOf:
             - type: object
               properties:
@@ -1965,6 +1956,7 @@ components:
                 - $ref: '#/components/schemas/FunnelQuery'
     Event:
       type: object
+      required: ["id", "createdAt", "createdBy", "projectId", "isSystem", "name", "status"]
       description: |
         Event describes user event. User event is an action which user (client) might do on a
         product site/app. For instance, user might do a signup and it might be a "Sign up" event.
@@ -2051,16 +2043,8 @@ components:
           type: array
           items:
             type: string
-    UpdateGroupRecordRequest:
-      type: object
-      required: [ 'properties' ]
-      properties:
-        properties:
-          type: object
-          description: map of group property name and property value pairs
-          additionalProperties:
-            $ref: '#/components/schemas/Value'
     CustomEvent:
+      required: ["id", "createdAt", "createdBy", "projectId", "isSystem", "name", "status"]
       description: |
         Custom Event is an alias to an expression which is used while querying.
         You can use regular or custom events in expression. You can combine events
@@ -2105,7 +2089,7 @@ components:
           items:
             $ref: '#/components/schemas/CustomEventEvent'
     CreateCustomEventRequest:
-      required: [ "name", "events",'eventType' ]
+      required: ["name", "events"]
       description: |
         Custom Event is an alias to an expression which is used while querying.
         You can use regular or custom events in expression. You can combine events in
@@ -2125,7 +2109,7 @@ components:
           items:
             $ref: '#/components/schemas/CustomEventEvent'
     UpdateCustomEventRequest:
-      required: [ "name", "events","eventType" ]
+      required: ["name", "events"]
       description: |
         Custom Event is an alias to an expression which is used while querying.
         You can use regular or custom events in expression. You can combine events
@@ -2152,10 +2136,10 @@ components:
     CustomEventEvent:
       type: object
       description: custom event will matches all of the provided events
+      required: ["eventType", "filters"]
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
-          required: ['filters']
           properties:
             filters:
               type: array
@@ -2164,8 +2148,8 @@ components:
                 $ref: '#/components/schemas/EventFilterByProperty'
     Property:
       type: object
-      required: [ "id", "projectId", "isSystem", "scope", "name",
-                  "status", "isRequired", "dataType","nullable", "isArray", "isDictionary" ]
+      required: ["id", "createdAt", "createdBy", "projectId", "isSystem", "scope", "name",
+                 "status", "isRequired", "nullable", "isArray", "isDictionary"]
       description: |
         Property defines event or user property. For example,
         event "Buy product" may contains next properties like "Product name" and "Price."
@@ -2313,7 +2297,7 @@ components:
     EventRecordsListRequest:
       type: object
       description: request event records sorted by time of creation
-      required: [ "time" ,"group" ]
+      required: ["time"]
       example: |
         {
 
@@ -2419,17 +2403,21 @@ components:
             inEventProperties:
               type: array
               items:
-                $ref: '#/components/schemas/Value'
+                oneOf:
+                  - type: string
+                  - type: number
             inUserProperties:
               type: array
               items:
-                $ref: '#/components/schemas/Value'
+                oneOf:
+                  - type: string
+                  - type: number
         events:
           type: array
           description: array of events to query
           items:
             type: object
-            required: [ "eventType" ]
+            required: ["eventType"]
             allOf:
               - $ref: '#/components/schemas/EventRef'
               - type: object
@@ -2447,7 +2435,7 @@ components:
     GroupRecordsListRequest:
       type: object
       description: request group records sorted by time of creation
-      required: [ "time" ,"group" ]
+      required: ["time"]
       properties:
         time:
           type: object
@@ -2462,11 +2450,16 @@ components:
           example: user
         search:
           type: object
-          required: ['term']
           description: search in results
           properties:
             term:
               type: string
+            inUserProperties:
+              type: array
+              items:
+                oneOf:
+                  - type: string
+                  - type: number
         segments:
           description: array of segments
           type: array
@@ -2476,7 +2469,6 @@ components:
           $ref: '#/components/schemas/EventFilters'
     FunnelQuery:
       type: object
-      required: [ "time","group","steps","timeWindow","chartType" ,"count","stepOrder" ]
       properties:
         time:
           type: object
@@ -2493,7 +2485,6 @@ components:
           type: array
           items:
             type: object
-            required: [ 'events' ]
             properties:
               events:
                 type: array
@@ -2506,7 +2497,6 @@ components:
                   - exact
         timeWindow:
           type: object
-          required: [ 'n','unit' ]
           properties:
             n:
               type: integer
@@ -2538,10 +2528,8 @@ components:
             - exactOrder
         attribution:
           type: object
-          required: [ 'type' ]
           oneOf:
             - type: object
-              required: [ 'type' ]
               properties:
                 type:
                   type: string
@@ -2549,7 +2537,6 @@ components:
                     - firstTouch
                     - lastTouch
             - type: object
-              required: [ 'type','step' ]
               properties:
                 type:
                   type: string
@@ -2582,7 +2569,6 @@ components:
           $ref: '#/components/schemas/EventFilters'
     FunnelConversionStepsChartType:
       type: object
-      required: [ 'type' ]
       properties:
         type:
           type: string
@@ -2619,7 +2605,6 @@ components:
               type: number
     FunnelConversionOverTimeChartType:
       type: object
-      required: [ 'type','intervalUnit' ]
       properties:
         type:
           type: string
@@ -2629,7 +2614,6 @@ components:
           $ref: '#/components/schemas/TimeUnit'
     FunnelTimeToConvertChartType:
       type: object
-      required: [ 'type','intervalUnit' ]
       properties:
         type:
           type: string
@@ -2643,7 +2627,6 @@ components:
           type: integer
     FunnelFrequencyChartType:
       type: object
-      required: [ 'type' ]
       properties:
         type:
           type: string
@@ -2651,11 +2634,9 @@ components:
             - frequency
     FunnelExcludeSteps:
       type: object
-      required: [ 'steps' ]
       properties:
         steps:
           type: object
-          required: [ 'type' ]
           oneOf:
             - type: object
               properties:
@@ -2664,7 +2645,6 @@ components:
                   enum:
                     - all
             - type: object
-              required: [ 'type','from','to' ]
               properties:
                 type:
                   type: string
@@ -2676,7 +2656,7 @@ components:
                   type: integer
     FunnelEvent:
       description: event object
-      required: [ "eventType", "filters" ]
+      required: ["eventType", "queries"]
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
@@ -2686,12 +2666,10 @@ components:
               description: array of event filters
               items:
                 type: object
-                required: [ 'type' ]
                 oneOf:
                   - $ref: '#/components/schemas/EventFilterByProperty'
     AnalysisLinear:
       type: object
-      required: [ 'type' ]
       properties:
         type:
           type: string
@@ -2699,7 +2677,6 @@ components:
             - linear
     AnalysisRollingAverage:
       type: object
-      required: [ 'type','window' ]
       properties:
         type:
           type: string
@@ -2709,7 +2686,6 @@ components:
           type: integer
     AnalysisRollingWindow:
       type: object
-      required: [ 'type','window' ]
       properties:
         type:
           type: string
@@ -2719,7 +2695,6 @@ components:
           type: integer
     AnalysisCumulative:
       type: object
-      required: [ 'type' ]
       properties:
         type:
           type: string
@@ -2728,7 +2703,7 @@ components:
     EventSegmentation:
       type: object
       description: event segmentation report type main payload
-      required: [ "time", "group", "intervalUnit", "chartType", "analysis", "events" ]
+      required: ["time", "group", "intervalUnit", "chartType", "analysis", "events"]
       example: |
         {
           "time": {
@@ -2793,7 +2768,7 @@ components:
                   "queryType": "aggregatePropertyPerGroup",
                   "propertyName": "revenue",
                   "propertyType": "event",
-                  "aggregatePerGroup": "sum",
+                  "aggregate_per_group": "sum",
                   "aggregate": "avg"
                 },
                 {
@@ -2880,12 +2855,18 @@ components:
           description: group that is used in aggregations by group. For instance, group by user or group by organizartion.
           example: user
         intervalUnit:
-          $ref: '#/components/schemas/TimeUnit'
+          type: object
+          allOf:
+            - description: the interval unit, by which the grouping will go
+            - $ref: '#/components/schemas/TimeUnit'
+          example: day
         chartType:
-          $ref: '#/components/schemas/EventChartType'
+          type: object
+          allOf:
+            - description: chart type
+            - $ref: '#/components/schemas/EventChartType'
         analysis:
           type: object
-          required: [ 'type' ]
           description: analysis type
           oneOf:
             - $ref: '#/components/schemas/AnalysisLinear'
@@ -2894,7 +2875,7 @@ components:
             - $ref: '#/components/schemas/AnalysisCumulative'
         compare:
           type: object
-          required: [ "offset", "unit" ]
+          required: ["offset", "unit"]
           description: optional comparison with previous period
           example: 1 day - compare with past day
           properties:
@@ -2903,7 +2884,10 @@ components:
               description: offset in past in timeUnit
               example: 1
             unit:
-              $ref: '#/components/schemas/TimeUnit'
+              type: object
+              allOf:
+                - description: time unit
+                - $ref: '#/components/schemas/TimeUnit'
         events:
           type: array
           description: array of events to query
@@ -2923,7 +2907,7 @@ components:
             $ref: '#/components/schemas/EventSegmentationSegment'
     EventSegmentationEvent:
       description: event object
-      required: [ "queries" ]
+      required: ["eventType", "queries"]
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
@@ -2950,7 +2934,6 @@ components:
     EventFilters:
       type: object
       description: event filters
-      required: [ "groups" ]
       properties:
         groupsCondition:
           type: string
@@ -2961,7 +2944,6 @@ components:
           type: array
           items:
             type: object
-            required: [ "filters" ]
             properties:
               filtersCondition:
                 type: string
@@ -2977,7 +2959,6 @@ components:
                     - $ref: '#/components/schemas/EventFilterByGroup'
     EventFilterByCohort:
       type: object
-      required: [ 'type','cohortId' ]
       properties:
         type:
           type: string
@@ -2988,7 +2969,6 @@ components:
           format: int64
     EventFilterByGroup:
       type: object
-      required: [ 'type','groupId' ]
       properties:
         type:
           type: string
@@ -2999,15 +2979,17 @@ components:
     EventFilterByProperty:
       type: object
       description: filter by property
-      required: [ "type", "operation" ]
+      required: ["filterType", "propertyType", "operation"]
       allOf:
-        - $ref: '#/components/schemas/PropertyRef'
         - type: object
           properties:
             type:
               type: string
               enum:
                 - property
+        - $ref: '#/components/schemas/PropertyRef'
+        - type: object
+          properties:
             operation:
               $ref: '#/components/schemas/PropertyFilterOperation'
             value:
@@ -3018,7 +3000,7 @@ components:
     EventQuery:
       type: object
       description: event query
-      required: [ "query" ]
+      required: ["query"]
       properties:
         name:
           type: string
@@ -3033,7 +3015,7 @@ components:
     BreakdownByProperty:
       type: object
       description: breakdown by property.
-      required: [ "type" ]
+      required: ["breakdownType", "propertyType"]
       allOf:
         - type: object
           properties:
@@ -3045,7 +3027,7 @@ components:
     EventSegmentationSegment:
       type: object
       description: segment
-      required: [ "conditions" ]
+      required: ["conditions"]
       properties:
         name:
           type: string
@@ -3066,7 +3048,7 @@ components:
     TimeBetween:
       type: object
       description: time range between fixed values
-      required: [ "type", "from", "to" ]
+      required: ["type", "from", "to"]
       example: |
         {
           "time": {
@@ -3093,7 +3075,7 @@ components:
     TimeFrom:
       type: object
       description: time range between fixed value and current time
-      required: [ "type", "from" ]
+      required: ["type", "from"]
       example: |
         {
           "time": {
@@ -3114,7 +3096,7 @@ components:
     TimeLast:
       type: object
       description: take last N days/weeks
-      required: [ "type", "n", "unit" ]
+      required: ["type", "n", "unit"]
       example: |
         {
           "time": {
@@ -3136,7 +3118,7 @@ components:
     TimeAfterFirstUse:
       type: object
       description: time spent after the first use of event. Use in segmentation
-      required: [ "type", "within", "unit" ]
+      required: ["type", "within", "unit"]
       example: |
         within 2 days after first use - select event which was triggered within 2 days
         of it's first use by user
@@ -3167,7 +3149,7 @@ components:
             "unit":"day"
           }
         }
-      required: [ "type", "unit" ]
+      required: ["type", "unit"]
       properties:
         type:
           type: string
@@ -3208,7 +3190,7 @@ components:
     SegmentConditionHasPropertyValue:
       type: object
       description: check whether the user currently has a property with a value
-      required: [ "type", "propertyName", "operation" ]
+      required: ["type", "propertyName", "operation"]
       properties:
         type:
           type: string
@@ -3230,7 +3212,7 @@ components:
     SegmentConditionHadPropertyValue:
       type: object
       description: check whether the user had a property with a value
-      required: [ "type", "propertyName", "operation", "time" ]
+      required: ["type", "propertyName", "operation", "time"]
       properties:
         type:
           type: string
@@ -3260,7 +3242,7 @@ components:
       type: object
       description: find all users who made event X times
       example: filter who made at least 1 purchase each day
-      required: [ "type", "operation", "time" ]
+      required: ["type", "operation", "time"]
       properties:
         type:
           type: string
@@ -3283,7 +3265,7 @@ components:
       type: object
       description: find all users who made left event X time more/less than right event.
       example: find users who viewed product more than bought product in last 30 days
-      required: [ "type", "operation", "rightEvent", "time" ]
+      required: ["type", "operation", "rightEvent", "time"]
       properties:
         type:
           type: string
@@ -3304,7 +3286,7 @@ components:
       type: object
       description: aggregate property and compare to value
       example: find who made sum(revenue) >$1000 in last 30 days
-      required: [ "type",  "aggregate", "operation", "time" ]
+      required: ["type", "propertyType", "aggregate", "operation", "time"]
       allOf:
         - type: object
           properties:
@@ -3334,7 +3316,7 @@ components:
       type: object
       description: find users with Nth event occurance
       example: find who made an event 3rd time in last month
-      required: [ "type", "propertyType", "operation", "time" ]
+      required: ["type", "propertyType", "operation", "time"]
       properties:
         type:
           type: string
@@ -3355,7 +3337,6 @@ components:
       description: did event condition
       allOf:
         - type: object
-          required: [ 'type' ]
           properties:
             type:
               type: string
@@ -3363,7 +3344,6 @@ components:
                 - didEvent
         - $ref: '#/components/schemas/EventRef'
         - type: object
-          required: [ 'aggregate' ]
           properties:
             filters:
               type: array
@@ -3378,7 +3358,6 @@ components:
                 - $ref: '#/components/schemas/DidEventHistoricalCount'
     SegmentConditionFunnel:
       type: object
-      required: [ 'type' ]
       properties:
         type:
           type: string
@@ -3391,7 +3370,7 @@ components:
     QuerySimple:
       type: object
       description: simple query without any additional agruments
-      required: [ "type", "query" ]
+      required: ["type", "query"]
       properties:
         type:
           type: string
@@ -3408,7 +3387,7 @@ components:
       type: object
       description: event count aggregate by group
       example: avegate event count per user
-      required: [ "type", "aggregate" ]
+      required: ["type", "aggregate"]
       properties:
         type:
           type: string
@@ -3419,10 +3398,10 @@ components:
     QueryAggregatePropertyPerGroup:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
+      required: ["type", "aggregate", "propertyType", "aggregatePerGroup"]
       type: object
       allOf:
         - type: object
-          required: [ 'type' ]
           properties:
             type:
               type: string
@@ -3430,7 +3409,6 @@ components:
                 - aggregatePropertyPerGroup
         - $ref: '#/components/schemas/PropertyRef'
         - type: object
-          required: [ 'aggregate' ]
           properties:
             aggregate:
               $ref: '#/components/schemas/QueryAggregate'
@@ -3439,10 +3417,10 @@ components:
     QueryAggregateProperty:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
+      required: ["type", "aggregate", "propertyType"]
       type: object
       allOf:
         - type: object
-          required: [ 'type' ]
           properties:
             type:
               type: string
@@ -3450,14 +3428,12 @@ components:
                 - aggregateProperty
         - $ref: '#/components/schemas/PropertyRef'
         - type: object
-          required: [ 'aggregate' ]
           properties:
             aggregate:
               $ref: '#/components/schemas/QueryAggregate'
     QueryFormula:
       description: apply formula
       type: object
-      required: [ 'type','formula' ]
       properties:
         type:
           type: string
@@ -3499,40 +3475,53 @@ components:
         - "false"
         - "exists"
         - "empty"
-        - "arrAll"
-        - "arrAny"
-        - "arrNone"
+        - "arr_all"
+        - "arr_any"
+        - "arr_none"
         - "regex"
-
     PropertyRef:
       type: object
-      required: [ 'propertyType' ]
       description: reference to a property by id or name, depends on property type
-      properties:
-        propertyName:
-          type: string
-        propertyId:
-          type: number
-        propertyType:
-          type: string
-          enum:
-            - event
-            - user
-            - custom
+      oneOf:
+        - type: object
+          properties:
+            propertyName:
+              type: string
+            propertyType:
+              type: string
+              enum:
+                - event
+                - user
+        - type: object
+          properties:
+            propertyId:
+              type: number
+            propertyType:
+              type: string
+              enum:
+                - custom
+                - event
+                - user
     EventRef:
       type: object
-      required: [ 'eventType' ]
       description: reference to event by its name and type
-      properties:
-        eventName:
-          type: string
-        eventId:
-          type: number
-        eventType:
-          type: string
-          enum:
-            - custom
-            - regular
+      oneOf:
+        - type: object
+          properties:
+            eventName:
+              type: string
+            eventType:
+              type: string
+              enum:
+                - regular
+        - type: object
+          properties:
+            eventId:
+              type: number
+            eventType:
+              type: string
+              enum:
+                - custom
     EventType:
       type: string
       description: possible event type

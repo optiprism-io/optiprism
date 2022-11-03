@@ -10,11 +10,11 @@ import {
     UpdateEventRequest,
     UpdatePropertyRequest,
     UpdateCustomEventRequest,
-    PropertyValuesListRequest, Configuration,
+    PropertyValuesListRequest,
 } from '@/api'
 
-const api = new EventsApi(new Configuration({ basePath: import.meta.env.VITE_API_BASE_PATH }))
-const propertiesApi = new PropertiesApi(new Configuration({ basePath: import.meta.env.VITE_API_BASE_PATH }))
+const api = new EventsApi()
+const propertiesApi = new PropertiesApi()
 
 export type FilterCustomEvent = {
     filterType: string

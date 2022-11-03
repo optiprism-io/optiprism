@@ -16,8 +16,8 @@ import { Configuration } from '../configuration';
 // Some imports not used depending on template conditions
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, RequestArgs, BaseAPI, RequiredError } from '../base';
-import { AuthLoginBody } from '../models';
 import { ErrorResponse } from '../models';
+import { LoginRequest } from '../models';
 import { RefreshTokenRequest } from '../models';
 import { SignupRequest } from '../models';
 import { TokensResponse } from '../models';
@@ -30,11 +30,11 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
         /**
          * 
          * @summary Basic login
-         * @param {AuthLoginBody} body 
+         * @param {LoginRequest} body 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        basicLogin: async (body: AuthLoginBody, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        basicLogin: async (body: LoginRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'body' is not null or undefined
             if (body === null || body === undefined) {
                 throw new RequiredError('body','Required parameter body was null or undefined when calling basicLogin.');
@@ -202,11 +202,11 @@ export const AuthApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary Basic login
-         * @param {AuthLoginBody} body 
+         * @param {LoginRequest} body 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async basicLogin(body: AuthLoginBody, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => Promise<AxiosResponse<TokensResponse>>> {
+        async basicLogin(body: LoginRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => Promise<AxiosResponse<TokensResponse>>> {
             const localVarAxiosArgs = await AuthApiAxiosParamCreator(configuration).basicLogin(body, options);
             return (axios: AxiosInstance = globalAxios, basePath: string = BASE_PATH) => {
                 const axiosRequestArgs :AxiosRequestConfig = {...localVarAxiosArgs.options, url: basePath + localVarAxiosArgs.url};
@@ -266,11 +266,11 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
         /**
          * 
          * @summary Basic login
-         * @param {AuthLoginBody} body 
+         * @param {LoginRequest} body 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async basicLogin(body: AuthLoginBody, options?: AxiosRequestConfig): Promise<AxiosResponse<TokensResponse>> {
+        async basicLogin(body: LoginRequest, options?: AxiosRequestConfig): Promise<AxiosResponse<TokensResponse>> {
             return AuthApiFp(configuration).basicLogin(body, options).then((request) => request(axios, basePath));
         },
         /**
@@ -315,12 +315,12 @@ export class AuthApi extends BaseAPI {
     /**
      * 
      * @summary Basic login
-     * @param {AuthLoginBody} body 
+     * @param {LoginRequest} body 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof AuthApi
      */
-    public async basicLogin(body: AuthLoginBody, options?: AxiosRequestConfig) : Promise<AxiosResponse<TokensResponse>> {
+    public async basicLogin(body: LoginRequest, options?: AxiosRequestConfig) : Promise<AxiosResponse<TokensResponse>> {
         return AuthApiFp(this.configuration).basicLogin(body, options).then((request) => request(this.axios, this.basePath));
     }
     /**

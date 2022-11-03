@@ -11,6 +11,8 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
+import { EventRecord } from './event-record';
+import { ListEventRecordsResponse } from './list-event-records-response';
 import { ListResponseMetadata } from './list-response-metadata';
 import { ListResponseMetadataMeta } from './list-response-metadata-meta';
 /**
@@ -18,7 +20,7 @@ import { ListResponseMetadataMeta } from './list-response-metadata-meta';
  * @export
  * @interface InlineResponse2006
  */
-export interface InlineResponse2006 {
+export interface InlineResponse2006 extends ListEventRecordsResponse {
     /**
      * 
      * @type {ListResponseMetadataMeta}

@@ -1026,6 +1026,12 @@
     "normalize-path" "^3.0.0"
     "picomatch" "^2.0.4"
 
+"api@file:frontend/packages/api":
+  "resolved" "file:frontend/packages/api"
+  "version" "1.0.0"
+  dependencies:
+    "axios" "^0.21.1"
+
 "argparse@^2.0.1":
   "integrity" "sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q=="
   "resolved" "https://registry.npmjs.org/argparse/-/argparse-2.0.1.tgz"
@@ -1801,7 +1807,7 @@
     "tape" "^4.5.1"
     "uglify-js" "^2.6.2"
 
-"follow-redirects@^1.14.9":
+"follow-redirects@^1.14.0", "follow-redirects@^1.14.9":
   "integrity" "sha512-VQLG33o04KaQ8uYi2tVNbdrWp1QWxNNea+nmIB4EVM28v0hmP17z7aG1+wAkNzVq4KeXTq3221ye5qTJP91JwA=="
   "resolved" "https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.15.2.tgz"
   "version" "1.15.2"

@@ -1,9 +1,25 @@
-import {describe, expect, test, beforeAll} from 'vitest'
+import {beforeAll, describe, expect, test} from 'vitest'
 
 import axios from 'axios'
 import jwt from 'jsonwebtoken'
-import {isDate} from '../../src/api3/calendarHelper'
-import {AuthApi, AuthLoginBody, Configuration, RefreshTokenRequest} from '../../src/api2'
+import {
+    AnalysisCumulative,
+    AnalysisCumulativeTypeEnum, AnalysisLinear, AnalysisRollingAverage, AnalysisRollingWindow,
+    AuthApi,
+    AuthLoginBody,
+    Configuration,
+    EventChartType,
+    EventSegmentation,
+    RefreshTokenRequest,
+    TimeBetween,
+    TimeBetweenTypeEnum,
+    TimeFrom,
+    TimeFromTypeEnum,
+    TimeLast,
+    TimeLastTypeEnum,
+    TimeUnit
+} from 'api'
+
 const AUTH_HEADER_KEY = 'authorization'
 const JWT_KEY = 'access_token_key'
 
@@ -22,7 +38,6 @@ describe('Unauthorized', () => {
         })
     })
 })
-/*
 
 describe('Authorized', () => {
     beforeAll(() => {
@@ -34,30 +49,50 @@ describe('Authorized', () => {
         axios.defaults.headers.common[AUTH_HEADER_KEY] = `Bearer ${token}`
     })
 
-    describe('queries', () => {
+    describe.concurrent('queries', () => {
         test.concurrent('Event Segmentation', async () => {
+            const time: (TimeBetween | TimeFrom | TimeLast) = [
+                <TimeBetween>{
+                    type: TimeBetweenTypeEnum.Between,
+                    from: new Date(1),
+                    to: new Date(1),
+                },
+                <TimeFrom>{
+                    type: TimeFromTypeEnum.From,
+                    from: new Date(1),
+                },
+                <TimeLast>{
+                    type: TimeLastTypeEnum.Last,
+                    n: 1,
+                    unit: TimeUnit.Day,
+                }
+            ];
+
+            const analysis: (AnalysisLinear | AnalysisRollingAverage | AnalysisRollingWindow | AnalysisCumulative) = [
+                <AnalysisLinear>{
+
+                }
+            ]
             const es: EventSegmentation = {
                 time: <TimeBetween>{
                     type: TimeBetweenTypeEnum.Between,
-                    from: '2017-07-21T17:32:28Z',
-                    to: '2017-07-21T17:32:28Z',
-                    chartType: EventChartType.Bar,
-                    analysis: <AnalysisCumulative>{
-                        type: AnalysisCumulativeTypeEnum.Cumulative
-                    }
+                    from: new Date(1),
+                    to: new Date(1),
+                },
+                chartType: EventChartType.Bar,
+                analysis: <AnalysisCumulative>{
+                    type: AnalysisCumulativeTypeEnum.Cumulative
                 },
                 group: 'users',
                 intervalUnit: TimeUnit.Day,
-                compare: <EventSegmentationCompare>{
+                compare: {
                     offset: 1,
                     unit: TimeUnit.Day
                 },
-                events: <EventSegmentationEvent[]>[{
-                    eventType
-                }]
+                events: <EventSegmentationEvent[]
             }
+
             await expect(queriesService.eventSegmentation(1, 1, es)).resolves.not.toThrow()
         })
     })
 })
-*/

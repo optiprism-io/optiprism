@@ -7,7 +7,7 @@ import {
     TimeFrom,
     TimeLast,
 } from '@/api'
-import queriesService from '@/api/services/queries.service';
+import dataService from '@/api/services/datas.service';
 import { useCommonStore } from '@/stores/common';
 import { useStepsStore } from '@/stores/funnels/steps';
 import { useEventName } from '@/helpers/useEventName';
@@ -145,7 +145,7 @@ export const useFunnelsStore = defineStore('funnels', {
             this.loading = true
 
             try {
-                const res = await queriesService.funnelQuery(commonStore.organizationId, commonStore.projectId, {
+                const res = await dataService.funnelQuery(commonStore.organizationId, commonStore.projectId, {
                     time: this.timeRequest,
                     timeWindow: {
                         n: stepsStore.size,

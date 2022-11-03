@@ -536,7 +536,7 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             if (propertyId === null || propertyId === undefined) {
                 throw new RequiredError('propertyId','Required parameter propertyId was null or undefined when calling getUserProperty.');
             }
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-proerties/{propertyId}`
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties/{propertyId}`
                 .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
                 .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
                 .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));

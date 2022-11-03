@@ -11,6 +11,8 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
+import { CustomProperty } from './custom-property';
+import { ListCustomPropertiesResponse } from './list-custom-properties-response';
 import { ListResponseMetadata } from './list-response-metadata';
 import { ListResponseMetadataMeta } from './list-response-metadata-meta';
 /**
@@ -18,7 +20,7 @@ import { ListResponseMetadataMeta } from './list-response-metadata-meta';
  * @export
  * @interface InlineResponse2005
  */
-export interface InlineResponse2005 {
+export interface InlineResponse2005 extends ListCustomPropertiesResponse {
     /**
      * 
      * @type {ListResponseMetadataMeta}
