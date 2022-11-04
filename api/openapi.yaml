@@ -2946,7 +2946,12 @@ components:
               type: array
               description: array of event queries
               items:
-                $ref: '#/components/schemas/EventQuery'
+                oneOf:
+                  - $ref: '#/components/schemas/QuerySimple'
+                  - $ref: '#/components/schemas/QueryCountPerGroup'
+                  - $ref: '#/components/schemas/QueryAggregatePropertyPerGroup'
+                  - $ref: '#/components/schemas/QueryAggregateProperty'
+                  - $ref: '#/components/schemas/QueryFormula'
     EventFilters:
       type: object
       description: event filters
@@ -3015,21 +3020,6 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Value'
-    EventQuery:
-      type: object
-      description: event query
-      required: [ "query" ]
-      properties:
-        name:
-          type: string
-        query:
-          type: object
-          oneOf:
-            - $ref: '#/components/schemas/QuerySimple'
-            - $ref: '#/components/schemas/QueryCountPerGroup'
-            - $ref: '#/components/schemas/QueryAggregatePropertyPerGroup'
-            - $ref: '#/components/schemas/QueryAggregateProperty'
-            - $ref: '#/components/schemas/QueryFormula'
     BreakdownByProperty:
       type: object
       description: breakdown by property.

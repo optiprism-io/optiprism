@@ -30,7 +30,7 @@ export interface CreateReportRequest {
      * @type {string}
      * @memberof CreateReportRequest
      */
-    name?: string;
+    name: string;
     /**
      * description
      * @type {string}
@@ -42,5 +42,5 @@ export interface CreateReportRequest {
      * @type {any & EventSegmentation | FunnelQuery}
      * @memberof CreateReportRequest
      */
-    report?: any & EventSegmentation | FunnelQuery;
+    report: any & EventSegmentation | FunnelQuery;
 }

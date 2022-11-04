@@ -23,5 +23,5 @@ export interface UpdateGroupRecordRequest {
      * @type {{ [key: string]: Value; }}
      * @memberof UpdateGroupRecordRequest
      */
-    properties?: { [key: string]: Value; };
+    properties: { [key: string]: Value; };
 }

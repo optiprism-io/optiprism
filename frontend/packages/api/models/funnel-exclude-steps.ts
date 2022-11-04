@@ -22,5 +22,5 @@ export interface FunnelExcludeSteps {
      * @type {any}
      * @memberof FunnelExcludeSteps
      */
-    steps?: any;
+    steps: any;
 }

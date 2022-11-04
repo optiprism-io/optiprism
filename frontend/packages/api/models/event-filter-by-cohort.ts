@@ -22,13 +22,13 @@ export interface EventFilterByCohort {
      * @type {string}
      * @memberof EventFilterByCohort
      */
-    type?: EventFilterByCohortTypeEnum;
+    type: EventFilterByCohortTypeEnum;
     /**
      * 
      * @type {number}
      * @memberof EventFilterByCohort
      */
-    cohortId?: number;
+    cohortId: number;
 }
 
 /**

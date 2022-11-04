@@ -22,5 +22,5 @@ export interface GroupRecordsListRequestSearch {
      * @type {string}
      * @memberof GroupRecordsListRequestSearch
      */
-    term?: string;
+    term: string;
 }

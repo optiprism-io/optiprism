@@ -22,7 +22,7 @@ export interface AnalysisLinear {
      * @type {string}
      * @memberof AnalysisLinear
      */
-    type?: AnalysisLinearTypeEnum;
+    type: AnalysisLinearTypeEnum;
 }
 
 /**

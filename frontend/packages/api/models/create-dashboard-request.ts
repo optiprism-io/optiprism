@@ -29,7 +29,7 @@ export interface CreateDashboardRequest {
      * @type {string}
      * @memberof CreateDashboardRequest
      */
-    name?: string;
+    name: string;
     /**
      * description
      * @type {string}
@@ -41,5 +41,5 @@ export interface CreateDashboardRequest {
      * @type {Array<CreateDashboardRequestRows>}
      * @memberof CreateDashboardRequest
      */
-    rows?: Array<CreateDashboardRequestRows>;
+    rows: Array<CreateDashboardRequestRows>;
 }

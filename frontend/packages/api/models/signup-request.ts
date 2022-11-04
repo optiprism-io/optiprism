@@ -22,19 +22,19 @@ export interface SignupRequest {
      * @type {string}
      * @memberof SignupRequest
      */
-    email?: string;
+    email: string;
     /**
      * 
      * @type {string}
      * @memberof SignupRequest
      */
-    password?: string;
+    password: string;
     /**
      * 
      * @type {string}
      * @memberof SignupRequest
      */
-    passwordRepeat?: string;
+    passwordRepeat: string;
     /**
      * 
      * @type {string}

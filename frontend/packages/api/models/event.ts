@@ -22,13 +22,13 @@ export interface Event {
      * @type {number}
      * @memberof Event
      */
-    id: number;
+    id?: number;
     /**
      * create date
      * @type {Date}
      * @memberof Event
      */
-    createdAt: Date;
+    createdAt?: Date;
     /**
      * update (once updated)
      * @type {Date}
@@ -40,7 +40,7 @@ export interface Event {
      * @type {number}
      * @memberof Event
      */
-    createdBy: number;
+    createdBy?: number;
     /**
      * id of updater User
      * @type {number}
@@ -52,13 +52,13 @@ export interface Event {
      * @type {number}
      * @memberof Event
      */
-    projectId: number;
+    projectId?: number;
     /**
      * the event is a system-wide, shown in any project and can't be modified by a regular user
      * @type {boolean}
      * @memberof Event
      */
-    isSystem: boolean;
+    isSystem?: boolean;
     /**
      * 
      * @type {Array<string>}
@@ -70,7 +70,7 @@ export interface Event {
      * @type {string}
      * @memberof Event
      */
-    name: string;
+    name?: string;
     /**
      * event name to display. If empty then name property is used.
      * @type {string}
@@ -88,7 +88,7 @@ export interface Event {
      * @type {string}
      * @memberof Event
      */
-    status: EventStatusEnum;
+    status?: EventStatusEnum;
     /**
      * array of id of attached to event properties
      * @type {Array<number>}

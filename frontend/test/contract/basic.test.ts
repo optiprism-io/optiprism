@@ -4,12 +4,24 @@ import axios from 'axios'
 import jwt from 'jsonwebtoken'
 import {
     AnalysisCumulative,
-    AnalysisCumulativeTypeEnum, AnalysisLinear, AnalysisRollingAverage, AnalysisRollingWindow,
+    AnalysisCumulativeTypeEnum,
+    AnalysisLinear,
+    AnalysisLinearTypeEnum,
+    AnalysisRollingAverage,
+    AnalysisRollingAverageTypeEnum,
+    AnalysisRollingWindow,
+    AnalysisRollingWindowTypeEnum,
     AuthApi,
-    AuthLoginBody,
+    QueryApi,
+    LoginRequest,
     Configuration,
     EventChartType,
+    EventRefEventTypeEnum,
     EventSegmentation,
+    EventSegmentationEvent,
+    QuerySimple,
+    QuerySimpleQueryEnum,
+    QuerySimpleTypeEnum,
     RefreshTokenRequest,
     TimeBetween,
     TimeBetweenTypeEnum,
@@ -19,6 +31,7 @@ import {
     TimeLastTypeEnum,
     TimeUnit
 } from 'api'
+import {combineInputs} from './helpers'
 
 const AUTH_HEADER_KEY = 'authorization'
 const JWT_KEY = 'access_token_key'
@@ -28,7 +41,7 @@ describe('Unauthorized', () => {
         const authApi = new AuthApi(new Configuration({basePath: import.meta.env.VITE_API_BASE_PATH}));
 
         test.concurrent('Login', async () => {
-            await expect(authApi.basicLogin(<AuthLoginBody>{
+            await expect(authApi.basicLogin(<LoginRequest>{
                 email: 'email',
                 password: 'password'
             })).resolves.not.toThrow()
@@ -51,7 +64,7 @@ describe('Authorized', () => {
 
     describe.concurrent('queries', () => {
         test.concurrent('Event Segmentation', async () => {
-            const time: (TimeBetween | TimeFrom | TimeLast) = [
+            const time: (TimeBetween | TimeFrom | TimeLast)[] = [
                 <TimeBetween>{
                     type: TimeBetweenTypeEnum.Between,
                     from: new Date(1),
@@ -68,31 +81,56 @@ describe('Authorized', () => {
                 }
             ];
 
-            const analysis: (AnalysisLinear | AnalysisRollingAverage | AnalysisRollingWindow | AnalysisCumulative) = [
+            const analysis: (AnalysisLinear | AnalysisRollingAverage | AnalysisRollingWindow | AnalysisCumulative)[] = [
                 <AnalysisLinear>{
-
+                    type: AnalysisLinearTypeEnum.Linear
+                },
+                <AnalysisRollingAverage>{
+                    type: AnalysisRollingAverageTypeEnum.RollingAverage,
+                    window: 10,
+                },
+                <AnalysisRollingWindow>{
+                    type: AnalysisRollingWindowTypeEnum.RollingWindow,
+                    window: 10,
+                },
+                <AnalysisCumulative>{
+                    type: AnalysisCumulativeTypeEnum.Cumulative
                 }
             ]
-            const es: EventSegmentation = {
-                time: <TimeBetween>{
-                    type: TimeBetweenTypeEnum.Between,
-                    from: new Date(1),
-                    to: new Date(1),
-                },
-                chartType: EventChartType.Bar,
-                analysis: <AnalysisCumulative>{
-                    type: AnalysisCumulativeTypeEnum.Cumulative
-                },
-                group: 'users',
-                intervalUnit: TimeUnit.Day,
-                compare: {
-                    offset: 1,
-                    unit: TimeUnit.Day
-                },
-                events: <EventSegmentationEvent[]
+
+            const compare = {
+                offset: 1,
+                unit: TimeUnit.Day
             }
 
-            await expect(queriesService.eventSegmentation(1, 1, es)).resolves.not.toThrow()
+            const events: EventSegmentationEvent[] = [{
+                eventType: EventRefEventTypeEnum.Regular,
+                eventName: 'event',
+                queries: [
+                    <QuerySimple>{
+                        type: QuerySimpleTypeEnum.Simple,
+                        query: QuerySimpleQueryEnum.CountEvents,
+                    }
+                ]
+            }]
+
+            combineInputs([time, analysis, [null, compare], events], async (vars) => {
+                const es: EventSegmentation = {
+                    time: vars[0],
+                    chartType: EventChartType.Bar,
+                    analysis: vars[1],
+                    compare: vars[2],
+                    group: 'users',
+                    intervalUnit: TimeUnit.Day,
+                    events: [vars[3]]
+                }
+
+                const queryApi = new QueryApi(new Configuration({basePath: import.meta.env.VITE_API_BASE_PATH}));
+                await expect(queryApi.eventSegmentationQuery(1, 1, es)).resolves.not.toThrow()
+
+            })
+
+
         })
     })
 })

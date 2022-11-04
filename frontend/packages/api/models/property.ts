@@ -29,7 +29,7 @@ export interface Property {
      * @type {Date}
      * @memberof Property
      */
-    createdAt: Date;
+    createdAt?: Date;
     /**
      * update (once updated)
      * @type {Date}
@@ -41,7 +41,7 @@ export interface Property {
      * @type {number}
      * @memberof Property
      */
-    createdBy: number;
+    createdBy?: number;
     /**
      * id of updater User
      * @type {number}
@@ -107,7 +107,7 @@ export interface Property {
      * @type {any & DataType}
      * @memberof Property
      */
-    dataType?: any & DataType;
+    dataType: any & DataType;
     /**
      * nullable property might contains null value
      * @type {boolean}

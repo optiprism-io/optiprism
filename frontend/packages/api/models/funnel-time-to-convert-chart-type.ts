@@ -23,13 +23,13 @@ export interface FunnelTimeToConvertChartType {
      * @type {string}
      * @memberof FunnelTimeToConvertChartType
      */
-    type?: FunnelTimeToConvertChartTypeTypeEnum;
+    type: FunnelTimeToConvertChartTypeTypeEnum;
     /**
      * 
      * @type {TimeUnit}
      * @memberof FunnelTimeToConvertChartType
      */
-    intervalUnit?: TimeUnit;
+    intervalUnit: TimeUnit;
     /**
      * 
      * @type {number}

@@ -34,7 +34,7 @@ export interface PropertyRef {
      * @type {string}
      * @memberof PropertyRef
      */
-    propertyType?: PropertyRefPropertyTypeEnum;
+    propertyType: PropertyRefPropertyTypeEnum;
 }
 
 /**

@@ -22,13 +22,13 @@ export interface QueryFormula {
      * @type {string}
      * @memberof QueryFormula
      */
-    type?: QueryFormulaTypeEnum;
+    type: QueryFormulaTypeEnum;
     /**
      * 
      * @type {string}
      * @memberof QueryFormula
      */
-    formula?: string;
+    formula: string;
 }
 
 /**

@@ -34,7 +34,7 @@ export interface EventRecordsListRequest {
      * @type {string}
      * @memberof EventRecordsListRequest
      */
-    group?: string;
+    group: string;
     /**
      * 
      * @type {EventRecordsListRequestSearch}

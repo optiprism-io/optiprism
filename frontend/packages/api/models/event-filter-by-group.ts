@@ -22,13 +22,13 @@ export interface EventFilterByGroup {
      * @type {string}
      * @memberof EventFilterByGroup
      */
-    type?: EventFilterByGroupTypeEnum;
+    type: EventFilterByGroupTypeEnum;
     /**
      * 
      * @type {number}
      * @memberof EventFilterByGroup
      */
-    groupId?: number;
+    groupId: number;
 }
 
 /**

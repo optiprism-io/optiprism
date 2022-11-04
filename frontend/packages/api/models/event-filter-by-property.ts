@@ -25,7 +25,7 @@ export interface EventFilterByProperty extends PropertyRef {
      * @type {string}
      * @memberof EventFilterByProperty
      */
-    type?: EventFilterByPropertyTypeEnum;
+    type: EventFilterByPropertyTypeEnum;
     /**
      * 
      * @type {PropertyFilterOperation}

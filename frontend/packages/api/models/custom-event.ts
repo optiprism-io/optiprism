@@ -23,13 +23,13 @@ export interface CustomEvent {
      * @type {number}
      * @memberof CustomEvent
      */
-    id: number;
+    id?: number;
     /**
      * 
      * @type {Date}
      * @memberof CustomEvent
      */
-    createdAt: Date;
+    createdAt?: Date;
     /**
      * 
      * @type {Date}
@@ -41,7 +41,7 @@ export interface CustomEvent {
      * @type {number}
      * @memberof CustomEvent
      */
-    createdBy: number;
+    createdBy?: number;
     /**
      * 
      * @type {number}
@@ -53,25 +53,25 @@ export interface CustomEvent {
      * @type {number}
      * @memberof CustomEvent
      */
-    projectId: number;
+    projectId?: number;
     /**
      * 
      * @type {boolean}
      * @memberof CustomEvent
      */
-    isSystem: boolean;
+    isSystem?: boolean;
     /**
      * 
      * @type {string}
      * @memberof CustomEvent
      */
-    status: CustomEventStatusEnum;
+    status?: CustomEventStatusEnum;
     /**
      * 
      * @type {string}
      * @memberof CustomEvent
      */
-    name: string;
+    name?: string;
     /**
      * 
      * @type {string}

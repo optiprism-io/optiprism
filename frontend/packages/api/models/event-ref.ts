@@ -34,7 +34,7 @@ export interface EventRef {
      * @type {string}
      * @memberof EventRef
      */
-    eventType?: EventRefEventTypeEnum;
+    eventType: EventRefEventTypeEnum;
 }
 
 /**

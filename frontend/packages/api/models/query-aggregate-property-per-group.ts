@@ -48,7 +48,7 @@ export interface QueryAggregatePropertyPerGroup {
      * @type {QueryAggregate}
      * @memberof QueryAggregatePropertyPerGroup
      */
-    aggregatePerGroup: QueryAggregate;
+    aggregatePerGroup?: QueryAggregate;
 }
 
 /**

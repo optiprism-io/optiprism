@@ -24,7 +24,7 @@ export interface FunnelEvent extends EventRef {
      * @type {Array<EventFilterByProperty>}
      * @memberof FunnelEvent
      */
-    filters?: Array<EventFilterByProperty>;
+    filters: Array<EventFilterByProperty>;
 }
 
 

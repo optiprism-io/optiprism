@@ -23,13 +23,13 @@ export interface FunnelQueryTimeWindow {
      * @type {number}
      * @memberof FunnelQueryTimeWindow
      */
-    n?: number;
+    n: number;
     /**
      * 
      * @type {TimeUnitWithSession}
      * @memberof FunnelQueryTimeWindow
      */
-    unit?: TimeUnitWithSession;
+    unit: TimeUnitWithSession;
     /**
      * 
      * @type {string}

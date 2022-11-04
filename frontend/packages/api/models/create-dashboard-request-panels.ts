@@ -22,19 +22,19 @@ export interface CreateDashboardRequestPanels {
      * @type {number}
      * @memberof CreateDashboardRequestPanels
      */
-    span?: number;
+    span: number;
     /**
      * 
      * @type {string}
      * @memberof CreateDashboardRequestPanels
      */
-    type?: CreateDashboardRequestPanelsTypeEnum;
+    type: CreateDashboardRequestPanelsTypeEnum;
     /**
      * 
      * @type {number}
      * @memberof CreateDashboardRequestPanels
      */
-    reportId?: number;
+    reportId: number;
 }
 
 /**

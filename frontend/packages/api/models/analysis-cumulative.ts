@@ -22,7 +22,7 @@ export interface AnalysisCumulative {
      * @type {string}
      * @memberof AnalysisCumulative
      */
-    type?: AnalysisCumulativeTypeEnum;
+    type: AnalysisCumulativeTypeEnum;
 }
 
 /**

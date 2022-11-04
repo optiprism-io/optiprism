@@ -26,8 +26,8 @@ export interface EventSegmentationCompare {
     offset: number;
     /**
      * 
-     * @type {any & TimeUnit}
+     * @type {TimeUnit}
      * @memberof EventSegmentationCompare
      */
-    unit: any & TimeUnit;
+    unit: TimeUnit;
 }

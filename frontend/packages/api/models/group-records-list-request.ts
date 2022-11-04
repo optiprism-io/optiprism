@@ -34,7 +34,7 @@ export interface GroupRecordsListRequest {
      * @type {string}
      * @memberof GroupRecordsListRequest
      */
-    group?: string;
+    group: string;
     /**
      * 
      * @type {GroupRecordsListRequestSearch}

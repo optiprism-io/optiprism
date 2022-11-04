@@ -23,7 +23,7 @@ export interface SegmentConditionFunnel {
      * @type {string}
      * @memberof SegmentConditionFunnel
      */
-    type?: SegmentConditionFunnelTypeEnum;
+    type: SegmentConditionFunnelTypeEnum;
     /**
      * 
      * @type {number}

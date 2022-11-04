@@ -13,8 +13,12 @@
  */
 import { BreakdownByProperty } from './breakdown-by-property';
 import { EventFilterByProperty } from './event-filter-by-property';
-import { EventQuery } from './event-query';
 import { EventRef } from './event-ref';
+import { QueryAggregateProperty } from './query-aggregate-property';
+import { QueryAggregatePropertyPerGroup } from './query-aggregate-property-per-group';
+import { QueryCountPerGroup } from './query-count-per-group';
+import { QueryFormula } from './query-formula';
+import { QuerySimple } from './query-simple';
 /**
  * event object
  * @export
@@ -35,10 +39,10 @@ export interface EventSegmentationEvent extends EventRef {
     breakdowns?: Array<BreakdownByProperty>;
     /**
      * array of event queries
-     * @type {Array<EventQuery>}
+     * @type {Array<QuerySimple | QueryCountPerGroup | QueryAggregatePropertyPerGroup | QueryAggregateProperty | QueryFormula>}
      * @memberof EventSegmentationEvent
      */
-    queries: Array<EventQuery>;
+    queries: Array<QuerySimple | QueryCountPerGroup | QueryAggregatePropertyPerGroup | QueryAggregateProperty | QueryFormula>;
 }
 
 

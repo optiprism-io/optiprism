@@ -37,19 +37,19 @@ export interface FunnelQuery {
      * @type {TimeBetween | TimeFrom | TimeLast}
      * @memberof FunnelQuery
      */
-    time?: TimeBetween | TimeFrom | TimeLast;
+    time: TimeBetween | TimeFrom | TimeLast;
     /**
      * group that is used in aggregations by group. For instance, group by user or group by organizartion.
      * @type {string}
      * @memberof FunnelQuery
      */
-    group?: string;
+    group: string;
     /**
      * 
      * @type {Array<FunnelQuerySteps>}
      * @memberof FunnelQuery
      */
-    steps?: Array<FunnelQuerySteps>;
+    steps: Array<FunnelQuerySteps>;
     /**
      * 
      * @type {FunnelQueryTimeWindow}
@@ -61,19 +61,19 @@ export interface FunnelQuery {
      * @type {FunnelConversionStepsChartType | FunnelConversionOverTimeChartType | FunnelTimeToConvertChartType | FunnelFrequencyChartType}
      * @memberof FunnelQuery
      */
-    chartType?: FunnelConversionStepsChartType | FunnelConversionOverTimeChartType | FunnelTimeToConvertChartType | FunnelFrequencyChartType;
+    chartType: FunnelConversionStepsChartType | FunnelConversionOverTimeChartType | FunnelTimeToConvertChartType | FunnelFrequencyChartType;
     /**
      * 
      * @type {string}
      * @memberof FunnelQuery
      */
-    count?: FunnelQueryCountEnum;
+    count: FunnelQueryCountEnum;
     /**
      * 
      * @type {string}
      * @memberof FunnelQuery
      */
-    stepOrder?: FunnelQueryStepOrderEnum;
+    stepOrder: FunnelQueryStepOrderEnum;
     /**
      * 
      * @type {any}

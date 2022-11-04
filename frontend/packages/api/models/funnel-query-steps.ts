@@ -23,7 +23,7 @@ export interface FunnelQuerySteps {
      * @type {Array<FunnelEvent>}
      * @memberof FunnelQuerySteps
      */
-    events?: Array<FunnelEvent>;
+    events: Array<FunnelEvent>;
     /**
      * 
      * @type {string}

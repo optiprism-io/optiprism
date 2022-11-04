@@ -22,13 +22,13 @@ export interface AnalysisRollingAverage {
      * @type {string}
      * @memberof AnalysisRollingAverage
      */
-    type?: AnalysisRollingAverageTypeEnum;
+    type: AnalysisRollingAverageTypeEnum;
     /**
      * 
      * @type {number}
      * @memberof AnalysisRollingAverage
      */
-    window?: number;
+    window: number;
 }
 
 /**

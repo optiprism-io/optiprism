@@ -29,7 +29,7 @@ export interface EventFilters {
      * @type {Array<EventFiltersGroups>}
      * @memberof EventFilters
      */
-    groups?: Array<EventFiltersGroups>;
+    groups: Array<EventFiltersGroups>;
 }
 
 /**

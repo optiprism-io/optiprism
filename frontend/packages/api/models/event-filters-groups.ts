@@ -31,7 +31,7 @@ export interface EventFiltersGroups {
      * @type {Array<EventFilterByCohort | EventFilterByProperty | EventFilterByGroup>}
      * @memberof EventFiltersGroups
      */
-    filters?: Array<EventFilterByCohort | EventFilterByProperty | EventFilterByGroup>;
+    filters: Array<EventFilterByCohort | EventFilterByProperty | EventFilterByGroup>;
 }
 
 /**

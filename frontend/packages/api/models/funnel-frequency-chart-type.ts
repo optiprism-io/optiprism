@@ -22,7 +22,7 @@ export interface FunnelFrequencyChartType {
      * @type {string}
      * @memberof FunnelFrequencyChartType
      */
-    type?: FunnelFrequencyChartTypeTypeEnum;
+    type: FunnelFrequencyChartTypeTypeEnum;
 }
 
 /**

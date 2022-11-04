@@ -45,16 +45,16 @@ export interface EventSegmentation {
     group: string;
     /**
      * 
-     * @type {any & TimeUnit}
+     * @type {TimeUnit}
      * @memberof EventSegmentation
      */
-    intervalUnit: any & TimeUnit;
+    intervalUnit: TimeUnit;
     /**
      * 
-     * @type {any & EventChartType}
+     * @type {EventChartType}
      * @memberof EventSegmentation
      */
-    chartType: any & EventChartType;
+    chartType: EventChartType;
     /**
      * analysis type
      * @type {AnalysisLinear | AnalysisRollingAverage | AnalysisRollingWindow | AnalysisCumulative}

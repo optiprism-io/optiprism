@@ -40,7 +40,7 @@ export interface SegmentConditionDidEvent {
      * @type {string}
      * @memberof SegmentConditionDidEvent
      */
-    eventType?: SegmentConditionDidEventEventTypeEnum;
+    eventType: SegmentConditionDidEventEventTypeEnum;
     /**
      * 
      * @type {Array<EventFilterByProperty>}
@@ -52,7 +52,7 @@ export interface SegmentConditionDidEvent {
      * @type {DidEventCount | DidEventRelativeCount | DidEventAggregateProperty | DidEventHistoricalCount}
      * @memberof SegmentConditionDidEvent
      */
-    aggregate?: DidEventCount | DidEventRelativeCount | DidEventAggregateProperty | DidEventHistoricalCount;
+    aggregate: DidEventCount | DidEventRelativeCount | DidEventAggregateProperty | DidEventHistoricalCount;
 }
 
 /**

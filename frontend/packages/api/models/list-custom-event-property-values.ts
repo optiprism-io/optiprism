@@ -11,17 +11,19 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
-import { CreateDashboardRequestPanels } from './create-dashboard-request-panels';
+import { PropertyRef } from './property-ref';
 /**
  * 
  * @export
- * @interface CreateDashboardRequestRows
+ * @interface ListCustomEventPropertyValues
  */
-export interface CreateDashboardRequestRows {
+export interface ListCustomEventPropertyValues extends PropertyRef {
     /**
      * 
-     * @type {Array<CreateDashboardRequestPanels>}
-     * @memberof CreateDashboardRequestRows
+     * @type {number}
+     * @memberof ListCustomEventPropertyValues
      */
-    panels: Array<CreateDashboardRequestPanels>;
+    eventId: number;
 }
+
+

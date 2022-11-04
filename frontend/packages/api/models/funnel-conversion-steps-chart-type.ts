@@ -22,7 +22,7 @@ export interface FunnelConversionStepsChartType {
      * @type {string}
      * @memberof FunnelConversionStepsChartType
      */
-    type?: FunnelConversionStepsChartTypeTypeEnum;
+    type: FunnelConversionStepsChartTypeTypeEnum;
 }
 
 /**
