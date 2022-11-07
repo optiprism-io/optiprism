@@ -13,30 +13,19 @@
  */
 import { PropertyRef } from './property-ref';
 import { QueryAggregate } from './query-aggregate';
+import { QueryAggregatePerGroup } from './query-aggregate-per-group';
 /**
  * aggregate of property per by group
  * @export
  * @interface QueryAggregatePropertyPerGroup
  */
-export interface QueryAggregatePropertyPerGroup {
+export interface QueryAggregatePropertyPerGroup extends PropertyRef {
     /**
      * 
      * @type {string}
      * @memberof QueryAggregatePropertyPerGroup
      */
-    propertyName?: string;
-    /**
-     * 
-     * @type {number}
-     * @memberof QueryAggregatePropertyPerGroup
-     */
-    propertyId?: number;
-    /**
-     * 
-     * @type {string}
-     * @memberof QueryAggregatePropertyPerGroup
-     */
-    propertyType: QueryAggregatePropertyPerGroupPropertyTypeEnum;
+    type: QueryAggregatePropertyPerGroupTypeEnum;
     /**
      * 
      * @type {QueryAggregate}
@@ -45,19 +34,17 @@ export interface QueryAggregatePropertyPerGroup {
     aggregate: QueryAggregate;
     /**
      * 
-     * @type {QueryAggregate}
+     * @type {QueryAggregatePerGroup}
      * @memberof QueryAggregatePropertyPerGroup
      */
-    aggregatePerGroup?: QueryAggregate;
+    aggregatePerGroup: QueryAggregatePerGroup;
 }
 
 /**
     * @export
     * @enum {string}
     */
-export enum QueryAggregatePropertyPerGroupPropertyTypeEnum {
-    Event = 'event',
-    User = 'user',
-    Custom = 'custom'
+export enum QueryAggregatePropertyPerGroupTypeEnum {
+    AggregatePropertyPerGroup = 'aggregatePropertyPerGroup'
 }
 

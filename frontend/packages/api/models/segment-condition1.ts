@@ -11,26 +11,10 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
-import { PropertyRef } from './property-ref';
 /**
- * breakdown by property.
+ * 
  * @export
- * @interface BreakdownByProperty
+ * @interface SegmentCondition1
  */
-export interface BreakdownByProperty extends PropertyRef {
-    /**
-     * 
-     * @type {string}
-     * @memberof BreakdownByProperty
-     */
-    type: BreakdownByPropertyTypeEnum;
+export interface SegmentCondition1 {
 }
-
-/**
-    * @export
-    * @enum {string}
-    */
-export enum BreakdownByPropertyTypeEnum {
-    Property = 'property'
-}
-

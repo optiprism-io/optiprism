@@ -11,7 +11,10 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
-import { SegmentCondition } from './segment-condition';
+import { SegmentConditionDidEvent } from './segment-condition-did-event';
+import { SegmentConditionFunnel } from './segment-condition-funnel';
+import { SegmentConditionHadPropertyValue } from './segment-condition-had-property-value';
+import { SegmentConditionHasPropertyValue } from './segment-condition-has-property-value';
 /**
  * segment
  * @export
@@ -26,8 +29,8 @@ export interface EventSegmentationSegment {
     name?: string;
     /**
      * array of conditions
-     * @type {Array<SegmentCondition>}
+     * @type {Array<SegmentConditionHasPropertyValue | SegmentConditionHadPropertyValue | SegmentConditionDidEvent | SegmentConditionFunnel>}
      * @memberof EventSegmentationSegment
      */
-    conditions: Array<SegmentCondition>;
+    conditions: Array<SegmentConditionHasPropertyValue | SegmentConditionHadPropertyValue | SegmentConditionDidEvent | SegmentConditionFunnel>;
 }

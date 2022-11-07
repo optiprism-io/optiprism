@@ -3025,13 +3025,13 @@ components:
       description: breakdown by property.
       required: [ "type" ]
       allOf:
+        - $ref: '#/components/schemas/PropertyRef'
         - type: object
           properties:
             type:
               type: string
               enum:
                 - property
-        - $ref: '#/components/schemas/PropertyRef'
     EventSegmentationSegment:
       type: object
       description: segment
@@ -3045,14 +3045,13 @@ components:
           type: array
           description: array of conditions
           items:
-            $ref: '#/components/schemas/SegmentCondition'
-    SegmentCondition:
-      type: object
-      oneOf:
-        - $ref: '#/components/schemas/SegmentConditionHasPropertyValue'
-        - $ref: '#/components/schemas/SegmentConditionHadPropertyValue'
-        - $ref: '#/components/schemas/SegmentConditionDidEvent'
-        - $ref: '#/components/schemas/SegmentConditionFunnel'
+            type: object
+            oneOf:
+              - $ref: '#/components/schemas/SegmentConditionHasPropertyValue'
+              - $ref: '#/components/schemas/SegmentConditionHadPropertyValue'
+              - $ref: '#/components/schemas/SegmentConditionDidEvent'
+              - $ref: '#/components/schemas/SegmentConditionFunnel'
+
     TimeBetween:
       type: object
       description: time range between fixed values
@@ -3208,10 +3207,7 @@ components:
           type: string
           description: property name. Because property here is a user only, we don't need propertyType
         operation:
-          type: object
-          allOf:
-            - description: operation
-            - $ref: '#/components/schemas/PropertyFilterOperation'
+          $ref: '#/components/schemas/PropertyFilterOperation'
         values:
           type: array
           description: one or more values. Doesn't need if operation is "empty" or "exist"
@@ -3230,10 +3226,7 @@ components:
           type: string
           description: property name. Because property here is a user only, we don't need propertyType
         operation:
-          type: object
-          allOf:
-            - description: operation
-            - $ref: '#/components/schemas/PropertyFilterOperation'
+          $ref: '#/components/schemas/PropertyFilterOperation'
         values:
           type: array
           description: one or more values. Doesn't need if operation is "empty" or "exist"
@@ -3274,43 +3267,42 @@ components:
       description: find all users who made left event X time more/less than right event.
       example: find users who viewed product more than bought product in last 30 days
       required: [ "type", "operation", "rightEvent", "time" ]
-      properties:
-        type:
-          type: string
-          enum:
-            - didEventRelativeCount
-        operation:
-          $ref: '#/components/schemas/PropertyFilterOperation'
-        rightEvent:
-          $ref: '#/components/schemas/EventRef'
-        time:
-          type: object
-          oneOf:
-            - $ref: '#/components/schemas/TimeBetween'
-            - $ref: '#/components/schemas/TimeLast'
-            - $ref: '#/components/schemas/TimeAfterFirstUse'
-            - $ref: '#/components/schemas/TimeWindowEach'
+      allOf:
+        - $ref: '#/components/schemas/EventRef'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum:
+                - didEventRelativeCount
+            operation:
+              $ref: '#/components/schemas/PropertyFilterOperation'
+            time:
+              type: object
+              oneOf:
+                - $ref: '#/components/schemas/TimeBetween'
+                - $ref: '#/components/schemas/TimeLast'
+                - $ref: '#/components/schemas/TimeAfterFirstUse'
+                - $ref: '#/components/schemas/TimeWindowEach'
     DidEventAggregateProperty:
       type: object
       description: aggregate property and compare to value
       example: find who made sum(revenue) >$1000 in last 30 days
       required: [ "type",  "aggregate", "operation", "time" ]
       allOf:
+        - $ref: '#/components/schemas/PropertyRef'
         - type: object
           properties:
             type:
               type: string
               enum:
                 - aggregateProperty
-        - $ref: '#/components/schemas/PropertyRef'
-        - type: object
-          properties:
             aggregate:
-              $ref: '#/components/schemas/QueryAggregateProperty'
+              $ref: '#/components/schemas/QueryAggregate'
             operation:
               $ref: '#/components/schemas/PropertyFilterOperation'
             value:
-              type: integer
+              type: number
               description: one or more values. Doesn't need if operation is "empty" or "exist"
             time:
               type: object
@@ -3344,6 +3336,7 @@ components:
     SegmentConditionDidEvent:
       description: did event condition
       allOf:
+        - $ref: '#/components/schemas/EventRef'
         - type: object
           required: [ 'type' ]
           properties:
@@ -3351,7 +3344,6 @@ components:
               type: string
               enum:
                 - didEvent
-        - $ref: '#/components/schemas/EventRef'
         - type: object
           required: [ 'aggregate' ]
           properties:
@@ -3411,6 +3403,7 @@ components:
       example: sum of revenue property per user, then calculate average
       type: object
       allOf:
+        - $ref: '#/components/schemas/PropertyRef'
         - type: object
           required: [ 'type' ]
           properties:
@@ -3418,19 +3411,19 @@ components:
               type: string
               enum:
                 - aggregatePropertyPerGroup
-        - $ref: '#/components/schemas/PropertyRef'
         - type: object
-          required: [ 'aggregate' ]
+          required: [ 'aggregate','aggregatePerGroup' ]
           properties:
             aggregate:
               $ref: '#/components/schemas/QueryAggregate'
             aggregatePerGroup:
-              $ref: '#/components/schemas/QueryAggregate'
+              $ref: '#/components/schemas/QueryAggregatePerGroup'
     QueryAggregateProperty:
       description: aggregate of property per by group
       example: sum of revenue property per user, then calculate average
       type: object
       allOf:
+        - $ref: '#/components/schemas/PropertyRef'
         - type: object
           required: [ 'type' ]
           properties:
@@ -3438,7 +3431,6 @@ components:
               type: string
               enum:
                 - aggregateProperty
-        - $ref: '#/components/schemas/PropertyRef'
         - type: object
           required: [ 'aggregate' ]
           properties:
@@ -3456,6 +3448,19 @@ components:
         formula:
           type: string
     QueryAggregate:
+      type: string
+      enum:
+        - sum
+        - avg
+        - median
+        - min
+        - max
+        - distinctCount
+        - 25thPercentile
+        - 75thPercentile
+        - 90thPercentile
+        - 99thPercentile
+    QueryAggregatePerGroup:
       type: string
       enum:
         - sum

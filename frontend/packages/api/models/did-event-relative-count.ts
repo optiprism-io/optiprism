@@ -22,7 +22,7 @@ import { TimeWindowEach } from './time-window-each';
  * @export
  * @interface DidEventRelativeCount
  */
-export interface DidEventRelativeCount {
+export interface DidEventRelativeCount extends EventRef {
     /**
      * 
      * @type {string}
@@ -35,12 +35,6 @@ export interface DidEventRelativeCount {
      * @memberof DidEventRelativeCount
      */
     operation: PropertyFilterOperation;
-    /**
-     * 
-     * @type {EventRef}
-     * @memberof DidEventRelativeCount
-     */
-    rightEvent: EventRef;
     /**
      * 
      * @type {TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach}

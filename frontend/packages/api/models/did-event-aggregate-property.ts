@@ -13,7 +13,7 @@
  */
 import { PropertyFilterOperation } from './property-filter-operation';
 import { PropertyRef } from './property-ref';
-import { QueryAggregateProperty } from './query-aggregate-property';
+import { QueryAggregate } from './query-aggregate';
 import { TimeAfterFirstUse } from './time-after-first-use';
 import { TimeBetween } from './time-between';
 import { TimeLast } from './time-last';
@@ -23,31 +23,19 @@ import { TimeWindowEach } from './time-window-each';
  * @export
  * @interface DidEventAggregateProperty
  */
-export interface DidEventAggregateProperty {
+export interface DidEventAggregateProperty extends PropertyRef {
     /**
      * 
      * @type {string}
      * @memberof DidEventAggregateProperty
      */
-    propertyName?: string;
+    type: DidEventAggregatePropertyTypeEnum;
     /**
      * 
-     * @type {number}
+     * @type {QueryAggregate}
      * @memberof DidEventAggregateProperty
      */
-    propertyId?: number;
-    /**
-     * 
-     * @type {string}
-     * @memberof DidEventAggregateProperty
-     */
-    propertyType: DidEventAggregatePropertyPropertyTypeEnum;
-    /**
-     * 
-     * @type {QueryAggregateProperty}
-     * @memberof DidEventAggregateProperty
-     */
-    aggregate: QueryAggregateProperty;
+    aggregate: QueryAggregate;
     /**
      * 
      * @type {PropertyFilterOperation}
@@ -72,9 +60,7 @@ export interface DidEventAggregateProperty {
     * @export
     * @enum {string}
     */
-export enum DidEventAggregatePropertyPropertyTypeEnum {
-    Event = 'event',
-    User = 'user',
-    Custom = 'custom'
+export enum DidEventAggregatePropertyTypeEnum {
+    AggregateProperty = 'aggregateProperty'
 }
 

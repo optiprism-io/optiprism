@@ -22,25 +22,13 @@ import { EventRef } from './event-ref';
  * @export
  * @interface SegmentConditionDidEvent
  */
-export interface SegmentConditionDidEvent {
+export interface SegmentConditionDidEvent extends EventRef {
     /**
      * 
      * @type {string}
      * @memberof SegmentConditionDidEvent
      */
-    eventName?: string;
-    /**
-     * 
-     * @type {number}
-     * @memberof SegmentConditionDidEvent
-     */
-    eventId?: number;
-    /**
-     * 
-     * @type {string}
-     * @memberof SegmentConditionDidEvent
-     */
-    eventType: SegmentConditionDidEventEventTypeEnum;
+    type: SegmentConditionDidEventTypeEnum;
     /**
      * 
      * @type {Array<EventFilterByProperty>}
@@ -59,8 +47,7 @@ export interface SegmentConditionDidEvent {
     * @export
     * @enum {string}
     */
-export enum SegmentConditionDidEventEventTypeEnum {
-    Custom = 'custom',
-    Regular = 'regular'
+export enum SegmentConditionDidEventTypeEnum {
+    DidEvent = 'didEvent'
 }
 

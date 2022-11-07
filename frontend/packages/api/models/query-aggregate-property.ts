@@ -18,25 +18,13 @@ import { QueryAggregate } from './query-aggregate';
  * @export
  * @interface QueryAggregateProperty
  */
-export interface QueryAggregateProperty {
+export interface QueryAggregateProperty extends PropertyRef {
     /**
      * 
      * @type {string}
      * @memberof QueryAggregateProperty
      */
-    propertyName?: string;
-    /**
-     * 
-     * @type {number}
-     * @memberof QueryAggregateProperty
-     */
-    propertyId?: number;
-    /**
-     * 
-     * @type {string}
-     * @memberof QueryAggregateProperty
-     */
-    propertyType: QueryAggregatePropertyPropertyTypeEnum;
+    type: QueryAggregatePropertyTypeEnum;
     /**
      * 
      * @type {QueryAggregate}
@@ -49,9 +37,7 @@ export interface QueryAggregateProperty {
     * @export
     * @enum {string}
     */
-export enum QueryAggregatePropertyPropertyTypeEnum {
-    Event = 'event',
-    User = 'user',
-    Custom = 'custom'
+export enum QueryAggregatePropertyTypeEnum {
+    AggregateProperty = 'aggregateProperty'
 }
 

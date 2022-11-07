@@ -36,10 +36,10 @@ export interface SegmentConditionHadPropertyValue {
     propertyName: string;
     /**
      * 
-     * @type {any & PropertyFilterOperation}
+     * @type {PropertyFilterOperation}
      * @memberof SegmentConditionHadPropertyValue
      */
-    operation: any & PropertyFilterOperation;
+    operation: PropertyFilterOperation;
     /**
      * one or more values. Doesn't need if operation is \"empty\" or \"exist\"
      * @type {Array<Value>}

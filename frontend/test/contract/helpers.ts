@@ -4,7 +4,26 @@ function* generateInput(v: any[]) {
     }
 }
 
-export const combineInputs = (vars: any[][], cb: (vars: any[]) => void) => {
+const {gen} = new class {
+    count = 0;
+    idx = new Map<number, number>();
+    gen = (key: number, arr: any[]) => {
+        let idx = this.idx.get(key)
+        if (idx == undefined) {
+            this.idx.set(key, arr.length - 1)
+            return arr[arr.length - 1]
+        } else {
+            const ret = arr[idx]
+            if (idx > 0) {
+                idx--
+                this.idx.set(key, idx)
+            }
+            return ret
+        }
+    }
+}
+
+export const combineInputs = async (vars: any[][], cb: (vars: any[]) => void) => {
     let gen = vars.map((v) => generateInput(v))
     let push = new Array<any>(vars.length);
     let closed = new Array<boolean>(vars.length);
@@ -24,6 +43,6 @@ export const combineInputs = (vars: any[][], cb: (vars: any[]) => void) => {
                 push[i] = v.value
             }
         }
-        cb(push)
+        await cb(push)
     }
 }

@@ -11,26 +11,21 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
-import { PropertyRef } from './property-ref';
 /**
- * breakdown by property.
+ * 
  * @export
- * @interface BreakdownByProperty
+ * @enum {string}
  */
-export interface BreakdownByProperty extends PropertyRef {
-    /**
-     * 
-     * @type {string}
-     * @memberof BreakdownByProperty
-     */
-    type: BreakdownByPropertyTypeEnum;
-}
-
-/**
-    * @export
-    * @enum {string}
-    */
-export enum BreakdownByPropertyTypeEnum {
-    Property = 'property'
+export enum QueryAggregatePerGroup {
+    Sum = 'sum',
+    Avg = 'avg',
+    Median = 'median',
+    Min = 'min',
+    Max = 'max',
+    DistinctCount = 'distinctCount',
+    _25thPercentile = '25thPercentile',
+    _75thPercentile = '75thPercentile',
+    _90thPercentile = '90thPercentile',
+    _99thPercentile = '99thPercentile'
 }
 
