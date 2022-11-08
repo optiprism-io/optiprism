@@ -5,6 +5,7 @@
             :default-options="defaultOptions"
             :options="props.options"
             :chart-constructor="Column"
+            :height="props.options?.height ? `${props.options.height}px` : '350px'"
         />
     </div>
 </template>

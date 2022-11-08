@@ -1,13 +1,15 @@
 <template>
     <div class="pf-c-dropdown pf-m-expanded">
         <VDropdown
-            placement="bottom-start"
+            :placement="placementMenu"
             :triggers="[]"
             :shown="isOpen"
             @hide="onHide"
         >
             <template v-if="$slots.button">
-                <slot name="button" />
+                <div @click="onToggle">
+                    <slot name="button" />
+                </div>
             </template>
             <button
                 v-else
@@ -22,6 +24,7 @@
                 @click="onToggle"
             >
                 <span
+                    v-if="textValue"
                     class="pf-c-dropdown__toggle-text"
                     :class="{
                         'pf-u-color-400': !textValue,
@@ -29,7 +32,10 @@
                 >
                     {{ textValue }}
                 </span>
-                <span class="pf-c-dropdown__toggle-icon">
+                <span
+                    v-if="hasIconArrowButton"
+                    class="pf-c-dropdown__toggle-icon"
+                >
                     <i
                         class="fas fa-caret-down"
                         aria-hidden="true"
@@ -102,6 +108,10 @@ class UiDropdownFactory<T = unknown> {
                     type: String as PropType<string>,
                     default: '',
                 },
+                hasIconArrowButton: {
+                    type: Boolean as PropType<boolean>,
+                    default: true,
+                },
                 textButton: {
                     type: String as PropType<string>,
                     default: '',
@@ -109,6 +119,10 @@ class UiDropdownFactory<T = unknown> {
                 typeButton: {
                     type: String as PropType<string>,
                     default: '',
+                },
+                placementMenu: {
+                    type: String as PropType<string>,
+                    default: 'bottom-start',
                 },
                 isCompact: Boolean as PropType<boolean>,
                 transparent: Boolean as PropType<boolean>,
@@ -174,8 +188,6 @@ export default main;
 }
 
 .pf-c-dropdown {
-    --min-width: 10rem;
-
     &__toggle {
         min-width: var(--min-width);
     }

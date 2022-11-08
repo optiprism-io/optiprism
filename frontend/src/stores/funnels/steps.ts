@@ -1,6 +1,6 @@
 import {defineStore} from 'pinia';
 import {Step} from '@/types/steps';
-import {EventProperty, EventRef} from '@/types/events';
+import { EventRef } from '@/types/events'
 import {EventFilter} from '@/stores/eventSegmentation/events';
 import {
     FunnelQueryStepsInner,

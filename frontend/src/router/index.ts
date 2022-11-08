@@ -12,6 +12,13 @@ export const pagesMap = {
     reportsEventSegmentation: {
         path: '/reports',
         name: 'reportsEventSegmentation',
+    },
+    dashboards: {
+        path: '/dashboards',
+        name: 'dashboards',
+    },
+    funnels: {
+        name: 'reports_funnels'
     }
 }
 
@@ -27,7 +34,7 @@ const routes = [
         children: [
             {
                 path: '',
-                redirect: { name: pagesMap.reportsEventSegmentation.name }
+                redirect: { name: pagesMap.dashboards.name }
             },
             {
                 path: 'users',
@@ -61,6 +68,11 @@ const routes = [
                     },
 
                 ]
+            },
+            {
+                path: pagesMap.dashboards.path,
+                name: pagesMap.dashboards.name,
+                component: () => import('@/pages/Dashboards.vue'),
             },
             {
                 path: 'reports',

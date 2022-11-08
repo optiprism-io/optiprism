@@ -32,34 +32,37 @@ import { pagesMap } from '@/router'
 const i18n = inject<any>('i18n')
 const route = useRoute()
 
-const items = computed(() => {
-    const mapTabs = [
-        {
-            name: i18n.$t('reports.title'),
-            to: {
-                name: pagesMap.reportsEventSegmentation.name,
-            },
-            active: typeof route.name === 'string' && route.name.includes('reports'),
-        },
-        {
-            name: i18n.$t('events.events'),
-            to: {
-                name: pagesMap.eventsLiveStream.name,
-            },
-            active: typeof route.name === 'string' && route.name.includes('events'),
-        },
-        {
-            name: i18n.$t('users.title'),
-            to: {
-                name: 'users',
-            }
-        },
-    ]
+const configNav = [
+    {
+        name: 'dashboards.title',
+        to: pagesMap.dashboards.name,
+        activeKey: 'dashboards',
+    },
+    {
+        name: 'reports.title',
+        to: pagesMap.reportsEventSegmentation.name,
+        activeKey: 'reports',
+    },
+    {
+        name: 'events.events',
+        to: pagesMap.eventsLiveStream.name,
+        activeKey: 'events',
+    },
+    {
+        name: i18n.$t('users.title'),
+        to: 'users',
+        activeKey: 'users',
+    },
+]
 
-    return mapTabs.map(item => {
+const items = computed(() => {
+    return configNav.map(item => {
         return {
-            ...item,
-            active: route.name === item.to.name || item.active,
+            name: i18n.$t(item.name),
+            to: {
+                name: item.to,
+            },
+            active: route.name === item.to || (typeof route.name === 'string' && route.name.includes(item.activeKey)),
         }
     })
 })

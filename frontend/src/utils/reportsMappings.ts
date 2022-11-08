@@ -53,7 +53,7 @@ import {
     EventFilterByPropertyPropertyTypeEnum,
 } from '@/api'
 
-import { useEventsStore, Event, EventQuery, EventBreakdown } from '@/stores/eventSegmentation/events'
+import { useEventsStore, Event, EventQuery, EventBreakdown, ChartType } from '@/stores/eventSegmentation/events'
 import { AggregateId } from '@/types/aggregate'
 import { Step } from '@/types/steps'
 import { EventRef, EventQueryRef, Condition, PropertyRef as PropertyRefEvent, UserCustomProperty } from '@/types/events'
@@ -347,7 +347,7 @@ const mapReportToBreakdowns = (items: BreakdownByProperty[]): EventBreakdown[] =
     })
 }
 
-const mapReportToSteps = async (items: FunnelQueryStepsInner[]): Promise<Step[]> => {
+export const mapReportToSteps = async (items: FunnelQueryStepsInner[]): Promise<Step[]> => {
     return await Promise.all(items.map(async (item): Promise<Step> => {
         return {
             events: item.events ? await Promise.all(item.events.map(async (event) => {
@@ -435,4 +435,5 @@ export const reportToStores = async (id: number) => {
     breakdownsStore.breakdowns = report?.breakdowns ? mapReportToBreakdowns(report.breakdowns) : []
     stepsStore.steps = report?.steps ? await mapReportToSteps(report.steps) : []
     stepsStore.holdingProperties = report?.holdingConstants ? mapReportToHoldingConstants(report.holdingConstants) : []
+    eventsStore.chartType = report?.chartType as ChartType
 }

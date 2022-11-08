@@ -4,6 +4,7 @@ import { customAlphabet } from 'nanoid'
 import { DataType, TokensResponse } from '@/api'
 import { BASE_PATH } from '@/api/base'
 import { EventStatus, UserCustomProperty } from '@/types/events';
+
 import splineChartMocks from '@/mocks/splineChart.json';
 import liveStreamMocks from '@/mocks/reports/liveStream.json'
 import funnelsMocks from '@/mocks/reports/funnels.json'
@@ -13,6 +14,7 @@ import eventMocks from '@/mocks/eventSegmentations/events.json';
 import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
 import customEventsMocks from '@/mocks/eventSegmentations/customEvents.json';
 import reportsMocks from '@/mocks/reports/reports.json'
+import dashboardsMocks from '@/mocks/dashboards'
 
 const alphabet = '0123456789';
 const nanoid = customAlphabet(alphabet, 4);
@@ -29,6 +31,7 @@ export default function ({ environment = 'development' } = {}) {
                 eventProperties: eventPropertiesMocks,
                 userProperties: userPropertiesMocks,
                 reports: reportsMocks,
+                dashboards: dashboardsMocks,
             })
         },
 
@@ -168,7 +171,6 @@ export default function ({ environment = 'development' } = {}) {
                 return splineChartMocks;
             });
 
-
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports`, (schema) => {
                 return {
                     dashboards: schema.db.reports,
@@ -234,6 +236,31 @@ export default function ({ environment = 'development' } = {}) {
                     csrfToken,
                 }
             }, { timing: 200 })
+
+            /**
+             * dashboards
+             */
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards`, (schema) => {
+                return {
+                    dashboards: schema.db.dashboards,
+                    meta: {}
+                }
+            })
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards`, (schema, request) => {
+                const body = JSON.parse(request.requestBody)
+                return schema.db.dashboards.insert({
+                    id: nanoid(),
+                    ...body,
+                })
+            }, { timing: 130 })
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards/:dashboard_id`, (schema, request) => {
+                const property = JSON.parse(request.requestBody)
+                return schema.db.dashboards.update(request.params.dashboard_id, property)
+            }, { timing: 135 })
+            this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards/:dashboard_id`, (schema, request) => {
+                schema.db.dashboards.remove(request.params.dashboard_id)
+                return request.params.dashboard_id;
+            }, { timing: 110 })
         }
     });
 }

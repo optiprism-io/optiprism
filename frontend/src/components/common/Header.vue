@@ -1,14 +1,18 @@
 <template>
     <header class="app-header">
-        <div class="pf-l-flex">
-            <div class="pf-l-flex__item">
-                <div class="app-header__menu">
-                    <UiDropdown
-                        :items="items"
-                        :text-button="'Dashboard'"
-                        :transparent="true"
-                    />
-                </div>
+        <div class="pf-l-flex pf-u-align-items-center">
+            <div class="pf-l-flex__item pf-u-ml-md">
+                <router-link
+                    class="app-header__logo"
+                    to="/dashboards"
+                    aria-current="page"
+                >
+                    <img
+                        class="pf-c-brand"
+                        src="@/assets/img/logo-black.svg"
+                        alt="Optyprism"
+                    >
+                </router-link>
             </div>
             <div class="pf-l-flex__item">
                 <Nav />
@@ -17,23 +21,8 @@
                 <div class="app-header__tools">
                     <div class="pf-c-page__header-tools-group">
                         <div class="pf-c-page__header-tools-item">
-                            <UiButton
-                                :icon="'fas fa-cog'"
-                                class="pf-m-base-light"
-                                aria-label="Settings"
-                            />
-                        </div>
-                        <div class="pf-c-page__header-tools-item">
-                            <UiButton
-                                :icon="'pf-icon pf-icon-help'"
-                                class="pf-m-base-light"
-                                aria-label="Help"
-                            />
-                        </div>
-                    </div>
-                    <div class="pf-c-page__header-tools-group">
-                        <div class="pf-c-page__header-tools-item">
                             <UiDropdown
+                                class="pf-u-mr-md"
                                 :items="userMenu"
                                 :text-button="'User'"
                                 :transparent="true"
@@ -58,19 +47,6 @@ const authStore = useAuthStore()
 const router = useRouter()
 const i18n = inject<any>('i18n')
 const UiDropdown = GenericUiDropdown<string>()
-
-const items = [
-    {
-        key: 1,
-        value: '1',
-        nameDisplay: 'Menu Item 1'
-    },
-    {
-        key: 2,
-        value: '2',
-        nameDisplay: 'Menu Item 2'
-    }
-];
 
 const userMenuMap = {
     LOGOUT: 'logout'
@@ -105,6 +81,11 @@ const selectUserMenu = (item: UiDropdownItem<string>) => {
         margin-left: auto;
         display: flex;
         color: #fff;
+    }
+    &__logo {
+        display: inline-block;
+        width: 110px;
+        margin-top: 6px;
     }
 }
 </style>

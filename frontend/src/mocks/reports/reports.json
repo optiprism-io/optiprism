@@ -268,5 +268,310 @@
                 }
             ]
         }
+    },
+    {
+        "id": "1",
+        "name": "Report for Dashboard",
+        "report": {
+            "type": "eventSegmentation",
+            "time": {
+                "type": "last",
+                "n": 20,
+                "unit": "day"
+            },
+            "group": "user",
+            "intervalUnit": "day",
+            "chartType": "column",
+            "analysis": {
+                "type": "linear"
+            },
+            "events": [
+                {
+                    "eventName": "sign_up",
+                    "queries": [
+                        {
+                            "name": "countEvents",
+                            "query": {
+                                "type": "formula",
+                                "query": "countEvents"
+                            }
+                        },
+                        {
+                            "name": "aggregatePropertyPer",
+                            "query": {
+                                "type": "aggregatePropertyPerGroup",
+                                "propertyType": "event",
+                                "propertyId": "7",
+                                "aggregate": "75thPercentile",
+                                "aggregatePerGroup": "distinctCount"
+                            }
+                        },
+                        {
+                            "name": "aggregateProperty",
+                            "query": {
+                                "type": "aggregateProperty",
+                                "propertyType": "event",
+                                "propertyId": "6",
+                                "aggregate": "min"
+                            }
+                        }
+                    ],
+                    "eventType": "regular",
+                    "eventId": "1",
+                    "filters": []
+                }
+            ]
+        }
+    },
+    {
+        "id": "2",
+        "name": "Report 2",
+        "report": {
+            "type": "eventSegmentation",
+            "time": {
+                "type": "last",
+                "n": 20,
+                "unit": "day"
+            },
+            "group": "user",
+            "intervalUnit": "day",
+            "chartType": "line",
+            "analysis": {
+                "type": "linear"
+            },
+            "events": [
+                {
+                    "eventName": "sign_up",
+                    "queries": [
+                        {
+                            "name": "countEvents",
+                            "query": {
+                                "type": "formula",
+                                "query": "countEvents"
+                            }
+                        },
+                        {
+                            "name": "aggregatePropertyPer",
+                            "query": {
+                                "type": "aggregatePropertyPerGroup",
+                                "propertyType": "event",
+                                "propertyId": "7",
+                                "aggregate": "75thPercentile",
+                                "aggregatePerGroup": "distinctCount"
+                            }
+                        },
+                        {
+                            "name": "aggregateProperty",
+                            "query": {
+                                "type": "aggregateProperty",
+                                "propertyType": "event",
+                                "propertyId": "6",
+                                "aggregate": "min"
+                            }
+                        }
+                    ],
+                    "eventType": "regular",
+                    "eventId": "1",
+                    "filters": []
+                }
+            ]
+        }
+    },
+    {
+        "id": "3",
+        "name": "Report 3",
+        "report": {
+            "type": "eventSegmentation",
+            "time": {
+                "type": "last",
+                "n": 20,
+                "unit": "day"
+            },
+            "group": "user",
+            "intervalUnit": "day",
+            "chartType": "column",
+            "analysis": {
+                "type": "linear"
+            },
+            "events": [
+                {
+                    "eventName": "sign_up",
+                    "queries": [
+                        {
+                            "name": "countEvents",
+                            "query": {
+                                "type": "formula",
+                                "query": "countEvents"
+                            }
+                        },
+                        {
+                            "name": "aggregatePropertyPer",
+                            "query": {
+                                "type": "aggregatePropertyPerGroup",
+                                "propertyType": "event",
+                                "propertyId": "7",
+                                "aggregate": "75thPercentile",
+                                "aggregatePerGroup": "distinctCount"
+                            }
+                        },
+                        {
+                            "name": "aggregateProperty",
+                            "query": {
+                                "type": "aggregateProperty",
+                                "propertyType": "event",
+                                "propertyId": "6",
+                                "aggregate": "min"
+                            }
+                        }
+                    ],
+                    "eventType": "regular",
+                    "eventId": "1",
+                    "filters": []
+                }
+            ]
+        }
+    },
+    {
+        "id": "4",
+        "name": "Report 4",
+        "report": {
+            "type": "eventSegmentation",
+            "time": {
+                "type": "last",
+                "n": 20,
+                "unit": "day"
+            },
+            "group": "user",
+            "intervalUnit": "day",
+            "chartType": "pie",
+            "analysis": {
+                "type": "linear"
+            },
+            "events": [
+                {
+                    "eventName": "sign_up",
+                    "queries": [
+                        {
+                            "name": "countEvents",
+                            "query": {
+                                "type": "formula",
+                                "query": "countEvents"
+                            }
+                        },
+                        {
+                            "name": "aggregatePropertyPer",
+                            "query": {
+                                "type": "aggregatePropertyPerGroup",
+                                "propertyType": "event",
+                                "propertyId": "7",
+                                "aggregate": "75thPercentile",
+                                "aggregatePerGroup": "distinctCount"
+                            }
+                        },
+                        {
+                            "name": "aggregateProperty",
+                            "query": {
+                                "type": "aggregateProperty",
+                                "propertyType": "event",
+                                "propertyId": "6",
+                                "aggregate": "min"
+                            }
+                        }
+                    ],
+                    "eventType": "regular",
+                    "eventId": "1",
+                    "filters": []
+                }
+            ]
+        }
+    },
+    {
+        "id": "8747",
+        "name": "Funnels Report #1",
+        "report": {
+            "type": "funnel",
+            "time": {
+                "type": "last",
+                "n": 30,
+                "unit": "day"
+            },
+            "group": "user",
+            "intervalUnit": "day",
+            "chartType": "line",
+            "analysis": {
+                "type": "linear"
+            },
+            "events": [],
+            "filters": {
+                "groupsCondition": "and",
+                "groups": [
+                    {
+                        "filtersCondition": "and",
+                        "filters": []
+                    }
+                ]
+            },
+            "breakdowns": [],
+            "segments": [
+                {
+                    "name": "Segment 1",
+                    "conditions": []
+                },
+                {
+                    "name": "Segment 2",
+                    "conditions": []
+                }
+            ],
+            "steps": [
+                {
+                    "events": [
+                        {
+                            "eventType": "custom",
+                            "eventId": 2,
+                            "eventName": "Find Product",
+                            "filters": []
+                        }
+                    ],
+                    "order": "any"
+                },
+                {
+                    "events": [
+                        {
+                            "eventType": "regular",
+                            "eventId": "1",
+                            "eventName": "Sign Up",
+                            "filters": [
+                                {
+                                    "propertyName": "productName",
+                                    "propertyId": "5",
+                                    "propertyType": "event",
+                                    "type": "property",
+                                    "operation": "eq",
+                                    "value": [
+                                        "Lamp",
+                                        "Doors"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "eventType": "regular",
+                            "eventId": "1",
+                            "eventName": "Sign Up",
+                            "filters": []
+                        }
+                    ],
+                    "order": "any"
+                }
+            ],
+            "holdingConstants": [
+                {
+                    "propertyType": "event",
+                    "propertyId": "3",
+                    "propertyName": "product_category"
+                }
+            ],
+            "exclude": []
+        }
     }
 ]

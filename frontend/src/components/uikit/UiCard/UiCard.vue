@@ -1,7 +1,21 @@
 <template>
     <UiCardContainer>
         <UiCardTitle>
-            {{ title }}
+            <router-link
+                v-if="link"
+                :to="link"
+            >
+                {{ title }}
+            </router-link>
+            <span v-else>
+                {{ title }}
+            </span>
+            <template
+                v-if="$slots.rightTitle"
+                #right
+            >
+                <slot name="rightTitle" />
+            </template>
         </UiCardTitle>
 
         <UiCardBody>
@@ -19,6 +33,7 @@ defineProps({
     title: {
         type: String,
         default: '',
-    }
+    },
+    link: [Object, String]
 })
 </script>

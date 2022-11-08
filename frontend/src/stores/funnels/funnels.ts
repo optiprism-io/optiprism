@@ -15,7 +15,7 @@ import { useFilterGroupsStore } from '@/stores/reports/filters'
 import { useBreakdownsStore } from '@/stores/reports/breakdowns'
 import { useSegmentsStore } from '@/stores/reports/segments'
 
-const convertColumns = (columns: DataTableResponseColumnsInner[], stepNumbers: number[]): number[][] => {
+export const convertColumns = (columns: DataTableResponseColumnsInner[], stepNumbers: number[]): number[][] => {
     const result: number[][] = []
 
     for (let i = 0; i < stepNumbers.length; i++) {
