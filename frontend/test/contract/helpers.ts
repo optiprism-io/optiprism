@@ -13,12 +13,11 @@ const {gen} = new class {
             this.idx.set(key, arr.length - 1)
             return arr[arr.length - 1]
         } else {
-            const ret = arr[idx]
             if (idx > 0) {
                 idx--
                 this.idx.set(key, idx)
             }
-            return ret
+            return arr[idx]
         }
     }
 }
