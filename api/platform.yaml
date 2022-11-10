@@ -1403,126 +1403,6 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
-  /organizations/{organization_id}/projects/{project_id}/track/event:
-    post:
-      summary: Track event
-      operationId: trackEvent
-      tags:
-        - track
-        - event
-      parameters:
-        - $ref: '#/components/parameters/OrganizationID'
-        - $ref: '#/components/parameters/ProjectID'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TrackEventRequest'
-      responses:
-        '200':
-          description: response
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/Internal'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-  /organizations/{organization_id}/projects/{project_id}/track/page-view:
-    post:
-      summary: Track page view
-      operationId: trackPageView
-      tags:
-        - track
-      parameters:
-        - $ref: '#/components/parameters/OrganizationID'
-        - $ref: '#/components/parameters/ProjectID'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TrackPageViewRequest'
-      responses:
-        '200':
-          description: response
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/Internal'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /organizations/{organization_id}/projects/{project_id}/track/user/identify:
-    post:
-      summary: Identify user
-      operationId: trackIdentify
-      tags:
-        - track
-        - identify
-        - user
-      parameters:
-        - $ref: '#/components/parameters/OrganizationID'
-        - $ref: '#/components/parameters/ProjectID'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/IdentifyUserRequest'
-      responses:
-        '200':
-          description: response
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/Internal'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /organizations/{organization_id}/projects/{project_id}/track/user/{user_id}:
-    put:
-      summary: Update user
-      operationId: trackUpdateUser
-      tags:
-        - track
-        - identify
-        - user
-      parameters:
-        - $ref: '#/components/parameters/OrganizationID'
-        - $ref: '#/components/parameters/ProjectID'
-        - name: user_id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateUserRequest'
-      responses:
-        '200':
-          description: response
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/Internal'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
 components:
   securitySchemes:
     bearerAuth:
@@ -1550,248 +1430,36 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     Unauthorized:
-      description: Bad Request
+      description: Unauthorized
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
-      description: Bad Request
+      description: Forbidden
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     NotFound:
-      description: Bad Request
+      description: NotFound
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     Internal:
-      description: Bad Request
+      description: Internal
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     ServiceUnavailable:
-      description: Bad Request
+      description: ServiceUnavailable
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
-    TrackEventRequest:
-      type: object
-      properties:
-        context:
-          $ref: '#/components/schemas/TrackContext'
-        eventName:
-          type: string
-        properties:
-          type: object
-          additionalProperties:
-            type: [ null,number,string,boolean ]
-    TrackPageViewRequest:
-      type: object
-      properties:
-        context:
-          $ref: '#/components/schemas/TrackContext'
-        properties:
-          type: object
-          additionalProperties:
-            type: [ null,number,string,boolean ]
-    IdentifyUserRequest:
-      type: object
-      properties:
-        context:
-          $ref: '#/components/schemas/TrackContext'
-        eventName:
-          type: string
-        properties:
-          type: object
-          additionalProperties:
-            type: [ null,number,string,boolean ]
-    UpdateUserRequest:
-      type: object
-      properties:
-        context:
-          $ref: '#/components/schemas/TrackContext'
-        operations:
-          type: array
-          items:
-            oneOf:
-              - $ref: '#/components/schemas/PropertyOpAppendToList'
-              - $ref: '#/components/schemas/PropertyOpRemoveFromList'
-              - $ref: '#/components/schemas/PropertyOpIncrement'
-              - $ref: '#/components/schemas/PropertyOpDecrement'
-              - $ref: '#/components/schemas/PropertyOpSet'
-              - $ref: '#/components/schemas/PropertyOpSetOnce'
-              - $ref: '#/components/schemas/PropertyOpUnset'
-
-    PropertyOpAppendToList:
-      type: object
-      properties:
-        appendToList:
-          type: object
-          additionalProperties:
-            type: [ null,number,string,boolean ]
-    PropertyOpRemoveFromList:
-      type: object
-      properties:
-        remveFromList:
-          type: object
-          additionalProperties:
-            type: [ null,number,string,boolean ]
-    PropertyOpIncrement:
-      type: object
-      properties:
-        increment:
-          type: object
-          additionalProperties:
-            type: number
-    PropertyOpDecrement:
-      type: object
-      properties:
-        decrement:
-          type: object
-          additionalProperties:
-            type: number
-    PropertyOpSet:
-      type: object
-      properties:
-        setOnce:
-          type: object
-          additionalProperties:
-            type: [ null,number,string,boolean ]
-    PropertyOpSetOnce:
-      type: object
-      properties:
-        set:
-          type: object
-          additionalProperties:
-            type: [ null,number,string,boolean ]
-    PropertyOpUnset:
-      type: object
-      properties:
-        unset:
-          type: array
-          items:
-            type: string
-    TrackContext:
-      type: object
-      properties:
-        anonymousId:
-          type: string
-        userId:
-          type: string
-        timestamp:
-          type: string
-          format: date-time
-        app:
-          type: object
-          properties:
-            name:
-              type: string
-            version:
-              type: string
-            build:
-              type: string
-            namespace:
-              type: string
-        campaign:
-          type: object
-          properties:
-            name:
-              type: string
-            source:
-              type: string
-            medium:
-              type: string
-            term:
-              type: string
-            content:
-              type: string
-        device:
-          type: object
-          properties:
-            id:
-              type: string
-            vendor:
-              type: string
-            model:
-              type: string
-            name:
-              type: string
-            platform:
-              type: string
-        ip:
-          type: string
-        userAgent:
-          type: string
-        library:
-          type: object
-          properties:
-            version:
-              type: string
-        locale:
-          type: string
-        location:
-          type: object
-          properties:
-            city:
-              type: string
-            country:
-              type: string
-        network:
-          type: object
-          properties:
-            carrier:
-              type: string
-            isBluetooth:
-              type: boolean
-            isCellular:
-              type: boolean
-            isWifi:
-              type: boolean
-        os:
-          type: object
-          properties:
-            name:
-              type: string
-            version:
-              type: string
-        page:
-          type: object
-          properties:
-            path:
-              type: string
-            referer:
-              type: string
-            search:
-              type: string
-            title:
-              type: string
-            url:
-              type: string
-        screen:
-          type: object
-          properties:
-            width:
-              type: integer
-            height:
-              type: integer
-            density:
-              type: integer
-        groupId:
-          type: string
-        timezone:
-          type: string
-
-
-
-
-
-
     SignupRequest:
       type: object
       properties:

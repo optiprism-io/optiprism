@@ -26,10 +26,16 @@ enum StorageMethod {
 interface Attribution {
 }
 
+enum LogLevel {
+    Error,
+    Info,
+    Debug,
+}
 interface Config {
     serverUrl: string
     autotrack?: Autotrack
     track?: Track
+    logLevel:LogLevel
     deviceId?: string
     sessionId?: string
     userId?: string
