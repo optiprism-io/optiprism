@@ -627,9 +627,9 @@ components:
               type: integer
             density:
               type: integer
-        groupType:
-          type: string
-        groupId:
-          type: string
+        groups:
+          type: object
+          additionalProperties:
+            type: string
         timezone:
           type: string
