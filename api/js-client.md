@@ -31,12 +31,21 @@ enum LogLevel {
     Info,
     Debug,
 }
+
+interface Group {
+    type: string
+    id: string
+    properties: Map<PropertyName, PropertyValue>
+}
+
 interface Config {
     serverUrl: string
     autotrack?: Autotrack
     track?: Track
-    logLevel:LogLevel
+    logLevel: LogLevel
     deviceId?: string
+    group?: Group
+    registeredProperties?: Map<PropertyName, PropertyValue>
     sessionId?: string
     userId?: string
     optedOut: boolean
@@ -99,9 +108,11 @@ interface OptiPrism {
     user: User
     group: Group
 
-    pageView(props?: Map<PropertyName, PropertyValue>): void
+    init(token: string, config?: Config)
 
-    pageView(pageName: string, props?: Map<PropertyName, PropertyValue>): void
+    page(props?: Map<PropertyName, PropertyValue>): void
+
+    page(pageName: string, props?: Map<PropertyName, PropertyValue>): void
 
     register(data: Map<PropertyName, PropertyValue>): void
 

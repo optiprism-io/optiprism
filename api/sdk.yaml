@@ -71,6 +71,33 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /projects/{project_id}/track/click:
+    post:
+      summary: Track click
+      operationId: trackClick
+      tags:
+        - event
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrackClickRequest'
+      responses:
+        '200':
+          description: response
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
   /projects/{project_id}/track/user/identify:
     post:
       summary: Identify user
@@ -341,6 +368,24 @@ components:
           type: object
           additionalProperties:
             type: [ null,number,string,boolean ]
+    TrackClickRequest:
+      type: object
+      properties:
+        context:
+          $ref: '#/components/schemas/TrackContext'
+        element:
+          type: string
+        name:
+          type: string
+        id:
+          type: string
+        class:
+          type: string
+        properties:
+          type: object
+          additionalProperties:
+            type: [ null,number,string,boolean ]
+
     IdentifyUserRequest:
       type: object
       properties:
