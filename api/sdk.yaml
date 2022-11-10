@@ -44,10 +44,10 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /projects/{project_id}/track/page-view:
+  /projects/{project_id}/track/page:
     post:
-      summary: Track page view
-      operationId: trackPageView
+      summary: Track page
+      operationId: trackPage
       tags:
         - event
       parameters:
@@ -98,14 +98,17 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
-  /projects/{project_id}/track/user/identify:
+  /projects/{project_id}/track/user/{user_id}/identify:
     post:
       summary: Identify user
-      operationId: trackIdentify
+      operationId: identifyUser
       tags:
         - user
       parameters:
         - $ref: '#/components/parameters/ProjectID'
+        - name: user_id
+          in: path
+          required: true
       requestBody:
         content:
           application/json:
@@ -128,7 +131,7 @@ paths:
   /projects/{project_id}/track/user/{user_id}:
     put:
       summary: Update user
-      operationId: trackUpdateUser
+      operationId: updateUser
       tags:
         - user
       parameters:
@@ -243,14 +246,19 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
-  /projects/{project_id}/track/group/identify:
+  /projects/{project_id}/track/group/{group_id}/identify:
     post:
       summary: Identify group
-      operationId: trackIdentify
+      operationId: identifyGroup
       tags:
         - group
       parameters:
         - $ref: '#/components/parameters/ProjectID'
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
@@ -273,7 +281,7 @@ paths:
   /projects/{project_id}/track/group/{group_id}:
     put:
       summary: Update group
-      operationId: trackUpdateGroup
+      operationId: updateGroup
       tags:
         - group
       parameters:
@@ -359,11 +367,21 @@ components:
           type: object
           additionalProperties:
             type: [ null,number,string,boolean ]
-    TrackPageViewRequest:
+    TrackPageRequest:
       type: object
       properties:
         context:
           $ref: '#/components/schemas/TrackContext'
+        path:
+          type: string
+        referer:
+          type: string
+        search:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
         properties:
           type: object
           additionalProperties:
@@ -391,8 +409,6 @@ components:
       properties:
         context:
           $ref: '#/components/schemas/TrackContext'
-        eventName:
-          type: string
         properties:
           type: object
           additionalProperties:
@@ -426,8 +442,6 @@ components:
       properties:
         context:
           $ref: '#/components/schemas/TrackContext'
-        eventName:
-          type: string
         properties:
           type: object
           additionalProperties:
