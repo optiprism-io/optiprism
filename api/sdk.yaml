@@ -246,7 +246,7 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
-  /projects/{project_id}/track/group/{group_id}/identify:
+  /projects/{project_id}/track/group/{group_key}/{group_id}/identify:
     post:
       summary: Identify group
       operationId: identifyGroup
@@ -254,6 +254,11 @@ paths:
         - group
       parameters:
         - $ref: '#/components/parameters/ProjectID'
+        - name: group_key
+          in: path
+          required: true
+          schema:
+            type: string
         - name: group_id
           in: path
           required: true
@@ -278,7 +283,7 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
-  /projects/{project_id}/track/group/{group_id}:
+  /projects/{project_id}/track/group/{group_key}/{group_id}:
     put:
       summary: Update group
       operationId: updateGroup
@@ -286,6 +291,11 @@ paths:
         - group
       parameters:
         - $ref: '#/components/parameters/ProjectID'
+        - name: group_key
+          in: path
+          required: true
+          schema:
+            type: string
         - name: group_id
           in: path
           required: true

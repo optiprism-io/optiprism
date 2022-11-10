@@ -38,12 +38,11 @@ interface Config {
 interface Persist {
     properties?: Map<PropertyName, PropertyValue>
     deviceId?: string
-    groupKey?: string
-    groupId?: string
+    groups?: Map<string,string>
     sessionId?: number
     anonymousId?: string
     userId?: string
-    optedOut: boolean
+    optedOut?: boolean
 }
 
 type PropertyName = string
@@ -58,7 +57,7 @@ interface TrackOptions {
     transport: Transport
 }
 
-interface Identity {
+interface User {
     appendToList(data: Map<PropertyName, PropertyValue>): void
 
     removeFromList(data: Map<PropertyName, PropertyValue>): void
@@ -72,9 +71,7 @@ interface Identity {
     setOnce(data: Map<PropertyName, PropertyValue>): void
 
     unset(properties: PropertyName[]): void
-}
-
-interface User extends Identity {
+    
     identify(userId: string, props?: Map<PropertyName, PropertyValue>): void
     
     alias(newId: string, oldId: string): void
@@ -84,8 +81,22 @@ interface User extends Identity {
     optIn(): void
 }
 
-interface Group extends Identity {
+interface Group {
     identify(groupType: string, groupId: string, props?: Map<PropertyName, PropertyValue>): void
+
+    appendToList(groupType: string,data: Map<PropertyName, PropertyValue>): void
+
+    removeFromList(groupType: string,data: Map<PropertyName, PropertyValue>): void
+
+    increment(groupType: string,data: Map<PropertyName, number>): void
+
+    decrement(groupType: string,data: Map<PropertyName, number>): void
+
+    set(groupType: string,data: Map<PropertyName, PropertyValue>): void
+
+    setOnce(groupType: string,data: Map<PropertyName, PropertyValue>): void
+
+    unset(groupType: string,properties: PropertyName[]): void
 }
 
 interface OptiPrism {
