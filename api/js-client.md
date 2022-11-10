@@ -25,12 +25,6 @@ enum LogLevel {
     Debug,
 }
 
-interface Group {
-    type: string
-    id: string
-    properties: Map<PropertyName, PropertyValue>
-}
-
 interface Config {
     serverUrl: string
     autotrack?: Autotrack
@@ -42,13 +36,16 @@ interface Config {
 }
 
 interface Persist {
+    properties?: Map<PropertyName, PropertyValue>
     deviceId?: string
-    group?: Group
-    registeredProperties?: Map<PropertyName, PropertyValue>
+    groupKey?: string
+    groupId?: string
     sessionId?: number
+    anonymousId?: string
     userId?: string
     optedOut: boolean
 }
+
 type PropertyName = string
 type PropertyValue = string | number | boolean | null | undefined
 
@@ -59,11 +56,6 @@ enum Transport {
 
 interface TrackOptions {
     transport: Transport
-}
-
-enum PropertyOp {
-    Set,
-    SetOnce
 }
 
 interface Identity {
@@ -84,9 +76,7 @@ interface Identity {
 
 interface User extends Identity {
     identify(userId: string, props?: Map<PropertyName, PropertyValue>): void
-
-    identify(props?: Map<PropertyName, PropertyValue>): void
-
+    
     alias(newId: string, oldId: string): void
 
     optOut(): void
@@ -95,7 +85,7 @@ interface User extends Identity {
 }
 
 interface Group extends Identity {
-    identify(group: string, groupId: string, props?: Map<PropertyName, PropertyValue>): void
+    identify(groupType: string, groupId: string, props?: Map<PropertyName, PropertyValue>): void
 }
 
 interface OptiPrism {
