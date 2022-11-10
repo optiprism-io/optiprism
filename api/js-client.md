@@ -14,16 +14,9 @@ interface Autotrack {
     elements?: Element[]
 }
 
-interface Track {
-
-}
-
 enum StorageMethod {
     Cookie,
     LocalStorage
-}
-
-interface Attribution {
 }
 
 enum LogLevel {
@@ -41,20 +34,21 @@ interface Group {
 interface Config {
     serverUrl: string
     autotrack?: Autotrack
-    track?: Track
     logLevel: LogLevel
-    deviceId?: string
-    group?: Group
-    registeredProperties?: Map<PropertyName, PropertyValue>
-    sessionId?: string
-    userId?: string
-    optedOut: boolean
     cookieExpiration: Date
     cookieSecure: boolean
     storage: StorageMethod
-    attribution?: Attribution
+    attribution?: string[]
 }
 
+interface Persist {
+    deviceId?: string
+    group?: Group
+    registeredProperties?: Map<PropertyName, PropertyValue>
+    sessionId?: number
+    userId?: string
+    optedOut: boolean
+}
 type PropertyName = string
 type PropertyValue = string | number | boolean | null | undefined
 
@@ -108,12 +102,10 @@ interface OptiPrism {
     user: User
     group: Group
 
-    init(token: string, config?: Config)
+    configure(config: Config)
 
     page(props?: Map<PropertyName, PropertyValue>): void
-
-    page(pageName: string, props?: Map<PropertyName, PropertyValue>): void
-
+    
     register(data: Map<PropertyName, PropertyValue>): void
 
     unregister(data: Map<PropertyName, PropertyValue>): void
