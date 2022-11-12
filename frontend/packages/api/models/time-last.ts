@@ -25,11 +25,11 @@ export interface TimeLast {
      */
     type: TimeLastTypeEnum;
     /**
-     * N days/weeks
+     * Last days/weeks
      * @type {number}
      * @memberof TimeLast
      */
-    n: number;
+    last: number;
     /**
      * 
      * @type {TimeUnit}

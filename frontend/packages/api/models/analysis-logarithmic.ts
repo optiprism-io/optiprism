@@ -11,32 +11,31 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
-import { TimeUnit } from './time-unit';
 /**
- * window operation for segmentation. Tells that event should be triggered each timeunit (each day, for instance) {   \"time\": {     \"type\": \"windowEach\",     \"unit\":\"day\"   } } 
+ * 
  * @export
- * @interface TimeWindowEach
+ * @interface AnalysisLogarithmic
  */
-export interface TimeWindowEach {
+export interface AnalysisLogarithmic {
     /**
      * 
      * @type {string}
-     * @memberof TimeWindowEach
+     * @memberof AnalysisLogarithmic
      */
-    type: TimeWindowEachTypeEnum;
+    type: AnalysisLogarithmicTypeEnum;
     /**
      * 
-     * @type {TimeUnit}
-     * @memberof TimeWindowEach
+     * @type {number}
+     * @memberof AnalysisLogarithmic
      */
-    unit: TimeUnit;
+    window?: number;
 }
 
 /**
     * @export
     * @enum {string}
     */
-export enum TimeWindowEachTypeEnum {
-    WindowEach = 'windowEach'
+export enum AnalysisLogarithmicTypeEnum {
+    Logarithmic = 'logarithmic'
 }
 

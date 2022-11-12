@@ -143,17 +143,17 @@ pub struct ResponseMetadata {
 #[derive(Serialize, Deserialize, Default, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ListResponse<T>
-where T: Debug
+    where T: Debug
 {
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
 }
 
 impl<A, B> TryInto<ListResponse<A>> for metadata::metadata::ListResponse<B>
-where
-    A: Debug,
-    B: TryInto<A> + Clone + Debug,
-    PlatformError: std::convert::From<<B as TryInto<A>>::Error>,
+    where
+        A: Debug,
+        B: TryInto<A> + Clone + Debug,
+        PlatformError: std::convert::From<<B as TryInto<A>>::Error>,
 {
     type Error = PlatformError;
 
@@ -365,6 +365,14 @@ pub enum EventFilter {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<Vec<Value>>,
     },
+    #[serde(rename_all = "camelCase")]
+    Cohort {
+        cohort_id: u64,
+    },
+    #[serde(rename_all = "camelCase")]
+    Group {
+        group_id: u64,
+    },
 }
 
 impl TryInto<common::types::EventFilter> for &EventFilter {
@@ -384,6 +392,7 @@ impl TryInto<common::types::EventFilter> for &EventFilter {
                     Some(v) => Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?),
                 },
             },
+            _ => todo!()
         })
     }
 }
@@ -452,4 +461,36 @@ impl TryFrom<query::DataTable> for DataTable {
 
         Ok(DataTable::new(cols))
     }
+}
+
+#[derive(Clone, Serialize, Deserialize, Default, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum EventGroupedFiltersGroupsCondition {
+    And,
+    #[default]
+    Or,
+}
+
+#[derive(Clone, Serialize, Deserialize, Default, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum EventGroupedFilterGroupCondition {
+    #[default]
+    And,
+    Or,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EventGroupedFilterGroup {
+    #[serde(default)]
+    pub filters_condition: EventGroupedFilterGroupCondition,
+    pub filters: Vec<EventFilter>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EventGroupedFilters {
+    #[serde(default)]
+    pub groups_condition: Option<EventGroupedFiltersGroupsCondition>,
+    pub groups: Vec<EventGroupedFilterGroup>,
 }

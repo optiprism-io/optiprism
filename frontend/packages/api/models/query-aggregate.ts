@@ -20,12 +20,13 @@ export enum QueryAggregate {
     Sum = 'sum',
     Avg = 'avg',
     Median = 'median',
+    Count = 'count',
     Min = 'min',
     Max = 'max',
     DistinctCount = 'distinctCount',
-    _25thPercentile = '25thPercentile',
-    _75thPercentile = '75thPercentile',
-    _90thPercentile = '90thPercentile',
-    _99thPercentile = '99thPercentile'
+    Percentile25 = 'percentile25',
+    Percentile75 = 'percentile75',
+    Percentile90 = 'percentile90',
+    Percentile99 = 'percentile99'
 }
 

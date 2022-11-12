@@ -39,7 +39,7 @@ export interface DidEventCount {
      * @type {number}
      * @memberof DidEventCount
      */
-    value?: number;
+    value: number;
     /**
      * time frame
      * @type {TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach}
@@ -53,6 +53,6 @@ export interface DidEventCount {
     * @enum {string}
     */
 export enum DidEventCountTypeEnum {
-    DidEventCount = 'didEventCount'
+    Count = 'count'
 }
 

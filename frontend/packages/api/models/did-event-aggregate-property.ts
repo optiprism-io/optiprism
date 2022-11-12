@@ -18,6 +18,7 @@ import { TimeAfterFirstUse } from './time-after-first-use';
 import { TimeBetween } from './time-between';
 import { TimeLast } from './time-last';
 import { TimeWindowEach } from './time-window-each';
+import { Value } from './value';
 /**
  * aggregate property and compare to value
  * @export
@@ -43,11 +44,11 @@ export interface DidEventAggregateProperty extends PropertyRef {
      */
     operation: PropertyFilterOperation;
     /**
-     * one or more values. Doesn't need if operation is \"empty\" or \"exist\"
-     * @type {number}
+     * 
+     * @type {Value}
      * @memberof DidEventAggregateProperty
      */
-    value?: number;
+    value?: Value;
     /**
      * time frame
      * @type {TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach}

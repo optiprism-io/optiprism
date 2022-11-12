@@ -12,7 +12,7 @@
  * Do not edit the class manually.
  */
 import { BreakdownByProperty } from './breakdown-by-property';
-import { EventFilters } from './event-filters';
+import { EventGroupedFilters } from './event-grouped-filters';
 import { EventSegmentationSegment } from './event-segmentation-segment';
 import { FunnelConversionOverTimeChartType } from './funnel-conversion-over-time-chart-type';
 import { FunnelConversionStepsChartType } from './funnel-conversion-steps-chart-type';
@@ -106,10 +106,10 @@ export interface FunnelQuery {
     segments?: Array<EventSegmentationSegment>;
     /**
      * 
-     * @type {EventFilters}
+     * @type {EventGroupedFilters}
      * @memberof FunnelQuery
      */
-    filters?: EventFilters;
+    filters?: EventGroupedFilters;
 }
 
 /**

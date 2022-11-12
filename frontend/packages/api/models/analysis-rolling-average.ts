@@ -11,6 +11,7 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
+import { TimeUnit } from './time-unit';
 /**
  * 
  * @export
@@ -29,6 +30,12 @@ export interface AnalysisRollingAverage {
      * @memberof AnalysisRollingAverage
      */
     window: number;
+    /**
+     * 
+     * @type {TimeUnit}
+     * @memberof AnalysisRollingAverage
+     */
+    unit: TimeUnit;
 }
 
 /**

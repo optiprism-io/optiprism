@@ -2443,7 +2443,7 @@ components:
                         - $ref: '#/components/schemas/EventFilterByProperty'
                         - $ref: '#/components/schemas/EventFilterByGroup'
         filters:
-          $ref: '#/components/schemas/EventFilters'
+          $ref: '#/components/schemas/EventGroupedFilters'
     GroupRecordsListRequest:
       type: object
       description: request group records sorted by time of creation
@@ -2473,7 +2473,7 @@ components:
           items:
             $ref: '#/components/schemas/EventSegmentationSegment'
         filters:
-          $ref: '#/components/schemas/EventFilters'
+          $ref: '#/components/schemas/EventGroupedFilters'
     FunnelQuery:
       type: object
       required: [ "time","group","steps","timeWindow","chartType" ,"count","stepOrder" ]
@@ -2579,7 +2579,7 @@ components:
           items:
             $ref: '#/components/schemas/EventSegmentationSegment'
         filters:
-          $ref: '#/components/schemas/EventFilters'
+          $ref: '#/components/schemas/EventGroupedFilters'
     FunnelConversionStepsChartType:
       type: object
       required: [ 'type' ]
@@ -2699,7 +2699,7 @@ components:
             - linear
     AnalysisRollingAverage:
       type: object
-      required: [ 'type','window' ]
+      required: [ 'type','window','unit' ]
       properties:
         type:
           type: string
@@ -2707,14 +2707,16 @@ components:
             - rollingAverage
         window:
           type: integer
-    AnalysisRollingWindow:
+        unit:
+          $ref: '#/components/schemas/TimeUnit'
+    AnalysisLogarithmic:
       type: object
-      required: [ 'type','window' ]
+      required: [ 'type' ]
       properties:
         type:
           type: string
           enum:
-            - rollingWindow
+            - logarithmic
         window:
           type: integer
     AnalysisCumulative:
@@ -2910,7 +2912,7 @@ components:
           items:
             $ref: '#/components/schemas/EventSegmentationEvent'
         filters:
-          $ref: '#/components/schemas/EventFilters'
+          $ref: '#/components/schemas/EventGroupedFilters'
         breakdowns:
           type: array
           description: array of common breakdowns (which applies to all events)
@@ -2952,7 +2954,7 @@ components:
                   - $ref: '#/components/schemas/QueryAggregatePropertyPerGroup'
                   - $ref: '#/components/schemas/QueryAggregateProperty'
                   - $ref: '#/components/schemas/QueryFormula'
-    EventFilters:
+    EventGroupedFilters:
       type: object
       description: event filters
       required: [ "groups" ]
@@ -3103,12 +3105,12 @@ components:
     TimeLast:
       type: object
       description: take last N days/weeks
-      required: [ "type", "n", "unit" ]
+      required: [ "type", "last", "unit" ]
       example: |
         {
           "time": {
             "type": "last",
-            "n": 10,
+            "last": 10,
             "unit":"day"
           }
         }
@@ -3117,9 +3119,9 @@ components:
           type: string
           enum:
             - last
-        n:
+        last:
           type: integer
-          description: N days/weeks
+          description: Last days/weeks
         unit:
           $ref: '#/components/schemas/TimeUnit'
     TimeAfterFirstUse:
@@ -3152,7 +3154,7 @@ components:
         timeunit (each day, for instance)
         {
           "time": {
-            "type": "each",
+            "type": "windowEach",
             "unit":"day"
           }
         }
@@ -3208,7 +3210,7 @@ components:
           description: property name. Because property here is a user only, we don't need propertyType
         operation:
           $ref: '#/components/schemas/PropertyFilterOperation'
-        values:
+        value:
           type: array
           description: one or more values. Doesn't need if operation is "empty" or "exist"
           items:
@@ -3227,7 +3229,7 @@ components:
           description: property name. Because property here is a user only, we don't need propertyType
         operation:
           $ref: '#/components/schemas/PropertyFilterOperation'
-        values:
+        value:
           type: array
           description: one or more values. Doesn't need if operation is "empty" or "exist"
           items:
@@ -3243,12 +3245,12 @@ components:
       type: object
       description: find all users who made event X times
       example: filter who made at least 1 purchase each day
-      required: [ "type", "operation", "time" ]
+      required: [ "type", "operation", "value","time" ]
       properties:
         type:
           type: string
           enum:
-            - didEventCount
+            - count
         operation:
           $ref: '#/components/schemas/PropertyFilterOperation'
         value:
@@ -3271,10 +3273,14 @@ components:
         - $ref: '#/components/schemas/EventRef'
         - type: object
           properties:
+            filters:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventFilterByProperty'
             type:
               type: string
               enum:
-                - didEventRelativeCount
+                - relativeCount
             operation:
               $ref: '#/components/schemas/PropertyFilterOperation'
             time:
@@ -3302,8 +3308,7 @@ components:
             operation:
               $ref: '#/components/schemas/PropertyFilterOperation'
             value:
-              type: number
-              description: one or more values. Doesn't need if operation is "empty" or "exist"
+              $ref: '#/components/schemas/Value'
             time:
               type: object
               description: time frame
@@ -3372,14 +3377,10 @@ components:
           $ref: '#/components/schemas/TimeUnit'
     QuerySimple:
       type: object
-      description: simple query without any additional agruments
-      required: [ "type", "query" ]
+      description: simple query without any additional arguments
+      required: [ "type" ]
       properties:
         type:
-          type: string
-          enum:
-            - simple
-        query:
           type: string
           enum:
             - countEvents
@@ -3453,26 +3454,28 @@ components:
         - sum
         - avg
         - median
+        - count
         - min
         - max
         - distinctCount
-        - 25thPercentile
-        - 75thPercentile
-        - 90thPercentile
-        - 99thPercentile
+        - percentile25
+        - percentile75
+        - percentile90
+        - percentile99
     QueryAggregatePerGroup:
       type: string
       enum:
         - sum
         - avg
         - median
+        - count
         - min
         - max
         - distinctCount
-        - 25thPercentile
-        - 75thPercentile
-        - 90thPercentile
-        - 99thPercentile
+        - percentile25
+        - percentile75
+        - percentile90
+        - percentile99
     Value:
       type: object
       description: value

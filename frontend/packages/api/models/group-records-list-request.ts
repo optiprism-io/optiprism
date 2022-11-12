@@ -11,7 +11,7 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
-import { EventFilters } from './event-filters';
+import { EventGroupedFilters } from './event-grouped-filters';
 import { EventSegmentationSegment } from './event-segmentation-segment';
 import { GroupRecordsListRequestSearch } from './group-records-list-request-search';
 import { TimeBetween } from './time-between';
@@ -49,8 +49,8 @@ export interface GroupRecordsListRequest {
     segments?: Array<EventSegmentationSegment>;
     /**
      * 
-     * @type {EventFilters}
+     * @type {EventGroupedFilters}
      * @memberof GroupRecordsListRequest
      */
-    filters?: EventFilters;
+    filters?: EventGroupedFilters;
 }

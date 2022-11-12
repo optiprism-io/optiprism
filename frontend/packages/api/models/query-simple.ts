@@ -12,7 +12,7 @@
  * Do not edit the class manually.
  */
 /**
- * simple query without any additional agruments
+ * simple query without any additional arguments
  * @export
  * @interface QuerySimple
  */
@@ -23,12 +23,6 @@ export interface QuerySimple {
      * @memberof QuerySimple
      */
     type: QuerySimpleTypeEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof QuerySimple
-     */
-    query: QuerySimpleQueryEnum;
 }
 
 /**
@@ -36,13 +30,6 @@ export interface QuerySimple {
     * @enum {string}
     */
 export enum QuerySimpleTypeEnum {
-    Simple = 'simple'
-}
-/**
-    * @export
-    * @enum {string}
-    */
-export enum QuerySimpleQueryEnum {
     CountEvents = 'countEvents',
     CountUniqueGroups = 'countUniqueGroups',
     WeeklyActiveGroups = 'weeklyActiveGroups',

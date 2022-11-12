@@ -127,7 +127,9 @@ where B: Send
         let TypedHeader(Authorization(bearer)) =
             TypedHeader::<Authorization<Bearer>>::from_request(req)
                 .await
-                .map_err(|err| AuthError::CantParseBearerHeader)?;
+                .map_err(|err| {
+                    println!("{}",err);
+                    AuthError::CantParseBearerHeader})?;
 
         let Extension(auth_cfg) = Extension::<auth::Config>::from_request(req)
             .await

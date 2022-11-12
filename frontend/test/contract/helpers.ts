@@ -1,47 +1,92 @@
-function* generateInput(v: any[]) {
-    for (let i = 0; i < v.length; i++) {
-        yield v[i]
+import {expect, test} from 'vitest';
+import {Configuration} from 'api';
+import jwt from 'jsonwebtoken';
+
+const AUTH_HEADER_KEY = 'authorization'
+const JWT_KEY = 'access_token_key'
+
+export const jwtToken = () => {
+    const claims = {
+        exp: Math.floor(new Date().getTime() / 1000) + 60 * 60 * 24,
+        accountId: 1
     }
+    return jwt.sign(claims, JWT_KEY, {algorithm: 'HS512'})
 }
 
-const {gen} = new class {
-    count = 0;
-    idx = new Map<number, number>();
-    gen = (key: number, arr: any[]) => {
+export class InputMaker {
+    count = 0
+    idx = new Map<number, number>()
+    left: number[] = []
+    gen: () => any
+
+    constructor(gen: any) {
+        this.gen = () => gen(this)
+    }
+
+    isDone = () => {
+        return this.left.length == 0
+    }
+    make = (key: number, arr: any[]) => {
         let idx = this.idx.get(key)
         if (idx == undefined) {
             this.idx.set(key, arr.length - 1)
+            this.left.push(key)
+
             return arr[arr.length - 1]
-        } else {
-            if (idx > 0) {
-                idx--
-                this.idx.set(key, idx)
-            }
+        }
+
+        if (idx > 0) {
+            idx--
+            this.idx.set(key, idx)
+
             return arr[idx]
         }
+
+        const index = this.left.indexOf(key, 0);
+        if (index > -1) {
+            this.left.splice(index, 1);
+        }
+        return arr[idx]
     }
 }
 
-export const combineInputs = async (vars: any[][], cb: (vars: any[]) => void) => {
-    let gen = vars.map((v) => generateInput(v))
-    let push = new Array<any>(vars.length);
-    let closed = new Array<boolean>(vars.length);
-    let left = vars.length
-    let j = 0;
-    while (left > 0 && j < 100) {
-        for (let i = 0; i < vars.length; i++) {
-            j++
-            if (closed[i]) {
-                continue
-            }
-            const v = gen[i].next()
-            if (v.done) {
-                left -= 1
-                closed[i] = true
+export const testRequestWithVariants = (reqFn: (body: any) => Promise<any>, vars: (im: InputMaker) => any) => {
+    const im = new InputMaker(vars)
+    const reqs = []
+    do {
+        reqs.push(im.gen())
+    } while (!im.isDone())
+
+    test.each(reqs)('request %#', async (req) => {
+        expect.assertions(1)
+        try {
+            await reqFn(req)
+            expect(true)
+        } catch (e) {
+            if (e.response?.data?.error) {
+                const err = {
+                    request: req,
+                    error: e.response.data.error
+                }
+                throw new Error(JSON.stringify(err))
             } else {
-                push[i] = v.value
+                throw new Error(e)
             }
         }
-        await cb(push)
+    })
+}
+
+interface ConfigParameters {
+    auth: boolean
+}
+
+export const config = (cfg?: ConfigParameters): Configuration => {
+    const baseOptions: any = {}
+    if (cfg?.auth) {
+        baseOptions.headers = {Authorization: `Bearer ${jwtToken()}`}
     }
+    return new Configuration({
+        basePath: import.meta.env.VITE_API_BASE_PATH,
+        baseOptions,
+    })
 }

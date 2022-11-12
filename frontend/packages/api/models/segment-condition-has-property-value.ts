@@ -42,7 +42,7 @@ export interface SegmentConditionHasPropertyValue {
      * @type {Array<Value>}
      * @memberof SegmentConditionHasPropertyValue
      */
-    values?: Array<Value>;
+    value?: Array<Value>;
 }
 
 /**

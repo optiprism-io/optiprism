@@ -17,7 +17,7 @@ import { AnalysisRollingAverage } from './analysis-rolling-average';
 import { AnalysisRollingWindow } from './analysis-rolling-window';
 import { BreakdownByProperty } from './breakdown-by-property';
 import { EventChartType } from './event-chart-type';
-import { EventFilters } from './event-filters';
+import { EventGroupedFilters } from './event-grouped-filters';
 import { EventSegmentationCompare } from './event-segmentation-compare';
 import { EventSegmentationEvent } from './event-segmentation-event';
 import { EventSegmentationSegment } from './event-segmentation-segment';
@@ -75,10 +75,10 @@ export interface EventSegmentation {
     events: Array<EventSegmentationEvent>;
     /**
      * 
-     * @type {EventFilters}
+     * @type {EventGroupedFilters}
      * @memberof EventSegmentation
      */
-    filters?: EventFilters;
+    filters?: EventGroupedFilters;
     /**
      * array of common breakdowns (which applies to all events)
      * @type {Array<BreakdownByProperty>}

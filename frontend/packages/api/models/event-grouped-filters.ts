@@ -11,32 +11,33 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
-import { TimeUnit } from './time-unit';
+import { EventGroupedFiltersGroups } from './event-grouped-filters-groups';
 /**
- * window operation for segmentation. Tells that event should be triggered each timeunit (each day, for instance) {   \"time\": {     \"type\": \"windowEach\",     \"unit\":\"day\"   } } 
+ * event filters
  * @export
- * @interface TimeWindowEach
+ * @interface EventGroupedFilters
  */
-export interface TimeWindowEach {
+export interface EventGroupedFilters {
     /**
      * 
      * @type {string}
-     * @memberof TimeWindowEach
+     * @memberof EventGroupedFilters
      */
-    type: TimeWindowEachTypeEnum;
+    groupsCondition?: EventGroupedFiltersGroupsConditionEnum;
     /**
      * 
-     * @type {TimeUnit}
-     * @memberof TimeWindowEach
+     * @type {Array<EventGroupedFiltersGroups>}
+     * @memberof EventGroupedFilters
      */
-    unit: TimeUnit;
+    groups: Array<EventGroupedFiltersGroups>;
 }
 
 /**
     * @export
     * @enum {string}
     */
-export enum TimeWindowEachTypeEnum {
-    WindowEach = 'windowEach'
+export enum EventGroupedFiltersGroupsConditionEnum {
+    And = 'and',
+    Or = 'or'
 }
 

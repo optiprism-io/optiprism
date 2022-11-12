@@ -44,10 +44,7 @@ pub enum Analysis {
         window: usize,
         unit: TimeIntervalUnit,
     },
-    WindowAverage {
-        window: usize,
-        unit: TimeIntervalUnit,
-    },
+    Logarithmic,
     Cumulative,
 }
 

@@ -11,6 +11,7 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
+import { EventFilterByProperty } from './event-filter-by-property';
 import { EventRef } from './event-ref';
 import { PropertyFilterOperation } from './property-filter-operation';
 import { TimeAfterFirstUse } from './time-after-first-use';
@@ -23,6 +24,12 @@ import { TimeWindowEach } from './time-window-each';
  * @interface DidEventRelativeCount
  */
 export interface DidEventRelativeCount extends EventRef {
+    /**
+     * 
+     * @type {Array<EventFilterByProperty>}
+     * @memberof DidEventRelativeCount
+     */
+    filters?: Array<EventFilterByProperty>;
     /**
      * 
      * @type {string}
@@ -48,6 +55,6 @@ export interface DidEventRelativeCount extends EventRef {
     * @enum {string}
     */
 export enum DidEventRelativeCountTypeEnum {
-    DidEventRelativeCount = 'didEventRelativeCount'
+    RelativeCount = 'relativeCount'
 }
 

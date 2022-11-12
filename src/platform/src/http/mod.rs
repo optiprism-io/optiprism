@@ -29,12 +29,14 @@ use axum_core::response::IntoResponse;
 use axum_core::response::Response;
 use axum_core::BoxError;
 use bytes::Bytes;
+use datafusion::parquet::data_type::AsBytes;
 use hyper::Body;
 use lazy_static::lazy_static;
 use metadata::MetadataProvider;
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde_json::{json, Value};
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tower_cookies::CookieManagerLayer;
@@ -155,9 +157,9 @@ async fn buffer_and_print<B>(
     direction: &str,
     body: B,
 ) -> std::result::Result<Bytes, (StatusCode, String)>
-where
-    B: axum::body::HttpBody<Data = Bytes>,
-    B::Error: std::fmt::Display,
+    where
+        B: HttpBody<Data=Bytes>,
+        B::Error: std::fmt::Display,
 {
     let bytes = match hyper::body::to_bytes(body).await {
         Ok(bytes) => bytes,
@@ -170,7 +172,8 @@ where
     };
 
     if let Ok(body) = std::str::from_utf8(&bytes) {
-        tracing::debug!("{} body = {:?}", direction, body);
+        let v = serde_json::from_slice::<Value>(body.as_bytes()).map_err(|_| (StatusCode::BAD_REQUEST, "bad request".to_string()))?;
+        tracing::debug!("{} body = {}", direction, serde_json::to_string_pretty(&v).map_err(|_| (StatusCode::BAD_REQUEST, "bad request".to_string()))?);
     }
 
     Ok(bytes)
@@ -181,11 +184,11 @@ pub struct Json<T>(pub T);
 
 #[async_trait]
 impl<T, B> FromRequest<B> for Json<T>
-where
-    T: DeserializeOwned,
-    B: HttpBody + Send,
-    B::Data: Send,
-    B::Error: Into<BoxError>,
+    where
+        T: DeserializeOwned,
+        B: HttpBody + Send,
+        B::Data: Send,
+        B::Error: Into<BoxError>,
 {
     type Rejection = ApiError;
 
@@ -228,7 +231,7 @@ where
 }
 
 impl<T> IntoResponse for Json<T>
-where T: Serialize
+    where T: Serialize
 {
     fn into_response(self) -> Response {
         axum::Json(self.0).into_response()

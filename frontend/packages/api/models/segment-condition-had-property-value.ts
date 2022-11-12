@@ -45,7 +45,7 @@ export interface SegmentConditionHadPropertyValue {
      * @type {Array<Value>}
      * @memberof SegmentConditionHadPropertyValue
      */
-    values?: Array<Value>;
+    value?: Array<Value>;
     /**
      * time frame
      * @type {TimeBetween | TimeLast | TimeWindowEach}
