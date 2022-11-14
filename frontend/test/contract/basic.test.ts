@@ -3,7 +3,7 @@ import {describe, expect, test} from 'vitest'
 import jwt from 'jsonwebtoken'
 import {Configuration, QueryApi, AuthApi} from 'api'
 
-import {config, InputMaker, jwtToken, testRequestWithVariants} from './helpers'
+import {config, InputMaker, jwtToken, testRequest, testRequestWithVariants} from './helpers'
 import {
     AnalysisCumulative,
     AnalysisCumulativeTypeEnum,
@@ -19,6 +19,7 @@ import {
     DidEventAggregatePropertyTypeEnum,
     DidEventCount,
     DidEventCountTypeEnum,
+    SignupRequest,
     DidEventHistoricalCount,
     DidEventHistoricalCountTypeEnum,
     DidEventRelativeCount,
@@ -75,14 +76,24 @@ describe('Unauthorized', () => {
     describe('Auth', () => {
         const authApi = new AuthApi(config());
 
-        test.concurrent('Login', async () => {
-            await expect(authApi.basicLogin(<LoginRequest>{
+        test.concurrent('Login', () => {
+            expect(()=>testRequest(authApi.basicLogin(<LoginRequest>{
                 email: 'email',
                 password: 'password'
-            })).resolves.not.toThrow()
+            }))).not.toThrow()
         })
-        test.concurrent('Refresh Token', async () => {
-            await expect(authApi.refreshToken(<RefreshTokenRequest>{refreshToken: 'refresh_token'})).resolves.not.toThrow()
+        test.concurrent('Signup', () => {
+            expect(() => testRequest(authApi.basicSignup(<SignupRequest>{
+                email: 'email',
+                password: 'password',
+                passwordRepeat: 'password',
+                firstName: 'first name',
+                lastName: 'last name'
+            }))).not.toThrow()
+        })
+
+        test.concurrent('Refresh Token', () => {
+            expect(() => testRequest(authApi.refreshToken(<RefreshTokenRequest>{refreshToken: 'refresh_token'}))).not.toThrow()
         })
     })
 })

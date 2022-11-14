@@ -103,23 +103,6 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/auth/logout:
-    post:
-      summary: Log out
-      operationId: logout
-      tags:
-        - auth
-      responses:
-        '204':
-          description: logout
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/Internal'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
   /v1/organizations/{organizationId}/projects/{projectId}/dashboards:
     get:
       summary: Dashboards list

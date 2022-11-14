@@ -9,6 +9,7 @@ pub mod events;
 pub mod http;
 pub mod properties;
 pub mod queries;
+pub mod dashboards;
 
 use std::fmt::Debug;
 use std::sync::Arc;

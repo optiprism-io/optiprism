@@ -50,6 +50,16 @@ export class InputMaker {
     }
 }
 
+export const testRequest = (resp:Promise<any>) => {
+    resp.catch((e)=>{
+        if (e.response?.data?.error) {
+            throw new Error(JSON.stringify(e.response.data.error,null, 2))
+        } else {
+            throw new Error(e)
+        }
+    })
+}
+
 export const testRequestWithVariants = (reqFn: (body: any) => Promise<any>, vars: (im: InputMaker) => any) => {
     const im = new InputMaker(vars)
     const reqs = []
