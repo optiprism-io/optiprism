@@ -10,6 +10,7 @@ pub mod projects;
 pub mod properties;
 pub mod store;
 pub mod teams;
+pub mod stub;
 
 pub use error::Result;
 

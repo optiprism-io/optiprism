@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::accounts;
+use crate::{accounts, stub};
 use crate::custom_events;
 use crate::database;
 use crate::dictionaries;
@@ -40,6 +40,20 @@ impl MetadataProvider {
             database: Arc::new(database::ProviderImpl::new(store.clone())),
             dictionaries: Arc::new(dictionaries::ProviderImpl::new(store)),
         })
+    }
+
+    pub fn new_stub() -> Self {
+        MetadataProvider {
+            events: Arc::new(stub::Events {}),
+            custom_events: Arc::new(stub::CustomEvents {}),
+            event_properties: Arc::new(stub::Properties {}),
+            user_properties: Arc::new(stub::Properties {}),
+            organizations: Arc::new(stub::Organizations {}),
+            projects: Arc::new(stub::Projects {}),
+            accounts: Arc::new(stub::Accounts {}),
+            database: Arc::new(stub::Database {}),
+            dictionaries: Arc::new(stub::Dictionaries {}),
+        }
     }
 }
 

@@ -8,43 +8,51 @@ use common::types::PropValueOperation;
 use common::types::PropertyRef;
 use common::ScalarValue;
 use datafusion::arrow::datatypes::DataType;
-use metadata::accounts;
-use metadata::accounts::Account;
-use metadata::accounts::CreateAccountRequest;
-use metadata::accounts::UpdateAccountRequest;
-use metadata::custom_events;
-use metadata::custom_events::CreateCustomEventRequest;
-use metadata::custom_events::CustomEvent;
-use metadata::custom_events::UpdateCustomEventRequest;
-use metadata::database;
-use metadata::database::Column;
-use metadata::database::Table;
-use metadata::database::TableRef;
-use metadata::dictionaries;
-use metadata::events;
-use metadata::events::CreateEventRequest;
-use metadata::events::Event;
-use metadata::events::UpdateEventRequest;
-use metadata::metadata::ListResponse;
-use metadata::metadata::ResponseMetadata;
-use metadata::organizations;
-use metadata::organizations::CreateOrganizationRequest;
-use metadata::organizations::Organization;
-use metadata::organizations::UpdateOrganizationRequest;
-use metadata::projects;
-use metadata::projects::CreateProjectRequest;
-use metadata::projects::Project;
-use metadata::projects::UpdateProjectRequest;
-use metadata::properties;
-use metadata::properties::CreatePropertyRequest;
-use metadata::properties::Property;
-use metadata::properties::UpdatePropertyRequest;
-use metadata::teams;
-use metadata::teams::CreateTeamRequest;
-use metadata::teams::Team;
-use metadata::teams::UpdateTeamRequest;
-
-use crate::DATE_TIME;
+use crate::accounts;
+use crate::accounts::Account;
+use crate::accounts::CreateAccountRequest;
+use crate::accounts::UpdateAccountRequest;
+use crate::custom_events;
+use crate::custom_events::CreateCustomEventRequest;
+use crate::custom_events::CustomEvent;
+use crate::custom_events::UpdateCustomEventRequest;
+use crate::database;
+use crate::database::Column;
+use crate::database::Table;
+use crate::database::TableRef;
+use crate::dictionaries;
+use crate::events;
+use crate::events::CreateEventRequest;
+use crate::events::Event;
+use crate::events::UpdateEventRequest;
+use crate::metadata::ListResponse;
+use crate::metadata::ResponseMetadata;
+use crate::organizations;
+use crate::organizations::CreateOrganizationRequest;
+use crate::organizations::Organization;
+use crate::organizations::UpdateOrganizationRequest;
+use crate::projects;
+use crate::projects::CreateProjectRequest;
+use crate::projects::Project;
+use crate::projects::UpdateProjectRequest;
+use crate::properties;
+use crate::properties::CreatePropertyRequest;
+use crate::properties::Property;
+use crate::properties::UpdatePropertyRequest;
+use crate::teams;
+use crate::teams::CreateTeamRequest;
+use crate::teams::Team;
+use crate::teams::UpdateTeamRequest;
+use crate::Result;
+use lazy_static::lazy_static;
+use chrono::Utc;
+use chrono::NaiveDateTime;
+use chrono::DateTime;
+use chrono::Duration;
+lazy_static! {
+    pub static ref DATE_TIME: DateTime<Utc> =
+        DateTime::from_utc(NaiveDateTime::from_timestamp(1000, 0), Utc);
+}
 
 pub struct Accounts {}
 
@@ -72,19 +80,19 @@ impl Accounts {
 
 #[async_trait]
 impl accounts::Provider for Accounts {
-    async fn create(&self, _req: CreateAccountRequest) -> metadata::Result<Account> {
+    async fn create(&self, _req: CreateAccountRequest) -> Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn get_by_id(&self, _id: u64) -> metadata::Result<Account> {
+    async fn get_by_id(&self, _id: u64) -> Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn get_by_email(&self, _email: &str) -> metadata::Result<Account> {
+    async fn get_by_email(&self, _email: &str) -> Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn list(&self) -> metadata::Result<ListResponse<Account>> {
+    async fn list(&self) -> Result<ListResponse<Account>> {
         Ok(ListResponse {
             data: vec![Accounts::account()],
             meta: ResponseMetadata { next: None },
@@ -95,11 +103,11 @@ impl accounts::Provider for Accounts {
         &self,
         _account_id: u64,
         _req: UpdateAccountRequest,
-    ) -> metadata::Result<Account> {
+    ) -> Result<Account> {
         Ok(Self::account())
     }
 
-    async fn delete(&self, _id: u64) -> metadata::Result<Account> {
+    async fn delete(&self, _id: u64) -> Result<Account> {
         Ok(Self::account())
     }
 }
@@ -138,7 +146,7 @@ impl custom_events::Provider for CustomEvents {
         _organization_id: u64,
         _project_id: u64,
         _req: CreateCustomEventRequest,
-    ) -> metadata::Result<CustomEvent> {
+    ) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
@@ -147,7 +155,7 @@ impl custom_events::Provider for CustomEvents {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> metadata::Result<CustomEvent> {
+    ) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
@@ -156,7 +164,7 @@ impl custom_events::Provider for CustomEvents {
         _organization_id: u64,
         _project_id: u64,
         _name: &str,
-    ) -> metadata::Result<CustomEvent> {
+    ) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
@@ -164,7 +172,7 @@ impl custom_events::Provider for CustomEvents {
         &self,
         _organization_id: u64,
         _project_id: u64,
-    ) -> metadata::Result<ListResponse<CustomEvent>> {
+    ) -> Result<ListResponse<CustomEvent>> {
         Ok(ListResponse {
             data: vec![CustomEvents::custom_event()],
             meta: ResponseMetadata { next: None },
@@ -177,7 +185,7 @@ impl custom_events::Provider for CustomEvents {
         _project_id: u64,
         _event_id: u64,
         _req: UpdateCustomEventRequest,
-    ) -> metadata::Result<CustomEvent> {
+    ) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
@@ -186,7 +194,7 @@ impl custom_events::Provider for CustomEvents {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> metadata::Result<CustomEvent> {
+    ) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 }
@@ -220,7 +228,7 @@ impl events::Provider for Events {
         _organization_id: u64,
         _project_id: u64,
         _req: CreateEventRequest,
-    ) -> metadata::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -229,7 +237,7 @@ impl events::Provider for Events {
         _organization_id: u64,
         _project_id: u64,
         _req: CreateEventRequest,
-    ) -> metadata::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -238,7 +246,7 @@ impl events::Provider for Events {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> metadata::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -247,7 +255,7 @@ impl events::Provider for Events {
         _organization_id: u64,
         _project_id: u64,
         _name: &str,
-    ) -> metadata::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -255,7 +263,7 @@ impl events::Provider for Events {
         &self,
         _organization_id: u64,
         _project_id: u64,
-    ) -> metadata::Result<ListResponse<Event>> {
+    ) -> Result<ListResponse<Event>> {
         Ok(ListResponse {
             data: vec![Events::event()],
             meta: ResponseMetadata { next: None },
@@ -268,7 +276,7 @@ impl events::Provider for Events {
         _project_id: u64,
         _event_id: u64,
         _req: UpdateEventRequest,
-    ) -> metadata::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -278,7 +286,7 @@ impl events::Provider for Events {
         _project_id: u64,
         _event_id: u64,
         _prop_id: u64,
-    ) -> metadata::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -288,7 +296,7 @@ impl events::Provider for Events {
         _project_id: u64,
         _event_id: u64,
         _prop_id: u64,
-    ) -> metadata::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -297,7 +305,7 @@ impl events::Provider for Events {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> metadata::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 }
@@ -334,7 +342,7 @@ impl properties::Provider for Properties {
         _organization_id: u64,
         _project_id: u64,
         _req: CreatePropertyRequest,
-    ) -> metadata::Result<Property> {
+    ) -> Result<Property> {
         Ok(Properties::property())
     }
 
@@ -343,7 +351,7 @@ impl properties::Provider for Properties {
         _organization_id: u64,
         _project_id: u64,
         _req: CreatePropertyRequest,
-    ) -> metadata::Result<Property> {
+    ) -> Result<Property> {
         Ok(Properties::property())
     }
 
@@ -352,7 +360,7 @@ impl properties::Provider for Properties {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> metadata::Result<Property> {
+    ) -> Result<Property> {
         Ok(Properties::property())
     }
 
@@ -361,7 +369,7 @@ impl properties::Provider for Properties {
         _organization_id: u64,
         _project_id: u64,
         _name: &str,
-    ) -> metadata::Result<Property> {
+    ) -> Result<Property> {
         Ok(Properties::property())
     }
 
@@ -369,7 +377,7 @@ impl properties::Provider for Properties {
         &self,
         _organization_id: u64,
         _project_id: u64,
-    ) -> metadata::Result<ListResponse<Property>> {
+    ) -> Result<ListResponse<Property>> {
         Ok(ListResponse {
             data: vec![Properties::property()],
             meta: ResponseMetadata { next: None },
@@ -382,7 +390,7 @@ impl properties::Provider for Properties {
         _project_id: u64,
         _property_id: u64,
         _req: UpdatePropertyRequest,
-    ) -> metadata::Result<Property> {
+    ) -> Result<Property> {
         Ok(Properties::property())
     }
 
@@ -391,7 +399,7 @@ impl properties::Provider for Properties {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> metadata::Result<Property> {
+    ) -> Result<Property> {
         Ok(Properties::property())
     }
 }
@@ -399,11 +407,11 @@ impl properties::Provider for Properties {
 pub struct Database {}
 #[async_trait]
 impl database::Provider for Database {
-    async fn create_table(&self, _table: Table) -> metadata::Result<()> {
+    async fn create_table(&self, _table: Table) -> Result<()> {
         Ok(())
     }
 
-    async fn get_table(&self, _table_type: TableRef) -> metadata::Result<Table> {
+    async fn get_table(&self, _table_type: TableRef) -> Result<Table> {
         Ok(Table {
             typ: TableRef::Events(1, 1),
             columns: vec![Column::new(
@@ -415,7 +423,7 @@ impl database::Provider for Database {
         })
     }
 
-    async fn add_column(&self, _table_type: TableRef, _col: Column) -> metadata::Result<()> {
+    async fn add_column(&self, _table_type: TableRef, _col: Column) -> Result<()> {
         Ok(())
     }
 }
@@ -429,7 +437,7 @@ impl dictionaries::Provider for Dictionaries {
         _project_id: u64,
         _dict: &str,
         _value: &str,
-    ) -> metadata::Result<u64> {
+    ) -> Result<u64> {
         Ok(1)
     }
 
@@ -439,7 +447,7 @@ impl dictionaries::Provider for Dictionaries {
         _project_id: u64,
         _dict: &str,
         _key: u64,
-    ) -> metadata::Result<String> {
+    ) -> Result<String> {
         Ok("v".to_string())
     }
 
@@ -449,7 +457,7 @@ impl dictionaries::Provider for Dictionaries {
         _project_id: u64,
         _dict: &str,
         _value: &str,
-    ) -> metadata::Result<u64> {
+    ) -> Result<u64> {
         Ok(1)
     }
 }
@@ -470,15 +478,15 @@ impl Organizations {
 }
 #[async_trait]
 impl organizations::Provider for Organizations {
-    async fn create(&self, _req: CreateOrganizationRequest) -> metadata::Result<Organization> {
+    async fn create(&self, _req: CreateOrganizationRequest) -> Result<Organization> {
         Ok(Organizations::org())
     }
 
-    async fn get_by_id(&self, _id: u64) -> metadata::Result<Organization> {
+    async fn get_by_id(&self, _id: u64) -> Result<Organization> {
         Ok(Organizations::org())
     }
 
-    async fn list(&self) -> metadata::Result<ListResponse<Organization>> {
+    async fn list(&self) -> Result<ListResponse<Organization>> {
         Ok(ListResponse {
             data: vec![Organizations::org()],
             meta: ResponseMetadata { next: None },
@@ -489,11 +497,11 @@ impl organizations::Provider for Organizations {
         &self,
         _org_id: u64,
         _req: UpdateOrganizationRequest,
-    ) -> metadata::Result<Organization> {
+    ) -> Result<Organization> {
         Ok(Organizations::org())
     }
 
-    async fn delete(&self, _id: u64) -> metadata::Result<Organization> {
+    async fn delete(&self, _id: u64) -> Result<Organization> {
         Ok(Organizations::org())
     }
 }
@@ -519,7 +527,7 @@ impl projects::Provider for Projects {
         &self,
         _organization_id: u64,
         _req: CreateProjectRequest,
-    ) -> metadata::Result<Project> {
+    ) -> Result<Project> {
         Ok(Projects::project())
     }
 
@@ -527,11 +535,11 @@ impl projects::Provider for Projects {
         &self,
         _organization_id: u64,
         _project_id: u64,
-    ) -> metadata::Result<Project> {
+    ) -> Result<Project> {
         Ok(Projects::project())
     }
 
-    async fn list(&self, _organization_id: u64) -> metadata::Result<ListResponse<Project>> {
+    async fn list(&self, _organization_id: u64) -> Result<ListResponse<Project>> {
         Ok(ListResponse {
             data: vec![Projects::project()],
             meta: ResponseMetadata { next: None },
@@ -543,11 +551,11 @@ impl projects::Provider for Projects {
         _organization_id: u64,
         _project_id: u64,
         _req: UpdateProjectRequest,
-    ) -> metadata::Result<Project> {
+    ) -> Result<Project> {
         Ok(Projects::project())
     }
 
-    async fn delete(&self, _organization_id: u64, _project_id: u64) -> metadata::Result<Project> {
+    async fn delete(&self, _organization_id: u64, _project_id: u64) -> Result<Project> {
         Ok(Projects::project())
     }
 }
@@ -573,15 +581,15 @@ impl teams::Provider for Teams {
         &self,
         _organization_id: u64,
         _req: CreateTeamRequest,
-    ) -> metadata::Result<Team> {
+    ) -> Result<Team> {
         Ok(Teams::team())
     }
 
-    async fn get_by_id(&self, _organization_id: u64, _team_id: u64) -> metadata::Result<Team> {
+    async fn get_by_id(&self, _organization_id: u64, _team_id: u64) -> Result<Team> {
         Ok(Teams::team())
     }
 
-    async fn list(&self, _organization_id: u64) -> metadata::Result<ListResponse<Team>> {
+    async fn list(&self, _organization_id: u64) -> Result<ListResponse<Team>> {
         Ok(ListResponse {
             data: vec![Teams::team()],
             meta: ResponseMetadata { next: None },
@@ -593,11 +601,11 @@ impl teams::Provider for Teams {
         _organization_id: u64,
         _team_id: u64,
         _req: UpdateTeamRequest,
-    ) -> metadata::Result<Team> {
+    ) -> Result<Team> {
         Ok(Teams::team())
     }
 
-    async fn delete(&self, _organization_id: u64, _team_id: u64) -> metadata::Result<Team> {
+    async fn delete(&self, _organization_id: u64, _team_id: u64) -> Result<Team> {
         Ok(Teams::team())
     }
 }

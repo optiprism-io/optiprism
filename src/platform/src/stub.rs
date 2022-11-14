@@ -1,43 +1,54 @@
-use async_trait::async_trait;
+use lazy_static::lazy_static;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
 use common::types::DictionaryDataType;
 use common::DataType;
-use platform::accounts;
-use platform::accounts::Account;
-use platform::accounts::CreateAccountRequest;
-use platform::accounts::UpdateAccountRequest;
-use platform::auth;
-use platform::auth::LogInRequest;
-use platform::auth::SignUpRequest;
-use platform::auth::TokensResponse;
-use platform::custom_events;
-use platform::custom_events::CreateCustomEventRequest;
-use platform::custom_events::CustomEvent;
-use platform::custom_events::UpdateCustomEventRequest;
-use platform::events;
-use platform::events::CreateEventRequest;
-use platform::events::Event;
-use platform::events::UpdateEventRequest;
-use platform::properties;
-use platform::properties::Property;
-use platform::properties::UpdatePropertyRequest;
-use platform::queries;
-use platform::queries::event_segmentation::EventSegmentation;
-use platform::queries::property_values::PropertyValues;
-use platform::Column;
-use platform::Context;
-use platform::DataTable;
-use platform::EventFilter;
-use platform::EventRef;
-use platform::ListResponse;
-use platform::PropValueOperation;
-use platform::PropertyRef;
-use platform::ResponseMetadata;
+use crate::{accounts, dashboards};
+use crate::accounts::Account;
+use crate::accounts::CreateAccountRequest;
+use crate::accounts::UpdateAccountRequest;
+use crate::auth;
+use crate::auth::LogInRequest;
+use crate::auth::SignUpRequest;
+use crate::auth::TokensResponse;
+use crate::custom_events;
+use crate::custom_events::CreateCustomEventRequest;
+use crate::custom_events::CustomEvent;
+use crate::custom_events::UpdateCustomEventRequest;
+use crate::events;
+use crate::events::CreateEventRequest;
+use crate::events::Event;
+use crate::events::UpdateEventRequest;
+use crate::properties;
+use crate::properties::Property;
+use crate::properties::UpdatePropertyRequest;
+use crate::queries;
+use crate::queries::event_segmentation::EventSegmentation;
+use crate::queries::property_values::PropertyValues;
+use crate::Column;
+use crate::Context;
+use crate::DataTable;
+use crate::EventFilter;
+use crate::EventRef;
+use crate::ListResponse;
+use crate::PropValueOperation;
+use crate::PropertyRef;
+use crate::ResponseMetadata;
 use serde_json::Value;
+use crate::dashboards::{CreateDashboardRequest, Dashboard, Panel, Row, UpdateDashboardRequest};
+use chrono::Utc;
+use chrono::NaiveDateTime;
+use chrono::DateTime;
+use chrono::Duration;
+use axum::async_trait;
+use crate::Result;
 
-use crate::DATE_TIME;
+lazy_static! {
+    pub static ref DATE_TIME: DateTime<Utc> =
+        DateTime::from_utc(NaiveDateTime::from_timestamp(1000, 0), Utc);
+}
+
 
 pub struct Accounts {}
 
@@ -62,15 +73,15 @@ impl Accounts {
 
 #[async_trait]
 impl accounts::Provider for Accounts {
-    async fn create(&self, _ctx: Context, _req: CreateAccountRequest) -> platform::Result<Account> {
+    async fn create(&self, _ctx: Context, _req: CreateAccountRequest) -> Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn get_by_id(&self, _ctx: Context, _id: u64) -> platform::Result<Account> {
+    async fn get_by_id(&self, _ctx: Context, _id: u64) -> Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn list(&self, _ctx: Context) -> platform::Result<ListResponse<Account>> {
+    async fn list(&self, _ctx: Context) -> Result<ListResponse<Account>> {
         Ok(ListResponse {
             data: vec![Accounts::account()],
             meta: ResponseMetadata { next: None },
@@ -82,11 +93,11 @@ impl accounts::Provider for Accounts {
         _ctx: Context,
         _account_id: u64,
         _req: UpdateAccountRequest,
-    ) -> platform::Result<Account> {
+    ) -> Result<Account> {
         Ok(Accounts::account())
     }
 
-    async fn delete(&self, _ctx: Context, _id: u64) -> platform::Result<Account> {
+    async fn delete(&self, _ctx: Context, _id: u64) -> Result<Account> {
         Ok(Accounts::account())
     }
 }
@@ -101,17 +112,18 @@ impl Auth {
         }
     }
 }
+
 #[async_trait]
 impl auth::Provider for Auth {
-    async fn sign_up(&self, _req: SignUpRequest) -> platform::Result<TokensResponse> {
+    async fn sign_up(&self, _req: SignUpRequest) -> Result<TokensResponse> {
         Ok(Auth::token_response())
     }
 
-    async fn log_in(&self, _req: LogInRequest) -> platform::Result<TokensResponse> {
+    async fn log_in(&self, _req: LogInRequest) -> Result<TokensResponse> {
         Ok(Auth::token_response())
     }
 
-    async fn refresh_token(&self, _refresh_token: &str) -> platform::Result<TokensResponse> {
+    async fn refresh_token(&self, _refresh_token: &str) -> Result<TokensResponse> {
         Ok(Auth::token_response())
     }
 }
@@ -145,6 +157,7 @@ impl CustomEvents {
         }
     }
 }
+
 #[async_trait]
 impl custom_events::Provider for CustomEvents {
     async fn create(
@@ -153,7 +166,7 @@ impl custom_events::Provider for CustomEvents {
         _organization_id: u64,
         _project_id: u64,
         _req: CreateCustomEventRequest,
-    ) -> platform::Result<CustomEvent> {
+    ) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
@@ -163,7 +176,7 @@ impl custom_events::Provider for CustomEvents {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> platform::Result<CustomEvent> {
+    ) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
@@ -172,7 +185,7 @@ impl custom_events::Provider for CustomEvents {
         _ctx: Context,
         _organization_id: u64,
         _project_id: u64,
-    ) -> platform::Result<ListResponse<CustomEvent>> {
+    ) -> Result<ListResponse<CustomEvent>> {
         Ok(ListResponse {
             data: vec![CustomEvents::custom_event()],
             meta: ResponseMetadata { next: None },
@@ -186,7 +199,7 @@ impl custom_events::Provider for CustomEvents {
         _project_id: u64,
         _event_id: u64,
         _req: UpdateCustomEventRequest,
-    ) -> platform::Result<CustomEvent> {
+    ) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 
@@ -196,7 +209,7 @@ impl custom_events::Provider for CustomEvents {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> platform::Result<CustomEvent> {
+    ) -> Result<CustomEvent> {
         Ok(CustomEvents::custom_event())
     }
 }
@@ -223,6 +236,7 @@ impl Events {
         }
     }
 }
+
 #[async_trait]
 impl events::Provider for Events {
     async fn create(
@@ -231,7 +245,7 @@ impl events::Provider for Events {
         _organization_id: u64,
         _project_id: u64,
         _request: CreateEventRequest,
-    ) -> platform::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -241,7 +255,7 @@ impl events::Provider for Events {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> platform::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -251,7 +265,7 @@ impl events::Provider for Events {
         _organization_id: u64,
         _project_id: u64,
         _name: &str,
-    ) -> platform::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -260,7 +274,7 @@ impl events::Provider for Events {
         _ctx: Context,
         _organization_id: u64,
         _project_id: u64,
-    ) -> platform::Result<ListResponse<Event>> {
+    ) -> Result<ListResponse<Event>> {
         Ok(ListResponse {
             data: vec![Events::event()],
             meta: ResponseMetadata { next: None },
@@ -274,7 +288,7 @@ impl events::Provider for Events {
         _project_id: u64,
         _event_id: u64,
         _req: UpdateEventRequest,
-    ) -> platform::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -285,7 +299,7 @@ impl events::Provider for Events {
         _project_id: u64,
         _event_id: u64,
         _prop_id: u64,
-    ) -> platform::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -296,7 +310,7 @@ impl events::Provider for Events {
         _project_id: u64,
         _event_id: u64,
         _prop_id: u64,
-    ) -> platform::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -306,7 +320,7 @@ impl events::Provider for Events {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> platform::Result<Event> {
+    ) -> Result<Event> {
         Ok(Events::event())
     }
 }
@@ -336,6 +350,7 @@ impl Properties {
         }
     }
 }
+
 #[async_trait]
 impl properties::Provider for Properties {
     async fn get_by_id(
@@ -344,7 +359,7 @@ impl properties::Provider for Properties {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> platform::Result<Property> {
+    ) -> Result<Property> {
         Ok(Properties::property())
     }
 
@@ -354,7 +369,7 @@ impl properties::Provider for Properties {
         _organization_id: u64,
         _project_id: u64,
         _name: &str,
-    ) -> platform::Result<Property> {
+    ) -> Result<Property> {
         Ok(Properties::property())
     }
 
@@ -363,7 +378,7 @@ impl properties::Provider for Properties {
         _ctx: Context,
         _organization_id: u64,
         _project_id: u64,
-    ) -> platform::Result<ListResponse<Property>> {
+    ) -> Result<ListResponse<Property>> {
         Ok(ListResponse {
             data: vec![Properties::property()],
             meta: ResponseMetadata { next: None },
@@ -377,7 +392,7 @@ impl properties::Provider for Properties {
         _project_id: u64,
         _property_id: u64,
         _req: UpdatePropertyRequest,
-    ) -> platform::Result<Property> {
+    ) -> Result<Property> {
         Ok(Properties::property())
     }
 
@@ -387,12 +402,13 @@ impl properties::Provider for Properties {
         _organization_id: u64,
         _project_id: u64,
         _id: u64,
-    ) -> platform::Result<Property> {
+    ) -> Result<Property> {
         Ok(Properties::property())
     }
 }
 
 pub struct Queries {}
+
 #[async_trait]
 impl queries::Provider for Queries {
     async fn event_segmentation(
@@ -401,7 +417,7 @@ impl queries::Provider for Queries {
         _organization_id: u64,
         _project_id: u64,
         _req: EventSegmentation,
-    ) -> platform::Result<DataTable> {
+    ) -> Result<DataTable> {
         Ok(DataTable::new(vec![Column {
             name: "name".to_string(),
             group: "group".to_string(),
@@ -417,9 +433,92 @@ impl queries::Provider for Queries {
         _organization_id: u64,
         _project_id: u64,
         _req: PropertyValues,
-    ) -> platform::Result<queries::property_values::ListResponse> {
+    ) -> Result<queries::property_values::ListResponse> {
         Ok(queries::property_values::ListResponse::new(vec![
             Value::from("value"),
         ]))
+    }
+}
+
+pub struct Dashboards {}
+
+impl Dashboards {
+    pub fn dashboard() -> Dashboard {
+        Dashboard {
+            id: 1,
+            created_at: *DATE_TIME,
+            updated_at: Some(*DATE_TIME),
+            created_by: 1,
+            updated_by: Some(1),
+            project_id: 1,
+            tags: Some(vec!["tag".to_string()]),
+            name: "name".to_string(),
+            description: Some("description".to_string()),
+            rows: vec![
+                Row {
+                    panels: vec![Panel {
+                        span: 1,
+                        typ: dashboards::Type::Report,
+                        report_id: 0,
+                    }]
+                }
+            ],
+        }
+    }
+}
+
+#[async_trait]
+impl dashboards::Provider for Dashboards {
+    async fn create(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _request: CreateDashboardRequest,
+    ) -> Result<Dashboard> {
+        Ok(Dashboards::dashboard())
+    }
+
+    async fn get_by_id(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
+    ) -> Result<Dashboard> {
+        Ok(Dashboards::dashboard())
+    }
+
+    async fn list(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+    ) -> Result<ListResponse<Dashboard>> {
+        Ok(ListResponse {
+            data: vec![Dashboards::dashboard()],
+            meta: ResponseMetadata { next: None },
+        })
+    }
+
+    async fn update(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _event_id: u64,
+        _req: UpdateDashboardRequest,
+    ) -> Result<Dashboard> {
+        Ok(Dashboards::dashboard())
+    }
+
+    async fn delete(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
+    ) -> Result<Dashboard> {
+        Ok(Dashboards::dashboard())
     }
 }

@@ -10,6 +10,7 @@ pub mod http;
 pub mod properties;
 pub mod queries;
 pub mod dashboards;
+pub mod stub;
 
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -45,7 +46,6 @@ use serde::Serialize;
 use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
-
 pub struct PlatformProvider {
     pub events: Arc<dyn events::Provider>,
     pub custom_events: Arc<dyn custom_events::Provider>,
@@ -54,6 +54,7 @@ pub struct PlatformProvider {
     pub accounts: Arc<dyn accounts::Provider>,
     pub auth: Arc<dyn auth::Provider>,
     pub query: Arc<dyn queries::Provider>,
+    pub dashboards: Arc<dyn dashboards::Provider>,
 }
 
 impl PlatformProvider {
@@ -74,6 +75,20 @@ impl PlatformProvider {
             accounts: Arc::new(accounts::ProviderImpl::new(md.accounts.clone())),
             auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
             query: Arc::new(queries::ProviderImpl::new(query_prov)),
+            dashboards:Arc::new(stub::Dashboards{})
+        }
+    }
+
+    pub fn new_stub() -> Self {
+        PlatformProvider {
+            events: Arc::new(stub::Events {}),
+            custom_events: Arc::new(stub::CustomEvents {}),
+            event_properties: Arc::new(stub::Properties {}),
+            user_properties: Arc::new(stub::Properties {}),
+            accounts: Arc::new(stub::Accounts {}),
+            auth: Arc::new(stub::Auth {}),
+            query: Arc::new(stub::Queries {}),
+            dashboards: Arc::new(stub::Dashboards {}),
         }
     }
 }

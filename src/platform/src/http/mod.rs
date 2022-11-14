@@ -4,6 +4,7 @@ pub mod custom_events;
 pub mod events;
 pub mod properties;
 pub mod queries;
+pub mod dashboards;
 
 use std::collections::BTreeMap;
 use std::error::Error;
