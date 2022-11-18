@@ -64,6 +64,8 @@ pub enum PlatformError {
     Unauthorized(String),
     #[error("forbidden: {0:?}")]
     Forbidden(String),
+    #[error("not found: {0:?}")]
+    NotFound(String),
     #[error("internal: {0:?}")]
     Internal(String),
     #[error("serde: {0:?}")]
@@ -194,6 +196,7 @@ impl PlatformError {
             PlatformError::InvalidFields(fields) => {
                 ApiError::new(StatusCode::BAD_REQUEST).with_fields(fields)
             }
+            PlatformError::NotFound(err) => ApiError::not_found(err)
         }
     }
 }

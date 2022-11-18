@@ -50,14 +50,15 @@ export class InputMaker {
     }
 }
 
-export const testRequest = (resp:Promise<any>) => {
-    resp.catch((e)=>{
-        if (e.response?.data?.error) {
-            throw new Error(JSON.stringify(e.response.data.error,null, 2))
-        } else {
-            throw new Error(e)
-        }
-    })
+export const testRequest = (resp: Promise<any>) => {
+    return resp
+        .then((r) => {
+            return new Promise((resolve, reject) => resolve(r))
+        })
+        .catch((e) => {
+            console.log(e, JSON.stringify(e.response.data.error, null, 2))
+            return new Promise((resolve, reject) => reject(JSON.stringify(e.response.data.error, null, 2)))
+        })
 }
 
 export const testRequestWithVariants = (reqFn: (body: any) => Promise<any>, vars: (im: InputMaker) => any) => {
@@ -90,8 +91,17 @@ interface ConfigParameters {
     auth: boolean
 }
 
+const defaultTransformer = (reqData, reqHeaders) => {
+    console.log('req', reqData)
+
+    return reqData;
+}
+
 export const config = (cfg?: ConfigParameters): Configuration => {
-    const baseOptions: any = {}
+    const baseOptions: any = {
+        // transformRequest: defaultTransformer,
+        // transformResponse: defaultTransformer
+    }
     if (cfg?.auth) {
         baseOptions.headers = {Authorization: `Bearer ${jwtToken()}`}
     }

@@ -1709,6 +1709,30 @@ components:
             properties:
               id:
                 type: integer
+    DashboardPanel:
+      type: object
+      required: [ 'span','type','reportId' ]
+      properties:
+        span:
+          type: integer
+          format: int64
+          description: span
+        type:
+          type: string
+          enum: [ 'report' ]
+        reportId:
+          type: integer
+          format: int64
+
+    DashboardRow:
+      type: object
+      required: [ 'panels' ]
+      properties:
+        panels:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardPanel'
+
     CreateDashboardRequest:
       type: object
       required: [ 'name','rows' ]
@@ -1727,25 +1751,8 @@ components:
         rows:
           type: array
           items:
-            type: object
-            required: [ 'panels' ]
-            properties:
-              panels:
-                type: array
-                items:
-                  type: object
-                  required: [ 'span','type','reportId' ]
-                  properties:
-                    span:
-                      type: integer
-                      format: int64
-                      description: span
-                    type:
-                      type: string
-                      enum: [ 'report' ]
-                    reportId:
-                      type: integer
-                      format: int64
+            $ref: '#/components/schemas/DashboardRow'
+
     UpdateDashboardRequest:
       type: object
       properties:
@@ -2875,7 +2882,6 @@ components:
           oneOf:
             - $ref: '#/components/schemas/AnalysisLinear'
             - $ref: '#/components/schemas/AnalysisRollingAverage'
-            - $ref: '#/components/schemas/AnalysisRollingWindow'
             - $ref: '#/components/schemas/AnalysisCumulative'
         compare:
           type: object

@@ -14,7 +14,6 @@
 import { AnalysisCumulative } from './analysis-cumulative';
 import { AnalysisLinear } from './analysis-linear';
 import { AnalysisRollingAverage } from './analysis-rolling-average';
-import { AnalysisRollingWindow } from './analysis-rolling-window';
 import { BreakdownByProperty } from './breakdown-by-property';
 import { EventChartType } from './event-chart-type';
 import { EventGroupedFilters } from './event-grouped-filters';
@@ -57,10 +56,10 @@ export interface EventSegmentation {
     chartType: EventChartType;
     /**
      * analysis type
-     * @type {AnalysisLinear | AnalysisRollingAverage | AnalysisRollingWindow | AnalysisCumulative}
+     * @type {AnalysisLinear | AnalysisRollingAverage | AnalysisCumulative}
      * @memberof EventSegmentation
      */
-    analysis: AnalysisLinear | AnalysisRollingAverage | AnalysisRollingWindow | AnalysisCumulative;
+    analysis: AnalysisLinear | AnalysisRollingAverage | AnalysisCumulative;
     /**
      * 
      * @type {EventSegmentationCompare}

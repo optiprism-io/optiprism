@@ -11,7 +11,7 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
-import { CreateDashboardRequestRows } from './create-dashboard-request-rows';
+import { UpdateDashboardRequestRows } from './update-dashboard-request-rows';
 /**
  * 
  * @export
@@ -38,8 +38,8 @@ export interface UpdateDashboardRequest {
     description?: string;
     /**
      * 
-     * @type {Array<CreateDashboardRequestRows>}
+     * @type {Array<UpdateDashboardRequestRows>}
      * @memberof UpdateDashboardRequest
      */
-    rows?: Array<CreateDashboardRequestRows>;
+    rows?: Array<UpdateDashboardRequestRows>;
 }

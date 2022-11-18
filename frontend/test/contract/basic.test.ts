@@ -1,83 +1,16 @@
 import {describe, expect, test} from 'vitest'
+import {DashboardsApi} from '../../packages/api'
 
-import jwt from 'jsonwebtoken'
-import {Configuration, QueryApi, AuthApi} from 'api'
+import {config, testRequest} from './helpers'
+import {DashboardPanelTypeEnum,} from '../../packages/api/models'
 
-import {config, InputMaker, jwtToken, testRequest, testRequestWithVariants} from './helpers'
-import {
-    AnalysisCumulative,
-    AnalysisCumulativeTypeEnum,
-    AnalysisLinear,
-    AnalysisLinearTypeEnum,
-    AnalysisLogarithmic,
-    AnalysisLogarithmicTypeEnum,
-    AnalysisRollingAverage,
-    AnalysisRollingAverageTypeEnum,
-    BreakdownByProperty,
-    BreakdownByPropertyTypeEnum,
-    DidEventAggregateProperty,
-    DidEventAggregatePropertyTypeEnum,
-    DidEventCount,
-    DidEventCountTypeEnum,
-    SignupRequest,
-    DidEventHistoricalCount,
-    DidEventHistoricalCountTypeEnum,
-    DidEventRelativeCount,
-    DidEventRelativeCountTypeEnum,
-    EventChartType,
-    EventFilterByCohort,
-    EventFilterByCohortTypeEnum,
-    EventFilterByGroup,
-    EventFilterByGroupTypeEnum,
-    EventFilterByProperty,
-    EventFilterByPropertyTypeEnum,
-    EventGroupedFilters,
-    EventGroupedFiltersGroupsConditionEnum,
-    EventGroupedFiltersGroupsFiltersConditionEnum,
-    EventRefEventTypeEnum,
-    EventSegmentation,
-    PropertyFilterOperation,
-    PropertyRefPropertyTypeEnum,
-    QueryAggregate,
-    QueryAggregatePerGroup,
-    QueryAggregateProperty,
-    QueryAggregatePropertyPerGroup,
-    QueryAggregatePropertyPerGroupTypeEnum,
-    QueryAggregatePropertyTypeEnum,
-    QueryCountPerGroup,
-    QueryCountPerGroupTypeEnum,
-    QueryFormula,
-    QueryFormulaTypeEnum,
-    QuerySimple,
-    QuerySimpleTypeEnum,
-    SegmentConditionDidEvent,
-    SegmentConditionDidEventTypeEnum,
-    SegmentConditionHadPropertyValue,
-    SegmentConditionHadPropertyValueTypeEnum,
-    SegmentConditionHasPropertyValue,
-    SegmentConditionHasPropertyValueTypeEnum,
-    TimeAfterFirstUse,
-    TimeAfterFirstUseTypeEnum,
-    TimeBetween,
-    TimeBetweenTypeEnum,
-    TimeFrom,
-    TimeFromTypeEnum,
-    TimeLast,
-    TimeLastTypeEnum,
-    TimeUnit,
-    TimeWindowEach,
-    TimeWindowEachTypeEnum,
-    LoginRequest,
-    RefreshTokenRequest,
-} from '../../packages/api/models'
-
-
+/*
 describe('Unauthorized', () => {
     describe('Auth', () => {
         const authApi = new AuthApi(config());
 
         test.concurrent('Login', () => {
-            expect(()=>testRequest(authApi.basicLogin(<LoginRequest>{
+            expect(() => testRequest(authApi.basicLogin(<LoginRequest>{
                 email: 'email',
                 password: 'password'
             }))).not.toThrow()
@@ -96,11 +29,64 @@ describe('Unauthorized', () => {
             expect(() => testRequest(authApi.refreshToken(<RefreshTokenRequest>{refreshToken: 'refresh_token'}))).not.toThrow()
         })
     })
-})
+})*/
 
 describe('Authorized', () => {
     describe('queries', () => {
-        describe('Event Segmentation', () => {
+        describe('Dashboards', () => {
+            const api = new DashboardsApi(config({auth: true}))
+            test('List', async () => {
+                await expect(testRequest(api.dashboardsList(1, 1))).resolves.toBe(true)
+            })
+
+
+            /* test('Create', async () => {
+                 await expect(testRequest(api.createDashboard({
+                     tags: ['d'],
+                     name: 'test',
+                     description: 'desc',
+                     rows: [
+                         {
+                             panels: [
+                                 {
+                                     span: 1,
+                                     type: DashboardPanelTypeEnum.Report,
+                                     reportId: 1
+                                 }
+                             ]
+                         }
+                     ]
+                 }, 1, 1))).resolves.toBe('ok');
+             })*/
+            /*
+                        test.concurrent('Get By Id', () => {
+                            expect(() => testRequest(api.getDashboard(1, 1,1))).not.toThrow()
+                        })
+
+                        test.concurrent('Update', () => {
+                            expect(() => testRequest(api.updateDashboard(<UpdateDashboardRequest>{
+                                tags: ['d'],
+                                name: 'test',
+                                description: 'desc',
+                                rows: [
+                                    <DashboardRow>{
+                                        panels: [
+                                            <DashboardPanel>{
+                                                span: 1,
+                                                type: DashboardPanelTypeEnum.Report,
+                                                reportId: 1
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }, 1, 1, 1))).not.toThrow()
+                        })
+
+                        test.concurrent('Get By Id', () => {
+                            expect(() => testRequest(api.deleteDashboard(1, 1,1))).not.toThrow()
+                        })*/
+        })
+        /*describe('Event Segmentation', () => {
             const queryApi = new QueryApi(config({auth: true}))
 
             testRequestWithVariants(
@@ -406,6 +392,6 @@ describe('Authorized', () => {
                     }
                 },
             )
-        })
+        })*/
     })
 })

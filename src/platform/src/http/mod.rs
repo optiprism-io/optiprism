@@ -13,12 +13,13 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::async_trait;
+use axum::{async_trait, http};
 use axum::body::HttpBody;
 use axum::extract::rejection::JsonRejection;
-use axum::http::Request;
+use axum::http::{HeaderMap, HeaderValue, Request, Uri};
 use axum::http::StatusCode;
 use axum::middleware;
+use axum::handler::Handler;
 use axum::middleware::Next;
 use axum::routing::get_service;
 use axum::Extension;
@@ -47,7 +48,7 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::error::ApiError;
-use crate::PlatformProvider;
+use crate::{PlatformError, PlatformProvider};
 use crate::Result;
 
 pub struct Service {
@@ -73,6 +74,7 @@ impl Service {
         router = properties::attach_event_routes(router);
         router = properties::attach_user_routes(router);
         router = queries::attach_routes(router);
+        router = dashboards::attach_routes(router);
         router = router.clone().nest("/api/v1", router);
 
         router = router
@@ -84,12 +86,14 @@ impl Service {
             .layer(Extension(platform.event_properties.clone()))
             .layer(Extension(platform.user_properties.clone()))
             .layer(Extension(auth_cfg))
-            .layer(Extension(platform.query.clone()));
+            .layer(Extension(platform.query.clone()))
+            .layer(Extension(platform.dashboards.clone()));
 
         router = router
             .layer(CookieManagerLayer::new())
             .layer(TraceLayer::new_for_http())
-            .layer(middleware::from_fn(print_request_response));
+            .layer(middleware::from_fn(print_request_response))
+            .fallback(fallback.into_service());
 
         Self { router, addr }
     }
@@ -136,28 +140,44 @@ impl Service {
     }
 }
 
+async fn fallback(uri: Uri) -> impl IntoResponse {
+    PlatformError::NotFound(format!("No route for {}", uri))
+}
+
+fn content_length(headers: &HeaderMap<HeaderValue>) -> Option<u64> {
+    headers
+        .get(http::header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok()?.parse::<u64>().ok())
+}
+
 pub async fn print_request_response(
-    req: Request<Body>,
+    mut req: Request<Body>,
     next: Next<Body>,
-) -> std::result::Result<impl IntoResponse, (StatusCode, String)> {
-    let (parts, body) = req.into_parts();
-    tracing::debug!("headers = {:?}", parts.headers);
-    let bytes = buffer_and_print("request", body).await?;
-    let req = Request::from_parts(parts, Body::from(bytes));
+) -> Result<impl IntoResponse> {
+    tracing::debug!("request headers = {:?}", req.headers());
+
+    if content_length(req.headers()).is_some() {
+        let (parts, body) = req.into_parts();
+        let bytes = buffer_and_print("request", body).await?;
+        req = Request::from_parts(parts, Body::from(bytes));
+    }
 
     let res = next.run(req).await;
 
+    if content_length(res.headers()).is_none() {
+        return Ok(res);
+    }
+
     let (parts, body) = res.into_parts();
     let bytes = buffer_and_print("response", body).await?;
-    let res = Response::from_parts(parts, Body::from(bytes));
 
-    Ok(res)
+    Ok(Response::from_parts(parts, Body::from(bytes)))
 }
 
 async fn buffer_and_print<B>(
     direction: &str,
     body: B,
-) -> std::result::Result<Bytes, (StatusCode, String)>
+) -> Result<Bytes>
     where
         B: HttpBody<Data=Bytes>,
         B::Error: std::fmt::Display,
@@ -165,16 +185,13 @@ async fn buffer_and_print<B>(
     let bytes = match hyper::body::to_bytes(body).await {
         Ok(bytes) => bytes,
         Err(err) => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!("failed to read {} body: {}", direction, err),
-            ));
+            return Err(PlatformError::BadRequest(format!("failed to read {} body: {}", direction, err)));
         }
     };
 
     if let Ok(body) = std::str::from_utf8(&bytes) {
-        let v = serde_json::from_slice::<Value>(body.as_bytes()).map_err(|_| (StatusCode::BAD_REQUEST, "bad request".to_string()))?;
-        tracing::debug!("{} body = {}", direction, serde_json::to_string_pretty(&v).map_err(|_| (StatusCode::BAD_REQUEST, "bad request".to_string()))?);
+        let v = serde_json::from_slice::<Value>(body.as_bytes())?;
+        tracing::debug!("{} body = {}", direction, serde_json::to_string_pretty(&v)?);
     }
 
     Ok(bytes)

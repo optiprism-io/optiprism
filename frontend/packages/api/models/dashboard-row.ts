@@ -11,10 +11,17 @@
  * https://github.com/swagger-api/swagger-codegen.git
  * Do not edit the class manually.
  */
+import { DashboardPanel } from './dashboard-panel';
 /**
  * 
  * @export
- * @interface SegmentCondition
+ * @interface DashboardRow
  */
-export interface SegmentCondition {
+export interface DashboardRow {
+    /**
+     * 
+     * @type {Array<DashboardPanel>}
+     * @memberof DashboardRow
+     */
+    panels: Array<DashboardPanel>;
 }

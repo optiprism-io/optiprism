@@ -14,25 +14,25 @@
 /**
  * 
  * @export
- * @interface CreateDashboardRequestPanels
+ * @interface UpdateDashboardRequestPanels
  */
-export interface CreateDashboardRequestPanels {
+export interface UpdateDashboardRequestPanels {
     /**
      * span
      * @type {number}
-     * @memberof CreateDashboardRequestPanels
+     * @memberof UpdateDashboardRequestPanels
      */
     span: number;
     /**
      * 
      * @type {string}
-     * @memberof CreateDashboardRequestPanels
+     * @memberof UpdateDashboardRequestPanels
      */
-    type: CreateDashboardRequestPanelsTypeEnum;
+    type: UpdateDashboardRequestPanelsTypeEnum;
     /**
      * 
      * @type {number}
-     * @memberof CreateDashboardRequestPanels
+     * @memberof UpdateDashboardRequestPanels
      */
     reportId: number;
 }
@@ -41,7 +41,7 @@ export interface CreateDashboardRequestPanels {
     * @export
     * @enum {string}
     */
-export enum CreateDashboardRequestPanelsTypeEnum {
+export enum UpdateDashboardRequestPanelsTypeEnum {
     Report = 'report'
 }
 

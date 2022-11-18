@@ -14,28 +14,34 @@
 /**
  * 
  * @export
- * @interface AnalysisRollingWindow
+ * @interface DashboardPanel
  */
-export interface AnalysisRollingWindow {
+export interface DashboardPanel {
+    /**
+     * span
+     * @type {number}
+     * @memberof DashboardPanel
+     */
+    span: number;
     /**
      * 
      * @type {string}
-     * @memberof AnalysisRollingWindow
+     * @memberof DashboardPanel
      */
-    type: AnalysisRollingWindowTypeEnum;
+    type: DashboardPanelTypeEnum;
     /**
      * 
      * @type {number}
-     * @memberof AnalysisRollingWindow
+     * @memberof DashboardPanel
      */
-    window: number;
+    reportId: number;
 }
 
 /**
     * @export
     * @enum {string}
     */
-export enum AnalysisRollingWindowTypeEnum {
-    RollingWindow = 'rollingWindow'
+export enum DashboardPanelTypeEnum {
+    Report = 'report'
 }
 
