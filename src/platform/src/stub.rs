@@ -46,7 +46,7 @@ use crate::Result;
 
 lazy_static! {
     pub static ref DATE_TIME: DateTime<Utc> =
-        DateTime::from_utc(NaiveDateTime::from_timestamp(1000, 0), Utc);
+        DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
 }
 
 
@@ -459,7 +459,7 @@ impl Dashboards {
                     panels: vec![Panel {
                         span: 1,
                         typ: dashboards::Type::Report,
-                        report_id: 0,
+                        report_id: 1,
                     }]
                 }
             ],
@@ -497,7 +497,7 @@ impl dashboards::Provider for Dashboards {
     ) -> Result<ListResponse<Dashboard>> {
         Ok(ListResponse {
             data: vec![Dashboards::dashboard()],
-            meta: ResponseMetadata { next: None },
+            meta: ResponseMetadata { next: Some("next".to_string()) },
         })
     }
 

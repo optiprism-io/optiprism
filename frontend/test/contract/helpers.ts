@@ -1,5 +1,5 @@
 import {expect, test} from 'vitest';
-import {Configuration} from 'api';
+import {Configuration} from '../../src/api2';
 import jwt from 'jsonwebtoken';
 
 const AUTH_HEADER_KEY = 'authorization'

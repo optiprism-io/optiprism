@@ -25,11 +25,12 @@ use axum::routing::get_service;
 use axum::Extension;
 use axum::Router;
 use axum::Server;
+use axum_core::body::BoxBody;
 use axum_core::extract::FromRequest;
 use axum_core::extract::RequestParts;
 use axum_core::response::IntoResponse;
 use axum_core::response::Response;
-use axum_core::BoxError;
+use axum_core::{body, BoxError};
 use bytes::Bytes;
 use datafusion::parquet::data_type::AsBytes;
 use hyper::Body;
@@ -163,7 +164,6 @@ pub async fn print_request_response(
     }
 
     let res = next.run(req).await;
-
     if content_length(res.headers()).is_none() {
         return Ok(res);
     }
@@ -171,7 +171,7 @@ pub async fn print_request_response(
     let (parts, body) = res.into_parts();
     let bytes = buffer_and_print("response", body).await?;
 
-    Ok(Response::from_parts(parts, Body::from(bytes)))
+    Ok(Response::from_parts(parts, body::boxed(Body::from(bytes))))
 }
 
 async fn buffer_and_print<B>(

@@ -1,9 +1,10 @@
 import {describe, expect, test} from 'vitest'
-import {DashboardsApi} from '../../packages/api'
-
+// import {DashboardsApi} from '../../packages/api'
+import {AxiosResponse} from 'axios'
+import {Dashboard, DashboardsApi, DashboardsList200Response, ListResponseMetadataMeta} from '../../src/api2'
 import {config, testRequest} from './helpers'
 import {DashboardPanelTypeEnum,} from '../../packages/api/models'
-
+import {stubs} from './stubs'
 /*
 describe('Unauthorized', () => {
     describe('Auth', () => {
@@ -31,12 +32,38 @@ describe('Unauthorized', () => {
     })
 })*/
 
+expect.extend({
+    async toBeApiResponse(received: Promise<any>, expected) {
+        return await received.then(
+            (r) => {
+                return {
+                    pass: JSON.stringify(r.data) === JSON.stringify(expected),
+                    message: () => 'error',
+                    actual: r.data,
+                    expected: expected
+                }
+            },
+            (err) => {
+                return {
+                    pass: false,
+                    message: () => 'error',
+                    actual: received,
+                    expected: expected
+                }
+            },
+        );
+    }
+})
+
 describe('Authorized', () => {
     describe('queries', () => {
         describe('Dashboards', () => {
             const api = new DashboardsApi(config({auth: true}))
             test('List', async () => {
-                await expect(testRequest(api.dashboardsList(1, 1))).resolves.toBe(true)
+                await expect(api.dashboardsList(1, 1)).toBeApiResponse(<DashboardsList200Response>{
+                    data: [stubs.dashboard],
+                    meta: <ListResponseMetadataMeta>{next: 'next'}
+                })
             })
 
 

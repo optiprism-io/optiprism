@@ -16,19 +16,19 @@ import { ListResponseMetadataMeta } from './list-response-metadata-meta';
 /**
  * 
  * @export
- * @interface InlineResponse200
+ * @interface InlineResponse201
  */
-export interface InlineResponse200 {
+export interface InlineResponse201 {
     /**
      * 
      * @type {Array<Dashboard>}
-     * @memberof InlineResponse200
+     * @memberof InlineResponse201
      */
     data?: Array<Dashboard>;
     /**
      * 
      * @type {ListResponseMetadataMeta}
-     * @memberof InlineResponse200
+     * @memberof InlineResponse201
      */
     meta?: ListResponseMetadataMeta;
 }

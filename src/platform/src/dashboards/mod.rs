@@ -59,6 +59,7 @@ pub enum Type {
 #[serde(rename_all = "camelCase")]
 pub struct Panel {
     pub span: usize,
+    #[serde(rename = "type")]
     pub typ: Type,
     pub report_id: u64,
 }

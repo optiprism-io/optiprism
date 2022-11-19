@@ -116,18 +116,7 @@ paths:
         - $ref: '#/components/parameters/ProjectID'
       responses:
         '200':
-          description: dashboard list
-          content:
-            application/json:
-              schema:
-                type: object
-                allOf:
-                  - properties:
-                      dashboards:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Dashboard'
-                  - $ref: '#/components/schemas/ListResponseMetadata'
+          $ref: '#/components/responses/ListDashboardsResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1223,7 +1212,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/parameters/ListPropertyValuesRequest'
+              $ref: '#/components/schemas/ListPropertyValuesRequest'
       responses:
         '200':
           description: list property values
@@ -1371,6 +1360,19 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    ListDashboardsResponse:
+      description: dashboard list
+      content:
+        application/json:
+          schema:
+            type: object
+            allOf:
+              - properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Dashboard'
+              - $ref: '#/components/schemas/ListResponseMetadata'
   schemas:
     LoginRequest:
       type: object
@@ -1384,7 +1386,7 @@ components:
           format: password
     SignupRequest:
       type: object
-      required: ['email','password','passwordRepeat']
+      required: [ 'email','password','passwordRepeat' ]
       properties:
         email:
           type: string
@@ -1414,7 +1416,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/PropertyRef'
         - type: object
-          required: ['eventName']
+          required: [ 'eventName' ]
           properties:
             eventName:
               type: string
@@ -1423,7 +1425,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/PropertyRef'
         - type: object
-          required: ['eventId']
+          required: [ 'eventId' ]
           properties:
             eventId:
               type: number
@@ -1791,6 +1793,7 @@ components:
                       format: int64
     Dashboard:
       type: object
+      required: [ 'id','name','rows' ]
       properties:
         id:
           type: integer
@@ -1831,11 +1834,13 @@ components:
           type: array
           items:
             type: object
+            required: [ 'panels' ]
             properties:
               panels:
                 type: array
                 items:
                   type: object
+                  required: [ 'span','type' ]
                   properties:
                     span:
                       type: integer
@@ -2145,7 +2150,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
-          required: ['filters']
+          required: [ 'filters' ]
           properties:
             filters:
               type: array
@@ -2452,7 +2457,7 @@ components:
           example: user
         search:
           type: object
-          required: ['term']
+          required: [ 'term' ]
           description: search in results
           properties:
             term:
