@@ -1,5 +1,10 @@
-import {Dashboard, DashboardPanelTypeEnum, DashboardsApi, DashboardsList200Response} from '../../src/api2'
-import {DashboardRow, DashboardPanel} from "../../src/api2";
+import {
+    Dashboard,
+    DashboardPanel,
+    DashboardPanelTypeEnum,
+    DashboardRow, DataTableResponse,
+    DataTableResponseColumnsInnerTypeEnum, DataType
+} from '../../src/api';
 
 export const stubs = {
     dashboard: <Dashboard>{
@@ -19,5 +24,19 @@ export const stubs = {
                 reportId: 1
             }]
         }]
+    },
+    dataTable: <DataTableResponse>{
+        columns: [
+            {
+                type: DataTableResponseColumnsInnerTypeEnum.Dimension,
+                name: 'name',
+                isNullable: true,
+                dataType: DataType.Number,
+                step: 1,
+                data: [1],
+                compareValues: [2]
+            }
+
+        ]
     }
 }

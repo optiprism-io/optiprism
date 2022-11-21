@@ -130,7 +130,7 @@ export interface AnalysisCumulative {
      * @type {string}
      * @memberof AnalysisCumulative
      */
-    'type'?: AnalysisCumulativeTypeEnum;
+    'type': AnalysisCumulativeTypeEnum;
 }
 
 export const AnalysisCumulativeTypeEnum = {
@@ -150,7 +150,7 @@ export interface AnalysisLinear {
      * @type {string}
      * @memberof AnalysisLinear
      */
-    'type'?: AnalysisLinearTypeEnum;
+    'type': AnalysisLinearTypeEnum;
 }
 
 export const AnalysisLinearTypeEnum = {
@@ -158,6 +158,32 @@ export const AnalysisLinearTypeEnum = {
 } as const;
 
 export type AnalysisLinearTypeEnum = typeof AnalysisLinearTypeEnum[keyof typeof AnalysisLinearTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface AnalysisLogarithmic
+ */
+export interface AnalysisLogarithmic {
+    /**
+     * 
+     * @type {string}
+     * @memberof AnalysisLogarithmic
+     */
+    'type': AnalysisLogarithmicTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof AnalysisLogarithmic
+     */
+    'window'?: number;
+}
+
+export const AnalysisLogarithmicTypeEnum = {
+    Logarithmic: 'logarithmic'
+} as const;
+
+export type AnalysisLogarithmicTypeEnum = typeof AnalysisLogarithmicTypeEnum[keyof typeof AnalysisLogarithmicTypeEnum];
 
 /**
  * 
@@ -170,13 +196,19 @@ export interface AnalysisRollingAverage {
      * @type {string}
      * @memberof AnalysisRollingAverage
      */
-    'type'?: AnalysisRollingAverageTypeEnum;
+    'type': AnalysisRollingAverageTypeEnum;
     /**
      * 
      * @type {number}
      * @memberof AnalysisRollingAverage
      */
-    'window'?: number;
+    'window': number;
+    /**
+     * 
+     * @type {TimeUnit}
+     * @memberof AnalysisRollingAverage
+     */
+    'unit': TimeUnit;
 }
 
 export const AnalysisRollingAverageTypeEnum = {
@@ -185,51 +217,6 @@ export const AnalysisRollingAverageTypeEnum = {
 
 export type AnalysisRollingAverageTypeEnum = typeof AnalysisRollingAverageTypeEnum[keyof typeof AnalysisRollingAverageTypeEnum];
 
-/**
- * 
- * @export
- * @interface AnalysisRollingWindow
- */
-export interface AnalysisRollingWindow {
-    /**
-     * 
-     * @type {string}
-     * @memberof AnalysisRollingWindow
-     */
-    'type'?: AnalysisRollingWindowTypeEnum;
-    /**
-     * 
-     * @type {number}
-     * @memberof AnalysisRollingWindow
-     */
-    'window'?: number;
-}
-
-export const AnalysisRollingWindowTypeEnum = {
-    RollingWindow: 'rollingWindow'
-} as const;
-
-export type AnalysisRollingWindowTypeEnum = typeof AnalysisRollingWindowTypeEnum[keyof typeof AnalysisRollingWindowTypeEnum];
-
-/**
- * 
- * @export
- * @interface BasicLoginRequest
- */
-export interface BasicLoginRequest {
-    /**
-     * 
-     * @type {string}
-     * @memberof BasicLoginRequest
-     */
-    'email': string;
-    /**
-     * 
-     * @type {string}
-     * @memberof BasicLoginRequest
-     */
-    'password': string;
-}
 /**
  * breakdown by property.
  * @export
@@ -241,13 +228,13 @@ export interface BreakdownByProperty {
      * @type {string}
      * @memberof BreakdownByProperty
      */
-    'type'?: BreakdownByPropertyTypeEnum;
+    'propertyName'?: string;
     /**
      * 
-     * @type {string}
+     * @type {number}
      * @memberof BreakdownByProperty
      */
-    'propertyName'?: string;
+    'propertyId'?: number;
     /**
      * 
      * @type {string}
@@ -256,24 +243,44 @@ export interface BreakdownByProperty {
     'propertyType': BreakdownByPropertyPropertyTypeEnum;
     /**
      * 
-     * @type {number}
+     * @type {string}
      * @memberof BreakdownByProperty
      */
-    'propertyId'?: number;
+    'type': BreakdownByPropertyTypeEnum;
 }
 
+export const BreakdownByPropertyPropertyTypeEnum = {
+    Event: 'event',
+    User: 'user',
+    Custom: 'custom'
+} as const;
+
+export type BreakdownByPropertyPropertyTypeEnum = typeof BreakdownByPropertyPropertyTypeEnum[keyof typeof BreakdownByPropertyPropertyTypeEnum];
 export const BreakdownByPropertyTypeEnum = {
     Property: 'property'
 } as const;
 
 export type BreakdownByPropertyTypeEnum = typeof BreakdownByPropertyTypeEnum[keyof typeof BreakdownByPropertyTypeEnum];
-export const BreakdownByPropertyPropertyTypeEnum = {
-    Custom: 'custom',
-    Event: 'event',
-    User: 'user'
+
+/**
+ * 
+ * @export
+ * @interface BreakdownByPropertyAllOf
+ */
+export interface BreakdownByPropertyAllOf {
+    /**
+     * 
+     * @type {string}
+     * @memberof BreakdownByPropertyAllOf
+     */
+    'type'?: BreakdownByPropertyAllOfTypeEnum;
+}
+
+export const BreakdownByPropertyAllOfTypeEnum = {
+    Property: 'property'
 } as const;
 
-export type BreakdownByPropertyPropertyTypeEnum = typeof BreakdownByPropertyPropertyTypeEnum[keyof typeof BreakdownByPropertyPropertyTypeEnum];
+export type BreakdownByPropertyAllOfTypeEnum = typeof BreakdownByPropertyAllOfTypeEnum[keyof typeof BreakdownByPropertyAllOfTypeEnum];
 
 /**
  * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties. 
@@ -323,7 +330,7 @@ export interface CreateDashboardRequest {
      * @type {string}
      * @memberof CreateDashboardRequest
      */
-    'name'?: string;
+    'name': string;
     /**
      * description
      * @type {string}
@@ -332,56 +339,11 @@ export interface CreateDashboardRequest {
     'description'?: string;
     /**
      * 
-     * @type {Array<CreateDashboardRequestRowsInner>}
+     * @type {Array<DashboardRow>}
      * @memberof CreateDashboardRequest
      */
-    'rows'?: Array<CreateDashboardRequestRowsInner>;
+    'rows': Array<DashboardRow>;
 }
-/**
- * 
- * @export
- * @interface CreateDashboardRequestRowsInner
- */
-export interface CreateDashboardRequestRowsInner {
-    /**
-     * 
-     * @type {Array<CreateDashboardRequestRowsInnerPanelsInner>}
-     * @memberof CreateDashboardRequestRowsInner
-     */
-    'panels'?: Array<CreateDashboardRequestRowsInnerPanelsInner>;
-}
-/**
- * 
- * @export
- * @interface CreateDashboardRequestRowsInnerPanelsInner
- */
-export interface CreateDashboardRequestRowsInnerPanelsInner {
-    /**
-     * span
-     * @type {number}
-     * @memberof CreateDashboardRequestRowsInnerPanelsInner
-     */
-    'span'?: number;
-    /**
-     * 
-     * @type {string}
-     * @memberof CreateDashboardRequestRowsInnerPanelsInner
-     */
-    'type'?: CreateDashboardRequestRowsInnerPanelsInnerTypeEnum;
-    /**
-     * 
-     * @type {number}
-     * @memberof CreateDashboardRequestRowsInnerPanelsInner
-     */
-    'reportId'?: number;
-}
-
-export const CreateDashboardRequestRowsInnerPanelsInnerTypeEnum = {
-    Report: 'report'
-} as const;
-
-export type CreateDashboardRequestRowsInnerPanelsInnerTypeEnum = typeof CreateDashboardRequestRowsInnerPanelsInnerTypeEnum[keyof typeof CreateDashboardRequestRowsInnerPanelsInnerTypeEnum];
-
 /**
  * 
  * @export
@@ -399,7 +361,7 @@ export interface CreateReportRequest {
      * @type {string}
      * @memberof CreateReportRequest
      */
-    'name'?: string;
+    'name': string;
     /**
      * description
      * @type {string}
@@ -408,11 +370,147 @@ export interface CreateReportRequest {
     'description'?: string;
     /**
      * 
-     * @type {ReportReport}
+     * @type {CreateReportRequestReport}
      * @memberof CreateReportRequest
      */
-    'report'?: ReportReport;
+    'report': CreateReportRequestReport;
 }
+/**
+ * 
+ * @export
+ * @interface CreateReportRequestReport
+ */
+export interface CreateReportRequestReport {
+    /**
+     * 
+     * @type {string}
+     * @memberof CreateReportRequestReport
+     */
+    'type': CreateReportRequestReportTypeEnum;
+    /**
+     * 
+     * @type {EventRecordsListRequestTime}
+     * @memberof CreateReportRequestReport
+     */
+    'time': EventRecordsListRequestTime;
+    /**
+     * group that is used in aggregations by group. For instance, group by user or group by organizartion.
+     * @type {string}
+     * @memberof CreateReportRequestReport
+     */
+    'group': string;
+    /**
+     * 
+     * @type {TimeUnit}
+     * @memberof CreateReportRequestReport
+     */
+    'intervalUnit': TimeUnit;
+    /**
+     * 
+     * @type {FunnelQueryChartType}
+     * @memberof CreateReportRequestReport
+     */
+    'chartType': FunnelQueryChartType;
+    /**
+     * 
+     * @type {EventSegmentationAnalysis}
+     * @memberof CreateReportRequestReport
+     */
+    'analysis': EventSegmentationAnalysis;
+    /**
+     * 
+     * @type {EventSegmentationCompare}
+     * @memberof CreateReportRequestReport
+     */
+    'compare'?: EventSegmentationCompare;
+    /**
+     * array of events to query
+     * @type {Array<EventSegmentationEvent>}
+     * @memberof CreateReportRequestReport
+     */
+    'events': Array<EventSegmentationEvent>;
+    /**
+     * 
+     * @type {EventGroupedFilters}
+     * @memberof CreateReportRequestReport
+     */
+    'filters'?: EventGroupedFilters;
+    /**
+     * array of breakdowns
+     * @type {Array<BreakdownByProperty>}
+     * @memberof CreateReportRequestReport
+     */
+    'breakdowns'?: Array<BreakdownByProperty>;
+    /**
+     * array of segments
+     * @type {Array<EventSegmentationSegment>}
+     * @memberof CreateReportRequestReport
+     */
+    'segments'?: Array<EventSegmentationSegment>;
+    /**
+     * 
+     * @type {Array<FunnelQueryStepsInner>}
+     * @memberof CreateReportRequestReport
+     */
+    'steps': Array<FunnelQueryStepsInner>;
+    /**
+     * 
+     * @type {FunnelQueryTimeWindow}
+     * @memberof CreateReportRequestReport
+     */
+    'timeWindow': FunnelQueryTimeWindow;
+    /**
+     * 
+     * @type {string}
+     * @memberof CreateReportRequestReport
+     */
+    'count': CreateReportRequestReportCountEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof CreateReportRequestReport
+     */
+    'stepOrder': CreateReportRequestReportStepOrderEnum;
+    /**
+     * 
+     * @type {FunnelQueryAttribution}
+     * @memberof CreateReportRequestReport
+     */
+    'attribution'?: FunnelQueryAttribution;
+    /**
+     * 
+     * @type {Array<PropertyRef>}
+     * @memberof CreateReportRequestReport
+     */
+    'holdingConstants'?: Array<PropertyRef>;
+    /**
+     * 
+     * @type {Array<FunnelQueryExcludeInner>}
+     * @memberof CreateReportRequestReport
+     */
+    'exclude'?: Array<FunnelQueryExcludeInner>;
+}
+
+export const CreateReportRequestReportTypeEnum = {
+    EventSegmentation: 'eventSegmentation',
+    Funnel: 'funnel'
+} as const;
+
+export type CreateReportRequestReportTypeEnum = typeof CreateReportRequestReportTypeEnum[keyof typeof CreateReportRequestReportTypeEnum];
+export const CreateReportRequestReportCountEnum = {
+    Uniques: 'uniques',
+    Totals: 'totals'
+} as const;
+
+export type CreateReportRequestReportCountEnum = typeof CreateReportRequestReportCountEnum[keyof typeof CreateReportRequestReportCountEnum];
+export const CreateReportRequestReportStepOrderEnum = {
+    Any: 'any',
+    ExactSequence: 'exactSequence',
+    ExactOrder: 'exactOrder'
+} as const;
+
+export type CreateReportRequestReportStepOrderEnum = typeof CreateReportRequestReportStepOrderEnum[keyof typeof CreateReportRequestReportStepOrderEnum];
+
 /**
  * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties. 
  * @export
@@ -424,13 +522,13 @@ export interface CustomEvent {
      * @type {number}
      * @memberof CustomEvent
      */
-    'id': number;
+    'id'?: number;
     /**
      * 
      * @type {string}
      * @memberof CustomEvent
      */
-    'createdAt': string;
+    'createdAt'?: string;
     /**
      * 
      * @type {string}
@@ -442,7 +540,7 @@ export interface CustomEvent {
      * @type {number}
      * @memberof CustomEvent
      */
-    'createdBy': number;
+    'createdBy'?: number;
     /**
      * 
      * @type {number}
@@ -454,25 +552,25 @@ export interface CustomEvent {
      * @type {number}
      * @memberof CustomEvent
      */
-    'projectId': number;
+    'projectId'?: number;
     /**
      * 
      * @type {boolean}
      * @memberof CustomEvent
      */
-    'isSystem': boolean;
+    'isSystem'?: boolean;
     /**
      * 
      * @type {string}
      * @memberof CustomEvent
      */
-    'status': CustomEventStatusEnum;
+    'status'?: CustomEventStatusEnum;
     /**
      * 
      * @type {string}
      * @memberof CustomEvent
      */
-    'name': string;
+    'name'?: string;
     /**
      * 
      * @type {string}
@@ -514,16 +612,16 @@ export interface CustomEventEvent {
     'eventName'?: string;
     /**
      * 
-     * @type {string}
-     * @memberof CustomEventEvent
-     */
-    'eventType': CustomEventEventEventTypeEnum;
-    /**
-     * 
      * @type {number}
      * @memberof CustomEventEvent
      */
     'eventId'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof CustomEventEvent
+     */
+    'eventType': CustomEventEventEventTypeEnum;
     /**
      * array of event filters
      * @type {Array<EventFilterByProperty>}
@@ -533,7 +631,8 @@ export interface CustomEventEvent {
 }
 
 export const CustomEventEventEventTypeEnum = {
-    Custom: 'custom'
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
 export type CustomEventEventEventTypeEnum = typeof CustomEventEventEventTypeEnum[keyof typeof CustomEventEventEventTypeEnum];
@@ -549,7 +648,7 @@ export interface CustomEventEventAllOf {
      * @type {Array<EventFilterByProperty>}
      * @memberof CustomEventEventAllOf
      */
-    'filters'?: Array<EventFilterByProperty>;
+    'filters': Array<EventFilterByProperty>;
 }
 /**
  * 
@@ -601,19 +700,6 @@ export interface CustomPropertiesList200Response {
      * @memberof CustomPropertiesList200Response
      */
     'meta'?: ListResponseMetadataMeta;
-}
-/**
- * 
- * @export
- * @interface CustomPropertiesList200ResponseAllOf
- */
-export interface CustomPropertiesList200ResponseAllOf {
-    /**
-     * 
-     * @type {Array<CustomProperty>}
-     * @memberof CustomPropertiesList200ResponseAllOf
-     */
-    'events'?: Array<CustomProperty>;
 }
 /**
  * 
@@ -731,7 +817,7 @@ export interface Dashboard {
      * @type {number}
      * @memberof Dashboard
      */
-    'id'?: number;
+    'id': number;
     /**
      * create date
      * @type {string}
@@ -773,7 +859,7 @@ export interface Dashboard {
      * @type {string}
      * @memberof Dashboard
      */
-    'name'?: string;
+    'name': string;
     /**
      * description
      * @type {string}
@@ -785,7 +871,52 @@ export interface Dashboard {
      * @type {Array<DashboardRowsInner>}
      * @memberof Dashboard
      */
-    'rows'?: Array<DashboardRowsInner>;
+    'rows': Array<DashboardRowsInner>;
+}
+/**
+ * 
+ * @export
+ * @interface DashboardPanel
+ */
+export interface DashboardPanel {
+    /**
+     * span
+     * @type {number}
+     * @memberof DashboardPanel
+     */
+    'span': number;
+    /**
+     * 
+     * @type {string}
+     * @memberof DashboardPanel
+     */
+    'type': DashboardPanelTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof DashboardPanel
+     */
+    'reportId': number;
+}
+
+export const DashboardPanelTypeEnum = {
+    Report: 'report'
+} as const;
+
+export type DashboardPanelTypeEnum = typeof DashboardPanelTypeEnum[keyof typeof DashboardPanelTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface DashboardRow
+ */
+export interface DashboardRow {
+    /**
+     * 
+     * @type {Array<DashboardPanel>}
+     * @memberof DashboardRow
+     */
+    'panels': Array<DashboardPanel>;
 }
 /**
  * 
@@ -798,7 +929,7 @@ export interface DashboardRowsInner {
      * @type {Array<DashboardRowsInnerPanelsInner>}
      * @memberof DashboardRowsInner
      */
-    'panels'?: Array<DashboardRowsInnerPanelsInner>;
+    'panels': Array<DashboardRowsInnerPanelsInner>;
 }
 /**
  * 
@@ -811,13 +942,13 @@ export interface DashboardRowsInnerPanelsInner {
      * @type {number}
      * @memberof DashboardRowsInnerPanelsInner
      */
-    'span'?: number;
+    'span': number;
     /**
      * 
      * @type {string}
      * @memberof DashboardRowsInnerPanelsInner
      */
-    'type'?: DashboardRowsInnerPanelsInnerTypeEnum;
+    'type': DashboardRowsInnerPanelsInnerTypeEnum;
     /**
      * 
      * @type {number}
@@ -849,7 +980,7 @@ export interface DashboardsList200Response {
      * @type {Array<Dashboard>}
      * @memberof DashboardsList200Response
      */
-    'dashboards'?: Array<Dashboard>;
+    'data'?: Array<Dashboard>;
     /**
      * 
      * @type {ListResponseMetadataMeta}
@@ -868,7 +999,7 @@ export interface DashboardsList200ResponseAllOf {
      * @type {Array<Dashboard>}
      * @memberof DashboardsList200ResponseAllOf
      */
-    'dashboards'?: Array<Dashboard>;
+    'data'?: Array<Dashboard>;
 }
 /**
  * 
@@ -894,37 +1025,43 @@ export interface DataTableResponseColumnsInner {
      * @type {string}
      * @memberof DataTableResponseColumnsInner
      */
-    'type'?: DataTableResponseColumnsInnerTypeEnum;
+    'type': DataTableResponseColumnsInnerTypeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof DataTableResponseColumnsInner
+     */
+    'name': string;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof DataTableResponseColumnsInner
+     */
+    'isNullable': boolean;
+    /**
+     * 
+     * @type {DataType}
+     * @memberof DataTableResponseColumnsInner
+     */
+    'dataType': DataType;
+    /**
+     * 
+     * @type {ListPropertyValuesResponseData}
+     * @memberof DataTableResponseColumnsInner
+     */
+    'data': ListPropertyValuesResponseData;
+    /**
+     * 
+     * @type {ListPropertyValuesResponseData}
+     * @memberof DataTableResponseColumnsInner
+     */
+    'compareValues'?: ListPropertyValuesResponseData;
     /**
      * 
      * @type {number}
      * @memberof DataTableResponseColumnsInner
      */
     'step'?: number;
-    /**
-     * 
-     * @type {DataType}
-     * @memberof DataTableResponseColumnsInner
-     */
-    'dataType'?: DataType;
-    /**
-     * 
-     * @type {string}
-     * @memberof DataTableResponseColumnsInner
-     */
-    'name'?: string;
-    /**
-     * 
-     * @type {PropertyValuesList200ResponseValues}
-     * @memberof DataTableResponseColumnsInner
-     */
-    'values'?: PropertyValuesList200ResponseValues;
-    /**
-     * 
-     * @type {PropertyValuesList200ResponseValues}
-     * @memberof DataTableResponseColumnsInner
-     */
-    'compareValues'?: PropertyValuesList200ResponseValues;
 }
 
 export const DataTableResponseColumnsInnerTypeEnum = {
@@ -962,19 +1099,7 @@ export interface DidEventAggregateProperty {
      * @type {string}
      * @memberof DidEventAggregateProperty
      */
-    'type': DidEventAggregatePropertyTypeEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof DidEventAggregateProperty
-     */
     'propertyName'?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof DidEventAggregateProperty
-     */
-    'propertyType': DidEventAggregatePropertyPropertyTypeEnum;
     /**
      * 
      * @type {number}
@@ -983,10 +1108,22 @@ export interface DidEventAggregateProperty {
     'propertyId'?: number;
     /**
      * 
-     * @type {QueryAggregateProperty}
+     * @type {string}
      * @memberof DidEventAggregateProperty
      */
-    'aggregate': QueryAggregateProperty;
+    'propertyType': DidEventAggregatePropertyPropertyTypeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof DidEventAggregateProperty
+     */
+    'type': DidEventAggregatePropertyTypeEnum;
+    /**
+     * 
+     * @type {QueryAggregate}
+     * @memberof DidEventAggregateProperty
+     */
+    'aggregate': QueryAggregate;
     /**
      * 
      * @type {PropertyFilterOperation}
@@ -994,11 +1131,11 @@ export interface DidEventAggregateProperty {
      */
     'operation': PropertyFilterOperation;
     /**
-     * one or more values. Doesn\'t need if operation is \"empty\" or \"exist\"
-     * @type {number}
+     * 
+     * @type {Value}
      * @memberof DidEventAggregateProperty
      */
-    'value'?: number;
+    'value'?: Value;
     /**
      * time frame
      * @type {TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach}
@@ -1007,18 +1144,18 @@ export interface DidEventAggregateProperty {
     'time': TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach;
 }
 
+export const DidEventAggregatePropertyPropertyTypeEnum = {
+    Event: 'event',
+    User: 'user',
+    Custom: 'custom'
+} as const;
+
+export type DidEventAggregatePropertyPropertyTypeEnum = typeof DidEventAggregatePropertyPropertyTypeEnum[keyof typeof DidEventAggregatePropertyPropertyTypeEnum];
 export const DidEventAggregatePropertyTypeEnum = {
     AggregateProperty: 'aggregateProperty'
 } as const;
 
 export type DidEventAggregatePropertyTypeEnum = typeof DidEventAggregatePropertyTypeEnum[keyof typeof DidEventAggregatePropertyTypeEnum];
-export const DidEventAggregatePropertyPropertyTypeEnum = {
-    Custom: 'custom',
-    Event: 'event',
-    User: 'user'
-} as const;
-
-export type DidEventAggregatePropertyPropertyTypeEnum = typeof DidEventAggregatePropertyPropertyTypeEnum[keyof typeof DidEventAggregatePropertyPropertyTypeEnum];
 
 /**
  * 
@@ -1032,6 +1169,30 @@ export interface DidEventAggregatePropertyAllOf {
      * @memberof DidEventAggregatePropertyAllOf
      */
     'type'?: DidEventAggregatePropertyAllOfTypeEnum;
+    /**
+     * 
+     * @type {QueryAggregate}
+     * @memberof DidEventAggregatePropertyAllOf
+     */
+    'aggregate'?: QueryAggregate;
+    /**
+     * 
+     * @type {PropertyFilterOperation}
+     * @memberof DidEventAggregatePropertyAllOf
+     */
+    'operation'?: PropertyFilterOperation;
+    /**
+     * 
+     * @type {Value}
+     * @memberof DidEventAggregatePropertyAllOf
+     */
+    'value'?: Value;
+    /**
+     * time frame
+     * @type {TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach}
+     * @memberof DidEventAggregatePropertyAllOf
+     */
+    'time'?: TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach;
 }
 
 export const DidEventAggregatePropertyAllOfTypeEnum = {
@@ -1040,37 +1201,6 @@ export const DidEventAggregatePropertyAllOfTypeEnum = {
 
 export type DidEventAggregatePropertyAllOfTypeEnum = typeof DidEventAggregatePropertyAllOfTypeEnum[keyof typeof DidEventAggregatePropertyAllOfTypeEnum];
 
-/**
- * 
- * @export
- * @interface DidEventAggregatePropertyAllOf1
- */
-export interface DidEventAggregatePropertyAllOf1 {
-    /**
-     * 
-     * @type {QueryAggregateProperty}
-     * @memberof DidEventAggregatePropertyAllOf1
-     */
-    'aggregate'?: QueryAggregateProperty;
-    /**
-     * 
-     * @type {PropertyFilterOperation}
-     * @memberof DidEventAggregatePropertyAllOf1
-     */
-    'operation'?: PropertyFilterOperation;
-    /**
-     * one or more values. Doesn\'t need if operation is \"empty\" or \"exist\"
-     * @type {number}
-     * @memberof DidEventAggregatePropertyAllOf1
-     */
-    'value'?: number;
-    /**
-     * time frame
-     * @type {TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach}
-     * @memberof DidEventAggregatePropertyAllOf1
-     */
-    'time'?: TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach;
-}
 /**
  * find all users who made event X times
  * @export
@@ -1094,7 +1224,7 @@ export interface DidEventCount {
      * @type {number}
      * @memberof DidEventCount
      */
-    'value'?: number;
+    'value': number;
     /**
      * 
      * @type {DidEventCountTime}
@@ -1104,7 +1234,7 @@ export interface DidEventCount {
 }
 
 export const DidEventCountTypeEnum = {
-    DidEventCount: 'didEventCount'
+    Count: 'count'
 } as const;
 
 export type DidEventCountTypeEnum = typeof DidEventCountTypeEnum[keyof typeof DidEventCountTypeEnum];
@@ -1142,10 +1272,10 @@ export interface DidEventHistoricalCount {
     'value'?: number;
     /**
      * 
-     * @type {DidEventRelativeCountTime}
+     * @type {DidEventHistoricalCountTime}
      * @memberof DidEventHistoricalCount
      */
-    'time': DidEventRelativeCountTime;
+    'time': DidEventHistoricalCountTime;
 }
 
 export const DidEventHistoricalCountTypeEnum = {
@@ -1155,11 +1285,41 @@ export const DidEventHistoricalCountTypeEnum = {
 export type DidEventHistoricalCountTypeEnum = typeof DidEventHistoricalCountTypeEnum[keyof typeof DidEventHistoricalCountTypeEnum];
 
 /**
+ * @type DidEventHistoricalCountTime
+ * @export
+ */
+export type DidEventHistoricalCountTime = TimeAfterFirstUse | TimeBetween | TimeLast | TimeWindowEach;
+
+/**
  * find all users who made left event X time more/less than right event.
  * @export
  * @interface DidEventRelativeCount
  */
 export interface DidEventRelativeCount {
+    /**
+     * 
+     * @type {string}
+     * @memberof DidEventRelativeCount
+     */
+    'eventName'?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof DidEventRelativeCount
+     */
+    'eventId'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof DidEventRelativeCount
+     */
+    'eventType': DidEventRelativeCountEventTypeEnum;
+    /**
+     * 
+     * @type {Array<EventFilterByProperty>}
+     * @memberof DidEventRelativeCount
+     */
+    'filters'?: Array<EventFilterByProperty>;
     /**
      * 
      * @type {string}
@@ -1174,29 +1334,61 @@ export interface DidEventRelativeCount {
     'operation': PropertyFilterOperation;
     /**
      * 
-     * @type {EventRef}
+     * @type {TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach}
      * @memberof DidEventRelativeCount
      */
-    'rightEvent': EventRef;
-    /**
-     * 
-     * @type {DidEventRelativeCountTime}
-     * @memberof DidEventRelativeCount
-     */
-    'time': DidEventRelativeCountTime;
+    'time': TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach;
 }
 
+export const DidEventRelativeCountEventTypeEnum = {
+    Custom: 'custom',
+    Regular: 'regular'
+} as const;
+
+export type DidEventRelativeCountEventTypeEnum = typeof DidEventRelativeCountEventTypeEnum[keyof typeof DidEventRelativeCountEventTypeEnum];
 export const DidEventRelativeCountTypeEnum = {
-    DidEventRelativeCount: 'didEventRelativeCount'
+    RelativeCount: 'relativeCount'
 } as const;
 
 export type DidEventRelativeCountTypeEnum = typeof DidEventRelativeCountTypeEnum[keyof typeof DidEventRelativeCountTypeEnum];
 
 /**
- * @type DidEventRelativeCountTime
+ * 
  * @export
+ * @interface DidEventRelativeCountAllOf
  */
-export type DidEventRelativeCountTime = TimeAfterFirstUse | TimeBetween | TimeLast | TimeWindowEach;
+export interface DidEventRelativeCountAllOf {
+    /**
+     * 
+     * @type {Array<EventFilterByProperty>}
+     * @memberof DidEventRelativeCountAllOf
+     */
+    'filters'?: Array<EventFilterByProperty>;
+    /**
+     * 
+     * @type {string}
+     * @memberof DidEventRelativeCountAllOf
+     */
+    'type'?: DidEventRelativeCountAllOfTypeEnum;
+    /**
+     * 
+     * @type {PropertyFilterOperation}
+     * @memberof DidEventRelativeCountAllOf
+     */
+    'operation'?: PropertyFilterOperation;
+    /**
+     * 
+     * @type {TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach}
+     * @memberof DidEventRelativeCountAllOf
+     */
+    'time'?: TimeBetween | TimeLast | TimeAfterFirstUse | TimeWindowEach;
+}
+
+export const DidEventRelativeCountAllOfTypeEnum = {
+    RelativeCount: 'relativeCount'
+} as const;
+
+export type DidEventRelativeCountAllOfTypeEnum = typeof DidEventRelativeCountAllOfTypeEnum[keyof typeof DidEventRelativeCountAllOfTypeEnum];
 
 /**
  * 
@@ -1241,13 +1433,13 @@ export interface Event {
      * @type {number}
      * @memberof Event
      */
-    'id': number;
+    'id'?: number;
     /**
      * create date
      * @type {string}
      * @memberof Event
      */
-    'createdAt': string;
+    'createdAt'?: string;
     /**
      * update (once updated)
      * @type {string}
@@ -1259,7 +1451,7 @@ export interface Event {
      * @type {number}
      * @memberof Event
      */
-    'createdBy': number;
+    'createdBy'?: number;
     /**
      * id of updater User
      * @type {number}
@@ -1271,13 +1463,13 @@ export interface Event {
      * @type {number}
      * @memberof Event
      */
-    'projectId': number;
+    'projectId'?: number;
     /**
      * the event is a system-wide, shown in any project and can\'t be modified by a regular user
      * @type {boolean}
      * @memberof Event
      */
-    'isSystem': boolean;
+    'isSystem'?: boolean;
     /**
      * 
      * @type {Array<string>}
@@ -1289,7 +1481,7 @@ export interface Event {
      * @type {string}
      * @memberof Event
      */
-    'name': string;
+    'name'?: string;
     /**
      * event name to display. If empty then name property is used.
      * @type {string}
@@ -1307,7 +1499,7 @@ export interface Event {
      * @type {string}
      * @memberof Event
      */
-    'status': EventStatusEnum;
+    'status'?: EventStatusEnum;
     /**
      * array of id of attached to event properties
      * @type {Array<number>}
@@ -1355,13 +1547,13 @@ export interface EventFilterByCohort {
      * @type {string}
      * @memberof EventFilterByCohort
      */
-    'type'?: EventFilterByCohortTypeEnum;
+    'type': EventFilterByCohortTypeEnum;
     /**
      * 
      * @type {number}
      * @memberof EventFilterByCohort
      */
-    'cohortId'?: number;
+    'cohortId': number;
 }
 
 export const EventFilterByCohortTypeEnum = {
@@ -1381,13 +1573,13 @@ export interface EventFilterByGroup {
      * @type {string}
      * @memberof EventFilterByGroup
      */
-    'type'?: EventFilterByGroupTypeEnum;
+    'type': EventFilterByGroupTypeEnum;
     /**
      * 
      * @type {number}
      * @memberof EventFilterByGroup
      */
-    'groupId'?: number;
+    'groupId': number;
 }
 
 export const EventFilterByGroupTypeEnum = {
@@ -1407,13 +1599,13 @@ export interface EventFilterByProperty {
      * @type {string}
      * @memberof EventFilterByProperty
      */
-    'type'?: EventFilterByPropertyTypeEnum;
+    'propertyName'?: string;
     /**
      * 
-     * @type {string}
+     * @type {number}
      * @memberof EventFilterByProperty
      */
-    'propertyName'?: string;
+    'propertyId'?: number;
     /**
      * 
      * @type {string}
@@ -1422,10 +1614,10 @@ export interface EventFilterByProperty {
     'propertyType': EventFilterByPropertyPropertyTypeEnum;
     /**
      * 
-     * @type {number}
+     * @type {string}
      * @memberof EventFilterByProperty
      */
-    'propertyId'?: number;
+    'type': EventFilterByPropertyTypeEnum;
     /**
      * 
      * @type {PropertyFilterOperation}
@@ -1440,18 +1632,18 @@ export interface EventFilterByProperty {
     'value'?: Array<Value>;
 }
 
+export const EventFilterByPropertyPropertyTypeEnum = {
+    Event: 'event',
+    User: 'user',
+    Custom: 'custom'
+} as const;
+
+export type EventFilterByPropertyPropertyTypeEnum = typeof EventFilterByPropertyPropertyTypeEnum[keyof typeof EventFilterByPropertyPropertyTypeEnum];
 export const EventFilterByPropertyTypeEnum = {
     Property: 'property'
 } as const;
 
 export type EventFilterByPropertyTypeEnum = typeof EventFilterByPropertyTypeEnum[keyof typeof EventFilterByPropertyTypeEnum];
-export const EventFilterByPropertyPropertyTypeEnum = {
-    Custom: 'custom',
-    Event: 'event',
-    User: 'user'
-} as const;
-
-export type EventFilterByPropertyPropertyTypeEnum = typeof EventFilterByPropertyPropertyTypeEnum[keyof typeof EventFilterByPropertyPropertyTypeEnum];
 
 /**
  * 
@@ -1465,6 +1657,18 @@ export interface EventFilterByPropertyAllOf {
      * @memberof EventFilterByPropertyAllOf
      */
     'type'?: EventFilterByPropertyAllOfTypeEnum;
+    /**
+     * 
+     * @type {PropertyFilterOperation}
+     * @memberof EventFilterByPropertyAllOf
+     */
+    'operation'?: PropertyFilterOperation;
+    /**
+     * one or several property values. May be not set if operation is \"empty\" or \"exist\"
+     * @type {Array<Value>}
+     * @memberof EventFilterByPropertyAllOf
+     */
+    'value'?: Array<Value>;
 }
 
 export const EventFilterByPropertyAllOfTypeEnum = {
@@ -1474,171 +1678,127 @@ export const EventFilterByPropertyAllOfTypeEnum = {
 export type EventFilterByPropertyAllOfTypeEnum = typeof EventFilterByPropertyAllOfTypeEnum[keyof typeof EventFilterByPropertyAllOfTypeEnum];
 
 /**
- * 
- * @export
- * @interface EventFilterByPropertyAllOf1
- */
-export interface EventFilterByPropertyAllOf1 {
-    /**
-     * 
-     * @type {PropertyFilterOperation}
-     * @memberof EventFilterByPropertyAllOf1
-     */
-    'operation'?: PropertyFilterOperation;
-    /**
-     * one or several property values. May be not set if operation is \"empty\" or \"exist\"
-     * @type {Array<Value>}
-     * @memberof EventFilterByPropertyAllOf1
-     */
-    'value'?: Array<Value>;
-}
-/**
  * event filters
  * @export
- * @interface EventFilters
+ * @interface EventGroupedFilters
  */
-export interface EventFilters {
+export interface EventGroupedFilters {
     /**
      * 
      * @type {string}
-     * @memberof EventFilters
+     * @memberof EventGroupedFilters
      */
-    'groupsCondition'?: EventFiltersGroupsConditionEnum;
+    'groupsCondition'?: EventGroupedFiltersGroupsConditionEnum;
     /**
      * 
-     * @type {Array<EventFiltersGroupsInner>}
-     * @memberof EventFilters
+     * @type {Array<EventGroupedFiltersGroupsInner>}
+     * @memberof EventGroupedFilters
      */
-    'groups'?: Array<EventFiltersGroupsInner>;
+    'groups': Array<EventGroupedFiltersGroupsInner>;
 }
 
-export const EventFiltersGroupsConditionEnum = {
+export const EventGroupedFiltersGroupsConditionEnum = {
     And: 'and',
     Or: 'or'
 } as const;
 
-export type EventFiltersGroupsConditionEnum = typeof EventFiltersGroupsConditionEnum[keyof typeof EventFiltersGroupsConditionEnum];
+export type EventGroupedFiltersGroupsConditionEnum = typeof EventGroupedFiltersGroupsConditionEnum[keyof typeof EventGroupedFiltersGroupsConditionEnum];
 
 /**
  * 
  * @export
- * @interface EventFiltersGroupsInner
+ * @interface EventGroupedFiltersGroupsInner
  */
-export interface EventFiltersGroupsInner {
+export interface EventGroupedFiltersGroupsInner {
     /**
      * 
      * @type {string}
-     * @memberof EventFiltersGroupsInner
+     * @memberof EventGroupedFiltersGroupsInner
      */
-    'filtersCondition'?: EventFiltersGroupsInnerFiltersConditionEnum;
+    'filtersCondition'?: EventGroupedFiltersGroupsInnerFiltersConditionEnum;
     /**
      * 
-     * @type {Array<EventFiltersGroupsInnerFiltersInner>}
-     * @memberof EventFiltersGroupsInner
+     * @type {Array<EventGroupedFiltersGroupsInnerFiltersInner>}
+     * @memberof EventGroupedFiltersGroupsInner
      */
-    'filters'?: Array<EventFiltersGroupsInnerFiltersInner>;
+    'filters': Array<EventGroupedFiltersGroupsInnerFiltersInner>;
 }
 
-export const EventFiltersGroupsInnerFiltersConditionEnum = {
+export const EventGroupedFiltersGroupsInnerFiltersConditionEnum = {
     And: 'and',
     Or: 'or'
 } as const;
 
-export type EventFiltersGroupsInnerFiltersConditionEnum = typeof EventFiltersGroupsInnerFiltersConditionEnum[keyof typeof EventFiltersGroupsInnerFiltersConditionEnum];
+export type EventGroupedFiltersGroupsInnerFiltersConditionEnum = typeof EventGroupedFiltersGroupsInnerFiltersConditionEnum[keyof typeof EventGroupedFiltersGroupsInnerFiltersConditionEnum];
 
 /**
  * 
  * @export
- * @interface EventFiltersGroupsInnerFiltersInner
+ * @interface EventGroupedFiltersGroupsInnerFiltersInner
  */
-export interface EventFiltersGroupsInnerFiltersInner {
+export interface EventGroupedFiltersGroupsInnerFiltersInner {
     /**
      * 
      * @type {string}
-     * @memberof EventFiltersGroupsInnerFiltersInner
+     * @memberof EventGroupedFiltersGroupsInnerFiltersInner
      */
-    'type'?: EventFiltersGroupsInnerFiltersInnerTypeEnum;
+    'type': EventGroupedFiltersGroupsInnerFiltersInnerTypeEnum;
     /**
      * 
      * @type {number}
-     * @memberof EventFiltersGroupsInnerFiltersInner
+     * @memberof EventGroupedFiltersGroupsInnerFiltersInner
      */
-    'cohortId'?: number;
+    'cohortId': number;
     /**
      * 
      * @type {string}
-     * @memberof EventFiltersGroupsInnerFiltersInner
+     * @memberof EventGroupedFiltersGroupsInnerFiltersInner
      */
     'propertyName'?: string;
     /**
      * 
-     * @type {string}
-     * @memberof EventFiltersGroupsInnerFiltersInner
-     */
-    'propertyType': EventFiltersGroupsInnerFiltersInnerPropertyTypeEnum;
-    /**
-     * 
      * @type {number}
-     * @memberof EventFiltersGroupsInnerFiltersInner
+     * @memberof EventGroupedFiltersGroupsInnerFiltersInner
      */
     'propertyId'?: number;
     /**
      * 
+     * @type {string}
+     * @memberof EventGroupedFiltersGroupsInnerFiltersInner
+     */
+    'propertyType': EventGroupedFiltersGroupsInnerFiltersInnerPropertyTypeEnum;
+    /**
+     * 
      * @type {PropertyFilterOperation}
-     * @memberof EventFiltersGroupsInnerFiltersInner
+     * @memberof EventGroupedFiltersGroupsInnerFiltersInner
      */
     'operation': PropertyFilterOperation;
     /**
      * one or several property values. May be not set if operation is \"empty\" or \"exist\"
      * @type {Array<Value>}
-     * @memberof EventFiltersGroupsInnerFiltersInner
+     * @memberof EventGroupedFiltersGroupsInnerFiltersInner
      */
     'value'?: Array<Value>;
     /**
      * 
      * @type {number}
-     * @memberof EventFiltersGroupsInnerFiltersInner
+     * @memberof EventGroupedFiltersGroupsInnerFiltersInner
      */
-    'groupId'?: number;
+    'groupId': number;
 }
 
-export const EventFiltersGroupsInnerFiltersInnerTypeEnum = {
+export const EventGroupedFiltersGroupsInnerFiltersInnerTypeEnum = {
     Group: 'group'
 } as const;
 
-export type EventFiltersGroupsInnerFiltersInnerTypeEnum = typeof EventFiltersGroupsInnerFiltersInnerTypeEnum[keyof typeof EventFiltersGroupsInnerFiltersInnerTypeEnum];
-export const EventFiltersGroupsInnerFiltersInnerPropertyTypeEnum = {
-    Custom: 'custom',
+export type EventGroupedFiltersGroupsInnerFiltersInnerTypeEnum = typeof EventGroupedFiltersGroupsInnerFiltersInnerTypeEnum[keyof typeof EventGroupedFiltersGroupsInnerFiltersInnerTypeEnum];
+export const EventGroupedFiltersGroupsInnerFiltersInnerPropertyTypeEnum = {
     Event: 'event',
-    User: 'user'
+    User: 'user',
+    Custom: 'custom'
 } as const;
 
-export type EventFiltersGroupsInnerFiltersInnerPropertyTypeEnum = typeof EventFiltersGroupsInnerFiltersInnerPropertyTypeEnum[keyof typeof EventFiltersGroupsInnerFiltersInnerPropertyTypeEnum];
-
-/**
- * event query
- * @export
- * @interface EventQuery
- */
-export interface EventQuery {
-    /**
-     * 
-     * @type {string}
-     * @memberof EventQuery
-     */
-    'name'?: string;
-    /**
-     * 
-     * @type {EventQueryQuery}
-     * @memberof EventQuery
-     */
-    'query': EventQueryQuery;
-}
-/**
- * @type EventQueryQuery
- * @export
- */
-export type EventQueryQuery = QueryAggregateProperty | QueryAggregatePropertyPerGroup | QueryCountPerGroup | QueryFormula | QuerySimple;
+export type EventGroupedFiltersGroupsInnerFiltersInnerPropertyTypeEnum = typeof EventGroupedFiltersGroupsInnerFiltersInnerPropertyTypeEnum[keyof typeof EventGroupedFiltersGroupsInnerFiltersInnerPropertyTypeEnum];
 
 /**
  * 
@@ -1710,19 +1870,6 @@ export interface EventRecordsList200Response {
     'meta'?: ListResponseMetadataMeta;
 }
 /**
- * 
- * @export
- * @interface EventRecordsList200ResponseAllOf
- */
-export interface EventRecordsList200ResponseAllOf {
-    /**
-     * 
-     * @type {Array<EventRecord>}
-     * @memberof EventRecordsList200ResponseAllOf
-     */
-    'events'?: Array<EventRecord>;
-}
-/**
  * request event records sorted by time of creation
  * @export
  * @interface EventRecordsListRequest
@@ -1739,7 +1886,7 @@ export interface EventRecordsListRequest {
      * @type {string}
      * @memberof EventRecordsListRequest
      */
-    'group'?: string;
+    'group': string;
     /**
      * 
      * @type {EventRecordsListRequestSearch}
@@ -1754,10 +1901,10 @@ export interface EventRecordsListRequest {
     'events'?: Array<EventRecordsListRequestEventsInner>;
     /**
      * 
-     * @type {EventFilters}
+     * @type {EventGroupedFilters}
      * @memberof EventRecordsListRequest
      */
-    'filters'?: EventFilters;
+    'filters'?: EventGroupedFilters;
 }
 /**
  * 
@@ -1773,16 +1920,16 @@ export interface EventRecordsListRequestEventsInner {
     'eventName'?: string;
     /**
      * 
-     * @type {string}
-     * @memberof EventRecordsListRequestEventsInner
-     */
-    'eventType': EventRecordsListRequestEventsInnerEventTypeEnum;
-    /**
-     * 
      * @type {number}
      * @memberof EventRecordsListRequestEventsInner
      */
     'eventId'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof EventRecordsListRequestEventsInner
+     */
+    'eventType': EventRecordsListRequestEventsInnerEventTypeEnum;
     /**
      * array of event filters
      * @type {Array<EventRecordsListRequestEventsInnerAllOfFiltersInner>}
@@ -1792,7 +1939,8 @@ export interface EventRecordsListRequestEventsInner {
 }
 
 export const EventRecordsListRequestEventsInnerEventTypeEnum = {
-    Custom: 'custom'
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
 export type EventRecordsListRequestEventsInnerEventTypeEnum = typeof EventRecordsListRequestEventsInnerEventTypeEnum[keyof typeof EventRecordsListRequestEventsInnerEventTypeEnum];
@@ -1830,23 +1978,17 @@ export interface EventRecordsListRequestSearch {
     'term'?: string;
     /**
      * 
-     * @type {Array<EventRecordsListRequestSearchInEventPropertiesInner>}
+     * @type {Array<Value>}
      * @memberof EventRecordsListRequestSearch
      */
-    'inEventProperties'?: Array<EventRecordsListRequestSearchInEventPropertiesInner>;
+    'inEventProperties'?: Array<Value>;
     /**
      * 
-     * @type {Array<EventRecordsListRequestSearchInEventPropertiesInner>}
+     * @type {Array<Value>}
      * @memberof EventRecordsListRequestSearch
      */
-    'inUserProperties'?: Array<EventRecordsListRequestSearchInEventPropertiesInner>;
+    'inUserProperties'?: Array<Value>;
 }
-/**
- * @type EventRecordsListRequestSearchInEventPropertiesInner
- * @export
- */
-export type EventRecordsListRequestSearchInEventPropertiesInner = number | string;
-
 /**
  * @type EventRecordsListRequestTime
  * select time
@@ -1855,63 +1997,37 @@ export type EventRecordsListRequestSearchInEventPropertiesInner = number | strin
 export type EventRecordsListRequestTime = TimeBetween | TimeFrom | TimeLast;
 
 /**
- * @type EventRef
  * reference to event by its name and type
  * @export
+ * @interface EventRef
  */
-export type EventRef = EventRefOneOf | EventRefOneOf1;
-
-/**
- * 
- * @export
- * @interface EventRefOneOf
- */
-export interface EventRefOneOf {
+export interface EventRef {
     /**
      * 
      * @type {string}
-     * @memberof EventRefOneOf
+     * @memberof EventRef
      */
     'eventName'?: string;
     /**
      * 
-     * @type {string}
-     * @memberof EventRefOneOf
-     */
-    'eventType'?: EventRefOneOfEventTypeEnum;
-}
-
-export const EventRefOneOfEventTypeEnum = {
-    Regular: 'regular'
-} as const;
-
-export type EventRefOneOfEventTypeEnum = typeof EventRefOneOfEventTypeEnum[keyof typeof EventRefOneOfEventTypeEnum];
-
-/**
- * 
- * @export
- * @interface EventRefOneOf1
- */
-export interface EventRefOneOf1 {
-    /**
-     * 
      * @type {number}
-     * @memberof EventRefOneOf1
+     * @memberof EventRef
      */
     'eventId'?: number;
     /**
      * 
      * @type {string}
-     * @memberof EventRefOneOf1
+     * @memberof EventRef
      */
-    'eventType'?: EventRefOneOf1EventTypeEnum;
+    'eventType': EventRefEventTypeEnum;
 }
 
-export const EventRefOneOf1EventTypeEnum = {
-    Custom: 'custom'
+export const EventRefEventTypeEnum = {
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
-export type EventRefOneOf1EventTypeEnum = typeof EventRefOneOf1EventTypeEnum[keyof typeof EventRefOneOf1EventTypeEnum];
+export type EventRefEventTypeEnum = typeof EventRefEventTypeEnum[keyof typeof EventRefEventTypeEnum];
 
 /**
  * event segmentation report type main payload
@@ -1963,10 +2079,10 @@ export interface EventSegmentation {
     'events': Array<EventSegmentationEvent>;
     /**
      * 
-     * @type {EventFilters}
+     * @type {EventGroupedFilters}
      * @memberof EventSegmentation
      */
-    'filters'?: EventFilters;
+    'filters'?: EventGroupedFilters;
     /**
      * array of common breakdowns (which applies to all events)
      * @type {Array<BreakdownByProperty>}
@@ -1985,7 +2101,7 @@ export interface EventSegmentation {
  * analysis type
  * @export
  */
-export type EventSegmentationAnalysis = AnalysisCumulative | AnalysisLinear | AnalysisRollingAverage | AnalysisRollingWindow;
+export type EventSegmentationAnalysis = AnalysisCumulative | AnalysisLinear | AnalysisRollingAverage;
 
 /**
  * optional comparison with previous period
@@ -2020,16 +2136,16 @@ export interface EventSegmentationEvent {
     'eventName'?: string;
     /**
      * 
-     * @type {string}
-     * @memberof EventSegmentationEvent
-     */
-    'eventType': EventSegmentationEventEventTypeEnum;
-    /**
-     * 
      * @type {number}
      * @memberof EventSegmentationEvent
      */
     'eventId'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof EventSegmentationEvent
+     */
+    'eventType': EventSegmentationEventEventTypeEnum;
     /**
      * array of event filters
      * @type {Array<EventFilterByProperty>}
@@ -2044,14 +2160,15 @@ export interface EventSegmentationEvent {
     'breakdowns'?: Array<BreakdownByProperty>;
     /**
      * array of event queries
-     * @type {Array<EventQuery>}
+     * @type {Array<QuerySimple | QueryCountPerGroup | QueryAggregatePropertyPerGroup | QueryAggregateProperty | QueryFormula>}
      * @memberof EventSegmentationEvent
      */
-    'queries': Array<EventQuery>;
+    'queries': Array<QuerySimple | QueryCountPerGroup | QueryAggregatePropertyPerGroup | QueryAggregateProperty | QueryFormula>;
 }
 
 export const EventSegmentationEventEventTypeEnum = {
-    Custom: 'custom'
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
 export type EventSegmentationEventEventTypeEnum = typeof EventSegmentationEventEventTypeEnum[keyof typeof EventSegmentationEventEventTypeEnum];
@@ -2076,10 +2193,10 @@ export interface EventSegmentationEventAllOf {
     'breakdowns'?: Array<BreakdownByProperty>;
     /**
      * array of event queries
-     * @type {Array<EventQuery>}
+     * @type {Array<QuerySimple | QueryCountPerGroup | QueryAggregatePropertyPerGroup | QueryAggregateProperty | QueryFormula>}
      * @memberof EventSegmentationEventAllOf
      */
-    'queries'?: Array<EventQuery>;
+    'queries'?: Array<QuerySimple | QueryCountPerGroup | QueryAggregatePropertyPerGroup | QueryAggregateProperty | QueryFormula>;
 }
 /**
  * segment
@@ -2095,11 +2212,17 @@ export interface EventSegmentationSegment {
     'name'?: string;
     /**
      * array of conditions
-     * @type {Array<SegmentCondition>}
+     * @type {Array<EventSegmentationSegmentConditionsInner>}
      * @memberof EventSegmentationSegment
      */
-    'conditions': Array<SegmentCondition>;
+    'conditions': Array<EventSegmentationSegmentConditionsInner>;
 }
+/**
+ * @type EventSegmentationSegmentConditionsInner
+ * @export
+ */
+export type EventSegmentationSegmentConditionsInner = SegmentConditionDidEvent | SegmentConditionFunnel | SegmentConditionHadPropertyValue | SegmentConditionHasPropertyValue;
+
 /**
  * possible event type
  * @export
@@ -2157,13 +2280,13 @@ export interface FunnelConversionOverTimeChartType {
      * @type {string}
      * @memberof FunnelConversionOverTimeChartType
      */
-    'type'?: FunnelConversionOverTimeChartTypeTypeEnum;
+    'type': FunnelConversionOverTimeChartTypeTypeEnum;
     /**
      * 
      * @type {TimeUnit}
      * @memberof FunnelConversionOverTimeChartType
      */
-    'intervalUnit'?: TimeUnit;
+    'intervalUnit': TimeUnit;
 }
 
 export const FunnelConversionOverTimeChartTypeTypeEnum = {
@@ -2183,7 +2306,7 @@ export interface FunnelConversionStepsChartType {
      * @type {string}
      * @memberof FunnelConversionStepsChartType
      */
-    'type'?: FunnelConversionStepsChartTypeTypeEnum;
+    'type': FunnelConversionStepsChartTypeTypeEnum;
 }
 
 export const FunnelConversionStepsChartTypeTypeEnum = {
@@ -2250,26 +2373,27 @@ export interface FunnelEvent {
     'eventName'?: string;
     /**
      * 
-     * @type {string}
-     * @memberof FunnelEvent
-     */
-    'eventType': FunnelEventEventTypeEnum;
-    /**
-     * 
      * @type {number}
      * @memberof FunnelEvent
      */
     'eventId'?: number;
     /**
+     * 
+     * @type {string}
+     * @memberof FunnelEvent
+     */
+    'eventType': FunnelEventEventTypeEnum;
+    /**
      * array of event filters
      * @type {Array<EventFilterByProperty>}
      * @memberof FunnelEvent
      */
-    'filters'?: Array<EventFilterByProperty>;
+    'filters': Array<EventFilterByProperty>;
 }
 
 export const FunnelEventEventTypeEnum = {
-    Custom: 'custom'
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
 export type FunnelEventEventTypeEnum = typeof FunnelEventEventTypeEnum[keyof typeof FunnelEventEventTypeEnum];
@@ -2298,7 +2422,7 @@ export interface FunnelExcludeSteps {
      * @type {FunnelExcludeStepsSteps}
      * @memberof FunnelExcludeSteps
      */
-    'steps'?: FunnelExcludeStepsSteps;
+    'steps': FunnelExcludeStepsSteps;
 }
 /**
  * @type FunnelExcludeStepsSteps
@@ -2337,19 +2461,19 @@ export interface FunnelExcludeStepsStepsOneOf1 {
      * @type {string}
      * @memberof FunnelExcludeStepsStepsOneOf1
      */
-    'type'?: FunnelExcludeStepsStepsOneOf1TypeEnum;
+    'type': FunnelExcludeStepsStepsOneOf1TypeEnum;
     /**
      * 
      * @type {number}
      * @memberof FunnelExcludeStepsStepsOneOf1
      */
-    'from'?: number;
+    'from': number;
     /**
      * 
      * @type {number}
      * @memberof FunnelExcludeStepsStepsOneOf1
      */
-    'to'?: number;
+    'to': number;
 }
 
 export const FunnelExcludeStepsStepsOneOf1TypeEnum = {
@@ -2369,7 +2493,7 @@ export interface FunnelFrequencyChartType {
      * @type {string}
      * @memberof FunnelFrequencyChartType
      */
-    'type'?: FunnelFrequencyChartTypeTypeEnum;
+    'type': FunnelFrequencyChartTypeTypeEnum;
 }
 
 export const FunnelFrequencyChartTypeTypeEnum = {
@@ -2389,43 +2513,43 @@ export interface FunnelQuery {
      * @type {EventRecordsListRequestTime}
      * @memberof FunnelQuery
      */
-    'time'?: EventRecordsListRequestTime;
+    'time': EventRecordsListRequestTime;
     /**
      * group that is used in aggregations by group. For instance, group by user or group by organizartion.
      * @type {string}
      * @memberof FunnelQuery
      */
-    'group'?: string;
+    'group': string;
     /**
      * 
      * @type {Array<FunnelQueryStepsInner>}
      * @memberof FunnelQuery
      */
-    'steps'?: Array<FunnelQueryStepsInner>;
+    'steps': Array<FunnelQueryStepsInner>;
     /**
      * 
      * @type {FunnelQueryTimeWindow}
      * @memberof FunnelQuery
      */
-    'timeWindow'?: FunnelQueryTimeWindow;
+    'timeWindow': FunnelQueryTimeWindow;
     /**
      * 
      * @type {FunnelQueryChartType}
      * @memberof FunnelQuery
      */
-    'chartType'?: FunnelQueryChartType;
+    'chartType': FunnelQueryChartType;
     /**
      * 
      * @type {string}
      * @memberof FunnelQuery
      */
-    'count'?: FunnelQueryCountEnum;
+    'count': FunnelQueryCountEnum;
     /**
      * 
      * @type {string}
      * @memberof FunnelQuery
      */
-    'stepOrder'?: FunnelQueryStepOrderEnum;
+    'stepOrder': FunnelQueryStepOrderEnum;
     /**
      * 
      * @type {FunnelQueryAttribution}
@@ -2458,10 +2582,10 @@ export interface FunnelQuery {
     'segments'?: Array<EventSegmentationSegment>;
     /**
      * 
-     * @type {EventFilters}
+     * @type {EventGroupedFilters}
      * @memberof FunnelQuery
      */
-    'filters'?: EventFilters;
+    'filters'?: EventGroupedFilters;
 }
 
 export const FunnelQueryCountEnum = {
@@ -2495,7 +2619,7 @@ export interface FunnelQueryAttributionOneOf {
      * @type {string}
      * @memberof FunnelQueryAttributionOneOf
      */
-    'type'?: FunnelQueryAttributionOneOfTypeEnum;
+    'type': FunnelQueryAttributionOneOfTypeEnum;
 }
 
 export const FunnelQueryAttributionOneOfTypeEnum = {
@@ -2516,13 +2640,13 @@ export interface FunnelQueryAttributionOneOf1 {
      * @type {string}
      * @memberof FunnelQueryAttributionOneOf1
      */
-    'type'?: FunnelQueryAttributionOneOf1TypeEnum;
+    'type': FunnelQueryAttributionOneOf1TypeEnum;
     /**
      * 
      * @type {number}
      * @memberof FunnelQueryAttributionOneOf1
      */
-    'step'?: number;
+    'step': number;
 }
 
 export const FunnelQueryAttributionOneOf1TypeEnum = {
@@ -2542,13 +2666,13 @@ export interface FunnelQueryChartType {
      * @type {string}
      * @memberof FunnelQueryChartType
      */
-    'type'?: FunnelQueryChartTypeTypeEnum;
+    'type': FunnelQueryChartTypeTypeEnum;
     /**
      * 
      * @type {TimeUnit}
      * @memberof FunnelQueryChartType
      */
-    'intervalUnit'?: TimeUnit;
+    'intervalUnit': TimeUnit;
     /**
      * 
      * @type {number}
@@ -2583,32 +2707,33 @@ export interface FunnelQueryExcludeInner {
     'eventName'?: string;
     /**
      * 
-     * @type {string}
-     * @memberof FunnelQueryExcludeInner
-     */
-    'eventType': FunnelQueryExcludeInnerEventTypeEnum;
-    /**
-     * 
      * @type {number}
      * @memberof FunnelQueryExcludeInner
      */
     'eventId'?: number;
     /**
+     * 
+     * @type {string}
+     * @memberof FunnelQueryExcludeInner
+     */
+    'eventType': FunnelQueryExcludeInnerEventTypeEnum;
+    /**
      * array of event filters
      * @type {Array<EventFilterByProperty>}
      * @memberof FunnelQueryExcludeInner
      */
-    'filters'?: Array<EventFilterByProperty>;
+    'filters': Array<EventFilterByProperty>;
     /**
      * 
      * @type {FunnelExcludeStepsSteps}
      * @memberof FunnelQueryExcludeInner
      */
-    'steps'?: FunnelExcludeStepsSteps;
+    'steps': FunnelExcludeStepsSteps;
 }
 
 export const FunnelQueryExcludeInnerEventTypeEnum = {
-    Custom: 'custom'
+    Custom: 'custom',
+    Regular: 'regular'
 } as const;
 
 export type FunnelQueryExcludeInnerEventTypeEnum = typeof FunnelQueryExcludeInnerEventTypeEnum[keyof typeof FunnelQueryExcludeInnerEventTypeEnum];
@@ -2624,7 +2749,7 @@ export interface FunnelQueryStepsInner {
      * @type {Array<FunnelEvent>}
      * @memberof FunnelQueryStepsInner
      */
-    'events'?: Array<FunnelEvent>;
+    'events': Array<FunnelEvent>;
     /**
      * 
      * @type {string}
@@ -2651,13 +2776,13 @@ export interface FunnelQueryTimeWindow {
      * @type {number}
      * @memberof FunnelQueryTimeWindow
      */
-    'n'?: number;
+    'n': number;
     /**
      * 
      * @type {TimeUnitWithSession}
      * @memberof FunnelQueryTimeWindow
      */
-    'unit'?: TimeUnitWithSession;
+    'unit': TimeUnitWithSession;
     /**
      * 
      * @type {string}
@@ -2684,13 +2809,13 @@ export interface FunnelTimeToConvertChartType {
      * @type {string}
      * @memberof FunnelTimeToConvertChartType
      */
-    'type'?: FunnelTimeToConvertChartTypeTypeEnum;
+    'type': FunnelTimeToConvertChartTypeTypeEnum;
     /**
      * 
      * @type {TimeUnit}
      * @memberof FunnelTimeToConvertChartType
      */
-    'intervalUnit'?: TimeUnit;
+    'intervalUnit': TimeUnit;
     /**
      * 
      * @type {number}
@@ -2722,26 +2847,13 @@ export interface GroupEventsList200Response {
      * @type {Array<GroupRecord>}
      * @memberof GroupEventsList200Response
      */
-    'events'?: Array<GroupRecord>;
+    'data'?: Array<GroupRecord>;
     /**
      * 
      * @type {ListResponseMetadataMeta}
      * @memberof GroupEventsList200Response
      */
     'meta'?: ListResponseMetadataMeta;
-}
-/**
- * 
- * @export
- * @interface GroupEventsList200ResponseAllOf
- */
-export interface GroupEventsList200ResponseAllOf {
-    /**
-     * 
-     * @type {Array<GroupRecord>}
-     * @memberof GroupEventsList200ResponseAllOf
-     */
-    'events'?: Array<GroupRecord>;
 }
 /**
  * 
@@ -2779,7 +2891,7 @@ export interface GroupRecordsListRequest {
      * @type {string}
      * @memberof GroupRecordsListRequest
      */
-    'group'?: string;
+    'group': string;
     /**
      * 
      * @type {GroupRecordsListRequestSearch}
@@ -2794,10 +2906,10 @@ export interface GroupRecordsListRequest {
     'segments'?: Array<EventSegmentationSegment>;
     /**
      * 
-     * @type {EventFilters}
+     * @type {EventGroupedFilters}
      * @memberof GroupRecordsListRequest
      */
-    'filters'?: EventFilters;
+    'filters'?: EventGroupedFilters;
 }
 /**
  * search in results
@@ -2810,13 +2922,7 @@ export interface GroupRecordsListRequestSearch {
      * @type {string}
      * @memberof GroupRecordsListRequestSearch
      */
-    'term'?: string;
-    /**
-     * 
-     * @type {Array<EventRecordsListRequestSearchInEventPropertiesInner>}
-     * @memberof GroupRecordsListRequestSearch
-     */
-    'inUserProperties'?: Array<EventRecordsListRequestSearchInEventPropertiesInner>;
+    'term': string;
 }
 /**
  * see https://datatracker.ietf.org/doc/html/rfc7519
@@ -2830,18 +2936,6 @@ export interface JWTToken {
      * @memberof JWTToken
      */
     'accountId': number;
-    /**
-     * 
-     * @type {number}
-     * @memberof JWTToken
-     */
-    'organizationId': number;
-    /**
-     * 
-     * @type {number}
-     * @memberof JWTToken
-     */
-    'projectId'?: number;
     /**
      * 
      * @type {string}
@@ -2881,6 +2975,189 @@ export const JWTTokenIssEnum = {
 export type JWTTokenIssEnum = typeof JWTTokenIssEnum[keyof typeof JWTTokenIssEnum];
 
 /**
+ * 
+ * @export
+ * @interface ListCustomEventPropertyValues
+ */
+export interface ListCustomEventPropertyValues {
+    /**
+     * 
+     * @type {string}
+     * @memberof ListCustomEventPropertyValues
+     */
+    'propertyName'?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof ListCustomEventPropertyValues
+     */
+    'propertyId'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof ListCustomEventPropertyValues
+     */
+    'propertyType': ListCustomEventPropertyValuesPropertyTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof ListCustomEventPropertyValues
+     */
+    'eventId': number;
+}
+
+export const ListCustomEventPropertyValuesPropertyTypeEnum = {
+    Event: 'event',
+    User: 'user',
+    Custom: 'custom'
+} as const;
+
+export type ListCustomEventPropertyValuesPropertyTypeEnum = typeof ListCustomEventPropertyValuesPropertyTypeEnum[keyof typeof ListCustomEventPropertyValuesPropertyTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface ListCustomEventPropertyValuesAllOf
+ */
+export interface ListCustomEventPropertyValuesAllOf {
+    /**
+     * 
+     * @type {number}
+     * @memberof ListCustomEventPropertyValuesAllOf
+     */
+    'eventId': number;
+}
+/**
+ * 
+ * @export
+ * @interface ListCustomPropertiesResponse
+ */
+export interface ListCustomPropertiesResponse {
+    /**
+     * 
+     * @type {Array<CustomProperty>}
+     * @memberof ListCustomPropertiesResponse
+     */
+    'events'?: Array<CustomProperty>;
+}
+/**
+ * 
+ * @export
+ * @interface ListEventPropertyValues
+ */
+export interface ListEventPropertyValues {
+    /**
+     * 
+     * @type {string}
+     * @memberof ListEventPropertyValues
+     */
+    'propertyName'?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof ListEventPropertyValues
+     */
+    'propertyId'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof ListEventPropertyValues
+     */
+    'propertyType': ListEventPropertyValuesPropertyTypeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof ListEventPropertyValues
+     */
+    'eventName': string;
+}
+
+export const ListEventPropertyValuesPropertyTypeEnum = {
+    Event: 'event',
+    User: 'user',
+    Custom: 'custom'
+} as const;
+
+export type ListEventPropertyValuesPropertyTypeEnum = typeof ListEventPropertyValuesPropertyTypeEnum[keyof typeof ListEventPropertyValuesPropertyTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface ListEventPropertyValuesAllOf
+ */
+export interface ListEventPropertyValuesAllOf {
+    /**
+     * 
+     * @type {string}
+     * @memberof ListEventPropertyValuesAllOf
+     */
+    'eventName': string;
+}
+/**
+ * 
+ * @export
+ * @interface ListEventRecordsResponse
+ */
+export interface ListEventRecordsResponse {
+    /**
+     * 
+     * @type {Array<EventRecord>}
+     * @memberof ListEventRecordsResponse
+     */
+    'events'?: Array<EventRecord>;
+}
+/**
+ * 
+ * @export
+ * @interface ListGroupRecordsResponse
+ */
+export interface ListGroupRecordsResponse {
+    /**
+     * 
+     * @type {Array<GroupRecord>}
+     * @memberof ListGroupRecordsResponse
+     */
+    'data'?: Array<GroupRecord>;
+}
+/**
+ * 
+ * @export
+ * @interface ListPropertiesResponse
+ */
+export interface ListPropertiesResponse {
+    /**
+     * 
+     * @type {Array<Property>}
+     * @memberof ListPropertiesResponse
+     */
+    'data'?: Array<Property>;
+}
+/**
+ * @type ListPropertyValuesRequest
+ * @export
+ */
+export type ListPropertyValuesRequest = ListCustomEventPropertyValues | ListEventPropertyValues;
+
+/**
+ * 
+ * @export
+ * @interface ListPropertyValuesResponse
+ */
+export interface ListPropertyValuesResponse {
+    /**
+     * 
+     * @type {ListPropertyValuesResponseData}
+     * @memberof ListPropertyValuesResponse
+     */
+    'data'?: ListPropertyValuesResponseData;
+}
+/**
+ * @type ListPropertyValuesResponseData
+ * @export
+ */
+export type ListPropertyValuesResponseData = Array<boolean> | Array<number> | Array<string>;
+
+/**
  * list response metadata
  * @export
  * @interface ListResponseMetadata
@@ -2917,6 +3194,25 @@ export interface ListResponseMetadataMeta {
      * @memberof ListResponseMetadataMeta
      */
     'total'?: number;
+}
+/**
+ * 
+ * @export
+ * @interface LoginRequest
+ */
+export interface LoginRequest {
+    /**
+     * 
+     * @type {string}
+     * @memberof LoginRequest
+     */
+    'email': string;
+    /**
+     * 
+     * @type {string}
+     * @memberof LoginRequest
+     */
+    'password': string;
 }
 /**
  * 
@@ -3015,7 +3311,7 @@ export interface Property {
      * @type {string}
      * @memberof Property
      */
-    'createdAt': string;
+    'createdAt'?: string;
     /**
      * update (once updated)
      * @type {string}
@@ -3027,7 +3323,7 @@ export interface Property {
      * @type {number}
      * @memberof Property
      */
-    'createdBy': number;
+    'createdBy'?: number;
     /**
      * id of updater User
      * @type {number}
@@ -3093,7 +3389,7 @@ export interface Property {
      * @type {object & DataType}
      * @memberof Property
      */
-    'dataType'?: object & DataType;
+    'dataType': object & DataType;
     /**
      * nullable property might contains null value
      * @type {boolean}
@@ -3150,9 +3446,9 @@ export const PropertyFilterOperation = {
     False: 'false',
     Exists: 'exists',
     Empty: 'empty',
-    ArrAll: 'arr_all',
-    ArrAny: 'arr_any',
-    ArrNone: 'arr_none',
+    ArrAll: 'arrAll',
+    ArrAny: 'arrAny',
+    ArrNone: 'arrNone',
     Regex: 'regex'
 } as const;
 
@@ -3160,66 +3456,38 @@ export type PropertyFilterOperation = typeof PropertyFilterOperation[keyof typeo
 
 
 /**
- * @type PropertyRef
  * reference to a property by id or name, depends on property type
  * @export
+ * @interface PropertyRef
  */
-export type PropertyRef = PropertyRefOneOf | PropertyRefOneOf1;
-
-/**
- * 
- * @export
- * @interface PropertyRefOneOf
- */
-export interface PropertyRefOneOf {
+export interface PropertyRef {
     /**
      * 
      * @type {string}
-     * @memberof PropertyRefOneOf
+     * @memberof PropertyRef
      */
     'propertyName'?: string;
     /**
      * 
-     * @type {string}
-     * @memberof PropertyRefOneOf
-     */
-    'propertyType'?: PropertyRefOneOfPropertyTypeEnum;
-}
-
-export const PropertyRefOneOfPropertyTypeEnum = {
-    Event: 'event',
-    User: 'user'
-} as const;
-
-export type PropertyRefOneOfPropertyTypeEnum = typeof PropertyRefOneOfPropertyTypeEnum[keyof typeof PropertyRefOneOfPropertyTypeEnum];
-
-/**
- * 
- * @export
- * @interface PropertyRefOneOf1
- */
-export interface PropertyRefOneOf1 {
-    /**
-     * 
      * @type {number}
-     * @memberof PropertyRefOneOf1
+     * @memberof PropertyRef
      */
     'propertyId'?: number;
     /**
      * 
      * @type {string}
-     * @memberof PropertyRefOneOf1
+     * @memberof PropertyRef
      */
-    'propertyType'?: PropertyRefOneOf1PropertyTypeEnum;
+    'propertyType': PropertyRefPropertyTypeEnum;
 }
 
-export const PropertyRefOneOf1PropertyTypeEnum = {
-    Custom: 'custom',
+export const PropertyRefPropertyTypeEnum = {
     Event: 'event',
-    User: 'user'
+    User: 'user',
+    Custom: 'custom'
 } as const;
 
-export type PropertyRefOneOf1PropertyTypeEnum = typeof PropertyRefOneOf1PropertyTypeEnum[keyof typeof PropertyRefOneOf1PropertyTypeEnum];
+export type PropertyRefPropertyTypeEnum = typeof PropertyRefPropertyTypeEnum[keyof typeof PropertyRefPropertyTypeEnum];
 
 /**
  * possible property type
@@ -3244,76 +3512,17 @@ export type PropertyType = typeof PropertyType[keyof typeof PropertyType];
 export interface PropertyValuesList200Response {
     /**
      * 
-     * @type {PropertyValuesList200ResponseValues}
+     * @type {ListPropertyValuesResponseData}
      * @memberof PropertyValuesList200Response
      */
-    'values'?: PropertyValuesList200ResponseValues;
-}
-/**
- * @type PropertyValuesList200ResponseValues
- * @export
- */
-export type PropertyValuesList200ResponseValues = Array<boolean> | Array<number> | Array<string>;
-
-/**
- * 
- * @export
- * @interface PropertyValuesListRequest
- */
-export interface PropertyValuesListRequest {
-    /**
-     * use event name only with eventType=event|user
-     * @type {string}
-     * @memberof PropertyValuesListRequest
-     */
-    'eventName'?: string;
-    /**
-     * use event id only with eventType=custom
-     * @type {number}
-     * @memberof PropertyValuesListRequest
-     */
-    'eventId'?: number;
+    'data'?: ListPropertyValuesResponseData;
     /**
      * 
-     * @type {string}
-     * @memberof PropertyValuesListRequest
+     * @type {ListResponseMetadataMeta}
+     * @memberof PropertyValuesList200Response
      */
-    'eventType'?: PropertyValuesListRequestEventTypeEnum;
-    /**
-     * use property name only with propertyType=event|user
-     * @type {string}
-     * @memberof PropertyValuesListRequest
-     */
-    'propertyName'?: string;
-    /**
-     * use property id only with propertyType=custom
-     * @type {number}
-     * @memberof PropertyValuesListRequest
-     */
-    'propertyId'?: number;
-    /**
-     * 
-     * @type {string}
-     * @memberof PropertyValuesListRequest
-     */
-    'propertyType'?: PropertyValuesListRequestPropertyTypeEnum;
+    'meta'?: ListResponseMetadataMeta;
 }
-
-export const PropertyValuesListRequestEventTypeEnum = {
-    Event: 'event',
-    User: 'user',
-    Custom: 'custom'
-} as const;
-
-export type PropertyValuesListRequestEventTypeEnum = typeof PropertyValuesListRequestEventTypeEnum[keyof typeof PropertyValuesListRequestEventTypeEnum];
-export const PropertyValuesListRequestPropertyTypeEnum = {
-    Event: 'event',
-    User: 'user',
-    Custom: 'custom'
-} as const;
-
-export type PropertyValuesListRequestPropertyTypeEnum = typeof PropertyValuesListRequestPropertyTypeEnum[keyof typeof PropertyValuesListRequestPropertyTypeEnum];
-
 /**
  * 
  * @export
@@ -3324,16 +3533,40 @@ export const QueryAggregate = {
     Sum: 'sum',
     Avg: 'avg',
     Median: 'median',
+    Count: 'count',
     Min: 'min',
     Max: 'max',
     DistinctCount: 'distinctCount',
-    _25thPercentile: '25thPercentile',
-    _75thPercentile: '75thPercentile',
-    _90thPercentile: '90thPercentile',
-    _99thPercentile: '99thPercentile'
+    Percentile25: 'percentile25',
+    Percentile75: 'percentile75',
+    Percentile90: 'percentile90',
+    Percentile99: 'percentile99'
 } as const;
 
 export type QueryAggregate = typeof QueryAggregate[keyof typeof QueryAggregate];
+
+
+/**
+ * 
+ * @export
+ * @enum {string}
+ */
+
+export const QueryAggregatePerGroup = {
+    Sum: 'sum',
+    Avg: 'avg',
+    Median: 'median',
+    Count: 'count',
+    Min: 'min',
+    Max: 'max',
+    DistinctCount: 'distinctCount',
+    Percentile25: 'percentile25',
+    Percentile75: 'percentile75',
+    Percentile90: 'percentile90',
+    Percentile99: 'percentile99'
+} as const;
+
+export type QueryAggregatePerGroup = typeof QueryAggregatePerGroup[keyof typeof QueryAggregatePerGroup];
 
 
 /**
@@ -3347,19 +3580,7 @@ export interface QueryAggregateProperty {
      * @type {string}
      * @memberof QueryAggregateProperty
      */
-    'type': QueryAggregatePropertyTypeEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof QueryAggregateProperty
-     */
     'propertyName'?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof QueryAggregateProperty
-     */
-    'propertyType': QueryAggregatePropertyPropertyTypeEnum;
     /**
      * 
      * @type {number}
@@ -3368,24 +3589,36 @@ export interface QueryAggregateProperty {
     'propertyId'?: number;
     /**
      * 
+     * @type {string}
+     * @memberof QueryAggregateProperty
+     */
+    'propertyType': QueryAggregatePropertyPropertyTypeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof QueryAggregateProperty
+     */
+    'type': QueryAggregatePropertyTypeEnum;
+    /**
+     * 
      * @type {QueryAggregate}
      * @memberof QueryAggregateProperty
      */
     'aggregate': QueryAggregate;
 }
 
+export const QueryAggregatePropertyPropertyTypeEnum = {
+    Event: 'event',
+    User: 'user',
+    Custom: 'custom'
+} as const;
+
+export type QueryAggregatePropertyPropertyTypeEnum = typeof QueryAggregatePropertyPropertyTypeEnum[keyof typeof QueryAggregatePropertyPropertyTypeEnum];
 export const QueryAggregatePropertyTypeEnum = {
     AggregateProperty: 'aggregateProperty'
 } as const;
 
 export type QueryAggregatePropertyTypeEnum = typeof QueryAggregatePropertyTypeEnum[keyof typeof QueryAggregatePropertyTypeEnum];
-export const QueryAggregatePropertyPropertyTypeEnum = {
-    Custom: 'custom',
-    Event: 'event',
-    User: 'user'
-} as const;
-
-export type QueryAggregatePropertyPropertyTypeEnum = typeof QueryAggregatePropertyPropertyTypeEnum[keyof typeof QueryAggregatePropertyPropertyTypeEnum];
 
 /**
  * 
@@ -3395,10 +3628,30 @@ export type QueryAggregatePropertyPropertyTypeEnum = typeof QueryAggregateProper
 export interface QueryAggregatePropertyAllOf {
     /**
      * 
-     * @type {QueryAggregate}
+     * @type {string}
      * @memberof QueryAggregatePropertyAllOf
      */
-    'aggregate'?: QueryAggregate;
+    'type': QueryAggregatePropertyAllOfTypeEnum;
+}
+
+export const QueryAggregatePropertyAllOfTypeEnum = {
+    AggregateProperty: 'aggregateProperty'
+} as const;
+
+export type QueryAggregatePropertyAllOfTypeEnum = typeof QueryAggregatePropertyAllOfTypeEnum[keyof typeof QueryAggregatePropertyAllOfTypeEnum];
+
+/**
+ * 
+ * @export
+ * @interface QueryAggregatePropertyAllOf1
+ */
+export interface QueryAggregatePropertyAllOf1 {
+    /**
+     * 
+     * @type {QueryAggregate}
+     * @memberof QueryAggregatePropertyAllOf1
+     */
+    'aggregate': QueryAggregate;
 }
 /**
  * aggregate of property per by group
@@ -3411,19 +3664,7 @@ export interface QueryAggregatePropertyPerGroup {
      * @type {string}
      * @memberof QueryAggregatePropertyPerGroup
      */
-    'type': QueryAggregatePropertyPerGroupTypeEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof QueryAggregatePropertyPerGroup
-     */
     'propertyName'?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof QueryAggregatePropertyPerGroup
-     */
-    'propertyType': QueryAggregatePropertyPerGroupPropertyTypeEnum;
     /**
      * 
      * @type {number}
@@ -3432,30 +3673,42 @@ export interface QueryAggregatePropertyPerGroup {
     'propertyId'?: number;
     /**
      * 
+     * @type {string}
+     * @memberof QueryAggregatePropertyPerGroup
+     */
+    'propertyType': QueryAggregatePropertyPerGroupPropertyTypeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof QueryAggregatePropertyPerGroup
+     */
+    'type': QueryAggregatePropertyPerGroupTypeEnum;
+    /**
+     * 
      * @type {QueryAggregate}
      * @memberof QueryAggregatePropertyPerGroup
      */
     'aggregate': QueryAggregate;
     /**
      * 
-     * @type {QueryAggregate}
+     * @type {QueryAggregatePerGroup}
      * @memberof QueryAggregatePropertyPerGroup
      */
-    'aggregatePerGroup': QueryAggregate;
+    'aggregatePerGroup': QueryAggregatePerGroup;
 }
 
+export const QueryAggregatePropertyPerGroupPropertyTypeEnum = {
+    Event: 'event',
+    User: 'user',
+    Custom: 'custom'
+} as const;
+
+export type QueryAggregatePropertyPerGroupPropertyTypeEnum = typeof QueryAggregatePropertyPerGroupPropertyTypeEnum[keyof typeof QueryAggregatePropertyPerGroupPropertyTypeEnum];
 export const QueryAggregatePropertyPerGroupTypeEnum = {
     AggregatePropertyPerGroup: 'aggregatePropertyPerGroup'
 } as const;
 
 export type QueryAggregatePropertyPerGroupTypeEnum = typeof QueryAggregatePropertyPerGroupTypeEnum[keyof typeof QueryAggregatePropertyPerGroupTypeEnum];
-export const QueryAggregatePropertyPerGroupPropertyTypeEnum = {
-    Custom: 'custom',
-    Event: 'event',
-    User: 'user'
-} as const;
-
-export type QueryAggregatePropertyPerGroupPropertyTypeEnum = typeof QueryAggregatePropertyPerGroupPropertyTypeEnum[keyof typeof QueryAggregatePropertyPerGroupPropertyTypeEnum];
 
 /**
  * 
@@ -3468,7 +3721,7 @@ export interface QueryAggregatePropertyPerGroupAllOf {
      * @type {string}
      * @memberof QueryAggregatePropertyPerGroupAllOf
      */
-    'type'?: QueryAggregatePropertyPerGroupAllOfTypeEnum;
+    'type': QueryAggregatePropertyPerGroupAllOfTypeEnum;
 }
 
 export const QueryAggregatePropertyPerGroupAllOfTypeEnum = {
@@ -3488,13 +3741,13 @@ export interface QueryAggregatePropertyPerGroupAllOf1 {
      * @type {QueryAggregate}
      * @memberof QueryAggregatePropertyPerGroupAllOf1
      */
-    'aggregate'?: QueryAggregate;
+    'aggregate': QueryAggregate;
     /**
      * 
-     * @type {QueryAggregate}
+     * @type {QueryAggregatePerGroup}
      * @memberof QueryAggregatePropertyPerGroupAllOf1
      */
-    'aggregatePerGroup'?: QueryAggregate;
+    'aggregatePerGroup': QueryAggregatePerGroup;
 }
 /**
  * event count aggregate by group
@@ -3533,13 +3786,13 @@ export interface QueryFormula {
      * @type {string}
      * @memberof QueryFormula
      */
-    'type'?: QueryFormulaTypeEnum;
+    'type': QueryFormulaTypeEnum;
     /**
      * 
      * @type {string}
      * @memberof QueryFormula
      */
-    'formula'?: string;
+    'formula': string;
 }
 
 export const QueryFormulaTypeEnum = {
@@ -3549,7 +3802,7 @@ export const QueryFormulaTypeEnum = {
 export type QueryFormulaTypeEnum = typeof QueryFormulaTypeEnum[keyof typeof QueryFormulaTypeEnum];
 
 /**
- * simple query without any additional agruments
+ * simple query without any additional arguments
  * @export
  * @interface QuerySimple
  */
@@ -3560,27 +3813,16 @@ export interface QuerySimple {
      * @memberof QuerySimple
      */
     'type': QuerySimpleTypeEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof QuerySimple
-     */
-    'query': QuerySimpleQueryEnum;
 }
 
 export const QuerySimpleTypeEnum = {
-    Simple: 'simple'
-} as const;
-
-export type QuerySimpleTypeEnum = typeof QuerySimpleTypeEnum[keyof typeof QuerySimpleTypeEnum];
-export const QuerySimpleQueryEnum = {
     CountEvents: 'countEvents',
     CountUniqueGroups: 'countUniqueGroups',
     WeeklyActiveGroups: 'weeklyActiveGroups',
     MonthlyActiveGroups: 'monthlyActiveGroups'
 } as const;
 
-export type QuerySimpleQueryEnum = typeof QuerySimpleQueryEnum[keyof typeof QuerySimpleQueryEnum];
+export type QuerySimpleTypeEnum = typeof QuerySimpleTypeEnum[keyof typeof QuerySimpleTypeEnum];
 
 /**
  * 
@@ -3593,7 +3835,7 @@ export interface RefreshTokenRequest {
      * @type {string}
      * @memberof RefreshTokenRequest
      */
-    'refresh_token'?: string;
+    'refreshToken': string;
 }
 /**
  * 
@@ -3712,10 +3954,10 @@ export interface ReportReport {
     'events': Array<EventSegmentationEvent>;
     /**
      * 
-     * @type {EventFilters}
+     * @type {EventGroupedFilters}
      * @memberof ReportReport
      */
-    'filters'?: EventFilters;
+    'filters'?: EventGroupedFilters;
     /**
      * array of breakdowns
      * @type {Array<BreakdownByProperty>}
@@ -3733,25 +3975,25 @@ export interface ReportReport {
      * @type {Array<FunnelQueryStepsInner>}
      * @memberof ReportReport
      */
-    'steps'?: Array<FunnelQueryStepsInner>;
+    'steps': Array<FunnelQueryStepsInner>;
     /**
      * 
      * @type {FunnelQueryTimeWindow}
      * @memberof ReportReport
      */
-    'timeWindow'?: FunnelQueryTimeWindow;
+    'timeWindow': FunnelQueryTimeWindow;
     /**
      * 
      * @type {string}
      * @memberof ReportReport
      */
-    'count'?: ReportReportCountEnum;
+    'count': ReportReportCountEnum;
     /**
      * 
      * @type {string}
      * @memberof ReportReport
      */
-    'stepOrder'?: ReportReportStepOrderEnum;
+    'stepOrder': ReportReportStepOrderEnum;
     /**
      * 
      * @type {FunnelQueryAttribution}
@@ -3852,12 +4094,6 @@ export interface ReportsList200ResponseAllOf {
     'dashboards'?: Array<Report>;
 }
 /**
- * @type SegmentCondition
- * @export
- */
-export type SegmentCondition = SegmentConditionDidEvent | SegmentConditionFunnel | SegmentConditionHadPropertyValue | SegmentConditionHasPropertyValue;
-
-/**
  * did event condition
  * @export
  * @interface SegmentConditionDidEvent
@@ -3868,25 +4104,25 @@ export interface SegmentConditionDidEvent {
      * @type {string}
      * @memberof SegmentConditionDidEvent
      */
-    'type'?: SegmentConditionDidEventTypeEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof SegmentConditionDidEvent
-     */
     'eventName'?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof SegmentConditionDidEvent
-     */
-    'eventType'?: SegmentConditionDidEventEventTypeEnum;
     /**
      * 
      * @type {number}
      * @memberof SegmentConditionDidEvent
      */
     'eventId'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof SegmentConditionDidEvent
+     */
+    'eventType': SegmentConditionDidEventEventTypeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof SegmentConditionDidEvent
+     */
+    'type': SegmentConditionDidEventTypeEnum;
     /**
      * 
      * @type {Array<EventFilterByProperty>}
@@ -3898,19 +4134,20 @@ export interface SegmentConditionDidEvent {
      * @type {DidEventCount | DidEventRelativeCount | DidEventAggregateProperty | DidEventHistoricalCount}
      * @memberof SegmentConditionDidEvent
      */
-    'aggregate'?: DidEventCount | DidEventRelativeCount | DidEventAggregateProperty | DidEventHistoricalCount;
+    'aggregate': DidEventCount | DidEventRelativeCount | DidEventAggregateProperty | DidEventHistoricalCount;
 }
 
+export const SegmentConditionDidEventEventTypeEnum = {
+    Custom: 'custom',
+    Regular: 'regular'
+} as const;
+
+export type SegmentConditionDidEventEventTypeEnum = typeof SegmentConditionDidEventEventTypeEnum[keyof typeof SegmentConditionDidEventEventTypeEnum];
 export const SegmentConditionDidEventTypeEnum = {
     DidEvent: 'didEvent'
 } as const;
 
 export type SegmentConditionDidEventTypeEnum = typeof SegmentConditionDidEventTypeEnum[keyof typeof SegmentConditionDidEventTypeEnum];
-export const SegmentConditionDidEventEventTypeEnum = {
-    Custom: 'custom'
-} as const;
-
-export type SegmentConditionDidEventEventTypeEnum = typeof SegmentConditionDidEventEventTypeEnum[keyof typeof SegmentConditionDidEventEventTypeEnum];
 
 /**
  * 
@@ -3923,7 +4160,7 @@ export interface SegmentConditionDidEventAllOf {
      * @type {string}
      * @memberof SegmentConditionDidEventAllOf
      */
-    'type'?: SegmentConditionDidEventAllOfTypeEnum;
+    'type': SegmentConditionDidEventAllOfTypeEnum;
 }
 
 export const SegmentConditionDidEventAllOfTypeEnum = {
@@ -3949,7 +4186,7 @@ export interface SegmentConditionDidEventAllOf1 {
      * @type {DidEventCount | DidEventRelativeCount | DidEventAggregateProperty | DidEventHistoricalCount}
      * @memberof SegmentConditionDidEventAllOf1
      */
-    'aggregate'?: DidEventCount | DidEventRelativeCount | DidEventAggregateProperty | DidEventHistoricalCount;
+    'aggregate': DidEventCount | DidEventRelativeCount | DidEventAggregateProperty | DidEventHistoricalCount;
 }
 /**
  * 
@@ -3962,7 +4199,7 @@ export interface SegmentConditionFunnel {
      * @type {string}
      * @memberof SegmentConditionFunnel
      */
-    'type'?: SegmentConditionFunnelTypeEnum;
+    'type': SegmentConditionFunnelTypeEnum;
     /**
      * 
      * @type {number}
@@ -4012,7 +4249,7 @@ export interface SegmentConditionHadPropertyValue {
      * @type {Array<Value>}
      * @memberof SegmentConditionHadPropertyValue
      */
-    'values'?: Array<Value>;
+    'value'?: Array<Value>;
     /**
      * 
      * @type {SegmentConditionHadPropertyValueTime}
@@ -4063,7 +4300,7 @@ export interface SegmentConditionHasPropertyValue {
      * @type {Array<Value>}
      * @memberof SegmentConditionHasPropertyValue
      */
-    'values'?: Array<Value>;
+    'value'?: Array<Value>;
 }
 
 export const SegmentConditionHasPropertyValueTypeEnum = {
@@ -4083,31 +4320,31 @@ export interface SignupRequest {
      * @type {string}
      * @memberof SignupRequest
      */
-    'email'?: string;
+    'email': string;
     /**
      * 
      * @type {string}
      * @memberof SignupRequest
      */
-    'password'?: string;
+    'password': string;
     /**
      * 
      * @type {string}
      * @memberof SignupRequest
      */
-    'password_repeat'?: string;
+    'passwordRepeat': string;
     /**
      * 
      * @type {string}
      * @memberof SignupRequest
      */
-    'first_name'?: string;
+    'firstName'?: string;
     /**
      * 
      * @type {string}
      * @memberof SignupRequest
      */
-    'last_name'?: string;
+    'lastName'?: string;
 }
 /**
  * time spent after the first use of event. Use in segmentation
@@ -4212,11 +4449,11 @@ export interface TimeLast {
      */
     'type': TimeLastTypeEnum;
     /**
-     * N days/weeks
+     * Last days/weeks
      * @type {number}
      * @memberof TimeLast
      */
-    'n': number;
+    'last': number;
     /**
      * 
      * @type {TimeUnit}
@@ -4271,7 +4508,7 @@ export type TimeUnitWithSession = typeof TimeUnitWithSession[keyof typeof TimeUn
 
 
 /**
- * window operation for segmentation. Tells that event should be triggered each timeunit (each day, for instance) {   \"time\": {     \"type\": \"each\",     \"unit\":\"day\"   } } 
+ * window operation for segmentation. Tells that event should be triggered each timeunit (each day, for instance) {   \"time\": {     \"type\": \"windowEach\",     \"unit\":\"day\"   } } 
  * @export
  * @interface TimeWindowEach
  */
@@ -4392,11 +4629,56 @@ export interface UpdateDashboardRequest {
     'description'?: string;
     /**
      * 
-     * @type {Array<CreateDashboardRequestRowsInner>}
+     * @type {Array<UpdateDashboardRequestRowsInner>}
      * @memberof UpdateDashboardRequest
      */
-    'rows'?: Array<CreateDashboardRequestRowsInner>;
+    'rows'?: Array<UpdateDashboardRequestRowsInner>;
 }
+/**
+ * 
+ * @export
+ * @interface UpdateDashboardRequestRowsInner
+ */
+export interface UpdateDashboardRequestRowsInner {
+    /**
+     * 
+     * @type {Array<UpdateDashboardRequestRowsInnerPanelsInner>}
+     * @memberof UpdateDashboardRequestRowsInner
+     */
+    'panels': Array<UpdateDashboardRequestRowsInnerPanelsInner>;
+}
+/**
+ * 
+ * @export
+ * @interface UpdateDashboardRequestRowsInnerPanelsInner
+ */
+export interface UpdateDashboardRequestRowsInnerPanelsInner {
+    /**
+     * span
+     * @type {number}
+     * @memberof UpdateDashboardRequestRowsInnerPanelsInner
+     */
+    'span': number;
+    /**
+     * 
+     * @type {string}
+     * @memberof UpdateDashboardRequestRowsInnerPanelsInner
+     */
+    'type': UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum;
+    /**
+     * 
+     * @type {number}
+     * @memberof UpdateDashboardRequestRowsInnerPanelsInner
+     */
+    'reportId': number;
+}
+
+export const UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum = {
+    Report: 'report'
+} as const;
+
+export type UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum = typeof UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum[keyof typeof UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum];
+
 /**
  * Update event request
  * @export
@@ -4444,10 +4726,10 @@ export type UpdateEventRequestStatusEnum = typeof UpdateEventRequestStatusEnum[k
 export interface UpdateGroupRecordRequest {
     /**
      * map of group property name and property value pairs
-     * @type {object}
+     * @type {{ [key: string]: Value; }}
      * @memberof UpdateGroupRecordRequest
      */
-    'properties'?: object;
+    'properties': { [key: string]: Value; };
 }
 /**
  * Propetty update
@@ -4514,10 +4796,10 @@ export interface UpdateReportRequest {
     'description'?: string;
     /**
      * 
-     * @type {ReportReport}
+     * @type {CreateReportRequestReport}
      * @memberof UpdateReportRequest
      */
-    'report'?: ReportReport;
+    'report'?: CreateReportRequestReport;
 }
 /**
  * 
@@ -4530,26 +4812,13 @@ export interface UserPropertiesList200Response {
      * @type {Array<Property>}
      * @memberof UserPropertiesList200Response
      */
-    'events'?: Array<Property>;
+    'data'?: Array<Property>;
     /**
      * 
      * @type {ListResponseMetadataMeta}
      * @memberof UserPropertiesList200Response
      */
     'meta'?: ListResponseMetadataMeta;
-}
-/**
- * 
- * @export
- * @interface UserPropertiesList200ResponseAllOf
- */
-export interface UserPropertiesList200ResponseAllOf {
-    /**
-     * 
-     * @type {Array<Property>}
-     * @memberof UserPropertiesList200ResponseAllOf
-     */
-    'events'?: Array<Property>;
 }
 /**
  * @type Value
@@ -4567,50 +4836,14 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
     return {
         /**
          * 
-         * @summary Refresh access token
-         * @param {RefreshTokenRequest} refreshTokenRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        authAccess: async (refreshTokenRequest: RefreshTokenRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'refreshTokenRequest' is not null or undefined
-            assertParamExists('authAccess', 'refreshTokenRequest', refreshTokenRequest)
-            const localVarPath = `/v1/auth/refresh-token`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-
-    
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(refreshTokenRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
          * @summary Basic login
-         * @param {BasicLoginRequest} basicLoginRequest 
+         * @param {LoginRequest} loginRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        basicLogin: async (basicLoginRequest: BasicLoginRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'basicLoginRequest' is not null or undefined
-            assertParamExists('basicLogin', 'basicLoginRequest', basicLoginRequest)
+        basicLogin: async (loginRequest: LoginRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'loginRequest' is not null or undefined
+            assertParamExists('basicLogin', 'loginRequest', loginRequest)
             const localVarPath = `/v1/auth/login`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -4630,7 +4863,7 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(basicLoginRequest, localVarRequestOptions, configuration)
+            localVarRequestOptions.data = serializeDataIfNeeded(loginRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -4675,12 +4908,15 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
         },
         /**
          * 
-         * @summary Log out
+         * @summary Refresh access token
+         * @param {RefreshTokenRequest} refreshTokenRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        logout: async (options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/v1/auth/logout`;
+        refreshToken: async (refreshTokenRequest: RefreshTokenRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'refreshTokenRequest' is not null or undefined
+            assertParamExists('refreshToken', 'refreshTokenRequest', refreshTokenRequest)
+            const localVarPath = `/v1/auth/refresh-token`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -4694,9 +4930,12 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
 
 
     
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(refreshTokenRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -4715,24 +4954,13 @@ export const AuthApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
-         * @summary Refresh access token
-         * @param {RefreshTokenRequest} refreshTokenRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async authAccess(refreshTokenRequest: RefreshTokenRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<TokensResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.authAccess(refreshTokenRequest, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
          * @summary Basic login
-         * @param {BasicLoginRequest} basicLoginRequest 
+         * @param {LoginRequest} loginRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async basicLogin(basicLoginRequest: BasicLoginRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<TokensResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.basicLogin(basicLoginRequest, options);
+        async basicLogin(loginRequest: LoginRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<TokensResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.basicLogin(loginRequest, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -4748,12 +4976,13 @@ export const AuthApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Log out
+         * @summary Refresh access token
+         * @param {RefreshTokenRequest} refreshTokenRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async logout(options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.logout(options);
+        async refreshToken(refreshTokenRequest: RefreshTokenRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<TokensResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.refreshToken(refreshTokenRequest, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
     }
@@ -4768,23 +4997,13 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
     return {
         /**
          * 
-         * @summary Refresh access token
-         * @param {RefreshTokenRequest} refreshTokenRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        authAccess(refreshTokenRequest: RefreshTokenRequest, options?: any): AxiosPromise<TokensResponse> {
-            return localVarFp.authAccess(refreshTokenRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary Basic login
-         * @param {BasicLoginRequest} basicLoginRequest 
+         * @param {LoginRequest} loginRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        basicLogin(basicLoginRequest: BasicLoginRequest, options?: any): AxiosPromise<TokensResponse> {
-            return localVarFp.basicLogin(basicLoginRequest, options).then((request) => request(axios, basePath));
+        basicLogin(loginRequest: LoginRequest, options?: any): AxiosPromise<TokensResponse> {
+            return localVarFp.basicLogin(loginRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -4798,12 +5017,13 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
         },
         /**
          * 
-         * @summary Log out
+         * @summary Refresh access token
+         * @param {RefreshTokenRequest} refreshTokenRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        logout(options?: any): AxiosPromise<void> {
-            return localVarFp.logout(options).then((request) => request(axios, basePath));
+        refreshToken(refreshTokenRequest: RefreshTokenRequest, options?: any): AxiosPromise<TokensResponse> {
+            return localVarFp.refreshToken(refreshTokenRequest, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -4817,26 +5037,14 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
 export class AuthApi extends BaseAPI {
     /**
      * 
-     * @summary Refresh access token
-     * @param {RefreshTokenRequest} refreshTokenRequest 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof AuthApi
-     */
-    public authAccess(refreshTokenRequest: RefreshTokenRequest, options?: AxiosRequestConfig) {
-        return AuthApiFp(this.configuration).authAccess(refreshTokenRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
      * @summary Basic login
-     * @param {BasicLoginRequest} basicLoginRequest 
+     * @param {LoginRequest} loginRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof AuthApi
      */
-    public basicLogin(basicLoginRequest: BasicLoginRequest, options?: AxiosRequestConfig) {
-        return AuthApiFp(this.configuration).basicLogin(basicLoginRequest, options).then((request) => request(this.axios, this.basePath));
+    public basicLogin(loginRequest: LoginRequest, options?: AxiosRequestConfig) {
+        return AuthApiFp(this.configuration).basicLogin(loginRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -4853,13 +5061,14 @@ export class AuthApi extends BaseAPI {
 
     /**
      * 
-     * @summary Log out
+     * @summary Refresh access token
+     * @param {RefreshTokenRequest} refreshTokenRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof AuthApi
      */
-    public logout(options?: AxiosRequestConfig) {
-        return AuthApiFp(this.configuration).logout(options).then((request) => request(this.axios, this.basePath));
+    public refreshToken(refreshTokenRequest: RefreshTokenRequest, options?: AxiosRequestConfig) {
+        return AuthApiFp(this.configuration).refreshToken(refreshTokenRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -4886,9 +5095,9 @@ export const DashboardsApiAxiosParamCreator = function (configuration?: Configur
             assertParamExists('createDashboard', 'projectId', projectId)
             // verify required parameter 'createDashboardRequest' is not null or undefined
             assertParamExists('createDashboard', 'createDashboardRequest', createDashboardRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/dashboards`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/dashboards`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -4931,9 +5140,9 @@ export const DashboardsApiAxiosParamCreator = function (configuration?: Configur
             assertParamExists('dashboardsList', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
             assertParamExists('dashboardsList', 'projectId', projectId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/dashboards`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/dashboards`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -4976,10 +5185,10 @@ export const DashboardsApiAxiosParamCreator = function (configuration?: Configur
             assertParamExists('deleteDashboard', 'projectId', projectId)
             // verify required parameter 'dashboardId' is not null or undefined
             assertParamExists('deleteDashboard', 'dashboardId', dashboardId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"dashboard_id"}}`, encodeURIComponent(String(dashboardId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/dashboards/{dashboardId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"dashboardId"}}`, encodeURIComponent(String(dashboardId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5022,10 +5231,10 @@ export const DashboardsApiAxiosParamCreator = function (configuration?: Configur
             assertParamExists('getDashboard', 'projectId', projectId)
             // verify required parameter 'dashboardId' is not null or undefined
             assertParamExists('getDashboard', 'dashboardId', dashboardId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"dashboard_id"}}`, encodeURIComponent(String(dashboardId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/dashboards/{dashboardId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"dashboardId"}}`, encodeURIComponent(String(dashboardId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5057,12 +5266,12 @@ export const DashboardsApiAxiosParamCreator = function (configuration?: Configur
          * @summary Update dashboard
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {string} dashboardId Dashboard ID
+         * @param {number} dashboardId Dashboard ID
          * @param {UpdateDashboardRequest} updateDashboardRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        updateDashboard: async (organizationId: number, projectId: number, dashboardId: string, updateDashboardRequest: UpdateDashboardRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        updateDashboard: async (organizationId: number, projectId: number, dashboardId: number, updateDashboardRequest: UpdateDashboardRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'organizationId' is not null or undefined
             assertParamExists('updateDashboard', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
@@ -5071,10 +5280,10 @@ export const DashboardsApiAxiosParamCreator = function (configuration?: Configur
             assertParamExists('updateDashboard', 'dashboardId', dashboardId)
             // verify required parameter 'updateDashboardRequest' is not null or undefined
             assertParamExists('updateDashboard', 'updateDashboardRequest', updateDashboardRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"dashboard_id"}}`, encodeURIComponent(String(dashboardId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/dashboards/{dashboardId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"dashboardId"}}`, encodeURIComponent(String(dashboardId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5148,7 +5357,7 @@ export const DashboardsApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async deleteDashboard(organizationId: number, projectId: number, dashboardId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async deleteDashboard(organizationId: number, projectId: number, dashboardId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Dashboard>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.deleteDashboard(organizationId, projectId, dashboardId, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
@@ -5170,12 +5379,12 @@ export const DashboardsApiFp = function(configuration?: Configuration) {
          * @summary Update dashboard
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {string} dashboardId Dashboard ID
+         * @param {number} dashboardId Dashboard ID
          * @param {UpdateDashboardRequest} updateDashboardRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async updateDashboard(organizationId: number, projectId: number, dashboardId: string, updateDashboardRequest: UpdateDashboardRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Dashboard>> {
+        async updateDashboard(organizationId: number, projectId: number, dashboardId: number, updateDashboardRequest: UpdateDashboardRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Dashboard>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.updateDashboard(organizationId, projectId, dashboardId, updateDashboardRequest, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
@@ -5221,7 +5430,7 @@ export const DashboardsApiFactory = function (configuration?: Configuration, bas
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        deleteDashboard(organizationId: number, projectId: number, dashboardId: number, options?: any): AxiosPromise<void> {
+        deleteDashboard(organizationId: number, projectId: number, dashboardId: number, options?: any): AxiosPromise<Dashboard> {
             return localVarFp.deleteDashboard(organizationId, projectId, dashboardId, options).then((request) => request(axios, basePath));
         },
         /**
@@ -5241,12 +5450,12 @@ export const DashboardsApiFactory = function (configuration?: Configuration, bas
          * @summary Update dashboard
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {string} dashboardId Dashboard ID
+         * @param {number} dashboardId Dashboard ID
          * @param {UpdateDashboardRequest} updateDashboardRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        updateDashboard(organizationId: number, projectId: number, dashboardId: string, updateDashboardRequest: UpdateDashboardRequest, options?: any): AxiosPromise<Dashboard> {
+        updateDashboard(organizationId: number, projectId: number, dashboardId: number, updateDashboardRequest: UpdateDashboardRequest, options?: any): AxiosPromise<Dashboard> {
             return localVarFp.updateDashboard(organizationId, projectId, dashboardId, updateDashboardRequest, options).then((request) => request(axios, basePath));
         },
     };
@@ -5319,13 +5528,13 @@ export class DashboardsApi extends BaseAPI {
      * @summary Update dashboard
      * @param {number} organizationId 
      * @param {number} projectId 
-     * @param {string} dashboardId Dashboard ID
+     * @param {number} dashboardId Dashboard ID
      * @param {UpdateDashboardRequest} updateDashboardRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof DashboardsApi
      */
-    public updateDashboard(organizationId: number, projectId: number, dashboardId: string, updateDashboardRequest: UpdateDashboardRequest, options?: AxiosRequestConfig) {
+    public updateDashboard(organizationId: number, projectId: number, dashboardId: number, updateDashboardRequest: UpdateDashboardRequest, options?: AxiosRequestConfig) {
         return DashboardsApiFp(this.configuration).updateDashboard(organizationId, projectId, dashboardId, updateDashboardRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
@@ -5353,9 +5562,9 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('createCustomEvent', 'projectId', projectId)
             // verify required parameter 'createCustomEventRequest' is not null or undefined
             assertParamExists('createCustomEvent', 'createCustomEventRequest', createCustomEventRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5398,9 +5607,9 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('customEventsList', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
             assertParamExists('customEventsList', 'projectId', projectId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5443,10 +5652,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('deleteCustomEvent', 'projectId', projectId)
             // verify required parameter 'eventId' is not null or undefined
             assertParamExists('deleteCustomEvent', 'eventId', eventId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events/{event_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"event_id"}}`, encodeURIComponent(String(eventId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5489,9 +5698,9 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('eventRecordsList', 'projectId', projectId)
             // verify required parameter 'eventRecordsListRequest' is not null or undefined
             assertParamExists('eventRecordsList', 'eventRecordsListRequest', eventRecordsListRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/data/event-records`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/data/event-records`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5534,9 +5743,9 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('eventsList', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
             assertParamExists('eventsList', 'projectId', projectId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/events`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/events`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5579,10 +5788,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('getCustomEvent', 'projectId', projectId)
             // verify required parameter 'eventId' is not null or undefined
             assertParamExists('getCustomEvent', 'eventId', eventId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events/{event_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"event_id"}}`, encodeURIComponent(String(eventId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5625,10 +5834,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('getEvent', 'projectId', projectId)
             // verify required parameter 'eventId' is not null or undefined
             assertParamExists('getEvent', 'eventId', eventId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/events/{event_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"event_id"}}`, encodeURIComponent(String(eventId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/events/{eventId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5671,10 +5880,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('getEventProperty', 'projectId', projectId)
             // verify required parameter 'propertyId' is not null or undefined
             assertParamExists('getEventProperty', 'propertyId', propertyId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties/{property_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"property_id"}}`, encodeURIComponent(String(propertyId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties/{propertyId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5717,9 +5926,9 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('getEventRecord', 'projectId', projectId)
             // verify required parameter 'id' is not null or undefined
             assertParamExists('getEventRecord', 'id', id)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/data/event-records/{id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/data/event-records/{id}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
                 .replace(`{${"id"}}`, encodeURIComponent(String(id)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -5763,10 +5972,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('getUserProperty', 'projectId', projectId)
             // verify required parameter 'propertyId' is not null or undefined
             assertParamExists('getUserProperty', 'propertyId', propertyId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties/{property_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"property_id"}}`, encodeURIComponent(String(propertyId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties/{propertyId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5812,10 +6021,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('updateCustomEvent', 'eventId', eventId)
             // verify required parameter 'updateCustomEventRequest' is not null or undefined
             assertParamExists('updateCustomEvent', 'updateCustomEventRequest', updateCustomEventRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/custom-events/{event_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"event_id"}}`, encodeURIComponent(String(eventId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5864,10 +6073,10 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('updateEvent', 'eventId', eventId)
             // verify required parameter 'updateEventRequest' is not null or undefined
             assertParamExists('updateEvent', 'updateEventRequest', updateEventRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/events/{event_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"event_id"}}`, encodeURIComponent(String(eventId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/events/{eventId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -6419,9 +6628,9 @@ export const GroupsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('getGroupRecord', 'projectId', projectId)
             // verify required parameter 'id' is not null or undefined
             assertParamExists('getGroupRecord', 'id', id)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/data/group-records/{id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/data/group-records/{id}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
                 .replace(`{${"id"}}`, encodeURIComponent(String(id)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -6465,9 +6674,9 @@ export const GroupsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('groupEventsList', 'projectId', projectId)
             // verify required parameter 'groupRecordsListRequest' is not null or undefined
             assertParamExists('groupEventsList', 'groupRecordsListRequest', groupRecordsListRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/data/group-records`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/data/group-records`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -6516,9 +6725,9 @@ export const GroupsApiAxiosParamCreator = function (configuration?: Configuratio
             assertParamExists('updateGroupRecord', 'id', id)
             // verify required parameter 'updateGroupRecordRequest' is not null or undefined
             assertParamExists('updateGroupRecord', 'updateGroupRecordRequest', updateGroupRecordRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/data/group-records/{id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/data/group-records/{id}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
                 .replace(`{${"id"}}`, encodeURIComponent(String(id)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -6720,9 +6929,9 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             assertParamExists('customPropertiesList', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
             assertParamExists('customPropertiesList', 'projectId', projectId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/custom-properties`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-properties`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -6762,9 +6971,9 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             assertParamExists('eventPropertiesList', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
             assertParamExists('eventPropertiesList', 'projectId', projectId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -6796,20 +7005,20 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
+         * @param {ListPropertyValuesRequest} listPropertyValuesRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        propertyValuesList: async (organizationId: number, projectId: number, propertyValuesListRequest: PropertyValuesListRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        propertyValuesList: async (organizationId: number, projectId: number, listPropertyValuesRequest: ListPropertyValuesRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'organizationId' is not null or undefined
             assertParamExists('propertyValuesList', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
             assertParamExists('propertyValuesList', 'projectId', projectId)
-            // verify required parameter 'propertyValuesListRequest' is not null or undefined
-            assertParamExists('propertyValuesList', 'propertyValuesListRequest', propertyValuesListRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/data/property-values`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            // verify required parameter 'listPropertyValuesRequest' is not null or undefined
+            assertParamExists('propertyValuesList', 'listPropertyValuesRequest', listPropertyValuesRequest)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/data/property-values`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -6832,7 +7041,7 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(propertyValuesListRequest, localVarRequestOptions, configuration)
+            localVarRequestOptions.data = serializeDataIfNeeded(listPropertyValuesRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -6858,10 +7067,10 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             assertParamExists('updateEventProperty', 'propertyId', propertyId)
             // verify required parameter 'updatePropertyRequest' is not null or undefined
             assertParamExists('updateEventProperty', 'updatePropertyRequest', updatePropertyRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/event_properties/{property_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"property_id"}}`, encodeURIComponent(String(propertyId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties/{propertyId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -6910,10 +7119,10 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             assertParamExists('updateUserProperty', 'propertyId', propertyId)
             // verify required parameter 'updatePropertyRequest' is not null or undefined
             assertParamExists('updateUserProperty', 'updatePropertyRequest', updatePropertyRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties/{property_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"property_id"}}`, encodeURIComponent(String(propertyId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties/{propertyId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -6956,9 +7165,9 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
             assertParamExists('userPropertiesList', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
             assertParamExists('userPropertiesList', 'projectId', projectId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/schema/user_properties`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -7024,12 +7233,12 @@ export const PropertiesApiFp = function(configuration?: Configuration) {
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
+         * @param {ListPropertyValuesRequest} listPropertyValuesRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async propertyValuesList(organizationId: number, projectId: number, propertyValuesListRequest: PropertyValuesListRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PropertyValuesList200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.propertyValuesList(organizationId, projectId, propertyValuesListRequest, options);
+        async propertyValuesList(organizationId: number, projectId: number, listPropertyValuesRequest: ListPropertyValuesRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PropertyValuesList200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.propertyValuesList(organizationId, projectId, listPropertyValuesRequest, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -7109,12 +7318,12 @@ export const PropertiesApiFactory = function (configuration?: Configuration, bas
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
-         * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
+         * @param {ListPropertyValuesRequest} listPropertyValuesRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        propertyValuesList(organizationId: number, projectId: number, propertyValuesListRequest: PropertyValuesListRequest, options?: any): AxiosPromise<PropertyValuesList200Response> {
-            return localVarFp.propertyValuesList(organizationId, projectId, propertyValuesListRequest, options).then((request) => request(axios, basePath));
+        propertyValuesList(organizationId: number, projectId: number, listPropertyValuesRequest: ListPropertyValuesRequest, options?: any): AxiosPromise<PropertyValuesList200Response> {
+            return localVarFp.propertyValuesList(organizationId, projectId, listPropertyValuesRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -7194,13 +7403,13 @@ export class PropertiesApi extends BaseAPI {
      * @summary List of property values
      * @param {number} organizationId 
      * @param {number} projectId 
-     * @param {PropertyValuesListRequest} propertyValuesListRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
+     * @param {ListPropertyValuesRequest} listPropertyValuesRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof PropertiesApi
      */
-    public propertyValuesList(organizationId: number, projectId: number, propertyValuesListRequest: PropertyValuesListRequest, options?: AxiosRequestConfig) {
-        return PropertiesApiFp(this.configuration).propertyValuesList(organizationId, projectId, propertyValuesListRequest, options).then((request) => request(this.axios, this.basePath));
+    public propertyValuesList(organizationId: number, projectId: number, listPropertyValuesRequest: ListPropertyValuesRequest, options?: AxiosRequestConfig) {
+        return PropertiesApiFp(this.configuration).propertyValuesList(organizationId, projectId, listPropertyValuesRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -7256,6 +7465,52 @@ export const QueryApiAxiosParamCreator = function (configuration?: Configuration
     return {
         /**
          * 
+         * @summary Event segmentation query
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {EventSegmentation} [eventSegmentation] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        eventSegmentationQuery: async (organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('eventSegmentationQuery', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('eventSegmentationQuery', 'projectId', projectId)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/queries/event-segmentation`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(eventSegmentation, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Funnel query
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -7268,9 +7523,9 @@ export const QueryApiAxiosParamCreator = function (configuration?: Configuration
             assertParamExists('funnelQuery', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
             assertParamExists('funnelQuery', 'projectId', projectId)
-            const localVarPath = `/organizations/{organization_id}/projects/{project_id}/reports/funnel`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/organizations/{organizationId}/projects/{projectId}/queries/funnel`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -7312,6 +7567,19 @@ export const QueryApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
+         * @summary Event segmentation query
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {EventSegmentation} [eventSegmentation] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async eventSegmentationQuery(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DataTableResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.eventSegmentationQuery(organizationId, projectId, eventSegmentation, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
          * @summary Funnel query
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -7335,6 +7603,18 @@ export const QueryApiFactory = function (configuration?: Configuration, basePath
     return {
         /**
          * 
+         * @summary Event segmentation query
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {EventSegmentation} [eventSegmentation] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        eventSegmentationQuery(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: any): AxiosPromise<DataTableResponse> {
+            return localVarFp.eventSegmentationQuery(organizationId, projectId, eventSegmentation, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Funnel query
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -7355,6 +7635,20 @@ export const QueryApiFactory = function (configuration?: Configuration, basePath
  * @extends {BaseAPI}
  */
 export class QueryApi extends BaseAPI {
+    /**
+     * 
+     * @summary Event segmentation query
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {EventSegmentation} [eventSegmentation] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof QueryApi
+     */
+    public eventSegmentationQuery(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: AxiosRequestConfig) {
+        return QueryApiFp(this.configuration).eventSegmentationQuery(organizationId, projectId, eventSegmentation, options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * 
      * @summary Funnel query
@@ -7393,9 +7687,9 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
             assertParamExists('createReport', 'projectId', projectId)
             // verify required parameter 'createReportRequest' is not null or undefined
             assertParamExists('createReport', 'createReportRequest', createReportRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/reports`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/reports`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -7441,10 +7735,10 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
             assertParamExists('deleteReport', 'projectId', projectId)
             // verify required parameter 'reportId' is not null or undefined
             assertParamExists('deleteReport', 'reportId', reportId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/reports/{report_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"report_id"}}`, encodeURIComponent(String(reportId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/reports/{reportId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"reportId"}}`, encodeURIComponent(String(reportId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -7473,52 +7767,6 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
         },
         /**
          * 
-         * @summary Event segmentation query
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {EventSegmentation} [eventSegmentation] 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        eventSegmentationQuery: async (organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('eventSegmentationQuery', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('eventSegmentationQuery', 'projectId', projectId)
-            const localVarPath = `/organizations/{organization_id}/projects/{project_id}/reports/event-segmentation`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(eventSegmentation, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
          * @summary Get report
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -7533,10 +7781,10 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
             assertParamExists('getReport', 'projectId', projectId)
             // verify required parameter 'reportId' is not null or undefined
             assertParamExists('getReport', 'reportId', reportId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/reports/{report_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"report_id"}}`, encodeURIComponent(String(reportId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/reports/{reportId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"reportId"}}`, encodeURIComponent(String(reportId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -7576,9 +7824,9 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
             assertParamExists('reportsList', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
             assertParamExists('reportsList', 'projectId', projectId)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/reports`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/reports`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -7624,10 +7872,10 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
             assertParamExists('updateReport', 'reportId', reportId)
             // verify required parameter 'updateReportRequest' is not null or undefined
             assertParamExists('updateReport', 'updateReportRequest', updateReportRequest)
-            const localVarPath = `/v1/organizations/{organization_id}/projects/{project_id}/reports/{report_id}`
-                .replace(`{${"organization_id"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"project_id"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"report_id"}}`, encodeURIComponent(String(reportId)));
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/reports/{reportId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"reportId"}}`, encodeURIComponent(String(reportId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -7691,19 +7939,6 @@ export const ReportsApiFp = function(configuration?: Configuration) {
          */
         async deleteReport(organizationId: number, projectId: number, reportId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.deleteReport(organizationId, projectId, reportId, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
-         * @summary Event segmentation query
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {EventSegmentation} [eventSegmentation] 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async eventSegmentationQuery(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<DataTableResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.eventSegmentationQuery(organizationId, projectId, eventSegmentation, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -7781,18 +8016,6 @@ export const ReportsApiFactory = function (configuration?: Configuration, basePa
         },
         /**
          * 
-         * @summary Event segmentation query
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {EventSegmentation} [eventSegmentation] 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        eventSegmentationQuery(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: any): AxiosPromise<DataTableResponse> {
-            return localVarFp.eventSegmentationQuery(organizationId, projectId, eventSegmentation, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary Get report
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -7863,20 +8086,6 @@ export class ReportsApi extends BaseAPI {
      */
     public deleteReport(organizationId: number, projectId: number, reportId: number, options?: AxiosRequestConfig) {
         return ReportsApiFp(this.configuration).deleteReport(organizationId, projectId, reportId, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Event segmentation query
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {EventSegmentation} [eventSegmentation] 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof ReportsApi
-     */
-    public eventSegmentationQuery(organizationId: number, projectId: number, eventSegmentation?: EventSegmentation, options?: AxiosRequestConfig) {
-        return ReportsApiFp(this.configuration).eventSegmentationQuery(organizationId, projectId, eventSegmentation, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

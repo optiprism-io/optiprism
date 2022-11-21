@@ -24,40 +24,27 @@ pub mod event_fields {
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ColumnType {
+    Dimension,
+    Metric,
+    MetricValue,
+    FunnelMetricValue,
+}
+
 #[async_trait]
 pub trait Provider: Sync + Send {
     async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef>;
     async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable>;
 }
 
+#[derive(Clone,Debug)]
 pub struct Column {
     pub name: String,
-    pub group: String,
+    pub typ: ColumnType,
     pub is_nullable: bool,
     pub data_type: DataType,
     pub data: ArrayRef,
-}
-
-impl Column {
-    pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    pub fn group(&self) -> &str {
-        self.group.as_str()
-    }
-
-    pub fn is_nullable(&self) -> bool {
-        self.is_nullable
-    }
-
-    pub fn data_type(&self) -> &DataType {
-        &self.data_type
-    }
-
-    pub fn data(&self) -> &ArrayRef {
-        &self.data
-    }
 }
 
 pub struct DataTable {

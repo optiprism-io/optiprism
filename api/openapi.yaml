@@ -215,7 +215,7 @@ paths:
           description: Dashboard ID
           required: true
           schema:
-            type: string
+            type: number
       requestBody:
         required: true
         content:
@@ -258,8 +258,12 @@ paths:
           schema:
             type: number
       responses:
-        204:
+        200:
           description: deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1503,6 +1507,7 @@ components:
           type: array
           items:
             type: object
+            required: [ 'type','dataType','isNullable','name','data' ]
             properties:
               type:
                 type: string
@@ -1511,13 +1516,13 @@ components:
                   - metric
                   - metricValue
                   - funnelMetricValue
-              step:
-                type: number
-              dataType:
-                $ref: '#/components/schemas/DataType'
               name:
                 type: string
-              values:
+              isNullable:
+                type: boolean
+              dataType:
+                $ref: '#/components/schemas/DataType'
+              data:
                 oneOf:
                   - type: array
                     items:
@@ -1528,6 +1533,8 @@ components:
                   - type: array
                     items:
                       type: boolean
+              step:
+                type: number
               compareValues:
                 oneOf:
                   - type: array

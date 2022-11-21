@@ -30,8 +30,7 @@ use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
-use arrow::datatypes::DataType;
-use common::ScalarValue;
+use common::{DataType, ScalarValue};
 use common::DECIMAL_PRECISION;
 pub use context::Context;
 use convert_case::Case;
@@ -46,6 +45,7 @@ use serde::Serialize;
 use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
+
 pub struct PlatformProvider {
     pub events: Arc<dyn events::Provider>,
     pub custom_events: Arc<dyn custom_events::Provider>,
@@ -75,7 +75,7 @@ impl PlatformProvider {
             accounts: Arc::new(accounts::ProviderImpl::new(md.accounts.clone())),
             auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
             query: Arc::new(queries::ProviderImpl::new(query_prov)),
-            dashboards:Arc::new(stub::Dashboards{})
+            dashboards: Arc::new(stub::Dashboards {}),
         }
     }
 
@@ -103,19 +103,19 @@ macro_rules! arr_to_json_values {
 
 pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
     match arr.data_type() {
-        DataType::Int8 => arr_to_json_values!(arr, Int8Array),
-        DataType::Int16 => arr_to_json_values!(arr, Int16Array),
-        DataType::Int32 => arr_to_json_values!(arr, Int32Array),
-        DataType::Int64 => arr_to_json_values!(arr, Int64Array),
-        DataType::UInt8 => arr_to_json_values!(arr, UInt8Array),
-        DataType::UInt16 => arr_to_json_values!(arr, UInt16Array),
-        DataType::UInt32 => arr_to_json_values!(arr, UInt32Array),
-        DataType::UInt64 => arr_to_json_values!(arr, UInt64Array),
-        DataType::Float32 => arr_to_json_values!(arr, Float32Array),
-        DataType::Float64 => arr_to_json_values!(arr, Float64Array),
-        DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
-        DataType::Utf8 => arr_to_json_values!(arr, StringArray),
-        DataType::Decimal128(_, s) => {
+        arrow::datatypes::DataType::Int8 => arr_to_json_values!(arr, Int8Array),
+        arrow::datatypes::DataType::Int16 => arr_to_json_values!(arr, Int16Array),
+        arrow::datatypes::DataType::Int32 => arr_to_json_values!(arr, Int32Array),
+        arrow::datatypes::DataType::Int64 => arr_to_json_values!(arr, Int64Array),
+        arrow::datatypes::DataType::UInt8 => arr_to_json_values!(arr, UInt8Array),
+        arrow::datatypes::DataType::UInt16 => arr_to_json_values!(arr, UInt16Array),
+        arrow::datatypes::DataType::UInt32 => arr_to_json_values!(arr, UInt32Array),
+        arrow::datatypes::DataType::UInt64 => arr_to_json_values!(arr, UInt64Array),
+        arrow::datatypes::DataType::Float32 => arr_to_json_values!(arr, Float32Array),
+        arrow::datatypes::DataType::Float64 => arr_to_json_values!(arr, Float64Array),
+        arrow::datatypes::DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
+        arrow::datatypes::DataType::Utf8 => arr_to_json_values!(arr, StringArray),
+        arrow::datatypes::DataType::Decimal128(_, s) => {
             let arr = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
             arr.iter()
                 .map(|value| match value {
@@ -434,14 +434,26 @@ impl TryInto<EventFilter> for common::types::EventFilter {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ColumnType {
+    Dimension,
+    Metric,
+    MetricValue,
+    FunnelMetricValue,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Column {
+    #[serde(rename = "type")]
+    pub typ: ColumnType,
     pub name: String,
-    pub group: String,
     pub is_nullable: bool,
     pub data_type: DataType,
+    pub step: Option<usize>,
     pub data: Vec<Value>,
+    pub compare_values: Option<Vec<Value>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -462,14 +474,16 @@ impl TryFrom<query::DataTable> for DataTable {
     fn try_from(value: query::DataTable) -> std::result::Result<Self, Self::Error> {
         let cols = value
             .columns
-            .iter()
-            .map(|column| match array_ref_to_json_values(column.data()) {
+            .iter().cloned()
+            .map(|column| match array_ref_to_json_values(&column.data) {
                 Ok(data) => Ok(Column {
-                    name: column.name().to_string(),
-                    group: column.group().to_string(),
-                    is_nullable: column.is_nullable(),
-                    data_type: column.data_type().to_owned(),
+                    typ: ColumnType::Dimension,
+                    name: column.name,
+                    is_nullable: column.is_nullable,
+                    data_type: column.data_type.try_into()?,
                     data,
+                    step: None,
+                    compare_values: None
                 }),
                 Err(err) => Err(err),
             })

@@ -25,7 +25,7 @@ use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values;
 use crate::queries::property_values::PropertyValues;
-use crate::Column;
+use crate::{Column, ColumnType};
 use crate::Context;
 use crate::DataTable;
 use crate::Provider;
@@ -93,20 +93,20 @@ impl Provider for ProviderImpl {
             .iter()
             .enumerate()
             .map(|(idx, field)| {
-                let group = match metric_cols.contains(field.name()) {
-                    true => "metricValue",
+                let typ = match metric_cols.contains(field.name()) {
+                    true => ColumnType::MetricValue,
                     false => {
                         if field.name() == COL_AGG_NAME {
-                            "metric"
+                            ColumnType::Metric
                         } else {
-                            "dimension"
+                            ColumnType::Dimension
                         }
                     }
                 };
 
                 Column {
                     name: field.name().to_owned(),
-                    group: group.to_string(),
+                    typ,
                     is_nullable: field.is_nullable(),
                     data_type: field.data_type().to_owned(),
                     data: result.column(idx).to_owned(),

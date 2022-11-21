@@ -1,10 +1,59 @@
 import {describe, expect, test} from 'vitest'
-// import {DashboardsApi} from '../../packages/api'
-import {AxiosResponse} from 'axios'
-import {Dashboard, DashboardsApi, DashboardsList200Response, ListResponseMetadataMeta} from '../../src/api2'
-import {config, testRequest} from './helpers'
-import {DashboardPanelTypeEnum,} from '../../packages/api/models'
+import {config, testRequest, testRequestWithVariants, InputMaker} from './helpers'
 import {stubs} from './stubs'
+import {
+    AnalysisCumulative, AnalysisCumulativeTypeEnum,
+    AnalysisLinear,
+    AnalysisLinearTypeEnum,
+    AnalysisLogarithmic,
+    AnalysisLogarithmicTypeEnum,
+    AnalysisRollingAverage, AnalysisRollingAverageTypeEnum,
+    BreakdownByProperty,
+    BreakdownByPropertyTypeEnum, DashboardPanelTypeEnum, DashboardsApi,
+    DidEventAggregateProperty,
+    DidEventAggregatePropertyTypeEnum, DidEventCount,
+    DidEventCountTypeEnum, DidEventHistoricalCount, DidEventHistoricalCountTypeEnum,
+    DidEventRelativeCount, DidEventRelativeCountTypeEnum,
+    EventChartType,
+    EventFilterByCohort, EventFilterByCohortTypeEnum, EventFilterByGroup, EventFilterByGroupTypeEnum,
+    EventFilterByProperty,
+    EventFilterByPropertyTypeEnum,
+    EventGroupedFilters,
+    EventGroupedFiltersGroupsConditionEnum, EventGroupedFiltersGroupsInnerFiltersConditionEnum,
+    EventRefEventTypeEnum,
+    EventSegmentation, ListResponseMetadataMeta,
+    PropertyFilterOperation,
+    PropertyRefPropertyTypeEnum,
+    QueryAggregate,
+    QueryAggregatePerGroup, QueryAggregateProperty,
+    QueryAggregatePropertyPerGroup,
+    QueryAggregatePropertyPerGroupTypeEnum, QueryAggregatePropertyTypeEnum, QueryApi,
+    QueryCountPerGroup,
+    QueryCountPerGroupTypeEnum,
+    QueryFormula,
+    QueryFormulaTypeEnum,
+    QuerySimple,
+    QuerySimpleTypeEnum,
+    SegmentConditionDidEvent,
+    SegmentConditionDidEventTypeEnum,
+    SegmentConditionHadPropertyValue,
+    SegmentConditionHadPropertyValueTypeEnum,
+    SegmentConditionHasPropertyValue,
+    SegmentConditionHasPropertyValueTypeEnum,
+    TimeAfterFirstUse,
+    TimeAfterFirstUseTypeEnum,
+    TimeBetween,
+    TimeBetweenTypeEnum,
+    TimeFrom,
+    TimeFromTypeEnum,
+    TimeLast,
+    TimeLastTypeEnum,
+    TimeUnit,
+    TimeWindowEach,
+    TimeWindowEachTypeEnum
+} from '../../src/api';
+import {AxiosError} from 'axios';
+
 /*
 describe('Unauthorized', () => {
     describe('Auth', () => {
@@ -32,29 +81,6 @@ describe('Unauthorized', () => {
     })
 })*/
 
-expect.extend({
-    async toBeApiResponse(received: Promise<any>, expected) {
-        return await received.then(
-            (r) => {
-                return {
-                    pass: JSON.stringify(r.data) === JSON.stringify(expected),
-                    message: () => 'error',
-                    actual: r.data,
-                    expected: expected
-                }
-            },
-            (err) => {
-                return {
-                    pass: false,
-                    message: () => 'error',
-                    actual: received,
-                    expected: expected
-                }
-            },
-        );
-    }
-})
-
 describe('Authorized', () => {
     describe('queries', () => {
         describe('Dashboards', () => {
@@ -67,71 +93,73 @@ describe('Authorized', () => {
             })
 
 
-            /* test('Create', async () => {
-                 await expect(testRequest(api.createDashboard({
-                     tags: ['d'],
-                     name: 'test',
-                     description: 'desc',
-                     rows: [
-                         {
-                             panels: [
-                                 {
-                                     span: 1,
-                                     type: DashboardPanelTypeEnum.Report,
-                                     reportId: 1
-                                 }
-                             ]
-                         }
-                     ]
-                 }, 1, 1))).resolves.toBe('ok');
-             })*/
-            /*
-                        test.concurrent('Get By Id', () => {
-                            expect(() => testRequest(api.getDashboard(1, 1,1))).not.toThrow()
-                        })
+            test('Create', async () => {
+                await expect(api.createDashboard(1, 1, {
+                    tags: ['d'],
+                    name: 'test',
+                    description: 'desc',
+                    rows: [
+                        {
+                            panels: [
+                                {
+                                    span: 1,
+                                    type: DashboardPanelTypeEnum.Report,
+                                    reportId: 1
+                                }
+                            ]
+                        }
+                    ]
+                })).toBeApiResponse(stubs.dashboard);
+            })
 
-                        test.concurrent('Update', () => {
-                            expect(() => testRequest(api.updateDashboard(<UpdateDashboardRequest>{
-                                tags: ['d'],
-                                name: 'test',
-                                description: 'desc',
-                                rows: [
-                                    <DashboardRow>{
-                                        panels: [
-                                            <DashboardPanel>{
-                                                span: 1,
-                                                type: DashboardPanelTypeEnum.Report,
-                                                reportId: 1
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }, 1, 1, 1))).not.toThrow()
-                        })
+            test('Get by id', async () => {
+                await expect(api.getDashboard(1, 1, 1)).toBeApiResponse(stubs.dashboard);
+            })
 
-                        test.concurrent('Get By Id', () => {
-                            expect(() => testRequest(api.deleteDashboard(1, 1,1))).not.toThrow()
-                        })*/
+            test('Update', async () => {
+                await expect(api.updateDashboard(1, 1, 1, {
+                    tags: ['d'],
+                    name: 'test',
+                    description: 'desc',
+                    rows: [
+                        {
+                            panels: [
+                                {
+                                    span: 1,
+                                    type: DashboardPanelTypeEnum.Report,
+                                    reportId: 1
+                                }
+                            ]
+                        }
+                    ]
+                })).toBeApiResponse(stubs.dashboard);
+            })
+
+            test('Delete', async () => {
+                await expect(api.deleteDashboard(1, 1, 1)).toBeApiResponse(stubs.dashboard);
+            })
         })
-        /*describe('Event Segmentation', () => {
+
+        describe('Event Segmentation', () => {
             const queryApi = new QueryApi(config({auth: true}))
 
             testRequestWithVariants(
-                async (req: any) => {
-                    await queryApi.eventSegmentationQuery(1, 1, req)
+                (req: any) => {
+                    return queryApi.eventSegmentationQuery(1, 1, req)
                 },
+                stubs.dataTable,
                 (im: InputMaker) => {
                     {
                         return <EventSegmentation>{
                             time: im.make(1, [
                                 <TimeBetween>{
                                     type: TimeBetweenTypeEnum.Between,
-                                    from: new Date(1),
-                                    to: new Date(1),
+                                    from: new Date(1).toISOString(),
+                                    to: new Date(1).toISOString(),
                                 },
                                 <TimeFrom>{
                                     type: TimeFromTypeEnum.From,
-                                    from: new Date(1),
+                                    from: new Date(1).toISOString(),
                                 },
                                 <TimeLast>{
                                     type: TimeLastTypeEnum.Last,
@@ -249,7 +277,7 @@ describe('Authorized', () => {
                                 groupsCondition: EventGroupedFiltersGroupsConditionEnum.And,
                                 groups: [
                                     {
-                                        filtersCondition: EventGroupedFiltersGroupsFiltersConditionEnum.And,
+                                        filtersCondition: EventGroupedFiltersGroupsInnerFiltersConditionEnum.And,
                                         filters: [
                                             <EventFilterByCohort>{
                                                 type: EventFilterByCohortTypeEnum.Cohort,
@@ -288,8 +316,8 @@ describe('Authorized', () => {
                                             operation: PropertyFilterOperation.Empty,
                                             time: <TimeBetween>{
                                                 type: TimeBetweenTypeEnum.Between,
-                                                from: new Date(1),
-                                                to: new Date(1),
+                                                from: new Date(1).toISOString(),
+                                                to: new Date(1).toISOString(),
                                             }
                                         },
                                         <SegmentConditionHadPropertyValue>{
@@ -419,6 +447,6 @@ describe('Authorized', () => {
                     }
                 },
             )
-        })*/
+        })
     })
 })

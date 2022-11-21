@@ -4,7 +4,7 @@ use common::rbac::ProjectRole;
 use common::rbac::Role;
 use common::types::DictionaryDataType;
 use common::DataType;
-use crate::{accounts, dashboards};
+use crate::{accounts, ColumnType, dashboards};
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
 use crate::accounts::UpdateAccountRequest;
@@ -419,11 +419,13 @@ impl queries::Provider for Queries {
         _req: EventSegmentation,
     ) -> Result<DataTable> {
         Ok(DataTable::new(vec![Column {
+            typ: ColumnType::Dimension,
             name: "name".to_string(),
-            group: "group".to_string(),
             is_nullable: true,
-            data_type: arrow::datatypes::DataType::Null,
-            data: vec![Value::from(1u8)],
+            data_type: DataType::Number,
+            data: vec![Value::from(1)],
+            step: Some(1),
+            compare_values: Some(vec![Value::from(2)]),
         }]))
     }
 

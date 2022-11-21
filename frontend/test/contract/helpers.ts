@@ -1,8 +1,8 @@
 import {expect, test} from 'vitest';
-import {Configuration} from '../../src/api2';
 import jwt from 'jsonwebtoken';
+import {Configuration} from '../../src/api';
+import {AxiosError} from 'axios';
 
-const AUTH_HEADER_KEY = 'authorization'
 const JWT_KEY = 'access_token_key'
 
 export const jwtToken = () => {
@@ -12,6 +12,35 @@ export const jwtToken = () => {
     }
     return jwt.sign(claims, JWT_KEY, {algorithm: 'HS512'})
 }
+
+expect.extend({
+    async toBeApiResponse(received: Promise<any>, expected, request) {
+        return await received.then(
+            (r) => {
+                console.log(JSON.stringify(r.data),JSON.stringify(expected))
+                return {
+                    pass: JSON.stringify(r.data) === JSON.stringify(expected),
+                    message: () => 'error',
+                    actual: r.data,
+                    expected: expected
+                }
+            },
+            (e: AxiosError) => {
+                const msg = [e.toString()]
+
+                msg.push('REQUEST', '=======', JSON.stringify(request), '')
+                if (e?.response?.data.error) {
+                    msg.push('RESPONSE', '========', JSON.stringify(e.response.data.error, null, 2))
+                }
+
+                return {
+                    pass: false,
+                    message: () => msg.join('\n'),
+                }
+            },
+        );
+    }
+})
 
 export class InputMaker {
     count = 0
@@ -50,18 +79,7 @@ export class InputMaker {
     }
 }
 
-export const testRequest = (resp: Promise<any>) => {
-    return resp
-        .then((r) => {
-            return new Promise((resolve, reject) => resolve(r))
-        })
-        .catch((e) => {
-            console.log(e, JSON.stringify(e.response.data.error, null, 2))
-            return new Promise((resolve, reject) => reject(JSON.stringify(e.response.data.error, null, 2)))
-        })
-}
-
-export const testRequestWithVariants = (reqFn: (body: any) => Promise<any>, vars: (im: InputMaker) => any) => {
+export const testRequestWithVariants = (reqFn: (body: any) => Promise<any>, resp:any, vars: (im: InputMaker) => any) => {
     const im = new InputMaker(vars)
     const reqs = []
     do {
@@ -69,21 +87,7 @@ export const testRequestWithVariants = (reqFn: (body: any) => Promise<any>, vars
     } while (!im.isDone())
 
     test.each(reqs)('request %#', async (req) => {
-        expect.assertions(1)
-        try {
-            await reqFn(req)
-            expect(true)
-        } catch (e) {
-            if (e.response?.data?.error) {
-                const err = {
-                    request: req,
-                    error: e.response.data.error
-                }
-                throw new Error(JSON.stringify(err))
-            } else {
-                throw new Error(e)
-            }
-        }
+        await expect(reqFn(req)).toBeApiResponse(resp,req);
     })
 }
 
