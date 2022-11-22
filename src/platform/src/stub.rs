@@ -233,8 +233,8 @@ impl Events {
             description: Some("description".to_string()),
             status: events::Status::Enabled,
             is_system: true,
-            properties: Some(vec![1]),
-            custom_properties: Some(vec![1]),
+            event_properties: Some(vec![1]),
+            user_properties: Some(vec![1]),
         }
     }
 }
@@ -279,7 +279,7 @@ impl events::Provider for Events {
     ) -> Result<ListResponse<Event>> {
         Ok(ListResponse {
             data: vec![Events::event()],
-            meta: ResponseMetadata { next: None },
+            meta: ResponseMetadata { next: Some("next".to_string()) },
         })
     }
 

@@ -147,7 +147,7 @@ paths:
               $ref: '#/components/schemas/CreateDashboardRequest'
       responses:
         201:
-          description: report
+          description: dashboard
           content:
             application/json:
               schema:

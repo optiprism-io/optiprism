@@ -20,8 +20,8 @@ fn assert(l: &Event, r: &Event) {
     assert_eq!(l.display_name, r.display_name);
     assert_eq!(l.description, r.description);
     assert_eq!(l.status, r.status);
-    assert_eq!(l.properties, r.properties);
-    assert_eq!(l.custom_properties, r.custom_properties);
+    assert_eq!(l.event_properties, r.event_properties);
+    assert_eq!(l.user_properties, r.user_properties);
 }
 
 #[tokio::test]
@@ -43,8 +43,8 @@ async fn test_events() -> anyhow::Result<()> {
         display_name: Some("dname".to_string()),
         description: Some("desc".to_string()),
         status: Status::Enabled,
-        properties: None,
-        custom_properties: None,
+        event_properties: None,
+        user_properties: None,
         is_system: false,
     };
 

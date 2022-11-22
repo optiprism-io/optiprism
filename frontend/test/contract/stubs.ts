@@ -20,13 +20,14 @@ import {
     TimeFromTypeEnum,
     TimeUnit,
     TokensResponse,
-    UpdateReportRequest
+    UpdateReportRequest,
+    Event, EventStatusEnum
 } from '../../src/api';
 
 export const stubs = {
     tokenResponse: <TokensResponse>{
         accessToken: 'access_token',
-        refreshToken:'refresh_token'
+        refreshToken: 'refresh_token'
     },
     dashboard: <Dashboard>{
         id: 1,
@@ -46,7 +47,7 @@ export const stubs = {
             }]
         }]
     },
-    report:<Report>{
+    report: <Report>{
         id: 1,
         createdAt: '1970-01-01T00:00:00Z',
         updatedAt: '1970-01-01T00:00:00Z',
@@ -73,6 +74,22 @@ export const stubs = {
             }]
 
         }
+    },
+    event: <Event>{
+        id: 1,
+        createdAt: '1970-01-01T00:00:00Z',
+        updatedAt: '1970-01-01T00:00:00Z',
+        createdBy: 1,
+        updatedBy: 1,
+        projectId: 1,
+        tags: ['tag'],
+        name: 'name',
+        displayName: 'display_name',
+        description: 'description',
+        status: EventStatusEnum.Enabled,
+        isSystem: true,
+        eventProperties: [1],
+        userProperties: [1],
     },
     dataTable: <DataTableResponse>{
         columns: [

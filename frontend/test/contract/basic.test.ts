@@ -37,7 +37,12 @@ import {
     EventGroupedFiltersGroupsInnerFiltersConditionEnum,
     EventRecordsListRequestTime,
     EventRefEventTypeEnum,
-    EventSegmentation, EventSegmentationEvent, EventSegmentationEventEventTypeEnum,
+    EventsApi,
+    EventSegmentation,
+    EventSegmentationEvent,
+    EventSegmentationEventEventTypeEnum,
+    EventsList200Response,
+    EventStatusEnum,
     ListResponseMetadataMeta,
     LoginRequest,
     PropertyFilterOperation,
@@ -76,7 +81,9 @@ import {
     TimeLastTypeEnum,
     TimeUnit,
     TimeWindowEach,
-    TimeWindowEachTypeEnum, UpdateReportRequest
+    TimeWindowEachTypeEnum,
+    UpdateEventRequest,
+    UpdateReportRequest
 } from '../../src/api';
 import {AxiosError} from 'axios';
 
@@ -233,6 +240,31 @@ describe('Authorized', () => {
             await expect(api.deleteReport(1, 1, 1)).toBeApiResponse(stubs.report);
         })
     })
+
+    describe('Events', () => {
+        const api = new EventsApi(config({auth: true}))
+
+        test('List events', async () => {
+            await expect(api.eventsList(1, 1)).toBeApiResponse(<EventsList200Response>{
+                data: [stubs.event],
+                meta: <ListResponseMetadataMeta>{next: 'next'}
+            })
+        })
+
+        test('Get event by id', async () => {
+            await expect(api.getEvent(1, 1, 1)).toBeApiResponse(stubs.event);
+        })
+
+        test('Update event', async () => {
+            await expect(api.updateEvent(1, 1, 1, <UpdateEventRequest>{
+                tags: ['tag'],
+                displayName: 'display_name',
+                description: 'description',
+                status: EventStatusEnum.Disabled,
+            })).toBeApiResponse(stubs.event);
+        })
+    })
+
     describe('queries', () => {
         describe('Event Segmentation', () => {
             const queryApi = new QueryApi(config({auth: true}))

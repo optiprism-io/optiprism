@@ -115,8 +115,8 @@ pub struct Event {
     pub description: Option<String>,
     pub status: Status,
     pub is_system: bool,
-    pub properties: Option<Vec<u64>>,
-    pub custom_properties: Option<Vec<u64>>,
+    pub event_properties: Option<Vec<u64>>,
+    pub user_properties: Option<Vec<u64>>,
 }
 
 impl TryInto<metadata::events::Event> for Event {
@@ -136,8 +136,8 @@ impl TryInto<metadata::events::Event> for Event {
             description: self.description,
             status: self.status.into(),
             is_system: self.is_system,
-            properties: self.properties,
-            custom_properties: self.custom_properties,
+            properties: self.event_properties,
+            custom_properties: self.user_properties,
         })
     }
 }
@@ -159,8 +159,8 @@ impl TryInto<Event> for metadata::events::Event {
             description: self.description,
             status: self.status.into(),
             is_system: self.is_system,
-            properties: self.properties,
-            custom_properties: self.custom_properties,
+            event_properties: self.properties,
+            user_properties: self.custom_properties,
         })
     }
 }
