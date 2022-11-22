@@ -38,7 +38,7 @@ pub trait Provider: Sync + Send {
     ) -> Result<property_values::ListResponse>;
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum QueryTime {
     Between {
@@ -89,7 +89,7 @@ pub enum SegmentTime {
     },
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum TimeIntervalUnit {
     Second,

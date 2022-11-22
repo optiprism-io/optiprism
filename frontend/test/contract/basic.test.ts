@@ -2,44 +2,70 @@ import {describe, expect, test} from 'vitest'
 import {config, testRequest, testRequestWithVariants, InputMaker} from './helpers'
 import {stubs} from './stubs'
 import {
-    AnalysisCumulative, AnalysisCumulativeTypeEnum,
+    AnalysisCumulative,
+    AnalysisCumulativeTypeEnum,
     AnalysisLinear,
     AnalysisLinearTypeEnum,
     AnalysisLogarithmic,
     AnalysisLogarithmicTypeEnum,
-    AnalysisRollingAverage, AnalysisRollingAverageTypeEnum,
+    AnalysisRollingAverage,
+    AnalysisRollingAverageTypeEnum,
+    AuthApi,
     BreakdownByProperty,
-    BreakdownByPropertyTypeEnum, DashboardPanelTypeEnum, DashboardsApi,
+    BreakdownByPropertyTypeEnum,
+    CreateReportRequest,
+    DashboardPanelTypeEnum,
+    DashboardsApi,
+    DashboardsList200Response,
     DidEventAggregateProperty,
-    DidEventAggregatePropertyTypeEnum, DidEventCount,
-    DidEventCountTypeEnum, DidEventHistoricalCount, DidEventHistoricalCountTypeEnum,
-    DidEventRelativeCount, DidEventRelativeCountTypeEnum,
+    DidEventAggregatePropertyTypeEnum,
+    DidEventCount,
+    DidEventCountTypeEnum,
+    DidEventHistoricalCount,
+    DidEventHistoricalCountTypeEnum,
+    DidEventRelativeCount,
+    DidEventRelativeCountTypeEnum,
     EventChartType,
-    EventFilterByCohort, EventFilterByCohortTypeEnum, EventFilterByGroup, EventFilterByGroupTypeEnum,
+    EventFilterByCohort,
+    EventFilterByCohortTypeEnum,
+    EventFilterByGroup,
+    EventFilterByGroupTypeEnum,
     EventFilterByProperty,
     EventFilterByPropertyTypeEnum,
     EventGroupedFilters,
-    EventGroupedFiltersGroupsConditionEnum, EventGroupedFiltersGroupsInnerFiltersConditionEnum,
+    EventGroupedFiltersGroupsConditionEnum,
+    EventGroupedFiltersGroupsInnerFiltersConditionEnum,
+    EventRecordsListRequestTime,
     EventRefEventTypeEnum,
-    EventSegmentation, ListResponseMetadataMeta,
+    EventSegmentation, EventSegmentationEvent, EventSegmentationEventEventTypeEnum,
+    ListResponseMetadataMeta,
+    LoginRequest,
     PropertyFilterOperation,
     PropertyRefPropertyTypeEnum,
     QueryAggregate,
-    QueryAggregatePerGroup, QueryAggregateProperty,
+    QueryAggregatePerGroup,
+    QueryAggregateProperty,
     QueryAggregatePropertyPerGroup,
-    QueryAggregatePropertyPerGroupTypeEnum, QueryAggregatePropertyTypeEnum, QueryApi,
+    QueryAggregatePropertyPerGroupTypeEnum,
+    QueryAggregatePropertyTypeEnum,
+    QueryApi,
     QueryCountPerGroup,
     QueryCountPerGroupTypeEnum,
     QueryFormula,
     QueryFormulaTypeEnum,
     QuerySimple,
     QuerySimpleTypeEnum,
+    RefreshTokenRequest,
+    ReportsApi,
+    ReportsList200Response,
+    ReportType,
     SegmentConditionDidEvent,
     SegmentConditionDidEventTypeEnum,
     SegmentConditionHadPropertyValue,
     SegmentConditionHadPropertyValueTypeEnum,
     SegmentConditionHasPropertyValue,
     SegmentConditionHasPropertyValueTypeEnum,
+    SignupRequest,
     TimeAfterFirstUse,
     TimeAfterFirstUseTypeEnum,
     TimeBetween,
@@ -50,96 +76,164 @@ import {
     TimeLastTypeEnum,
     TimeUnit,
     TimeWindowEach,
-    TimeWindowEachTypeEnum
+    TimeWindowEachTypeEnum, UpdateReportRequest
 } from '../../src/api';
 import {AxiosError} from 'axios';
 
-/*
 describe('Unauthorized', () => {
     describe('Auth', () => {
         const authApi = new AuthApi(config());
 
-        test.concurrent('Login', () => {
-            expect(() => testRequest(authApi.basicLogin(<LoginRequest>{
+        test('Login', async () => {
+            await expect(authApi.basicLogin(<LoginRequest>{
                 email: 'email',
                 password: 'password'
-            }))).not.toThrow()
+            })).toBeApiResponse(stubs.tokenResponse)
         })
-        test.concurrent('Signup', () => {
-            expect(() => testRequest(authApi.basicSignup(<SignupRequest>{
+        test('Signup', async () => {
+            await expect(authApi.basicSignup(<SignupRequest>{
                 email: 'email',
                 password: 'password',
                 passwordRepeat: 'password',
                 firstName: 'first name',
                 lastName: 'last name'
-            }))).not.toThrow()
+            })).toBeApiResponse(stubs.tokenResponse)
         })
 
-        test.concurrent('Refresh Token', () => {
-            expect(() => testRequest(authApi.refreshToken(<RefreshTokenRequest>{refreshToken: 'refresh_token'}))).not.toThrow()
+        test('Refresh Token', async () => {
+            await expect(authApi.refreshToken(<RefreshTokenRequest>{refreshToken: 'refresh_token'})).toBeApiResponse(stubs.tokenResponse)
         })
     })
-})*/
+})
 
 describe('Authorized', () => {
-    describe('queries', () => {
-        describe('Dashboards', () => {
-            const api = new DashboardsApi(config({auth: true}))
-            test('List', async () => {
-                await expect(api.dashboardsList(1, 1)).toBeApiResponse(<DashboardsList200Response>{
-                    data: [stubs.dashboard],
-                    meta: <ListResponseMetadataMeta>{next: 'next'}
-                })
-            })
+    describe('Dashboards', () => {
+        const api = new DashboardsApi(config({auth: true}))
 
-
-            test('Create', async () => {
-                await expect(api.createDashboard(1, 1, {
-                    tags: ['d'],
-                    name: 'test',
-                    description: 'desc',
-                    rows: [
-                        {
-                            panels: [
-                                {
-                                    span: 1,
-                                    type: DashboardPanelTypeEnum.Report,
-                                    reportId: 1
-                                }
-                            ]
-                        }
-                    ]
-                })).toBeApiResponse(stubs.dashboard);
-            })
-
-            test('Get by id', async () => {
-                await expect(api.getDashboard(1, 1, 1)).toBeApiResponse(stubs.dashboard);
-            })
-
-            test('Update', async () => {
-                await expect(api.updateDashboard(1, 1, 1, {
-                    tags: ['d'],
-                    name: 'test',
-                    description: 'desc',
-                    rows: [
-                        {
-                            panels: [
-                                {
-                                    span: 1,
-                                    type: DashboardPanelTypeEnum.Report,
-                                    reportId: 1
-                                }
-                            ]
-                        }
-                    ]
-                })).toBeApiResponse(stubs.dashboard);
-            })
-
-            test('Delete', async () => {
-                await expect(api.deleteDashboard(1, 1, 1)).toBeApiResponse(stubs.dashboard);
+        test('List dashboards', async () => {
+            await expect(api.dashboardsList(1, 1)).toBeApiResponse(<DashboardsList200Response>{
+                data: [stubs.dashboard],
+                meta: <ListResponseMetadataMeta>{next: 'next'}
             })
         })
 
+
+        test('Create dashboard', async () => {
+            await expect(api.createDashboard(1, 1, {
+                tags: ['d'],
+                name: 'test',
+                description: 'desc',
+                rows: [
+                    {
+                        panels: [
+                            {
+                                span: 1,
+                                type: DashboardPanelTypeEnum.Report,
+                                reportId: 1
+                            }
+                        ]
+                    }
+                ]
+            })).toBeApiResponse(stubs.dashboard);
+        })
+
+        test('Get dashboard by id', async () => {
+            await expect(api.getDashboard(1, 1, 1)).toBeApiResponse(stubs.dashboard);
+        })
+
+        test('Update dashboard', async () => {
+            await expect(api.updateDashboard(1, 1, 1, {
+                tags: ['d'],
+                name: 'test',
+                description: 'desc',
+                rows: [
+                    {
+                        panels: [
+                            {
+                                span: 1,
+                                type: DashboardPanelTypeEnum.Report,
+                                reportId: 1
+                            }
+                        ]
+                    }
+                ]
+            })).toBeApiResponse(stubs.dashboard);
+        })
+
+        test('Delete dashboard', async () => {
+            await expect(api.deleteDashboard(1, 1, 1)).toBeApiResponse(stubs.dashboard);
+        })
+    })
+
+    describe('Reports', () => {
+        const api = new ReportsApi(config({auth: true}))
+
+        test('List reports', async () => {
+            await expect(api.reportsList(1, 1)).toBeApiResponse(<ReportsList200Response>{
+                data: [stubs.report],
+                meta: <ListResponseMetadataMeta>{next: 'next'}
+            })
+        })
+
+        test('Create report', async () => {
+            await expect(api.createReport(1, 1, <CreateReportRequest>{
+                tags: ['tag'],
+                name: 'name',
+                description: 'description',
+                type: ReportType.EventSegmentation,
+                query: <EventSegmentation>{
+                    time: <TimeFrom>{
+                        type: TimeFromTypeEnum.From,
+                        from: new Date(1).toISOString(),
+                    },
+                    group: 'group',
+                    intervalUnit: TimeUnit.Second,
+                    chartType: EventChartType.Line,
+                    analysis: <AnalysisLinear>{type: AnalysisLinearTypeEnum.Linear},
+                    events: [<EventSegmentationEvent>{
+                        eventType: EventSegmentationEventEventTypeEnum.Regular,
+                        eventName: 'event',
+                        queries: [<QuerySimple>{type: QuerySimpleTypeEnum.CountEvents}]
+                    }]
+
+                }
+            })).toBeApiResponse(stubs.report);
+        })
+
+        test('Get report by id', async () => {
+            await expect(api.getReport(1, 1, 1)).toBeApiResponse(stubs.report);
+        })
+
+        test('Update report', async () => {
+            await expect(api.updateReport(1, 1, 1, <UpdateReportRequest>{
+                tags: ['tag'],
+                name: 'name',
+                description: 'description',
+                type: ReportType.EventSegmentation,
+                query: <EventSegmentation>{
+                    time: <TimeFrom>{
+                        type: TimeFromTypeEnum.From,
+                        from: new Date(1).toISOString(),
+                    },
+                    group: 'group',
+                    intervalUnit: TimeUnit.Day,
+                    chartType: EventChartType.Bar,
+                    analysis: <AnalysisCumulative>{type: AnalysisCumulativeTypeEnum.Cumulative},
+                    events: [<EventSegmentationEvent>{
+                        eventType: EventSegmentationEventEventTypeEnum.Regular,
+                        eventName: 'event',
+                        queries: [<QuerySimple>{type: QuerySimpleTypeEnum.CountEvents}]
+                    }]
+
+                }
+            })).toBeApiResponse(stubs.report);
+        })
+
+        test('Delete report', async () => {
+            await expect(api.deleteReport(1, 1, 1)).toBeApiResponse(stubs.report);
+        })
+    })
+    describe('queries', () => {
         describe('Event Segmentation', () => {
             const queryApi = new QueryApi(config({auth: true}))
 

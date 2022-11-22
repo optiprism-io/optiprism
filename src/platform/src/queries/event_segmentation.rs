@@ -15,7 +15,7 @@ use crate::EventRef;
 use crate::PlatformError;
 use crate::PropertyRef;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum SegmentTime {
     Between {
@@ -60,7 +60,7 @@ impl TryInto<query_es_types::SegmentTime> for SegmentTime {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ChartType {
     Line,
@@ -78,7 +78,7 @@ impl TryInto<query_es_types::ChartType> for ChartType {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Analysis {
     Linear,
@@ -106,7 +106,7 @@ impl TryInto<query_es_types::Analysis> for Analysis {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Compare {
     pub offset: usize,
@@ -124,7 +124,7 @@ impl TryInto<query_es_types::Compare> for Compare {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum QueryAggregate {
     Min,
@@ -158,7 +158,7 @@ impl TryInto<query_es_types::QueryAggregate> for QueryAggregate {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum QueryAggregatePerGroup {
     Min,
@@ -186,7 +186,7 @@ impl TryInto<query_es_types::QueryAggregatePerGroup> for QueryAggregatePerGroup 
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum QueryPerGroup {
     CountEvents,
@@ -202,7 +202,7 @@ impl TryInto<query_es_types::QueryPerGroup> for QueryPerGroup {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Query {
     CountEvents,
@@ -267,7 +267,7 @@ impl TryInto<query_es_types::Query> for &Query {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Breakdown {
     Property {
@@ -295,7 +295,7 @@ pub enum EventType {
     Custom,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
     #[serde(flatten)]
@@ -344,7 +344,7 @@ impl TryInto<query_es_types::Event> for &Event {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum DidEventAggregate {
     Count {
@@ -374,7 +374,7 @@ pub enum DidEventAggregate {
     },
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum SegmentCondition {
     #[serde(rename_all = "camelCase")]
@@ -401,14 +401,14 @@ pub enum SegmentCondition {
     },
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Segment {
     name: String,
     conditions: Vec<SegmentCondition>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EventSegmentation {
     pub time: QueryTime,

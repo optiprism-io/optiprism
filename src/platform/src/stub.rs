@@ -4,7 +4,7 @@ use common::rbac::ProjectRole;
 use common::rbac::Role;
 use common::types::DictionaryDataType;
 use common::DataType;
-use crate::{accounts, ColumnType, dashboards};
+use crate::{accounts, ColumnType, dashboards, reports};
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
 use crate::accounts::UpdateAccountRequest;
@@ -24,7 +24,7 @@ use crate::properties;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::queries;
-use crate::queries::event_segmentation::EventSegmentation;
+use crate::queries::event_segmentation::{Analysis, ChartType, EventSegmentation, Query};
 use crate::queries::property_values::PropertyValues;
 use crate::Column;
 use crate::Context;
@@ -42,6 +42,8 @@ use chrono::NaiveDateTime;
 use chrono::DateTime;
 use chrono::Duration;
 use axum::async_trait;
+use crate::queries::{event_segmentation, QueryTime, TimeIntervalUnit};
+use crate::reports::{CreateReportRequest, Report, UpdateReportRequest};
 use crate::Result;
 
 lazy_static! {
@@ -409,6 +411,30 @@ impl properties::Provider for Properties {
 
 pub struct Queries {}
 
+impl Queries {
+    pub fn event_segmentation() -> EventSegmentation {
+        EventSegmentation {
+            time: QueryTime::From { from: *DATE_TIME },
+            group: "group".to_string(),
+            interval_unit: TimeIntervalUnit::Second,
+            chart_type: ChartType::Line,
+            analysis: Analysis::Linear,
+            compare: None,
+            events: vec![
+                event_segmentation::Event {
+                    event: EventRef::Regular { event_name: "event".to_string() },
+                    filters: None,
+                    breakdowns: None,
+                    queries: vec![Query::CountEvents],
+                }
+            ],
+            filters: None,
+            breakdowns: None,
+            segments: None,
+        }
+    }
+}
+
 #[async_trait]
 impl queries::Provider for Queries {
     async fn event_segmentation(
@@ -522,5 +548,81 @@ impl dashboards::Provider for Dashboards {
         _id: u64,
     ) -> Result<Dashboard> {
         Ok(Dashboards::dashboard())
+    }
+}
+
+pub struct Reports {}
+
+impl Reports {
+    pub fn entity() -> Report {
+        Report {
+            id: 1,
+            created_at: *DATE_TIME,
+            updated_at: Some(*DATE_TIME),
+            created_by: 1,
+            updated_by: Some(1),
+            project_id: 1,
+            tags: Some(vec!["tag".to_string()]),
+            name: "name".to_string(),
+            description: Some("description".to_string()),
+            typ: reports::Type::EventSegmentation,
+            query: reports::Query::EventSegmentation(Queries::event_segmentation()),
+        }
+    }
+}
+
+#[async_trait]
+impl reports::Provider for Reports {
+    async fn create(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _request: CreateReportRequest,
+    ) -> Result<Report> {
+        Ok(Reports::entity())
+    }
+
+    async fn get_by_id(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
+    ) -> Result<Report> {
+        Ok(Reports::entity())
+    }
+
+    async fn list(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+    ) -> Result<ListResponse<Report>> {
+        Ok(ListResponse {
+            data: vec![Reports::entity()],
+            meta: ResponseMetadata { next: Some("next".to_string()) },
+        })
+    }
+
+    async fn update(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _event_id: u64,
+        _req: UpdateReportRequest,
+    ) -> Result<Report> {
+        Ok(Reports::entity())
+    }
+
+    async fn delete(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
+    ) -> Result<Report> {
+        Ok(Reports::entity())
     }
 }

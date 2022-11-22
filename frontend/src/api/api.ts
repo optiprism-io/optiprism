@@ -370,147 +370,17 @@ export interface CreateReportRequest {
     'description'?: string;
     /**
      * 
-     * @type {CreateReportRequestReport}
+     * @type {ReportType}
      * @memberof CreateReportRequest
      */
-    'report': CreateReportRequestReport;
+    'type': ReportType;
+    /**
+     * 
+     * @type {ReportQuery}
+     * @memberof CreateReportRequest
+     */
+    'query'?: ReportQuery;
 }
-/**
- * 
- * @export
- * @interface CreateReportRequestReport
- */
-export interface CreateReportRequestReport {
-    /**
-     * 
-     * @type {string}
-     * @memberof CreateReportRequestReport
-     */
-    'type': CreateReportRequestReportTypeEnum;
-    /**
-     * 
-     * @type {EventRecordsListRequestTime}
-     * @memberof CreateReportRequestReport
-     */
-    'time': EventRecordsListRequestTime;
-    /**
-     * group that is used in aggregations by group. For instance, group by user or group by organizartion.
-     * @type {string}
-     * @memberof CreateReportRequestReport
-     */
-    'group': string;
-    /**
-     * 
-     * @type {TimeUnit}
-     * @memberof CreateReportRequestReport
-     */
-    'intervalUnit': TimeUnit;
-    /**
-     * 
-     * @type {FunnelQueryChartType}
-     * @memberof CreateReportRequestReport
-     */
-    'chartType': FunnelQueryChartType;
-    /**
-     * 
-     * @type {EventSegmentationAnalysis}
-     * @memberof CreateReportRequestReport
-     */
-    'analysis': EventSegmentationAnalysis;
-    /**
-     * 
-     * @type {EventSegmentationCompare}
-     * @memberof CreateReportRequestReport
-     */
-    'compare'?: EventSegmentationCompare;
-    /**
-     * array of events to query
-     * @type {Array<EventSegmentationEvent>}
-     * @memberof CreateReportRequestReport
-     */
-    'events': Array<EventSegmentationEvent>;
-    /**
-     * 
-     * @type {EventGroupedFilters}
-     * @memberof CreateReportRequestReport
-     */
-    'filters'?: EventGroupedFilters;
-    /**
-     * array of breakdowns
-     * @type {Array<BreakdownByProperty>}
-     * @memberof CreateReportRequestReport
-     */
-    'breakdowns'?: Array<BreakdownByProperty>;
-    /**
-     * array of segments
-     * @type {Array<EventSegmentationSegment>}
-     * @memberof CreateReportRequestReport
-     */
-    'segments'?: Array<EventSegmentationSegment>;
-    /**
-     * 
-     * @type {Array<FunnelQueryStepsInner>}
-     * @memberof CreateReportRequestReport
-     */
-    'steps': Array<FunnelQueryStepsInner>;
-    /**
-     * 
-     * @type {FunnelQueryTimeWindow}
-     * @memberof CreateReportRequestReport
-     */
-    'timeWindow': FunnelQueryTimeWindow;
-    /**
-     * 
-     * @type {string}
-     * @memberof CreateReportRequestReport
-     */
-    'count': CreateReportRequestReportCountEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof CreateReportRequestReport
-     */
-    'stepOrder': CreateReportRequestReportStepOrderEnum;
-    /**
-     * 
-     * @type {FunnelQueryAttribution}
-     * @memberof CreateReportRequestReport
-     */
-    'attribution'?: FunnelQueryAttribution;
-    /**
-     * 
-     * @type {Array<PropertyRef>}
-     * @memberof CreateReportRequestReport
-     */
-    'holdingConstants'?: Array<PropertyRef>;
-    /**
-     * 
-     * @type {Array<FunnelQueryExcludeInner>}
-     * @memberof CreateReportRequestReport
-     */
-    'exclude'?: Array<FunnelQueryExcludeInner>;
-}
-
-export const CreateReportRequestReportTypeEnum = {
-    EventSegmentation: 'eventSegmentation',
-    Funnel: 'funnel'
-} as const;
-
-export type CreateReportRequestReportTypeEnum = typeof CreateReportRequestReportTypeEnum[keyof typeof CreateReportRequestReportTypeEnum];
-export const CreateReportRequestReportCountEnum = {
-    Uniques: 'uniques',
-    Totals: 'totals'
-} as const;
-
-export type CreateReportRequestReportCountEnum = typeof CreateReportRequestReportCountEnum[keyof typeof CreateReportRequestReportCountEnum];
-export const CreateReportRequestReportStepOrderEnum = {
-    Any: 'any',
-    ExactSequence: 'exactSequence',
-    ExactOrder: 'exactOrder'
-} as const;
-
-export type CreateReportRequestReportStepOrderEnum = typeof CreateReportRequestReportStepOrderEnum[keyof typeof CreateReportRequestReportStepOrderEnum];
-
 /**
  * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties. 
  * @export
@@ -1052,16 +922,16 @@ export interface DataTableResponseColumnsInner {
     'data': ListPropertyValuesResponseData;
     /**
      * 
-     * @type {ListPropertyValuesResponseData}
-     * @memberof DataTableResponseColumnsInner
-     */
-    'compareValues'?: ListPropertyValuesResponseData;
-    /**
-     * 
      * @type {number}
      * @memberof DataTableResponseColumnsInner
      */
     'step'?: number;
+    /**
+     * 
+     * @type {ListPropertyValuesResponseData}
+     * @memberof DataTableResponseColumnsInner
+     */
+    'compareValues'?: ListPropertyValuesResponseData;
 }
 
 export const DataTableResponseColumnsInnerTypeEnum = {
@@ -3893,173 +3763,36 @@ export interface Report {
     'description'?: string;
     /**
      * 
-     * @type {ReportReport}
+     * @type {ReportType}
      * @memberof Report
      */
-    'report'?: ReportReport;
+    'type'?: ReportType;
+    /**
+     * 
+     * @type {ReportQuery}
+     * @memberof Report
+     */
+    'query'?: ReportQuery;
 }
 /**
- * 
+ * @type ReportQuery
  * @export
- * @interface ReportReport
  */
-export interface ReportReport {
-    /**
-     * 
-     * @type {string}
-     * @memberof ReportReport
-     */
-    'type'?: ReportReportTypeEnum;
-    /**
-     * 
-     * @type {EventRecordsListRequestTime}
-     * @memberof ReportReport
-     */
-    'time': EventRecordsListRequestTime;
-    /**
-     * group that is used in aggregations by group. For instance, group by user or group by organizartion.
-     * @type {string}
-     * @memberof ReportReport
-     */
-    'group': string;
-    /**
-     * 
-     * @type {TimeUnit}
-     * @memberof ReportReport
-     */
-    'intervalUnit': TimeUnit;
-    /**
-     * 
-     * @type {FunnelQueryChartType}
-     * @memberof ReportReport
-     */
-    'chartType': FunnelQueryChartType;
-    /**
-     * 
-     * @type {EventSegmentationAnalysis}
-     * @memberof ReportReport
-     */
-    'analysis': EventSegmentationAnalysis;
-    /**
-     * 
-     * @type {EventSegmentationCompare}
-     * @memberof ReportReport
-     */
-    'compare'?: EventSegmentationCompare;
-    /**
-     * array of events to query
-     * @type {Array<EventSegmentationEvent>}
-     * @memberof ReportReport
-     */
-    'events': Array<EventSegmentationEvent>;
-    /**
-     * 
-     * @type {EventGroupedFilters}
-     * @memberof ReportReport
-     */
-    'filters'?: EventGroupedFilters;
-    /**
-     * array of breakdowns
-     * @type {Array<BreakdownByProperty>}
-     * @memberof ReportReport
-     */
-    'breakdowns'?: Array<BreakdownByProperty>;
-    /**
-     * array of segments
-     * @type {Array<EventSegmentationSegment>}
-     * @memberof ReportReport
-     */
-    'segments'?: Array<EventSegmentationSegment>;
-    /**
-     * 
-     * @type {Array<FunnelQueryStepsInner>}
-     * @memberof ReportReport
-     */
-    'steps': Array<FunnelQueryStepsInner>;
-    /**
-     * 
-     * @type {FunnelQueryTimeWindow}
-     * @memberof ReportReport
-     */
-    'timeWindow': FunnelQueryTimeWindow;
-    /**
-     * 
-     * @type {string}
-     * @memberof ReportReport
-     */
-    'count': ReportReportCountEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof ReportReport
-     */
-    'stepOrder': ReportReportStepOrderEnum;
-    /**
-     * 
-     * @type {FunnelQueryAttribution}
-     * @memberof ReportReport
-     */
-    'attribution'?: FunnelQueryAttribution;
-    /**
-     * 
-     * @type {Array<PropertyRef>}
-     * @memberof ReportReport
-     */
-    'holdingConstants'?: Array<PropertyRef>;
-    /**
-     * 
-     * @type {Array<FunnelQueryExcludeInner>}
-     * @memberof ReportReport
-     */
-    'exclude'?: Array<FunnelQueryExcludeInner>;
-}
+export type ReportQuery = EventSegmentation | FunnelQuery;
 
-export const ReportReportTypeEnum = {
+/**
+ * report type
+ * @export
+ * @enum {string}
+ */
+
+export const ReportType = {
     EventSegmentation: 'eventSegmentation',
     Funnel: 'funnel'
 } as const;
 
-export type ReportReportTypeEnum = typeof ReportReportTypeEnum[keyof typeof ReportReportTypeEnum];
-export const ReportReportCountEnum = {
-    Uniques: 'uniques',
-    Totals: 'totals'
-} as const;
+export type ReportType = typeof ReportType[keyof typeof ReportType];
 
-export type ReportReportCountEnum = typeof ReportReportCountEnum[keyof typeof ReportReportCountEnum];
-export const ReportReportStepOrderEnum = {
-    Any: 'any',
-    ExactSequence: 'exactSequence',
-    ExactOrder: 'exactOrder'
-} as const;
-
-export type ReportReportStepOrderEnum = typeof ReportReportStepOrderEnum[keyof typeof ReportReportStepOrderEnum];
-
-/**
- * 
- * @export
- * @interface ReportReportAllOf
- */
-export interface ReportReportAllOf {
-    /**
-     * 
-     * @type {string}
-     * @memberof ReportReportAllOf
-     */
-    'type'?: ReportReportAllOfTypeEnum;
-}
-
-export const ReportReportAllOfTypeEnum = {
-    EventSegmentation: 'eventSegmentation',
-    Funnel: 'funnel'
-} as const;
-
-export type ReportReportAllOfTypeEnum = typeof ReportReportAllOfTypeEnum[keyof typeof ReportReportAllOfTypeEnum];
-
-/**
- * @type ReportReportAllOf1
- * @export
- */
-export type ReportReportAllOf1 = EventSegmentation | FunnelQuery;
 
 /**
  * 
@@ -4796,10 +4529,16 @@ export interface UpdateReportRequest {
     'description'?: string;
     /**
      * 
-     * @type {CreateReportRequestReport}
+     * @type {ReportType}
      * @memberof UpdateReportRequest
      */
-    'report'?: CreateReportRequestReport;
+    'type'?: ReportType;
+    /**
+     * 
+     * @type {ReportQuery}
+     * @memberof UpdateReportRequest
+     */
+    'query'?: ReportQuery;
 }
 /**
  * 

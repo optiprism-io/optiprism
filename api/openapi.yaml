@@ -1863,6 +1863,7 @@ components:
                       $ref: '#/components/schemas/Report'
     Report:
       type: object
+      required: [ 'id','name','type','query' ]
       properties:
         id:
           type: integer
@@ -1894,23 +1895,15 @@ components:
         description:
           type: string
           description: description
-        report:
-          type: object
-          allOf:
-            - type: object
-              properties:
-                type:
-                  type: string
-                  enum:
-                    - eventSegmentation
-                    - funnel
-            - type: object
-              oneOf:
-                - $ref: '#/components/schemas/EventSegmentation'
-                - $ref: '#/components/schemas/FunnelQuery'
+        type:
+          $ref: '#/components/schemas/ReportType'
+        query:
+          oneOf:
+            - $ref: '#/components/schemas/EventSegmentation'
+            - $ref: '#/components/schemas/FunnelQuery'
     CreateReportRequest:
       type: object
-      required: [ 'name','report' ]
+      required: [ 'name', 'type', 'query' ]
       properties:
         tags:
           type: array
@@ -1922,21 +1915,12 @@ components:
         description:
           type: string
           description: description
-        report:
-          type: object
-          required: [ 'type' ]
-          allOf:
-            - type: object
-              properties:
-                type:
-                  type: string
-                  enum:
-                    - eventSegmentation
-                    - funnel
-            - type: object
-              oneOf:
-                - $ref: '#/components/schemas/EventSegmentation'
-                - $ref: '#/components/schemas/FunnelQuery'
+        type:
+          $ref: '#/components/schemas/ReportType'
+        query:
+          oneOf:
+            - $ref: '#/components/schemas/EventSegmentation'
+            - $ref: '#/components/schemas/FunnelQuery'
     UpdateReportRequest:
       type: object
       properties:
@@ -1950,21 +1934,12 @@ components:
         description:
           type: string
           description: description
-        report:
-          type: object
-          required: [ 'type' ]
-          allOf:
-            - type: object
-              properties:
-                type:
-                  type: string
-                  enum:
-                    - eventSegmentation
-                    - funnel
-            - type: object
-              oneOf:
-                - $ref: '#/components/schemas/EventSegmentation'
-                - $ref: '#/components/schemas/FunnelQuery'
+        type:
+          $ref: '#/components/schemas/ReportType'
+        query:
+          oneOf:
+            - $ref: '#/components/schemas/EventSegmentation'
+            - $ref: '#/components/schemas/FunnelQuery'
     Event:
       type: object
       description: |
@@ -3552,3 +3527,9 @@ components:
         - string
         - number
         - boolean
+    ReportType:
+      type: string
+      description: report type
+      enum:
+        - eventSegmentation
+        - funnel

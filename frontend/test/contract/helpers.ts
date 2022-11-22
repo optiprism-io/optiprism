@@ -14,10 +14,9 @@ export const jwtToken = () => {
 }
 
 expect.extend({
-    async toBeApiResponse(received: Promise<any>, expected, request) {
+    async toBeApiResponse(received: Promise<any>, expected, request=undefined) {
         return await received.then(
             (r) => {
-                console.log(JSON.stringify(r.data),JSON.stringify(expected))
                 return {
                     pass: JSON.stringify(r.data) === JSON.stringify(expected),
                     message: () => 'error',
@@ -28,7 +27,9 @@ expect.extend({
             (e: AxiosError) => {
                 const msg = [e.toString()]
 
-                msg.push('REQUEST', '=======', JSON.stringify(request), '')
+                if (request) {
+                    msg.push('REQUEST', '=======', JSON.stringify(request), '')
+                }
                 if (e?.response?.data.error) {
                     msg.push('RESPONSE', '========', JSON.stringify(e.response.data.error, null, 2))
                 }
