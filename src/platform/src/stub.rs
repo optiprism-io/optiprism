@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use lazy_static::lazy_static;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
 use common::types::DictionaryDataType;
 use common::DataType;
-use crate::{accounts, ColumnType, dashboards, reports};
+use crate::{accounts, ColumnType, dashboards, event_records, reports};
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
 use crate::accounts::UpdateAccountRequest;
@@ -42,6 +43,7 @@ use chrono::NaiveDateTime;
 use chrono::DateTime;
 use chrono::Duration;
 use axum::async_trait;
+use crate::event_records::{EventRecord, ListEventRecordsRequest};
 use crate::queries::{event_segmentation, QueryTime, TimeIntervalUnit};
 use crate::reports::{CreateReportRequest, Report, UpdateReportRequest};
 use crate::Result;
@@ -625,5 +627,33 @@ impl reports::Provider for Reports {
         _id: u64,
     ) -> Result<Report> {
         Ok(Reports::entity())
+    }
+}
+
+pub struct EventRecords {}
+
+impl EventRecords {
+    pub fn entity() -> EventRecord {
+        EventRecord {
+            id: 1,
+            name: "name".to_string(),
+            event_properties: Some(HashMap::from([("key".to_string(), Value::String("value".to_string()))])),
+            user_properties: Some(HashMap::from([("key".to_string(), Value::String("value".to_string()))])),
+            matched_custom_events: Some(vec![1]),
+        }
+    }
+}
+
+#[async_trait]
+impl event_records::Provider for EventRecords {
+    async fn list(&self, _ctx: Context, _organization_id: u64, _project_id: u64, _request: ListEventRecordsRequest) -> Result<ListResponse<EventRecord>> {
+        Ok(ListResponse {
+            data: vec![EventRecords::entity()],
+            meta: ResponseMetadata { next: Some("next".to_string()) },
+        })
+    }
+
+    async fn get_by_id(&self, _ctx: Context, _organization_id: u64, _project_id: u64, id: u64) -> Result<EventRecord> {
+        Ok(EventRecords::entity())
     }
 }

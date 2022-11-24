@@ -1003,14 +1003,14 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/data/event-records/{id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/event-records/{id}:
     get:
       summary: Get event record
       operationId: getEventRecord
       security:
         - bearerAuth: [ ]
       tags:
-        - events
+        - event records
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -1040,14 +1040,14 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/data/event-records:
+  /v1/organizations/{organizationId}/projects/{projectId}/event-records:
     post:
-      summary: Get events
+      summary: Get event records
       operationId: eventRecordsList
       security:
         - bearerAuth: [ ]
       tags:
-        - events
+        - event records
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -1079,7 +1079,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/data/group-records/{id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/group-records/{id}:
     get:
       summary: Get group record
       operationId: getGroupRecord
@@ -1158,7 +1158,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/data/group-records:
+  /v1/organizations/{organizationId}/projects/{projectId}/group-records:
     post:
       summary: Get group records
       operationId: groupEventsList
@@ -1197,7 +1197,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/data/property-values:
+  /v1/organizations/{organizationId}/projects/{projectId}/property-values:
     post:
       summary: List of property values
       operationId: PropertyValuesList
@@ -1683,11 +1683,12 @@ components:
           description: map of group property name and property value pairs
     EventRecord:
       type: object
+      required: ['id','name']
       example: |
         {
           "id": 213,
           "name": "Buy Product",
-          "properties": {
+          "eventProperties": {
             "createdAt": "2017-07-21T17:32:28Z",
             "Product Name": "TV"
           },
@@ -1705,12 +1706,16 @@ components:
           type: integer
         name:
           type: string
-        properties:
+        eventProperties:
           type: object
           description: map of property name and property value pairs
+          additionalProperties:
+            $ref: '#/components/schemas/Value'
         userProperties:
           type: object
           description: map of user name and property value pairs
+          additionalProperties:
+            $ref: '#/components/schemas/Value'
         matchedCustomEvents:
           type: array
           items:
@@ -2261,8 +2266,6 @@ components:
       required: [ "time" ,"group" ]
       example: |
         {
-
-
           "time": {
             "type": "between",
             "from": "2017-07-21T17:32:28Z",
@@ -2351,33 +2354,25 @@ components:
             - $ref: '#/components/schemas/TimeBetween'
             - $ref: '#/components/schemas/TimeFrom'
             - $ref: '#/components/schemas/TimeLast'
-        group:
-          type: string
-          description: group that is used in aggregations by group. For instance, group by user or group by organization.
-          example: user
-        search:
-          type: object
-          description: search in results
-          properties:
-            term:
-              type: string
-            inEventProperties:
-              type: array
-              items:
-                $ref: '#/components/schemas/Value'
-            inUserProperties:
-              type: array
-              items:
-                $ref: '#/components/schemas/Value'
+        searchInEventProperties:
+          type: array
+          items:
+            $ref: '#/components/schemas/Value'
+        searchInUserProperties:
+          type: array
+          items:
+            $ref: '#/components/schemas/Value'
         events:
           type: array
           description: array of events to query
           items:
+            title: 'EventRecordRequestEvent'
             type: object
             required: [ "eventType" ]
             allOf:
               - $ref: '#/components/schemas/EventRef'
               - type: object
+                title: 'EventRecordRequestEventFilters'
                 properties:
                   filters:
                     type: array
@@ -3456,11 +3451,7 @@ components:
         propertyId:
           type: number
         propertyType:
-          type: string
-          enum:
-            - event
-            - user
-            - custom
+          $ref: '#/components/schemas/PropertyType'
     EventRef:
       type: object
       required: [ 'eventType' ]
@@ -3471,10 +3462,7 @@ components:
         eventId:
           type: number
         eventType:
-          type: string
-          enum:
-            - custom
-            - regular
+          $ref: '#/components/schemas/EventType'
     EventType:
       type: string
       description: possible event type

@@ -13,7 +13,9 @@ import {
     AuthApi,
     BreakdownByProperty,
     BreakdownByPropertyTypeEnum,
-    CreateReportRequest, CustomEventsApi, CustomEventStatus,
+    CreateReportRequest,
+    CustomEventsApi,
+    CustomEventStatus,
     DashboardPanelTypeEnum,
     DashboardsApi,
     DashboardsList200Response,
@@ -34,19 +36,25 @@ import {
     EventFilterByPropertyTypeEnum,
     EventGroupedFilters,
     EventGroupedFiltersGroupsConditionEnum,
-    EventGroupedFiltersGroupsInnerFiltersConditionEnum, EventPropertiesApi,
+    EventGroupedFiltersGroupsInnerFiltersConditionEnum,
+    EventPropertiesApi, EventRecordRequestEvent, EventRecordRequestEventFilters,
+    EventRecordsApi,
+    EventRecordsListRequest,
     EventRecordsListRequestTime,
-    EventRefEventTypeEnum,
+    EventType,
     EventsApi,
     EventSegmentation,
     EventSegmentationEvent,
     EventSegmentationEventEventTypeEnum,
-    EventsList200Response, EventStatus,
-    EventStatusEnum,
+    EventsList200Response,
+    EventStatus,
+    EventStatusEnum, EventType,
     ListResponseMetadataMeta,
-    LoginRequest, Property,
+    LoginRequest,
+    Property,
     PropertyFilterOperation,
-    PropertyRefPropertyTypeEnum, PropertyStatus,
+    PropertyType,
+    PropertyStatus,
     QueryAggregate,
     QueryAggregatePerGroup,
     QueryAggregateProperty,
@@ -81,9 +89,12 @@ import {
     TimeLastTypeEnum,
     TimeUnit,
     TimeWindowEach,
-    TimeWindowEachTypeEnum, UpdateCustomEventRequest,
-    UpdateEventRequest, UpdatePropertyRequest,
-    UpdateReportRequest, UserPropertiesApi
+    TimeWindowEachTypeEnum,
+    UpdateCustomEventRequest,
+    UpdateEventRequest,
+    UpdatePropertyRequest,
+    UpdateReportRequest,
+    UserPropertiesApi
 } from '../../src/api';
 import {AxiosError} from 'axios';
 
@@ -342,6 +353,31 @@ describe('Authorized', () => {
         })
     })
 
+    describe('Event Records', () => {
+        const api = new EventRecordsApi(config({auth: true}))
+
+        test('List event records', async () => {
+            await expect(api.eventRecordsList(1, 1, <EventRecordsListRequest>{
+                time: <TimeLast>{last: 1, unit: TimeUnit.Day, type: TimeLastTypeEnum.Last},
+                searchInEventProperties: ['test'],
+                searchInUserProperties: ['test'],
+                events: [<EventRecordRequestEvent>{
+                    eventName: 'event',
+                    eventType: EventType.Regular,
+                    filters: [stubs.eventFilterByProperty]
+                }],
+                filters: stubs.eventGroupedFilters,
+            })).toBeApiResponse(<EventsList200Response>{
+                data: [stubs.eventRecord],
+                meta: <ListResponseMetadataMeta>{next: 'next'}
+            })
+        })
+
+        test('Get event record by id', async () => {
+            await expect(api.getEventRecord(1, 1, 1)).toBeApiResponse(stubs.eventRecord);
+        })
+    })
+
     describe('queries', () => {
         describe('Event Segmentation', () => {
             const queryApi = new QueryApi(config({auth: true}))
@@ -395,7 +431,7 @@ describe('Authorized', () => {
                             intervalUnit: TimeUnit.Day,
                             events: [
                                 {
-                                    eventType: EventRefEventTypeEnum.Regular,
+                                    eventType: EventType.Regular,
                                     eventName: 'event',
                                     queries: [
                                         <QuerySimple>{
@@ -404,32 +440,32 @@ describe('Authorized', () => {
                                     ]
                                 },
                                 {
-                                    eventType: EventRefEventTypeEnum.Regular,
+                                    eventType: EventType.Regular,
                                     eventName: 'event',
                                     filters: [
                                         <EventFilterByProperty>{
-                                            propertyType: PropertyRefPropertyTypeEnum.Custom,
+                                            propertyType: PropertyType.Custom,
                                             propertyId: 1,
                                             type: EventFilterByPropertyTypeEnum.Property,
                                             operation: PropertyFilterOperation.Eq,
                                             value: [1]
                                         },
                                         <EventFilterByProperty>{
-                                            propertyType: PropertyRefPropertyTypeEnum.Event,
+                                            propertyType: PropertyType.Event,
                                             propertyName: 'prop',
                                             type: EventFilterByPropertyTypeEnum.Property,
                                             operation: PropertyFilterOperation.Eq,
                                             value: [1]
                                         },
                                         <EventFilterByProperty>{
-                                            propertyType: PropertyRefPropertyTypeEnum.Event,
+                                            propertyType: PropertyType.Event,
                                             propertyName: 'prop',
                                             type: EventFilterByPropertyTypeEnum.Property,
                                             operation: PropertyFilterOperation.Eq,
                                             value: [1, '2', true]
                                         },
                                         <EventFilterByProperty>{
-                                            propertyType: PropertyRefPropertyTypeEnum.Event,
+                                            propertyType: PropertyType.Event,
                                             propertyName: 'prop',
                                             type: EventFilterByPropertyTypeEnum.Property,
                                             operation: PropertyFilterOperation.Empty
@@ -437,7 +473,7 @@ describe('Authorized', () => {
                                     ],
                                     breakdowns: [
                                         <BreakdownByProperty>{
-                                            propertyType: PropertyRefPropertyTypeEnum.Event,
+                                            propertyType: PropertyType.Event,
                                             propertyName: 'prop',
                                             type: BreakdownByPropertyTypeEnum.Property
                                         }
@@ -451,14 +487,14 @@ describe('Authorized', () => {
                                             aggregate: QueryAggregate.Avg
                                         },
                                         <QueryAggregatePropertyPerGroup>{
-                                            propertyType: PropertyRefPropertyTypeEnum.Event,
+                                            propertyType: PropertyType.Event,
                                             propertyName: 'prop',
                                             type: QueryAggregatePropertyPerGroupTypeEnum.AggregatePropertyPerGroup,
                                             aggregate: QueryAggregate.Avg,
                                             aggregatePerGroup: QueryAggregatePerGroup.Max,
                                         },
                                         <QueryAggregateProperty>{
-                                            propertyType: PropertyRefPropertyTypeEnum.Event,
+                                            propertyType: PropertyType.Event,
                                             propertyName: 'prop2',
                                             type: QueryAggregatePropertyTypeEnum.AggregateProperty,
                                             aggregate: QueryAggregate.Avg
@@ -471,7 +507,7 @@ describe('Authorized', () => {
                                 }],
                             breakdowns: [
                                 <BreakdownByProperty>{
-                                    propertyType: PropertyRefPropertyTypeEnum.Event,
+                                    propertyType: PropertyType.Event,
                                     propertyName: 'prop',
                                     type: BreakdownByPropertyTypeEnum.Property
                                 }
@@ -487,7 +523,7 @@ describe('Authorized', () => {
                                                 cohortId: 1,
                                             },
                                             <EventFilterByProperty>{
-                                                propertyType: PropertyRefPropertyTypeEnum.Event,
+                                                propertyType: PropertyType.Event,
                                                 propertyName: 'prop2',
                                                 type: EventFilterByPropertyTypeEnum.Property,
                                                 operation: PropertyFilterOperation.Eq,
@@ -507,14 +543,14 @@ describe('Authorized', () => {
                                     conditions: [
                                         <SegmentConditionHasPropertyValue>{
                                             type: SegmentConditionHasPropertyValueTypeEnum.HasPropertyValue,
-                                            propertyType: PropertyRefPropertyTypeEnum.User,
+                                            propertyType: PropertyType.User,
                                             propertyName: 'prop',
                                             operation: PropertyFilterOperation.Eq,
                                             values: [1]
                                         },
                                         <SegmentConditionHadPropertyValue>{
                                             type: SegmentConditionHadPropertyValueTypeEnum.HadPropertyValue,
-                                            propertyType: PropertyRefPropertyTypeEnum.User,
+                                            propertyType: PropertyType.User,
                                             propertyName: 'prop',
                                             operation: PropertyFilterOperation.Empty,
                                             time: <TimeBetween>{
@@ -525,7 +561,7 @@ describe('Authorized', () => {
                                         },
                                         <SegmentConditionHadPropertyValue>{
                                             type: SegmentConditionHadPropertyValueTypeEnum.HadPropertyValue,
-                                            propertyType: PropertyRefPropertyTypeEnum.User,
+                                            propertyType: PropertyType.User,
                                             propertyName: 'prop',
                                             operation: PropertyFilterOperation.Eq,
                                             values: [1],
@@ -535,12 +571,12 @@ describe('Authorized', () => {
                                             }
                                         },
                                         <SegmentConditionDidEvent>{
-                                            eventType: EventRefEventTypeEnum.Regular,
+                                            eventType: EventType.Regular,
                                             eventName: 'event',
                                             type: SegmentConditionDidEventTypeEnum.DidEvent,
                                             filters: [
                                                 <EventFilterByProperty>{
-                                                    propertyType: PropertyRefPropertyTypeEnum.Custom,
+                                                    propertyType: PropertyType.Custom,
                                                     propertyId: 1,
                                                     type: EventFilterByPropertyTypeEnum.Property,
                                                     operation: PropertyFilterOperation.Eq,
@@ -559,12 +595,12 @@ describe('Authorized', () => {
                                             },
                                         },
                                         <SegmentConditionDidEvent>{
-                                            eventType: EventRefEventTypeEnum.Regular,
+                                            eventType: EventType.Regular,
                                             eventName: 'event',
                                             type: SegmentConditionDidEventTypeEnum.DidEvent,
                                             filters: [
                                                 <EventFilterByProperty>{
-                                                    propertyType: PropertyRefPropertyTypeEnum.Custom,
+                                                    propertyType: PropertyType.Custom,
                                                     propertyId: 1,
                                                     type: EventFilterByPropertyTypeEnum.Property,
                                                     operation: PropertyFilterOperation.Eq,
@@ -572,12 +608,12 @@ describe('Authorized', () => {
                                                 },
                                             ],
                                             aggregate: <DidEventRelativeCount>{
-                                                eventType: EventRefEventTypeEnum.Regular,
+                                                eventType: EventType.Regular,
                                                 eventName: 'right event',
                                                 type: DidEventRelativeCountTypeEnum.RelativeCount,
                                                 filters: [
                                                     <EventFilterByProperty>{
-                                                        propertyType: PropertyRefPropertyTypeEnum.Custom,
+                                                        propertyType: PropertyType.Custom,
                                                         propertyId: 1,
                                                         type: EventFilterByPropertyTypeEnum.Property,
                                                         operation: PropertyFilterOperation.Eq,
@@ -593,12 +629,12 @@ describe('Authorized', () => {
                                             },
                                         },
                                         <SegmentConditionDidEvent>{
-                                            eventType: EventRefEventTypeEnum.Regular,
+                                            eventType: EventType.Regular,
                                             eventName: 'event',
                                             type: SegmentConditionDidEventTypeEnum.DidEvent,
                                             filters: [
                                                 <EventFilterByProperty>{
-                                                    propertyType: PropertyRefPropertyTypeEnum.Custom,
+                                                    propertyType: PropertyType.Custom,
                                                     propertyId: 1,
                                                     type: EventFilterByPropertyTypeEnum.Property,
                                                     operation: PropertyFilterOperation.Eq,
@@ -607,7 +643,7 @@ describe('Authorized', () => {
                                             ],
                                             aggregate: <DidEventAggregateProperty>{
                                                 type: DidEventAggregatePropertyTypeEnum.AggregateProperty,
-                                                propertyType: PropertyRefPropertyTypeEnum.User,
+                                                propertyType: PropertyType.User,
                                                 propertyName: 'prop',
                                                 aggregate: QueryAggregate.Max,
                                                 operation: PropertyFilterOperation.Gt,
@@ -620,12 +656,12 @@ describe('Authorized', () => {
                                             },
                                         },
                                         <SegmentConditionDidEvent>{
-                                            eventType: EventRefEventTypeEnum.Regular,
+                                            eventType: EventType.Regular,
                                             eventName: 'event',
                                             type: SegmentConditionDidEventTypeEnum.DidEvent,
                                             filters: [
                                                 <EventFilterByProperty>{
-                                                    propertyType: PropertyRefPropertyTypeEnum.Custom,
+                                                    propertyType: PropertyType.Custom,
                                                     propertyId: 1,
                                                     type: EventFilterByPropertyTypeEnum.Property,
                                                     operation: PropertyFilterOperation.Eq,

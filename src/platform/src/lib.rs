@@ -12,6 +12,7 @@ pub mod queries;
 pub mod dashboards;
 pub mod stub;
 pub mod reports;
+pub mod event_records;
 
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -57,6 +58,7 @@ pub struct PlatformProvider {
     pub query: Arc<dyn queries::Provider>,
     pub dashboards: Arc<dyn dashboards::Provider>,
     pub reports: Arc<dyn reports::Provider>,
+    pub event_records: Arc<dyn event_records::Provider>,
 }
 
 impl PlatformProvider {
@@ -79,6 +81,7 @@ impl PlatformProvider {
             query: Arc::new(queries::ProviderImpl::new(query_prov)),
             dashboards: Arc::new(stub::Dashboards {}),
             reports: Arc::new(stub::Reports {}),
+            event_records: Arc::new(stub::EventRecords {}),
         }
     }
 
@@ -93,6 +96,7 @@ impl PlatformProvider {
             query: Arc::new(stub::Queries {}),
             dashboards: Arc::new(stub::Dashboards {}),
             reports: Arc::new(stub::Reports {}),
+            event_records: Arc::new(stub::EventRecords {}),
         }
     }
 }

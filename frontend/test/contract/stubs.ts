@@ -13,7 +13,7 @@ import {
     EventChartType,
     EventSegmentation,
     EventSegmentationEvent,
-    EventSegmentationEventEventTypeEnum,
+    EventType,
     QuerySimple,
     QuerySimpleTypeEnum,
     Report,
@@ -27,26 +27,61 @@ import {
     EventStatusEnum,
     CustomEvent,
     CustomEventEvent,
-    EventRefEventTypeEnum,
+    EventType,
     EventFilterByProperty,
-    PropertyRefPropertyTypeEnum,
+    PropertyType,
     EventFilterByPropertyTypeEnum,
     PropertyFilterOperation,
     EventStatus,
     CustomEventStatus,
-    Property, PropertyStatus, DictionaryDataType
+    Property,
+    PropertyStatus,
+    DictionaryDataType,
+    EventRecord,
+    EventGroupedFilters,
+    EventGroupedFiltersGroupsConditionEnum,
+    EventGroupedFiltersGroupsInnerFiltersConditionEnum,
+    EventFilterByCohort,
+    EventFilterByCohortTypeEnum, EventFilterByGroup, EventFilterByGroupTypeEnum
 } from '../../src/api';
 
 const eventFilterByProperty = <EventFilterByProperty>{
     type: EventFilterByPropertyTypeEnum.Property,
-    propertyType: PropertyRefPropertyTypeEnum.Event,
+    propertyType: PropertyType.Event,
     propertyName: 'prop',
     operation: PropertyFilterOperation.Eq,
     value: [1]
 };
 
+const eventGroupedFilters = <EventGroupedFilters>{
+    groupsCondition: EventGroupedFiltersGroupsConditionEnum.And,
+    groups: [
+        {
+            filtersCondition: EventGroupedFiltersGroupsInnerFiltersConditionEnum.And,
+            filters: [
+                <EventFilterByCohort>{
+                    type: EventFilterByCohortTypeEnum.Cohort,
+                    cohortId: 1,
+                },
+                <EventFilterByProperty>{
+                    propertyType: PropertyType.Event,
+                    propertyName: 'prop2',
+                    type: EventFilterByPropertyTypeEnum.Property,
+                    operation: PropertyFilterOperation.Eq,
+                    value: [1]
+                },
+                <EventFilterByGroup>{
+                    type: EventFilterByGroupTypeEnum.Group,
+                    groupId: 1
+                }
+            ]
+        }
+    ]
+};
+
 export const stubs = {
     eventFilterByProperty: eventFilterByProperty,
+    eventGroupedFilters: eventGroupedFilters,
     tokenResponse: <TokensResponse>{
         accessToken: 'access_token',
         refreshToken: 'refresh_token'
@@ -90,7 +125,7 @@ export const stubs = {
             chartType: EventChartType.Line,
             analysis: <AnalysisLinear>{type: AnalysisLinearTypeEnum.Linear},
             events: [<EventSegmentationEvent>{
-                eventType: EventSegmentationEventEventTypeEnum.Regular,
+                eventType: EventType.Regular,
                 eventName: 'event',
                 queries: [<QuerySimple>{type: QuerySimpleTypeEnum.CountEvents}]
             }]
@@ -126,50 +161,57 @@ export const stubs = {
         status: CustomEventStatus.Enabled,
         isSystem: true,
         events: [<CustomEventEvent>{
-            eventType: EventRefEventTypeEnum.Custom,
+            eventType: EventType.Custom,
             eventId: 1,
             filters: [eventFilterByProperty]
         }]
     },
-    userProperty:<Property>{
-        id:1,
+    userProperty: <Property>{
+        id: 1,
         createdAt: '1970-01-01T00:00:00Z',
         updatedAt: '1970-01-01T00:00:00Z',
         createdBy: 1,
         updatedBy: 1,
         projectId: 1,
-        events:[1],
+        events: [1],
         tags: ['tag'],
         name: 'name',
-        displayName:'display_name',
+        displayName: 'display_name',
         description: 'description',
-        dataType:DataType.Number,
-        status:PropertyStatus.Enabled,
-        isSystem:true,
-        nullable:true,
-        isArray:true,
-        isDictionary:true,
-        dictionaryType:DictionaryDataType.Uint8
+        dataType: DataType.Number,
+        status: PropertyStatus.Enabled,
+        isSystem: true,
+        nullable: true,
+        isArray: true,
+        isDictionary: true,
+        dictionaryType: DictionaryDataType.Uint8
     },
-    eventProperty:<Property>{
-        id:1,
+    eventProperty: <Property>{
+        id: 1,
         createdAt: '1970-01-01T00:00:00Z',
         updatedAt: '1970-01-01T00:00:00Z',
         createdBy: 1,
         updatedBy: 1,
         projectId: 1,
-        events:[1],
+        events: [1],
         tags: ['tag'],
         name: 'name',
-        displayName:'display_name',
+        displayName: 'display_name',
         description: 'description',
-        dataType:DataType.Number,
-        status:PropertyStatus.Enabled,
-        isSystem:true,
-        nullable:true,
-        isArray:true,
-        isDictionary:true,
-        dictionaryType:DictionaryDataType.Uint8
+        dataType: DataType.Number,
+        status: PropertyStatus.Enabled,
+        isSystem: true,
+        nullable: true,
+        isArray: true,
+        isDictionary: true,
+        dictionaryType: DictionaryDataType.Uint8
+    },
+    eventRecord: <EventRecord>{
+        id: 1,
+        name: 'name',
+        eventProperties: {'key': 'value'},
+        userProperties: {'key': 'value'},
+        matchedCustomEvents: [1]
     },
     dataTable: <DataTableResponse>{
         columns: [
