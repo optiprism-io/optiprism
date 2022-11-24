@@ -86,7 +86,7 @@ impl accounts::Provider for Accounts {
     async fn list(&self, _ctx: Context) -> Result<ListResponse<Account>> {
         Ok(ListResponse {
             data: vec![Accounts::account()],
-            meta: ResponseMetadata { next: None },
+            meta: ResponseMetadata { next: Some("next".to_string()) },
         })
     }
 
@@ -190,7 +190,7 @@ impl custom_events::Provider for CustomEvents {
     ) -> Result<ListResponse<CustomEvent>> {
         Ok(ListResponse {
             data: vec![CustomEvents::custom_event()],
-            meta: ResponseMetadata { next: None },
+            meta: ResponseMetadata { next: Some("next".to_string()) },
         })
     }
 
@@ -383,7 +383,7 @@ impl properties::Provider for Properties {
     ) -> Result<ListResponse<Property>> {
         Ok(ListResponse {
             data: vec![Properties::property()],
-            meta: ResponseMetadata { next: None },
+            meta: ResponseMetadata { next: Some("next".to_string()) },
         })
     }
 

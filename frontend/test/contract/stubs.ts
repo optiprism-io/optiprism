@@ -1,6 +1,8 @@
 import {
     AnalysisCumulative,
-    AnalysisCumulativeTypeEnum, AnalysisLinear, AnalysisLinearTypeEnum,
+    AnalysisCumulativeTypeEnum,
+    AnalysisLinear,
+    AnalysisLinearTypeEnum,
     Dashboard,
     DashboardPanel,
     DashboardPanelTypeEnum,
@@ -21,10 +23,25 @@ import {
     TimeUnit,
     TokensResponse,
     UpdateReportRequest,
-    Event, EventStatusEnum
+    Event,
+    EventStatusEnum,
+    CustomEvent,
+    CustomEventEvent,
+    EventRefEventTypeEnum,
+    EventFilterByProperty,
+    PropertyRefPropertyTypeEnum, EventFilterByPropertyTypeEnum, PropertyFilterOperation, EventStatus, CustomEventStatus
 } from '../../src/api';
 
+const eventFilterByProperty = <EventFilterByProperty>{
+    type: EventFilterByPropertyTypeEnum.Property,
+    propertyType: PropertyRefPropertyTypeEnum.Event,
+    propertyName: 'prop',
+    operation: PropertyFilterOperation.Eq,
+    value: [1]
+};
+
 export const stubs = {
+    eventFilterByProperty: eventFilterByProperty,
     tokenResponse: <TokensResponse>{
         accessToken: 'access_token',
         refreshToken: 'refresh_token'
@@ -86,10 +103,28 @@ export const stubs = {
         name: 'name',
         displayName: 'display_name',
         description: 'description',
-        status: EventStatusEnum.Enabled,
+        status: EventStatus.Enabled,
         isSystem: true,
         eventProperties: [1],
         userProperties: [1],
+    },
+    customEvent: <CustomEvent>{
+        id: 1,
+        createdAt: '1970-01-01T00:00:00Z',
+        updatedAt: '1970-01-01T00:00:00Z',
+        createdBy: 1,
+        updatedBy: 1,
+        projectId: 1,
+        tags: ['tag'],
+        name: 'name',
+        description: 'description',
+        status: CustomEventStatus.Enabled,
+        isSystem: true,
+        events: [<CustomEventEvent>{
+            eventType: EventRefEventTypeEnum.Custom,
+            eventId: 1,
+            filters: [eventFilterByProperty]
+        }]
     },
     dataTable: <DataTableResponse>{
         columns: [

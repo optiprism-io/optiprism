@@ -379,7 +379,7 @@ export interface CreateReportRequest {
      * @type {ReportQuery}
      * @memberof CreateReportRequest
      */
-    'query'?: ReportQuery;
+    'query': ReportQuery;
 }
 /**
  * Custom Event is an alias to an expression which is used while querying. You can use regular or custom events in expression. You can combine events in expression, you can use filter by properties. 
@@ -392,13 +392,13 @@ export interface CustomEvent {
      * @type {number}
      * @memberof CustomEvent
      */
-    'id'?: number;
+    'id': number;
     /**
      * 
      * @type {string}
      * @memberof CustomEvent
      */
-    'createdAt'?: string;
+    'createdAt': string;
     /**
      * 
      * @type {string}
@@ -410,7 +410,7 @@ export interface CustomEvent {
      * @type {number}
      * @memberof CustomEvent
      */
-    'createdBy'?: number;
+    'createdBy': number;
     /**
      * 
      * @type {number}
@@ -422,31 +422,7 @@ export interface CustomEvent {
      * @type {number}
      * @memberof CustomEvent
      */
-    'projectId'?: number;
-    /**
-     * 
-     * @type {boolean}
-     * @memberof CustomEvent
-     */
-    'isSystem'?: boolean;
-    /**
-     * 
-     * @type {string}
-     * @memberof CustomEvent
-     */
-    'status'?: CustomEventStatusEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof CustomEvent
-     */
-    'name'?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof CustomEvent
-     */
-    'description'?: string;
+    'projectId': number;
     /**
      * 
      * @type {Array<string>}
@@ -455,19 +431,35 @@ export interface CustomEvent {
     'tags'?: Array<string>;
     /**
      * 
+     * @type {string}
+     * @memberof CustomEvent
+     */
+    'name': string;
+    /**
+     * 
+     * @type {string}
+     * @memberof CustomEvent
+     */
+    'description'?: string;
+    /**
+     * 
+     * @type {CustomEventStatus}
+     * @memberof CustomEvent
+     */
+    'status': CustomEventStatus;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof CustomEvent
+     */
+    'isSystem': boolean;
+    /**
+     * 
      * @type {Array<CustomEventEvent>}
      * @memberof CustomEvent
      */
-    'events'?: Array<CustomEventEvent>;
+    'events': Array<CustomEventEvent>;
 }
-
-export const CustomEventStatusEnum = {
-    Enabled: 'enabled',
-    Disabled: 'disabled'
-} as const;
-
-export type CustomEventStatusEnum = typeof CustomEventStatusEnum[keyof typeof CustomEventStatusEnum];
-
 /**
  * custom event will matches all of the provided events
  * @export
@@ -497,7 +489,7 @@ export interface CustomEventEvent {
      * @type {Array<EventFilterByProperty>}
      * @memberof CustomEventEvent
      */
-    'filters': Array<EventFilterByProperty>;
+    'filters'?: Array<EventFilterByProperty>;
 }
 
 export const CustomEventEventEventTypeEnum = {
@@ -518,8 +510,22 @@ export interface CustomEventEventAllOf {
      * @type {Array<EventFilterByProperty>}
      * @memberof CustomEventEventAllOf
      */
-    'filters': Array<EventFilterByProperty>;
+    'filters'?: Array<EventFilterByProperty>;
 }
+/**
+ * custom event status
+ * @export
+ * @enum {string}
+ */
+
+export const CustomEventStatus = {
+    Enabled: 'enabled',
+    Disabled: 'disabled'
+} as const;
+
+export type CustomEventStatus = typeof CustomEventStatus[keyof typeof CustomEventStatus];
+
+
 /**
  * 
  * @export
@@ -627,10 +633,10 @@ export interface CustomProperty {
     'isSystem'?: boolean;
     /**
      * 
-     * @type {string}
+     * @type {CustomPropertyStatus}
      * @memberof CustomProperty
      */
-    'status'?: CustomPropertyStatusEnum;
+    'status'?: CustomPropertyStatus;
     /**
      * 
      * @type {string}
@@ -668,13 +674,19 @@ export interface CustomProperty {
      */
     'tags'?: Array<string>;
 }
+/**
+ * custom property status
+ * @export
+ * @enum {string}
+ */
 
-export const CustomPropertyStatusEnum = {
+export const CustomPropertyStatus = {
     Enabled: 'enabled',
     Disabled: 'disabled'
 } as const;
 
-export type CustomPropertyStatusEnum = typeof CustomPropertyStatusEnum[keyof typeof CustomPropertyStatusEnum];
+export type CustomPropertyStatus = typeof CustomPropertyStatus[keyof typeof CustomPropertyStatus];
+
 
 /**
  * 
@@ -1303,13 +1315,13 @@ export interface Event {
      * @type {number}
      * @memberof Event
      */
-    'id'?: number;
+    'id': number;
     /**
      * create date
      * @type {string}
      * @memberof Event
      */
-    'createdAt'?: string;
+    'createdAt': string;
     /**
      * update (once updated)
      * @type {string}
@@ -1321,7 +1333,7 @@ export interface Event {
      * @type {number}
      * @memberof Event
      */
-    'createdBy'?: number;
+    'createdBy': number;
     /**
      * id of updater User
      * @type {number}
@@ -1333,13 +1345,13 @@ export interface Event {
      * @type {number}
      * @memberof Event
      */
-    'projectId'?: number;
+    'projectId': number;
     /**
      * the event is a system-wide, shown in any project and can\'t be modified by a regular user
      * @type {boolean}
      * @memberof Event
      */
-    'isSystem'?: boolean;
+    'isSystem': boolean;
     /**
      * 
      * @type {Array<string>}
@@ -1351,7 +1363,7 @@ export interface Event {
      * @type {string}
      * @memberof Event
      */
-    'name'?: string;
+    'name': string;
     /**
      * event name to display. If empty then name property is used.
      * @type {string}
@@ -1365,11 +1377,11 @@ export interface Event {
      */
     'description'?: string;
     /**
-     * event status
-     * @type {string}
+     * 
+     * @type {EventStatus}
      * @memberof Event
      */
-    'status'?: EventStatusEnum;
+    'status': EventStatus;
     /**
      * array of id of attached to event properties
      * @type {Array<number>}
@@ -1383,14 +1395,6 @@ export interface Event {
      */
     'userProperties'?: Array<number>;
 }
-
-export const EventStatusEnum = {
-    Enabled: 'enabled',
-    Disabled: 'disabled'
-} as const;
-
-export type EventStatusEnum = typeof EventStatusEnum[keyof typeof EventStatusEnum];
-
 /**
  * chart type
  * @export
@@ -2092,6 +2096,20 @@ export interface EventSegmentationSegment {
  * @export
  */
 export type EventSegmentationSegmentConditionsInner = SegmentConditionDidEvent | SegmentConditionFunnel | SegmentConditionHadPropertyValue | SegmentConditionHasPropertyValue;
+
+/**
+ * event status
+ * @export
+ * @enum {string}
+ */
+
+export const EventStatus = {
+    Enabled: 'enabled',
+    Disabled: 'disabled'
+} as const;
+
+export type EventStatus = typeof EventStatus[keyof typeof EventStatus];
+
 
 /**
  * possible event type
@@ -3249,11 +3267,11 @@ export interface Property {
      */
     'description'?: string;
     /**
-     * property status
-     * @type {string}
+     * 
+     * @type {PropertyStatus}
      * @memberof Property
      */
-    'status': PropertyStatusEnum;
+    'status': PropertyStatus;
     /**
      * 
      * @type {object & DataType}
@@ -3292,12 +3310,6 @@ export const PropertyTypeEnum = {
 } as const;
 
 export type PropertyTypeEnum = typeof PropertyTypeEnum[keyof typeof PropertyTypeEnum];
-export const PropertyStatusEnum = {
-    Enabled: 'enabled',
-    Disabled: 'disabled'
-} as const;
-
-export type PropertyStatusEnum = typeof PropertyStatusEnum[keyof typeof PropertyStatusEnum];
 
 /**
  * operation
@@ -3358,6 +3370,20 @@ export const PropertyRefPropertyTypeEnum = {
 } as const;
 
 export type PropertyRefPropertyTypeEnum = typeof PropertyRefPropertyTypeEnum[keyof typeof PropertyRefPropertyTypeEnum];
+
+/**
+ * property status
+ * @export
+ * @enum {string}
+ */
+
+export const PropertyStatus = {
+    Enabled: 'enabled',
+    Disabled: 'disabled'
+} as const;
+
+export type PropertyStatus = typeof PropertyStatus[keyof typeof PropertyStatus];
+
 
 /**
  * possible property type
@@ -3718,7 +3744,7 @@ export interface Report {
      * @type {number}
      * @memberof Report
      */
-    'id'?: number;
+    'id': number;
     /**
      * create date
      * @type {string}
@@ -3754,7 +3780,7 @@ export interface Report {
      * @type {string}
      * @memberof Report
      */
-    'name'?: string;
+    'name': string;
     /**
      * description
      * @type {string}
@@ -3766,13 +3792,13 @@ export interface Report {
      * @type {ReportType}
      * @memberof Report
      */
-    'type'?: ReportType;
+    'type': ReportType;
     /**
      * 
      * @type {ReportQuery}
      * @memberof Report
      */
-    'query'?: ReportQuery;
+    'query': ReportQuery;
 }
 /**
  * @type ReportQuery
@@ -4311,10 +4337,10 @@ export interface UpdateCustomEventRequest {
     'description'?: string;
     /**
      * 
-     * @type {string}
+     * @type {CustomEventStatus}
      * @memberof UpdateCustomEventRequest
      */
-    'status'?: UpdateCustomEventRequestStatusEnum;
+    'status'?: CustomEventStatus;
     /**
      * 
      * @type {Array<string>}
@@ -4328,14 +4354,6 @@ export interface UpdateCustomEventRequest {
      */
     'events': Array<CustomEventEvent>;
 }
-
-export const UpdateCustomEventRequestStatusEnum = {
-    Enabled: 'enabled',
-    Disabled: 'disabled'
-} as const;
-
-export type UpdateCustomEventRequestStatusEnum = typeof UpdateCustomEventRequestStatusEnum[keyof typeof UpdateCustomEventRequestStatusEnum];
-
 /**
  * 
  * @export
@@ -4432,10 +4450,10 @@ export interface UpdateEventRequest {
     'description'?: string;
     /**
      * 
-     * @type {string}
+     * @type {EventStatus}
      * @memberof UpdateEventRequest
      */
-    'status'?: UpdateEventRequestStatusEnum;
+    'status'?: EventStatus;
     /**
      * 
      * @type {Array<string>}
@@ -4443,14 +4461,6 @@ export interface UpdateEventRequest {
      */
     'tags'?: Array<string>;
 }
-
-export const UpdateEventRequestStatusEnum = {
-    Enabled: 'enabled',
-    Disabled: 'disabled'
-} as const;
-
-export type UpdateEventRequestStatusEnum = typeof UpdateEventRequestStatusEnum[keyof typeof UpdateEventRequestStatusEnum];
-
 /**
  * 
  * @export
@@ -4484,10 +4494,10 @@ export interface UpdatePropertyRequest {
     'description'?: string;
     /**
      * 
-     * @type {string}
+     * @type {PropertyStatus}
      * @memberof UpdatePropertyRequest
      */
-    'status'?: UpdatePropertyRequestStatusEnum;
+    'status'?: PropertyStatus;
     /**
      * 
      * @type {Array<string>}
@@ -4495,14 +4505,6 @@ export interface UpdatePropertyRequest {
      */
     'tags'?: Array<string>;
 }
-
-export const UpdatePropertyRequestStatusEnum = {
-    Enabled: 'enabled',
-    Disabled: 'disabled'
-} as const;
-
-export type UpdatePropertyRequestStatusEnum = typeof UpdatePropertyRequestStatusEnum[keyof typeof UpdatePropertyRequestStatusEnum];
-
 /**
  * 
  * @export
@@ -4808,6 +4810,473 @@ export class AuthApi extends BaseAPI {
      */
     public refreshToken(refreshTokenRequest: RefreshTokenRequest, options?: AxiosRequestConfig) {
         return AuthApiFp(this.configuration).refreshToken(refreshTokenRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+/**
+ * CustomEventsApi - axios parameter creator
+ * @export
+ */
+export const CustomEventsApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Create custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {CreateCustomEventRequest} createCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createCustomEvent: async (organizationId: number, projectId: number, createCustomEventRequest: CreateCustomEventRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('createCustomEvent', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('createCustomEvent', 'projectId', projectId)
+            // verify required parameter 'createCustomEventRequest' is not null or undefined
+            assertParamExists('createCustomEvent', 'createCustomEventRequest', createCustomEventRequest)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createCustomEventRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Custom events list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        customEventsList: async (organizationId: number, projectId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('customEventsList', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('customEventsList', 'projectId', projectId)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Delete custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} eventId Event ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteCustomEvent: async (organizationId: number, projectId: number, eventId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('deleteCustomEvent', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('deleteCustomEvent', 'projectId', projectId)
+            // verify required parameter 'eventId' is not null or undefined
+            assertParamExists('deleteCustomEvent', 'eventId', eventId)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Get custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} eventId Event ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getCustomEvent: async (organizationId: number, projectId: number, eventId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('getCustomEvent', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('getCustomEvent', 'projectId', projectId)
+            // verify required parameter 'eventId' is not null or undefined
+            assertParamExists('getCustomEvent', 'eventId', eventId)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Update custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {string} eventId Custom Event ID
+         * @param {UpdateCustomEventRequest} updateCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateCustomEvent: async (organizationId: number, projectId: number, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('updateCustomEvent', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('updateCustomEvent', 'projectId', projectId)
+            // verify required parameter 'eventId' is not null or undefined
+            assertParamExists('updateCustomEvent', 'eventId', eventId)
+            // verify required parameter 'updateCustomEventRequest' is not null or undefined
+            assertParamExists('updateCustomEvent', 'updateCustomEventRequest', updateCustomEventRequest)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateCustomEventRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * CustomEventsApi - functional programming interface
+ * @export
+ */
+export const CustomEventsApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = CustomEventsApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Create custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {CreateCustomEventRequest} createCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async createCustomEvent(organizationId: number, projectId: number, createCustomEventRequest: CreateCustomEventRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEvent>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createCustomEvent(organizationId, projectId, createCustomEventRequest, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Custom events list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async customEventsList(organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEventsList200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.customEventsList(organizationId, projectId, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Delete custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} eventId Event ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteCustomEvent(organizationId: number, projectId: number, eventId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteCustomEvent(organizationId, projectId, eventId, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Get custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} eventId Event ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getCustomEvent(organizationId: number, projectId: number, eventId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEvent>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getCustomEvent(organizationId, projectId, eventId, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Update custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {string} eventId Custom Event ID
+         * @param {UpdateCustomEventRequest} updateCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateCustomEvent(organizationId: number, projectId: number, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEvent>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateCustomEvent(organizationId, projectId, eventId, updateCustomEventRequest, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+    }
+};
+
+/**
+ * CustomEventsApi - factory interface
+ * @export
+ */
+export const CustomEventsApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = CustomEventsApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Create custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {CreateCustomEventRequest} createCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createCustomEvent(organizationId: number, projectId: number, createCustomEventRequest: CreateCustomEventRequest, options?: any): AxiosPromise<CustomEvent> {
+            return localVarFp.createCustomEvent(organizationId, projectId, createCustomEventRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Custom events list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        customEventsList(organizationId: number, projectId: number, options?: any): AxiosPromise<CustomEventsList200Response> {
+            return localVarFp.customEventsList(organizationId, projectId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Delete custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} eventId Event ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteCustomEvent(organizationId: number, projectId: number, eventId: number, options?: any): AxiosPromise<void> {
+            return localVarFp.deleteCustomEvent(organizationId, projectId, eventId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Get custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} eventId Event ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getCustomEvent(organizationId: number, projectId: number, eventId: number, options?: any): AxiosPromise<CustomEvent> {
+            return localVarFp.getCustomEvent(organizationId, projectId, eventId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Update custom event
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {string} eventId Custom Event ID
+         * @param {UpdateCustomEventRequest} updateCustomEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateCustomEvent(organizationId: number, projectId: number, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options?: any): AxiosPromise<CustomEvent> {
+            return localVarFp.updateCustomEvent(organizationId, projectId, eventId, updateCustomEventRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * CustomEventsApi - object-oriented interface
+ * @export
+ * @class CustomEventsApi
+ * @extends {BaseAPI}
+ */
+export class CustomEventsApi extends BaseAPI {
+    /**
+     * 
+     * @summary Create custom event
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {CreateCustomEventRequest} createCustomEventRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof CustomEventsApi
+     */
+    public createCustomEvent(organizationId: number, projectId: number, createCustomEventRequest: CreateCustomEventRequest, options?: AxiosRequestConfig) {
+        return CustomEventsApiFp(this.configuration).createCustomEvent(organizationId, projectId, createCustomEventRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Custom events list
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof CustomEventsApi
+     */
+    public customEventsList(organizationId: number, projectId: number, options?: AxiosRequestConfig) {
+        return CustomEventsApiFp(this.configuration).customEventsList(organizationId, projectId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Delete custom event
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {number} eventId Event ID
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof CustomEventsApi
+     */
+    public deleteCustomEvent(organizationId: number, projectId: number, eventId: number, options?: AxiosRequestConfig) {
+        return CustomEventsApiFp(this.configuration).deleteCustomEvent(organizationId, projectId, eventId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Get custom event
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {number} eventId Event ID
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof CustomEventsApi
+     */
+    public getCustomEvent(organizationId: number, projectId: number, eventId: number, options?: AxiosRequestConfig) {
+        return CustomEventsApiFp(this.configuration).getCustomEvent(organizationId, projectId, eventId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Update custom event
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {string} eventId Custom Event ID
+     * @param {UpdateCustomEventRequest} updateCustomEventRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof CustomEventsApi
+     */
+    public updateCustomEvent(organizationId: number, projectId: number, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options?: AxiosRequestConfig) {
+        return CustomEventsApiFp(this.configuration).updateCustomEvent(organizationId, projectId, eventId, updateCustomEventRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -5287,142 +5756,6 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
     return {
         /**
          * 
-         * @summary Create custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {CreateCustomEventRequest} createCustomEventRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        createCustomEvent: async (organizationId: number, projectId: number, createCustomEventRequest: CreateCustomEventRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('createCustomEvent', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('createCustomEvent', 'projectId', projectId)
-            // verify required parameter 'createCustomEventRequest' is not null or undefined
-            assertParamExists('createCustomEvent', 'createCustomEventRequest', createCustomEventRequest)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(createCustomEventRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary Custom events list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        customEventsList: async (organizationId: number, projectId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('customEventsList', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('customEventsList', 'projectId', projectId)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary Delete custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} eventId Event ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        deleteCustomEvent: async (organizationId: number, projectId: number, eventId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('deleteCustomEvent', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('deleteCustomEvent', 'projectId', projectId)
-            // verify required parameter 'eventId' is not null or undefined
-            assertParamExists('deleteCustomEvent', 'eventId', eventId)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
          * @summary Get events
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -5485,52 +5818,6 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
             const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/events`
                 .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
                 .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary Get custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} eventId Event ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getCustomEvent: async (organizationId: number, projectId: number, eventId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('getCustomEvent', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('getCustomEvent', 'projectId', projectId)
-            // verify required parameter 'eventId' is not null or undefined
-            assertParamExists('getCustomEvent', 'eventId', eventId)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -5743,58 +6030,6 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
         },
         /**
          * 
-         * @summary Update custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {string} eventId Custom Event ID
-         * @param {UpdateCustomEventRequest} updateCustomEventRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        updateCustomEvent: async (organizationId: number, projectId: number, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('updateCustomEvent', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('updateCustomEvent', 'projectId', projectId)
-            // verify required parameter 'eventId' is not null or undefined
-            assertParamExists('updateCustomEvent', 'eventId', eventId)
-            // verify required parameter 'updateCustomEventRequest' is not null or undefined
-            assertParamExists('updateCustomEvent', 'updateCustomEventRequest', updateCustomEventRequest)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/custom-events/{eventId}`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"eventId"}}`, encodeURIComponent(String(eventId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(updateCustomEventRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
          * @summary Update event
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -5857,44 +6092,6 @@ export const EventsApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
-         * @summary Create custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {CreateCustomEventRequest} createCustomEventRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async createCustomEvent(organizationId: number, projectId: number, createCustomEventRequest: CreateCustomEventRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEvent>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.createCustomEvent(organizationId, projectId, createCustomEventRequest, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
-         * @summary Custom events list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async customEventsList(organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEventsList200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.customEventsList(organizationId, projectId, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
-         * @summary Delete custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} eventId Event ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async deleteCustomEvent(organizationId: number, projectId: number, eventId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteCustomEvent(organizationId, projectId, eventId, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
          * @summary Get events
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -5916,19 +6113,6 @@ export const EventsApiFp = function(configuration?: Configuration) {
          */
         async eventsList(organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<EventsList200Response>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.eventsList(organizationId, projectId, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
-         * @summary Get custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} eventId Event ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async getCustomEvent(organizationId: number, projectId: number, eventId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEvent>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getCustomEvent(organizationId, projectId, eventId, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -5985,20 +6169,6 @@ export const EventsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Update custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {string} eventId Custom Event ID
-         * @param {UpdateCustomEventRequest} updateCustomEventRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async updateCustomEvent(organizationId: number, projectId: number, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomEvent>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.updateCustomEvent(organizationId, projectId, eventId, updateCustomEventRequest, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
          * @summary Update event
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -6023,41 +6193,6 @@ export const EventsApiFactory = function (configuration?: Configuration, basePat
     return {
         /**
          * 
-         * @summary Create custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {CreateCustomEventRequest} createCustomEventRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        createCustomEvent(organizationId: number, projectId: number, createCustomEventRequest: CreateCustomEventRequest, options?: any): AxiosPromise<CustomEvent> {
-            return localVarFp.createCustomEvent(organizationId, projectId, createCustomEventRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Custom events list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        customEventsList(organizationId: number, projectId: number, options?: any): AxiosPromise<CustomEventsList200Response> {
-            return localVarFp.customEventsList(organizationId, projectId, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Delete custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} eventId Event ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        deleteCustomEvent(organizationId: number, projectId: number, eventId: number, options?: any): AxiosPromise<void> {
-            return localVarFp.deleteCustomEvent(organizationId, projectId, eventId, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary Get events
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -6078,18 +6213,6 @@ export const EventsApiFactory = function (configuration?: Configuration, basePat
          */
         eventsList(organizationId: number, projectId: number, options?: any): AxiosPromise<EventsList200Response> {
             return localVarFp.eventsList(organizationId, projectId, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Get custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} eventId Event ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getCustomEvent(organizationId: number, projectId: number, eventId: number, options?: any): AxiosPromise<CustomEvent> {
-            return localVarFp.getCustomEvent(organizationId, projectId, eventId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -6141,19 +6264,6 @@ export const EventsApiFactory = function (configuration?: Configuration, basePat
         },
         /**
          * 
-         * @summary Update custom event
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {string} eventId Custom Event ID
-         * @param {UpdateCustomEventRequest} updateCustomEventRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        updateCustomEvent(organizationId: number, projectId: number, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options?: any): AxiosPromise<CustomEvent> {
-            return localVarFp.updateCustomEvent(organizationId, projectId, eventId, updateCustomEventRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary Update event
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -6175,47 +6285,6 @@ export const EventsApiFactory = function (configuration?: Configuration, basePat
  * @extends {BaseAPI}
  */
 export class EventsApi extends BaseAPI {
-    /**
-     * 
-     * @summary Create custom event
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {CreateCustomEventRequest} createCustomEventRequest 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof EventsApi
-     */
-    public createCustomEvent(organizationId: number, projectId: number, createCustomEventRequest: CreateCustomEventRequest, options?: AxiosRequestConfig) {
-        return EventsApiFp(this.configuration).createCustomEvent(organizationId, projectId, createCustomEventRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Custom events list
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof EventsApi
-     */
-    public customEventsList(organizationId: number, projectId: number, options?: AxiosRequestConfig) {
-        return EventsApiFp(this.configuration).customEventsList(organizationId, projectId, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Delete custom event
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {number} eventId Event ID
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof EventsApi
-     */
-    public deleteCustomEvent(organizationId: number, projectId: number, eventId: number, options?: AxiosRequestConfig) {
-        return EventsApiFp(this.configuration).deleteCustomEvent(organizationId, projectId, eventId, options).then((request) => request(this.axios, this.basePath));
-    }
-
     /**
      * 
      * @summary Get events
@@ -6241,20 +6310,6 @@ export class EventsApi extends BaseAPI {
      */
     public eventsList(organizationId: number, projectId: number, options?: AxiosRequestConfig) {
         return EventsApiFp(this.configuration).eventsList(organizationId, projectId, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Get custom event
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {number} eventId Event ID
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof EventsApi
-     */
-    public getCustomEvent(organizationId: number, projectId: number, eventId: number, options?: AxiosRequestConfig) {
-        return EventsApiFp(this.configuration).getCustomEvent(organizationId, projectId, eventId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -6311,21 +6366,6 @@ export class EventsApi extends BaseAPI {
      */
     public getUserProperty(organizationId: number, projectId: number, propertyId: number, options?: AxiosRequestConfig) {
         return EventsApiFp(this.configuration).getUserProperty(organizationId, projectId, propertyId, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Update custom event
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {string} eventId Custom Event ID
-     * @param {UpdateCustomEventRequest} updateCustomEventRequest 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof EventsApi
-     */
-    public updateCustomEvent(organizationId: number, projectId: number, eventId: string, updateCustomEventRequest: UpdateCustomEventRequest, options?: AxiosRequestConfig) {
-        return EventsApiFp(this.configuration).updateCustomEvent(organizationId, projectId, eventId, updateCustomEventRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

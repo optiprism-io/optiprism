@@ -19,9 +19,9 @@ expect.extend({
             (r) => {
                 return {
                     pass: JSON.stringify(r.data) === JSON.stringify(expected),
-                    message: () => 'error',
-                    actual: r.data,
-                    expected: expected
+                    message: () => 'diff error',
+                    actual: JSON.stringify(r.data,null,2),
+                    expected: JSON.stringify(expected,null,2)
                 }
             },
             (e: AxiosError) => {

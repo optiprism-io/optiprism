@@ -13,7 +13,7 @@ import {
     AuthApi,
     BreakdownByProperty,
     BreakdownByPropertyTypeEnum,
-    CreateReportRequest,
+    CreateReportRequest, CustomEventsApi, CustomEventStatus,
     DashboardPanelTypeEnum,
     DashboardsApi,
     DashboardsList200Response,
@@ -41,7 +41,7 @@ import {
     EventSegmentation,
     EventSegmentationEvent,
     EventSegmentationEventEventTypeEnum,
-    EventsList200Response,
+    EventsList200Response, EventStatus,
     EventStatusEnum,
     ListResponseMetadataMeta,
     LoginRequest,
@@ -81,7 +81,7 @@ import {
     TimeLastTypeEnum,
     TimeUnit,
     TimeWindowEach,
-    TimeWindowEachTypeEnum,
+    TimeWindowEachTypeEnum, UpdateCustomEventRequest,
     UpdateEventRequest,
     UpdateReportRequest
 } from '../../src/api';
@@ -260,8 +260,37 @@ describe('Authorized', () => {
                 tags: ['tag'],
                 displayName: 'display_name',
                 description: 'description',
-                status: EventStatusEnum.Disabled,
+                status: EventStatus.Disabled,
             })).toBeApiResponse(stubs.event);
+        })
+    })
+
+    describe('Custom Events', () => {
+        const api = new CustomEventsApi(config({auth: true}))
+
+        test('List custom events', async () => {
+            await expect(api.customEventsList(1, 1)).toBeApiResponse(<EventsList200Response>{
+                data: [stubs.customEvent],
+                meta: <ListResponseMetadataMeta>{next: 'next'}
+            })
+        })
+
+        test('Get custom event by id', async () => {
+            await expect(api.getCustomEvent(1, 1, 1)).toBeApiResponse(stubs.customEvent);
+        })
+
+        test('Update event', async () => {
+            await expect(api.updateCustomEvent(1, 1, 1, <UpdateCustomEventRequest>{
+                tags: ['tag'],
+                name: 'name',
+                description: 'description',
+                status: CustomEventStatus.Disabled,
+                events: stubs.customEvent.events,
+            })).toBeApiResponse(stubs.customEvent);
+        })
+
+        test('Delete custom event', async () => {
+            await expect(api.deleteCustomEvent(1, 1, 1)).toBeApiResponse(stubs.customEvent);
         })
     })
 

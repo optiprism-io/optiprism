@@ -82,6 +82,7 @@ impl From<Status> for metadata::custom_events::Status {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
+    #[serde(flatten)]
     pub event: EventRef,
     pub filters: Option<Vec<EventFilter>>,
 }

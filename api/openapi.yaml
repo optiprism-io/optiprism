@@ -577,7 +577,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - events
+        - custom events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -613,7 +613,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - events
+        - custom events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -649,7 +649,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - events
+        - custom events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -684,7 +684,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - events
+        - custom events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -715,7 +715,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - events
+        - custom events
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -1949,6 +1949,7 @@ components:
         including custom ones. E.g. you can't have multiple "Sign up" events. <br/><br/>
         Normally events are created and updated by admin in a project scope, but there
         are also system events, which can't be deleted or modified.
+      required: [ 'id','createdAt','createdBy','projectId','isSystem','status','name' ]
       properties:
         id:
           type: integer
@@ -1992,11 +1993,7 @@ components:
           type: string
           description: description
         status:
-          type: string
-          enum:
-            - enabled
-            - disabled
-          description: event status
+          $ref: '#/components/schemas/EventStatus'
         eventProperties:
           type: array
           items:
@@ -2020,10 +2017,7 @@ components:
           type: string
           description: description
         status:
-          type: string
-          enum:
-            - enabled
-            - disabled
+          $ref: '#/components/schemas/EventStatus'
         tags:
           type: array
           items:
@@ -2043,6 +2037,7 @@ components:
         You can use regular or custom events in expression. You can combine events
         in expression, you can use filter by properties.
       type: object
+      required: [ 'id','createdAt','createdBy','projectId','isSystem','status','name','events' ]
       properties:
         id:
           type: integer
@@ -2062,21 +2057,18 @@ components:
         projectId:
           type: integer
           format: int64
-        isSystem:
-          type: boolean
-        status:
-          type: string
-          enum:
-            - enabled
-            - disabled
-        name:
-          type: string
-        description:
-          type: string
         tags:
           type: array
           items:
             type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/CustomEventStatus'
+        isSystem:
+          type: boolean
         events:
           type: array
           items:
@@ -2114,10 +2106,7 @@ components:
         description:
           type: string
         status:
-          type: string
-          enum:
-            - enabled
-            - disabled
+          $ref: '#/components/schemas/CustomEventStatus'
         tags:
           type: array
           items:
@@ -2129,10 +2118,10 @@ components:
     CustomEventEvent:
       type: object
       description: custom event will matches all of the provided events
+      required: ['eventType']
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
-          required: [ 'filters' ]
           properties:
             filters:
               type: array
@@ -2199,10 +2188,7 @@ components:
           type: string
           description: description
         status:
-          type: string
-          enum:
-            - enabled
-            - disabled
+          $ref: '#/components/schemas/PropertyStatus'
           description: property status
         dataType:
           allOf:
@@ -2232,10 +2218,7 @@ components:
         description:
           type: string
         status:
-          type: string
-          enum:
-            - enabled
-            - disabled
+          $ref: '#/components/schemas/PropertyStatus'
         tags:
           type: array
           items:
@@ -2269,10 +2252,7 @@ components:
         isSystem:
           type: boolean
         status:
-          type: string
-          enum:
-            - enabled
-            - disabled
+          $ref: '#/components/schemas/CustomPropertyStatus'
         name:
           type: string
         description:
@@ -3513,6 +3493,30 @@ components:
       enum:
         - regular
         - custom
+    EventStatus:
+      type: string
+      description: event status
+      enum:
+        - enabled
+        - disabled
+    CustomEventStatus:
+      type: string
+      description: custom event status
+      enum:
+        - enabled
+        - disabled
+    PropertyStatus:
+      type: string
+      description: property status
+      enum:
+        - enabled
+        - disabled
+    CustomPropertyStatus:
+      type: string
+      description: custom property status
+      enum:
+        - enabled
+        - disabled
     PropertyType:
       type: string
       description: possible property type
