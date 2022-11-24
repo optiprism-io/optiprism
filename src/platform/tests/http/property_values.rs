@@ -3,7 +3,7 @@ mod tests {
 
     use axum::http::StatusCode;
     use platform::queries::property_values::Filter;
-    use platform::queries::property_values::PropertyValues;
+    use platform::queries::property_values::ListPropertyValuesRequest;
     use platform::EventRef;
     use platform::PropValueOperation;
     use platform::PropertyRef;
@@ -20,7 +20,7 @@ mod tests {
         let cl = Client::new();
         let headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
-        let req = PropertyValues {
+        let req = ListPropertyValuesRequest {
             property: PropertyRef::Event {
                 property_name: "Product Name".to_string(),
             },

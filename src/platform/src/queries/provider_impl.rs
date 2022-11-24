@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use axum::async_trait;
+use serde_json::Value;
 use common::rbac::ProjectPermission;
 
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values;
-use crate::queries::property_values::PropertyValues;
+use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::Provider;
-use crate::Context;
+use crate::{Context, ListResponse};
 use crate::DataTable;
 use crate::Result;
 
@@ -49,8 +50,8 @@ impl Provider for ProviderImpl {
         ctx: Context,
         organization_id: u64,
         project_id: u64,
-        req: PropertyValues,
-    ) -> Result<property_values::ListResponse> {
+        req: ListPropertyValuesRequest,
+    ) -> Result<ListResponse<Value>> {
         ctx.check_project_permission(
             organization_id,
             project_id,

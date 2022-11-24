@@ -26,7 +26,7 @@ use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::queries;
 use crate::queries::event_segmentation::{Analysis, ChartType, EventSegmentation, Query};
-use crate::queries::property_values::PropertyValues;
+use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::Column;
 use crate::Context;
 use crate::DataTable;
@@ -464,11 +464,12 @@ impl queries::Provider for Queries {
         _ctx: Context,
         _organization_id: u64,
         _project_id: u64,
-        _req: PropertyValues,
-    ) -> Result<queries::property_values::ListResponse> {
-        Ok(queries::property_values::ListResponse::new(vec![
-            Value::from("value"),
-        ]))
+        _req: ListPropertyValuesRequest,
+    ) -> Result<ListResponse<Value>> {
+        Ok(ListResponse {
+            data: vec![Value::from("value")],
+            meta: ResponseMetadata { next: Some("next".to_string()) },
+        })
     }
 }
 

@@ -1204,7 +1204,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - properties
+        - property values
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -1412,42 +1412,31 @@ components:
           type: string
     ListPropertyValuesRequest:
       type: object
-      oneOf:
-        - $ref: '#/components/schemas/ListEventPropertyValues'
-        - $ref: '#/components/schemas/ListCustomEventPropertyValues'
-    ListEventPropertyValues:
-      type: object
+      required: [ 'propertyType' ]
       allOf:
         - $ref: '#/components/schemas/PropertyRef'
+        - $ref: '#/components/schemas/EventRef'
         - type: object
-          required: [ 'eventName' ]
           properties:
-            eventName:
-              type: string
-    ListCustomEventPropertyValues:
-      type: object
-      allOf:
-        - $ref: '#/components/schemas/PropertyRef'
-        - type: object
-          required: [ 'eventId' ]
-          properties:
-            eventId:
-              type: number
+            filter:
+              type: object
+              title: 'PropertyValuesRequestFilter'
+              required: [ 'operation' ,'value' ]
+              properties:
+                operation:
+                  $ref: '#/components/schemas/PropertyFilterOperation'
+                value:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Value'
 
     ListPropertyValuesResponse:
       type: object
       properties:
         data:
-          oneOf:
-            - type: array
-              items:
-                type: string
-            - type: array
-              items:
-                type: number
-            - type: array
-              items:
-                type: boolean
+          type: array
+          items:
+            $ref: '#/components/schemas/Value'
     TokensResponse:
       type: object
       properties:

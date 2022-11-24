@@ -4,12 +4,13 @@ use axum::extract::Extension;
 use axum::extract::Path;
 use axum::routing;
 use axum::Router;
+use serde_json::Value;
 
 use crate::http::Json;
-use crate::queries;
+use crate::{ListResponse, queries};
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values;
-use crate::queries::property_values::PropertyValues;
+use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::Context;
 use crate::DataTable;
 use crate::Result;
@@ -31,8 +32,8 @@ async fn property_values(
     ctx: Context,
     Extension(provider): Extension<Arc<dyn queries::Provider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
-    Json(request): Json<PropertyValues>,
-) -> Result<Json<property_values::ListResponse>> {
+    Json(request): Json<ListPropertyValuesRequest>,
+) -> Result<Json<ListResponse<Value>>> {
     Ok(Json(
         provider
             .property_values(ctx, organization_id, project_id, request)
@@ -42,9 +43,9 @@ async fn property_values(
 
 pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
-        "/organizations/:organization_id/projects/:project_id/queries",
+        "/organizations/:organization_id/projects/:project_id",
         router
-            .route("/event-segmentation", routing::post(event_segmentation))
+            .route("/queries/event-segmentation", routing::post(event_segmentation))
             .route("/property-values", routing::post(property_values)),
     )
 }

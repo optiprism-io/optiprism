@@ -248,5 +248,6 @@ export const stubs = {
             }
 
         ]
-    }
+    },
+    propertyValue: 'value'
 }

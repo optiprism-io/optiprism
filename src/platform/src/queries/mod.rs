@@ -2,8 +2,8 @@ use chrono::DateTime;
 use chrono::Utc;
 
 use crate::queries::event_segmentation::EventSegmentation;
-use crate::queries::property_values::PropertyValues;
-use crate::Context;
+use crate::queries::property_values::ListPropertyValuesRequest;
+use crate::{Context, ListResponse};
 use crate::DataTable;
 use crate::PlatformError;
 
@@ -16,6 +16,7 @@ pub use provider_impl::ProviderImpl;
 use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
 use serde::Deserialize;
 use serde::Serialize;
+use serde_json::Value;
 
 use crate::Result;
 
@@ -34,8 +35,8 @@ pub trait Provider: Sync + Send {
         ctx: Context,
         organization_id: u64,
         project_id: u64,
-        req: PropertyValues,
-    ) -> Result<property_values::ListResponse>;
+        req: ListPropertyValuesRequest,
+    ) -> Result<ListResponse<Value>>;
 }
 
 #[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]

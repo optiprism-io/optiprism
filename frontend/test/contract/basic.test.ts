@@ -101,7 +101,11 @@ import {
     GroupRecordsApi,
     GroupRecordsListRequest,
     EventRecordsList200Response,
-    GroupRecordsList200Response, UpdateGroupRecordRequest
+    GroupRecordsList200Response,
+    UpdateGroupRecordRequest,
+    PropertyValuesApi,
+    ListPropertyValuesRequest,
+    PropertyValuesRequestFilter, PropertyValuesList200Response
 } from '../../src/api';
 import {AxiosError} from 'axios';
 
@@ -409,6 +413,25 @@ describe('Authorized', () => {
             await expect(api.updateGroupRecord(1, 1, 1, <UpdateGroupRecordRequest>{
                 properties: {'prop': 1}
             })).toBeApiResponse(stubs.groupRecord);
+        })
+    })
+
+    describe('Property Values', () => {
+        const api = new PropertyValuesApi(config({auth: true}))
+        test('List property values', async () => {
+            await expect(api.propertyValuesList(1, 1, <ListPropertyValuesRequest>{
+                eventType: EventType.Regular,
+                eventName: 'event',
+                propertyType: PropertyType.User,
+                propertyName: 'property',
+                filter: <PropertyValuesRequestFilter>{
+                    operation: PropertyFilterOperation.Eq,
+                    value: [1, '2']
+                }
+            })).toBeApiResponse(<PropertyValuesList200Response>{
+                data: [stubs.propertyValue],
+                meta: <ListResponseMetadataMeta>{next: 'next'}
+            })
         })
     })
 

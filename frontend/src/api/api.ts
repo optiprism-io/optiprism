@@ -913,10 +913,10 @@ export interface DataTableResponseColumnsInner {
     'dataType': DataType;
     /**
      * 
-     * @type {ListPropertyValuesResponseData}
+     * @type {DataTableResponseColumnsInnerData}
      * @memberof DataTableResponseColumnsInner
      */
-    'data': ListPropertyValuesResponseData;
+    'data': DataTableResponseColumnsInnerData;
     /**
      * 
      * @type {number}
@@ -925,10 +925,10 @@ export interface DataTableResponseColumnsInner {
     'step'?: number;
     /**
      * 
-     * @type {ListPropertyValuesResponseData}
+     * @type {DataTableResponseColumnsInnerData}
      * @memberof DataTableResponseColumnsInner
      */
-    'compareValues'?: ListPropertyValuesResponseData;
+    'compareValues'?: DataTableResponseColumnsInnerData;
 }
 
 export const DataTableResponseColumnsInnerTypeEnum = {
@@ -939,6 +939,12 @@ export const DataTableResponseColumnsInnerTypeEnum = {
 } as const;
 
 export type DataTableResponseColumnsInnerTypeEnum = typeof DataTableResponseColumnsInnerTypeEnum[keyof typeof DataTableResponseColumnsInnerTypeEnum];
+
+/**
+ * @type DataTableResponseColumnsInnerData
+ * @export
+ */
+export type DataTableResponseColumnsInnerData = Array<boolean> | Array<number> | Array<string>;
 
 /**
  * data type
@@ -2773,50 +2779,6 @@ export type JWTTokenIssEnum = typeof JWTTokenIssEnum[keyof typeof JWTTokenIssEnu
 /**
  * 
  * @export
- * @interface ListCustomEventPropertyValues
- */
-export interface ListCustomEventPropertyValues {
-    /**
-     * 
-     * @type {string}
-     * @memberof ListCustomEventPropertyValues
-     */
-    'propertyName'?: string;
-    /**
-     * 
-     * @type {number}
-     * @memberof ListCustomEventPropertyValues
-     */
-    'propertyId'?: number;
-    /**
-     * 
-     * @type {PropertyType}
-     * @memberof ListCustomEventPropertyValues
-     */
-    'propertyType': PropertyType;
-    /**
-     * 
-     * @type {number}
-     * @memberof ListCustomEventPropertyValues
-     */
-    'eventId': number;
-}
-/**
- * 
- * @export
- * @interface ListCustomEventPropertyValuesAllOf
- */
-export interface ListCustomEventPropertyValuesAllOf {
-    /**
-     * 
-     * @type {number}
-     * @memberof ListCustomEventPropertyValuesAllOf
-     */
-    'eventId': number;
-}
-/**
- * 
- * @export
  * @interface ListCustomPropertiesResponse
  */
 export interface ListCustomPropertiesResponse {
@@ -2826,50 +2788,6 @@ export interface ListCustomPropertiesResponse {
      * @memberof ListCustomPropertiesResponse
      */
     'events'?: Array<CustomProperty>;
-}
-/**
- * 
- * @export
- * @interface ListEventPropertyValues
- */
-export interface ListEventPropertyValues {
-    /**
-     * 
-     * @type {string}
-     * @memberof ListEventPropertyValues
-     */
-    'propertyName'?: string;
-    /**
-     * 
-     * @type {number}
-     * @memberof ListEventPropertyValues
-     */
-    'propertyId'?: number;
-    /**
-     * 
-     * @type {PropertyType}
-     * @memberof ListEventPropertyValues
-     */
-    'propertyType': PropertyType;
-    /**
-     * 
-     * @type {string}
-     * @memberof ListEventPropertyValues
-     */
-    'eventName': string;
-}
-/**
- * 
- * @export
- * @interface ListEventPropertyValuesAllOf
- */
-export interface ListEventPropertyValuesAllOf {
-    /**
-     * 
-     * @type {string}
-     * @memberof ListEventPropertyValuesAllOf
-     */
-    'eventName': string;
 }
 /**
  * 
@@ -2911,11 +2829,67 @@ export interface ListPropertiesResponse {
     'data'?: Array<Property>;
 }
 /**
- * @type ListPropertyValuesRequest
+ * 
  * @export
+ * @interface ListPropertyValuesRequest
  */
-export type ListPropertyValuesRequest = ListCustomEventPropertyValues | ListEventPropertyValues;
-
+export interface ListPropertyValuesRequest {
+    /**
+     * 
+     * @type {string}
+     * @memberof ListPropertyValuesRequest
+     */
+    'propertyName'?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof ListPropertyValuesRequest
+     */
+    'propertyId'?: number;
+    /**
+     * 
+     * @type {PropertyType}
+     * @memberof ListPropertyValuesRequest
+     */
+    'propertyType': PropertyType;
+    /**
+     * 
+     * @type {string}
+     * @memberof ListPropertyValuesRequest
+     */
+    'eventName'?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof ListPropertyValuesRequest
+     */
+    'eventId'?: number;
+    /**
+     * 
+     * @type {EventType}
+     * @memberof ListPropertyValuesRequest
+     */
+    'eventType': EventType;
+    /**
+     * 
+     * @type {PropertyValuesRequestFilter}
+     * @memberof ListPropertyValuesRequest
+     */
+    'filter'?: PropertyValuesRequestFilter;
+}
+/**
+ * 
+ * @export
+ * @interface ListPropertyValuesRequestAllOf
+ */
+export interface ListPropertyValuesRequestAllOf {
+    /**
+     * 
+     * @type {PropertyValuesRequestFilter}
+     * @memberof ListPropertyValuesRequestAllOf
+     */
+    'filter'?: PropertyValuesRequestFilter;
+}
 /**
  * 
  * @export
@@ -2924,17 +2898,11 @@ export type ListPropertyValuesRequest = ListCustomEventPropertyValues | ListEven
 export interface ListPropertyValuesResponse {
     /**
      * 
-     * @type {ListPropertyValuesResponseData}
+     * @type {Array<Value>}
      * @memberof ListPropertyValuesResponse
      */
-    'data'?: ListPropertyValuesResponseData;
+    'data'?: Array<Value>;
 }
-/**
- * @type ListPropertyValuesResponseData
- * @export
- */
-export type ListPropertyValuesResponseData = Array<boolean> | Array<number> | Array<string>;
-
 /**
  * list response metadata
  * @export
@@ -3275,16 +3243,35 @@ export type PropertyType = typeof PropertyType[keyof typeof PropertyType];
 export interface PropertyValuesList200Response {
     /**
      * 
-     * @type {ListPropertyValuesResponseData}
+     * @type {Array<Value>}
      * @memberof PropertyValuesList200Response
      */
-    'data'?: ListPropertyValuesResponseData;
+    'data'?: Array<Value>;
     /**
      * 
      * @type {ListResponseMetadataMeta}
      * @memberof PropertyValuesList200Response
      */
     'meta'?: ListResponseMetadataMeta;
+}
+/**
+ * 
+ * @export
+ * @interface PropertyValuesRequestFilter
+ */
+export interface PropertyValuesRequestFilter {
+    /**
+     * 
+     * @type {PropertyFilterOperation}
+     * @memberof PropertyValuesRequestFilter
+     */
+    'operation'?: PropertyFilterOperation;
+    /**
+     * 
+     * @type {Array<Value>}
+     * @memberof PropertyValuesRequestFilter
+     */
+    'value'?: Array<Value>;
 }
 /**
  * 
@@ -6747,6 +6734,80 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
                 options: localVarRequestOptions,
             };
         },
+    }
+};
+
+/**
+ * PropertiesApi - functional programming interface
+ * @export
+ */
+export const PropertiesApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = PropertiesApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Event custom properties list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async customPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomPropertiesList200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.customPropertiesList(organizationId, projectId, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+    }
+};
+
+/**
+ * PropertiesApi - factory interface
+ * @export
+ */
+export const PropertiesApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = PropertiesApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Event custom properties list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        customPropertiesList(organizationId: number, projectId: number, options?: any): AxiosPromise<CustomPropertiesList200Response> {
+            return localVarFp.customPropertiesList(organizationId, projectId, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * PropertiesApi - object-oriented interface
+ * @export
+ * @class PropertiesApi
+ * @extends {BaseAPI}
+ */
+export class PropertiesApi extends BaseAPI {
+    /**
+     * 
+     * @summary Event custom properties list
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PropertiesApi
+     */
+    public customPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig) {
+        return PropertiesApiFp(this.configuration).customPropertiesList(organizationId, projectId, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+/**
+ * PropertyValuesApi - axios parameter creator
+ * @export
+ */
+export const PropertyValuesApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
         /**
          * 
          * @summary List of property values
@@ -6799,24 +6860,12 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
 };
 
 /**
- * PropertiesApi - functional programming interface
+ * PropertyValuesApi - functional programming interface
  * @export
  */
-export const PropertiesApiFp = function(configuration?: Configuration) {
-    const localVarAxiosParamCreator = PropertiesApiAxiosParamCreator(configuration)
+export const PropertyValuesApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = PropertyValuesApiAxiosParamCreator(configuration)
     return {
-        /**
-         * 
-         * @summary Event custom properties list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async customPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CustomPropertiesList200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.customPropertiesList(organizationId, projectId, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
         /**
          * 
          * @summary List of property values
@@ -6834,23 +6883,12 @@ export const PropertiesApiFp = function(configuration?: Configuration) {
 };
 
 /**
- * PropertiesApi - factory interface
+ * PropertyValuesApi - factory interface
  * @export
  */
-export const PropertiesApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
-    const localVarFp = PropertiesApiFp(configuration)
+export const PropertyValuesApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = PropertyValuesApiFp(configuration)
     return {
-        /**
-         * 
-         * @summary Event custom properties list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        customPropertiesList(organizationId: number, projectId: number, options?: any): AxiosPromise<CustomPropertiesList200Response> {
-            return localVarFp.customPropertiesList(organizationId, projectId, options).then((request) => request(axios, basePath));
-        },
         /**
          * 
          * @summary List of property values
@@ -6867,25 +6905,12 @@ export const PropertiesApiFactory = function (configuration?: Configuration, bas
 };
 
 /**
- * PropertiesApi - object-oriented interface
+ * PropertyValuesApi - object-oriented interface
  * @export
- * @class PropertiesApi
+ * @class PropertyValuesApi
  * @extends {BaseAPI}
  */
-export class PropertiesApi extends BaseAPI {
-    /**
-     * 
-     * @summary Event custom properties list
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof PropertiesApi
-     */
-    public customPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig) {
-        return PropertiesApiFp(this.configuration).customPropertiesList(organizationId, projectId, options).then((request) => request(this.axios, this.basePath));
-    }
-
+export class PropertyValuesApi extends BaseAPI {
     /**
      * 
      * @summary List of property values
@@ -6894,10 +6919,10 @@ export class PropertiesApi extends BaseAPI {
      * @param {ListPropertyValuesRequest} listPropertyValuesRequest property type and property id/name must be specified. Event is optional and  works as a filter for values 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
-     * @memberof PropertiesApi
+     * @memberof PropertyValuesApi
      */
     public propertyValuesList(organizationId: number, projectId: number, listPropertyValuesRequest: ListPropertyValuesRequest, options?: AxiosRequestConfig) {
-        return PropertiesApiFp(this.configuration).propertyValuesList(organizationId, projectId, listPropertyValuesRequest, options).then((request) => request(this.axios, this.basePath));
+        return PropertyValuesApiFp(this.configuration).propertyValuesList(organizationId, projectId, listPropertyValuesRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

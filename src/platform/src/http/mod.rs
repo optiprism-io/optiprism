@@ -72,18 +72,29 @@ impl Service {
 
         info!("attaching api routes...");
         router = accounts::attach_routes(router);
+        info!("1");
         router = auth::attach_routes(router);
+        info!("2");
         router = events::attach_routes(router);
+        info!("3");
         router = custom_events::attach_routes(router);
+        info!("4");
         router = properties::attach_event_routes(router);
+        info!("5");
         router = properties::attach_user_routes(router);
+        info!("6");
         router = queries::attach_routes(router);
+        info!("7");
         router = dashboards::attach_routes(router);
+        info!("8");
         router = reports::attach_routes(router);
+        info!("9");
         router = event_records::attach_routes(router);
+        info!("10");
         router = group_records::attach_routes(router);
+        info!("11");
         router = router.clone().nest("/api/v1", router);
-
+        info!("12");
         router = router
             .layer(Extension(md.accounts.clone()))
             .layer(Extension(platform.accounts.clone()))
