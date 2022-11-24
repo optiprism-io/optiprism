@@ -1,5 +1,5 @@
 import {describe, expect, test} from 'vitest'
-import {config, testRequest, testRequestWithVariants, InputMaker} from './helpers'
+import {config, testRequestWithVariants, InputMaker} from './helpers'
 import {stubs} from './stubs'
 import {
     AnalysisCumulative,
@@ -39,22 +39,16 @@ import {
     EventGroupedFiltersGroupsInnerFiltersConditionEnum,
     EventPropertiesApi,
     EventRecordRequestEvent,
-    EventRecordRequestEventFilters,
     EventRecordsApi,
     EventRecordsListRequest,
-    EventRecordsListRequestTime,
-    EventType,
     EventsApi,
     EventSegmentation,
     EventSegmentationEvent,
-    EventSegmentationEventEventTypeEnum,
     EventsList200Response,
     EventStatus,
-    EventStatusEnum,
     EventType,
     ListResponseMetadataMeta,
     LoginRequest,
-    Property,
     PropertyFilterOperation,
     PropertyType,
     PropertyStatus,
@@ -107,7 +101,6 @@ import {
     ListPropertyValuesRequest,
     PropertyValuesRequestFilter, PropertyValuesList200Response
 } from '../../src/api';
-import {AxiosError} from 'axios';
 
 describe('Unauthorized', () => {
     describe('Auth', () => {
@@ -220,7 +213,7 @@ describe('Authorized', () => {
                     chartType: EventChartType.Line,
                     analysis: <AnalysisLinear>{type: AnalysisLinearTypeEnum.Linear},
                     events: [<EventSegmentationEvent>{
-                        eventType: EventSegmentationEventEventTypeEnum.Regular,
+                        eventType: EventType.Regular,
                         eventName: 'event',
                         queries: [<QuerySimple>{type: QuerySimpleTypeEnum.CountEvents}]
                     }]
@@ -249,7 +242,7 @@ describe('Authorized', () => {
                     chartType: EventChartType.Bar,
                     analysis: <AnalysisCumulative>{type: AnalysisCumulativeTypeEnum.Cumulative},
                     events: [<EventSegmentationEvent>{
-                        eventType: EventSegmentationEventEventTypeEnum.Regular,
+                        eventType: EventType.Regular,
                         eventName: 'event',
                         queries: [<QuerySimple>{type: QuerySimpleTypeEnum.CountEvents}]
                     }]
