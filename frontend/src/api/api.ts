@@ -971,6 +971,22 @@ export type DataType = typeof DataType[keyof typeof DataType];
 
 
 /**
+ * dictionary data type
+ * @export
+ * @enum {string}
+ */
+
+export const DictionaryDataType = {
+    Uint8: 'uint8',
+    Uint16: 'uint16',
+    Uint32: 'uint32',
+    Uint64: 'uint64'
+} as const;
+
+export type DictionaryDataType = typeof DictionaryDataType[keyof typeof DictionaryDataType];
+
+
+/**
  * aggregate property and compare to value
  * @export
  * @interface DidEventAggregateProperty
@@ -3232,18 +3248,6 @@ export interface Property {
     'events'?: Array<number>;
     /**
      * 
-     * @type {string}
-     * @memberof Property
-     */
-    'type'?: PropertyTypeEnum;
-    /**
-     * the property is a system-wide, shown in any project and can\'t be modified by a regular user
-     * @type {boolean}
-     * @memberof Property
-     */
-    'isSystem': boolean;
-    /**
-     * 
      * @type {Array<string>}
      * @memberof Property
      */
@@ -3268,16 +3272,22 @@ export interface Property {
     'description'?: string;
     /**
      * 
+     * @type {DataType}
+     * @memberof Property
+     */
+    'dataType': DataType;
+    /**
+     * 
      * @type {PropertyStatus}
      * @memberof Property
      */
     'status': PropertyStatus;
     /**
-     * 
-     * @type {object & DataType}
+     * the property is a system-wide, shown in any project and can\'t be modified by a regular user
+     * @type {boolean}
      * @memberof Property
      */
-    'dataType': object & DataType;
+    'isSystem': boolean;
     /**
      * nullable property might contains null value
      * @type {boolean}
@@ -3298,19 +3308,11 @@ export interface Property {
     'isDictionary': boolean;
     /**
      * 
-     * @type {object & DataType}
+     * @type {DictionaryDataType}
      * @memberof Property
      */
-    'dictionaryType'?: object & DataType;
+    'dictionaryType'?: DictionaryDataType;
 }
-
-export const PropertyTypeEnum = {
-    Event: 'event',
-    User: 'user'
-} as const;
-
-export type PropertyTypeEnum = typeof PropertyTypeEnum[keyof typeof PropertyTypeEnum];
-
 /**
  * operation
  * @export
@@ -5749,6 +5751,301 @@ export class DashboardsApi extends BaseAPI {
 
 
 /**
+ * EventPropertiesApi - axios parameter creator
+ * @export
+ */
+export const EventPropertiesApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Event properties list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        eventPropertiesList: async (organizationId: number, projectId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('eventPropertiesList', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('eventPropertiesList', 'projectId', projectId)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Get event property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} propertyId Property ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getEventProperty: async (organizationId: number, projectId: number, propertyId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('getEventProperty', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('getEventProperty', 'projectId', projectId)
+            // verify required parameter 'propertyId' is not null or undefined
+            assertParamExists('getEventProperty', 'propertyId', propertyId)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties/{propertyId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Update event property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {string} propertyId Property ID
+         * @param {UpdatePropertyRequest} updatePropertyRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateEventProperty: async (organizationId: number, projectId: number, propertyId: string, updatePropertyRequest: UpdatePropertyRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('updateEventProperty', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('updateEventProperty', 'projectId', projectId)
+            // verify required parameter 'propertyId' is not null or undefined
+            assertParamExists('updateEventProperty', 'propertyId', propertyId)
+            // verify required parameter 'updatePropertyRequest' is not null or undefined
+            assertParamExists('updateEventProperty', 'updatePropertyRequest', updatePropertyRequest)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties/{propertyId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updatePropertyRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * EventPropertiesApi - functional programming interface
+ * @export
+ */
+export const EventPropertiesApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = EventPropertiesApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Event properties list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async eventPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserPropertiesList200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.eventPropertiesList(organizationId, projectId, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Get event property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} propertyId Property ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getEventProperty(organizationId: number, projectId: number, propertyId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Property>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getEventProperty(organizationId, projectId, propertyId, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Update event property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {string} propertyId Property ID
+         * @param {UpdatePropertyRequest} updatePropertyRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateEventProperty(organizationId: number, projectId: number, propertyId: string, updatePropertyRequest: UpdatePropertyRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Property>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateEventProperty(organizationId, projectId, propertyId, updatePropertyRequest, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+    }
+};
+
+/**
+ * EventPropertiesApi - factory interface
+ * @export
+ */
+export const EventPropertiesApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = EventPropertiesApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Event properties list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        eventPropertiesList(organizationId: number, projectId: number, options?: any): AxiosPromise<UserPropertiesList200Response> {
+            return localVarFp.eventPropertiesList(organizationId, projectId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Get event property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} propertyId Property ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getEventProperty(organizationId: number, projectId: number, propertyId: number, options?: any): AxiosPromise<Property> {
+            return localVarFp.getEventProperty(organizationId, projectId, propertyId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Update event property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {string} propertyId Property ID
+         * @param {UpdatePropertyRequest} updatePropertyRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateEventProperty(organizationId: number, projectId: number, propertyId: string, updatePropertyRequest: UpdatePropertyRequest, options?: any): AxiosPromise<Property> {
+            return localVarFp.updateEventProperty(organizationId, projectId, propertyId, updatePropertyRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * EventPropertiesApi - object-oriented interface
+ * @export
+ * @class EventPropertiesApi
+ * @extends {BaseAPI}
+ */
+export class EventPropertiesApi extends BaseAPI {
+    /**
+     * 
+     * @summary Event properties list
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof EventPropertiesApi
+     */
+    public eventPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig) {
+        return EventPropertiesApiFp(this.configuration).eventPropertiesList(organizationId, projectId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Get event property
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {number} propertyId Property ID
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof EventPropertiesApi
+     */
+    public getEventProperty(organizationId: number, projectId: number, propertyId: number, options?: AxiosRequestConfig) {
+        return EventPropertiesApiFp(this.configuration).getEventProperty(organizationId, projectId, propertyId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Update event property
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {string} propertyId Property ID
+     * @param {UpdatePropertyRequest} updatePropertyRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof EventPropertiesApi
+     */
+    public updateEventProperty(organizationId: number, projectId: number, propertyId: string, updatePropertyRequest: UpdatePropertyRequest, options?: AxiosRequestConfig) {
+        return EventPropertiesApiFp(this.configuration).updateEventProperty(organizationId, projectId, propertyId, updatePropertyRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+/**
  * EventsApi - axios parameter creator
  * @export
  */
@@ -5892,52 +6189,6 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
         },
         /**
          * 
-         * @summary Get event property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} propertyId Property ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getEventProperty: async (organizationId: number, projectId: number, propertyId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('getEventProperty', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('getEventProperty', 'projectId', projectId)
-            // verify required parameter 'propertyId' is not null or undefined
-            assertParamExists('getEventProperty', 'propertyId', propertyId)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties/{propertyId}`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
          * @summary Get event record
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -5956,52 +6207,6 @@ export const EventsApiAxiosParamCreator = function (configuration?: Configuratio
                 .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
                 .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
                 .replace(`{${"id"}}`, encodeURIComponent(String(id)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary Get user property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} propertyId Property ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getUserProperty: async (organizationId: number, projectId: number, propertyId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('getUserProperty', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('getUserProperty', 'projectId', projectId)
-            // verify required parameter 'propertyId' is not null or undefined
-            assertParamExists('getUserProperty', 'propertyId', propertyId)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties/{propertyId}`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -6130,19 +6335,6 @@ export const EventsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Get event property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} propertyId Property ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async getEventProperty(organizationId: number, projectId: number, propertyId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Property>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getEventProperty(organizationId, projectId, propertyId, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
          * @summary Get event record
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -6152,19 +6344,6 @@ export const EventsApiFp = function(configuration?: Configuration) {
          */
         async getEventRecord(organizationId: number, projectId: number, id: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<EventRecord>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.getEventRecord(organizationId, projectId, id, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
-         * @summary Get user property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} propertyId Property ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async getUserProperty(organizationId: number, projectId: number, propertyId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Property>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getUserProperty(organizationId, projectId, propertyId, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -6228,18 +6407,6 @@ export const EventsApiFactory = function (configuration?: Configuration, basePat
         },
         /**
          * 
-         * @summary Get event property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} propertyId Property ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getEventProperty(organizationId: number, projectId: number, propertyId: number, options?: any): AxiosPromise<Property> {
-            return localVarFp.getEventProperty(organizationId, projectId, propertyId, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary Get event record
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -6249,18 +6416,6 @@ export const EventsApiFactory = function (configuration?: Configuration, basePat
          */
         getEventRecord(organizationId: number, projectId: number, id: number, options?: any): AxiosPromise<EventRecord> {
             return localVarFp.getEventRecord(organizationId, projectId, id, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Get user property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} propertyId Property ID
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getUserProperty(organizationId: number, projectId: number, propertyId: number, options?: any): AxiosPromise<Property> {
-            return localVarFp.getUserProperty(organizationId, projectId, propertyId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -6328,20 +6483,6 @@ export class EventsApi extends BaseAPI {
 
     /**
      * 
-     * @summary Get event property
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {number} propertyId Property ID
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof EventsApi
-     */
-    public getEventProperty(organizationId: number, projectId: number, propertyId: number, options?: AxiosRequestConfig) {
-        return EventsApiFp(this.configuration).getEventProperty(organizationId, projectId, propertyId, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
      * @summary Get event record
      * @param {number} organizationId 
      * @param {number} projectId 
@@ -6352,20 +6493,6 @@ export class EventsApi extends BaseAPI {
      */
     public getEventRecord(organizationId: number, projectId: number, id: number, options?: AxiosRequestConfig) {
         return EventsApiFp(this.configuration).getEventRecord(organizationId, projectId, id, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Get user property
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {number} propertyId Property ID
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof EventsApi
-     */
-    public getUserProperty(organizationId: number, projectId: number, propertyId: number, options?: AxiosRequestConfig) {
-        return EventsApiFp(this.configuration).getUserProperty(organizationId, projectId, propertyId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -6739,48 +6866,6 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
         },
         /**
          * 
-         * @summary Event properties list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        eventPropertiesList: async (organizationId: number, projectId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('eventPropertiesList', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('eventPropertiesList', 'projectId', projectId)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -6827,152 +6912,6 @@ export const PropertiesApiAxiosParamCreator = function (configuration?: Configur
                 options: localVarRequestOptions,
             };
         },
-        /**
-         * 
-         * @summary Update event property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {string} propertyId Property ID
-         * @param {UpdatePropertyRequest} updatePropertyRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        updateEventProperty: async (organizationId: number, projectId: number, propertyId: string, updatePropertyRequest: UpdatePropertyRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('updateEventProperty', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('updateEventProperty', 'projectId', projectId)
-            // verify required parameter 'propertyId' is not null or undefined
-            assertParamExists('updateEventProperty', 'propertyId', propertyId)
-            // verify required parameter 'updatePropertyRequest' is not null or undefined
-            assertParamExists('updateEventProperty', 'updatePropertyRequest', updatePropertyRequest)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties/{propertyId}`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(updatePropertyRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary Update user property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} propertyId Property ID
-         * @param {UpdatePropertyRequest} updatePropertyRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        updateUserProperty: async (organizationId: number, projectId: number, propertyId: number, updatePropertyRequest: UpdatePropertyRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('updateUserProperty', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('updateUserProperty', 'projectId', projectId)
-            // verify required parameter 'propertyId' is not null or undefined
-            assertParamExists('updateUserProperty', 'propertyId', propertyId)
-            // verify required parameter 'updatePropertyRequest' is not null or undefined
-            assertParamExists('updateUserProperty', 'updatePropertyRequest', updatePropertyRequest)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties/{propertyId}`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
-                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(updatePropertyRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary User properties list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        userPropertiesList: async (organizationId: number, projectId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('userPropertiesList', 'organizationId', organizationId)
-            // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('userPropertiesList', 'projectId', projectId)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties`
-                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
-                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication bearerAuth required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
     }
 };
 
@@ -6997,18 +6936,6 @@ export const PropertiesApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Event properties list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async eventPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserPropertiesList200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.eventPropertiesList(organizationId, projectId, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -7018,46 +6945,6 @@ export const PropertiesApiFp = function(configuration?: Configuration) {
          */
         async propertyValuesList(organizationId: number, projectId: number, listPropertyValuesRequest: ListPropertyValuesRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PropertyValuesList200Response>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.propertyValuesList(organizationId, projectId, listPropertyValuesRequest, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
-         * @summary Update event property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {string} propertyId Property ID
-         * @param {UpdatePropertyRequest} updatePropertyRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async updateEventProperty(organizationId: number, projectId: number, propertyId: string, updatePropertyRequest: UpdatePropertyRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Property>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.updateEventProperty(organizationId, projectId, propertyId, updatePropertyRequest, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
-         * @summary Update user property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} propertyId Property ID
-         * @param {UpdatePropertyRequest} updatePropertyRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async updateUserProperty(organizationId: number, projectId: number, propertyId: number, updatePropertyRequest: UpdatePropertyRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Property>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.updateUserProperty(organizationId, projectId, propertyId, updatePropertyRequest, options);
-            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
-        },
-        /**
-         * 
-         * @summary User properties list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async userPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserPropertiesList200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.userPropertiesList(organizationId, projectId, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
     }
@@ -7083,17 +6970,6 @@ export const PropertiesApiFactory = function (configuration?: Configuration, bas
         },
         /**
          * 
-         * @summary Event properties list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        eventPropertiesList(organizationId: number, projectId: number, options?: any): AxiosPromise<UserPropertiesList200Response> {
-            return localVarFp.eventPropertiesList(organizationId, projectId, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary List of property values
          * @param {number} organizationId 
          * @param {number} projectId 
@@ -7103,43 +6979,6 @@ export const PropertiesApiFactory = function (configuration?: Configuration, bas
          */
         propertyValuesList(organizationId: number, projectId: number, listPropertyValuesRequest: ListPropertyValuesRequest, options?: any): AxiosPromise<PropertyValuesList200Response> {
             return localVarFp.propertyValuesList(organizationId, projectId, listPropertyValuesRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Update event property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {string} propertyId Property ID
-         * @param {UpdatePropertyRequest} updatePropertyRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        updateEventProperty(organizationId: number, projectId: number, propertyId: string, updatePropertyRequest: UpdatePropertyRequest, options?: any): AxiosPromise<Property> {
-            return localVarFp.updateEventProperty(organizationId, projectId, propertyId, updatePropertyRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Update user property
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {number} propertyId Property ID
-         * @param {UpdatePropertyRequest} updatePropertyRequest 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        updateUserProperty(organizationId: number, projectId: number, propertyId: number, updatePropertyRequest: UpdatePropertyRequest, options?: any): AxiosPromise<Property> {
-            return localVarFp.updateUserProperty(organizationId, projectId, propertyId, updatePropertyRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary User properties list
-         * @param {number} organizationId 
-         * @param {number} projectId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        userPropertiesList(organizationId: number, projectId: number, options?: any): AxiosPromise<UserPropertiesList200Response> {
-            return localVarFp.userPropertiesList(organizationId, projectId, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -7166,19 +7005,6 @@ export class PropertiesApi extends BaseAPI {
 
     /**
      * 
-     * @summary Event properties list
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof PropertiesApi
-     */
-    public eventPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig) {
-        return PropertiesApiFp(this.configuration).eventPropertiesList(organizationId, projectId, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
      * @summary List of property values
      * @param {number} organizationId 
      * @param {number} projectId 
@@ -7189,49 +7015,6 @@ export class PropertiesApi extends BaseAPI {
      */
     public propertyValuesList(organizationId: number, projectId: number, listPropertyValuesRequest: ListPropertyValuesRequest, options?: AxiosRequestConfig) {
         return PropertiesApiFp(this.configuration).propertyValuesList(organizationId, projectId, listPropertyValuesRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Update event property
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {string} propertyId Property ID
-     * @param {UpdatePropertyRequest} updatePropertyRequest 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof PropertiesApi
-     */
-    public updateEventProperty(organizationId: number, projectId: number, propertyId: string, updatePropertyRequest: UpdatePropertyRequest, options?: AxiosRequestConfig) {
-        return PropertiesApiFp(this.configuration).updateEventProperty(organizationId, projectId, propertyId, updatePropertyRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Update user property
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {number} propertyId Property ID
-     * @param {UpdatePropertyRequest} updatePropertyRequest 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof PropertiesApi
-     */
-    public updateUserProperty(organizationId: number, projectId: number, propertyId: number, updatePropertyRequest: UpdatePropertyRequest, options?: AxiosRequestConfig) {
-        return PropertiesApiFp(this.configuration).updateUserProperty(organizationId, projectId, propertyId, updatePropertyRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary User properties list
-     * @param {number} organizationId 
-     * @param {number} projectId 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof PropertiesApi
-     */
-    public userPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig) {
-        return PropertiesApiFp(this.configuration).userPropertiesList(organizationId, projectId, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -7907,6 +7690,301 @@ export class ReportsApi extends BaseAPI {
      */
     public updateReport(organizationId: number, projectId: number, reportId: number, updateReportRequest: UpdateReportRequest, options?: AxiosRequestConfig) {
         return ReportsApiFp(this.configuration).updateReport(organizationId, projectId, reportId, updateReportRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+/**
+ * UserPropertiesApi - axios parameter creator
+ * @export
+ */
+export const UserPropertiesApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Get user property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} propertyId Property ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getUserProperty: async (organizationId: number, projectId: number, propertyId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('getUserProperty', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('getUserProperty', 'projectId', projectId)
+            // verify required parameter 'propertyId' is not null or undefined
+            assertParamExists('getUserProperty', 'propertyId', propertyId)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties/{propertyId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Update user property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} propertyId Property ID
+         * @param {UpdatePropertyRequest} updatePropertyRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateUserProperty: async (organizationId: number, projectId: number, propertyId: number, updatePropertyRequest: UpdatePropertyRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('updateUserProperty', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('updateUserProperty', 'projectId', projectId)
+            // verify required parameter 'propertyId' is not null or undefined
+            assertParamExists('updateUserProperty', 'propertyId', propertyId)
+            // verify required parameter 'updatePropertyRequest' is not null or undefined
+            assertParamExists('updateUserProperty', 'updatePropertyRequest', updatePropertyRequest)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties/{propertyId}`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)))
+                .replace(`{${"propertyId"}}`, encodeURIComponent(String(propertyId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updatePropertyRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary User properties list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        userPropertiesList: async (organizationId: number, projectId: number, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'organizationId' is not null or undefined
+            assertParamExists('userPropertiesList', 'organizationId', organizationId)
+            // verify required parameter 'projectId' is not null or undefined
+            assertParamExists('userPropertiesList', 'projectId', projectId)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/schema/user-properties`
+                .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
+                .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication bearerAuth required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * UserPropertiesApi - functional programming interface
+ * @export
+ */
+export const UserPropertiesApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = UserPropertiesApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Get user property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} propertyId Property ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getUserProperty(organizationId: number, projectId: number, propertyId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Property>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getUserProperty(organizationId, projectId, propertyId, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary Update user property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} propertyId Property ID
+         * @param {UpdatePropertyRequest} updatePropertyRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateUserProperty(organizationId: number, projectId: number, propertyId: number, updatePropertyRequest: UpdatePropertyRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Property>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateUserProperty(organizationId, projectId, propertyId, updatePropertyRequest, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+        /**
+         * 
+         * @summary User properties list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async userPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserPropertiesList200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.userPropertiesList(organizationId, projectId, options);
+            return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
+        },
+    }
+};
+
+/**
+ * UserPropertiesApi - factory interface
+ * @export
+ */
+export const UserPropertiesApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = UserPropertiesApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Get user property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} propertyId Property ID
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getUserProperty(organizationId: number, projectId: number, propertyId: number, options?: any): AxiosPromise<Property> {
+            return localVarFp.getUserProperty(organizationId, projectId, propertyId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Update user property
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {number} propertyId Property ID
+         * @param {UpdatePropertyRequest} updatePropertyRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateUserProperty(organizationId: number, projectId: number, propertyId: number, updatePropertyRequest: UpdatePropertyRequest, options?: any): AxiosPromise<Property> {
+            return localVarFp.updateUserProperty(organizationId, projectId, propertyId, updatePropertyRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary User properties list
+         * @param {number} organizationId 
+         * @param {number} projectId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        userPropertiesList(organizationId: number, projectId: number, options?: any): AxiosPromise<UserPropertiesList200Response> {
+            return localVarFp.userPropertiesList(organizationId, projectId, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * UserPropertiesApi - object-oriented interface
+ * @export
+ * @class UserPropertiesApi
+ * @extends {BaseAPI}
+ */
+export class UserPropertiesApi extends BaseAPI {
+    /**
+     * 
+     * @summary Get user property
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {number} propertyId Property ID
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UserPropertiesApi
+     */
+    public getUserProperty(organizationId: number, projectId: number, propertyId: number, options?: AxiosRequestConfig) {
+        return UserPropertiesApiFp(this.configuration).getUserProperty(organizationId, projectId, propertyId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Update user property
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {number} propertyId Property ID
+     * @param {UpdatePropertyRequest} updatePropertyRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UserPropertiesApi
+     */
+    public updateUserProperty(organizationId: number, projectId: number, propertyId: number, updatePropertyRequest: UpdatePropertyRequest, options?: AxiosRequestConfig) {
+        return UserPropertiesApiFp(this.configuration).updateUserProperty(organizationId, projectId, propertyId, updatePropertyRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary User properties list
+     * @param {number} organizationId 
+     * @param {number} projectId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UserPropertiesApi
+     */
+    public userPropertiesList(organizationId: number, projectId: number, options?: AxiosRequestConfig) {
+        return UserPropertiesApiFp(this.configuration).userPropertiesList(organizationId, projectId, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

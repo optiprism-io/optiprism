@@ -34,7 +34,7 @@ import {
     EventFilterByPropertyTypeEnum,
     EventGroupedFilters,
     EventGroupedFiltersGroupsConditionEnum,
-    EventGroupedFiltersGroupsInnerFiltersConditionEnum,
+    EventGroupedFiltersGroupsInnerFiltersConditionEnum, EventPropertiesApi,
     EventRecordsListRequestTime,
     EventRefEventTypeEnum,
     EventsApi,
@@ -44,9 +44,9 @@ import {
     EventsList200Response, EventStatus,
     EventStatusEnum,
     ListResponseMetadataMeta,
-    LoginRequest,
+    LoginRequest, Property,
     PropertyFilterOperation,
-    PropertyRefPropertyTypeEnum,
+    PropertyRefPropertyTypeEnum, PropertyStatus,
     QueryAggregate,
     QueryAggregatePerGroup,
     QueryAggregateProperty,
@@ -82,8 +82,8 @@ import {
     TimeUnit,
     TimeWindowEach,
     TimeWindowEachTypeEnum, UpdateCustomEventRequest,
-    UpdateEventRequest,
-    UpdateReportRequest
+    UpdateEventRequest, UpdatePropertyRequest,
+    UpdateReportRequest, UserPropertiesApi
 } from '../../src/api';
 import {AxiosError} from 'axios';
 
@@ -291,6 +291,54 @@ describe('Authorized', () => {
 
         test('Delete custom event', async () => {
             await expect(api.deleteCustomEvent(1, 1, 1)).toBeApiResponse(stubs.customEvent);
+        })
+    })
+
+    describe('User Properties', () => {
+        const api = new UserPropertiesApi(config({auth: true}))
+
+        test('List user properties', async () => {
+            await expect(api.userPropertiesList(1, 1)).toBeApiResponse(<EventsList200Response>{
+                data: [stubs.userProperty],
+                meta: <ListResponseMetadataMeta>{next: 'next'}
+            })
+        })
+
+        test('Get user property by id', async () => {
+            await expect(api.getUserProperty(1, 1, 1)).toBeApiResponse(stubs.userProperty);
+        })
+
+        test('Update user property', async () => {
+            await expect(api.updateUserProperty(1, 1, 1, <UpdatePropertyRequest>{
+                tags: ['tag'],
+                displayName: 'name',
+                description: 'description',
+                status: PropertyStatus.Disabled,
+            })).toBeApiResponse(stubs.userProperty);
+        })
+    })
+
+    describe('Event Properties', () => {
+        const api = new EventPropertiesApi(config({auth: true}))
+
+        test('List event properties', async () => {
+            await expect(api.eventPropertiesList(1, 1)).toBeApiResponse(<EventsList200Response>{
+                data: [stubs.userProperty],
+                meta: <ListResponseMetadataMeta>{next: 'next'}
+            })
+        })
+
+        test('Get event property by id', async () => {
+            await expect(api.getEventProperty(1, 1, 1)).toBeApiResponse(stubs.userProperty);
+        })
+
+        test('Update event property', async () => {
+            await expect(api.updateEventProperty(1, 1, 1, <UpdatePropertyRequest>{
+                tags: ['tag'],
+                displayName: 'name',
+                description: 'description',
+                status: PropertyStatus.Disabled,
+            })).toBeApiResponse(stubs.userProperty);
         })
     })
 

@@ -29,7 +29,12 @@ import {
     CustomEventEvent,
     EventRefEventTypeEnum,
     EventFilterByProperty,
-    PropertyRefPropertyTypeEnum, EventFilterByPropertyTypeEnum, PropertyFilterOperation, EventStatus, CustomEventStatus
+    PropertyRefPropertyTypeEnum,
+    EventFilterByPropertyTypeEnum,
+    PropertyFilterOperation,
+    EventStatus,
+    CustomEventStatus,
+    Property, PropertyStatus, DictionaryDataType
 } from '../../src/api';
 
 const eventFilterByProperty = <EventFilterByProperty>{
@@ -125,6 +130,46 @@ export const stubs = {
             eventId: 1,
             filters: [eventFilterByProperty]
         }]
+    },
+    userProperty:<Property>{
+        id:1,
+        createdAt: '1970-01-01T00:00:00Z',
+        updatedAt: '1970-01-01T00:00:00Z',
+        createdBy: 1,
+        updatedBy: 1,
+        projectId: 1,
+        events:[1],
+        tags: ['tag'],
+        name: 'name',
+        displayName:'display_name',
+        description: 'description',
+        dataType:DataType.Number,
+        status:PropertyStatus.Enabled,
+        isSystem:true,
+        nullable:true,
+        isArray:true,
+        isDictionary:true,
+        dictionaryType:DictionaryDataType.Uint8
+    },
+    eventProperty:<Property>{
+        id:1,
+        createdAt: '1970-01-01T00:00:00Z',
+        updatedAt: '1970-01-01T00:00:00Z',
+        createdBy: 1,
+        updatedBy: 1,
+        projectId: 1,
+        events:[1],
+        tags: ['tag'],
+        name: 'name',
+        displayName:'display_name',
+        description: 'description',
+        dataType:DataType.Number,
+        status:PropertyStatus.Enabled,
+        isSystem:true,
+        nullable:true,
+        isArray:true,
+        isDictionary:true,
+        dictionaryType:DictionaryDataType.Uint8
     },
     dataTable: <DataTableResponse>{
         columns: [

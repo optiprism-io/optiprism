@@ -71,17 +71,16 @@ async fn delete(
 }
 
 pub fn attach_user_routes(router: Router) -> Router {
-    let path = "/v1/organizations/:organization_id/projects/:project_id/schema/user-properties";
-    router
-        .route(path, routing::get(list))
-        .route(
-            format!("{}/:prop_id", path).as_str(),
-            routing::get(get_by_id).delete(delete).put(update),
-        )
-        .route(
-            format!("{}/name/:prop_name", path).as_str(),
-            routing::get(get_by_name),
-        )
+    router.clone().nest(
+        "/organizations/:organization_id/projects/:project_id/schema/user-properties",
+        router
+            .route("/", routing::get(list))
+            .route(
+                "/:prop_id",
+                routing::get(get_by_id).delete(delete).put(update),
+            )
+            .route("/name/:prop_name", routing::get(get_by_name)),
+    )
 }
 
 pub fn attach_event_routes(router: Router) -> Router {

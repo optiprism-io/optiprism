@@ -117,9 +117,13 @@ impl TryInto<DataType> for ArrowDataType {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum DictionaryDataType {
+    #[serde(rename = "uint8")]
     UInt8,
+    #[serde(rename = "uint16")]
     UInt16,
+    #[serde(rename = "uint32")]
     UInt32,
+    #[serde(rename = "uint64")]
     UInt64,
 }
 

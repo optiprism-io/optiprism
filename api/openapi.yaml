@@ -757,40 +757,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - properties
-      parameters:
-        - $ref: '#/components/parameters/OrganizationID'
-        - $ref: '#/components/parameters/ProjectID'
-      responses:
-        '200':
-          description: properties list
-          content:
-            application/json:
-              schema:
-                type: object
-                allOf:
-                  - $ref: '#/components/schemas/ListPropertiesResponse'
-                  - $ref: '#/components/schemas/ListResponseMetadata'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/Internal'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties:
-    get:
-      summary: Event properties list
-      operationId: eventPropertiesList
-      security:
-        - bearerAuth: [ ]
-      tags:
-        - properties
+        - user properties
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -823,7 +790,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - events
+        - user properties
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -858,7 +825,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - properties
+        - user properties
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -893,6 +860,39 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties:
+    get:
+      summary: Event properties list
+      operationId: eventPropertiesList
+      security:
+        - bearerAuth: [ ]
+      tags:
+        - event properties
+      parameters:
+        - $ref: '#/components/parameters/OrganizationID'
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200':
+          description: properties list
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - $ref: '#/components/schemas/ListPropertiesResponse'
+                  - $ref: '#/components/schemas/ListResponseMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/organizations/{organizationId}/projects/{projectId}/schema/event-properties/{propertyId}:
     get:
       summary: Get event property
@@ -900,7 +900,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - events
+        - event properties
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -935,7 +935,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - properties
+        - event properties
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -2166,14 +2166,6 @@ components:
             type: integer
             format: i64
           description: list of id of events which use this property
-        type:
-          type: string
-          enum:
-            - event
-            - user
-        isSystem:
-          type: boolean
-          description: the property is a system-wide, shown in any project and can't be modified by a regular user
         tags:
           type: array
           items:
@@ -2187,14 +2179,13 @@ components:
         description:
           type: string
           description: description
+        dataType:
+          $ref: '#/components/schemas/DataType'
         status:
           $ref: '#/components/schemas/PropertyStatus'
-          description: property status
-        dataType:
-          allOf:
-            - type: object
-              description: data type of property. if property is "Product name", that it whould be String, if "Revenue", that it might be numeric.
-            - $ref: '#/components/schemas/DataType'
+        isSystem:
+          type: boolean
+          description: the property is a system-wide, shown in any project and can't be modified by a regular user
         nullable:
           type: boolean
           description: nullable property might contains null value
@@ -2205,10 +2196,7 @@ components:
           type: boolean
           description: dictionary can efficiently packs strings provided that cardinality will be relatively log (16bits is a reasonable maximum)
         dictionaryType:
-          allOf:
-            - type: object
-              description: type of integer to pack. Between 8bits and 16bits
-            - $ref: '#/components/schemas/DataType'
+          $ref: '#/components/schemas/DictionaryDataType'
     UpdatePropertyRequest:
       type: object
       description: Propetty update
@@ -3531,6 +3519,14 @@ components:
         - string
         - number
         - boolean
+    DictionaryDataType:
+      type: string
+      description: dictionary data type
+      enum:
+        - uint8
+        - uint16
+        - uint32
+        - uint64
     ReportType:
       type: string
       description: report type

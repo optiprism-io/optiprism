@@ -22,7 +22,7 @@ fn assert(l: &Property, r: &Property) {
     assert_eq!(l.display_name, r.display_name);
     assert_eq!(l.description, r.description);
     assert_eq!(l.status, r.status);
-    assert_eq!(l.typ, r.typ);
+    assert_eq!(l.data_type, r.data_type);
     assert_eq!(l.nullable, r.nullable);
     assert_eq!(l.is_array, r.is_dictionary);
     assert_eq!(l.dictionary_type, r.dictionary_type);
@@ -45,7 +45,7 @@ async fn test_event_properties() -> anyhow::Result<()> {
         tags: Some(vec!["sdf".to_string()]),
         name: "qwe".to_string(),
         display_name: Some("dname".to_string()),
-        typ: DataType::String,
+        data_type: DataType::String,
         description: Some("desc".to_string()),
         status: Status::Enabled,
         nullable: true,
@@ -88,7 +88,7 @@ async fn test_event_properties() -> anyhow::Result<()> {
             name: prop1.name.clone(),
             description: prop1.description.clone(),
             display_name: prop1.display_name.clone(),
-            typ: prop1.typ.clone().try_into()?,
+            typ: prop1.data_type.clone().try_into()?,
             status: prop1.status.clone().into(),
             nullable: prop1.nullable,
             is_array: prop1.is_array,
