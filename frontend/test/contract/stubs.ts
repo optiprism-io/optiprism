@@ -42,7 +42,11 @@ import {
     EventGroupedFiltersGroupsConditionEnum,
     EventGroupedFiltersGroupsInnerFiltersConditionEnum,
     EventFilterByCohort,
-    EventFilterByCohortTypeEnum, EventFilterByGroup, EventFilterByGroupTypeEnum
+    EventFilterByCohortTypeEnum,
+    EventFilterByGroup,
+    EventFilterByGroupTypeEnum,
+    SegmentConditionHasPropertyValue,
+    SegmentConditionHasPropertyValueTypeEnum, EventSegmentationSegment, GroupRecord
 } from '../../src/api';
 
 const eventFilterByProperty = <EventFilterByProperty>{
@@ -79,9 +83,21 @@ const eventGroupedFilters = <EventGroupedFilters>{
     ]
 };
 
+const segment = <EventSegmentationSegment>{
+    name: 'test',
+    conditions: [<SegmentConditionHasPropertyValue>{
+        type: SegmentConditionHasPropertyValueTypeEnum.HasPropertyValue,
+        propertyType: PropertyType.User,
+        propertyName: 'prop',
+        operation: PropertyFilterOperation.Eq,
+        values: [1]
+    }]
+};
+
 export const stubs = {
     eventFilterByProperty: eventFilterByProperty,
     eventGroupedFilters: eventGroupedFilters,
+    segment: segment,
     tokenResponse: <TokensResponse>{
         accessToken: 'access_token',
         refreshToken: 'refresh_token'
@@ -212,6 +228,12 @@ export const stubs = {
         eventProperties: {'key': 'value'},
         userProperties: {'key': 'value'},
         matchedCustomEvents: [1]
+    },
+    groupRecord: <GroupRecord>{
+        id: 1,
+        strId: '1',
+        group: 'group',
+        properties: {'key': 'value'},
     },
     dataTable: <DataTableResponse>{
         columns: [

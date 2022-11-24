@@ -7,6 +7,7 @@ pub mod queries;
 pub mod dashboards;
 pub mod reports;
 pub mod event_records;
+pub mod group_records;
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -80,6 +81,7 @@ impl Service {
         router = dashboards::attach_routes(router);
         router = reports::attach_routes(router);
         router = event_records::attach_routes(router);
+        router = group_records::attach_routes(router);
         router = router.clone().nest("/api/v1", router);
 
         router = router
@@ -94,7 +96,8 @@ impl Service {
             .layer(Extension(platform.query.clone()))
             .layer(Extension(platform.dashboards.clone()))
             .layer(Extension(platform.reports.clone()))
-            .layer(Extension(platform.event_records.clone()));
+            .layer(Extension(platform.event_records.clone()))
+            .layer(Extension(platform.group_records.clone()));
 
         router = router
             .layer(CookieManagerLayer::new())

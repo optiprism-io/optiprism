@@ -37,7 +37,9 @@ import {
     EventGroupedFilters,
     EventGroupedFiltersGroupsConditionEnum,
     EventGroupedFiltersGroupsInnerFiltersConditionEnum,
-    EventPropertiesApi, EventRecordRequestEvent, EventRecordRequestEventFilters,
+    EventPropertiesApi,
+    EventRecordRequestEvent,
+    EventRecordRequestEventFilters,
     EventRecordsApi,
     EventRecordsListRequest,
     EventRecordsListRequestTime,
@@ -48,7 +50,8 @@ import {
     EventSegmentationEventEventTypeEnum,
     EventsList200Response,
     EventStatus,
-    EventStatusEnum, EventType,
+    EventStatusEnum,
+    EventType,
     ListResponseMetadataMeta,
     LoginRequest,
     Property,
@@ -94,7 +97,11 @@ import {
     UpdateEventRequest,
     UpdatePropertyRequest,
     UpdateReportRequest,
-    UserPropertiesApi
+    UserPropertiesApi,
+    GroupRecordsApi,
+    GroupRecordsListRequest,
+    EventRecordsList200Response,
+    GroupRecordsList200Response, UpdateGroupRecordRequest
 } from '../../src/api';
 import {AxiosError} from 'axios';
 
@@ -367,7 +374,7 @@ describe('Authorized', () => {
                     filters: [stubs.eventFilterByProperty]
                 }],
                 filters: stubs.eventGroupedFilters,
-            })).toBeApiResponse(<EventsList200Response>{
+            })).toBeApiResponse(<EventRecordsList200Response>{
                 data: [stubs.eventRecord],
                 meta: <ListResponseMetadataMeta>{next: 'next'}
             })
@@ -375,6 +382,33 @@ describe('Authorized', () => {
 
         test('Get event record by id', async () => {
             await expect(api.getEventRecord(1, 1, 1)).toBeApiResponse(stubs.eventRecord);
+        })
+    })
+
+    describe('Group Records', () => {
+        const api = new GroupRecordsApi(config({auth: true}))
+
+        test('List group records', async () => {
+            await expect(api.groupRecordsList(1, 1, <GroupRecordsListRequest>{
+                time: <TimeLast>{last: 1, unit: TimeUnit.Day, type: TimeLastTypeEnum.Last},
+                group: 'group',
+                searchTerm: 'term',
+                segments: [stubs.segment],
+                filters: stubs.eventGroupedFilters,
+            })).toBeApiResponse(<GroupRecordsList200Response>{
+                data: [stubs.groupRecord],
+                meta: <ListResponseMetadataMeta>{next: 'next'}
+            })
+        })
+
+        test('Get group record by id', async () => {
+            await expect(api.getGroupRecord(1, 1, 1)).toBeApiResponse(stubs.groupRecord);
+        })
+
+        test('Update group record', async () => {
+            await expect(api.updateGroupRecord(1, 1, 1, <UpdateGroupRecordRequest>{
+                properties: {'prop': 1}
+            })).toBeApiResponse(stubs.groupRecord);
         })
     })
 

@@ -5,7 +5,7 @@ use common::rbac::ProjectRole;
 use common::rbac::Role;
 use common::types::DictionaryDataType;
 use common::DataType;
-use crate::{accounts, ColumnType, dashboards, event_records, reports};
+use crate::{accounts, ColumnType, dashboards, event_records, group_records, reports};
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
 use crate::accounts::UpdateAccountRequest;
@@ -44,6 +44,7 @@ use chrono::DateTime;
 use chrono::Duration;
 use axum::async_trait;
 use crate::event_records::{EventRecord, ListEventRecordsRequest};
+use crate::group_records::{GroupRecord, ListGroupRecordsRequest, UpdateGroupRecordRequest};
 use crate::queries::{event_segmentation, QueryTime, TimeIntervalUnit};
 use crate::reports::{CreateReportRequest, Report, UpdateReportRequest};
 use crate::Result;
@@ -655,5 +656,36 @@ impl event_records::Provider for EventRecords {
 
     async fn get_by_id(&self, _ctx: Context, _organization_id: u64, _project_id: u64, id: u64) -> Result<EventRecord> {
         Ok(EventRecords::entity())
+    }
+}
+
+pub struct GroupRecords {}
+
+impl GroupRecords {
+    pub fn entity() -> GroupRecord {
+        GroupRecord {
+            id: 1,
+            str_id:"1".to_string(),
+            group: "group".to_string(),
+            properties: Some(HashMap::from([("key".to_string(), Value::String("value".to_string()))])),
+        }
+    }
+}
+
+#[async_trait]
+impl group_records::Provider for GroupRecords {
+    async fn list(&self, ctx: Context, organization_id: u64, project_id: u64, request: ListGroupRecordsRequest) -> Result<ListResponse<GroupRecord>> {
+        Ok(ListResponse {
+            data: vec![GroupRecords::entity()],
+            meta: ResponseMetadata { next: Some("next".to_string()) },
+        })
+    }
+
+    async fn get_by_id(&self, ctx: Context, organization_id: u64, project_id: u64, id: u64) -> Result<GroupRecord> {
+        Ok(GroupRecords::entity())
+    }
+
+    async fn update(&self, ctx: Context, organization_id: u64, project_id: u64, id: u64, req: UpdateGroupRecordRequest) -> Result<GroupRecord> {
+        Ok(GroupRecords::entity())
     }
 }

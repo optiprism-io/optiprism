@@ -1040,7 +1040,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/event-records:
+  /v1/organizations/{organizationId}/projects/{projectId}/event-records/search:
     post:
       summary: Get event records
       operationId: eventRecordsList
@@ -1086,7 +1086,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - groups
+        - group records
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -1122,7 +1122,7 @@ paths:
       security:
         - bearerAuth: [ ]
       tags:
-        - groups
+        - group records
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -1158,14 +1158,14 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/group-records:
+  /v1/organizations/{organizationId}/projects/{projectId}/group-records/search:
     post:
-      summary: Get group records
-      operationId: groupEventsList
+      summary: List group records
+      operationId: groupRecordsList
       security:
         - bearerAuth: [ ]
       tags:
-        - groups
+        - group records
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
@@ -1666,6 +1666,7 @@ components:
             type: integer
     GroupRecord:
       type: object
+      required: [ 'id','group','properties' ]
       example: |
         {
           "id": 213,
@@ -1678,12 +1679,18 @@ components:
       properties:
         id:
           type: integer
+        strId:
+          type: string
+        group:
+          type: string
         properties:
           type: object
           description: map of group property name and property value pairs
+          additionalProperties:
+            $ref: '#/components/schemas/Value'
     EventRecord:
       type: object
-      required: ['id','name']
+      required: [ 'id','name' ]
       example: |
         {
           "id": 213,
@@ -2123,7 +2130,7 @@ components:
     CustomEventEvent:
       type: object
       description: custom event will matches all of the provided events
-      required: ['eventType']
+      required: [ 'eventType' ]
       allOf:
         - $ref: '#/components/schemas/EventRef'
         - type: object
@@ -2400,13 +2407,8 @@ components:
           type: string
           description: group that is used in aggregations by group. For instance, group by user or group by organization.
           example: user
-        search:
-          type: object
-          required: [ 'term' ]
-          description: search in results
-          properties:
-            term:
-              type: string
+        searchTerm:
+          type: string
         segments:
           description: array of segments
           type: array

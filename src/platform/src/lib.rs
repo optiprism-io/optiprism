@@ -13,6 +13,7 @@ pub mod dashboards;
 pub mod stub;
 pub mod reports;
 pub mod event_records;
+pub mod group_records;
 
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -59,6 +60,7 @@ pub struct PlatformProvider {
     pub dashboards: Arc<dyn dashboards::Provider>,
     pub reports: Arc<dyn reports::Provider>,
     pub event_records: Arc<dyn event_records::Provider>,
+    pub group_records: Arc<dyn group_records::Provider>,
 }
 
 impl PlatformProvider {
@@ -82,6 +84,7 @@ impl PlatformProvider {
             dashboards: Arc::new(stub::Dashboards {}),
             reports: Arc::new(stub::Reports {}),
             event_records: Arc::new(stub::EventRecords {}),
+            group_records: Arc::new(stub::GroupRecords {}),
         }
     }
 
@@ -97,6 +100,7 @@ impl PlatformProvider {
             dashboards: Arc::new(stub::Dashboards {}),
             reports: Arc::new(stub::Reports {}),
             event_records: Arc::new(stub::EventRecords {}),
+            group_records: Arc::new(stub::GroupRecords {}),
         }
     }
 }

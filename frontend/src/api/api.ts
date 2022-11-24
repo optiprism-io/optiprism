@@ -2636,25 +2636,6 @@ export type FunnelTimeToConvertChartTypeTypeEnum = typeof FunnelTimeToConvertCha
 /**
  * 
  * @export
- * @interface GroupEventsList200Response
- */
-export interface GroupEventsList200Response {
-    /**
-     * 
-     * @type {Array<GroupRecord>}
-     * @memberof GroupEventsList200Response
-     */
-    'data'?: Array<GroupRecord>;
-    /**
-     * 
-     * @type {ListResponseMetadataMeta}
-     * @memberof GroupEventsList200Response
-     */
-    'meta'?: ListResponseMetadataMeta;
-}
-/**
- * 
- * @export
  * @interface GroupRecord
  */
 export interface GroupRecord {
@@ -2663,13 +2644,44 @@ export interface GroupRecord {
      * @type {number}
      * @memberof GroupRecord
      */
-    'id'?: number;
+    'id': number;
     /**
-     * map of group property name and property value pairs
-     * @type {object}
+     * 
+     * @type {string}
      * @memberof GroupRecord
      */
-    'properties'?: object;
+    'strId'?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof GroupRecord
+     */
+    'group': string;
+    /**
+     * map of group property name and property value pairs
+     * @type {{ [key: string]: Value; }}
+     * @memberof GroupRecord
+     */
+    'properties': { [key: string]: Value; };
+}
+/**
+ * 
+ * @export
+ * @interface GroupRecordsList200Response
+ */
+export interface GroupRecordsList200Response {
+    /**
+     * 
+     * @type {Array<GroupRecord>}
+     * @memberof GroupRecordsList200Response
+     */
+    'data'?: Array<GroupRecord>;
+    /**
+     * 
+     * @type {ListResponseMetadataMeta}
+     * @memberof GroupRecordsList200Response
+     */
+    'meta'?: ListResponseMetadataMeta;
 }
 /**
  * request group records sorted by time of creation
@@ -2691,10 +2703,10 @@ export interface GroupRecordsListRequest {
     'group': string;
     /**
      * 
-     * @type {GroupRecordsListRequestSearch}
+     * @type {string}
      * @memberof GroupRecordsListRequest
      */
-    'search'?: GroupRecordsListRequestSearch;
+    'searchTerm'?: string;
     /**
      * array of segments
      * @type {Array<EventSegmentationSegment>}
@@ -2707,19 +2719,6 @@ export interface GroupRecordsListRequest {
      * @memberof GroupRecordsListRequest
      */
     'filters'?: EventGroupedFilters;
-}
-/**
- * search in results
- * @export
- * @interface GroupRecordsListRequestSearch
- */
-export interface GroupRecordsListRequestSearch {
-    /**
-     * 
-     * @type {string}
-     * @memberof GroupRecordsListRequestSearch
-     */
-    'term': string;
 }
 /**
  * see https://datatracker.ietf.org/doc/html/rfc7519
@@ -5913,7 +5912,7 @@ export const EventRecordsApiAxiosParamCreator = function (configuration?: Config
             assertParamExists('eventRecordsList', 'projectId', projectId)
             // verify required parameter 'eventRecordsListRequest' is not null or undefined
             assertParamExists('eventRecordsList', 'eventRecordsListRequest', eventRecordsListRequest)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/event-records`
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/event-records/search`
                 .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
                 .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -6397,10 +6396,10 @@ export class EventsApi extends BaseAPI {
 
 
 /**
- * GroupsApi - axios parameter creator
+ * GroupRecordsApi - axios parameter creator
  * @export
  */
-export const GroupsApiAxiosParamCreator = function (configuration?: Configuration) {
+export const GroupRecordsApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
         /**
          * 
@@ -6450,21 +6449,21 @@ export const GroupsApiAxiosParamCreator = function (configuration?: Configuratio
         },
         /**
          * 
-         * @summary Get group records
+         * @summary List group records
          * @param {number} organizationId 
          * @param {number} projectId 
          * @param {GroupRecordsListRequest} groupRecordsListRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        groupEventsList: async (organizationId: number, projectId: number, groupRecordsListRequest: GroupRecordsListRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
+        groupRecordsList: async (organizationId: number, projectId: number, groupRecordsListRequest: GroupRecordsListRequest, options: AxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'organizationId' is not null or undefined
-            assertParamExists('groupEventsList', 'organizationId', organizationId)
+            assertParamExists('groupRecordsList', 'organizationId', organizationId)
             // verify required parameter 'projectId' is not null or undefined
-            assertParamExists('groupEventsList', 'projectId', projectId)
+            assertParamExists('groupRecordsList', 'projectId', projectId)
             // verify required parameter 'groupRecordsListRequest' is not null or undefined
-            assertParamExists('groupEventsList', 'groupRecordsListRequest', groupRecordsListRequest)
-            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/group-records`
+            assertParamExists('groupRecordsList', 'groupRecordsListRequest', groupRecordsListRequest)
+            const localVarPath = `/v1/organizations/{organizationId}/projects/{projectId}/group-records/search`
                 .replace(`{${"organizationId"}}`, encodeURIComponent(String(organizationId)))
                 .replace(`{${"projectId"}}`, encodeURIComponent(String(projectId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -6552,11 +6551,11 @@ export const GroupsApiAxiosParamCreator = function (configuration?: Configuratio
 };
 
 /**
- * GroupsApi - functional programming interface
+ * GroupRecordsApi - functional programming interface
  * @export
  */
-export const GroupsApiFp = function(configuration?: Configuration) {
-    const localVarAxiosParamCreator = GroupsApiAxiosParamCreator(configuration)
+export const GroupRecordsApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = GroupRecordsApiAxiosParamCreator(configuration)
     return {
         /**
          * 
@@ -6573,15 +6572,15 @@ export const GroupsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Get group records
+         * @summary List group records
          * @param {number} organizationId 
          * @param {number} projectId 
          * @param {GroupRecordsListRequest} groupRecordsListRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async groupEventsList(organizationId: number, projectId: number, groupRecordsListRequest: GroupRecordsListRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GroupEventsList200Response>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.groupEventsList(organizationId, projectId, groupRecordsListRequest, options);
+        async groupRecordsList(organizationId: number, projectId: number, groupRecordsListRequest: GroupRecordsListRequest, options?: AxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GroupRecordsList200Response>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.groupRecordsList(organizationId, projectId, groupRecordsListRequest, options);
             return createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration);
         },
         /**
@@ -6602,11 +6601,11 @@ export const GroupsApiFp = function(configuration?: Configuration) {
 };
 
 /**
- * GroupsApi - factory interface
+ * GroupRecordsApi - factory interface
  * @export
  */
-export const GroupsApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
-    const localVarFp = GroupsApiFp(configuration)
+export const GroupRecordsApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = GroupRecordsApiFp(configuration)
     return {
         /**
          * 
@@ -6622,15 +6621,15 @@ export const GroupsApiFactory = function (configuration?: Configuration, basePat
         },
         /**
          * 
-         * @summary Get group records
+         * @summary List group records
          * @param {number} organizationId 
          * @param {number} projectId 
          * @param {GroupRecordsListRequest} groupRecordsListRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        groupEventsList(organizationId: number, projectId: number, groupRecordsListRequest: GroupRecordsListRequest, options?: any): AxiosPromise<GroupEventsList200Response> {
-            return localVarFp.groupEventsList(organizationId, projectId, groupRecordsListRequest, options).then((request) => request(axios, basePath));
+        groupRecordsList(organizationId: number, projectId: number, groupRecordsListRequest: GroupRecordsListRequest, options?: any): AxiosPromise<GroupRecordsList200Response> {
+            return localVarFp.groupRecordsList(organizationId, projectId, groupRecordsListRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -6649,12 +6648,12 @@ export const GroupsApiFactory = function (configuration?: Configuration, basePat
 };
 
 /**
- * GroupsApi - object-oriented interface
+ * GroupRecordsApi - object-oriented interface
  * @export
- * @class GroupsApi
+ * @class GroupRecordsApi
  * @extends {BaseAPI}
  */
-export class GroupsApi extends BaseAPI {
+export class GroupRecordsApi extends BaseAPI {
     /**
      * 
      * @summary Get group record
@@ -6663,24 +6662,24 @@ export class GroupsApi extends BaseAPI {
      * @param {number} id Group Record ID
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
-     * @memberof GroupsApi
+     * @memberof GroupRecordsApi
      */
     public getGroupRecord(organizationId: number, projectId: number, id: number, options?: AxiosRequestConfig) {
-        return GroupsApiFp(this.configuration).getGroupRecord(organizationId, projectId, id, options).then((request) => request(this.axios, this.basePath));
+        return GroupRecordsApiFp(this.configuration).getGroupRecord(organizationId, projectId, id, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
      * 
-     * @summary Get group records
+     * @summary List group records
      * @param {number} organizationId 
      * @param {number} projectId 
      * @param {GroupRecordsListRequest} groupRecordsListRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
-     * @memberof GroupsApi
+     * @memberof GroupRecordsApi
      */
-    public groupEventsList(organizationId: number, projectId: number, groupRecordsListRequest: GroupRecordsListRequest, options?: AxiosRequestConfig) {
-        return GroupsApiFp(this.configuration).groupEventsList(organizationId, projectId, groupRecordsListRequest, options).then((request) => request(this.axios, this.basePath));
+    public groupRecordsList(organizationId: number, projectId: number, groupRecordsListRequest: GroupRecordsListRequest, options?: AxiosRequestConfig) {
+        return GroupRecordsApiFp(this.configuration).groupRecordsList(organizationId, projectId, groupRecordsListRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -6692,10 +6691,10 @@ export class GroupsApi extends BaseAPI {
      * @param {UpdateGroupRecordRequest} updateGroupRecordRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
-     * @memberof GroupsApi
+     * @memberof GroupRecordsApi
      */
     public updateGroupRecord(organizationId: number, projectId: number, id: number, updateGroupRecordRequest: UpdateGroupRecordRequest, options?: AxiosRequestConfig) {
-        return GroupsApiFp(this.configuration).updateGroupRecord(organizationId, projectId, id, updateGroupRecordRequest, options).then((request) => request(this.axios, this.basePath));
+        return GroupRecordsApiFp(this.configuration).updateGroupRecord(organizationId, projectId, id, updateGroupRecordRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

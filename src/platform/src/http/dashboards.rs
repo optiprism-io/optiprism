@@ -6,7 +6,7 @@ use axum::http::StatusCode;
 use axum::routing;
 use axum::Router;
 
-use crate::{dashboards, events};
+use crate::{dashboards};
 use crate::http::Json;
 use crate::Context;
 use crate::dashboards::{CreateDashboardRequest, Dashboard, UpdateDashboardRequest};

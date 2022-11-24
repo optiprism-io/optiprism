@@ -6,6 +6,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::Context;
+use crate::group_records::ListGroupRecordsRequest;
 use crate::ListResponse;
 use crate::PlatformError;
 use crate::Result;

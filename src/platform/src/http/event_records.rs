@@ -39,7 +39,7 @@ pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
         "/organizations/:organization_id/projects/:project_id/event-records",
         router
-            .route("/", routing::post(list))
+            .route("/search", routing::post(list))
             .route(
                 "/:id",
                 routing::get(get_by_id),
