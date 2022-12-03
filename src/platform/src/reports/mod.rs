@@ -5,11 +5,9 @@ use common::types::OptionalProperty;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::queries::event_segmentation::EventSegmentation;
 use crate::Context;
 use crate::ListResponse;
-use crate::PlatformError;
-use crate::queries::event_segmentation::EventSegmentation;
-use crate::queries::QueryTime;
 use crate::Result;
 
 #[async_trait]
@@ -61,7 +59,7 @@ pub enum Type {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Query {
-    EventSegmentation(EventSegmentation)
+    EventSegmentation(EventSegmentation),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -101,9 +99,12 @@ pub struct UpdateReportRequest {
     pub name: OptionalProperty<Option<String>>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub description: OptionalProperty<Option<String>>,
-    #[serde(default, rename = "type", skip_serializing_if = "OptionalProperty::is_none")]
+    #[serde(
+        default,
+        rename = "type",
+        skip_serializing_if = "OptionalProperty::is_none"
+    )]
     pub typ: OptionalProperty<Type>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub query: OptionalProperty<Query>,
-
 }

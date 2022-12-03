@@ -196,7 +196,7 @@ impl PlatformError {
             PlatformError::InvalidFields(fields) => {
                 ApiError::new(StatusCode::BAD_REQUEST).with_fields(fields)
             }
-            PlatformError::NotFound(err) => ApiError::not_found(err)
+            PlatformError::NotFound(err) => ApiError::not_found(err),
         }
     }
 }

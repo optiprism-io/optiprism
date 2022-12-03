@@ -38,7 +38,7 @@ pub trait Provider: Sync + Send {
     async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable>;
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct Column {
     pub name: String,
     pub typ: ColumnType,

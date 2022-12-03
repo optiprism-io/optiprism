@@ -6,10 +6,12 @@ use axum::http::StatusCode;
 use axum::routing;
 use axum::Router;
 
-use crate::{reports, events};
 use crate::http::Json;
+use crate::reports;
+use crate::reports::CreateReportRequest;
+use crate::reports::Report;
+use crate::reports::UpdateReportRequest;
 use crate::Context;
-use crate::reports::{CreateReportRequest, Report, UpdateReportRequest};
 use crate::ListResponse;
 use crate::Result;
 
@@ -75,13 +77,13 @@ async fn delete(
 }
 
 pub fn attach_routes(router: Router) -> Router {
-    router.clone().nest(
+    router.nest(
         "/organizations/:organization_id/projects/:project_id/reports",
         Router::new()
             .route("/", routing::post(create).get(list))
             .route(
                 "/:project_id",
                 routing::get(get_by_id).delete(delete).put(update),
-            )
+            ),
     )
 }

@@ -1,13 +1,13 @@
 pub mod accounts;
 pub mod auth;
 pub mod custom_events;
+pub mod dashboards;
+pub mod event_records;
 pub mod events;
+pub mod group_records;
 pub mod properties;
 pub mod queries;
-pub mod dashboards;
 pub mod reports;
-pub mod event_records;
-pub mod group_records;
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -16,33 +16,36 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::{async_trait, http};
+use axum::async_trait;
 use axum::body::HttpBody;
 use axum::extract::rejection::JsonRejection;
-use axum::http::{HeaderMap, HeaderValue, Request, Uri};
-use axum::http::StatusCode;
-use axum::middleware;
 use axum::handler::Handler;
+use axum::http;
+use axum::http::HeaderMap;
+use axum::http::HeaderValue;
+use axum::http::Request;
+use axum::http::StatusCode;
+use axum::http::Uri;
+use axum::middleware;
 use axum::middleware::Next;
 use axum::routing::get_service;
 use axum::Extension;
 use axum::Router;
 use axum::Server;
-use axum_core::body::BoxBody;
+use axum_core::body;
 use axum_core::extract::FromRequest;
 use axum_core::extract::RequestParts;
 use axum_core::response::IntoResponse;
 use axum_core::response::Response;
-use axum_core::{body, BoxError};
+use axum_core::BoxError;
 use bytes::Bytes;
-use datafusion::parquet::data_type::AsBytes;
 use hyper::Body;
 use lazy_static::lazy_static;
 use metadata::MetadataProvider;
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::Value;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tower_cookies::CookieManagerLayer;
@@ -52,7 +55,8 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 use crate::error::ApiError;
-use crate::{PlatformError, PlatformProvider};
+use crate::PlatformError;
+use crate::PlatformProvider;
 use crate::Result;
 
 pub struct Service {
@@ -182,18 +186,18 @@ pub async fn print_request_response(
     Ok(Response::from_parts(parts, body::boxed(Body::from(bytes))))
 }
 
-async fn buffer_and_print<B>(
-    direction: &str,
-    body: B,
-) -> Result<Bytes>
-    where
-        B: HttpBody<Data=Bytes>,
-        B::Error: std::fmt::Display,
+async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes>
+where
+    B: HttpBody<Data = Bytes>,
+    B::Error: std::fmt::Display,
 {
     let bytes = match hyper::body::to_bytes(body).await {
         Ok(bytes) => bytes,
         Err(err) => {
-            return Err(PlatformError::BadRequest(format!("failed to read {} body: {}", direction, err)));
+            return Err(PlatformError::BadRequest(format!(
+                "failed to read {} body: {}",
+                direction, err
+            )));
         }
     };
 
@@ -210,11 +214,11 @@ pub struct Json<T>(pub T);
 
 #[async_trait]
 impl<T, B> FromRequest<B> for Json<T>
-    where
-        T: DeserializeOwned,
-        B: HttpBody + Send,
-        B::Data: Send,
-        B::Error: Into<BoxError>,
+where
+    T: DeserializeOwned,
+    B: HttpBody + Send,
+    B::Data: Send,
+    B::Error: Into<BoxError>,
 {
     type Rejection = ApiError;
 
@@ -257,7 +261,7 @@ impl<T, B> FromRequest<B> for Json<T>
 }
 
 impl<T> IntoResponse for Json<T>
-    where T: Serialize
+where T: Serialize
 {
     fn into_response(self) -> Response {
         axum::Json(self.0).into_response()

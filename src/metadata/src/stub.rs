@@ -1,4 +1,7 @@
 use async_trait::async_trait;
+use chrono::DateTime;
+use chrono::NaiveDateTime;
+use chrono::Utc;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
@@ -8,6 +11,8 @@ use common::types::PropValueOperation;
 use common::types::PropertyRef;
 use common::ScalarValue;
 use datafusion::arrow::datatypes::DataType;
+use lazy_static::lazy_static;
+
 use crate::accounts;
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
@@ -44,14 +49,10 @@ use crate::teams::CreateTeamRequest;
 use crate::teams::Team;
 use crate::teams::UpdateTeamRequest;
 use crate::Result;
-use lazy_static::lazy_static;
-use chrono::Utc;
-use chrono::NaiveDateTime;
-use chrono::DateTime;
-use chrono::Duration;
+
 lazy_static! {
     pub static ref DATE_TIME: DateTime<Utc> =
-        DateTime::from_utc(NaiveDateTime::from_timestamp(1000, 0), Utc);
+        DateTime::from_utc(NaiveDateTime::from_timestamp_opt(1000, 0).unwrap(), Utc);
 }
 
 pub struct Accounts {}
@@ -99,11 +100,7 @@ impl accounts::Provider for Accounts {
         })
     }
 
-    async fn update(
-        &self,
-        _account_id: u64,
-        _req: UpdateAccountRequest,
-    ) -> Result<Account> {
+    async fn update(&self, _account_id: u64, _req: UpdateAccountRequest) -> Result<Account> {
         Ok(Self::account())
     }
 
@@ -241,12 +238,7 @@ impl events::Provider for Events {
         Ok(Events::event())
     }
 
-    async fn get_by_id(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-        _id: u64,
-    ) -> Result<Event> {
+    async fn get_by_id(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Event> {
         Ok(Events::event())
     }
 
@@ -259,11 +251,7 @@ impl events::Provider for Events {
         Ok(Events::event())
     }
 
-    async fn list(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-    ) -> Result<ListResponse<Event>> {
+    async fn list(&self, _organization_id: u64, _project_id: u64) -> Result<ListResponse<Event>> {
         Ok(ListResponse {
             data: vec![Events::event()],
             meta: ResponseMetadata { next: None },
@@ -300,12 +288,7 @@ impl events::Provider for Events {
         Ok(Events::event())
     }
 
-    async fn delete(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-        _id: u64,
-    ) -> Result<Event> {
+    async fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Event> {
         Ok(Events::event())
     }
 }
@@ -394,12 +377,7 @@ impl properties::Provider for Properties {
         Ok(Properties::property())
     }
 
-    async fn delete(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-        _id: u64,
-    ) -> Result<Property> {
+    async fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Property> {
         Ok(Properties::property())
     }
 }
@@ -493,11 +471,7 @@ impl organizations::Provider for Organizations {
         })
     }
 
-    async fn update(
-        &self,
-        _org_id: u64,
-        _req: UpdateOrganizationRequest,
-    ) -> Result<Organization> {
+    async fn update(&self, _org_id: u64, _req: UpdateOrganizationRequest) -> Result<Organization> {
         Ok(Organizations::org())
     }
 
@@ -523,19 +497,11 @@ impl Projects {
 }
 #[async_trait]
 impl projects::Provider for Projects {
-    async fn create(
-        &self,
-        _organization_id: u64,
-        _req: CreateProjectRequest,
-    ) -> Result<Project> {
+    async fn create(&self, _organization_id: u64, _req: CreateProjectRequest) -> Result<Project> {
         Ok(Projects::project())
     }
 
-    async fn get_by_id(
-        &self,
-        _organization_id: u64,
-        _project_id: u64,
-    ) -> Result<Project> {
+    async fn get_by_id(&self, _organization_id: u64, _project_id: u64) -> Result<Project> {
         Ok(Projects::project())
     }
 
@@ -577,11 +543,7 @@ impl Teams {
 }
 #[async_trait]
 impl teams::Provider for Teams {
-    async fn create(
-        &self,
-        _organization_id: u64,
-        _req: CreateTeamRequest,
-    ) -> Result<Team> {
+    async fn create(&self, _organization_id: u64, _req: CreateTeamRequest) -> Result<Team> {
         Ok(Teams::team())
     }
 

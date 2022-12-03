@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::{accounts, stub};
+use crate::accounts;
 use crate::custom_events;
 use crate::database;
 use crate::dictionaries;
@@ -12,6 +12,7 @@ use crate::organizations;
 use crate::projects;
 use crate::properties;
 use crate::store::Store;
+use crate::stub;
 use crate::Result;
 
 pub struct MetadataProvider {

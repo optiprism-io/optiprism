@@ -3,8 +3,9 @@ use chrono::Utc;
 
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::ListPropertyValuesRequest;
-use crate::{Context, ListResponse};
+use crate::Context;
 use crate::DataTable;
+use crate::ListResponse;
 use crate::PlatformError;
 
 pub mod event_segmentation;
@@ -39,7 +40,7 @@ pub trait Provider: Sync + Send {
     ) -> Result<ListResponse<Value>>;
 }
 
-#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum QueryTime {
     Between {
@@ -47,7 +48,7 @@ pub enum QueryTime {
         to: DateTime<Utc>,
     },
     From {
-        from: DateTime<Utc>
+        from: DateTime<Utc>,
     },
     Last {
         last: i64,
@@ -61,7 +62,7 @@ impl TryInto<query::queries::QueryTime> for QueryTime {
     fn try_into(self) -> std::result::Result<query::queries::QueryTime, Self::Error> {
         Ok(match self {
             QueryTime::Between { from, to } => query::queries::QueryTime::Between { from, to },
-            QueryTime::From{from} => query::queries::QueryTime::From(from),
+            QueryTime::From { from } => query::queries::QueryTime::From(from),
             QueryTime::Last { last, unit } => query::queries::QueryTime::Last {
                 last,
                 unit: unit.try_into()?,
@@ -78,7 +79,7 @@ pub enum SegmentTime {
         to: DateTime<Utc>,
     },
     WindowEach {
-        unit: TimeIntervalUnit
+        unit: TimeIntervalUnit,
     },
     Last {
         last: i64,
@@ -90,7 +91,7 @@ pub enum SegmentTime {
     },
 }
 
-#[derive(Clone, Serialize, Deserialize,Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum TimeIntervalUnit {
     Second,
@@ -221,7 +222,6 @@ pub enum PartitionedAggregateFunction {
     Percentile75,
     Percentile90,
     Percentile99,
-
 }
 
 impl TryInto<QueryPartitionedAggregateFunction> for &PartitionedAggregateFunction {
@@ -231,7 +231,7 @@ impl TryInto<QueryPartitionedAggregateFunction> for &PartitionedAggregateFunctio
         Ok(match self {
             PartitionedAggregateFunction::Count => QueryPartitionedAggregateFunction::Count,
             PartitionedAggregateFunction::Sum => QueryPartitionedAggregateFunction::Sum,
-            _ => todo!()
+            _ => todo!(),
         })
     }
 }

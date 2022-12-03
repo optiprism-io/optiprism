@@ -128,15 +128,16 @@ where B: Send
             TypedHeader::<Authorization<Bearer>>::from_request(req)
                 .await
                 .map_err(|err| {
-                    println!("{}",err);
-                    AuthError::CantParseBearerHeader})?;
+                    println!("{}", err);
+                    AuthError::CantParseBearerHeader
+                })?;
 
         let Extension(auth_cfg) = Extension::<auth::Config>::from_request(req)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
         let claims = parse_access_token(bearer.token(), &auth_cfg.access_token_key)
-            .map_err(|err| AuthError::CantParseAccessToken)?;
+            .map_err(|_err| AuthError::CantParseAccessToken)?;
         let Extension(md_acc_prov) =
             Extension::<Arc<dyn metadata::accounts::Provider>>::from_request(req)
                 .await

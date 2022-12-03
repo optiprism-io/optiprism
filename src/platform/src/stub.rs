@@ -1,11 +1,18 @@
 use std::collections::HashMap;
-use lazy_static::lazy_static;
+
+use axum::async_trait;
+use chrono::DateTime;
+use chrono::NaiveDateTime;
+use chrono::Utc;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
 use common::types::DictionaryDataType;
 use common::DataType;
-use crate::{accounts, ColumnType, dashboards, event_records, group_records, reports};
+use lazy_static::lazy_static;
+use serde_json::Value;
+
+use crate::accounts;
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
 use crate::accounts::UpdateAccountRequest;
@@ -17,17 +24,41 @@ use crate::custom_events;
 use crate::custom_events::CreateCustomEventRequest;
 use crate::custom_events::CustomEvent;
 use crate::custom_events::UpdateCustomEventRequest;
+use crate::dashboards;
+use crate::dashboards::CreateDashboardRequest;
+use crate::dashboards::Dashboard;
+use crate::dashboards::Panel;
+use crate::dashboards::Row;
+use crate::dashboards::UpdateDashboardRequest;
+use crate::event_records;
+use crate::event_records::EventRecord;
+use crate::event_records::ListEventRecordsRequest;
 use crate::events;
 use crate::events::CreateEventRequest;
 use crate::events::Event;
 use crate::events::UpdateEventRequest;
+use crate::group_records;
+use crate::group_records::GroupRecord;
+use crate::group_records::ListGroupRecordsRequest;
+use crate::group_records::UpdateGroupRecordRequest;
 use crate::properties;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::queries;
-use crate::queries::event_segmentation::{Analysis, ChartType, EventSegmentation, Query};
+use crate::queries::event_segmentation;
+use crate::queries::event_segmentation::Analysis;
+use crate::queries::event_segmentation::ChartType;
+use crate::queries::event_segmentation::EventSegmentation;
+use crate::queries::event_segmentation::Query;
 use crate::queries::property_values::ListPropertyValuesRequest;
+use crate::queries::QueryTime;
+use crate::queries::TimeIntervalUnit;
+use crate::reports;
+use crate::reports::CreateReportRequest;
+use crate::reports::Report;
+use crate::reports::UpdateReportRequest;
 use crate::Column;
+use crate::ColumnType;
 use crate::Context;
 use crate::DataTable;
 use crate::EventFilter;
@@ -36,24 +67,12 @@ use crate::ListResponse;
 use crate::PropValueOperation;
 use crate::PropertyRef;
 use crate::ResponseMetadata;
-use serde_json::Value;
-use crate::dashboards::{CreateDashboardRequest, Dashboard, Panel, Row, UpdateDashboardRequest};
-use chrono::Utc;
-use chrono::NaiveDateTime;
-use chrono::DateTime;
-use chrono::Duration;
-use axum::async_trait;
-use crate::event_records::{EventRecord, ListEventRecordsRequest};
-use crate::group_records::{GroupRecord, ListGroupRecordsRequest, UpdateGroupRecordRequest};
-use crate::queries::{event_segmentation, QueryTime, TimeIntervalUnit};
-use crate::reports::{CreateReportRequest, Report, UpdateReportRequest};
 use crate::Result;
 
 lazy_static! {
     pub static ref DATE_TIME: DateTime<Utc> =
-        DateTime::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
+        DateTime::from_utc(NaiveDateTime::from_timestamp_opt(0, 0).unwrap(), Utc);
 }
-
 
 pub struct Accounts {}
 
@@ -89,7 +108,9 @@ impl accounts::Provider for Accounts {
     async fn list(&self, _ctx: Context) -> Result<ListResponse<Account>> {
         Ok(ListResponse {
             data: vec![Accounts::account()],
-            meta: ResponseMetadata { next: Some("next".to_string()) },
+            meta: ResponseMetadata {
+                next: Some("next".to_string()),
+            },
         })
     }
 
@@ -193,7 +214,9 @@ impl custom_events::Provider for CustomEvents {
     ) -> Result<ListResponse<CustomEvent>> {
         Ok(ListResponse {
             data: vec![CustomEvents::custom_event()],
-            meta: ResponseMetadata { next: Some("next".to_string()) },
+            meta: ResponseMetadata {
+                next: Some("next".to_string()),
+            },
         })
     }
 
@@ -282,7 +305,9 @@ impl events::Provider for Events {
     ) -> Result<ListResponse<Event>> {
         Ok(ListResponse {
             data: vec![Events::event()],
-            meta: ResponseMetadata { next: Some("next".to_string()) },
+            meta: ResponseMetadata {
+                next: Some("next".to_string()),
+            },
         })
     }
 
@@ -387,7 +412,9 @@ impl properties::Provider for Properties {
     ) -> Result<ListResponse<Property>> {
         Ok(ListResponse {
             data: vec![Properties::property()],
-            meta: ResponseMetadata { next: Some("next".to_string()) },
+            meta: ResponseMetadata {
+                next: Some("next".to_string()),
+            },
         })
     }
 
@@ -424,14 +451,14 @@ impl Queries {
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
-            events: vec![
-                event_segmentation::Event {
-                    event: EventRef::Regular { event_name: "event".to_string() },
-                    filters: None,
-                    breakdowns: None,
-                    queries: vec![Query::CountEvents],
-                }
-            ],
+            events: vec![event_segmentation::Event {
+                event: EventRef::Regular {
+                    event_name: "event".to_string(),
+                },
+                filters: None,
+                breakdowns: None,
+                queries: vec![Query::CountEvents],
+            }],
             filters: None,
             breakdowns: None,
             segments: None,
@@ -468,7 +495,9 @@ impl queries::Provider for Queries {
     ) -> Result<ListResponse<Value>> {
         Ok(ListResponse {
             data: vec![Value::from("value")],
-            meta: ResponseMetadata { next: Some("next".to_string()) },
+            meta: ResponseMetadata {
+                next: Some("next".to_string()),
+            },
         })
     }
 }
@@ -487,15 +516,13 @@ impl Dashboards {
             tags: Some(vec!["tag".to_string()]),
             name: "name".to_string(),
             description: Some("description".to_string()),
-            rows: vec![
-                Row {
-                    panels: vec![Panel {
-                        span: 1,
-                        typ: dashboards::Type::Report,
-                        report_id: 1,
-                    }]
-                }
-            ],
+            rows: vec![Row {
+                panels: vec![Panel {
+                    span: 1,
+                    typ: dashboards::Type::Report,
+                    report_id: 1,
+                }],
+            }],
         }
     }
 }
@@ -530,7 +557,9 @@ impl dashboards::Provider for Dashboards {
     ) -> Result<ListResponse<Dashboard>> {
         Ok(ListResponse {
             data: vec![Dashboards::dashboard()],
-            meta: ResponseMetadata { next: Some("next".to_string()) },
+            meta: ResponseMetadata {
+                next: Some("next".to_string()),
+            },
         })
     }
 
@@ -606,7 +635,9 @@ impl reports::Provider for Reports {
     ) -> Result<ListResponse<Report>> {
         Ok(ListResponse {
             data: vec![Reports::entity()],
-            meta: ResponseMetadata { next: Some("next".to_string()) },
+            meta: ResponseMetadata {
+                next: Some("next".to_string()),
+            },
         })
     }
 
@@ -639,8 +670,14 @@ impl EventRecords {
         EventRecord {
             id: 1,
             name: "name".to_string(),
-            event_properties: Some(HashMap::from([("key".to_string(), Value::String("value".to_string()))])),
-            user_properties: Some(HashMap::from([("key".to_string(), Value::String("value".to_string()))])),
+            event_properties: Some(HashMap::from([(
+                "key".to_string(),
+                Value::String("value".to_string()),
+            )])),
+            user_properties: Some(HashMap::from([(
+                "key".to_string(),
+                Value::String("value".to_string()),
+            )])),
             matched_custom_events: Some(vec![1]),
         }
     }
@@ -648,14 +685,28 @@ impl EventRecords {
 
 #[async_trait]
 impl event_records::Provider for EventRecords {
-    async fn list(&self, _ctx: Context, _organization_id: u64, _project_id: u64, _request: ListEventRecordsRequest) -> Result<ListResponse<EventRecord>> {
+    async fn list(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _request: ListEventRecordsRequest,
+    ) -> Result<ListResponse<EventRecord>> {
         Ok(ListResponse {
             data: vec![EventRecords::entity()],
-            meta: ResponseMetadata { next: Some("next".to_string()) },
+            meta: ResponseMetadata {
+                next: Some("next".to_string()),
+            },
         })
     }
 
-    async fn get_by_id(&self, _ctx: Context, _organization_id: u64, _project_id: u64, id: u64) -> Result<EventRecord> {
+    async fn get_by_id(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
+    ) -> Result<EventRecord> {
         Ok(EventRecords::entity())
     }
 }
@@ -666,27 +717,51 @@ impl GroupRecords {
     pub fn entity() -> GroupRecord {
         GroupRecord {
             id: 1,
-            str_id:"1".to_string(),
+            str_id: "1".to_string(),
             group: "group".to_string(),
-            properties: Some(HashMap::from([("key".to_string(), Value::String("value".to_string()))])),
+            properties: Some(HashMap::from([(
+                "key".to_string(),
+                Value::String("value".to_string()),
+            )])),
         }
     }
 }
 
 #[async_trait]
 impl group_records::Provider for GroupRecords {
-    async fn list(&self, ctx: Context, organization_id: u64, project_id: u64, request: ListGroupRecordsRequest) -> Result<ListResponse<GroupRecord>> {
+    async fn list(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _request: ListGroupRecordsRequest,
+    ) -> Result<ListResponse<GroupRecord>> {
         Ok(ListResponse {
             data: vec![GroupRecords::entity()],
-            meta: ResponseMetadata { next: Some("next".to_string()) },
+            meta: ResponseMetadata {
+                next: Some("next".to_string()),
+            },
         })
     }
 
-    async fn get_by_id(&self, ctx: Context, organization_id: u64, project_id: u64, id: u64) -> Result<GroupRecord> {
+    async fn get_by_id(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
+    ) -> Result<GroupRecord> {
         Ok(GroupRecords::entity())
     }
 
-    async fn update(&self, ctx: Context, organization_id: u64, project_id: u64, id: u64, req: UpdateGroupRecordRequest) -> Result<GroupRecord> {
+    async fn update(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
+        _req: UpdateGroupRecordRequest,
+    ) -> Result<GroupRecord> {
         Ok(GroupRecords::entity())
     }
 }

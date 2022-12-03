@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use axum::async_trait;
-use serde_json::Value;
 use common::rbac::ProjectPermission;
+use serde_json::Value;
 
 use crate::queries::event_segmentation::EventSegmentation;
-use crate::queries::property_values;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::Provider;
-use crate::{Context, ListResponse};
+use crate::Context;
 use crate::DataTable;
+use crate::ListResponse;
 use crate::Result;
 
 pub struct ProviderImpl {

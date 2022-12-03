@@ -1,11 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use chrono::DateTime;
 use chrono::Duration;
-use chrono::NaiveDateTime;
-use chrono::Utc;
-use lazy_static::lazy_static;
 use platform::auth;
 use tracing::info;
 

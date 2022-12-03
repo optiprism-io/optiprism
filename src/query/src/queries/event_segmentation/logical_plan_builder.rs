@@ -395,7 +395,6 @@ impl LogicalPlanBuilder {
                         operation,
                         value.to_owned(),
                     )),
-                    _ => todo!()
                 }
             })
             .collect::<Result<Vec<Expr>>>()?;

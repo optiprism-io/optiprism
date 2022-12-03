@@ -1,15 +1,16 @@
 use std::collections::HashMap;
+
 use axum::async_trait;
-use chrono::DateTime;
-use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{Context, EventFilter, EventGroupedFilters, EventRef};
-use crate::ListResponse;
-use crate::PlatformError;
 use crate::queries::QueryTime;
+use crate::Context;
+use crate::EventFilter;
+use crate::EventGroupedFilters;
+use crate::EventRef;
+use crate::ListResponse;
 use crate::Result;
 
 #[async_trait]

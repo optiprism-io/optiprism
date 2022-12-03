@@ -6,9 +6,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::Context;
-use crate::group_records::ListGroupRecordsRequest;
 use crate::ListResponse;
-use crate::PlatformError;
 use crate::Result;
 
 #[async_trait]
@@ -53,7 +51,7 @@ pub trait Provider: Sync + Send {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Type {
-    Report
+    Report,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

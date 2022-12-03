@@ -42,6 +42,7 @@ async fn test_event_properties() -> anyhow::Result<()> {
         created_by: 0,
         updated_by: None,
         project_id: 1,
+        events: None,
         tags: Some(vec!["sdf".to_string()]),
         name: "qwe".to_string(),
         display_name: Some("dname".to_string()),

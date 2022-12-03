@@ -4,16 +4,16 @@ pub mod accounts;
 pub mod auth;
 pub mod context;
 pub mod custom_events;
+pub mod dashboards;
 pub mod error;
+pub mod event_records;
 pub mod events;
+pub mod group_records;
 pub mod http;
 pub mod properties;
 pub mod queries;
-pub mod dashboards;
-pub mod stub;
 pub mod reports;
-pub mod event_records;
-pub mod group_records;
+pub mod stub;
 
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -33,7 +33,8 @@ use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
-use common::{DataType, ScalarValue};
+use common::DataType;
+use common::ScalarValue;
 use common::DECIMAL_PRECISION;
 pub use context::Context;
 use convert_case::Case;
@@ -171,17 +172,17 @@ pub struct ResponseMetadata {
 #[derive(Serialize, Deserialize, Default, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ListResponse<T>
-    where T: Debug
+where T: Debug
 {
     pub data: Vec<T>,
     pub meta: ResponseMetadata,
 }
 
 impl<A, B> TryInto<ListResponse<A>> for metadata::metadata::ListResponse<B>
-    where
-        A: Debug,
-        B: TryInto<A> + Clone + Debug,
-        PlatformError: std::convert::From<<B as TryInto<A>>::Error>,
+where
+    A: Debug,
+    B: TryInto<A> + Clone + Debug,
+    PlatformError: std::convert::From<<B as TryInto<A>>::Error>,
 {
     type Error = PlatformError;
 
@@ -394,13 +395,9 @@ pub enum EventFilter {
         value: Option<Vec<Value>>,
     },
     #[serde(rename_all = "camelCase")]
-    Cohort {
-        cohort_id: u64,
-    },
+    Cohort { cohort_id: u64 },
     #[serde(rename_all = "camelCase")]
-    Group {
-        group_id: u64,
-    },
+    Group { group_id: u64 },
 }
 
 impl TryInto<common::types::EventFilter> for &EventFilter {
@@ -420,7 +417,7 @@ impl TryInto<common::types::EventFilter> for &EventFilter {
                     Some(v) => Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?),
                 },
             },
-            _ => todo!()
+            _ => todo!(),
         })
     }
 }
@@ -486,7 +483,8 @@ impl TryFrom<query::DataTable> for DataTable {
     fn try_from(value: query::DataTable) -> std::result::Result<Self, Self::Error> {
         let cols = value
             .columns
-            .iter().cloned()
+            .iter()
+            .cloned()
             .map(|column| match array_ref_to_json_values(&column.data) {
                 Ok(data) => Ok(Column {
                     typ: ColumnType::Dimension,
@@ -495,7 +493,7 @@ impl TryFrom<query::DataTable> for DataTable {
                     data_type: column.data_type.try_into()?,
                     data,
                     step: None,
-                    compare_values: None
+                    compare_values: None,
                 }),
                 Err(err) => Err(err),
             })

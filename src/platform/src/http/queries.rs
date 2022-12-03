@@ -7,12 +7,12 @@ use axum::Router;
 use serde_json::Value;
 
 use crate::http::Json;
-use crate::{ListResponse, queries};
+use crate::queries;
 use crate::queries::event_segmentation::EventSegmentation;
-use crate::queries::property_values;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::Context;
 use crate::DataTable;
+use crate::ListResponse;
 use crate::Result;
 
 async fn event_segmentation(
@@ -42,10 +42,13 @@ async fn property_values(
 }
 
 pub fn attach_routes(router: Router) -> Router {
-    router.clone().nest(
+    router.nest(
         "/organizations/:organization_id/projects/:project_id",
         Router::new()
-            .route("/queries/event-segmentation", routing::post(event_segmentation))
+            .route(
+                "/queries/event-segmentation",
+                routing::post(event_segmentation),
+            )
             .route("/property-values", routing::post(property_values)),
     )
 }
