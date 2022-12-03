@@ -86,7 +86,7 @@ pub fn attach_user_routes(router: Router) -> Router {
 pub fn attach_event_routes(router: Router) -> Router {
     router.clone().nest(
         "/organizations/:organization_id/projects/:project_id/schema/event-properties",
-        router
+        Router::new()
             .route("/", routing::get(list))
             .route(
                 "/:prop_id",

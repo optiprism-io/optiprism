@@ -50,7 +50,7 @@ async fn update(
 pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
         "/organizations/:organization_id/projects/:project_id/group-records",
-        router
+        Router::new()
             .route("/search", routing::post(list))
             .route(
                 "/:id",

@@ -99,7 +99,7 @@ async fn refresh_token(
 pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
         "/auth",
-        router
+        Router::new()
             .route("/signup", post(sign_up))
             .route("/login", post(log_in))
             .route("/refresh-token", post(refresh_token)),
