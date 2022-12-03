@@ -24,7 +24,6 @@ use query::error::QueryError;
 use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
-use tracing::debug;
 
 pub type Result<T> = result::Result<T, PlatformError>;
 
@@ -96,9 +95,8 @@ impl PlatformError {
     pub fn wrap_into(self, err: impl Into<PlatformError>) -> PlatformError {
         PlatformError::Wrapped(Box::new(self), Box::new(err.into()))
     }
-
+    
     pub fn into_api_error(self) -> ApiError {
-        debug!("{:?}", self);
         match self {
             PlatformError::Serde(err) => ApiError::bad_request(err.to_string()),
             PlatformError::Decimal(err) => ApiError::bad_request(err.to_string()),

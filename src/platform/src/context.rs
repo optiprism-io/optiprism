@@ -117,7 +117,7 @@ impl Context {
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
-where B: Send
+    where B: Send
 {
     type Rejection = PlatformError;
 
@@ -127,17 +127,14 @@ where B: Send
         let TypedHeader(Authorization(bearer)) =
             TypedHeader::<Authorization<Bearer>>::from_request(req)
                 .await
-                .map_err(|err| {
-                    println!("{}", err);
-                    AuthError::CantParseBearerHeader
-                })?;
+                .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
         let Extension(auth_cfg) = Extension::<auth::Config>::from_request(req)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
         let claims = parse_access_token(bearer.token(), &auth_cfg.access_token_key)
-            .map_err(|_err| AuthError::CantParseAccessToken)?;
+            .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;
         let Extension(md_acc_prov) =
             Extension::<Arc<dyn metadata::accounts::Provider>>::from_request(req)
                 .await
@@ -145,8 +142,7 @@ where B: Send
 
         let acc = md_acc_prov
             .get_by_id(claims.account_id)
-            .await
-            .map_err(|err| PlatformError::Internal(err.to_string()))?;
+            .await?;
         let ctx = Context {
             account_id: Some(acc.id),
             role: acc.role,
