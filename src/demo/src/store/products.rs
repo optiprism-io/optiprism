@@ -50,7 +50,7 @@ impl Product {
 }
 
 pub struct ProductProvider {
-    dicts: Arc<dictionaries::Provider>,
+    dicts: Arc<dyn dictionaries::Provider>,
     org_id: u64,
     proj_id: u64,
     pub products: Vec<Product>,
@@ -70,7 +70,7 @@ impl ProductProvider {
         org_id: u64,
         proj_id: u64,
         rng: &mut ThreadRng,
-        dicts: Arc<dictionaries::Provider>,
+        dicts: Arc<dyn dictionaries::Provider>,
         rdr: R,
     ) -> Result<Self> {
         let mut rdr = csv::Reader::from_reader(rdr);

@@ -4,20 +4,20 @@ use axum::extract::Extension;
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::routing;
-use axum::Json;
 use axum::Router;
-use metadata::metadata::ListResponse;
 
 use crate::custom_events;
-use crate::custom_events::types::CreateCustomEventRequest;
-use crate::custom_events::types::CustomEvent;
-use crate::custom_events::types::UpdateCustomEventRequest;
+use crate::custom_events::CreateCustomEventRequest;
+use crate::custom_events::CustomEvent;
+use crate::custom_events::UpdateCustomEventRequest;
+use crate::http::Json;
 use crate::Context;
+use crate::ListResponse;
 use crate::Result;
 
 async fn create(
     ctx: Context,
-    Extension(provider): Extension<Arc<custom_events::Provider>>,
+    Extension(provider): Extension<Arc<dyn custom_events::Provider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<CreateCustomEventRequest>,
 ) -> Result<(StatusCode, Json<CustomEvent>)> {
@@ -33,7 +33,7 @@ async fn create(
 
 async fn get_by_id(
     ctx: Context,
-    Extension(provider): Extension<Arc<custom_events::Provider>>,
+    Extension(provider): Extension<Arc<dyn custom_events::Provider>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<CustomEvent>> {
     Ok(Json(
@@ -45,7 +45,7 @@ async fn get_by_id(
 
 async fn list(
     ctx: Context,
-    Extension(provider): Extension<Arc<custom_events::Provider>>,
+    Extension(provider): Extension<Arc<dyn custom_events::Provider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
 ) -> Result<Json<ListResponse<CustomEvent>>> {
     Ok(Json(provider.list(ctx, organization_id, project_id).await?))
@@ -53,7 +53,7 @@ async fn list(
 
 async fn update(
     ctx: Context,
-    Extension(provider): Extension<Arc<custom_events::Provider>>,
+    Extension(provider): Extension<Arc<dyn custom_events::Provider>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
     Json(request): Json<UpdateCustomEventRequest>,
 ) -> Result<Json<CustomEvent>> {
@@ -66,7 +66,7 @@ async fn update(
 
 async fn delete(
     ctx: Context,
-    Extension(provider): Extension<Arc<custom_events::Provider>>,
+    Extension(provider): Extension<Arc<dyn custom_events::Provider>>,
     Path((organization_id, project_id, event_id)): Path<(u64, u64, u64)>,
 ) -> Result<Json<CustomEvent>> {
     Ok(Json(
@@ -76,15 +76,12 @@ async fn delete(
     ))
 }
 
-pub fn attach_routes(router: Router, events: Arc<custom_events::Provider>) -> Router {
+pub fn attach_routes(router: Router) -> Router {
     router.clone().nest(
         "/organizations/:organization_id/projects/:project_id/schema/custom-events",
-        router
-            .route("/", routing::post(create).get(list))
-            .route(
-                "/:event_id",
-                routing::get(get_by_id).delete(delete).put(update),
-            )
-            .layer(Extension(events)),
+        router.route("/", routing::post(create).get(list)).route(
+            "/:event_id",
+            routing::get(get_by_id).delete(delete).put(update),
+        ),
     )
 }

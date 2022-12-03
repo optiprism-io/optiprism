@@ -27,15 +27,15 @@ mod tests {
     use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
-    use query::queries::event_segmentation::types::Analysis;
-    use query::queries::event_segmentation::types::Breakdown;
-    use query::queries::event_segmentation::types::ChartType;
-    use query::queries::event_segmentation::types::Event;
-    use query::queries::event_segmentation::types::EventSegmentation;
-    use query::queries::event_segmentation::types::NamedQuery;
-    use query::queries::event_segmentation::types::Query;
-    use query::queries::types::QueryTime;
-    use query::queries::types::TimeUnit;
+    use query::queries::event_segmentation::Analysis;
+    use query::queries::event_segmentation::Breakdown;
+    use query::queries::event_segmentation::ChartType;
+    use query::queries::event_segmentation::Event;
+    use query::queries::event_segmentation::EventSegmentation;
+    use query::queries::event_segmentation::NamedQuery;
+    use query::queries::event_segmentation::Query;
+    use query::queries::QueryTime;
+    use query::queries::TimeIntervalUnit;
     use query::test_util::create_entities;
     use query::test_util::create_md;
     use query::test_util::events_provider;
@@ -53,7 +53,7 @@ mod tests {
                 to,
             },
             group: event_fields::USER_ID.to_string(),
-            interval_unit: TimeUnit::Second,
+            interval_unit: TimeIntervalUnit::Second,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
@@ -199,10 +199,10 @@ mod tests {
             // },
             time: QueryTime::Last {
                 last: 30,
-                unit: TimeUnit::Day,
+                unit: TimeIntervalUnit::Day,
             },
             group: event_fields::USER_ID.to_string(),
-            interval_unit: TimeUnit::Week,
+            interval_unit: TimeIntervalUnit::Week,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
@@ -324,7 +324,7 @@ mod tests {
                 status: custom_events::Status::Enabled,
                 is_system: false,
                 events: vec![
-                    custom_events::types::Event {
+                    custom_events::Event {
                         event: EventRef::RegularName("View Product".to_string()),
                         filters: Some(vec![
                             EventFilter::Property {
@@ -342,7 +342,7 @@ mod tests {
                             },
                         ]),
                     },
-                    custom_events::types::Event {
+                    custom_events::Event {
                         event: EventRef::RegularName("Buy Product".to_string()),
                         filters: None,
                     },
@@ -360,10 +360,10 @@ mod tests {
         let es = EventSegmentation {
             time: QueryTime::Last {
                 last: 30,
-                unit: TimeUnit::Day,
+                unit: TimeIntervalUnit::Day,
             },
             group: event_fields::USER_ID.to_string(),
-            interval_unit: TimeUnit::Week,
+            interval_unit: TimeIntervalUnit::Week,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,

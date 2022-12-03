@@ -11,6 +11,7 @@ axum = { version = "0.5.16", features = ["headers"] }
 chrono = { version = "0.4.19" }
 clap = { version = "4.0.15", features = ["derive"] }
 common = { path = "../common" }
+contract-test-server = { path = "../contract-test-server" }
 crossbeam-channel = "0.3.9"
 csv = "1.1"
 dateparser = "0.1.7"

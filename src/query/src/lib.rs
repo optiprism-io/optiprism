@@ -1,14 +1,19 @@
+use arrow::array::ArrayRef;
+use arrow::datatypes::DataType;
+use arrow::datatypes::SchemaRef;
+use async_trait::async_trait;
 pub use context::Context;
 pub use error::Result;
-pub use provider::QueryProvider;
+pub use provider_impl::ProviderImpl;
 
+use crate::queries::event_segmentation::EventSegmentation;
+use crate::queries::property_values::PropertyValues;
 pub mod context;
-pub mod data_table;
 pub mod error;
 pub mod expr;
 pub mod logical_plan;
 pub mod physical_plan;
-pub mod provider;
+pub mod provider_impl;
 pub mod queries;
 
 pub mod event_fields {
@@ -19,8 +24,43 @@ pub mod event_fields {
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ColumnType {
+    Dimension,
+    Metric,
+    MetricValue,
+    FunnelMetricValue,
+}
+
+#[async_trait]
+pub trait Provider: Sync + Send {
+    async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef>;
+    async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable>;
+}
+
+#[derive(Clone, Debug)]
+pub struct Column {
+    pub name: String,
+    pub typ: ColumnType,
+    pub is_nullable: bool,
+    pub data_type: DataType,
+    pub data: ArrayRef,
+}
+
+pub struct DataTable {
+    pub schema: SchemaRef,
+    pub columns: Vec<Column>,
+}
+
+impl DataTable {
+    pub fn new(schema: SchemaRef, columns: Vec<Column>) -> Self {
+        Self { schema, columns }
+    }
+}
+
 pub mod test_util {
     use std::env::temp_dir;
+    use std::path::PathBuf;
     use std::sync::Arc;
 
     use arrow::datatypes::DataType;
@@ -38,7 +78,7 @@ pub mod test_util {
     use metadata::database::TableRef;
     use metadata::events;
     use metadata::properties;
-    use metadata::properties::provider::Namespace;
+    use metadata::properties::provider_impl::Namespace;
     use metadata::properties::CreatePropertyRequest;
     use metadata::properties::Property;
     use metadata::store::Store;
@@ -49,7 +89,7 @@ pub mod test_util {
     use crate::event_fields;
 
     pub async fn events_provider(
-        db: Arc<database::Provider>,
+        db: Arc<dyn database::Provider>,
         org_id: u64,
         proj_id: u64,
     ) -> Result<LogicalPlan> {
@@ -57,7 +97,12 @@ pub mod test_util {
         let schema = table.arrow_schema();
 
         let options = CsvReadOptions::new();
-        let table_path = ListingTableUrl::parse("../tests/events.csv")?;
+        let table_path = ListingTableUrl::parse(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("resources/test/events.csv")
+                .to_str()
+                .unwrap(),
+        )?;
         let target_partitions = 1;
         let listing_options = options.to_listing_options(target_partitions);
 

@@ -4,19 +4,23 @@ use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::types::OptionalProperty;
 use metadata::accounts::UpdateAccountRequest;
-use platform::auth::types::TokensResponse;
 use platform::auth::SignUpRequest;
+use platform::auth::TokensResponse;
 use platform::http::auth::RefreshTokenRequest;
 use reqwest::header::HeaderMap;
 use reqwest::Client;
 use reqwest::StatusCode;
 
+use crate::assert_response_json_eq;
+use crate::assert_response_status_eq;
 use crate::http::tests::create_admin_acc_and_login;
 use crate::http::tests::run_http_service;
+use crate::http::tests::EMPTY_LIST;
 
 #[tokio::test]
 async fn test_auth() -> anyhow::Result<()> {
     let (base_addr, md, pp) = run_http_service(false).await?;
+    let auth_addr = format!("{base_addr}/auth");
     let cl = Client::new();
     let admin_headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
@@ -26,7 +30,7 @@ async fn test_auth() -> anyhow::Result<()> {
         HeaderValue::from_str("application/json")?,
     );
 
-    let user_tokens = {
+    let user_tokens: TokensResponse = {
         let pwd = "password".to_string();
         let req = SignUpRequest {
             email: "user@gmail.com".to_string(),
@@ -36,17 +40,14 @@ async fn test_auth() -> anyhow::Result<()> {
             last_name: Some("last".to_string()),
         };
 
-        let body = serde_json::to_string(&req)?;
-
         let resp = cl
-            .post(format!("{base_addr}/api/v1/auth/signup"))
-            .body(body)
+            .post(format!("{auth_addr}/signup"))
+            .body(serde_json::to_string(&req)?)
             .headers(admin_headers.clone())
             .send()
             .await?;
 
-        assert_eq!(resp.status(), StatusCode::CREATED);
-        let resp: TokensResponse = serde_json::from_str(resp.text().await?.as_str())?;
+        assert_response_status_eq!(resp, StatusCode::CREATED);
 
         md.accounts
             .update(2, UpdateAccountRequest {
@@ -61,19 +62,20 @@ async fn test_auth() -> anyhow::Result<()> {
                 teams: OptionalProperty::None,
             })
             .await?;
-        resp
+
+        resp.json().await?
     };
 
     {
         let resp = cl
             .get(format!(
-                "{base_addr}/api/v1/organizations/1/projects/1/schema/events"
+                "{base_addr}/organizations/1/projects/1/schema/events"
             ))
             .headers(headers.clone())
             .send()
             .await?;
 
-        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert_response_status_eq!(resp, StatusCode::UNAUTHORIZED);
     }
 
     // list without events should be empty
@@ -86,14 +88,14 @@ async fn test_auth() -> anyhow::Result<()> {
 
         let resp = cl
             .get(format!(
-                "{base_addr}/api/v1/organizations/1/projects/1/schema/events"
+                "{base_addr}/organizations/1/projects/1/schema/events"
             ))
             .headers(jwt_headers.clone())
             .send()
             .await?;
 
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(resp.text().await?, r#"{"data":[],"meta":{"next":null}}"#);
+        assert_response_status_eq!(resp, StatusCode::OK);
+        assert_response_json_eq!(resp, EMPTY_LIST);
     }
 
     let new_jwt_headers = {
@@ -101,14 +103,14 @@ async fn test_auth() -> anyhow::Result<()> {
             refresh_token: Some(user_tokens.refresh_token),
         };
 
-        let body = serde_json::to_string(&req)?;
         let resp = cl
-            .post(format!("{base_addr}/api/v1/auth/refresh-token"))
-            .body(body)
+            .post(format!("{auth_addr}/refresh-token"))
+            .body(serde_json::to_string(&req)?)
             .headers(headers.clone())
             .send()
             .await?;
-        assert_eq!(resp.status(), StatusCode::OK);
+
+        assert_response_status_eq!(resp, StatusCode::OK);
         let new_user_tokens: TokensResponse = serde_json::from_str(resp.text().await?.as_str())?;
 
         // todo: check for tokens revocation here
@@ -126,14 +128,14 @@ async fn test_auth() -> anyhow::Result<()> {
     {
         let resp = cl
             .get(format!(
-                "{base_addr}/api/v1/organizations/1/projects/1/schema/events"
+                "{base_addr}/organizations/1/projects/1/schema/events"
             ))
             .headers(new_jwt_headers.clone())
             .send()
             .await?;
 
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(resp.text().await?, r#"{"data":[],"meta":{"next":null}}"#);
+        assert_response_status_eq!(resp, StatusCode::OK);
+        assert_response_json_eq!(resp, EMPTY_LIST.to_string());
     }
 
     Ok(())

@@ -2,12 +2,12 @@ use std::env::temp_dir;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use chrono::Duration;
 use chrono::Utc;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 use dateparser::DateTimeUtc;
+use time::Duration;
 use tracing::metadata::LevelFilter;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -69,6 +69,14 @@ enum Cmd {
         #[arg(long, default_value = "100")]
         new_daily_users: usize,
     },
+    ContractTestServer {
+        #[arg(long, default_value = "0.0.0.0:8080")]
+        host: SocketAddr,
+        #[arg(long, default_value = "refresh_token_key")]
+        refresh_token_key: String,
+        #[arg(long, default_value = "access_token_key")]
+        access_token_key: String,
+    },
 }
 
 #[tokio::main]
@@ -120,9 +128,22 @@ async fn main() -> Result<()> {
                 to_date,
                 new_daily_users,
             };
-            demo::run(cfg).await?
+
+            demo::run(cfg).await?;
+        }
+        Cmd::ContractTestServer {
+            host,
+            refresh_token_key,
+            access_token_key,
+        } => {
+            let cfg = contract_test_server::Config {
+                host,
+                refresh_token_key,
+                access_token_key,
+            };
+
+            contract_test_server::run(cfg).await?;
         }
     }
-
     Ok(())
 }

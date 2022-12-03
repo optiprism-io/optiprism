@@ -1,20 +1,23 @@
 use chrono::DateTime;
 use chrono::Utc;
-use query::queries::event_segmentation::types as query_es_types;
-use query::queries::event_segmentation::types::NamedQuery;
+use query::queries::event_segmentation as query_es_types;
+use query::queries::event_segmentation::NamedQuery;
 use serde::Deserialize;
 use serde::Serialize;
+use serde_json::Value;
 
-use crate::queries::types::AggregateFunction;
-use crate::queries::types::EventFilter;
-use crate::queries::types::EventRef;
-use crate::queries::types::PartitionedAggregateFunction;
-use crate::queries::types::PropertyRef;
-use crate::queries::types::QueryTime;
-use crate::queries::types::TimeUnit;
+use crate::queries::AggregateFunction;
+use crate::queries::PartitionedAggregateFunction;
+use crate::queries::QueryTime;
+use crate::queries::TimeIntervalUnit;
+use crate::EventFilter;
+use crate::EventGroupedFilters;
+use crate::EventRef;
 use crate::PlatformError;
+use crate::PropValueOperation;
+use crate::PropertyRef;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum SegmentTime {
     Between {
@@ -23,15 +26,15 @@ pub enum SegmentTime {
     },
     From(DateTime<Utc>),
     Last {
-        n: i64,
-        unit: TimeUnit,
+        last: i64,
+        unit: TimeIntervalUnit,
     },
     AfterFirstUse {
         within: i64,
-        unit: TimeUnit,
+        unit: TimeIntervalUnit,
     },
     WindowEach {
-        unit: TimeUnit,
+        unit: TimeIntervalUnit,
     },
 }
 
@@ -42,7 +45,7 @@ impl TryInto<query_es_types::SegmentTime> for SegmentTime {
         Ok(match self {
             SegmentTime::Between { from, to } => query_es_types::SegmentTime::Between { from, to },
             SegmentTime::From(v) => query_es_types::SegmentTime::From(v),
-            SegmentTime::Last { n, unit } => query_es_types::SegmentTime::Last {
+            SegmentTime::Last { last: n, unit } => query_es_types::SegmentTime::Last {
                 n,
                 unit: unit.try_into()?,
             },
@@ -59,7 +62,7 @@ impl TryInto<query_es_types::SegmentTime> for SegmentTime {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ChartType {
     Line,
@@ -77,12 +80,15 @@ impl TryInto<query_es_types::ChartType> for ChartType {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Analysis {
     Linear,
-    RollingAverage { window: usize, unit: TimeUnit },
-    WindowAverage { window: usize, unit: TimeUnit },
+    RollingAverage {
+        window: usize,
+        unit: TimeIntervalUnit,
+    },
+    Logarithmic,
     Cumulative,
 }
 
@@ -96,32 +102,19 @@ impl TryInto<query_es_types::Analysis> for Analysis {
                 window,
                 unit: unit.try_into()?,
             },
-            Analysis::WindowAverage { window, unit } => query_es_types::Analysis::WindowAverage {
-                window,
-                unit: unit.try_into()?,
-            },
+            Analysis::Logarithmic => query_es_types::Analysis::Logarithmic,
             Analysis::Cumulative => query_es_types::Analysis::Cumulative,
         })
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Compare {
     pub offset: usize,
-    pub unit: TimeUnit,
+    pub unit: TimeIntervalUnit,
 }
 
-// impl TryFrom<Option<Compare>> for Option<query_es_types::Compare> {
-// type Error = Error;
-//
-// fn try_from(value: Option<Compare>) -> std::result::Result<Self, Self::Error> {
-// Ok(match value {
-// None => None,
-// Some(v) => v.try_into()?
-// })
-// }
-// }
 impl TryInto<query_es_types::Compare> for Compare {
     type Error = PlatformError;
 
@@ -133,7 +126,7 @@ impl TryInto<query_es_types::Compare> for Compare {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum QueryAggregate {
     Min,
@@ -167,7 +160,7 @@ impl TryInto<query_es_types::QueryAggregate> for QueryAggregate {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum QueryAggregatePerGroup {
     Min,
@@ -195,7 +188,7 @@ impl TryInto<query_es_types::QueryAggregatePerGroup> for QueryAggregatePerGroup 
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum QueryPerGroup {
     CountEvents,
@@ -211,7 +204,7 @@ impl TryInto<query_es_types::QueryPerGroup> for QueryPerGroup {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Query {
     CountEvents,
@@ -235,7 +228,7 @@ pub enum Query {
         property: PropertyRef,
         aggregate: AggregateFunction,
     },
-    QueryFormula {
+    Formula {
         formula: String,
     },
 }
@@ -269,14 +262,14 @@ impl TryInto<query_es_types::Query> for &Query {
                 property: property.to_owned().try_into()?,
                 aggregate: aggregate.try_into()?,
             },
-            Query::QueryFormula { formula } => query_es_types::Query::QueryFormula {
+            Query::Formula { formula } => query_es_types::Query::QueryFormula {
                 formula: formula.clone(),
             },
         })
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Breakdown {
     Property {
@@ -304,7 +297,7 @@ pub enum EventType {
     Custom,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
     #[serde(flatten)]
@@ -353,30 +346,83 @@ impl TryInto<query_es_types::Event> for &Event {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum SegmentCondition {}
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum DidEventAggregate {
+    Count {
+        operation: PropValueOperation,
+        value: u64,
+        time: SegmentTime,
+    },
+    RelativeCount {
+        #[serde(flatten)]
+        event: EventRef,
+        operation: PropValueOperation,
+        filters: Option<Vec<EventFilter>>,
+        time: SegmentTime,
+    },
+    AggregateProperty {
+        #[serde(flatten)]
+        property: PropertyRef,
+        aggregate: QueryAggregate,
+        operation: PropValueOperation,
+        value: Option<Value>,
+        time: SegmentTime,
+    },
+    HistoricalCount {
+        operation: PropValueOperation,
+        value: u64,
+        time: SegmentTime,
+    },
+}
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum SegmentCondition {
+    #[serde(rename_all = "camelCase")]
+    HasPropertyValue {
+        property_name: String,
+        operation: PropValueOperation,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Vec<Value>>,
+    },
+    #[serde(rename_all = "camelCase")]
+    HadPropertyValue {
+        property_name: String,
+        operation: PropValueOperation,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Vec<Value>>,
+        time: SegmentTime,
+    },
+    #[serde(rename_all = "camelCase")]
+    DidEvent {
+        #[serde(flatten)]
+        event: EventRef,
+        filters: Option<Vec<EventFilter>>,
+        aggregate: DidEventAggregate,
+    },
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Segment {
     name: String,
     conditions: Vec<SegmentCondition>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct EventSegmentation {
     pub time: QueryTime,
     pub group: String,
-    pub interval_unit: TimeUnit,
+    pub interval_unit: TimeIntervalUnit,
     pub chart_type: ChartType,
     pub analysis: Analysis,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compare: Option<Compare>,
     pub events: Vec<Event>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filters: Option<Vec<EventFilter>>,
+    pub filters: Option<EventGroupedFilters>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub breakdowns: Option<Vec<Breakdown>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -399,14 +445,15 @@ impl TryInto<query_es_types::EventSegmentation> for EventSegmentation {
                 .iter()
                 .map(|v| v.try_into())
                 .collect::<std::result::Result<_, _>>()?,
-            filters: self
-                .filters
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.try_into())
-                        .collect::<std::result::Result<_, _>>()
-                })
-                .transpose()?,
+            filters: None, // TODO fix
+            // filters: self
+            // .filters
+            // .map(|v| {
+            // v.iter()
+            // .map(|v| v.try_into())
+            // .collect::<std::result::Result<_, _>>()
+            // })
+            // .transpose()?,
             breakdowns: self
                 .breakdowns
                 .map(|v| {
@@ -424,7 +471,7 @@ mod tests {
     use chrono::DateTime;
     use chrono::Utc;
     use query::event_fields;
-    use query::queries::event_segmentation::types::EventSegmentation as QueryEventSegmentation;
+    use query::queries::event_segmentation::EventSegmentation as QueryEventSegmentation;
     use serde_json::json;
 
     use crate::error::Result;
@@ -439,10 +486,11 @@ mod tests {
     use crate::queries::event_segmentation::PartitionedAggregateFunction;
     use crate::queries::event_segmentation::Query;
     use crate::queries::event_segmentation::QueryTime;
-    use crate::queries::event_segmentation::TimeUnit;
-    use crate::queries::types::EventRef;
-    use crate::queries::types::PropValueOperation;
-    use crate::queries::types::PropertyRef;
+    use crate::queries::event_segmentation::TimeIntervalUnit;
+    use crate::EventGroupedFilters;
+    use crate::EventRef;
+    use crate::PropValueOperation;
+    use crate::PropertyRef;
 
     #[test]
     fn test_serialize() -> Result<()> {
@@ -455,12 +503,12 @@ mod tests {
         let es = EventSegmentation {
             time: QueryTime::Between { from, to },
             group: event_fields::USER_ID.to_string(),
-            interval_unit: TimeUnit::Minute,
+            interval_unit: TimeIntervalUnit::Minute,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: Some(Compare {
                 offset: 1,
-                unit: TimeUnit::Second,
+                unit: TimeIntervalUnit::Second,
             }),
             events: vec![Event {
                 event: EventRef::Regular {
@@ -522,13 +570,17 @@ mod tests {
                     },
                 ],
             }],
-            filters: Some(vec![EventFilter::Property {
-                property: PropertyRef::User {
-                    property_name: "p1".to_string(),
-                },
-                operation: PropValueOperation::Eq,
-                value: Some(vec![json!(true)]),
-            }]),
+            filters: Some(EventGroupedFilters {
+                groups_condition: None,
+                groups: vec![],
+            }),
+            // filters: Some(vec![EventFilter::Property {
+            // property: PropertyRef::User {
+            // property_name: "p1".to_string(),
+            // },
+            // operation: PropValueOperation::Eq,
+            // value: Some(vec![json!(true)]),
+            // }]),
             breakdowns: Some(vec![Breakdown::Property {
                 property: PropertyRef::User {
                     property_name: "Device".to_string(),

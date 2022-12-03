@@ -21,7 +21,7 @@ use datafusion_expr::Expr;
 use datafusion_expr::Operator;
 use futures::executor;
 use metadata::dictionaries;
-use metadata::properties::provider::Namespace;
+use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
 
 use crate::error::QueryError;
@@ -29,7 +29,7 @@ use crate::event_fields;
 use crate::logical_plan::expr::lit_timestamp;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
-use crate::queries::types::QueryTime;
+use crate::queries::QueryTime;
 use crate::Context;
 use crate::Result;
 
@@ -167,7 +167,7 @@ pub async fn event_filters_expression(
 
 pub async fn encode_property_dict_values(
     ctx: &Context,
-    dictionaries: &Arc<dictionaries::Provider>,
+    dictionaries: &Arc<dyn dictionaries::Provider>,
     dict_type: &DataType,
     col_name: &str,
     values: &[ScalarValue],

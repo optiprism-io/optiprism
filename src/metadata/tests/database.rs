@@ -4,6 +4,7 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use metadata::database::Column;
 use metadata::database::Provider;
+use metadata::database::ProviderImpl;
 use metadata::database::Table;
 use metadata::database::TableRef;
 use metadata::error::Result;
@@ -16,7 +17,7 @@ async fn test_database() -> Result<()> {
     path.push(format!("{}.db", Uuid::new_v4()));
 
     let store = Arc::new(Store::new(path));
-    let db = Provider::new(store.clone());
+    let db: Box<dyn Provider> = Box::new(ProviderImpl::new(store.clone()));
 
     let table = Table {
         typ: TableRef::System("t1".to_string()),

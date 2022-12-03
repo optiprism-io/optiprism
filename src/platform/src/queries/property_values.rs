@@ -4,12 +4,15 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::array_ref_to_json_values;
-use crate::queries::types::json_value_to_scalar;
-use crate::queries::types::EventRef;
-use crate::queries::types::PropValueOperation;
-use crate::queries::types::PropertyRef;
+use crate::json_value_to_scalar;
+use crate::EventRef;
+use crate::ListResponse;
 use crate::PlatformError;
+use crate::PropValueOperation;
+use crate::PropertyRef;
+use crate::ResponseMetadata;
 use crate::Result;
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Filter {
@@ -19,19 +22,15 @@ pub struct Filter {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PropertyValues {
+pub struct ListPropertyValuesRequest {
+    #[serde(flatten)]
     pub property: PropertyRef,
+    #[serde(flatten)]
     pub event: Option<EventRef>,
     pub filter: Option<Filter>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListResponse {
-    values: Vec<Value>,
-}
-
-impl TryInto<query::queries::property_values::PropertyValues> for PropertyValues {
+impl TryInto<query::queries::property_values::PropertyValues> for ListPropertyValuesRequest {
     type Error = PlatformError;
 
     fn try_into(
@@ -64,12 +63,13 @@ impl TryInto<query::queries::property_values::Filter> for Filter {
     }
 }
 
-impl TryInto<ListResponse> for ArrayRef {
+impl TryInto<ListResponse<Value>> for ArrayRef {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<ListResponse, Self::Error> {
+    fn try_into(self) -> std::result::Result<ListResponse<Value>, Self::Error> {
         Ok(ListResponse {
-            values: array_ref_to_json_values(&self)?,
+            data: array_ref_to_json_values(&self)?,
+            meta: ResponseMetadata { next: None },
         })
     }
 }

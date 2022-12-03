@@ -11,10 +11,13 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, 'frontend', 'src')
+            '@': path.resolve('frontend', 'src')
         }
     },
     test: {
-        root: 'frontend'
-    }
+        include: [
+            'test/unit/**/*.{test,spec}.ts',
+            'test/contract/**/*.{test,spec}.ts'
+        ],
+    },
 })

@@ -2,25 +2,25 @@
 mod tests {
 
     use axum::http::StatusCode;
-    use platform::error::Result;
     use platform::queries::property_values::Filter;
-    use platform::queries::property_values::PropertyValues;
-    use platform::queries::types::EventRef;
-    use platform::queries::types::PropValueOperation;
-    use platform::queries::types::PropertyRef;
+    use platform::queries::property_values::ListPropertyValuesRequest;
+    use platform::EventRef;
+    use platform::PropValueOperation;
+    use platform::PropertyRef;
     use reqwest::Client;
     use serde_json::Value;
 
+    use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;
     use crate::http::tests::run_http_service;
 
     #[tokio::test]
-    async fn test_property_values() -> Result<()> {
+    async fn test_property_values() -> anyhow::Result<()> {
         let (base_url, md, pp) = run_http_service(true).await?;
         let cl = Client::new();
         let headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
-        let req = PropertyValues {
+        let req = ListPropertyValuesRequest {
             property: PropertyRef::Event {
                 property_name: "Product Name".to_string(),
             },
@@ -33,21 +33,17 @@ mod tests {
             }),
         };
 
-        let body = serde_json::to_string(&req).unwrap();
-
         let resp = cl
             .post(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/queries/property-values"
+                "{base_url}/organizations/1/projects/1/queries/property-values"
             ))
-            .body(body)
+            .body(serde_json::to_string(&req)?)
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
+            .await?;
 
-        let status = resp.status();
-        let _txt = resp.text().await.unwrap();
-        assert_eq!(status, StatusCode::OK);
+        assert_response_status_eq!(resp, StatusCode::OK);
+        let _txt = resp.text().await?;
 
         Ok(())
     }

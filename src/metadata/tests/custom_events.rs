@@ -3,32 +3,36 @@ use std::sync::Arc;
 
 use common::types::EventRef;
 use common::types::OptionalProperty;
-use metadata::custom_events::types::Event;
+use metadata::custom_events::provider_impl::MAX_EVENTS_LEVEL;
 use metadata::custom_events::CreateCustomEventRequest;
+use metadata::custom_events::Event;
 use metadata::custom_events::Provider;
+use metadata::custom_events::ProviderImpl;
 use metadata::custom_events::Status;
 use metadata::custom_events::UpdateCustomEventRequest;
 use metadata::error::CustomEventError;
 use metadata::error::MetadataError;
 use metadata::error::Result;
 use metadata::events;
-use metadata::events::types::CreateEventRequest;
+use metadata::events::CreateEventRequest;
 use metadata::store::Store;
 use uuid::Uuid;
 
-fn get_providers() -> (Arc<events::Provider>, Provider) {
+fn get_providers(max_events_level: usize) -> (Arc<dyn events::Provider>, Arc<dyn Provider>) {
     let mut path = temp_dir();
     path.push(format!("{}.db", Uuid::new_v4()));
     let store = Arc::new(Store::new(path));
-    let events_prov = Arc::new(events::Provider::new(store.clone()));
-    let custom_events = Provider::new(store, events_prov.clone());
+    let events_prov = Arc::new(events::ProviderImpl::new(store.clone()));
+    let custom_events = Arc::new(
+        ProviderImpl::new(store, events_prov.clone()).with_max_events_level(max_events_level),
+    );
 
     (events_prov, custom_events)
 }
 
 #[tokio::test]
 async fn non_exist() -> Result<()> {
-    let (_, custom_events) = get_providers();
+    let (_, custom_events) = get_providers(MAX_EVENTS_LEVEL);
 
     // try to get, delete, update unexisting event
     assert!(custom_events.get_by_id(1, 1, 1).await.is_err());
@@ -55,7 +59,7 @@ async fn non_exist() -> Result<()> {
 
 #[tokio::test]
 async fn create_event() -> Result<()> {
-    let (event_prov, prov) = get_providers();
+    let (event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);
 
     let event = event_prov
         .create(1, 1, CreateEventRequest {
@@ -93,7 +97,7 @@ async fn create_event() -> Result<()> {
 
 #[tokio::test]
 async fn create_event_not_found() -> Result<()> {
-    let (_event_prov, prov) = get_providers();
+    let (_event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);
 
     let req = CreateCustomEventRequest {
         created_by: 0,
@@ -115,7 +119,7 @@ async fn create_event_not_found() -> Result<()> {
 
 #[tokio::test]
 async fn create_event_duplicate_name() -> Result<()> {
-    let (event_prov, prov) = get_providers();
+    let (event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);
 
     event_prov
         .create(1, 1, CreateEventRequest {
@@ -153,8 +157,7 @@ async fn create_event_duplicate_name() -> Result<()> {
 
 #[tokio::test]
 async fn create_event_recursion_level_exceeded() -> Result<()> {
-    let (event_prov, prov) = get_providers();
-    let prov = prov.with_max_events_level(1);
+    let (event_prov, prov) = get_providers(1);
 
     event_prov
         .create(1, 1, CreateEventRequest {
@@ -222,8 +225,7 @@ async fn create_event_recursion_level_exceeded() -> Result<()> {
 
 #[tokio::test]
 async fn test_duplicate() -> Result<()> {
-    let (event_prov, prov) = get_providers();
-    let prov = prov.with_max_events_level(5);
+    let (event_prov, prov) = get_providers(5);
 
     event_prov
         .create(1, 1, CreateEventRequest {
@@ -308,7 +310,7 @@ async fn test_duplicate() -> Result<()> {
 
 #[tokio::test]
 async fn update_event() -> Result<()> {
-    let (event_prov, prov) = get_providers();
+    let (event_prov, prov) = get_providers(MAX_EVENTS_LEVEL);
 
     let _event = event_prov
         .create(1, 1, CreateEventRequest {

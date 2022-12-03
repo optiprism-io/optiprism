@@ -3,20 +3,21 @@ use std::sync::Arc;
 use axum::extract::Extension;
 use axum::extract::Path;
 use axum::routing;
-use axum::Json;
 use axum::Router;
+use serde_json::Value;
 
-use crate::data_table::DataTable;
+use crate::http::Json;
+use crate::queries;
 use crate::queries::event_segmentation::EventSegmentation;
-use crate::queries::property_values;
-use crate::queries::property_values::PropertyValues;
-use crate::queries::provider::QueryProvider;
+use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::Context;
+use crate::DataTable;
+use crate::ListResponse;
 use crate::Result;
 
 async fn event_segmentation(
     ctx: Context,
-    Extension(provider): Extension<Arc<QueryProvider>>,
+    Extension(provider): Extension<Arc<dyn queries::Provider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<EventSegmentation>,
 ) -> Result<Json<DataTable>> {
@@ -29,10 +30,10 @@ async fn event_segmentation(
 
 async fn property_values(
     ctx: Context,
-    Extension(provider): Extension<Arc<QueryProvider>>,
+    Extension(provider): Extension<Arc<dyn queries::Provider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
-    Json(request): Json<PropertyValues>,
-) -> Result<Json<property_values::ListResponse>> {
+    Json(request): Json<ListPropertyValuesRequest>,
+) -> Result<Json<ListResponse<Value>>> {
     Ok(Json(
         provider
             .property_values(ctx, organization_id, project_id, request)
@@ -40,12 +41,14 @@ async fn property_values(
     ))
 }
 
-pub fn attach_routes(router: Router, prov: Arc<QueryProvider>) -> Router {
-    router.clone().nest(
-        "/organizations/:organization_id/projects/:project_id/queries",
-        router
-            .route("/event-segmentation", routing::post(event_segmentation))
-            .route("/property-values", routing::post(property_values))
-            .layer(Extension(prov)),
+pub fn attach_routes(router: Router) -> Router {
+    router.nest(
+        "/organizations/:organization_id/projects/:project_id",
+        Router::new()
+            .route(
+                "/queries/event-segmentation",
+                routing::post(event_segmentation),
+            )
+            .route("/property-values", routing::post(property_values)),
     )
 }

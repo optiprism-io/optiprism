@@ -10,4 +10,8 @@ node_modules
 dist
 dist-ssr
 *.local
-frontend/coverage
+*.ts.snap
+frontend/coverage/
+test-results/
+playwright-report/
+playwright/.cache/

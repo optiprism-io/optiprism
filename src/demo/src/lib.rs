@@ -12,7 +12,8 @@ use chrono::Utc;
 use datafusion::datasource::MemTable;
 use metadata::store::Store;
 use metadata::MetadataProvider;
-use query::QueryProvider;
+use platform::auth;
+use query::ProviderImpl;
 use tracing::debug;
 use tracing::info;
 
@@ -98,28 +99,35 @@ pub async fn run(cfg: Config) -> Result<()> {
     );
 
     let data_provider = Arc::new(MemTable::try_new(batches[0][0].schema(), batches)?);
-    let query_provider = Arc::new(QueryProvider::try_new_from_provider(
+    let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
         md.clone(),
         data_provider,
     )?);
-    let platform_query_provider = Arc::new(platform::queries::provider::QueryProvider::new(
-        query_provider,
-    ));
 
-    let pp = Arc::new(platform::PlatformProvider::new(
+    let auth_cfg = auth::Config {
+        access_token_duration: Duration::days(1),
+        access_token_key: "access".to_owned(),
+        refresh_token_duration: Duration::days(1),
+        refresh_token_key: "refresh".to_owned(),
+    };
+
+    let platform_provider = Arc::new(platform::PlatformProvider::new(
         md.clone(),
-        platform_query_provider,
-        Duration::days(1),
-        "key".to_string(),
-        Duration::days(1),
-        "key".to_string(),
+        query_provider,
+        auth_cfg.clone(),
     ));
 
-    let svc = platform::http::Service::new(&md, &pp, cfg.host, cfg.ui_path.clone());
+    let svc = platform::http::Service::new(
+        &md,
+        &platform_provider,
+        auth_cfg,
+        cfg.host,
+        cfg.ui_path.clone(),
+    );
     info!("start listening on {}", cfg.host);
     if cfg.ui_path.is_some() {
         info!("http ui http://{}", cfg.host);
     }
-    svc.serve().await?;
-    Ok(())
+
+    Ok(svc.serve().await?)
 }

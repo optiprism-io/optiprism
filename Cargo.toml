@@ -5,12 +5,12 @@ opt-level = 3
 
 [workspace]
 members = [
-    "src/cmd",
-    "src/common",
-    "src/demo"
-,
-    "src/events-gen",
-    "src/metadata",
-    "src/platform",
-    "src/query",
-    "src/store",]
+	"src/cmd",
+	"src/common",
+	"src/contract-test-server",
+	"src/demo",
+	"src/events-gen",
+	"src/metadata",
+	"src/platform",
+	"src/query",
+	"src/store",]

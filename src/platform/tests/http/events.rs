@@ -1,7 +1,6 @@
 use chrono::Utc;
 use common::types::OptionalProperty;
 use metadata::metadata::ListResponse;
-use platform::error::Result;
 use platform::events::CreateEventRequest;
 use platform::events::Event;
 use platform::events::Status;
@@ -9,6 +8,7 @@ use platform::events::UpdateEventRequest;
 use reqwest::Client;
 use reqwest::StatusCode;
 
+use crate::assert_response_status_eq;
 use crate::http::tests::create_admin_acc_and_login;
 use crate::http::tests::run_http_service;
 
@@ -20,13 +20,14 @@ fn assert(l: &Event, r: &Event) {
     assert_eq!(l.display_name, r.display_name);
     assert_eq!(l.description, r.description);
     assert_eq!(l.status, r.status);
-    assert_eq!(l.properties, r.properties);
-    assert_eq!(l.custom_properties, r.custom_properties);
+    assert_eq!(l.event_properties, r.event_properties);
+    assert_eq!(l.user_properties, r.user_properties);
 }
 
 #[tokio::test]
-async fn test_events() -> Result<()> {
+async fn test_events() -> anyhow::Result<()> {
     let (base_url, md, pp) = run_http_service(false).await?;
+    let events_url = format!("{base_url}/organizations/1/projects/1/schema/events");
     let cl = Client::new();
     let headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
 
@@ -42,53 +43,37 @@ async fn test_events() -> Result<()> {
         display_name: Some("dname".to_string()),
         description: Some("desc".to_string()),
         status: Status::Enabled,
-        properties: None,
-        custom_properties: None,
+        event_properties: None,
+        user_properties: None,
         is_system: false,
     };
 
     // list without events should be empty
     {
-        let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/events"
-            ))
-            .headers(headers.clone())
-            .send()
-            .await
-            .unwrap();
+        let resp = cl.get(&events_url).headers(headers.clone()).send().await?;
 
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(
-            resp.text().await.unwrap(),
-            r#"{"data":[],"meta":{"next":null}}"#
-        );
+        assert_response_status_eq!(resp, StatusCode::OK);
+        assert_eq!(resp.text().await?, r#"{"data":[],"meta":{"next":null}}"#);
     }
 
     // get of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
-            ))
+            .get(format!("{events_url}/1"))
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+            .await?;
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
 
     // delete of unexisting event 1 should return 404 not found error
     {
         let resp = cl
-            .delete(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
-            ))
+            .delete(format!("{events_url}/1"))
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+            .await?;
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
 
     // create request should create event
@@ -102,20 +87,14 @@ async fn test_events() -> Result<()> {
             is_system: false,
         };
 
-        let body = serde_json::to_string(&req).unwrap();
-
         let resp = cl
-            .post(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/events"
-            ))
-            .body(body)
+            .post(&events_url)
+            .body(serde_json::to_string(&req)?)
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        let status = resp.status();
-        assert_eq!(status, StatusCode::CREATED);
-        let resp: Event = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+            .await?;
+        assert_response_status_eq!(resp, StatusCode::CREATED);
+        let resp: Event = serde_json::from_str(resp.text().await?.as_str())?;
         assert(&resp, &event1)
     }
 
@@ -133,51 +112,35 @@ async fn test_events() -> Result<()> {
             status: OptionalProperty::Some(event1.status.clone()),
         };
 
-        let body = serde_json::to_string(&req).unwrap();
+        let body = serde_json::to_string(&req)?;
 
         let resp = cl
-            .put(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
-            ))
+            .put(format!("{events_url}/1"))
             .body(body)
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        let status = resp.status();
-        assert_eq!(status, StatusCode::OK);
-        let e: Event = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+            .await?;
+        assert_response_status_eq!(resp, StatusCode::OK);
+        let e: Event = serde_json::from_str(resp.text().await?.as_str())?;
         assert(&e, &event1);
     }
 
     // get should return event
     {
         let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
-            ))
+            .get(format!("{events_url}/1"))
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        let status = resp.status();
-        assert_eq!(status, StatusCode::OK);
-        let e: Event = serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+            .await?;
+        assert_response_status_eq!(resp, StatusCode::OK);
+        let e: Event = serde_json::from_str(resp.text().await?.as_str())?;
         assert(&e, &event1);
     }
     // list events should return list with one event
     {
-        let resp = cl
-            .get(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/events"
-            ))
-            .headers(headers.clone())
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let resp: ListResponse<Event> =
-            serde_json::from_str(resp.text().await.unwrap().as_str()).unwrap();
+        let resp = cl.get(&events_url).headers(headers.clone()).send().await?;
+        assert_response_status_eq!(resp, StatusCode::OK);
+        let resp: ListResponse<Event> = serde_json::from_str(resp.text().await?.as_str())?;
         assert_eq!(resp.data.len(), 1);
         assert(&resp.data[0], &event1);
     }
@@ -185,24 +148,18 @@ async fn test_events() -> Result<()> {
     // delete request should delete event
     {
         let resp = cl
-            .delete(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
-            ))
+            .delete(format!("{events_url}/1"))
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
+            .await?;
+        assert_response_status_eq!(resp, StatusCode::OK);
 
         let resp = cl
-            .delete(format!(
-                "{base_url}/api/v1/organizations/1/projects/1/schema/events/1"
-            ))
+            .delete(format!("{events_url}/1"))
             .headers(headers.clone())
             .send()
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+            .await?;
+        assert_response_status_eq!(resp, StatusCode::NOT_FOUND);
     }
     Ok(())
 }

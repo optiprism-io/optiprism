@@ -19,6 +19,7 @@ use common::rbac::PROJECT_PERMISSIONS;
 
 use crate::auth;
 use crate::auth::token::parse_access_token;
+use crate::error::AuthError;
 use crate::PlatformError;
 use crate::Result;
 
@@ -116,7 +117,7 @@ impl Context {
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
-where B: Send
+    where B: Send
 {
     type Rejection = PlatformError;
 
@@ -126,23 +127,22 @@ where B: Send
         let TypedHeader(Authorization(bearer)) =
             TypedHeader::<Authorization<Bearer>>::from_request(req)
                 .await
-                .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+                .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
-        let Extension(auth_prov) = Extension::<Arc<auth::Provider>>::from_request(req)
+        let Extension(auth_cfg) = Extension::<auth::Config>::from_request(req)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
-        let claims = parse_access_token(bearer.token(), &auth_prov.access_token_key)
-            .map_err(|err| PlatformError::Unauthorized(format!("{:?}", err)))?;
+        let claims = parse_access_token(bearer.token(), &auth_cfg.access_token_key)
+            .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;
         let Extension(md_acc_prov) =
-            Extension::<Arc<metadata::accounts::Provider>>::from_request(req)
+            Extension::<Arc<dyn metadata::accounts::Provider>>::from_request(req)
                 .await
                 .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
         let acc = md_acc_prov
             .get_by_id(claims.account_id)
-            .await
-            .map_err(|err| PlatformError::Internal(err.to_string()))?;
+            .await?;
         let ctx = Context {
             account_id: Some(acc.id),
             role: acc.role,

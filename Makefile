@@ -1,5 +1,7 @@
 SHELL = /bin/bash
 
+cargo-fix-fmt: cargo-fix cargo-fmt cargo-sort cargo-lint
+
 cargo-fix:
 	cargo fix --allow-dirty
 
