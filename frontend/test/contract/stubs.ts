@@ -47,7 +47,7 @@ import {
     EventFilterByGroupTypeEnum,
     SegmentConditionHasPropertyValue,
     SegmentConditionHasPropertyValueTypeEnum, EventSegmentationSegment, GroupRecord
-} from '../../src/api';
+} from '../../src/api_new';
 
 const eventFilterByProperty = <EventFilterByProperty>{
     type: EventFilterByPropertyTypeEnum.Property,

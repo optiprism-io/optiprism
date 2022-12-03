@@ -4,7 +4,7 @@
   "scripts": {
     "start:dev": "vite",
     "start:preview": "vite preview",
-    "generate:openapi": "openapi-generator generate -i ./api/openapi.yaml -g typescript-axios -o ./frontend/src/api",
+    "generate:openapi": "openapi-generator generate -i api/openapi.yaml -g typescript-axios -o ./frontend/src/api",
     "clean": "rm -rf frontend/dist && mkdir ./frontend/dist",
     "check:eslint": "eslint --ext .ts,vue ./frontend",
     "check:vue-tsc": "vue-tsc --noEmit",

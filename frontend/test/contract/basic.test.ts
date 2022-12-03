@@ -100,7 +100,7 @@ import {
     PropertyValuesApi,
     ListPropertyValuesRequest,
     PropertyValuesRequestFilter, PropertyValuesList200Response
-} from '../../src/api';
+} from '../../src/api_new';
 
 describe('Unauthorized', () => {
     describe('Auth', () => {
