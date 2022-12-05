@@ -109,6 +109,7 @@ impl TryInto<DataType> for ArrowDataType {
             ArrowDataType::UInt64 => DataType::UInt64,
             ArrowDataType::Float32 => DataType::Float32,
             ArrowDataType::Float64 => DataType::Float64,
+            ArrowDataType::Decimal128(_, _) => DataType::Number,
             _ => return Err(CommonError::EntityMapping),
         })
     }

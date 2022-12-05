@@ -18,6 +18,7 @@ use datafusion::physical_plan::displayable;
 use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use metadata::MetadataProvider;
+use tracing::debug;
 
 use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::event_segmentation;
@@ -126,18 +127,18 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
         .with_query_planner(Arc::new(QueryPlanner {}))
         .with_optimizer_rules(vec![]);
     let exec_ctx = SessionContext::with_state(state);
-    println!("logical plan: {:?}", plan);
+    debug!("logical plan: {:?}", plan);
     let physical_plan = exec_ctx.create_physical_plan(plan).await?;
     let displayable_plan = displayable(physical_plan.as_ref());
 
-    println!("physical plan: {}", displayable_plan.indent());
+    debug!("physical plan: {}", displayable_plan.indent());
     let batches = collect(physical_plan, exec_ctx.task_ctx()).await?;
     for batch in batches.iter() {
-        println!("{}", pretty_format_batches(&[batch.clone()])?);
+        debug!("{}", pretty_format_batches(&[batch.clone()])?);
     }
 
     let duration = start.elapsed();
-    println!("elapsed: {:?}", duration);
+    debug!("elapsed: {:?}", duration);
     let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
     Ok(concat_batches(&schema, &batches, 0)?)
 }

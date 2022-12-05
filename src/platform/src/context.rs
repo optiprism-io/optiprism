@@ -117,7 +117,7 @@ impl Context {
 
 #[async_trait]
 impl<B> FromRequest<B> for Context
-    where B: Send
+where B: Send
 {
     type Rejection = PlatformError;
 
@@ -140,9 +140,7 @@ impl<B> FromRequest<B> for Context
                 .await
                 .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
-        let acc = md_acc_prov
-            .get_by_id(claims.account_id)
-            .await?;
+        let acc = md_acc_prov.get_by_id(claims.account_id).await?;
         let ctx = Context {
             account_id: Some(acc.id),
             role: acc.role,

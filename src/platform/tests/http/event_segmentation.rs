@@ -19,6 +19,7 @@ mod tests {
     use platform::PropertyRef;
     use reqwest::Client;
     use serde_json::Value;
+    use tracing::debug;
 
     use crate::assert_response_status_eq;
     use crate::http::tests::create_admin_acc_and_login;
@@ -109,7 +110,7 @@ mod tests {
 
         assert_response_status_eq!(resp, StatusCode::OK);
         let txt = resp.text().await?;
-        println!("{}", &txt);
+        debug!("{}", &txt);
 
         Ok(())
     }
