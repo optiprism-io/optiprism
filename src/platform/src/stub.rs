@@ -7,8 +7,6 @@ use chrono::Utc;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
-use common::types::DictionaryDataType;
-use common::DataType;
 use lazy_static::lazy_static;
 use serde_json::Value;
 
@@ -61,6 +59,7 @@ use crate::Column;
 use crate::ColumnType;
 use crate::Context;
 use crate::DataTable;
+use crate::datatype::{DataType, DictionaryDataType};
 use crate::EventFilter;
 use crate::EventRef;
 use crate::ListResponse;

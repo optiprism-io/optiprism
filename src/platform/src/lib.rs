@@ -14,6 +14,7 @@ pub mod properties;
 pub mod queries;
 pub mod reports;
 pub mod stub;
+pub mod datatype;
 
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -33,12 +34,11 @@ use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
-use common::DataType;
-use common::ScalarValue;
 use common::DECIMAL_PRECISION;
 pub use context::Context;
 use convert_case::Case;
 use convert_case::Casing;
+use datafusion_common::ScalarValue;
 pub use error::PlatformError;
 pub use error::Result;
 use metadata::MetadataProvider;
@@ -49,6 +49,7 @@ use serde::Serialize;
 use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
+use crate::datatype::DataType;
 
 pub struct PlatformProvider {
     pub events: Arc<dyn events::Provider>,
@@ -134,7 +135,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
                 .map(|value| match value {
                     None => Ok(Value::Null),
                     Some(v) => {
-                        let d = match Decimal::try_new(v.as_i128() as i64, *s as u32) {
+                        let d = match Decimal::try_new(v as i64, *s as u32) {
                             Ok(v) => v,
                             Err(err) => return Err(err.into()),
                         };
@@ -207,7 +208,7 @@ pub fn json_value_to_scalar(v: &Value) -> Result<ScalarValue> {
             Ok(ScalarValue::Decimal128(
                 Some(dec.mantissa()),
                 DECIMAL_PRECISION,
-                dec.scale() as usize,
+                dec.scale() as i8,
             ))
         }
         Value::String(v) => Ok(ScalarValue::Utf8(Some(v.to_string()))),

@@ -94,7 +94,7 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
                     match value {
                         None => continue,
                         Some(value) => {
-                            sum += value.as_i128();
+                            sum += value;
                         }
                     }
                 }
@@ -182,9 +182,9 @@ mod tests {
         //                                  v              v                  v
         let vals: Vec<i128> = vec![123, 231, 314, 411, 523, 623, 713, 843, 91, 10];
         let arr = {
-            let mut builder = Decimal128Builder::new(10, 10, 2);
+            let mut builder = Decimal128Builder::with_capacity(10);
             for val in vals.iter() {
-                builder.append_value(*val)?;
+                builder.append_value(*val);
             }
 
             Arc::new(builder.finish())

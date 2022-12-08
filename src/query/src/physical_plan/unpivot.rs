@@ -168,7 +168,7 @@ impl ExecutionPlan for UnpivotExec {
                 self.name_col.clone(),
                 self.value_col.clone(),
             )
-            .map_err(QueryError::into_datafusion_execution_error)?,
+                .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -233,12 +233,33 @@ impl Stream for UnpivotStream {
 }
 
 macro_rules! build_group_arr {
+    ($batch_col_idx:expr, $src_arr_ref:expr, StringArray, $unpivot_cols_len:ident,StringBuilder) => {{
+        // get typed source array
+        let src_arr = $src_arr_ref.as_any().downcast_ref::<StringArray>().unwrap();
+        // make result builder. The length of array is the lengths of source array multiplied by number of pivot columns
+        let mut result = StringBuilder::with_capacity($src_arr_ref.len()*$unpivot_cols_len,$src_arr_ref.len()*$unpivot_cols_len);
+        // populate the values from source array to result
+        for row_idx in 0..$src_arr_ref.len() {
+            if src_arr.is_null(row_idx) {
+                    // append value multiple time, one for each unpivot column
+                    for _ in 0..$unpivot_cols_len {
+                        result.append_null()
+                    }
+                } else {
+                // populate null
+                for _ in 0..$unpivot_cols_len {
+                        result.append_value(src_arr.value(row_idx));
+                    }
+                }
+        }
+
+        Ok(Arc::new(result.finish()) as ArrayRef)
+    }};
     ($batch_col_idx:expr, $src_arr_ref:expr, $array_type:ident, $unpivot_cols_len:ident,$builder_type:ident) => {{
         // get typed source array
         let src_arr = $src_arr_ref.as_any().downcast_ref::<$array_type>().unwrap();
-        // make result builder. The length of array is the lengs of source array multiplied by number of pivot columns
-        let mut result = $builder_type::new($src_arr_ref.len()*$unpivot_cols_len);
-
+        // make result builder. The length of array is the lengths of source array multiplied by number of pivot columns
+        let mut result = $builder_type::with_capacity($src_arr_ref.len()*$unpivot_cols_len);
         // populate the values from source array to result
         for row_idx in 0..$src_arr_ref.len() {
             if src_arr.is_null(row_idx) {
@@ -266,7 +287,7 @@ macro_rules! build_value_arr {
             .map(|x| x.as_any().downcast_ref::<$array_type>().unwrap())
             .collect();
         // make result builder
-        let mut result = $builder_type::new($builder_cap);
+        let mut result = $builder_type::with_capacity($builder_cap);
 
         // iterate over each row
         for idx in 0..$unpivot_arrs[0].len() {
@@ -385,10 +406,10 @@ pub fn unpivot(
                 unpivot_cols_len,
                 TimestampNanosecondBuilder
             ),
-            DataType::Decimal128(precision, scale) => {
+            DataType::Decimal128(_, _) => {
                 // build group array realisation for decimal type
                 let src_arr_typed = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
-                let mut result = Decimal128Builder::new(builder_cap, *precision, *scale);
+                let mut result = Decimal128Builder::with_capacity(builder_cap);
 
                 for row_idx in 0..arr.len() {
                     if src_arr_typed.is_null(row_idx) {
@@ -397,7 +418,7 @@ pub fn unpivot(
                         }
                     } else {
                         for _ in 0..=unpivot_cols_len {
-                            result.append_value(src_arr_typed.value(row_idx))?;
+                            result.append_value(src_arr_typed.value(row_idx));
                         }
                     }
                 }
@@ -429,7 +450,7 @@ pub fn unpivot(
         .collect();
 
     let name_arr = {
-        let mut builder = StringBuilder::new(builder_cap);
+        let mut builder = StringBuilder::with_capacity(builder_cap, builder_cap);
         for _ in 0..batch.num_rows() {
             for c in cols.iter() {
                 builder.append_value(c.as_str());
@@ -451,14 +472,14 @@ pub fn unpivot(
                 .iter()
                 .map(|x| x.as_any().downcast_ref::<Decimal128Array>().unwrap())
                 .collect();
-            let mut result = Decimal128Builder::new(builder_cap, DECIMAL_PRECISION, DECIMAL_SCALE);
+            let mut result = Decimal128Builder::with_capacity(builder_cap);
 
             for idx in 0..unpivot_arrs[0].len() {
                 for arr in arrs.iter() {
                     if arr.is_null(idx) {
                         result.append_null();
                     } else {
-                        result.append_value(arr.value(idx))?;
+                        result.append_value(arr.value(idx));
                     }
                 }
             }
@@ -545,7 +566,7 @@ mod tests {
             "name".to_string(),
             "value".to_string(),
         )
-        .unwrap();
+            .unwrap();
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx)?;

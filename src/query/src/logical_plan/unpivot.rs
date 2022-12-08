@@ -7,12 +7,9 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion::logical_plan::DFSchemaRef;
-use datafusion::logical_plan::LogicalPlan;
-use datafusion::logical_plan::UserDefinedLogicalNode;
-use datafusion_common::DFField;
+use datafusion_common::{DFField, DFSchemaRef};
 use datafusion_common::DFSchema;
-use datafusion_expr::Expr;
+use datafusion_expr::{Expr, LogicalPlan, UserDefinedLogicalNode};
 
 use crate::error::QueryError;
 use crate::Result;

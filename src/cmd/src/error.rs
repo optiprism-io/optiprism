@@ -1,9 +1,9 @@
 use std::net::AddrParseError;
 use std::result;
+use chrono::OutOfRangeError;
 
 use demo::error::DemoError;
 use thiserror::Error;
-use time::OutOfRangeError;
 
 pub type Result<T> = result::Result<T, Error>;
 

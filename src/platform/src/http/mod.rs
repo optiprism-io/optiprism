@@ -34,7 +34,6 @@ use axum::Router;
 use axum::Server;
 use axum_core::body;
 use axum_core::extract::FromRequest;
-use axum_core::extract::RequestParts;
 use axum_core::response::IntoResponse;
 use axum_core::response::Response;
 use axum_core::BoxError;
@@ -106,7 +105,7 @@ impl Service {
             .layer(CookieManagerLayer::new())
             .layer(TraceLayer::new_for_http())
             .layer(middleware::from_fn(print_request_response))
-            .fallback(fallback.into_service());
+            .fallback(fallback);
 
         Self { router, addr }
     }
@@ -121,15 +120,15 @@ impl Service {
 
         let mut router = self.router;
         info!("attaching ui static files handler...");
-        let index =
+/*        let index =
             get_service(ServeFile::new(path.join("index.html"))).handle_error(error_handler);
-        let favicon =
+*/        let favicon =
             get_service(ServeFile::new(path.join("favicon.ico"))).handle_error(error_handler);
         let assets = get_service(ServeDir::new(path.join("assets"))).handle_error(error_handler);
         // TODO resolve actual routes and distinguish them from 404s
-        router = router.fallback(index);
+        // router = router.fallback(index);
         router = router.route("/favicon.ico", favicon);
-        router = router.nest("/assets", assets);
+        router = router.route("/assets", assets);
 
         Self {
             router,
@@ -187,9 +186,9 @@ pub async fn print_request_response(
 }
 
 async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes>
-where
-    B: HttpBody<Data = Bytes>,
-    B::Error: std::fmt::Display,
+    where
+        B: HttpBody<Data=Bytes>,
+        B::Error: std::fmt::Display,
 {
     let bytes = match hyper::body::to_bytes(body).await {
         Ok(bytes) => bytes,
@@ -213,17 +212,18 @@ where
 pub struct Json<T>(pub T);
 
 #[async_trait]
-impl<T, B> FromRequest<B> for Json<T>
-where
-    T: DeserializeOwned,
-    B: HttpBody + Send,
-    B::Data: Send,
-    B::Error: Into<BoxError>,
+impl<T, S, B> FromRequest<S, B> for Json<T>
+    where
+        T: DeserializeOwned,
+        B: HttpBody + Send + 'static,
+        B::Data: Send,
+        B::Error: Into<BoxError>,
+        S: Send + Sync,
 {
     type Rejection = ApiError;
 
-    async fn from_request(req: &mut RequestParts<B>) -> std::result::Result<Self, Self::Rejection> {
-        match axum::Json::<T>::from_request(req).await {
+    async fn from_request(req: Request<B>, state: &S) -> std::result::Result<Self, Self::Rejection> {
+        match axum::Json::<T>::from_request(req, state).await {
             Ok(v) => Ok(Json(v.0)),
             Err(err) => {
                 let mut api_err = ApiError::bad_request(err.to_string());
@@ -261,7 +261,7 @@ where
 }
 
 impl<T> IntoResponse for Json<T>
-where T: Serialize
+    where T: Serialize
 {
     fn into_response(self) -> Response {
         axum::Json(self.0).into_response()

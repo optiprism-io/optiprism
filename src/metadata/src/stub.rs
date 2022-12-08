@@ -9,8 +9,8 @@ use common::types::EventFilter;
 use common::types::EventRef;
 use common::types::PropValueOperation;
 use common::types::PropertyRef;
-use common::ScalarValue;
 use datafusion::arrow::datatypes::DataType;
+use datafusion_common::ScalarValue;
 use lazy_static::lazy_static;
 
 use crate::accounts;

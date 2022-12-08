@@ -67,6 +67,8 @@ pub enum PlatformError {
     NotFound(String),
     #[error("internal: {0:?}")]
     Internal(String),
+    #[error("entity map")]
+    EntityMap,
     #[error("serde: {0:?}")]
     Serde(#[from] serde_json::Error),
     #[error("password hash")]
@@ -195,6 +197,7 @@ impl PlatformError {
                 ApiError::new(StatusCode::BAD_REQUEST).with_fields(fields)
             }
             PlatformError::NotFound(err) => ApiError::not_found(err),
+            PlatformError::EntityMap => ApiError::internal("map error"),
         }
     }
 }

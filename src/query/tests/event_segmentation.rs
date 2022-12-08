@@ -12,13 +12,13 @@ mod tests {
     use common::types::EventRef;
     use common::types::PropValueOperation;
     use common::types::PropertyRef;
-    use common::ScalarValue;
     use datafusion::execution::context::SessionState;
     use datafusion::execution::runtime_env::RuntimeEnv;
     use datafusion::physical_plan::coalesce_batches::concat_batches;
     use datafusion::physical_plan::collect;
     use datafusion::prelude::SessionConfig;
     use datafusion::prelude::SessionContext;
+    use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;
     use metadata::custom_events;
     use metadata::custom_events::CreateCustomEventRequest;

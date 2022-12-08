@@ -7,11 +7,9 @@ use common::types::EventFilter;
 use common::types::EventRef;
 use common::types::PropValueOperation;
 use common::types::PropertyRef;
-use common::ScalarValue;
-use datafusion::logical_plan::ExprSchemable;
-use datafusion_common::Column;
+use datafusion_expr::ExprSchemable;
+use datafusion_common::{Column, ScalarValue};
 use datafusion_common::ExprSchema;
-use datafusion_common::ScalarValue as DFScalarValue;
 use datafusion_expr::col;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::expr_fn::binary_expr;
@@ -72,7 +70,7 @@ pub async fn event_expression(
             binary_expr(
                 col(event_fields::EVENT),
                 Operator::Eq,
-                lit(DFScalarValue::from(e.id)),
+                lit(ScalarValue::from(e.id)),
             )
         }
         EventRef::Regular(id) => {
@@ -84,7 +82,7 @@ pub async fn event_expression(
             binary_expr(
                 col(event_fields::EVENT),
                 Operator::Eq,
-                lit(DFScalarValue::from(e.id)),
+                lit(ScalarValue::from(e.id)),
             )
         }
 
@@ -322,7 +320,7 @@ pub fn named_property_expression(
                 1 => binary_expr(
                     prop_col,
                     operation.clone().into(),
-                    lit(DFScalarValue::from(values_vec[0].to_owned())),
+                    lit(ScalarValue::from(values_vec[0].to_owned())),
                 ),
                 _ => {
                     // iterate over all possible values
@@ -332,7 +330,7 @@ pub fn named_property_expression(
                             binary_expr(
                                 prop_col.clone(),
                                 operation.clone().into(),
-                                lit(DFScalarValue::from(v.to_owned())),
+                                lit(ScalarValue::from(v.to_owned())),
                             )
                         })
                         .collect();

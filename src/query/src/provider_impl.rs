@@ -11,12 +11,12 @@ use datafusion::datasource::DefaultTableSource;
 use datafusion::datasource::TableProvider;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::coalesce_batches::concat_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::displayable;
 use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
+use datafusion_expr::LogicalPlan;
 use metadata::MetadataProvider;
 use tracing::debug;
 
@@ -45,7 +45,7 @@ impl ProviderImpl {
     ) -> Result<Self> {
         let table_source = Arc::new(DefaultTableSource::new(table_provider));
         let input =
-            datafusion::logical_plan::LogicalPlanBuilder::scan("table", table_source, None)?
+            datafusion_expr::LogicalPlanBuilder::scan("table", table_source, None)?
                 .build()?;
         Ok(Self { metadata, input })
     }

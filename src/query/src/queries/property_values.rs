@@ -4,21 +4,15 @@ use std::sync::Arc;
 use common::types::EventRef;
 use common::types::PropValueOperation;
 use common::types::PropertyRef;
-use common::ScalarValue;
-use datafusion::logical_plan::plan::Aggregate;
-use datafusion::logical_plan::plan::Extension;
-use datafusion::logical_plan::plan::Filter as PlanFilter;
-use datafusion::logical_plan::plan::Sort;
-use datafusion::logical_plan::DFSchema;
-use datafusion::logical_plan::LogicalPlan;
-use datafusion_common::Column;
+use datafusion_expr::{Filter as PlanFilter, LogicalPlan, Sort, Aggregate, Extension};
+use datafusion_common::DFSchema;
+use datafusion_common::{Column, ScalarValue};
 use datafusion_expr::col;
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Expr;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
-
 use crate::error::Result;
 use crate::expr::event_expression;
 use crate::expr::property_expression;
@@ -74,10 +68,7 @@ impl LogicalPlanBuilder {
         req: PropertyValues,
     ) -> Result<LogicalPlan> {
         let input = match &req.event {
-            Some(event) => LogicalPlan::Filter(PlanFilter {
-                predicate: event_expression(&ctx, &metadata, event).await?,
-                input: Arc::new(input),
-            }),
+            Some(event) => LogicalPlan::Filter(PlanFilter::try_new(event_expression(&ctx, &metadata, event).await?, Arc::new(input))?),
             None => input,
         };
 
@@ -108,17 +99,13 @@ impl LogicalPlanBuilder {
         let expr_col = input.expressions()[0].clone();
 
         let input = match &req.filter {
-            Some(filter) => LogicalPlan::Filter(PlanFilter {
-                predicate: property_expression(
-                    &ctx,
-                    &metadata,
-                    &req.property,
-                    &filter.operation,
-                    filter.value.clone(),
-                )
-                .await?,
-                input: Arc::new(input),
-            }),
+            Some(filter) => LogicalPlan::Filter(PlanFilter::try_new(property_expression(
+                &ctx,
+                &metadata,
+                &req.property,
+                &filter.operation,
+                filter.value.clone(),
+            ).await?, Arc::new(input))?),
             None => input,
         };
 
@@ -129,6 +116,7 @@ impl LogicalPlanBuilder {
                 nulls_first: false,
             }],
             input: Arc::new(input),
+            fetch: None,
         });
 
         Ok(input)

@@ -12,7 +12,7 @@ cargo-lint:
 	cargo clippy --workspace --all-targets -- -D warnings
 
 cargo-test:
-	cargo test
+	cargo nextest run
 
 cargo-udeps:
 	cargo +nightly udeps --all-targets

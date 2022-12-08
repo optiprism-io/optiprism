@@ -68,10 +68,9 @@ pub mod test_util {
     use datafusion::datasource::listing::ListingTableConfig;
     use datafusion::datasource::listing::ListingTableUrl;
     use datafusion::datasource::provider_as_source;
-    use datafusion::logical_plan::LogicalPlan;
     use datafusion::prelude::CsvReadOptions;
     use datafusion_expr::logical_plan::builder::UNNAMED_TABLE;
-    use datafusion_expr::LogicalPlanBuilder;
+    use datafusion_expr::{LogicalPlan, LogicalPlanBuilder};
     use metadata::database;
     use metadata::database::Column;
     use metadata::database::Table;

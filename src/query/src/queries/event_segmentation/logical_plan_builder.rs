@@ -8,14 +8,9 @@ use chrono::Utc;
 use chronoutil::DateRule;
 use common::types::EventFilter;
 use common::types::PropertyRef;
-use datafusion::logical_plan::plan::Aggregate;
-use datafusion::logical_plan::plan::Extension;
-use datafusion::logical_plan::plan::Filter;
-use datafusion::logical_plan::Column;
-use datafusion::logical_plan::DFSchema;
-use datafusion::logical_plan::LogicalPlan;
 use datafusion::physical_plan::aggregates::AggregateFunction;
-use datafusion_expr::col;
+use datafusion_common::{Column, DFSchema};
+use datafusion_expr::{Aggregate, col, Extension, Filter, LogicalPlan};
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
 use datafusion_expr::utils::exprlist_to_fields;
@@ -259,10 +254,7 @@ impl LogicalPlanBuilder {
         }
 
         // global filter
-        Ok(LogicalPlan::Filter(Filter {
-            predicate: expr,
-            input: Arc::new(input),
-        }))
+        Ok(LogicalPlan::Filter(Filter::try_new(expr, Arc::new(input))?))
     }
 
     // builds logical plan for aggregate
@@ -309,6 +301,7 @@ impl LogicalPlanBuilder {
                         fun: AggregateFunction::Count,
                         args: vec![col(event_fields::EVENT)],
                         distinct: false,
+                        filter: None
                     },
                     Query::CountUniqueGroups | Query::DailyActiveGroups => {
                         let _a = col(self.es.group.as_ref());
@@ -349,6 +342,7 @@ impl LogicalPlanBuilder {
                             property,
                         ))?],
                         distinct: false,
+                        filter: None
                     },
                     Query::QueryFormula { .. } => unimplemented!(),
                 };

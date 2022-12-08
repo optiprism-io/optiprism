@@ -5,9 +5,9 @@ use std::fmt::Formatter;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
-use datafusion::logical_plan::DFSchemaRef;
-use datafusion::logical_plan::LogicalPlan;
-use datafusion::logical_plan::UserDefinedLogicalNode;
+use datafusion_common::DFSchemaRef;
+use datafusion_expr::logical_plan::LogicalPlan;
+use datafusion_expr::logical_plan::UserDefinedLogicalNode;
 use datafusion_common::Column;
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;

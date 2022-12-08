@@ -46,27 +46,27 @@ pub struct RecordBatchBuilder {
 impl RecordBatchBuilder {
     pub fn new(cap: usize, schema: SchemaRef) -> Self {
         Self {
-            user_id: UInt64Builder::new(cap),
-            created_at: TimestampSecondBuilder::new(cap),
-            event: UInt64Builder::new(cap),
-            product_name: UInt16Builder::new(cap),
-            product_category: UInt16Builder::new(cap),
-            product_subcategory: UInt16Builder::new(cap),
-            product_brand: UInt16Builder::new(cap),
-            product_price: Decimal128Builder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
-            product_discount_price: Decimal128Builder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
+            user_id: UInt64Builder::with_capacity(cap),
+            created_at: TimestampSecondBuilder::with_capacity(cap),
+            event: UInt64Builder::with_capacity(cap),
+            product_name: UInt16Builder::with_capacity(cap),
+            product_category: UInt16Builder::with_capacity(cap),
+            product_subcategory: UInt16Builder::with_capacity(cap),
+            product_brand: UInt16Builder::with_capacity(cap),
+            product_price: Decimal128Builder::with_capacity(cap),
+            product_discount_price: Decimal128Builder::with_capacity(cap),
             // search_query: UInt16Builder::new(cap),
-            spent_total: Decimal128Builder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
-            products_bought: UInt8Builder::new(cap),
-            cart_items_number: UInt8Builder::new(cap),
-            cart_amount: Decimal128Builder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
-            revenue: Decimal128Builder::new(cap, DECIMAL_PRECISION, DECIMAL_SCALE),
-            country: UInt16Builder::new(cap),
-            city: UInt16Builder::new(cap),
-            device: UInt16Builder::new(cap),
-            device_category: UInt16Builder::new(cap),
-            os: UInt16Builder::new(cap),
-            os_version: UInt16Builder::new(cap),
+            spent_total: Decimal128Builder::with_capacity(cap),
+            products_bought: UInt8Builder::with_capacity(cap),
+            cart_items_number: UInt8Builder::with_capacity(cap),
+            cart_amount: Decimal128Builder::with_capacity(cap),
+            revenue: Decimal128Builder::with_capacity(cap),
+            country: UInt16Builder::with_capacity(cap),
+            city: UInt16Builder::with_capacity(cap),
+            device: UInt16Builder::with_capacity(cap),
+            device_category: UInt16Builder::with_capacity(cap),
+            os: UInt16Builder::with_capacity(cap),
+            os_version: UInt16Builder::with_capacity(cap),
             schema,
             len: 0,
         }
@@ -130,12 +130,12 @@ impl RecordBatchBuilder {
                     .append_option(product.subcategory.map(|v| v as u16));
                 self.product_brand
                     .append_option(product.brand.map(|v| v as u16));
-                self.product_price.append_value(product.price.mantissa())?;
+                self.product_price.append_value(product.price.mantissa());
 
                 match product.discount_price {
                     None => self.product_discount_price.append_null(),
                     Some(price) => {
-                        self.product_discount_price.append_value(price.mantissa())?;
+                        self.product_discount_price.append_value(price.mantissa());
                     }
                 }
             }
@@ -143,7 +143,7 @@ impl RecordBatchBuilder {
 
         if !state.spent_total.is_zero() {
             self.spent_total
-                .append_value(state.spent_total.mantissa())?;
+                .append_value(state.spent_total.mantissa());
         } else {
             self.spent_total.append_null();
         }
@@ -164,7 +164,7 @@ impl RecordBatchBuilder {
                 .map(|p| p.discount_price.unwrap_or(p.price))
                 .sum();
 
-            self.cart_amount.append_value(_cart_amount.mantissa())?;
+            self.cart_amount.append_value(_cart_amount.mantissa());
             cart_amount = Some(_cart_amount);
         } else {
             self.cart_items_number.append_null();
@@ -173,7 +173,7 @@ impl RecordBatchBuilder {
 
         match event {
             Event::OrderCompleted => {
-                self.revenue.append_value(cart_amount.unwrap().mantissa())?;
+                self.revenue.append_value(cart_amount.unwrap().mantissa());
             }
             _ => {
                 self.revenue.append_null();
