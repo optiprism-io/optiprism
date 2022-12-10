@@ -7,17 +7,16 @@ use common::types::EventFilter;
 use common::types::EventRef;
 use common::types::PropValueOperation;
 use common::types::PropertyRef;
-use common::ScalarValue;
-use datafusion::logical_plan::ExprSchemable;
 use datafusion_common::Column;
 use datafusion_common::ExprSchema;
-use datafusion_common::ScalarValue as DFScalarValue;
+use datafusion_common::ScalarValue;
 use datafusion_expr::col;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::expr_fn::binary_expr;
 use datafusion_expr::lit;
 use datafusion_expr::or;
 use datafusion_expr::Expr;
+use datafusion_expr::ExprSchemable;
 use datafusion_expr::Operator;
 use futures::executor;
 use metadata::dictionaries;
@@ -61,6 +60,7 @@ pub async fn event_expression(
     metadata: &Arc<MetadataProvider>,
     event: &EventRef,
 ) -> Result<Expr> {
+    let _v = ScalarValue::from(1);
     Ok(match &event {
         // regular event
         EventRef::RegularName(name) => {
@@ -72,21 +72,14 @@ pub async fn event_expression(
             binary_expr(
                 col(event_fields::EVENT),
                 Operator::Eq,
-                lit(DFScalarValue::from(e.id)),
+                lit(ScalarValue::from(e.id as u16)),
             )
         }
-        EventRef::Regular(id) => {
-            let e = metadata
-                .events
-                .get_by_id(ctx.organization_id, ctx.project_id, *id)
-                .await?;
-
-            binary_expr(
-                col(event_fields::EVENT),
-                Operator::Eq,
-                lit(DFScalarValue::from(e.id)),
-            )
-        }
+        EventRef::Regular(id) => binary_expr(
+            col(event_fields::EVENT),
+            Operator::Eq,
+            lit(ScalarValue::from(*id as u16)),
+        ),
 
         EventRef::Custom(id) => {
             let e = metadata
@@ -322,7 +315,7 @@ pub fn named_property_expression(
                 1 => binary_expr(
                     prop_col,
                     operation.clone().into(),
-                    lit(DFScalarValue::from(values_vec[0].to_owned())),
+                    lit(values_vec[0].to_owned()),
                 ),
                 _ => {
                     // iterate over all possible values
@@ -332,7 +325,7 @@ pub fn named_property_expression(
                             binary_expr(
                                 prop_col.clone(),
                                 operation.clone().into(),
-                                lit(DFScalarValue::from(v.to_owned())),
+                                lit(v.to_owned()),
                             )
                         })
                         .collect();

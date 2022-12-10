@@ -2,11 +2,13 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use axum::extract::Extension;
-use axum::extract::FromRequest;
-use axum::extract::RequestParts;
+
 use axum::extract::TypedHeader;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
+use axum::http::request::Parts;
+
+use axum_core::extract::FromRequestParts;
 use common::rbac::OrganizationPermission;
 use common::rbac::OrganizationRole;
 use common::rbac::Permission;
@@ -116,33 +118,32 @@ impl Context {
 }
 
 #[async_trait]
-impl<B> FromRequest<B> for Context
-    where B: Send
+impl<S> FromRequestParts<S> for Context
+where S: Send + Sync
 {
     type Rejection = PlatformError;
 
-    async fn from_request(
-        req: &mut RequestParts<B>,
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &S,
     ) -> core::result::Result<Self, Self::Rejection> {
         let TypedHeader(Authorization(bearer)) =
-            TypedHeader::<Authorization<Bearer>>::from_request(req)
+            TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state)
                 .await
                 .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
-        let Extension(auth_cfg) = Extension::<auth::Config>::from_request(req)
+        let Extension(auth_cfg) = Extension::<auth::Config>::from_request_parts(parts, state)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
         let claims = parse_access_token(bearer.token(), &auth_cfg.access_token_key)
             .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;
         let Extension(md_acc_prov) =
-            Extension::<Arc<dyn metadata::accounts::Provider>>::from_request(req)
+            Extension::<Arc<dyn metadata::accounts::Provider>>::from_request_parts(parts, state)
                 .await
                 .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
-        let acc = md_acc_prov
-            .get_by_id(claims.account_id)
-            .await?;
+        let acc = md_acc_prov.get_by_id(claims.account_id).await?;
         let ctx = Context {
             account_id: Some(acc.id),
             role: acc.role,

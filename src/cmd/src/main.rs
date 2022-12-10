@@ -2,12 +2,12 @@ use std::env::temp_dir;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
+use chrono::Duration;
 use chrono::Utc;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 use dateparser::DateTimeUtc;
-use time::Duration;
 use tracing::metadata::LevelFilter;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;

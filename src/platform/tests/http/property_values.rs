@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-
     use axum::http::StatusCode;
     use platform::queries::property_values::Filter;
     use platform::queries::property_values::ListPropertyValuesRequest;
@@ -19,7 +18,6 @@ mod tests {
         let (base_url, md, pp) = run_http_service(true).await?;
         let cl = Client::new();
         let headers = create_admin_acc_and_login(&pp.auth, &md.accounts).await?;
-
         let req = ListPropertyValuesRequest {
             property: PropertyRef::Event {
                 property_name: "Product Name".to_string(),
@@ -35,7 +33,7 @@ mod tests {
 
         let resp = cl
             .post(format!(
-                "{base_url}/organizations/1/projects/1/queries/property-values"
+                "{base_url}/organizations/1/projects/1/property-values"
             ))
             .body(serde_json::to_string(&req)?)
             .headers(headers.clone())

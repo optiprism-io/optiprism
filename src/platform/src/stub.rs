@@ -7,8 +7,6 @@ use chrono::Utc;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
-use common::types::DictionaryDataType;
-use common::DataType;
 use lazy_static::lazy_static;
 use serde_json::Value;
 
@@ -30,6 +28,8 @@ use crate::dashboards::Dashboard;
 use crate::dashboards::Panel;
 use crate::dashboards::Row;
 use crate::dashboards::UpdateDashboardRequest;
+use crate::datatype::DataType;
+use crate::datatype::DictionaryDataType;
 use crate::event_records;
 use crate::event_records::EventRecord;
 use crate::event_records::ListEventRecordsRequest;

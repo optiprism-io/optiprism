@@ -4,13 +4,13 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
 
-use datafusion::logical_plan::DFSchemaRef;
-use datafusion::logical_plan::LogicalPlan;
-use datafusion::logical_plan::UserDefinedLogicalNode;
 use datafusion_common::Column;
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
+use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
+use datafusion_expr::LogicalPlan;
+use datafusion_expr::UserDefinedLogicalNode;
 
 use crate::error::QueryError;
 use crate::Result;

@@ -3,13 +3,13 @@ mod provider_impl;
 use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use common::types::DictionaryDataType;
 use common::types::OptionalProperty;
-use common::DataType;
 pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::datatype::DataType;
+use crate::datatype::DictionaryDataType;
 use crate::Context;
 use crate::ListResponse;
 use crate::PlatformError;

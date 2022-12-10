@@ -94,7 +94,7 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
                     match value {
                         None => continue,
                         Some(value) => {
-                            sum += value.as_i128();
+                            sum += value;
                         }
                     }
                 }
@@ -129,6 +129,8 @@ mod tests {
     use arrow::array::Decimal128Builder;
     use arrow::array::Int8Array;
     use arrow::datatypes::DataType;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion::physical_plan::expressions::AvgAccumulator;
     use datafusion_common::ScalarValue as DFScalarValue;
     use datafusion_expr::Accumulator;
@@ -182,12 +184,16 @@ mod tests {
         //                                  v              v                  v
         let vals: Vec<i128> = vec![123, 231, 314, 411, 523, 623, 713, 843, 91, 10];
         let arr = {
-            let mut builder = Decimal128Builder::new(10, 10, 2);
+            let mut builder = Decimal128Builder::with_capacity(10);
             for val in vals.iter() {
-                builder.append_value(*val)?;
+                builder.append_value(*val);
             }
 
-            Arc::new(builder.finish())
+            Arc::new(
+                builder
+                    .finish()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?,
+            )
         };
 
         sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef])?;

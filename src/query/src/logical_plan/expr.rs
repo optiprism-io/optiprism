@@ -3,7 +3,6 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
-use datafusion::logical_plan::ExprSchemable;
 use datafusion_common::DFSchema;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
@@ -16,6 +15,7 @@ use datafusion_expr::AccumulatorFunctionImplementation;
 use datafusion_expr::AggregateFunction;
 use datafusion_expr::AggregateUDF;
 use datafusion_expr::Expr;
+use datafusion_expr::ExprSchemable;
 pub use datafusion_expr::Literal;
 use datafusion_expr::ReturnTypeFunction;
 use datafusion_expr::Signature;
@@ -62,6 +62,9 @@ pub fn lit_timestamp(data_type: DataType, date_time: &DateTime<Utc>) -> Result<E
         DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, tz) => {
             ScalarValue::TimestampMicrosecond(Some(date_time.timestamp_nanos() / 1000), tz)
         }
+        DataType::Timestamp(arrow::datatypes::TimeUnit::Nanosecond, tz) => {
+            ScalarValue::TimestampNanosecond(Some(date_time.timestamp_nanos()), tz)
+        }
         _ => {
             return Err(QueryError::Plan(format!(
                 "unsupported \"{:?}\" timestamp data type",
@@ -80,6 +83,7 @@ pub fn sorted_distinct_count(input_schema: &DFSchema, col: Expr) -> Result<Expr>
     Ok(Expr::AggregateUDF {
         fun: Arc::new(udf),
         args: vec![col],
+        filter: None,
     })
 }
 
@@ -111,7 +115,7 @@ pub fn aggregate_partitioned(
     )?;
 
     // factory closure
-    let acc_fn: AccumulatorFunctionImplementation = Arc::new(move || {
+    let acc_fn: AccumulatorFunctionImplementation = Arc::new(move |_| {
         pagg.create_accumulator()
             .map_err(QueryError::into_datafusion_plan_error)
     });
@@ -131,5 +135,6 @@ pub fn aggregate_partitioned(
         fun: Arc::new(udf),
         // join partition and function arguments into one vector
         args: vec![vec![partition_by], args].concat(),
+        filter: None,
     })
 }

@@ -186,7 +186,7 @@ mod tests {
     use common::types::EventRef;
     use common::types::PropValueOperation;
     use common::types::PropertyRef;
-    use common::ScalarValue;
+    use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;
 
     use crate::event_fields;

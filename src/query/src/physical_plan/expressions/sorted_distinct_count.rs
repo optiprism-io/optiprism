@@ -49,10 +49,10 @@ impl TryFrom<SortedDistinctCount> for AggregateUDF {
 
     fn try_from(sorted_distinct: SortedDistinctCount) -> std::result::Result<Self, Self::Error> {
         let data_type = sorted_distinct.data_type.clone();
-        let data_type_arc = Arc::new(data_type.clone());
+        let data_type_arc = Arc::new(data_type);
         let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(data_type_arc.clone()));
-        let accumulator: AccumulatorFunctionImplementation = Arc::new(move || {
-            let acc = SortedDistinctCountAccumulator::try_new(&data_type)?;
+        let accumulator: AccumulatorFunctionImplementation = Arc::new(move |dt| {
+            let acc = SortedDistinctCountAccumulator::try_new(dt)?;
             Ok(Box::new(acc))
         });
         let state_type: StateTypeFunction = Arc::new(|_| Ok(Arc::new(vec![DataType::UInt64])));
@@ -189,6 +189,10 @@ impl Accumulator for SortedDistinctCountAccumulator {
     }
     fn evaluate(&self) -> Result<ScalarValue> {
         Ok(ScalarValue::UInt64(Some(self.count)))
+    }
+
+    fn size(&self) -> usize {
+        std::mem::size_of_val(self)
     }
 }
 

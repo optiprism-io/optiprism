@@ -119,12 +119,12 @@ impl Buffer {
             DataType::Float32 | DataType::Float64 => {
                 buffer_to_array_ref!(buffer, f64, Float64Array)
             }
-            DataType::Decimal128(precision, scale) => {
-                let mut builder = Decimal128Builder::new(buffer.len(), precision, scale);
+            DataType::Decimal128(p, s) => {
+                let mut builder = Decimal128Builder::with_capacity(buffer.len());
                 for v in buffer.iter() {
-                    builder.append_value(v)?;
+                    builder.append_value(v.into());
                 }
-                Arc::new(builder.finish()) as ArrayRef
+                Arc::new(builder.finish().with_precision_and_scale(p, s)?) as ArrayRef
             }
             _ => unimplemented!("{:?}", self.data_type),
         };
@@ -423,5 +423,9 @@ impl Accumulator for PartitionedAggregateAccumulator {
         self.acc
             .evaluate()
             .map_err(QueryError::into_datafusion_execution_error)
+    }
+
+    fn size(&self) -> usize {
+        std::mem::size_of_val(self)
     }
 }

@@ -67,6 +67,8 @@ pub enum PlatformError {
     NotFound(String),
     #[error("internal: {0:?}")]
     Internal(String),
+    #[error("entity map")]
+    EntityMap,
     #[error("serde: {0:?}")]
     Serde(#[from] serde_json::Error),
     #[error("password hash")]
@@ -95,7 +97,7 @@ impl PlatformError {
     pub fn wrap_into(self, err: impl Into<PlatformError>) -> PlatformError {
         PlatformError::Wrapped(Box::new(self), Box::new(err.into()))
     }
-    
+
     pub fn into_api_error(self) -> ApiError {
         match self {
             PlatformError::Serde(err) => ApiError::bad_request(err.to_string()),
@@ -180,7 +182,7 @@ impl PlatformError {
                 AuthError::InvalidPasswordHashing => ApiError::internal(err),
                 AuthError::CantMakeAccessToken => ApiError::internal(err),
                 AuthError::CantMakeRefreshToken => ApiError::internal(err),
-                AuthError::CantParseBearerHeader => ApiError::bad_request(err),
+                AuthError::CantParseBearerHeader => ApiError::unauthorized(err),
                 AuthError::CantParseAccessToken => ApiError::unauthorized(err),
             },
             PlatformError::Unauthorized(err) => ApiError::unauthorized(err),
@@ -195,6 +197,7 @@ impl PlatformError {
                 ApiError::new(StatusCode::BAD_REQUEST).with_fields(fields)
             }
             PlatformError::NotFound(err) => ApiError::not_found(err),
+            PlatformError::EntityMap => ApiError::internal("map error"),
         }
     }
 }

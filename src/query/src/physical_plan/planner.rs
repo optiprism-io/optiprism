@@ -3,8 +3,6 @@ use std::sync::Arc;
 use axum::async_trait;
 use datafusion::execution::context::QueryPlanner as DFQueryPlanner;
 use datafusion::execution::context::SessionState;
-use datafusion::logical_plan::LogicalPlan;
-use datafusion::logical_plan::UserDefinedLogicalNode;
 use datafusion::physical_plan::expressions;
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::planner::ExtensionPlanner as DFExtensionPlanner;
@@ -12,6 +10,8 @@ use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::PhysicalPlanner;
 use datafusion_common::DataFusionError;
 use datafusion_common::Result;
+use datafusion_expr::LogicalPlan;
+use datafusion_expr::UserDefinedLogicalNode;
 
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;

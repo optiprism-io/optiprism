@@ -1,9 +1,9 @@
 use chrono::Utc;
-use common::types::DictionaryDataType;
 use common::types::OptionalProperty;
-use common::DataType;
 use metadata::metadata::ListResponse;
 use metadata::properties::CreatePropertyRequest;
+use platform::datatype::DataType;
+use platform::datatype::DictionaryDataType;
 use platform::properties::Property;
 use platform::properties::Status;
 use platform::properties::UpdatePropertyRequest;

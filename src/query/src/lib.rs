@@ -68,9 +68,9 @@ pub mod test_util {
     use datafusion::datasource::listing::ListingTableConfig;
     use datafusion::datasource::listing::ListingTableUrl;
     use datafusion::datasource::provider_as_source;
-    use datafusion::logical_plan::LogicalPlan;
     use datafusion::prelude::CsvReadOptions;
     use datafusion_expr::logical_plan::builder::UNNAMED_TABLE;
+    use datafusion_expr::LogicalPlan;
     use datafusion_expr::LogicalPlanBuilder;
     use metadata::database;
     use metadata::database::Column;
@@ -175,7 +175,7 @@ pub mod test_util {
                 TableRef::Events(org_id, proj_id),
                 Column::new(
                     event_fields::CREATED_AT.to_string(),
-                    DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
+                    DataType::Timestamp(arrow::datatypes::TimeUnit::Nanosecond, None),
                     false,
                     None,
                 ),

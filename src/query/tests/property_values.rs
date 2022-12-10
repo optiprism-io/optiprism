@@ -2,17 +2,18 @@
 mod tests {
     use std::sync::Arc;
 
+    
     use arrow::util::pretty::print_batches;
     use common::types::EventRef;
     use common::types::PropValueOperation;
     use common::types::PropertyRef;
-    use common::ScalarValue;
     use datafusion::execution::context::SessionState;
     use datafusion::execution::runtime_env::RuntimeEnv;
-    use datafusion::physical_plan::coalesce_batches::concat_batches;
+    
     use datafusion::physical_plan::collect;
     use datafusion::prelude::SessionConfig;
     use datafusion::prelude::SessionContext;
+    use datafusion_common::ScalarValue;
     use query::error::Result;
     use query::physical_plan::planner::QueryPlanner;
     use query::queries::property_values::Filter;
@@ -48,7 +49,6 @@ mod tests {
         };
 
         let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, req).await?;
-        println!("logical plan: {:?}", plan);
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
         let session_state = SessionState::with_config_rt(config, runtime)
@@ -58,9 +58,8 @@ mod tests {
         let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
 
         let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
-        let concatenated = concat_batches(&result[0].schema(), &result, 0)?;
 
-        print_batches(&[concatenated])?;
+        print_batches(&result)?;
         Ok(())
     }
 }
