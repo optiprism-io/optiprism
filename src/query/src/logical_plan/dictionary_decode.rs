@@ -5,12 +5,12 @@ use std::fmt::Formatter;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
-use datafusion_common::DFSchemaRef;
-use datafusion_expr::logical_plan::LogicalPlan;
-use datafusion_expr::logical_plan::UserDefinedLogicalNode;
 use datafusion_common::Column;
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
+use datafusion_common::DFSchemaRef;
+use datafusion_expr::logical_plan::LogicalPlan;
+use datafusion_expr::logical_plan::UserDefinedLogicalNode;
 use datafusion_expr::Expr;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 

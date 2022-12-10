@@ -8,8 +8,8 @@ use arrow::array::UInt64Builder;
 use arrow::array::UInt8Builder;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
-use common::DECIMAL_PRECISION;
-use common::DECIMAL_SCALE;
+
+
 use events_gen::profiles::Profile;
 use rust_decimal::Decimal;
 
@@ -142,8 +142,7 @@ impl RecordBatchBuilder {
         }
 
         if !state.spent_total.is_zero() {
-            self.spent_total
-                .append_value(state.spent_total.mantissa());
+            self.spent_total.append_value(state.spent_total.mantissa());
         } else {
             self.spent_total.append_null();
         }

@@ -129,6 +129,8 @@ mod tests {
     use arrow::array::Decimal128Builder;
     use arrow::array::Int8Array;
     use arrow::datatypes::DataType;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion::physical_plan::expressions::AvgAccumulator;
     use datafusion_common::ScalarValue as DFScalarValue;
     use datafusion_expr::Accumulator;
@@ -187,7 +189,11 @@ mod tests {
                 builder.append_value(*val);
             }
 
-            Arc::new(builder.finish())
+            Arc::new(
+                builder
+                    .finish()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?,
+            )
         };
 
         sum_acc.update_batch(&spans, &[arr.clone() as ArrayRef])?;

@@ -9,13 +9,18 @@ use chronoutil::DateRule;
 use common::types::EventFilter;
 use common::types::PropertyRef;
 use datafusion::physical_plan::aggregates::AggregateFunction;
-use datafusion_common::{Column, DFSchema};
-use datafusion_expr::{Aggregate, col, Extension, Filter, LogicalPlan};
+use datafusion_common::Column;
+use datafusion_common::DFSchema;
+use datafusion_expr::col;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
 use datafusion_expr::utils::exprlist_to_fields;
+use datafusion_expr::Aggregate;
 use datafusion_expr::BuiltinScalarFunction;
 use datafusion_expr::Expr;
+use datafusion_expr::Extension;
+use datafusion_expr::Filter;
+use datafusion_expr::LogicalPlan;
 use futures::executor;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::properties::provider_impl::Namespace;
@@ -301,7 +306,7 @@ impl LogicalPlanBuilder {
                         fun: AggregateFunction::Count,
                         args: vec![col(event_fields::EVENT)],
                         distinct: false,
-                        filter: None
+                        filter: None,
                     },
                     Query::CountUniqueGroups | Query::DailyActiveGroups => {
                         let _a = col(self.es.group.as_ref());
@@ -342,7 +347,7 @@ impl LogicalPlanBuilder {
                             property,
                         ))?],
                         distinct: false,
-                        filter: None
+                        filter: None,
                     },
                     Query::QueryFormula { .. } => unimplemented!(),
                 };

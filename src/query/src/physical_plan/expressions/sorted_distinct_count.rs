@@ -49,7 +49,7 @@ impl TryFrom<SortedDistinctCount> for AggregateUDF {
 
     fn try_from(sorted_distinct: SortedDistinctCount) -> std::result::Result<Self, Self::Error> {
         let data_type = sorted_distinct.data_type.clone();
-        let data_type_arc = Arc::new(data_type.clone());
+        let data_type_arc = Arc::new(data_type);
         let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(data_type_arc.clone()));
         let accumulator: AccumulatorFunctionImplementation = Arc::new(move |dt| {
             let acc = SortedDistinctCountAccumulator::try_new(dt)?;

@@ -168,7 +168,7 @@ impl ExecutionPlan for UnpivotExec {
                 self.name_col.clone(),
                 self.value_col.clone(),
             )
-                .map_err(QueryError::into_datafusion_execution_error)?,
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -399,14 +399,16 @@ pub fn unpivot(
                 unpivot_cols_len,
                 StringBuilder
             ),
-            DataType::Timestamp(_, None) => build_group_arr!(
-                batch_col_idx,
-                arr,
-                TimestampNanosecondArray,
-                unpivot_cols_len,
-                TimestampNanosecondBuilder
-            ),
-            DataType::Decimal128(_, _) => {
+            DataType::Timestamp(_, None) => {
+                build_group_arr!(
+                    batch_col_idx,
+                    arr,
+                    TimestampNanosecondArray,
+                    unpivot_cols_len,
+                    TimestampNanosecondBuilder
+                )
+            }
+            DataType::Decimal128(p, s) => {
                 // build group array realisation for decimal type
                 let src_arr_typed = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
                 let mut result = Decimal128Builder::with_capacity(builder_cap);
@@ -423,7 +425,7 @@ pub fn unpivot(
                     }
                 }
 
-                Ok(Arc::new(result.finish()) as ArrayRef)
+                Ok(Arc::new(result.finish().with_precision_and_scale(*p, *s)?) as ArrayRef)
             }
             _ => unimplemented!("{}", arr.data_type()),
         })
@@ -484,7 +486,11 @@ pub fn unpivot(
                 }
             }
 
-            Arc::new(result.finish()) as ArrayRef
+            Arc::new(
+                result
+                    .finish()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?,
+            ) as ArrayRef
         }
 
         _ => unimplemented!("{}", value_type),
@@ -566,7 +572,7 @@ mod tests {
             "name".to_string(),
             "value".to_string(),
         )
-            .unwrap();
+        .unwrap();
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = exec.execute(0, task_ctx)?;

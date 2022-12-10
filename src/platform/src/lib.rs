@@ -5,6 +5,7 @@ pub mod auth;
 pub mod context;
 pub mod custom_events;
 pub mod dashboards;
+pub mod datatype;
 pub mod error;
 pub mod event_records;
 pub mod events;
@@ -14,7 +15,6 @@ pub mod properties;
 pub mod queries;
 pub mod reports;
 pub mod stub;
-pub mod datatype;
 
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -49,6 +49,7 @@ use serde::Serialize;
 use serde_json::json;
 use serde_json::Number;
 use serde_json::Value;
+
 use crate::datatype::DataType;
 
 pub struct PlatformProvider {
@@ -160,7 +161,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
                 })
                 .collect::<Result<_>>()
         }
-        _ => unimplemented!(),
+        _ => unimplemented!("{}", arr.data_type()),
     }
 }
 

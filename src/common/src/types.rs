@@ -4,9 +4,10 @@ use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
-use crate::scalar::ScalarValueRef;
+use serde_with::serde_as;
+
 use crate::error::CommonError;
-use serde_with::{serde_as};
+use crate::scalar::ScalarValueRef;
 
 pub const DECIMAL_PRECISION: u8 = 19;
 pub const DECIMAL_SCALE: i8 = 10;

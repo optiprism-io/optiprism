@@ -4,15 +4,21 @@ use std::sync::Arc;
 use common::types::EventRef;
 use common::types::PropValueOperation;
 use common::types::PropertyRef;
-use datafusion_expr::{Filter as PlanFilter, LogicalPlan, Sort, Aggregate, Extension};
+use datafusion_common::Column;
 use datafusion_common::DFSchema;
-use datafusion_common::{Column, ScalarValue};
+use datafusion_common::ScalarValue;
 use datafusion_expr::col;
 use datafusion_expr::utils::exprlist_to_fields;
+use datafusion_expr::Aggregate;
 use datafusion_expr::Expr;
+use datafusion_expr::Extension;
+use datafusion_expr::Filter as PlanFilter;
+use datafusion_expr::LogicalPlan;
+use datafusion_expr::Sort;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
+
 use crate::error::Result;
 use crate::expr::event_expression;
 use crate::expr::property_expression;
@@ -68,7 +74,10 @@ impl LogicalPlanBuilder {
         req: PropertyValues,
     ) -> Result<LogicalPlan> {
         let input = match &req.event {
-            Some(event) => LogicalPlan::Filter(PlanFilter::try_new(event_expression(&ctx, &metadata, event).await?, Arc::new(input))?),
+            Some(event) => LogicalPlan::Filter(PlanFilter::try_new(
+                event_expression(&ctx, &metadata, event).await?,
+                Arc::new(input),
+            )?),
             None => input,
         };
 
@@ -99,13 +108,17 @@ impl LogicalPlanBuilder {
         let expr_col = input.expressions()[0].clone();
 
         let input = match &req.filter {
-            Some(filter) => LogicalPlan::Filter(PlanFilter::try_new(property_expression(
-                &ctx,
-                &metadata,
-                &req.property,
-                &filter.operation,
-                filter.value.clone(),
-            ).await?, Arc::new(input))?),
+            Some(filter) => LogicalPlan::Filter(PlanFilter::try_new(
+                property_expression(
+                    &ctx,
+                    &metadata,
+                    &req.property,
+                    &filter.operation,
+                    filter.value.clone(),
+                )
+                .await?,
+                Arc::new(input),
+            )?),
             None => input,
         };
 

@@ -4,6 +4,10 @@ mod tests {
     use std::ops::Sub;
     use std::sync::Arc;
 
+    
+    
+    
+    
     use arrow::util::pretty::print_batches;
     use chrono::DateTime;
     use chrono::Duration;
@@ -14,7 +18,7 @@ mod tests {
     use common::types::PropertyRef;
     use datafusion::execution::context::SessionState;
     use datafusion::execution::runtime_env::RuntimeEnv;
-    use datafusion::physical_plan::coalesce_batches::concat_batches;
+    
     use datafusion::physical_plan::collect;
     use datafusion::prelude::SessionConfig;
     use datafusion::prelude::SessionContext;
@@ -40,8 +44,10 @@ mod tests {
     use query::test_util::create_md;
     use query::test_util::events_provider;
     use query::Context;
+    use tracing_test::traced_test;
     use uuid::Uuid;
 
+    #[traced_test]
     #[tokio::test]
     async fn test_filters() -> Result<()> {
         let to = DateTime::parse_from_rfc3339("2021-09-08T15:42:29.190855+00:00")
@@ -184,6 +190,7 @@ mod tests {
         Ok(())
     }
 
+    #[traced_test]
     #[tokio::test]
     async fn test_query() -> Result<()> {
         let _from = DateTime::parse_from_rfc3339("2020-09-08T13:42:00.000000+00:00")
@@ -284,6 +291,7 @@ mod tests {
 
         create_entities(md.clone(), org_id, proj_id).await?;
         let input = events_provider(md.database.clone(), org_id, proj_id).await?;
+        println!("{:?}", input.schema());
         let cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
@@ -300,13 +308,12 @@ mod tests {
         let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
 
         let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
+        print_batches(&result)?;
 
-        let concated = concat_batches(&result[0].schema(), &result, 0)?;
-
-        print_batches(&[concated])?;
         Ok(())
     }
 
+    #[traced_test]
     #[tokio::test]
     async fn test_custom_events() -> Result<()> {
         let org_id = 1;
@@ -406,10 +413,8 @@ mod tests {
         let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
 
         let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
+        print_batches(&result)?;
 
-        let concated = concat_batches(&result[0].schema(), &result, 0)?;
-
-        print_batches(&[concated])?;
         Ok(())
     }
 }

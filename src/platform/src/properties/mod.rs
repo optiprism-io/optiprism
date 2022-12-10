@@ -8,8 +8,9 @@ pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::datatype::DataType;
+use crate::datatype::DictionaryDataType;
 use crate::Context;
-use crate::datatype::{DataType, DictionaryDataType};
 use crate::ListResponse;
 use crate::PlatformError;
 use crate::Result;

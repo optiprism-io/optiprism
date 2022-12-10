@@ -10,7 +10,8 @@ use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::PhysicalPlanner;
 use datafusion_common::DataFusionError;
 use datafusion_common::Result;
-use datafusion_expr::{LogicalPlan, UserDefinedLogicalNode};
+use datafusion_expr::LogicalPlan;
+use datafusion_expr::UserDefinedLogicalNode;
 
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;

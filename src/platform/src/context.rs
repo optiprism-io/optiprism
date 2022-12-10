@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use axum::extract::Extension;
-use axum::extract::FromRequest;
+
 use axum::extract::TypedHeader;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
-use axum::http::Request;
 use axum::http::request::Parts;
+
 use axum_core::extract::FromRequestParts;
 use common::rbac::OrganizationPermission;
 use common::rbac::OrganizationRole;
@@ -119,7 +119,7 @@ impl Context {
 
 #[async_trait]
 impl<S> FromRequestParts<S> for Context
-    where S: Send + Sync,
+where S: Send + Sync
 {
     type Rejection = PlatformError;
 
@@ -132,14 +132,14 @@ impl<S> FromRequestParts<S> for Context
                 .await
                 .map_err(|_err| AuthError::CantParseBearerHeader)?;
 
-        let Extension(auth_cfg) = Extension::<auth::Config>::from_request_parts(parts,state)
+        let Extension(auth_cfg) = Extension::<auth::Config>::from_request_parts(parts, state)
             .await
             .map_err(|err| PlatformError::Internal(err.to_string()))?;
 
         let claims = parse_access_token(bearer.token(), &auth_cfg.access_token_key)
             .map_err(|err| err.wrap_into(AuthError::CantParseAccessToken))?;
         let Extension(md_acc_prov) =
-            Extension::<Arc<dyn metadata::accounts::Provider>>::from_request_parts(parts,state)
+            Extension::<Arc<dyn metadata::accounts::Provider>>::from_request_parts(parts, state)
                 .await
                 .map_err(|err| PlatformError::Internal(err.to_string()))?;
 

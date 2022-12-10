@@ -1,11 +1,17 @@
-use arrow_schema::{DataType, Field};
-use datafusion_common::DataFusionError;
+use arrow_schema::DataType;
+use arrow_schema::Field;
+
 use datafusion_common::ScalarValue;
-use serde::{Deserialize, Deserializer, ser, Serializer};
+
+use serde::Deserialize;
+use serde::Deserializer;
 use serde::Serialize;
-use serde_with::{DeserializeAs, SerializeAs};
-use serde_with::rust::maps_first_key_wins::serialize;
-use crate::error::CommonError;
+use serde::Serializer;
+
+use serde_with::DeserializeAs;
+use serde_with::SerializeAs;
+
+
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ScalarValueRef {
@@ -121,11 +127,7 @@ impl From<&ScalarValue> for ScalarValueRef {
             ScalarValue::Binary(v) => ScalarValueRef::Binary(v),
             ScalarValue::LargeBinary(v) => ScalarValueRef::LargeBinary(v),
             ScalarValue::List(v, f) => ScalarValueRef::List(
-                v.map(|v| {
-                    v.iter()
-                        .map(|v| v.into())
-                        .collect::<Vec<ScalarValueRef>>()
-                }),
+                v.map(|v| v.iter().map(|v| v.into()).collect::<Vec<ScalarValueRef>>()),
                 f,
             ),
             ScalarValue::Date32(v) => ScalarValueRef::Date32(v),
@@ -138,11 +140,7 @@ impl From<&ScalarValue> for ScalarValueRef {
             ScalarValue::IntervalDayTime(v) => ScalarValueRef::IntervalDayTime(v),
             ScalarValue::IntervalMonthDayNano(v) => ScalarValueRef::IntervalMonthDayNano(v),
             ScalarValue::Struct(v, f) => ScalarValueRef::Struct(
-                v.map(|v|
-                    v.iter()
-                        .map(|v| v.into())
-                        .collect::<Vec<ScalarValueRef>>()
-                ),
+                v.map(|v| v.iter().map(|v| v.into()).collect::<Vec<ScalarValueRef>>()),
                 f,
             ),
             ScalarValue::Dictionary(t, v) => {
@@ -159,19 +157,14 @@ impl From<&ScalarValue> for ScalarValueRef {
 
 impl SerializeAs<ScalarValue> for ScalarValueRef {
     fn serialize_as<S>(value: &ScalarValue, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-    {
+    where S: Serializer {
         ScalarValueRef::serialize(&ScalarValueRef::from(value), serializer)
     }
 }
 
 impl<'de> DeserializeAs<'de, ScalarValue> for ScalarValueRef {
     fn deserialize_as<D>(deserializer: D) -> Result<ScalarValue, D::Error>
-        where
-            D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         Ok(ScalarValueRef::deserialize(deserializer)?.into())
     }
 }
-

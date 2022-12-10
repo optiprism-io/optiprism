@@ -182,11 +182,11 @@ pub struct EventSegmentation {
 mod tests {
     use chrono::DateTime;
     use chrono::Utc;
-    use datafusion_common::ScalarValue;
     use common::types::EventFilter;
     use common::types::EventRef;
     use common::types::PropValueOperation;
     use common::types::PropertyRef;
+    use datafusion_common::ScalarValue;
     use datafusion_expr::AggregateFunction;
 
     use crate::event_fields;

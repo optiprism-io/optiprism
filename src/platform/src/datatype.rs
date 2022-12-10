@@ -1,10 +1,13 @@
-use arrow::datatypes::{DataType as ArrowDataType, TimeUnit};
-use datafusion::logical_expr::Operator;
+use arrow::datatypes::DataType as ArrowDataType;
+use arrow::datatypes::TimeUnit;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
+
 use serde::Deserialize;
-use serde::Deserializer;
+
 use serde::Serialize;
-use serde::Serializer;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+
+
 use crate::PlatformError;
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]

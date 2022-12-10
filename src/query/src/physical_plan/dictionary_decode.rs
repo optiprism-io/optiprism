@@ -152,7 +152,7 @@ struct DictionaryDecodeStream {
 
 macro_rules! decode_array {
     ($array_ref:expr,$array_type:ident, $dict:expr) => {{
-        let mut result = StringBuilder::with_capacity($array_ref.len(),$array_ref.len());
+        let mut result = StringBuilder::with_capacity($array_ref.len(), $array_ref.len());
         let src_arr = $array_ref.as_any().downcast_ref::<$array_type>().unwrap();
 
         for v in src_arr.iter() {

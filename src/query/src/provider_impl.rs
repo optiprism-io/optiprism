@@ -20,6 +20,7 @@ use datafusion_expr::LogicalPlan;
 use metadata::MetadataProvider;
 use tracing::debug;
 
+
 use crate::physical_plan::planner::QueryPlanner;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
@@ -45,8 +46,7 @@ impl ProviderImpl {
     ) -> Result<Self> {
         let table_source = Arc::new(DefaultTableSource::new(table_provider));
         let input =
-            datafusion_expr::LogicalPlanBuilder::scan("table", table_source, None)?
-                .build()?;
+            datafusion_expr::LogicalPlanBuilder::scan("table", table_source, None)?.build()?;
         Ok(Self { metadata, input })
     }
 
@@ -134,11 +134,13 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     debug!("physical plan: {}", displayable_plan.indent());
     let batches = collect(physical_plan, exec_ctx.task_ctx()).await?;
     for batch in batches.iter() {
-        debug!("{}", pretty_format_batches(&[batch.clone()])?);
+        println!("{}", pretty_format_batches(&[batch.clone()])?);
     }
 
     let duration = start.elapsed();
     debug!("elapsed: {:?}", duration);
     let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
-    Ok(concat_batches(&schema, &batches, 0)?)
+    let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
+
+    Ok(concat_batches(&schema, &batches, rows_count)?)
 }

@@ -19,7 +19,6 @@ use std::sync::Arc;
 use axum::async_trait;
 use axum::body::HttpBody;
 use axum::extract::rejection::JsonRejection;
-use axum::handler::Handler;
 use axum::http;
 use axum::http::HeaderMap;
 use axum::http::HeaderValue;
@@ -120,9 +119,9 @@ impl Service {
 
         let mut router = self.router;
         info!("attaching ui static files handler...");
-/*        let index =
-            get_service(ServeFile::new(path.join("index.html"))).handle_error(error_handler);
-*/        let favicon =
+        //        let index =
+        // get_service(ServeFile::new(path.join("index.html"))).handle_error(error_handler);
+        let favicon =
             get_service(ServeFile::new(path.join("favicon.ico"))).handle_error(error_handler);
         let assets = get_service(ServeDir::new(path.join("assets"))).handle_error(error_handler);
         // TODO resolve actual routes and distinguish them from 404s
@@ -186,9 +185,9 @@ pub async fn print_request_response(
 }
 
 async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes>
-    where
-        B: HttpBody<Data=Bytes>,
-        B::Error: std::fmt::Display,
+where
+    B: HttpBody<Data = Bytes>,
+    B::Error: std::fmt::Display,
 {
     let bytes = match hyper::body::to_bytes(body).await {
         Ok(bytes) => bytes,
@@ -213,16 +212,19 @@ pub struct Json<T>(pub T);
 
 #[async_trait]
 impl<T, S, B> FromRequest<S, B> for Json<T>
-    where
-        T: DeserializeOwned,
-        B: HttpBody + Send + 'static,
-        B::Data: Send,
-        B::Error: Into<BoxError>,
-        S: Send + Sync,
+where
+    T: DeserializeOwned,
+    B: HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<BoxError>,
+    S: Send + Sync,
 {
     type Rejection = ApiError;
 
-    async fn from_request(req: Request<B>, state: &S) -> std::result::Result<Self, Self::Rejection> {
+    async fn from_request(
+        req: Request<B>,
+        state: &S,
+    ) -> std::result::Result<Self, Self::Rejection> {
         match axum::Json::<T>::from_request(req, state).await {
             Ok(v) => Ok(Json(v.0)),
             Err(err) => {
@@ -261,7 +263,7 @@ impl<T, S, B> FromRequest<S, B> for Json<T>
 }
 
 impl<T> IntoResponse for Json<T>
-    where T: Serialize
+where T: Serialize
 {
     fn into_response(self) -> Response {
         axum::Json(self.0).into_response()

@@ -2,12 +2,13 @@ use chrono::Utc;
 use common::types::OptionalProperty;
 use metadata::metadata::ListResponse;
 use metadata::properties::CreatePropertyRequest;
+use platform::datatype::DataType;
+use platform::datatype::DictionaryDataType;
 use platform::properties::Property;
 use platform::properties::Status;
 use platform::properties::UpdatePropertyRequest;
 use reqwest::Client;
 use reqwest::StatusCode;
-use platform::datatype::{DataType, DictionaryDataType};
 
 use crate::assert_response_status_eq;
 use crate::http::tests::create_admin_acc_and_login;
