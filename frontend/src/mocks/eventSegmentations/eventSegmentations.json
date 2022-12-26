@@ -4,7 +4,7 @@
             "type": "dimension",
             "dataType": "string",
             "name": "Event Name",
-            "values": [
+            "data": [
                 "Buy Product",
                 "Buy Product",
                 "View Product",
@@ -15,7 +15,7 @@
             "type": "dimension",
             "dataType": "string",
             "name": "Country",
-            "values": [
+            "data": [
                 "Spain",
                 "United Kingdom",
                 "Spain",
@@ -26,7 +26,7 @@
             "type": "dimension",
             "dataType": "number",
             "name": "Age",
-            "values": [
+            "data": [
                 null,
                 null,
                 null,
@@ -37,7 +37,7 @@
             "type": "metric",
             "dataType": "string",
             "name": "Metric",
-            "values": [
+            "data": [
                 "count",
                 "count",
                 "count",
@@ -48,7 +48,7 @@
             "type": "metricValue",
             "dataType": "number",
             "name": "2021.11.10",
-            "values": [
+            "data": [
                 1123,
                 2123,
                 8123,
@@ -59,7 +59,7 @@
             "type": "metricValue",
             "dataType": "number",
             "name": "2021.11.12",
-            "values": [
+            "data": [
                 126,
                 14126,
                 20126,
@@ -70,7 +70,7 @@
             "type": "metricValue",
             "dataType": "number",
             "name": "2021.11.13",
-            "values": [
+            "data": [
                 5126,
                 2126,
                 3126,
@@ -81,7 +81,7 @@
             "type": "metricValue",
             "dataType": "number",
             "name": "2021.11.14",
-            "values": [
+            "data": [
                 9126,
                 2126,
                 7126,
@@ -92,7 +92,7 @@
             "type": "metricValue",
             "dataType": "number",
             "name": "2021.11.15",
-            "values": [
+            "data": [
                 19126,
                 126,
                 7126,
@@ -103,7 +103,7 @@
             "type": "metricValue",
             "dataType": "number",
             "name": "2021.11.16",
-            "values": [
+            "data": [
                 3126,
                 2126,
                 3126,
@@ -114,7 +114,7 @@
             "type": "metricValue",
             "dataType": "number",
             "name": "total",
-            "values": [
+            "data": [
                 9126,
                 2126,
                 7126,

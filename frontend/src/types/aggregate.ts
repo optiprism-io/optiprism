@@ -1,15 +1,4 @@
-export enum AggregateId {
-    Sum = 'sum',
-    Avg = 'avg',
-    Median = 'median',
-    Min = 'min',
-    Max = 'max',
-    DistinctCount = 'distinctCount',
-    PercentileTh25 = '25thPercentile',
-    PercentileTh75 = '75thPercentile',
-    PercentileTh90 = '90thPercentile',
-    PercentileTh99 = '99thPercentile'
-}
+import { QueryAggregate as AggregateId } from '@/api'
 
 export interface Aggregate {
     id: AggregateId;
@@ -43,23 +32,23 @@ export const aggregates: Aggregate[] = [
         name: 'Distinct count'
     },
     {
-        id: AggregateId.PercentileTh25,
+        id: AggregateId.Percentile25,
         name: '25th Percentile'
     },
     {
-        id: AggregateId.PercentileTh75,
+        id: AggregateId.Percentile75,
         name: '75th Percentile'
     },
     {
-        id: AggregateId.PercentileTh90,
+        id: AggregateId.Percentile90,
         name: '90th Percentile'
     },
     {
-        id: AggregateId.PercentileTh99,
+        id: AggregateId.Percentile99,
         name: '99th Percentile'
     },
 ]
 
 export type AggregateRef = {
-    typeAggregate?: AggregateId;
+    typeAggregate?: AggregateId
 }

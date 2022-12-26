@@ -6,40 +6,38 @@ import { useReportsStore } from '@/stores/reports/reports'
 import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
 import { useBreakdownsStore } from '@/stores/reports/breakdowns'
-import { useFilterGroupsStore, FilterGroup, FilterCondition } from '@/stores/reports/filters'
+import { useFilterGroupsStore, FilterGroup } from '@/stores/reports/filters'
 import { useSegmentsStore, Segment } from '@/stores/reports/segments'
 import { Each } from '@/components/uikit/UiCalendar/UiCalendar'
+import { Value } from '@/api'
 
 import {
     Property,
-    EventRefOneOf1EventTypeEnum,
-    EventRefOneOfEventTypeEnum,
     EventType,
     PropertyType,
-    PropertyValuesListRequestPropertyTypeEnum,
-    EventQueryQuery,
-
+    ReportType,
+    QuerySimple,
+    QueryCountPerGroup,
+    QueryAggregatePropertyPerGroup,
+    QueryAggregateProperty,
+    QueryFormula,
+    EventSegmentation,
+    FunnelQuery,
     QueryFormulaTypeEnum,
     QuerySimpleTypeEnum,
     QueryCountPerGroupTypeEnum,
     QueryAggregatePropertyPerGroupTypeEnum,
     QueryAggregatePropertyTypeEnum,
-
     EventSegmentationEvent,
-    EventFiltersGroupsInner,
+    EventGroupedFiltersGroupsInner,
     EventSegmentationSegment,
-
+    DidEventRelativeCountTypeEnum,
     SegmentConditionDidEventTypeEnum,
     SegmentConditionHadPropertyValueTypeEnum,
     SegmentConditionHasPropertyValueTypeEnum,
-
-    DidEventRelativeCountTypeEnum,
-
     TimeBetweenTypeEnum,
     Event as EventItem,
     EventFilterByProperty,
-    PropertyValuesListRequestEventTypeEnum,
-
     TimeBetween,
     TimeLast,
     TimeAfterFirstUse,
@@ -50,20 +48,23 @@ import {
     BreakdownByProperty,
     FunnelQueryStepsInner,
     PropertyRef,
-    EventFilterByPropertyPropertyTypeEnum,
+    QueryAggregate,
+    QueryAggregatePerGroup,
+    EventFilterByPropertyTypeEnum,
 } from '@/api'
 
+type Queries = QuerySimple | QueryCountPerGroup | QueryAggregatePropertyPerGroup | QueryAggregateProperty | QueryFormula
+
 import { useEventsStore, Event, EventQuery, EventBreakdown, ChartType } from '@/stores/eventSegmentation/events'
-import { AggregateId } from '@/types/aggregate'
 import { Step } from '@/types/steps'
 import { EventRef, EventQueryRef, Condition, PropertyRef as PropertyRefEvent, UserCustomProperty } from '@/types/events'
 import { Filter } from '@/types/filters'
 
 type GetValues = {
     eventName?: string
-    eventType?: PropertyValuesListRequestEventTypeEnum
+    eventType?: EventType,
     propertyName: string
-    propertyType?: PropertyValuesListRequestPropertyTypeEnum
+    propertyType?: PropertyType
 }
 
 type GetTime = {
@@ -81,7 +82,7 @@ const getTime = (props: GetTime) => {
 
     switch (props.time.type) {
         case TimeLastTypeEnum.Last:
-            period.last = props.time.n
+            period.last = props.time.last
         case TimeLastTypeEnum.Last:
         case TimeAfterFirstUseTypeEnum.AfterFirstUse:
         case TimeWindowEachTypeEnum.WindowEach:
@@ -101,18 +102,16 @@ const getTime = (props: GetTime) => {
 
 const getValues = async (props: GetValues) => {
     const commonStore = useCommonStore()
-    let valuesList: Array<boolean> | Array<number> | Array<string> = []
+    let valuesList: Value[] = []
 
     try {
         const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
-            eventName: props.eventName,
-            eventType: props.eventType,
-            propertyName: props.propertyName,
-            propertyType: props.propertyType,
+            propertyType: props.propertyType || PropertyType.User,
+            eventType: props.eventType || EventType.Regular,
         })
 
-        if (res.data.values) {
-            valuesList = res.data.values
+        if (res.data.data) {
+            valuesList = res.data.data
         }
     } catch (error) {
         throw new Error('error get events values')
@@ -121,7 +120,7 @@ const getValues = async (props: GetValues) => {
     return valuesList
 }
 
-const computedFilter = async (eventName: string | undefined, eventType: PropertyValuesListRequestEventTypeEnum | undefined, items: EventFilterByProperty[]) => {
+const computedFilter = async (eventName: string | undefined, eventType: EventType | undefined, items: EventFilterByProperty[]) => {
     return await Promise.all(items.map(async filter => {
         return {
             propRef: {
@@ -134,7 +133,7 @@ const computedFilter = async (eventName: string | undefined, eventType: Property
                 eventName: eventName,
                 eventType: eventType,
                 propertyName: filter.propertyName || '',
-                propertyType: filter.propertyType as PropertyValuesListRequestPropertyTypeEnum,
+                propertyType: filter.propertyType as PropertyType,
             }),
         }
     }))
@@ -147,23 +146,25 @@ const mapReportToEvents = async (items: EventSegmentationEvent[]): Promise<Event
                 type: item.eventType,
                 id: item.eventId || 0,
             },
-            filters: item.filters ? await computedFilter(item.eventName, item.eventType, item.filters) : [],
+            filters: item.filters ? await computedFilter(item.eventName, item.eventType, item.filters) as Filter[] : [],
             queries: item.queries.map((row, i): EventQuery => {
-                const query = row.query as EventQueryQuery
+                const query = row as Queries
 
                 const queryRef: EventQueryRef = {
                     type: query.type,
-                    name: row.name,
                 }
 
                 switch (query.type) {
                     case QueryFormulaTypeEnum.Formula:
                         queryRef.value = query.formula
                         break;
-                    case QuerySimpleTypeEnum.Simple:
+                    case QuerySimpleTypeEnum.CountEvents:
+                    case QuerySimpleTypeEnum.CountUniqueGroups:
+                    case QuerySimpleTypeEnum.MonthlyActiveGroups:
+                    case QuerySimpleTypeEnum.WeeklyActiveGroups:
                         break;
                     case QueryAggregatePropertyPerGroupTypeEnum.AggregatePropertyPerGroup:
-                        queryRef.typeGroupAggregate = query.aggregatePerGroup as AggregateId
+                        queryRef.typeGroupAggregate = query.aggregatePerGroup as QueryAggregatePerGroup
                     case QueryAggregatePropertyTypeEnum.AggregateProperty:
                     case QueryAggregatePropertyPerGroupTypeEnum.AggregatePropertyPerGroup:
                         queryRef.propRef = {
@@ -173,7 +174,7 @@ const mapReportToEvents = async (items: EventSegmentationEvent[]): Promise<Event
                     case QueryAggregatePropertyTypeEnum.AggregateProperty:
                     case QueryAggregatePropertyPerGroupTypeEnum.AggregatePropertyPerGroup:
                     case QueryCountPerGroupTypeEnum.CountPerGroup:
-                        queryRef.typeAggregate = query.aggregate as AggregateId
+                        queryRef.typeAggregate = query.aggregate as QueryAggregate
                         break
                 }
 
@@ -194,22 +195,23 @@ const mapReportToEvents = async (items: EventSegmentationEvent[]): Promise<Event
     }))
 }
 
-const mapReportToFilterGroups = async (items: EventFiltersGroupsInner[]): Promise<FilterGroup[]> => {
+const mapReportToFilterGroups = async (items: EventGroupedFiltersGroupsInner[]): Promise<FilterGroup[]> => {
     const commonStore = useCommonStore()
 
     return await Promise.all(items.map(async (item): Promise<FilterGroup> => {
         return {
-            condition: item.filtersCondition as FilterCondition,
+            condition: item.filtersCondition,
             filters: item.filters ? await Promise.all(item.filters.map(async (filter): Promise<Filter> => {
-                let valuesList: string[] | boolean[] | number[] = []
+                let valuesList: Value[] = []
                 try {
                     const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
                         propertyName: filter.propertyName || '',
-                        propertyType: filter.propertyType
+                        propertyType: filter.propertyType,
+                        eventType: EventType.Regular,
                     })
 
-                    if (res.data.values) {
-                        valuesList = res.data.values
+                    if (res.data.data) {
+                        valuesList = res.data.data
                     }
                 } catch (error) {
                     throw new Error('error get values');
@@ -221,7 +223,7 @@ const mapReportToFilterGroups = async (items: EventFiltersGroupsInner[]): Promis
                     },
                     opId: filter.operation,
                     values: filter.value || [],
-                    valuesList,
+                    valuesList: valuesList as string[] | boolean[] | number[],
                 }
             })) : []
         }
@@ -264,7 +266,7 @@ const mapReportToSegments = async (items: EventSegmentationSegment[]): Promise<S
                         if (condition.aggregate) {
                             res.opId = condition.aggregate.operation
 
-                            if (condition.aggregate.type !== DidEventRelativeCountTypeEnum.DidEventRelativeCount && condition.aggregate?.value) {
+                            if (condition.aggregate.type !== DidEventRelativeCountTypeEnum.RelativeCount && condition.aggregate?.value) {
                                 res.valueItem = condition.aggregate.value
                             }
 
@@ -274,15 +276,15 @@ const mapReportToSegments = async (items: EventSegmentationSegment[]): Promise<S
                                 res.each = each as Each
                             }
 
-                            if (condition.aggregate.type === DidEventRelativeCountTypeEnum.DidEventRelativeCount && condition.aggregate.rightEvent) {
+                            if (condition.aggregate.type === DidEventRelativeCountTypeEnum.RelativeCount && condition.aggregate.eventType) {
                                 let event: EventItem | null = null
 
-                                switch (condition.aggregate.rightEvent.eventType) {
-                                    case EventRefOneOfEventTypeEnum.Regular:
-                                        event = lexiconStore.findEventByName(condition.aggregate.rightEvent.eventName || '')
+                                switch (condition.aggregate.eventType) {
+                                    case EventType.Regular:
+                                        event = lexiconStore.findEventByName(condition.aggregate.eventName || '')
                                         break
-                                    case EventRefOneOf1EventTypeEnum.Custom:
-                                        event = lexiconStore.findCustomEventById(condition.aggregate.rightEvent.eventId || 0)
+                                    case EventType.Custom:
+                                        event = lexiconStore.findCustomEventById(condition.aggregate.eventId || 0)
                                         break
                                 }
 
@@ -290,7 +292,7 @@ const mapReportToSegments = async (items: EventSegmentationSegment[]): Promise<S
                                     res.compareEvent = {
                                         name: event.name,
                                         ref: {
-                                            type: condition.aggregate.rightEvent.eventType as EventType,
+                                            type: condition.aggregate.eventType as EventType,
                                             id: event.id,
                                         }
                                     }
@@ -313,17 +315,17 @@ const mapReportToSegments = async (items: EventSegmentationSegment[]): Promise<S
                         if (condition.propertyName) {
                             const property: Property = lexiconStore.findEventPropertyByName(condition.propertyName) || lexiconStore.findUserPropertyByName(condition.propertyName)
                             res.propRef = {
-                                type: property.type as PropertyType,
+                                type: PropertyType.User,
                                 id: property.id
                             }
                             res.valuesList = await getValues({
                                 propertyName: property.name,
-                                propertyType: property.type as PropertyType,
+                                propertyType: PropertyType.User,
                             })
                         }
 
                         res.opId = condition.operation
-                        res.values = condition.values
+                        res.values = condition.value
                 }
 
                 return res;
@@ -359,22 +361,16 @@ export const mapReportToSteps = async (items: FunnelQueryStepsInner[]): Promise<
                     filters: event.filters ? await computedFilter(event.eventName, event.eventType, event.filters) : [],
                 }
             })) : []
-        }
+        } as Step
     }))
 }
 
 const mapReportToHoldingConstants = (items: PropertyRef[]): HoldingProperty[] => {
     return items.map(item => {
-        const propertyRef = item as {
-            propertyName?: string
-            propertyId?: number
-            propertyType: EventFilterByPropertyPropertyTypeEnum
-        }
-
         return {
-            name: propertyRef?.propertyName || '',
-            id: Number(propertyRef.propertyId) || 0,
-            type: propertyRef.propertyType
+            id: Number(item.propertyId) || 0,
+            name: item?.propertyName || '',
+            type: item.propertyType as EventFilterByPropertyTypeEnum,
         }
     })
 }
@@ -393,7 +389,7 @@ export const funnelsToEvents = () => {
                     noDelete: true,
                     queryRef: {
                         name: 'countEvents',
-                        type: 'simple'
+                        type: QuerySimpleTypeEnum.CountEvents,
                     }
                 }]
             })
@@ -426,14 +422,21 @@ export const reportToStores = async (id: number) => {
     const stepsStore = useStepsStore()
 
     reportsStore.reportId = id
-    const report = reportsStore.activeReport?.report
-
-    eventsStore.events = report?.events ? await mapReportToEvents(report.events) : []
-    filterGroupsStore.condition = report?.filters?.groupsCondition || 'and'
-    filterGroupsStore.filterGroups = report?.filters?.groups ? await mapReportToFilterGroups(report.filters.groups) : []
-    segmentsStore.segments = report?.segments ? await mapReportToSegments(report.segments) : []
-    breakdownsStore.breakdowns = report?.breakdowns ? mapReportToBreakdowns(report.breakdowns) : []
-    stepsStore.steps = report?.steps ? await mapReportToSteps(report.steps) : []
-    stepsStore.holdingProperties = report?.holdingConstants ? mapReportToHoldingConstants(report.holdingConstants) : []
-    eventsStore.chartType = report?.chartType as ChartType
+    const report = reportsStore.activeReport
+    if (report?.query) {
+        if (report.type === ReportType.EventSegmentation) {
+            const query = report?.query as EventSegmentation
+            eventsStore.events = query.events ? await mapReportToEvents(query.events) : []
+        }
+        if (report.type === ReportType.Funnel) {
+            const query = report?.query as FunnelQuery
+            stepsStore.steps = query?.steps ? await mapReportToSteps(query.steps) : []
+            stepsStore.holdingProperties = query?.holdingConstants ? mapReportToHoldingConstants(query.holdingConstants) : []
+        }
+        filterGroupsStore.condition = report.query?.filters?.groupsCondition || 'and'
+        filterGroupsStore.filterGroups = report.query?.filters?.groups ? await mapReportToFilterGroups(report.query.filters.groups) : []
+        segmentsStore.segments = report?.query?.segments ? await mapReportToSegments(report.query.segments) : []
+        breakdownsStore.breakdowns = report?.query?.breakdowns ? mapReportToBreakdowns(report.query.breakdowns) : []
+        eventsStore.chartType = report?.query?.chartType as ChartType
+    }
 }

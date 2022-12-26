@@ -139,7 +139,7 @@ provide('changeEventCondition', (payload: ChangeEventCondition) => {
         idx: payload.idx,
         idxParent: payload.idxParent,
         value: {
-            id: DidEventCountTypeEnum.DidEventCount,
+            id: DidEventCountTypeEnum.Count,
             name: i18n.$t('events.aggregates.count')
         }
     })

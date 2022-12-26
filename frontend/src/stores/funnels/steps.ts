@@ -3,13 +3,14 @@ import {Step} from '@/types/steps';
 import { EventRef } from '@/types/events'
 import {EventFilter} from '@/stores/eventSegmentation/events';
 import {
+    EventType,
     FunnelQueryStepsInner,
+    FunnelExcludeStepsSteps,
     FunnelEvent,
     PropertyRef,
     FunnelQueryExcludeInner,
     EventFilterByProperty,
-    FunnelEventEventTypeEnum,
-    EventFilterByPropertyPropertyTypeEnum,
+    EventFilterByPropertyTypeEnum,
 } from '@/api'
 
 import { useEventName } from '@/helpers/useEventName'
@@ -32,7 +33,7 @@ export type ExcludedEventSteps = {
 export type HoldingProperty = {
     id: number,
     name: string,
-    type: EventFilterByPropertyPropertyTypeEnum
+    type: EventFilterByPropertyTypeEnum
 };
 
 interface ExcludedEvent {
@@ -157,10 +158,10 @@ export const useStepsStore = defineStore('steps', {
         getExcluded(): FunnelQueryExcludeInner[] {
             const eventName = useEventName()
 
-            return this.excludedEvents.map(item => {
+            return this.excludedEvents.map((item): FunnelQueryExcludeInner => {
                 return {
-                    eventType: item.event.type as FunnelEventEventTypeEnum,
                     eventName: eventName(item.event),
+                    eventType: item.event.type as EventType,
                     filters: item.filters.map(filter => {
                         return {
                             propertyType: filter.propRef?.type ?? '',
@@ -169,6 +170,7 @@ export const useStepsStore = defineStore('steps', {
                             value: filter.values
                         }
                     }) as EventFilterByProperty[],
+                    steps: this.getSteps as FunnelExcludeStepsSteps
                 }
             })
         },

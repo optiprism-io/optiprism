@@ -190,7 +190,7 @@ const selectAggregateName = computed((): string => {
 });
 
 const selectedAggregateRef = computed((): AggregateRef | undefined => {
-    return selectedAggregate.value?.item || undefined;
+    return selectedAggregate.value?.item as AggregateRef || undefined;
 });
 
 const selectedGroupAggregate = computed((): Item<EventQueryRef, null> | undefined => {
@@ -200,7 +200,7 @@ const selectedGroupAggregate = computed((): Item<EventQueryRef, null> | undefine
 });
 
 const selectedGroupAggregateRef = computed((): AggregateRef | undefined => {
-    return selectedGroupAggregate.value?.item || undefined;
+    return selectedGroupAggregate.value?.item as AggregateRef || undefined;
 });
 
 const selectedGroupAggregateName = computed((): string => {

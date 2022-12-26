@@ -58,8 +58,8 @@
 </template>
 
 <script lang="ts" setup>
-import UiDatePicker from '@/components/uikit/UiDatePicker.vue';
-import {computed, inject, ref, watch} from 'vue';
+import { computed, inject, ref, watch } from 'vue'
+import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
 import {periodMap} from '@/configs/events/controls';
 import {UiToggleGroupItem} from '@/components/uikit/UiToggleGroup.vue';
 import {useFunnelsStore} from '@/stores/funnels/funnels';

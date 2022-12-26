@@ -22,6 +22,7 @@ import {
     Property,
     Event,
     CustomProperty,
+    QueryAggregate,
 } from '@/api'
 import { useCommonStore, PropertyTypeEnum } from '@/stores/common'
 
@@ -158,8 +159,8 @@ export const useLexiconStore = defineStore('lexicon', {
             this.eventPropertiesLoading = true
             try {
                 const res = await schemaService.eventProperties(commonStore.organizationId, commonStore.projectId)
-                if (res.data.events) {
-                    this.eventProperties = res.data.events
+                if (res.data.data) {
+                    this.eventProperties = res.data.data
                 }
 
                 const resCustom = await schemaService.eventCustomProperties(commonStore.organizationId, commonStore.projectId)
@@ -167,7 +168,7 @@ export const useLexiconStore = defineStore('lexicon', {
                     this.eventCustomProperties = resCustom.data.events
                 }
             } catch (error) {
-                throw new Error('error getEventProperties')
+                console.error(error);
             }
             this.eventPropertiesLoading = false
         },
@@ -177,8 +178,8 @@ export const useLexiconStore = defineStore('lexicon', {
             try {
                 const res = await schemaService.userProperties(commonStore.organizationId, commonStore.projectId);
 
-                if (res.data.events) {
-                    this.userProperties = res.data.events
+                if (res.data.data) {
+                    this.userProperties = res.data.data
                 }
             } catch (error) {
                 throw new Error('error getUserProperties');
@@ -401,7 +402,7 @@ export const useLexiconStore = defineStore('lexicon', {
         eventsQueryAggregates() {
             return aggregates.map((aggregate): Item<EventQueryRef, null> => ({
                 item: {
-                    typeAggregate: aggregate.id,
+                    typeAggregate: aggregate.id as QueryAggregate,
                 },
                 name: aggregate.name || '',
             }));
@@ -428,7 +429,7 @@ export const useLexiconStore = defineStore('lexicon', {
         findQuery() {
             return (ref: EventQueryRef | undefined): EventsQuery | undefined => {
                 return ref ? eventsQueries.find((item: EventsQuery) => {
-                    return item.name === ref.name;
+                    return item.type === ref.type;
                 }) : ref;
             }
         },

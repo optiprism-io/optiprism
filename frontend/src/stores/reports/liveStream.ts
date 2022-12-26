@@ -1,12 +1,12 @@
 import {defineStore} from 'pinia'
 import {
     EventFilterByProperty,
-    EventRecordsListRequestEventsInner,
-    EventRecordsListRequestEventsInnerEventTypeEnum,
+    EventRecordRequestEvent,
     EventType,
     TimeBetween,
     TimeFrom,
     TimeLast,
+    PropertyFilterOperation,
 } from '@/api'
 import {Event} from '@/stores/eventSegmentation/events'
 import dataService from '@/api/services/datas.service'
@@ -73,7 +73,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
                                 type: 'property',
                                 propertyType: 'custom',
                                 propertyId: filter.propRef.id,
-                                operation: filter.opId,
+                                operation: filter.opId as PropertyFilterOperation,
                                 value: filter.values,
                             })
                         }
@@ -83,7 +83,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
 
             return filters
         },
-        eventsRequest(): Array<EventRecordsListRequestEventsInner> {
+        eventsRequest(): Array<EventRecordRequestEvent> {
             const lexiconStore = useLexiconStore()
 
             return this.events.map(event => {
@@ -93,7 +93,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
                     case EventType.Regular:
                         return {
                             eventName: eventStore.name,
-                            eventType: event.ref.type as EventRecordsListRequestEventsInnerEventTypeEnum,
+                            eventType: event.ref.type as EventType,
                             filters: this.filtersRequest,
                         }
                     case EventType.Custom:
@@ -110,7 +110,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
                 case 'last':
                     return {
                         type: this.period.type,
-                        n: this.period.last,
+                        last: this.period.last,
                         unit: 'day'
                     }
                 case 'since':
@@ -127,7 +127,7 @@ export const useLiveStreamStore = defineStore('liveStream', {
                 default:
                     return {
                         type: 'last',
-                        n: Number(this.controlsPeriod),
+                        last: Number(this.controlsPeriod),
                         unit: 'day'
                     }
             }

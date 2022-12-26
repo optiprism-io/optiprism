@@ -109,11 +109,11 @@ import SelectedEvent from '@/components/events/Events/SelectedEvent.vue'
 import schemaService from '@/api/services/schema.service'
 import {
     CreateCustomEventRequest,
-    CustomEventEventEventTypeEnum,
     CustomEventEvent,
     EventType,
-    CustomEventStatusEnum,
-    UpdateCustomEventRequest
+    EventStatus,
+    UpdateCustomEventRequest,
+    Value
 } from '@/api'
 const i18n = inject<any>('i18n')
 
@@ -199,7 +199,7 @@ const resultEvent = computed(() => {
 
             const eventProps: CustomEventEvent = {
                 eventName: event.name,
-                eventType: item.ref.type as CustomEventEventEventTypeEnum,
+                eventType: item.ref.type as EventType,
                 eventId: event.id,
                 filters: [],
             }
@@ -230,7 +230,7 @@ const apply = async () => {
     try {
         if (isEdit.value) {
             const data: UpdateCustomEventRequest = resultEvent.value
-            data.status = eventStatus.value ? CustomEventStatusEnum.Enabled : CustomEventStatusEnum.Disabled;
+            data.status = eventStatus.value ? EventStatus.Enabled : EventStatus.Disabled;
             await schemaService.updateCustomEvent(commonStore.organizationId, commonStore.projectId, String(editedEvent.value?.id), data)
         } else {
             const data: CreateCustomEventRequest = resultEvent.value
@@ -256,7 +256,7 @@ onBeforeMount(async () => {
         eventName.value = editedEvent.value.name
         eventDescription.value = editedEvent.value?.description || ''
         eventTags.value = editedEvent.value?.tags || []
-        eventStatus.value = editedEvent.value?.status === CustomEventStatusEnum.Enabled
+        eventStatus.value = editedEvent.value?.status === EventStatus.Enabled
 
         if (editedEvent.value.events) {
             events.value = JSON.parse(JSON.stringify(await Promise.all(editedEvent.value.events.map(async item => {
@@ -266,7 +266,7 @@ onBeforeMount(async () => {
                         id: item.eventId
                     },
                     filters: item.filters ? await Promise.all(item.filters.map(async filter => {
-                        let valuesList: Array<boolean> | Array<number> | Array<string> = []
+                        let valuesList: Array<Value> = []
 
                         try {
                             const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
@@ -275,8 +275,8 @@ onBeforeMount(async () => {
                                 propertyName: filter.propertyName || '',
                                 propertyType: filter.propertyType,
                             })
-                            if (res.data.values) {
-                                valuesList = res.data.values
+                            if (res.data.data) {
+                                valuesList = res.data.data
                             }
                         } catch (error) {
                             throw new Error('error get events values')

@@ -19,6 +19,7 @@ import {useStepsStore} from '@/stores/funnels/steps';
 import {useEventsStore} from '@/stores/eventSegmentation/events';
 import PropertySelect from '@/components/events/PropertySelect.vue';
 import {PropertyRef} from '@/types/events';
+import { EventFilterByPropertyTypeEnum } from '@/api'
 
 const lexiconStore = useLexiconStore();
 const stepsStore = useStepsStore();
@@ -35,7 +36,7 @@ const addHoldingConstant = (property: PropertyRef): void => {
         stepsStore.addHoldingProperty({
             id,
             name,
-            type: property.type
+            type: property.type as EventFilterByPropertyTypeEnum
         })
     }
 }

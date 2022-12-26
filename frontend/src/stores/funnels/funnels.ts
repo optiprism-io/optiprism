@@ -6,11 +6,14 @@ import {
     TimeBetween,
     TimeFrom,
     TimeLast,
+    EventRecordsListRequestTime,
+    FunnelQueryChartTypeTypeEnum,
+    TimeUnit,
+    FunnelQueryCountEnum,
 } from '@/api'
 import dataService from '@/api/services/datas.service';
 import { useCommonStore } from '@/stores/common';
 import { useStepsStore } from '@/stores/funnels/steps';
-import { useEventName } from '@/helpers/useEventName';
 import { useFilterGroupsStore } from '@/stores/reports/filters'
 import { useBreakdownsStore } from '@/stores/reports/breakdowns'
 import { useSegmentsStore } from '@/stores/reports/segments'
@@ -21,7 +24,7 @@ export const convertColumns = (columns: DataTableResponseColumnsInner[], stepNum
     for (let i = 0; i < stepNumbers.length; i++) {
         const column = columns.find(col => col.step === stepNumbers[i])
         if (column) {
-            result.push(column.values as number[])
+            result.push(column.data as number[])
         } else {
             result.push([])
         }
@@ -60,7 +63,7 @@ export const useFunnelsStore = defineStore('funnels', {
                 case 'last':
                     return {
                         type: this.period.type,
-                        n: this.period.last,
+                        last: this.period.last,
                         unit: 'day'
                     }
                 case 'since':
@@ -77,7 +80,7 @@ export const useFunnelsStore = defineStore('funnels', {
                 default:
                     return {
                         type: 'last',
-                        n: Number(this.controlsPeriod),
+                        last: Number(this.controlsPeriod),
                         unit: 'day'
                     }
             }
@@ -91,10 +94,10 @@ export const useFunnelsStore = defineStore('funnels', {
             const result: string[] = []
             const columns = this.reports.filter(col => col.type === 'dimension')
 
-            for (let i = 0; i < (columns[0]?.values?.length ?? 0); i++) {
+            for (let i = 0; i < (columns[0]?.data?.length ?? 0); i++) {
                 const row: string[] = []
                 columns.forEach(item => {
-                    row.push(`${item.values?.[i] ?? ''}`)
+                    row.push(`${item.data?.[i] ?? ''}`)
                 })
                 result.push(row.join(' / '))
             }
@@ -137,7 +140,6 @@ export const useFunnelsStore = defineStore('funnels', {
         async getReports(): Promise<void> {
             const commonStore = useCommonStore()
             const stepsStore = useStepsStore()
-            const eventName = useEventName()
             const breakdownsStore = useBreakdownsStore()
             const filterGroupsStore = useFilterGroupsStore()
             const segmentsStore = useSegmentsStore()
@@ -146,17 +148,24 @@ export const useFunnelsStore = defineStore('funnels', {
 
             try {
                 const res = await dataService.funnelQuery(commonStore.organizationId, commonStore.projectId, {
-                    time: this.timeRequest,
+                    time: this.timeRequest as EventRecordsListRequestTime,
+                    group: '',
+                    steps: stepsStore.getSteps,
                     timeWindow: {
                         n: stepsStore.size,
                         unit: stepsStore.unit,
                     },
-                    steps: stepsStore.getSteps,
+                    chartType: {
+                        type: FunnelQueryChartTypeTypeEnum.Frequency,
+                        intervalUnit: TimeUnit.Day,
+                    },
+                    count: FunnelQueryCountEnum.Totals,
+                    stepOrder: 'any',
                     holdingConstants: stepsStore.getHoldingProperties,
                     exclude: stepsStore.getExcluded,
-                    filters: filterGroupsStore.filters,
                     breakdowns: breakdownsStore.breakdownsItems,
                     segments: segmentsStore.segmentationItems,
+                    filters: filterGroupsStore.filters,
                 })
 
                 if (res?.data?.columns) {

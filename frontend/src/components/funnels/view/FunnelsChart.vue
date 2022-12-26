@@ -80,10 +80,10 @@ const dimensions = computed((): string[] => {
     const result: string[] = []
     const columns = reports.value.filter(col => col.type === 'dimension')
 
-    for (let i = 0; i < (columns[0]?.values?.length ?? 0); i++) {
+    for (let i = 0; i < (columns[0]?.data?.length ?? 0); i++) {
         const row: string[] = []
         columns.forEach(item => {
-            row.push(`${item.values?.[i] ?? ''}`)
+            row.push(`${item.data?.[i] ?? ''}`)
         })
         result.push(row.join(' / '))
     }

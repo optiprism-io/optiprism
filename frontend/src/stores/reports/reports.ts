@@ -9,9 +9,17 @@ import { useBreakdownsStore } from '@/stores/reports/breakdowns'
 import { useSegmentsStore } from '@/stores/reports/segments'
 import {
     Report,
-    ReportReport,
-    ReportReportTypeEnum,
-    FunnelQueryChartType,
+    ReportQuery,
+    ReportType,
+    EventRecordsListRequestTime,
+    EventChartType,
+    FunnelQueryChartTypeTypeEnum,
+    TimeUnit,
+    EventGroupedFilters,
+    BreakdownByProperty,
+    EventSegmentationSegment,
+    FunnelQueryStepsInner,
+    PropertyRef,
 } from '@/api'
 
 type Reports = {
@@ -20,10 +28,10 @@ type Reports = {
     saveLoading: boolean
     reportId: number
     reportDump: string
-    reportDumpType: ReportReportTypeEnum
+    reportDumpType: ReportType
 }
 
-export const getReport = (type: ReportReportTypeEnum): ReportReport => {
+export const getReport = (type: ReportType) => {
     const eventsStore = useEventsStore()
     const funnelsStore = useFunnelsStore()
     const breakdownsStore = useBreakdownsStore()
@@ -32,20 +40,22 @@ export const getReport = (type: ReportReportTypeEnum): ReportReport => {
     const stepsStore = useStepsStore()
 
     return {
-        type,
-        time: type === ReportReportTypeEnum.EventSegmentation ? eventsStore.timeRequest : funnelsStore.timeRequest,
+        time: type === ReportType.EventSegmentation ? eventsStore.timeRequest as EventRecordsListRequestTime : funnelsStore.timeRequest as EventRecordsListRequestTime,
         group: eventsStore.group,
         intervalUnit: eventsStore.controlsGroupBy,
-        chartType: eventsStore.chartType as FunnelQueryChartType,
+        chartType: type === ReportType.EventSegmentation ? eventsStore.chartType as EventChartType : {
+            type: FunnelQueryChartTypeTypeEnum.Frequency,
+            intervalUnit: TimeUnit.Day
+        },
         analysis: { type: 'linear' },
-        events: type === ReportReportTypeEnum.EventSegmentation ? eventsStore.propsForEventSegmentationResult.events : [],
-        filters: filterGroupsStore.filters,
-        breakdowns: breakdownsStore.breakdownsItems,
-        segments: segmentsStore.segmentationItems,
-        steps: stepsStore.getSteps,
-        holdingConstants: stepsStore.getHoldingProperties,
+        events: type === ReportType.EventSegmentation ? eventsStore.propsForEventSegmentationResult.events : [],
+        filters: filterGroupsStore.filters as EventGroupedFilters,
+        breakdowns: breakdownsStore.breakdownsItems as BreakdownByProperty[],
+        segments: segmentsStore.segmentationItems as EventSegmentationSegment[],
+        steps: stepsStore.getSteps as FunnelQueryStepsInner[],
+        holdingConstants: stepsStore.getHoldingProperties as PropertyRef[],
         exclude: stepsStore.getExcluded,
-    }
+    } as ReportQuery
 }
 
 export const useReportsStore = defineStore('reports', {
@@ -55,7 +65,7 @@ export const useReportsStore = defineStore('reports', {
         reportId: 0,
         saveLoading: false,
         reportDump: '',
-        reportDumpType: ReportReportTypeEnum.EventSegmentation,
+        reportDumpType: ReportType.EventSegmentation,
     }),
     getters: {
         isChangedReport(): boolean {
@@ -71,7 +81,7 @@ export const useReportsStore = defineStore('reports', {
         },
     },
     actions: {
-        updateDump(type: ReportReportTypeEnum) {
+        updateDump(type: ReportType) {
             this.reportDumpType = type
             this.reportDump = JSON.stringify(getReport(type))
         },
@@ -88,14 +98,15 @@ export const useReportsStore = defineStore('reports', {
                 throw new Error('error reportsList');
             }
         },
-        async createReport(name: string, type: ReportReportTypeEnum) {
+        async createReport(name: string, type: ReportType) {
             this.saveLoading = true
             const commonStore = useCommonStore()
 
             try {
                 const res = await reportsService.createReport(commonStore.organizationId, commonStore.projectId, {
+                    type,
                     name,
-                    report: getReport(type)
+                    query: getReport(type)
                 })
 
                 if (res.data?.id) {
@@ -107,13 +118,13 @@ export const useReportsStore = defineStore('reports', {
 
             this.saveLoading = false
         },
-        async editReport(name: string, type: ReportReportTypeEnum) {
+        async editReport(name: string, type: ReportType) {
             this.saveLoading = true
             const commonStore = useCommonStore()
 
             await reportsService.updateReport(commonStore.organizationId, commonStore.projectId, Number(this.reportId), {
                 name,
-                report: getReport(type)
+                query: getReport(type)
             })
             this.saveLoading = false
         },

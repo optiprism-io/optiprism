@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import { BasicLoginRequest, TokensResponse } from '@/api'
+import { LoginRequest, TokensResponse } from '@/api'
 import { authService } from '@/api/services/auth.service'
 import { LocalStorageAccessor } from '@/utils/localStorageAccessor'
 import { getCookie, setCookie, removeCookie } from 'typescript-cookie'
@@ -16,7 +16,7 @@ export interface AuthState {
   refreshToken: LocalStorageAccessor,
 }
 
-interface LoginPayload extends BasicLoginRequest {
+interface LoginPayload extends LoginRequest {
     keepLogged?: boolean
 }
 

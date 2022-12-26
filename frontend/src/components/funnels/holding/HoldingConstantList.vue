@@ -34,7 +34,7 @@ import {computed} from 'vue';
 import {useLexiconStore} from '@/stores/lexicon';
 import PropertySelect from '@/components/events/PropertySelect.vue';
 import {PropertyRef} from '@/types/events';
-
+import { EventFilterByPropertyTypeEnum } from '@/api'
 
 const lexiconStore = useLexiconStore();
 const stepsStore = useStepsStore();
@@ -54,7 +54,7 @@ const editHoldingProperty = (index: number, property: PropertyRef) => {
             property: {
                 id,
                 name,
-                type: property.type,
+                type: property.type as EventFilterByPropertyTypeEnum,
             }
         })
     }

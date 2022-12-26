@@ -4,7 +4,7 @@
             "type": "dimension",
             "dataType": "string",
             "name": "Login/Signup",
-            "values": [
+            "data": [
                 "Login",
                 "Login",
                 "Signup",
@@ -15,7 +15,7 @@
             "type": "dimension",
             "dataType": "string",
             "name": "Platform",
-            "values": [
+            "data": [
                 "Android",
                 "iOS",
                 "Android",
@@ -26,7 +26,7 @@
             "type": "metricValue",
             "dataType": "number",
             "name": "totalConversionRatio",
-            "values": [
+            "data": [
                 46.93,
                 44.80,
                 48.96,
@@ -38,7 +38,7 @@
             "step": 1,
             "dataType": "number",
             "name": "conversionCount",
-            "values": [
+            "data": [
                 10016,
                 8803,
                 3519,
@@ -50,7 +50,7 @@
             "step": 2,
             "dataType": "number",
             "name": "conversionCount",
-            "values": [
+            "data": [
                 8670,
                 7448,
                 2763,
@@ -62,7 +62,7 @@
             "step": 2,
             "dataType": "number",
             "name": "dropOffCount",
-            "values": [
+            "data": [
                 1346,
                 1355,
                 756,
@@ -74,7 +74,7 @@
             "step": 2,
             "dataType": "number",
             "name": "dropOffRatio",
-            "values": [
+            "data": [
                 13.44,
                 15.39,
                 21.48,
@@ -86,7 +86,7 @@
             "step": 2,
             "dataType": "number",
             "name": "dropOffRatioFromFirstStep",
-            "values": [
+            "data": [
                 13.44,
                 15.39,
                 21.48,
@@ -98,7 +98,7 @@
             "step": 2,
             "dataType": "number",
             "name": "avgTimeFromPrevStep",
-            "values": [
+            "data": [
                 146880,
                 164160,
                 518400,
@@ -110,7 +110,7 @@
             "step": 2,
             "dataType": "number",
             "name": "avgTimeFromFirstStep",
-            "values": [
+            "data": [
                 146880,
                 164160,
                 518400,
@@ -122,7 +122,7 @@
             "step": 2,
             "dataType": "number",
             "name": "conversionRatio",
-            "values": [
+            "data": [
                 86.56,
                 84.61,
                 78.52,
@@ -134,7 +134,7 @@
             "step": 2,
             "dataType": "number",
             "name": "conversionRatioFromFirstStep",
-            "values": [
+            "data": [
                 86.56,
                 84.61,
                 78.52,
@@ -146,7 +146,7 @@
             "step": 3,
             "dataType": "number",
             "name": "conversionCount",
-            "values": [
+            "data": [
                 4701,
                 3944,
                 1723,
@@ -158,7 +158,7 @@
             "step": 3,
             "dataType": "number",
             "name": "dropOffCount",
-            "values": [
+            "data": [
                 3969,
                 3504,
                 1040,
@@ -170,7 +170,7 @@
             "step": 3,
             "dataType": "number",
             "name": "dropOffRatio",
-            "values": [
+            "data": [
                 45.78,
                 47.01,
                 37.64,
@@ -182,7 +182,7 @@
             "step": 3,
             "dataType": "number",
             "name": "dropOffRatioFromFirstStep",
-            "values": [
+            "data": [
                 13.44,
                 15.39,
                 21.48,
@@ -194,7 +194,7 @@
             "step": 3,
             "dataType": "number",
             "name": "avgTimeFromPrevStep",
-            "values": [
+            "data": [
                 117279,
                 114160,
                 468400,
@@ -206,7 +206,7 @@
             "step": 3,
             "dataType": "number",
             "name": "avgTimeFromFirstStep",
-            "values": [
+            "data": [
                 827837,
                 264160,
                 618400,
@@ -218,7 +218,7 @@
             "step": 3,
             "dataType": "number",
             "name": "conversionRatio",
-            "values": [
+            "data": [
                 54.22,
                 52.95,
                 62.36,
@@ -230,7 +230,7 @@
             "step": 3,
             "dataType": "number",
             "name": "conversionRatioFromFirstStep",
-            "values": [
+            "data": [
                 46.93,
                 44.80,
                 48.96,

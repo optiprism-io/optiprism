@@ -5,16 +5,24 @@ import {
     CustomEventEvent,
     EventsApi,
     EventType,
+    EventPropertiesApi,
+    CustomEventsApi,
     PropertiesApi,
+    PropertyValuesApi,
+    UserPropertiesApi,
     PropertyType,
     UpdateEventRequest,
     UpdatePropertyRequest,
     UpdateCustomEventRequest,
-    PropertyValuesListRequest,
+    ListPropertyValuesRequest,
 } from '@/api'
 
 const api = new EventsApi()
+const customEventsApi = new CustomEventsApi()
 const propertiesApi = new PropertiesApi()
+const propertyValuesApi = new PropertyValuesApi()
+const eventPropertiesApi = new EventPropertiesApi()
+const userPropertiesApi = new UserPropertiesApi()
 
 export type FilterCustomEvent = {
     filterType: string
@@ -37,19 +45,16 @@ export interface CustomEvents extends Omit<CreateCustomEventRequest, 'events'> {
 const schemaService = {
     events: async (organizationId: number, projectId: number) => await api.eventsList(organizationId, projectId),
     updateEvent: async(organizationId: number, projectId: number, eventId: string, params: UpdateEventRequest) => await api.updateEvent(organizationId, projectId, eventId, params),
-
-    customEvents: async (organizationId: number, projectId: number) => await api.customEventsList(organizationId, projectId),
-    createCustomEvent: async (organizationId: number, projectId: number, params: CreateCustomEventRequest) => await api.createCustomEvent(organizationId, projectId, params),
-    updateCustomEvent: async(organizationId: number, projectId: number, eventId: string, params: UpdateCustomEventRequest) => await api.updateCustomEvent(organizationId, projectId, eventId, params),
-    deleteCustomEvents: async (organizationId: number, projectId: number, eventId: number) => await api.deleteCustomEvent(organizationId, projectId, eventId),
-
-    eventProperties: async (organizationId: number, projectId: number) => await propertiesApi.eventPropertiesList(organizationId, projectId),
-    updateEventProperty: async(organizationId: number, projectId: number, propertyId: string, params: UpdatePropertyRequest) => await propertiesApi.updateEventProperty(organizationId, projectId, propertyId, params),
+    customEvents: async (organizationId: number, projectId: number) => await customEventsApi.customEventsList(organizationId, projectId),
+    createCustomEvent: async (organizationId: number, projectId: number, params: CreateCustomEventRequest) => await customEventsApi.createCustomEvent(organizationId, projectId, params),
+    updateCustomEvent: async(organizationId: number, projectId: number, eventId: string, params: UpdateCustomEventRequest) => await customEventsApi.updateCustomEvent(organizationId, projectId, eventId, params),
+    deleteCustomEvents: async (organizationId: number, projectId: number, eventId: number) => await customEventsApi.deleteCustomEvent(organizationId, projectId, eventId),
     eventCustomProperties: async (organizationId: number, projectId: number) => await propertiesApi.customPropertiesList(organizationId, projectId),
-    userProperties: async (organizationId: number, projectId: number) => await propertiesApi.userPropertiesList(organizationId, projectId),
-    updateUserProperty: async(organizationId: number, projectId: number, propertyId: number, params: UpdatePropertyRequest) => await propertiesApi.updateUserProperty(organizationId, projectId, propertyId, params),
-
-    propertyValues: async(organizationId: number, projectId: number, params: PropertyValuesListRequest) => await propertiesApi.propertyValuesList(organizationId, projectId, params),
+    eventProperties: async (organizationId: number, projectId: number) => await eventPropertiesApi.eventPropertiesList(organizationId, projectId),
+    updateEventProperty: async(organizationId: number, projectId: number, propertyId: string, params: UpdatePropertyRequest) => await eventPropertiesApi.updateEventProperty(organizationId, projectId, propertyId, params),
+    userProperties: async (organizationId: number, projectId: number) => await userPropertiesApi.userPropertiesList(organizationId, projectId),
+    updateUserProperty: async(organizationId: number, projectId: number, propertyId: number, params: UpdatePropertyRequest) => await userPropertiesApi.updateUserProperty(organizationId, projectId, propertyId, params),
+    propertyValues: async(organizationId: number, projectId: number, params: ListPropertyValuesRequest) => await propertyValuesApi.propertyValuesList(organizationId, projectId, params),
 };
 
-export default schemaService;
+export default schemaService

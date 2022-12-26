@@ -1,7 +1,7 @@
 <template>
     <div class="dashboard-panel">
         <EventsViews
-            v-if="reportType === ReportReportTypeEnum.EventSegmentation"
+            v-if="reportType === ReportType.EventSegmentation"
             class="dashboard-panel__views"
             :event-segmentation="eventSegmentation"
             :loading="loading"
@@ -23,7 +23,16 @@
 
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
-import { Report, EventChartType, DataTableResponse, ReportReportTypeEnum, DataTableResponseColumnsInner } from '@/api'
+import {
+    Report,
+    EventChartType,
+    DataTableResponse,
+    ReportType,
+    DataTableResponseColumnsInner,
+    FunnelQuery,
+    EventSegmentation as EventSegmentationType,
+} from '@/api';
+
 import reportsService from '@/api/services/reports.service'
 import { ChartType } from '@/stores/eventSegmentation/events';
 import { useCommonStore } from '@/stores/common'
@@ -44,16 +53,18 @@ const loading = ref(false)
 const eventSegmentation = ref<DataTableResponse>()
 const funnelsReport = ref<DataTableResponseColumnsInner[]>()
 const steps = ref<Step[]>()
-const reportChartType = computed(() => props.report?.report?.chartType as ChartType ?? 'line')
-const reportType = computed(() => props.report?.report?.type ?? 'eventSegmentation')
+
+const query = computed(() => props.report?.query);
+const reportChartType = computed(() => props.report?.query?.chartType as ChartType ?? 'line')
+const reportType = computed(() => props.report?.type ?? ReportType.EventSegmentation)
 
 const getEventSegmentation = async () => {
     loading.value = true
-    if (props.report?.report) {
+    if (query.value) {
         try {
             const res = await reportsService.eventSegmentation(commonStore.organizationId, commonStore.projectId, {
-                ...props.report.report,
-                chartType: props.report.report.chartType as EventChartType,
+                ...query.value as EventSegmentationType,
+                chartType: query.value.chartType as EventChartType,
             })
             if (res) {
                 eventSegmentation.value = res.data as DataTableResponse
@@ -67,9 +78,10 @@ const getEventSegmentation = async () => {
 
 const getFunnelsReport = async () => {
     loading.value = true
-    if (props.report?.report) {
+    if (query.value) {
         try {
-            const res = await dataService.funnelQuery(commonStore.organizationId, commonStore.projectId, props.report.report)
+            const query = props.report?.query as FunnelQuery;
+            const res = await dataService.funnelQuery(commonStore.organizationId, commonStore.projectId, query)
 
             if (res?.data?.columns) {
                 funnelsReport.value = res.data.columns as DataTableResponseColumnsInner[]
@@ -82,13 +94,14 @@ const getFunnelsReport = async () => {
 }
 
 onMounted(async () => {
-    if (reportType.value === ReportReportTypeEnum.EventSegmentation) {
+    if (reportType.value === ReportType.EventSegmentation) {
         getEventSegmentation()
-    } else {
+    } else if (reportType.value === ReportType.Funnel) {
         getFunnelsReport()
+        const query = props.report?.query as FunnelQuery;
 
-        if (props.report?.report?.steps) {
-            steps.value = await mapReportToSteps(props.report?.report?.steps)
+        if (query.steps) {
+            steps.value = await mapReportToSteps(query.steps)
         }
     }
 })
