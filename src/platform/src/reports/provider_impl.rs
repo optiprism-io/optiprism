@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use common::rbac::ProjectPermission;
+use metadata::reports::Provider as ReportsProvider;
 
 use super::CreateReportRequest;
 use super::Provider;
@@ -9,13 +10,11 @@ use super::Report;
 use crate::Context;
 
 pub struct ProviderImpl {
-    // prov: Arc<dyn reports::Provider>, // <- metadata::reports::Provider to be used here
-    prov: Arc<dyn crate::reports::Provider>,
+    prov: Arc<dyn ReportsProvider>,
 }
 
 impl ProviderImpl {
-    // pub fn new(prov: Arc<dyn reports::Provider>) -> Self { // <- metadata::reports::Provider to be used here
-    pub fn new(prov: Arc<dyn crate::reports::Provider>) -> Self {
+    pub fn new(prov: Arc<dyn ReportsProvider>) -> Self {
         Self { prov }
     }
 }
@@ -29,21 +28,23 @@ impl Provider for ProviderImpl {
         project_id: u64,
         request: CreateReportRequest,
     ) -> Result<Report> {
-        ctx.check_project_permission(organization_id, project_id, ProjectPermission::ManageSchema)?;
+        ctx.check_project_permission(
+            organization_id,
+            project_id,
+            ProjectPermission::ManageReports,
+        )?;
 
         let report = self
             .prov
             .create(
-                ctx, // FIXME: remove
                 organization_id,
                 project_id,
-                // metadata::reports::CreateReportRequest {
-                CreateReportRequest {
-                    // created_by: ctx.account_id.unwrap(),
+                metadata::reports::CreateReportRequest {
+                    created_by: ctx.account_id.unwrap(),
                     tags: request.tags,
                     name: request.name,
                     description: request.description,
-                    typ: request.typ, // ? typ or type
+                    typ: request.typ,
                     query: request.query,
                 },
             )
