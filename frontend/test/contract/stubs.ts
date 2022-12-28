@@ -13,7 +13,6 @@ import {
     EventChartType,
     EventSegmentation,
     EventSegmentationEvent,
-    EventType,
     QuerySimple,
     QuerySimpleTypeEnum,
     Report,
@@ -24,7 +23,6 @@ import {
     TokensResponse,
     UpdateReportRequest,
     Event,
-    EventStatusEnum,
     CustomEvent,
     CustomEventEvent,
     EventType,
@@ -47,7 +45,7 @@ import {
     EventFilterByGroupTypeEnum,
     SegmentConditionHasPropertyValue,
     SegmentConditionHasPropertyValueTypeEnum, EventSegmentationSegment, GroupRecord
-} from '../../src/api_new';
+} from '../../src/api';
 
 const eventFilterByProperty = <EventFilterByProperty>{
     type: EventFilterByPropertyTypeEnum.Property,

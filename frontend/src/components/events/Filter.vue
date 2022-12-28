@@ -184,7 +184,7 @@ const operationButtonText = computed(() => {
 })
 
 const filterItemValues = computed(() =>
-    props.filter.valuesList.map((item) => {
+    props.filter.valuesList.map((item: any) => {
         return { item, name: item };
     })
 );

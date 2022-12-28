@@ -68,7 +68,7 @@
                                 v-if="panel?.report"
                                 :title="panel?.report?.name"
                                 :link="{
-                                    name: panel.report?.report?.type === ReportReportTypeEnum.EventSegmentation ? pagesMap.reportsEventSegmentation.name : pagesMap.funnels.name,
+                                    name: panel.report?.type === ReportType.EventSegmentation ? pagesMap.reportsEventSegmentation.name : pagesMap.funnels.name,
                                     params: {
                                         id: panel?.report?.id
                                     }
@@ -143,8 +143,13 @@ import dashboardService from '@/api/services/dashboards.service'
 import reportsService from '@/api/services/reports.service'
 import {
     Dashboard,
-    ReportReportTypeEnum,
+    ReportType,
     Report,
+} from '@/api'
+import {
+    UpdateDashboardRequest,
+    CreateDashboardRequest,
+    UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum,
 } from '@/api'
 import { pagesMap } from '@/router'
 import useConfirm from '@/hooks/useConfirm'
@@ -275,8 +280,8 @@ const onDeleteDashboard = async () => {
 const getDashboardsList = async () => {
     const res = await dashboardService.dashboardsList(commonStore.organizationId, commonStore.organizationId)
 
-    if (res?.data?.dashboards) {
-        dashboards.value = res.data.dashboards
+    if (res?.data?.data) {
+        dashboards.value = res.data.data
     }
 }
 
@@ -301,15 +306,15 @@ const updateCreateDashboard = async () => {
                 panels: item.panels.map((item) => {
                     return {
                         span: item.span,
+                        type: UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum.Report,
                         reportId: Number(item.reportId),
-                        report: item.report,
                     };
                 })
             };
         }),
     }
     if (activeDashboardId.value) {
-        await dashboardService.updateDashboard(commonStore.organizationId, commonStore.projectId, String(activeDashboardId.value), dataForRequest)
+        await dashboardService.updateDashboard(commonStore.organizationId, commonStore.projectId, activeDashboardId.value, dataForRequest)
     } else {
         await dashboardService.createDashboard(commonStore.organizationId, commonStore.projectId, dataForRequest)
     }

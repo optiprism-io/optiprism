@@ -15,7 +15,7 @@ import {I18N} from '@/utils/i18n';
 import {useEventName} from '@/helpers/useEventName';
 import {useStepsStore} from '@/stores/funnels/steps';
 import { DataTableResponseColumnsInner } from '@/api';
-import {useFunnelsStore} from '@/stores/funnels/funnels';
+import { useFunnelsStore } from '@/stores/funnels/funnels';
 
 const { $t } = inject('i18n') as I18N
 
@@ -60,7 +60,7 @@ const dimensions = computed(() => {
     return funnelsStore.reports.filter(col => col.type === 'dimension')
 })
 
-const totalDimensions = computed(() => dimensions.value[0]?.values?.length ?? 0)
+const totalDimensions = computed(() => dimensions.value[0]?.data?.length ?? 0)
 
 const funnelMetricValues = computed(() => {
     const res = funnelsStore.reports
@@ -116,7 +116,7 @@ const funnelMetricValueValues = computed(() => {
             return grp.map((item, j) => {
                 const postfix = item.name?.indexOf('Ratio') !== -1 ? '%' : ''
                 return {
-                    title: item.values ? item.values[i] + postfix : '',
+                    title: item.data ? item.data[i] + postfix : '',
                     lastFixed: j === grp.length - 1,
                 }
             })
@@ -142,14 +142,14 @@ const columns = computed<Column[]>(() => [
 const data = computed<Row[]>(() => {
     const totalConversionRatio = funnelsStore.reports
         ?.find(col => col.name === 'totalConversionRatio')
-        ?.values?.map(item => `${item}%`)
+        ?.data?.map(item => `${item}%`)
       ?? Array.from({ length: totalDimensions.value }).map(() => '0%')
 
     return Array.from({ length: totalDimensions.value }).map((_, i) => {
         return [
             ...dimensions.value.map(item => {
                 return {
-                    title: item.values?.[i] ?? '',
+                    title: item.data?.[i] ?? '',
                     fixed: true,
                 }
             }),

@@ -231,7 +231,7 @@ const changeCompareEvent = (ref: EventRef) => {
 }
 
 const isShowNextEventSelect = computed(() => {
-    return props.condition.aggregate?.id === DidEventRelativeCountTypeEnum.DidEventRelativeCount
+    return props.condition.aggregate?.id === DidEventRelativeCountTypeEnum.RelativeCount
 })
 
 const compareEventItems = computed(() => {

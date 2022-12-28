@@ -168,8 +168,8 @@ import schemaService from '@/api/services/schema.service'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
 import {
     EventType,
-    PropertyValuesList200ResponseValues,
-    PropertyValuesListRequestEventTypeEnum
+    PropertyType,
+    DataTableResponseColumnsInnerData,
 } from '@/api'
 import CommonIdentifier from '@/components/common/identifier/CommonIdentifier.vue';
 import { useCommonStore } from '@/stores/common'
@@ -279,21 +279,21 @@ const addFilter = (): void => {
 
 const changeFilterProperty = async (filterIdx: number, propRef: PropertyRef) => {
     const event = props.event
-    let valuesList: PropertyValuesList200ResponseValues = []
+    let valuesList: Value[] = []
 
     try {
         const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
             eventName: lexiconStore.eventName(props.event.ref),
-            eventType: props.event.ref.type as PropertyValuesListRequestEventTypeEnum,
+            eventType: props.event.ref.type as EventType,
             propertyName: lexiconStore.propertyName(propRef),
             propertyType: propRef.type
         })
 
-        if (res.data.values) {
-            valuesList = res.data.values
+        if (res.data.data) {
+            valuesList = res.data.data
         }
     } catch (e) {
-        throw new Error('error getEventsValues')
+        console.error(e);
     }
 
     event.filters[filterIdx] = {

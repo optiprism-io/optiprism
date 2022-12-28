@@ -1,5 +1,4 @@
-import { QueryAggregatePropertyPerGroup } from './../../api/api';
-import { defineStore } from 'pinia';
+import { defineStore } from 'pinia'
 import {
     EventRef,
     PropertyRef,
@@ -15,24 +14,28 @@ import {
     EventRecordsListRequestTime,
     EventChartType,
     EventSegmentationEvent,
-    EventQuery as EventQuerySegmentation,
     QueryAggregatePropertyTypeEnum,
     QueryAggregatePropertyPerGroupTypeEnum,
-    QueryAggregateProperty,
     QueryCountPerGroupTypeEnum,
     QueryFormulaTypeEnum,
     QuerySimpleTypeEnum,
-
     EventFilterByProperty,
-    EventRecordsListRequestEventsInnerEventTypeEnum,
     EventType,
-    PropertyValuesList200ResponseValues,
+    QueryAggregatePerGroup,
+    QueryAggregatePropertyPerGroup,
+    QueryAggregateProperty,
+    QueryAggregate,
+    QuerySimple,
+    QueryCountPerGroup,
+    QueryFormula,
 } from '@/api'
 
 import { useLexiconStore } from '@/stores/lexicon'
 import { useSegmentsStore } from '@/stores/reports/segments'
 import { useFilterGroupsStore } from '../reports/filters'
 import { useBreakdownsStore } from '../reports/breakdowns'
+
+type Query = QuerySimple | QueryCountPerGroup | QueryAggregatePropertyPerGroup | QueryAggregateProperty | QueryFormula
 
 export type ChartType = 'line' | 'pie' | 'column';
 
@@ -41,7 +44,7 @@ export interface EventFilter {
     propRef?: PropertyRef;
     opId: OperationId;
     values: Value[];
-    valuesList: PropertyValuesList200ResponseValues | []
+    valuesList: Value[] | []
     error?: boolean;
 }
 
@@ -89,7 +92,7 @@ export type Events = {
 export const initialQuery = <EventQuery[]>[
     {
         queryRef: <EventQueryRef>{
-            type: 'simple',
+            type: 'countEvents',
             name: 'countEvents'
         },
         noDelete: true,
@@ -130,7 +133,7 @@ export const useEventsStore = defineStore('events', {
                 case 'last':
                     return {
                         type: this.period.type,
-                        n: this.period.last,
+                        last: this.period.last,
                         unit: 'day'
                     }
                 case 'since':
@@ -147,7 +150,7 @@ export const useEventsStore = defineStore('events', {
                 default:
                     return {
                         type: 'last',
-                        n: Number(this.controlsPeriod),
+                        last: Number(this.controlsPeriod),
                         unit: 'day'
                     }
             }
@@ -187,9 +190,9 @@ export const useEventsStore = defineStore('events', {
                 events: this.events.map((item): EventSegmentationEvent => {
                     const eventLexicon = lexiconStore.findEvent(item.ref)
 
-                    const event = {
+                    return {
                         eventName: eventLexicon.name,
-                        queries: item.queries.filter(query => query.queryRef).map((query) => {
+                        queries: item.queries.filter(query => query.queryRef).map((query): Query => {
                             const type = query.queryRef?.type;
 
                             if (query?.queryRef?.propRef) {
@@ -197,58 +200,44 @@ export const useEventsStore = defineStore('events', {
                                     type: type,
                                     propertyType: query.queryRef.propRef.type,
                                     propertyId: query.queryRef.propRef.id,
-                                    aggregate: query.queryRef.typeAggregate,
+                                    aggregate: query.queryRef.typeAggregate || QueryAggregate.Avg,
                                 }
 
                                 if (type === QueryAggregatePropertyTypeEnum.AggregateProperty) {
                                     return {
-                                        name: query.queryRef.name,
-                                        query: prop as QueryAggregateProperty,
+                                        ...prop as QueryAggregateProperty,
+                                        type: QueryAggregatePropertyTypeEnum.AggregateProperty,
                                     }
                                 }
 
                                 if (type === QueryAggregatePropertyPerGroupTypeEnum.AggregatePropertyPerGroup && query.queryRef.typeGroupAggregate) {
                                     return {
-                                        name: query.queryRef.name,
-                                        query: {
-                                            ...prop,
-                                            aggregatePerGroup: query.queryRef.typeGroupAggregate
-                                        } as QueryAggregatePropertyPerGroup
+                                        ...prop,
+                                        aggregatePerGroup: query.queryRef.typeGroupAggregate || QueryAggregate.Avg,
+                                        type: QueryAggregatePropertyPerGroupTypeEnum.AggregatePropertyPerGroup,
                                     }
                                 }
                             }
 
                             if (query?.queryRef?.type === QueryCountPerGroupTypeEnum.CountPerGroup) {
                                 return {
-                                    name: query.queryRef.name,
-                                    query: {
-                                        type: QueryCountPerGroupTypeEnum.CountPerGroup,
-                                        aggregate: query.queryRef.typeAggregate
-                                    }
+                                    type: QueryCountPerGroupTypeEnum.CountPerGroup,
+                                    aggregate: query.queryRef.typeAggregate || QueryAggregate.Avg,
                                 }
                             }
 
                             if (query.queryRef?.type === QueryFormulaTypeEnum.Formula) {
                                 return {
-                                    name: query.queryRef.name,
-                                    query: {
-                                        type: QueryFormulaTypeEnum.Formula,
-                                        formula: query.queryRef.value
-                                    }
+                                    type: QueryFormulaTypeEnum.Formula,
+                                    formula: query.queryRef.value || '',
                                 }
                             }
 
-                            if (query.queryRef?.type === QuerySimpleTypeEnum.Simple) {
-                                return {
-                                    name: query.queryRef.name,
-                                    query: {
-                                        type: QueryFormulaTypeEnum.Formula,
-                                        query: query.queryRef.name
-                                    }
-                                }
-                            }
-                        }).filter(item => item as EventQuerySegmentation),
-                        eventType: item.ref.type as EventRecordsListRequestEventsInnerEventTypeEnum,
+                            return {
+                                type: query.queryRef?.type,
+                            } as QuerySimple
+                        }),
+                        eventType: item.ref.type as EventType,
                         eventId: item.ref.id,
                         filters: item.filters.filter(item => item.propRef).map((filter): EventFilterByProperty => {
                             const propertyId = filter.propRef?.id || 0;
@@ -276,8 +265,6 @@ export const useEventsStore = defineStore('events', {
                             }
                         }),
                     }
-
-                    return event as EventSegmentationEvent;
                 }),
                 filters: filterGroupsStore.filters,
                 segments: segmentsStore.segmentationItems,

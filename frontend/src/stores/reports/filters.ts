@@ -1,6 +1,11 @@
 import {defineStore} from 'pinia';
 import {Filter} from '@/types/filters';
-import {EventFilters, EventFiltersGroupsInnerFiltersInner, EventFiltersGroupsInnerFiltersInnerTypeEnum,} from '@/api'
+import {
+    EventGroupedFilters,
+    EventGroupedFiltersGroupsConditionEnum,
+    EventGroupedFiltersGroupsInnerFiltersInner,
+    EventGroupedFiltersGroupsInnerFiltersInnerTypeEnum,
+} from '@/api'
 
 export const filterConditions = ['and', 'or'] as const;
 export type FilterCondition = typeof filterConditions[number];
@@ -11,13 +16,13 @@ export const filterConditionOperations: Record<FilterCondition, string> = {
 }
 
 export interface FilterGroup {
-    condition: FilterCondition;
+    condition?: EventGroupedFiltersGroupsConditionEnum;
     filters: Filter[];
 }
 
 type ChangeFilterGroupConditionPayload = {
     index: number;
-    condition: FilterCondition;
+    condition: EventGroupedFiltersGroupsConditionEnum;
 }
 
 type AddFilterToGroupPayload = {
@@ -37,7 +42,7 @@ type EditFilterForGroupPayload = {
 }
 
 interface FilterGroupsStore {
-    condition: FilterCondition;
+    condition: EventGroupedFiltersGroupsConditionEnum;
     filterGroups: FilterGroup[];
 }
 
@@ -52,7 +57,7 @@ export const useFilterGroupsStore = defineStore('filter-groups', {
         ]
     }),
     actions: {
-        setCondition(payload: FilterCondition): void {
+        setCondition(payload: EventGroupedFiltersGroupsConditionEnum): void {
             this.condition = payload;
         },
         addFilterGroup(): void {
@@ -81,15 +86,17 @@ export const useFilterGroupsStore = defineStore('filter-groups', {
         }
     },
     getters: {
-        filters(): EventFilters {
+        filters(): EventGroupedFilters {
             return {
                 groupsCondition: this.condition,
                 groups: this.filterGroups.map(group => {
                     return {
                         filtersCondition: group.condition,
-                        filters: group.filters.map((filter): EventFiltersGroupsInnerFiltersInner => {
+                        filters: group.filters.map((filter): EventGroupedFiltersGroupsInnerFiltersInner => {
                             return {
-                                type: 'property' as EventFiltersGroupsInnerFiltersInnerTypeEnum,
+                                type: 'property' as EventGroupedFiltersGroupsInnerFiltersInnerTypeEnum,
+                                cohortId: 0,
+                                groupId: 0,
                                 propertyType: filter.propRef?.type || 'event',
                                 operation: filter.opId,
                                 value: filter.values,

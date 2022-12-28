@@ -6,10 +6,10 @@ import {
 
 export const aggregates = [
     {
-        key: DidEventCountTypeEnum.DidEventCount,
+        key: DidEventCountTypeEnum.Count,
     },
     {
-        key: DidEventRelativeCountTypeEnum.DidEventRelativeCount,
+        key: DidEventRelativeCountTypeEnum.RelativeCount,
     },
     {
         key: DidEventAggregatePropertyTypeEnum.AggregateProperty,

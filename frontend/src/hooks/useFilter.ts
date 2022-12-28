@@ -1,15 +1,15 @@
-import schemaService from '@/api/services/schema.service';
-import {EventRef, PropertyRef} from '@/types/events';
-import {useLexiconStore} from '@/stores/lexicon';
+import schemaService from '@/api/services/schema.service'
+import { EventRef, PropertyRef } from '@/types/events'
+import { useLexiconStore } from '@/stores/lexicon'
 import {
-    PropertyValuesList200ResponseValues,
-    PropertyValuesListRequestEventTypeEnum,
+    EventType,
+    Value,
 } from '@/api'
 import { useCommonStore } from '@/stores/common'
 
 interface UseFilter {
     getEventRef: (id: number) => EventRef | undefined;
-    getValues: (propRef: PropertyRef) => Promise<PropertyValuesList200ResponseValues>;
+    getValues: (propRef: PropertyRef) => Promise<Value[]>;
 }
 
 export const useFilter = (): UseFilter => {
@@ -36,21 +36,21 @@ export const useFilter = (): UseFilter => {
         return eventRef
     };
 
-    const getValues = async (propRef: PropertyRef): Promise<PropertyValuesList200ResponseValues> => {
+    const getValues = async (propRef: PropertyRef) => {
         const property = lexiconStore.property(propRef);
         const eventRef = property.id ? getEventRef(property.id) : null
-        let valuesList: PropertyValuesList200ResponseValues = []
+        let valuesList: Value[] = []
 
         try {
             const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
                 eventName: eventRef ? lexiconStore.eventName(eventRef) : '',
-                eventType: eventRef?.type as PropertyValuesListRequestEventTypeEnum,
+                eventType: eventRef?.type as EventType,
                 propertyName: property.name || '',
                 propertyType: propRef.type
             })
 
-            if (res.data.values) {
-                valuesList = res.data.values
+            if (res.data.data) {
+                valuesList = res.data.data
             }
         } catch (error) {
             throw new Error('error getEventsValues');

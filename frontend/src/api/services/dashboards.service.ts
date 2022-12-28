@@ -11,7 +11,7 @@ const schemaDashboards = {
     createDashboard: async(organizationId: number, projectId: number, params: CreateDashboardRequest) => await api.createDashboard(organizationId, projectId, params),
     deleteDashboard: async(organizationId: number, projectId: number, dashboardId: number) => await api.deleteDashboard(organizationId, projectId, dashboardId),
     getDashboard: async(organizationId: number, projectId: number, dashboardId: number) => await api.getDashboard(organizationId, projectId, dashboardId),
-    updateDashboard: async(organizationId: number, projectId: number, dashboardId: string, updateDashboardRequest: UpdateDashboardRequest) => await api.updateDashboard(organizationId, projectId, dashboardId, updateDashboardRequest),
+    updateDashboard: async(organizationId: number, projectId: number, dashboardId: number, updateDashboardRequest: UpdateDashboardRequest) => await api.updateDashboard(organizationId, projectId, dashboardId, updateDashboardRequest),
 }
 
 export default schemaDashboards

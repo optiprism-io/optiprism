@@ -1,6 +1,6 @@
 import {expect, test} from 'vitest';
 import jwt from 'jsonwebtoken';
-import {Configuration} from '../../src/api_new';
+import {Configuration} from '../../src/api';
 import {AxiosError} from 'axios';
 
 const JWT_KEY = 'access_token_key'

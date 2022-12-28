@@ -69,28 +69,24 @@ export default function ({ environment = 'development' } = {}) {
                 return schema.db.customEvents
             })
 
-            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/data/event-records`, (schema, request) => {
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/event-records/search`, (schema, request) => {
                 return liveStreamMocks
             })
 
-            this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/reports/funnel`, (schema, request) => {
-                return funnelsMocks
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/event-properties`, (schema) => {
+                return { data: schema.db.eventProperties }
             })
 
-            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/event_properties`, (schema) => {
-                return { events: schema.db.eventProperties }
-            })
-
-            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/event_properties/:property_id`, (schema, request) => {
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/event-properties/:property_id`, (schema, request) => {
                 const property = JSON.parse(request.requestBody)
                 return schema.db.eventProperties.update(request.params.property_id, property)
             })
 
-            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user_properties`, (schema) => {
-                return { events: schema.db.userProperties }
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user-properties`, (schema) => {
+                return { data: schema.db.userProperties }
             }, { timing: 140 })
 
-            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user_properties/:property_id`, (schema, request) => {
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/user-properties/:property_id`, (schema, request) => {
                 const property = JSON.parse(request.requestBody)
                 return schema.db.userProperties.update(request.params.property_id, property)
             }, { timing: 200 })
@@ -154,7 +150,7 @@ export default function ({ environment = 'development' } = {}) {
                 ];
             });
 
-            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/data/property-values`, (_, request) => {
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/property-values`, (_, request) => {
                 const propertyName = request.queryParams?.property_name
                 let values = []
 
@@ -164,7 +160,7 @@ export default function ({ environment = 'development' } = {}) {
                     values = ['Furniture', 'Doors', 'Lamp', 'Tables', 'Shelves']
                 }
 
-                return { values }
+                return { data: values }
             });
 
             this.get('/chart', (): any[] => {
@@ -197,7 +193,7 @@ export default function ({ environment = 'development' } = {}) {
                 return request.params.report_id;
             })
 
-            this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/reports/event-segmentation`, (_, request) => {
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/queries/event-segmentation`, (_, request) => {
                 const body = JSON.parse(request.requestBody);
 
                 if (body.events.length || body.segments) {
@@ -207,7 +203,11 @@ export default function ({ environment = 'development' } = {}) {
                         columns: []
                     };
                 }
-            });
+            })
+
+            this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/queries/funnel`, (schema, request) => {
+                return funnelsMocks
+            })
 
             this.post(`${BASE_PATH}/v1/auth/login`, (_, request) => {
                 const property = JSON.parse(request.requestBody)
@@ -242,7 +242,7 @@ export default function ({ environment = 'development' } = {}) {
              */
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards`, (schema) => {
                 return {
-                    dashboards: schema.db.dashboards,
+                    data: schema.db.dashboards,
                     meta: {}
                 }
             })

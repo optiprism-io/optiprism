@@ -307,7 +307,7 @@ const isShowSelectProp = computed(() => {
 
 const isShowSelectDate = computed(() => {
     if (isSelectedDidEvent.value) {
-        return props.condition?.aggregate?.id === DidEventRelativeCountTypeEnum.DidEventRelativeCount || Boolean(props.condition.valueItem)
+        return props.condition?.aggregate?.id === DidEventRelativeCountTypeEnum.RelativeCount || Boolean(props.condition.valueItem)
     } else {
         return conditionConfig.value && conditionConfig.value.hasSelectPeriod && props.condition.propRef && props.condition.values && props.condition.values.length
     }

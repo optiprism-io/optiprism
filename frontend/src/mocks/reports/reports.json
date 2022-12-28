@@ -2,7 +2,8 @@
     {
         "id": "31",
         "name": "New Report for Test",
-        "report": {
+        "type": "eventSegmentation",
+        "query": {
             "type": "eventSegmentation",
             "time": {
                 "type": "last",
@@ -20,11 +21,8 @@
                     "eventName": "sign_up",
                     "queries": [
                         {
-                            "name": "countPer",
-                            "query": {
-                                "type": "countPerGroup",
-                                "aggregate": "median"
-                            }
+                            "type": "countPerGroup",
+                            "aggregate": "median"
                         }
                     ],
                     "eventType": "regular",
@@ -67,30 +65,21 @@
                     "eventName": "sign_up",
                     "queries": [
                         {
-                            "name": "countEvents",
-                            "query": {
-                                "type": "formula",
-                                "query": "countEvents"
-                            }
+                            "type": "formula",
+                            "formula": "2+57*255"
                         },
                         {
-                            "name": "aggregatePropertyPer",
-                            "query": {
-                                "type": "aggregatePropertyPerGroup",
-                                "propertyType": "event",
-                                "propertyId": "7",
-                                "aggregate": "75thPercentile",
-                                "aggregatePerGroup": "distinctCount"
-                            }
+                            "type": "aggregatePropertyPerGroup",
+                            "propertyType": "event",
+                            "propertyId": "7",
+                            "aggregate": "75thPercentile",
+                            "aggregatePerGroup": "distinctCount"
                         },
                         {
-                            "name": "aggregateProperty",
-                            "query": {
-                                "type": "aggregateProperty",
-                                "propertyType": "event",
-                                "propertyId": "6",
-                                "aggregate": "min"
-                            }
+                            "type": "aggregateProperty",
+                            "propertyType": "event",
+                            "propertyId": "6",
+                            "aggregate": "min"
                         }
                     ],
                     "eventType": "regular",
@@ -272,7 +261,8 @@
     {
         "id": "1",
         "name": "Report for Dashboard",
-        "report": {
+        "type": "eventSegmentation",
+        "query": {
             "type": "eventSegmentation",
             "time": {
                 "type": "last",
@@ -290,30 +280,21 @@
                     "eventName": "sign_up",
                     "queries": [
                         {
-                            "name": "countEvents",
-                            "query": {
-                                "type": "formula",
-                                "query": "countEvents"
-                            }
+                            "type": "formula",
+                            "formula": ""
                         },
                         {
-                            "name": "aggregatePropertyPer",
-                            "query": {
-                                "type": "aggregatePropertyPerGroup",
-                                "propertyType": "event",
-                                "propertyId": "7",
-                                "aggregate": "75thPercentile",
-                                "aggregatePerGroup": "distinctCount"
-                            }
+                            "type": "aggregatePropertyPerGroup",
+                            "propertyType": "event",
+                            "propertyId": "7",
+                            "aggregate": "75thPercentile",
+                            "aggregatePerGroup": "distinctCount"
                         },
                         {
-                            "name": "aggregateProperty",
-                            "query": {
-                                "type": "aggregateProperty",
-                                "propertyType": "event",
-                                "propertyId": "6",
-                                "aggregate": "min"
-                            }
+                            "type": "aggregateProperty",
+                            "propertyType": "event",
+                            "propertyId": "6",
+                            "aggregate": "min"
                         }
                     ],
                     "eventType": "regular",
@@ -326,7 +307,8 @@
     {
         "id": "2",
         "name": "Report 2",
-        "report": {
+        "type": "eventSegmentation",
+        "query": {
             "type": "eventSegmentation",
             "time": {
                 "type": "last",
@@ -344,30 +326,21 @@
                     "eventName": "sign_up",
                     "queries": [
                         {
-                            "name": "countEvents",
-                            "query": {
-                                "type": "formula",
-                                "query": "countEvents"
-                            }
+                            "type": "formula",
+                            "formula": "+2"
                         },
                         {
-                            "name": "aggregatePropertyPer",
-                            "query": {
-                                "type": "aggregatePropertyPerGroup",
-                                "propertyType": "event",
-                                "propertyId": "7",
-                                "aggregate": "75thPercentile",
-                                "aggregatePerGroup": "distinctCount"
-                            }
+                            "type": "aggregatePropertyPerGroup",
+                            "propertyType": "event",
+                            "propertyId": "7",
+                            "aggregate": "75thPercentile",
+                            "aggregatePerGroup": "distinctCount"
                         },
                         {
-                            "name": "aggregateProperty",
-                            "query": {
-                                "type": "aggregateProperty",
-                                "propertyType": "event",
-                                "propertyId": "6",
-                                "aggregate": "min"
-                            }
+                            "type": "aggregateProperty",
+                            "propertyType": "event",
+                            "propertyId": "6",
+                            "aggregate": "min"
                         }
                     ],
                     "eventType": "regular",
@@ -380,7 +353,8 @@
     {
         "id": "3",
         "name": "Report 3",
-        "report": {
+        "type": "eventSegmentation",
+        "query": {
             "type": "eventSegmentation",
             "time": {
                 "type": "last",
@@ -398,30 +372,21 @@
                     "eventName": "sign_up",
                     "queries": [
                         {
-                            "name": "countEvents",
-                            "query": {
-                                "type": "formula",
-                                "query": "countEvents"
-                            }
+                            "type": "formula",
+                            "formula": "-124"
                         },
                         {
-                            "name": "aggregatePropertyPer",
-                            "query": {
-                                "type": "aggregatePropertyPerGroup",
-                                "propertyType": "event",
-                                "propertyId": "7",
-                                "aggregate": "75thPercentile",
-                                "aggregatePerGroup": "distinctCount"
-                            }
+                            "type": "aggregatePropertyPerGroup",
+                            "propertyType": "event",
+                            "propertyId": "7",
+                            "aggregate": "75thPercentile",
+                            "aggregatePerGroup": "distinctCount"
                         },
                         {
-                            "name": "aggregateProperty",
-                            "query": {
-                                "type": "aggregateProperty",
-                                "propertyType": "event",
-                                "propertyId": "6",
-                                "aggregate": "min"
-                            }
+                            "type": "aggregateProperty",
+                            "propertyType": "event",
+                            "propertyId": "6",
+                            "aggregate": "min"
                         }
                     ],
                     "eventType": "regular",
@@ -434,7 +399,8 @@
     {
         "id": "4",
         "name": "Report 4",
-        "report": {
+        "type": "eventSegmentation",
+        "query": {
             "type": "eventSegmentation",
             "time": {
                 "type": "last",
@@ -452,30 +418,21 @@
                     "eventName": "sign_up",
                     "queries": [
                         {
-                            "name": "countEvents",
-                            "query": {
-                                "type": "formula",
-                                "query": "countEvents"
-                            }
+                            "type": "aggregatePropertyPerGroup",
+                            "propertyType": "event",
+                            "propertyId": "7",
+                            "aggregate": "75thPercentile",
+                            "aggregatePerGroup": "distinctCount"
                         },
                         {
-                            "name": "aggregatePropertyPer",
-                            "query": {
-                                "type": "aggregatePropertyPerGroup",
-                                "propertyType": "event",
-                                "propertyId": "7",
-                                "aggregate": "75thPercentile",
-                                "aggregatePerGroup": "distinctCount"
-                            }
+                            "type": "formula",
+                            "formula": "x * y"
                         },
                         {
-                            "name": "aggregateProperty",
-                            "query": {
-                                "type": "aggregateProperty",
-                                "propertyType": "event",
-                                "propertyId": "6",
-                                "aggregate": "min"
-                            }
+                            "type": "aggregateProperty",
+                            "propertyType": "event",
+                            "propertyId": "6",
+                            "aggregate": "min"
                         }
                     ],
                     "eventType": "regular",
@@ -488,7 +445,8 @@
     {
         "id": "8747",
         "name": "Funnels Report #1",
-        "report": {
+        "type": "funnel",
+        "query": {
             "type": "funnel",
             "time": {
                 "type": "last",

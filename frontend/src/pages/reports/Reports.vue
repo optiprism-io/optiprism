@@ -67,7 +67,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { pagesMap } from '@/router'
 import usei18n from '@/hooks/useI18n'
-import { ReportReportTypeEnum } from '@/api'
+import { ReportType } from '@/api'
 import { reportToStores } from '@/utils/reportsMappings'
 
 import useConfirm from '@/hooks/useConfirm'
@@ -135,7 +135,7 @@ const isChangedReport = computed(() => {
 })
 
 const reportType = computed(() => pagesMap.reportsEventSegmentation.name === route.name ?
-    ReportReportTypeEnum.EventSegmentation : ReportReportTypeEnum.Funnel)
+    ReportType.EventSegmentation : ReportType.Funnel)
 
 const itemsReports = computed(() => {
     return reportsStore.list.map(item => {

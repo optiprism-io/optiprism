@@ -20,43 +20,33 @@ import {
     Event,
     EventType,
     Property,
-    PropertyTypeEnum,
+    PropertyType,
     PropertyFilterOperation,
-
     EventSegmentationSegment,
-    SegmentCondition,
+    EventSegmentationSegmentConditionsInner,
     SegmentConditionHasPropertyValue,
     SegmentConditionHasPropertyValueTypeEnum,
     SegmentConditionDidEvent,
     SegmentConditionDidEventTypeEnum,
-    SegmentConditionDidEventEventTypeEnum,
     SegmentConditionHadPropertyValue,
     SegmentConditionHadPropertyValueTypeEnum,
     SegmentConditionHadPropertyValueTime,
-
     TimeBetweenTypeEnum,
     TimeWindowEachTypeEnum,
     TimeUnit,
     TimeLastTypeEnum,
-
     DidEventCount,
     DidEventRelativeCount,
     DidEventAggregateProperty,
     DidEventHistoricalCount,
-
     DidEventCountTypeEnum,
     DidEventRelativeCountTypeEnum,
-
-    EventRefOneOf1EventTypeEnum,
-    EventRefOneOfEventTypeEnum,
     DidEventAggregatePropertyTypeEnum,
-    DidEventAggregatePropertyPropertyTypeEnum,
     QueryAggregatePropertyTypeEnum,
     QueryAggregate,
     EventFilterByProperty,
     EventFilterByPropertyTypeEnum,
-    PropertyValuesList200ResponseValues,
-    PropertyValuesListRequestEventTypeEnum,
+    DataTableResponseColumnsInnerData
 } from '@/api'
 
 export interface Segment {
@@ -80,7 +70,7 @@ const computedValueTime = (item: Condition): SegmentConditionHadPropertyValueTim
     if (item.period?.type === TimeLastTypeEnum.Last) {
         return {
             type: TimeLastTypeEnum.Last,
-            n: Number(item.period.last),
+            last: Number(item.period.last),
             unit: 'day'
         }
     }
@@ -97,7 +87,7 @@ const computedValueAggregate = (item: Condition): DidEventCount | DidEventRelati
     const operation = item.opId as PropertyFilterOperation
 
     if (item.aggregate?.id === DidEventAggregatePropertyTypeEnum.AggregateProperty && item.propRef) {
-        const property: Property = item.propRef.type === PropertyTypeEnum.Event ? lexiconStore.findEventPropertyById(item.propRef.id) : lexiconStore.findUserPropertyById(item.propRef.id)
+        const property: Property = item.propRef.type === PropertyType.Event ? lexiconStore.findEventPropertyById(item.propRef.id) : lexiconStore.findUserPropertyById(item.propRef.id)
 
         return {
             type: DidEventAggregatePropertyTypeEnum.AggregateProperty,
@@ -105,35 +95,27 @@ const computedValueAggregate = (item: Condition): DidEventCount | DidEventRelati
             operation,
             value: Number(item.valueItem),
             propertyName: property.name,
-            propertyType: property.type as DidEventAggregatePropertyPropertyTypeEnum,
+            propertyType: PropertyType.User,
             propertyId: property.id,
-            aggregate: {
-                type: QueryAggregatePropertyTypeEnum.AggregateProperty,
-                propertyName: property.name,
-                propertyType: property.type as DidEventAggregatePropertyPropertyTypeEnum,
-                propertyId: property.id,
-                aggregate: item.aggregate.typeAggregate as QueryAggregate,
-            }
+            aggregate: item.aggregate.typeAggregate as QueryAggregate,
         }
     }
 
-    if (item.aggregate?.id === DidEventRelativeCountTypeEnum.DidEventRelativeCount && item.compareEvent) {
+    if (item.aggregate?.id === DidEventRelativeCountTypeEnum.RelativeCount && item.compareEvent) {
         const eventItem: Event = item.compareEvent.ref.type === EventType.Regular ? lexiconStore.findEventById(item.compareEvent.ref.id) : lexiconStore.findCustomEventById(item.compareEvent.ref.id)
 
         return {
-            type: DidEventRelativeCountTypeEnum.DidEventRelativeCount,
+            type: DidEventRelativeCountTypeEnum.RelativeCount,
             operation,
             time,
-            rightEvent: {
-                eventId: eventItem.id,
-                eventName: eventItem.name,
-                eventType: item.compareEvent.ref.type === EventRefOneOfEventTypeEnum.Regular ? EventRefOneOf1EventTypeEnum.Custom : EventRefOneOfEventTypeEnum.Regular,
-            },
+            eventId: eventItem.id,
+            eventName: eventItem.name,
+            eventType: item.compareEvent.ref.type === EventType.Regular ? EventType.Custom : EventType.Regular,
         }
     }
 
     return {
-        type: DidEventCountTypeEnum.DidEventCount,
+        type: DidEventCountTypeEnum.Count,
         value: Number(item.valueItem),
         operation,
         time,
@@ -151,9 +133,9 @@ export const useSegmentsStore = defineStore('segments', {
             return this.segments.map(segment => {
                 return {
                     name: segment.name,
-                    conditions: segment.conditions ? segment.conditions.reduce((items: SegmentCondition[], item) => {
+                    conditions: segment.conditions ? segment.conditions.reduce((items: EventSegmentationSegmentConditionsInner[], item) => {
                         if (item.action?.id === SegmentConditionDidEventTypeEnum.DidEvent && item.event) {
-                            if (item?.aggregate?.id === DidEventRelativeCountTypeEnum.DidEventRelativeCount && !item.compareEvent) {
+                            if (item?.aggregate?.id === DidEventRelativeCountTypeEnum.RelativeCount && !item.compareEvent) {
                                 return items
                             }
 
@@ -167,15 +149,15 @@ export const useSegmentsStore = defineStore('segments', {
                                 type: SegmentConditionDidEventTypeEnum.DidEvent,
                                 eventName: eventItem.name,
                                 eventId: eventItem.id,
-                                eventType: item.event.ref.type === EventType.Custom ? SegmentConditionDidEventEventTypeEnum.Custom : undefined,
+                                eventType: item.event.ref.type,
                                 filters: item.filters.filter(item => item.propRef).reduce((items: EventFilterByProperty[], filterRef) => {
                                     if (filterRef.propRef) {
-                                        const property: Property = filterRef?.propRef.type === PropertyTypeEnum.Event ? lexiconStore.findEventPropertyById(filterRef.propRef.id) : lexiconStore.findUserPropertyById(filterRef.propRef.id)
+                                        const property: Property = filterRef?.propRef.type === PropertyType.Event ? lexiconStore.findEventPropertyById(filterRef.propRef.id) : lexiconStore.findUserPropertyById(filterRef.propRef.id)
 
                                         items.push({
                                             type: EventFilterByPropertyTypeEnum.Property,
                                             propertyName: property.name,
-                                            propertyType: property.type as PropertyTypeEnum,
+                                            propertyType: filterRef?.propRef.type,
                                             propertyId: filterRef.propRef.id,
                                             operation: filterRef.opId as PropertyFilterOperation,
                                             value: filterRef.values,
@@ -191,7 +173,7 @@ export const useSegmentsStore = defineStore('segments', {
                         }
 
                         if (item.propRef && item.action?.id) {
-                            const property: Property = item.propRef.type === PropertyTypeEnum.Event ? lexiconStore.findEventPropertyById(item.propRef.id) : lexiconStore.findUserPropertyById(item.propRef.id)
+                            const property: Property = item.propRef.type === PropertyType.Event ? lexiconStore.findEventPropertyById(item.propRef.id) : lexiconStore.findUserPropertyById(item.propRef.id)
 
                             if (property) {
                                 if (item.action?.id === SegmentConditionHasPropertyValueTypeEnum.HasPropertyValue) {
@@ -199,7 +181,7 @@ export const useSegmentsStore = defineStore('segments', {
                                         type: SegmentConditionHasPropertyValueTypeEnum.HasPropertyValue,
                                         propertyName: property.name,
                                         operation: item.opId as PropertyFilterOperation,
-                                        values: item.values,
+                                        value: item.values,
                                     }
 
                                     items.push(condition)
@@ -211,7 +193,7 @@ export const useSegmentsStore = defineStore('segments', {
                                         type: SegmentConditionHadPropertyValueTypeEnum.HadPropertyValue,
                                         propertyName: property.name,
                                         operation: item.opId as PropertyFilterOperation,
-                                        values: item.values,
+                                        value: item.values,
                                         time: computedValueTime(item),
                                     }
 
@@ -343,7 +325,7 @@ export const useSegmentsStore = defineStore('segments', {
 
                 if (condition && condition.event) {
                     const eventRef = condition.event.ref;
-                    let valuesList: PropertyValuesList200ResponseValues = []
+                    let valuesList: Value[] = []
 
                     try {
                         const lexiconStore = useLexiconStore()
@@ -351,13 +333,13 @@ export const useSegmentsStore = defineStore('segments', {
 
                         const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
                             eventName: lexiconStore.eventName(eventRef),
-                            eventType: eventRef.type as PropertyValuesListRequestEventTypeEnum,
+                            eventType: eventRef.type,
                             propertyName: lexiconStore.propertyName(payload.propRef),
                             propertyType: payload.propRef.type
                         })
 
-                        if (res.data.values) {
-                            valuesList = res.data.values
+                        if (res.data.data) {
+                            valuesList = res.data.data
                         }
                     } catch (error) {
                         throw new Error('error getEventsValues')
@@ -466,11 +448,13 @@ export const useSegmentsStore = defineStore('segments', {
                         const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
                             // TODO integration with backand
                             // check condition type
+                            propertyType: condition.propRef?.type as PropertyType,
+                            eventType: condition.event?.ref?.type as EventType,
                             propertyName: lexiconStore.propertyName(ref),
                         })
 
-                        if (res.data.values) {
-                            condition.valuesList = res.data.values
+                        if (res.data.data) {
+                            condition.valuesList = res.data.data
                         }
                     } catch (error) {
                         throw new Error('error getEventsValues')

@@ -5,5 +5,5 @@ export interface Filter {
     propRef?: PropertyRef;
     opId: OperationId;
     values: Value[];
-    valuesList: string[] | boolean[] | number[];
+    valuesList: Value[]
 }

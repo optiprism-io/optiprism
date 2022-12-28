@@ -1,17 +1,23 @@
 import {OperationId} from '@/types'
-import {AggregateId} from '@/types/aggregate'
 import {Each} from '@/components/uikit/UiCalendar/UiCalendar'
+
 import {
-    CustomEvent,
-    CustomEventEventEventTypeEnum,
     DataType,
     Event,
-    EventRefOneOfEventTypeEnum,
     EventType,
     PropertyType,
+    CustomEvent,
     Value,
-    PropertyValuesList200ResponseValues,
+    QuerySimpleTypeEnum,
+    QueryCountPerGroupTypeEnum,
+    DidEventAggregatePropertyTypeEnum,
+    QueryAggregatePropertyPerGroupTypeEnum,
+    QueryFormulaTypeEnum,
+    QueryAggregatePerGroup,
+    QueryAggregate,
 } from '@/api'
+
+export type QueryType = QuerySimpleTypeEnum | QueryCountPerGroupTypeEnum | DidEventAggregatePropertyTypeEnum | QueryAggregatePropertyPerGroupTypeEnum | QueryFormulaTypeEnum;
 
 export type PropertyRef = {
     type: PropertyType;
@@ -24,7 +30,7 @@ export enum EventStatus {
 }
 
 export type EventRef = {
-    type: EventType | CustomEventEventEventTypeEnum | EventRefOneOfEventTypeEnum
+    type: EventType
     id: number
 }
 
@@ -139,12 +145,10 @@ export interface UserCustomProperty {
     dictionaryType?: DataType;
 }
 
-export type QueryType = 'simple' | 'countPerGroup' | 'aggregateProperty' | 'aggregatePropertyPerGroup' | 'formula';
-
 export type EventQueryRef = {
     type?: QueryType;
-    typeAggregate?: AggregateId;
-    typeGroupAggregate?: AggregateId;
+    typeAggregate?: QueryAggregate;
+    typeGroupAggregate?: QueryAggregatePerGroup;
     propRef?: PropertyRef;
     name?: string;
     value?: string;
@@ -163,50 +167,50 @@ export interface EventsQuery {
 
 export const eventsQueries: EventsQuery[] = [
     {
-        type: 'simple',
+        type: QuerySimpleTypeEnum.CountEvents,
         name: 'countEvents',
         displayName: 'Count',
     },
     {
-        type: 'simple',
+        type: QuerySimpleTypeEnum.CountUniqueGroups,
         name: 'countUnique',
         displayName: 'Count Unique',
         grouped: true,
     },
     {
-        type: 'simple',
+        type: QuerySimpleTypeEnum.WeeklyActiveGroups,
         name: 'dailyActive',
         displayName: 'Daily Active',
         grouped: true,
     },
     {
-        type: 'simple',
+        type: QuerySimpleTypeEnum.WeeklyActiveGroups,
         name: 'weeklyActive',
         displayName: 'Weekly Active',
         grouped: true,
     },
     {
-        type: 'simple',
+        type: QuerySimpleTypeEnum.MonthlyActiveGroups,
         name: 'monthlyActive',
         displayName: 'Monthly Active',
         grouped: true,
     },
     {
-        type: 'countPerGroup',
+        type: QueryCountPerGroupTypeEnum.CountPerGroup,
         name: 'countPer',
         displayName: 'Count',
         grouped: true,
         hasAggregate: true,
     },
     {
-        type: 'aggregateProperty',
+        type: DidEventAggregatePropertyTypeEnum.AggregateProperty,
         name: 'aggregateProperty',
         displayName: 'Aggregate Property',
         hasAggregate: true,
         hasProperty: true
     },
     {
-        type: 'aggregatePropertyPerGroup',
+        type: QueryAggregatePropertyPerGroupTypeEnum.AggregatePropertyPerGroup,
         name: 'aggregatePropertyPer',
         displayName: 'Aggregate Property per',
         grouped: true,
@@ -215,7 +219,7 @@ export const eventsQueries: EventsQuery[] = [
         hasProperty: true
     },
     {
-        type: 'formula',
+        type: QueryFormulaTypeEnum.Formula,
         name: 'formula',
         displayName: 'Formula',
         hasValue: true,
@@ -226,7 +230,7 @@ export interface ConditionFilter {
     propRef?: PropertyRef
     opId: OperationId
     values: Value[]
-    valuesList: PropertyValuesList200ResponseValues
+    valuesList: Value[]
     error?: boolean
 }
 
@@ -238,8 +242,8 @@ export interface Condition {
     propRef?: PropertyRef
     opId?: OperationId
     values?: Value[]
-    valueItem?: string | number
-    valuesList?: PropertyValuesList200ResponseValues
+    valueItem?: Value,
+    valuesList?: Value[],
     period?: {
         from?: string
         to?: string
