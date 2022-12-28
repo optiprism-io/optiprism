@@ -1,10 +1,13 @@
 use async_trait::async_trait;
+use chrono::DateTime;
+use chrono::Utc;
 use common::types::OptionalProperty;
+// use crate::queries::event_segmentation::EventSegmentation;
+use query::queries::event_segmentation::EventSegmentation; // FIXME
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::metadata::ListResponse;
-use crate::queries::event_segmentation::EventSegmentation;
 use crate::Result;
 
 #[async_trait]

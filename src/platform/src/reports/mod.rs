@@ -59,10 +59,48 @@ pub enum Type {
     Funnel,
 }
 
+impl From<metadata::reports::Type> for Type {
+    fn from(t: metadata::reports::Type) -> Self {
+        match t {
+            metadata::reports::Type::EventSegmentation => Type::EventSegmentation,
+            metadata::reports::Type::Funnel => Type::Funnel,
+        }
+    }
+}
+
+impl From<Type> for metadata::reports::Type {
+    fn from(t: Type) -> Self {
+        match t {
+            Type::EventSegmentation => metadata::reports::Type::EventSegmentation,
+            Type::Funnel => metadata::reports::Type::Funnel,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Query {
     EventSegmentation(EventSegmentation),
+}
+
+impl From<metadata::reports::Query> for Query {
+    fn from(q: metadata::reports::Query) -> Self {
+        match q {
+            metadata::reports::Query::EventSegmentation(event_seg) => {
+                Query::EventSegmentation(event_seg.clone())
+            }
+        }
+    }
+}
+
+impl From<Query> for metadata::reports::Query {
+    fn from(q: Query) -> Self {
+        match q {
+            Query::EventSegmentation(event_seg) => {
+                metadata::reports::Query::EventSegmentation(event_seg.clone())
+            }
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -80,6 +118,46 @@ pub struct Report {
     #[serde(rename = "type")]
     pub typ: Type,
     pub query: Query,
+}
+
+impl TryInto<metadata::reports::Report> for Report {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<metadata::reports::Report, Self::Error> {
+        Ok(metadata::reports::Report {
+            id: self.id,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            created_by: self.created_by,
+            updated_by: self.updated_by,
+            project_id: self.project_id,
+            tags: self.tags,
+            name: self.name,
+            description: self.description,
+            typ: self.typ.into(),
+            query: self.query.into(),
+        })
+    }
+}
+
+impl TryInto<Report> for metadata::reports::Report {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<Report, Self::Error> {
+        Ok(Report {
+            id: self.id,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            created_by: self.created_by,
+            updated_by: self.updated_by,
+            project_id: self.project_id,
+            tags: self.tags,
+            name: self.name,
+            description: self.description,
+            typ: self.typ.into(),
+            query: self.query.into(),
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
