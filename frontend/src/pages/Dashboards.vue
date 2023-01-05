@@ -1,31 +1,5 @@
 <template>
     <div class="dashboards pf-u-p-md pf-u-pb-3xl">
-        <div class="pf-u-mb-md pf-u-display-flex">
-            <UiSelect
-                v-if="dashboards.length"
-                class="pf-u-w-25-on-md pf-u-mr-md"
-                :items="selectDashboards"
-                :text-button="selectDashboardsText"
-                :selections="selections"
-                @on-select="onSelectDashboard"
-            />
-            <UiButton
-                v-show="activeDashboardId"
-                class="pf-m-primary"
-                :before-icon="'fas fa-plus'"
-                @click="setNew"
-            >
-                {{ $t('dashboards.newDashboard') }}
-            </UiButton>
-            <UiButton
-                v-show="activeDashboardId"
-                class="pf-u-ml-auto pf-m-link pf-m-danger"
-                :before-icon="'fas fa-trash'"
-                @click="onDeleteDashboard"
-            >
-                {{ $t('dashboards.delete') }}
-            </UiButton>
-        </div>
         <div>
             <div class="dashboards__name pf-u-mb-md">
                 <UiInlineEdit
@@ -154,6 +128,7 @@ import {
 import { pagesMap } from '@/router'
 import useConfirm from '@/hooks/useConfirm'
 
+import { useDashboardsStore } from '@/stores/dashboards'
 import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
 import usei18n from '@/hooks/useI18n'
@@ -174,6 +149,7 @@ const router = useRouter()
 const commonStore = useCommonStore()
 const lexiconStore = useLexiconStore()
 const UiDropdown = GenericUiDropdown<string>()
+const dashboardsStore = useDashboardsStore()
 
 interface DashboardPanelType {
     span: number,
@@ -192,12 +168,12 @@ const addReportPanels = ref(0)
 const dashboardName = ref(t('dashboards.untitledDashboard'))
 const newDashboardRows = ref<DashboardRows[]>([])
 const errorDashboard = ref(false)
-const dashboards = ref<Dashboard[]>([])
 const activeDashboardId = ref<number | null>(null)
 const dashboardsId = computed((): number[] => {
     return dashboards.value.map(item => Number(item.id))
 });
 
+const dashboards = computed(() => dashboardsStore.dashboards)
 const selections = computed(() => activeDashboardId.value ? [activeDashboardId.value] : [])
 const activeDashboard = computed(() => {
     return dashboards.value.find(item => Number(item.id) === activeDashboardId.value) ?? null
@@ -278,11 +254,7 @@ const onDeleteDashboard = async () => {
 }
 
 const getDashboardsList = async () => {
-    const res = await dashboardService.dashboardsList(commonStore.organizationId, commonStore.organizationId)
-
-    if (res?.data?.data) {
-        dashboards.value = res.data.data
-    }
+    await dashboardsStore.getDashboards()
 }
 
 const updateDashboardSpan = (dashboard: DashboardRows[]) => {
@@ -391,7 +363,9 @@ onMounted(async () => {
     lexiconStore.getEvents()
     lexiconStore.getEventProperties()
     lexiconStore.getUserProperties()
-    await getDashboardsList()
+    if (!dashboards.value?.length) {
+        await getDashboardsList()
+    }
     const dashboardId = route.query.id;
 
     if (dashboardId) {
