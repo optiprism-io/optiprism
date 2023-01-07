@@ -3,6 +3,7 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
+use common::queries::QueryTime;
 use common::types::EventFilter;
 use common::types::EventRef;
 use common::types::PropValueOperation;
@@ -28,7 +29,6 @@ use crate::event_fields;
 use crate::logical_plan::expr::lit_timestamp;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
-use crate::queries::QueryTime;
 use crate::Context;
 use crate::Result;
 

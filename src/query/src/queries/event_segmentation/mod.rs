@@ -1,13 +1,12 @@
 use chrono::DateTime;
 use chrono::Utc;
+use common::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
+use common::queries::QueryTime;
+use common::queries::TimeIntervalUnit;
 use common::types::EventFilter;
 use common::types::EventRef;
 use common::types::PropertyRef;
 use datafusion_expr::AggregateFunction;
-
-use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-use crate::queries::QueryTime;
-use crate::queries::TimeIntervalUnit;
 
 pub mod logical_plan_builder;
 
@@ -182,6 +181,17 @@ pub struct EventSegmentation {
 mod tests {
     use chrono::DateTime;
     use chrono::Utc;
+    use common::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
+    use common::queries::event_segmentation::Analysis;
+    use common::queries::event_segmentation::Breakdown;
+    use common::queries::event_segmentation::ChartType;
+    use common::queries::event_segmentation::Compare;
+    use common::queries::event_segmentation::Event;
+    use common::queries::event_segmentation::EventSegmentation;
+    use common::queries::event_segmentation::NamedQuery;
+    use common::queries::event_segmentation::Query;
+    use common::queries::QueryTime;
+    use common::queries::TimeIntervalUnit;
     use common::types::EventFilter;
     use common::types::EventRef;
     use common::types::PropValueOperation;
@@ -190,17 +200,6 @@ mod tests {
     use datafusion_expr::AggregateFunction;
 
     use crate::event_fields;
-    use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-    use crate::queries::event_segmentation::Analysis;
-    use crate::queries::event_segmentation::Breakdown;
-    use crate::queries::event_segmentation::ChartType;
-    use crate::queries::event_segmentation::Compare;
-    use crate::queries::event_segmentation::Event;
-    use crate::queries::event_segmentation::EventSegmentation;
-    use crate::queries::event_segmentation::NamedQuery;
-    use crate::queries::event_segmentation::Query;
-    use crate::queries::QueryTime;
-    use crate::queries::TimeIntervalUnit;
 
     #[test]
     fn test_serialize() {

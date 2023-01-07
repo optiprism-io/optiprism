@@ -6,7 +6,7 @@ pub use context::Context;
 pub use error::Result;
 pub use provider_impl::ProviderImpl;
 
-use crate::queries::event_segmentation::EventSegmentation;
+use common::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::PropertyValues;
 pub mod context;
 pub mod error;

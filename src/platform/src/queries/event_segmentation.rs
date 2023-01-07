@@ -1,7 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
-use query::queries::event_segmentation as query_es_types;
-use query::queries::event_segmentation::NamedQuery;
+use common::queries::event_segmentation as query_es_types;
+use common::queries::event_segmentation::NamedQuery;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -470,8 +470,8 @@ impl TryInto<query_es_types::EventSegmentation> for EventSegmentation {
 mod tests {
     use chrono::DateTime;
     use chrono::Utc;
+    use common::queries::event_segmentation::EventSegmentation as QueryEventSegmentation;
     use query::event_fields;
-    use query::queries::event_segmentation::EventSegmentation as QueryEventSegmentation;
     use serde_json::json;
 
     use crate::error::Result;

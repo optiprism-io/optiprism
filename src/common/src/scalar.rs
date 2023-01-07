@@ -8,7 +8,7 @@ use serde::Serializer;
 use serde_with::DeserializeAs;
 use serde_with::SerializeAs;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ScalarValueRef {
     Null,
     Boolean(Option<bool>),

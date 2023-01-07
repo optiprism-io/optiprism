@@ -13,8 +13,8 @@ pub mod property_values;
 pub mod provider_impl;
 
 use axum::async_trait;
+use common::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
 pub use provider_impl::ProviderImpl;
-use query::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction as QueryPartitionedAggregateFunction;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -56,14 +56,14 @@ pub enum QueryTime {
     },
 }
 
-impl TryInto<query::queries::QueryTime> for QueryTime {
+impl TryInto<common::queries::QueryTime> for QueryTime {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query::queries::QueryTime, Self::Error> {
+    fn try_into(self) -> std::result::Result<common::queries::QueryTime, Self::Error> {
         Ok(match self {
-            QueryTime::Between { from, to } => query::queries::QueryTime::Between { from, to },
-            QueryTime::From { from } => query::queries::QueryTime::From(from),
-            QueryTime::Last { last, unit } => query::queries::QueryTime::Last {
+            QueryTime::Between { from, to } => common::queries::QueryTime::Between { from, to },
+            QueryTime::From { from } => common::queries::QueryTime::From(from),
+            QueryTime::Last { last, unit } => common::queries::QueryTime::Last {
                 last,
                 unit: unit.try_into()?,
             },
@@ -103,18 +103,18 @@ pub enum TimeIntervalUnit {
     Year,
 }
 
-impl TryInto<query::queries::TimeIntervalUnit> for TimeIntervalUnit {
+impl TryInto<common::queries::TimeIntervalUnit> for TimeIntervalUnit {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query::queries::TimeIntervalUnit, Self::Error> {
+    fn try_into(self) -> std::result::Result<common::queries::TimeIntervalUnit, Self::Error> {
         Ok(match self {
-            TimeIntervalUnit::Second => query::queries::TimeIntervalUnit::Second,
-            TimeIntervalUnit::Minute => query::queries::TimeIntervalUnit::Minute,
-            TimeIntervalUnit::Hour => query::queries::TimeIntervalUnit::Hour,
-            TimeIntervalUnit::Day => query::queries::TimeIntervalUnit::Day,
-            TimeIntervalUnit::Week => query::queries::TimeIntervalUnit::Week,
-            TimeIntervalUnit::Month => query::queries::TimeIntervalUnit::Month,
-            TimeIntervalUnit::Year => query::queries::TimeIntervalUnit::Year,
+            TimeIntervalUnit::Second => common::queries::TimeIntervalUnit::Second,
+            TimeIntervalUnit::Minute => common::queries::TimeIntervalUnit::Minute,
+            TimeIntervalUnit::Hour => common::queries::TimeIntervalUnit::Hour,
+            TimeIntervalUnit::Day => common::queries::TimeIntervalUnit::Day,
+            TimeIntervalUnit::Week => common::queries::TimeIntervalUnit::Week,
+            TimeIntervalUnit::Month => common::queries::TimeIntervalUnit::Month,
+            TimeIntervalUnit::Year => common::queries::TimeIntervalUnit::Year,
         })
     }
 }
