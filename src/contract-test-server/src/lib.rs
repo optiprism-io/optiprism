@@ -24,7 +24,8 @@ pub async fn run(cfg: Config) -> anyhow::Result<()> {
     };
 
     let platform_provider = Arc::new(platform::PlatformProvider::new_stub());
-    let svc = platform::http::Service::new(&md, &platform_provider, auth_cfg, cfg.host, None);
+    let svc = platform::http::Service::new(&md, &platform_provider, auth_cfg, cfg.host);
+
     info!("start listening on {}", cfg.host);
     Ok(svc.serve().await?)
 }

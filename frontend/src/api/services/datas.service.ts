@@ -4,9 +4,10 @@ import {
     QueryApi,
     EventRecordsApi,
 } from '@/api'
+import {config} from '@/api/services/config';
 
-const queryApi = new QueryApi()
-const eventRecordsApi = new EventRecordsApi()
+const queryApi = new QueryApi(config)
+const eventRecordsApi = new EventRecordsApi(config)
 
 const dataService = {
     createEventsStream: async(organizationId: number, projectId: number, eventListRequest: EventRecordsListRequest) => await eventRecordsApi.eventRecordsList(organizationId, projectId, eventListRequest),

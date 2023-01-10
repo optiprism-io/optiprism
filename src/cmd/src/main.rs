@@ -66,7 +66,7 @@ enum Cmd {
         duration: Option<String>,
         #[arg(long)]
         to_date: Option<String>,
-        #[arg(long, default_value = "100")]
+        #[arg(long, default_value = "10")]
         new_daily_users: usize,
     },
     ContractTestServer {

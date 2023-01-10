@@ -1,4 +1,6 @@
 SHELL = /bin/bash
+VERSION = v$(shell cargo get version)
+DEMO_IMAGE = optiprism/optiprism:$(VERSION)-demo
 
 cargo-fix-fmt: cargo-fix cargo-fmt cargo-sort cargo-lint
 
@@ -45,3 +47,14 @@ generate-openapi:
 clean:
 	cargo clean
 	yarn cache clean
+
+docker-build-demo:
+ifneq ($(shell docker images -q $(IMAGE) 2> /dev/null),)
+	$(error image $(IMAGE) already exists)
+endif
+	docker buildx build --ssh default --platform=linux/amd64 --progress plain -t $(IMAGE) .
+
+docker-publish-demo:
+	docker push $(IMAGE)
+
+docker-release-demo: docker-build-demo docker-publish-demo

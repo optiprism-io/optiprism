@@ -16,13 +16,14 @@ import {
     UpdateCustomEventRequest,
     ListPropertyValuesRequest,
 } from '@/api'
+import {config} from '@/api/services/config';
 
-const api = new EventsApi()
-const customEventsApi = new CustomEventsApi()
-const propertiesApi = new PropertiesApi()
-const propertyValuesApi = new PropertyValuesApi()
-const eventPropertiesApi = new EventPropertiesApi()
-const userPropertiesApi = new UserPropertiesApi()
+const api = new EventsApi(config)
+const customEventsApi = new CustomEventsApi(config)
+const propertiesApi = new PropertiesApi(config)
+const propertyValuesApi = new PropertyValuesApi(config)
+const eventPropertiesApi = new EventPropertiesApi(config)
+const userPropertiesApi = new UserPropertiesApi(config)
 
 export type FilterCustomEvent = {
     filterType: string

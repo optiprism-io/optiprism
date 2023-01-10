@@ -122,11 +122,11 @@ pub async fn run(cfg: Config) -> Result<()> {
         &platform_provider,
         auth_cfg,
         cfg.host,
-        cfg.ui_path.clone(),
-    );
+    ).set_ui(cfg.ui_path.clone());
+
     info!("start listening on {}", cfg.host);
     if cfg.ui_path.is_some() {
-        info!("http ui http://{}", cfg.host);
+        info!("http UI http://{}", cfg.host);
     }
 
     Ok(svc.serve().await?)

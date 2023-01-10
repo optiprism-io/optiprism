@@ -36,6 +36,7 @@ use axum_core::extract::FromRequest;
 use axum_core::response::IntoResponse;
 use axum_core::response::Response;
 use axum_core::BoxError;
+use axum_extra::routing::SpaRouter;
 use bytes::Bytes;
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -68,7 +69,6 @@ impl Service {
         platform: &Arc<PlatformProvider>,
         auth_cfg: crate::auth::Config,
         addr: SocketAddr,
-        _ui_path: Option<PathBuf>,
     ) -> Self {
         let mut router = Router::new();
 
@@ -103,13 +103,19 @@ impl Service {
         router = router
             .layer(CookieManagerLayer::new())
             .layer(TraceLayer::new_for_http())
-            .layer(middleware::from_fn(print_request_response))
-            .fallback(fallback);
+            .layer(middleware::from_fn(print_request_response));
+            // .fallback(fallback);
 
         Self { router, addr }
     }
 
-    pub fn with_ui(self, path: PathBuf) -> Self {
+    pub fn set_ui(self, maybe_path: Option<PathBuf>) -> Self {
+        let path = if let Some(path) = maybe_path {
+            path
+        } else {
+            return self;
+        };
+
         let error_handler = |error: io::Error| async move {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -119,15 +125,13 @@ impl Service {
 
         let mut router = self.router;
         info!("attaching ui static files handler...");
-        //        let index =
-        // get_service(ServeFile::new(path.join("index.html"))).handle_error(error_handler);
+        // let index =
+        //     get_service(ServeFile::new(path.join("index.html"))).handle_error(error_handler);
         let favicon =
             get_service(ServeFile::new(path.join("favicon.ico"))).handle_error(error_handler);
-        let assets = get_service(ServeDir::new(path.join("assets"))).handle_error(error_handler);
-        // TODO resolve actual routes and distinguish them from 404s
-        // router = router.fallback(index);
+        // let assets = get_service(ServeDir::new(path.join("assets"))).handle_error(error_handler);
+        router = router.merge(SpaRouter::new("/assets", path.join("assets")).index_file(path.join("index.html")));
         router = router.route("/favicon.ico", favicon);
-        router = router.route("/assets", assets);
 
         Self {
             router,
@@ -185,9 +189,9 @@ pub async fn print_request_response(
 }
 
 async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes>
-where
-    B: HttpBody<Data = Bytes>,
-    B::Error: std::fmt::Display,
+    where
+        B: HttpBody<Data=Bytes>,
+        B::Error: std::fmt::Display,
 {
     let bytes = match hyper::body::to_bytes(body).await {
         Ok(bytes) => bytes,
@@ -212,12 +216,12 @@ pub struct Json<T>(pub T);
 
 #[async_trait]
 impl<T, S, B> FromRequest<S, B> for Json<T>
-where
-    T: DeserializeOwned,
-    B: HttpBody + Send + 'static,
-    B::Data: Send,
-    B::Error: Into<BoxError>,
-    S: Send + Sync,
+    where
+        T: DeserializeOwned,
+        B: HttpBody + Send + 'static,
+        B::Data: Send,
+        B::Error: Into<BoxError>,
+        S: Send + Sync,
 {
     type Rejection = ApiError;
 
@@ -263,7 +267,7 @@ where
 }
 
 impl<T> IntoResponse for Json<T>
-where T: Serialize
+    where T: Serialize
 {
     fn into_response(self) -> Response {
         axum::Json(self.0).into_response()
