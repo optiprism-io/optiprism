@@ -3,8 +3,9 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use chronoutil::DateRule;
-use tokio::io::Error;
 
+// use tokio::io::Error;
+use crate::error::Result;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::TimeIntervalUnit;
 
@@ -38,10 +39,7 @@ pub fn time_columns(
         .collect()
 }
 
-pub fn date_trunc(
-    granularity: &TimeIntervalUnit,
-    value: DateTime<Utc>,
-) -> Result<DateTime<Utc>, Error> {
+pub fn date_trunc(granularity: &TimeIntervalUnit, value: DateTime<Utc>) -> Result<DateTime<Utc>> {
     let value = Some(value);
     let value = match granularity {
         TimeIntervalUnit::Second => value,
