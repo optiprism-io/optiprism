@@ -1,9 +1,3 @@
-[package]
-name = "OptiPrism"
-version = "0.1.0"
-edition = "2021"
-authors = ["Optiprism <dev@optiprism.io>"]
-
 [profile.release]
 lto = "fat"
 codegen-units = 1
@@ -11,12 +5,12 @@ opt-level = 3
 
 [workspace]
 members = [
-	"src/cmd",
-	"src/common",
-	"src/contract-test-server",
-	"src/demo",
-	"src/events-gen",
-	"src/metadata",
-	"src/platform",
-	"src/query",
-	"src/store",]
+    "src/common",
+    "src/contract-test-server",
+    "src/demo",
+    "src/events-gen",
+    "src/metadata",
+    "src/platform",
+    "src/query",
+    "src/store",
+    "src/service"]

@@ -13,5 +13,8 @@ datafusion = "15.0.0"
 lazy_static = "1.4.0"
 metadata = { path = "../metadata" }
 platform = { path = "../platform" }
+service = { path = "../service" }
+clap = { version = "4.0.29", features = ["derive"] }
 serde_json = "1.0.89"
 tracing = "0.1.37"
+tokio = { version = "1.23.0", features = ["full"] }

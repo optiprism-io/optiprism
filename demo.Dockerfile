@@ -1,5 +1,6 @@
 FROM node:lts-alpine3.16 as ui
 WORKDIR /app
+ENV VITE_API_BASE_PATH=/api
 COPY frontend/src frontend/src
 COPY frontend/index.html frontend/index.html
 COPY frontend/public frontend/public
@@ -14,7 +15,7 @@ FROM rust:1.64.0 AS rust
 WORKDIR /app
 RUN apt-get update && apt-get install -y clang openssl
 COPY ./src ./src
-COPY ./src/demo/data ./demo_data
+COPY demo/data ./demo_data
 COPY ./Cargo.toml ./
 COPY ./Cargo.lock ./
 RUN cargo build --release

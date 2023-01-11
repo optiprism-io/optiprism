@@ -49,12 +49,12 @@ clean:
 	yarn cache clean
 
 docker-build-demo:
-ifneq ($(shell docker images -q $(IMAGE) 2> /dev/null),)
-	$(error image $(IMAGE) already exists)
+ifneq ($(shell docker images -q $(DEMO_IMAGE) 2> /dev/null),)
+	$(error image $(DEMO_IMAGE) already exists)
 endif
-	docker buildx build --ssh default --platform=linux/amd64 --progress plain -t $(IMAGE) .
+	docker buildx build --ssh default --file demo.Dockerfile --platform=linux/amd64,linux/arm64 --progress plain -t $(DEMO_IMAGE) .
 
 docker-publish-demo:
-	docker push $(IMAGE)
+	docker push $(DEMO_IMAGE)
 
 docker-release-demo: docker-build-demo docker-publish-demo

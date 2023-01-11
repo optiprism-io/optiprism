@@ -11,7 +11,6 @@ pub mod reports;
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -23,11 +22,8 @@ use axum::http;
 use axum::http::HeaderMap;
 use axum::http::HeaderValue;
 use axum::http::Request;
-use axum::http::StatusCode;
-use axum::http::Uri;
 use axum::middleware;
 use axum::middleware::Next;
-use axum::routing::get_service;
 use axum::Extension;
 use axum::Router;
 use axum::Server;
@@ -48,8 +44,6 @@ use serde_json::Value;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tower_cookies::CookieManagerLayer;
-use tower_http::services::ServeDir;
-use tower_http::services::ServeFile;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
@@ -104,7 +98,7 @@ impl Service {
             .layer(CookieManagerLayer::new())
             .layer(TraceLayer::new_for_http())
             .layer(middleware::from_fn(print_request_response));
-            // .fallback(fallback);
+        // .fallback(fallback);
 
         Self { router, addr }
     }
@@ -116,22 +110,16 @@ impl Service {
             return self;
         };
 
-        let error_handler = |error: io::Error| async move {
+/*        let error_handler = |error: io::Error| async move {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Unhandled internal error: {}", error),
             )
         };
-
+*/
         let mut router = self.router;
         info!("attaching ui static files handler...");
-        // let index =
-        //     get_service(ServeFile::new(path.join("index.html"))).handle_error(error_handler);
-        let favicon =
-            get_service(ServeFile::new(path.join("favicon.ico"))).handle_error(error_handler);
-        // let assets = get_service(ServeDir::new(path.join("assets"))).handle_error(error_handler);
         router = router.merge(SpaRouter::new("/assets", path.join("assets")).index_file(path.join("index.html")));
-        router = router.route("/favicon.ico", favicon);
 
         Self {
             router,
@@ -155,9 +143,9 @@ impl Service {
     }
 }
 
-async fn fallback(uri: Uri) -> impl IntoResponse {
-    PlatformError::NotFound(format!("No route for {}", uri))
-}
+// async fn fallback(uri: Uri) -> impl IntoResponse {
+//     PlatformError::NotFound(format!("No route for {}", uri))
+// }
 
 fn content_length(headers: &HeaderMap<HeaderValue>) -> Option<u64> {
     headers
