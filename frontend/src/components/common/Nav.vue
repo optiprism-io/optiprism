@@ -3,6 +3,18 @@
         class="pf-c-nav pf-m-horizontal-subnav"
         aria-label="Local"
     >
+        <Select
+            :grouped="true"
+            :items="itemsDashboards"
+            @select="changeDashboard"
+        >
+            <UiButton
+                class="pf-u-color-light-100 pf-u-h-100"
+                :after-icon="'fas fa-caret-down'"
+            >
+                {{ $t('dashboards.title') }}
+            </UiButton>
+        </Select>
         <ul class="pf-c-nav__list">
             <li
                 v-for="item in items"
@@ -26,18 +38,17 @@
 
 <script lang="ts" setup>
 import { computed, inject } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { pagesMap } from '@/router'
+import Select from '@/components/Select/Select.vue';
+import { useDashboardsStore } from '@/stores/dashboards';
 
 const i18n = inject<any>('i18n')
 const route = useRoute()
+const router = useRouter()
+const dashboardsStore = useDashboardsStore()
 
 const configNav = [
-    {
-        name: 'dashboards.title',
-        to: pagesMap.dashboards.name,
-        activeKey: 'dashboards',
-    },
     {
         name: 'reports.title',
         to: pagesMap.reportsEventSegmentation.name,
@@ -55,6 +66,43 @@ const configNav = [
     },
 ]
 
+const dashboards = computed(() => dashboardsStore.dashboards)
+
+const selectDashboards = computed(() => {
+    return dashboards.value.map(item => {
+        const id = Number(item.id)
+        return {
+            value: id,
+            key: id,
+            nameDisplay: item.name || '',
+        }
+    });
+})
+
+const activeDashboardId = computed(() => {
+    return route.name === pagesMap.dashboards.name && route?.query?.id ? Number(route.query.id) : 0;
+});
+
+const itemsDashboards = computed(() => {
+    return [
+        {
+            items: dashboards.value.map(item => {
+                const id = Number(item.id)
+                return {
+                    description: item.description,
+                    name: item.name || '',
+                    selected: id === activeDashboardId.value,
+                    item: {
+                        id,
+                        type: id,
+                    },
+                };
+            }),
+            name: ''
+        },
+    ];
+});
+
 const items = computed(() => {
     return configNav.map(item => {
         return {
@@ -66,6 +114,13 @@ const items = computed(() => {
         }
     })
 })
+
+const changeDashboard = (payload: { id: number }) => {
+    router.push({
+        name: pagesMap.dashboards.name,
+        query: { id: payload.id }
+    })
+}
 </script>
 
 <style scoped>

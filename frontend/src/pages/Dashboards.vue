@@ -111,20 +111,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dashboardService from '@/api/services/dashboards.service'
 import reportsService from '@/api/services/reports.service'
 import {
-    Dashboard,
     ReportType,
     Report,
 } from '@/api'
-import {
-    UpdateDashboardRequest,
-    CreateDashboardRequest,
-    UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum,
-} from '@/api'
+import { UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum } from '@/api'
 import { pagesMap } from '@/router'
 import useConfirm from '@/hooks/useConfirm'
 
@@ -133,7 +128,6 @@ import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
 import usei18n from '@/hooks/useI18n'
 
-import UiSelect from '@/components/uikit/UiSelect.vue'
 import GridContainer from '@/components/grid/GridContainer.vue'
 import GridItem from '@/components/grid/GridItem.vue'
 import UiCard from '@/components/uikit/UiCard/UiCard.vue'
@@ -187,17 +181,6 @@ const menuCardReport = computed<UiDropdownItem<string>[]>(() => {
             nameDisplay: t('common.delete'),
         }
     ]
-})
-
-const selectDashboards = computed(() => {
-    return dashboards.value.map(item => {
-        const id = Number(item.id)
-        return {
-            value: id,
-            key: id,
-            nameDisplay: item.name || '',
-        }
-    })
 })
 
 const selectDashboardsText = computed(() => {
@@ -380,6 +363,12 @@ onMounted(async () => {
         } else {
             setNew()
         }
+    }
+})
+
+watch(() => route.query.id, id => {
+    if (Number(id) !== activeDashboardId.value) {
+        onSelectDashboard(Number(id))
     }
 })
 </script>
