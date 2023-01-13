@@ -8,8 +8,8 @@ use arrow::array::UInt64Builder;
 use arrow::array::UInt8Builder;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
-
-
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use events_gen::profiles::Profile;
 use rust_decimal::Decimal;
 
@@ -81,13 +81,33 @@ impl RecordBatchBuilder {
             Arc::new(self.product_category.finish()),
             Arc::new(self.product_subcategory.finish()),
             Arc::new(self.product_brand.finish()),
-            Arc::new(self.product_price.finish()),
-            Arc::new(self.product_discount_price.finish()),
-            Arc::new(self.spent_total.finish()),
+            Arc::new(
+                self.product_price
+                    .finish()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?,
+            ),
+            Arc::new(
+                self.product_discount_price
+                    .finish()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?,
+            ),
+            Arc::new(
+                self.spent_total
+                    .finish()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?,
+            ),
             Arc::new(self.products_bought.finish()),
             Arc::new(self.cart_items_number.finish()),
-            Arc::new(self.cart_amount.finish()),
-            Arc::new(self.revenue.finish()),
+            Arc::new(
+                self.cart_amount
+                    .finish()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?,
+            ),
+            Arc::new(
+                self.revenue
+                    .finish()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?,
+            ),
             Arc::new(self.country.finish()),
             Arc::new(self.city.finish()),
             Arc::new(self.device.finish()),

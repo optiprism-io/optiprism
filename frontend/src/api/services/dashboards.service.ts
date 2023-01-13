@@ -3,8 +3,9 @@ import {
     CreateDashboardRequest,
     UpdateDashboardRequest,
 } from '@/api'
+import {config} from '@/api/services/config';
 
-const api = new DashboardsApi()
+const api = new DashboardsApi(config)
 
 const schemaDashboards = {
     dashboardsList: async(organizationId: number, projectId: number) => await api.dashboardsList(organizationId, projectId),

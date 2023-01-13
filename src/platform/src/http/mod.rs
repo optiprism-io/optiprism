@@ -11,7 +11,6 @@ pub mod reports;
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -23,11 +22,8 @@ use axum::http;
 use axum::http::HeaderMap;
 use axum::http::HeaderValue;
 use axum::http::Request;
-use axum::http::StatusCode;
-use axum::http::Uri;
 use axum::middleware;
 use axum::middleware::Next;
-use axum::routing::get_service;
 use axum::Extension;
 use axum::Router;
 use axum::Server;
@@ -36,6 +32,7 @@ use axum_core::extract::FromRequest;
 use axum_core::response::IntoResponse;
 use axum_core::response::Response;
 use axum_core::BoxError;
+use axum_extra::routing::SpaRouter;
 use bytes::Bytes;
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -47,8 +44,6 @@ use serde_json::Value;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tower_cookies::CookieManagerLayer;
-use tower_http::services::ServeDir;
-use tower_http::services::ServeFile;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
@@ -68,7 +63,6 @@ impl Service {
         platform: &Arc<PlatformProvider>,
         auth_cfg: crate::auth::Config,
         addr: SocketAddr,
-        _ui_path: Option<PathBuf>,
     ) -> Self {
         let mut router = Router::new();
 
@@ -103,31 +97,30 @@ impl Service {
         router = router
             .layer(CookieManagerLayer::new())
             .layer(TraceLayer::new_for_http())
-            .layer(middleware::from_fn(print_request_response))
-            .fallback(fallback);
+            .layer(middleware::from_fn(print_request_response));
+        // .fallback(fallback);
 
         Self { router, addr }
     }
 
-    pub fn with_ui(self, path: PathBuf) -> Self {
-        let error_handler = |error: io::Error| async move {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Unhandled internal error: {}", error),
-            )
+    pub fn set_ui(self, maybe_path: Option<PathBuf>) -> Self {
+        let path = if let Some(path) = maybe_path {
+            path
+        } else {
+            return self;
         };
 
+        //        let error_handler = |error: io::Error| async move {
+        // (
+        // StatusCode::INTERNAL_SERVER_ERROR,
+        // format!("Unhandled internal error: {}", error),
+        // )
+        // };
         let mut router = self.router;
         info!("attaching ui static files handler...");
-        //        let index =
-        // get_service(ServeFile::new(path.join("index.html"))).handle_error(error_handler);
-        let favicon =
-            get_service(ServeFile::new(path.join("favicon.ico"))).handle_error(error_handler);
-        let assets = get_service(ServeDir::new(path.join("assets"))).handle_error(error_handler);
-        // TODO resolve actual routes and distinguish them from 404s
-        // router = router.fallback(index);
-        router = router.route("/favicon.ico", favicon);
-        router = router.route("/assets", assets);
+        router = router.merge(
+            SpaRouter::new("/assets", path.join("assets")).index_file(path.join("index.html")),
+        );
 
         Self {
             router,
@@ -151,9 +144,9 @@ impl Service {
     }
 }
 
-async fn fallback(uri: Uri) -> impl IntoResponse {
-    PlatformError::NotFound(format!("No route for {}", uri))
-}
+// async fn fallback(uri: Uri) -> impl IntoResponse {
+//     PlatformError::NotFound(format!("No route for {}", uri))
+// }
 
 fn content_length(headers: &HeaderMap<HeaderValue>) -> Option<u64> {
     headers

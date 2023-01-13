@@ -5,9 +5,10 @@ import {
     UpdateReportRequest,
     QueryApi,
 } from '@/api'
+import {config} from '@/api/services/config';
 
-const api = new ReportsApi()
-const queryApi = new QueryApi();
+const api = new ReportsApi(config);
+const queryApi = new QueryApi(config);
 
 const schemaReports = {
     eventSegmentation: async(organizationId: number, projectId: number, eventSegmentation: EventSegmentation) => await queryApi.eventSegmentationQuery(organizationId, projectId, eventSegmentation),

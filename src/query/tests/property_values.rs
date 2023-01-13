@@ -2,14 +2,12 @@
 mod tests {
     use std::sync::Arc;
 
-    
     use arrow::util::pretty::print_batches;
     use common::types::EventRef;
     use common::types::PropValueOperation;
     use common::types::PropertyRef;
     use datafusion::execution::context::SessionState;
     use datafusion::execution::runtime_env::RuntimeEnv;
-    
     use datafusion::physical_plan::collect;
     use datafusion::prelude::SessionConfig;
     use datafusion::prelude::SessionContext;

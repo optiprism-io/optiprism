@@ -17,8 +17,10 @@ pub type Result<T> = result::Result<T, DemoError>;
 pub enum DemoError {
     #[error("PlatformError: {0:?}")]
     Platform(#[from] PlatformError),
-    #[error("Internal")]
+    #[error("Internal: {0:?}")]
     Internal(String),
+    #[error("FileNotFound: {0:?}")]
+    FileNotFound(String),
     #[error("IP Address Parse Error: {0:?}")]
     AddrParseError(#[from] AddrParseError),
     #[error("StdIO: {0:?}")]

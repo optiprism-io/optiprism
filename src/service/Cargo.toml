@@ -1,0 +1,10 @@
+[package]
+name = "service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.66"
+clap = { version = "4.0.29", features = ["derive"] }
+tracing = "0.1.37"
+tracing-subscriber = "0.3.16"
