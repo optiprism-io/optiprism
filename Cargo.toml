@@ -1,7 +1,7 @@
 [profile.release]
-lto = "fat"
-codegen-units = 1
-opt-level = 3
+#lto = "fat"
+#codegen-units = 1
+#opt-level = 3
 
 [workspace]
 members = [
@@ -12,5 +12,6 @@ members = [
     "src/metadata",
     "src/platform",
     "src/query",
+    "src/service",
     "src/store",
-    "src/service"]
+]

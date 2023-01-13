@@ -4,10 +4,6 @@ mod tests {
     use std::ops::Sub;
     use std::sync::Arc;
 
-    
-    
-    
-    
     use arrow::util::pretty::print_batches;
     use chrono::DateTime;
     use chrono::Duration;
@@ -18,7 +14,6 @@ mod tests {
     use common::types::PropertyRef;
     use datafusion::execution::context::SessionState;
     use datafusion::execution::runtime_env::RuntimeEnv;
-    
     use datafusion::physical_plan::collect;
     use datafusion::prelude::SessionConfig;
     use datafusion::prelude::SessionContext;

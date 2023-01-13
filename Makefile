@@ -1,6 +1,7 @@
 SHELL = /bin/bash
-VERSION = v$(shell cargo get version)
-DEMO_IMAGE = optiprism/optiprism:$(VERSION)-demo
+DEMO_VERSION =$(shell cd src/demo; cargo get version)
+DEMO_TAG = v$(DEMO_VERSION)
+DEMO_IMAGE = optiprismio/demo:$(DEMO_TAG)
 
 cargo-fix-fmt: cargo-fix cargo-fmt cargo-sort cargo-lint
 
@@ -17,7 +18,7 @@ cargo-test:
 	cargo nextest run
 
 cargo-udeps:
-	cargo +nightly udeps --all-targets
+	cargo  udeps --all-targets
 
 cargo-sort:
 	cargo-sort -w
@@ -49,12 +50,14 @@ clean:
 	yarn cache clean
 
 docker-build-demo:
+	$(info building $(DEMO_IMAGE) docker image...)
 ifneq ($(shell docker images -q $(DEMO_IMAGE) 2> /dev/null),)
 	$(error image $(DEMO_IMAGE) already exists)
 endif
-	docker buildx build --ssh default --file demo.Dockerfile --platform=linux/amd64,linux/arm64 --progress plain -t $(DEMO_IMAGE) .
+	docker buildx build --builder multibuilder --ssh default --load --file demo.Dockerfile --platform=linux/arm64 --progress plain -t $(DEMO_IMAGE) .
 
 docker-publish-demo:
+	$(pushing pushing $(DEMO_IMAGE) docker image...)
 	docker push $(DEMO_IMAGE)
 
 docker-release-demo: docker-build-demo docker-publish-demo

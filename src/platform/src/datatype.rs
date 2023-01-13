@@ -2,11 +2,8 @@ use arrow::datatypes::DataType as ArrowDataType;
 use arrow::datatypes::TimeUnit;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-
 use serde::Deserialize;
-
 use serde::Serialize;
-
 
 use crate::PlatformError;
 

@@ -1,20 +1,12 @@
-use std::env::temp_dir;
-use std::fs::File;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
+
 use chrono::Duration;
-use chrono::Utc;
 use clap::Parser;
-use clap::ValueEnum;
-use datafusion::datasource::MemTable;
-use tracing::metadata::LevelFilter;
-use tracing::{debug, info, Level};
 use metadata::MetadataProvider;
-use metadata::store::Store;
 use platform::auth;
 use service::tracing::TracingCliArgs;
-
+use tracing::info;
 
 #[derive(Parser)]
 #[command(propagate_version = true)]

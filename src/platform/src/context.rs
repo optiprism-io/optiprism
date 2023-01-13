@@ -2,12 +2,10 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use axum::extract::Extension;
-
 use axum::extract::TypedHeader;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
 use axum::http::request::Parts;
-
 use axum_core::extract::FromRequestParts;
 use common::rbac::OrganizationPermission;
 use common::rbac::OrganizationRole;

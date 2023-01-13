@@ -15,13 +15,16 @@ FROM rust:1.64.0 AS rust
 WORKDIR /app
 RUN apt-get update && apt-get install -y clang openssl
 COPY ./src ./src
-COPY demo/data ./demo_data
 COPY ./Cargo.toml ./
 COPY ./Cargo.lock ./
-RUN cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/home/root/app/target \
+    cargo build --bin demo --release
+
 FROM debian:stable-slim AS runtime
-COPY --from=rust /app/target/release/optiprism /usr/local/bin
-COPY --from=rust /app/demo_data ./demo_data
-COPY --from=ui /app/demo_data ./demo_data
+WORKDIR /app
+COPY --from=ui /app/frontend/dist ./ui
+COPY --from=rust /app/target/release/demo ./
+COPY demo/data ./demo_data
 EXPOSE 8080
-ENTRYPOINT ["optiprism","demo","--demo-data-path","./demo_data"]
+ENTRYPOINT ["/app/demo","--demo-data-path","/app/demo_data","--ui-path","/app/ui"]

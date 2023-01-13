@@ -1,19 +1,14 @@
 use arrow_schema::DataType;
 use arrow_schema::Field;
-
 use datafusion_common::ScalarValue;
-
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
-
 use serde_with::DeserializeAs;
 use serde_with::SerializeAs;
 
-
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum ScalarValueRef {
     Null,
     Boolean(Option<bool>),

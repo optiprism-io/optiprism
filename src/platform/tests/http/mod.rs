@@ -110,8 +110,7 @@ mod tests {
             Arc::new(PlatformProvider::new(md.clone(), query, AUTH_CFG.clone()));
 
         let addr = SocketAddr::from(([127, 0, 0, 1], HTTP_PORT.fetch_add(1, Ordering::SeqCst)));
-        let svc =
-            platform::http::Service::new(&md, &platform_provider, AUTH_CFG.clone(), addr);
+        let svc = platform::http::Service::new(&md, &platform_provider, AUTH_CFG.clone(), addr);
 
         tokio::spawn(async move {
             svc.serve().await.unwrap();

@@ -1,8 +1,8 @@
-use tracing::Level;
-use tracing::level_filters::LevelFilter;
 use clap::Parser;
-use tracing_subscriber::FmtSubscriber;
 use clap::ValueEnum;
+use tracing::level_filters::LevelFilter;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 #[derive(Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum LogLevel {
@@ -22,7 +22,7 @@ impl From<LogLevel> for LevelFilter {
             LogLevel::Warn => Level::WARN,
             LogLevel::Error => Level::ERROR,
         }
-            .into()
+        .into()
     }
 }
 

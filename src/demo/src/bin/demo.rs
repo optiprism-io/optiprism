@@ -3,30 +3,26 @@ use std::fs::File;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+
 use bytesize::ByteSize;
 use chrono::Duration;
 use chrono::Utc;
 use clap::Parser;
-use clap::ValueEnum;
 use datafusion::datasource::MemTable;
 use dateparser::DateTimeUtc;
-use tracing::metadata::LevelFilter;
-use tracing::{debug, info, Level};
-use tracing_subscriber::FmtSubscriber;
-use uuid::Uuid;
 use demo::error::DemoError;
 use demo::store;
 use demo::store::gen;
-use metadata::MetadataProvider;
 use metadata::store::Store;
+use metadata::MetadataProvider;
 use platform::auth;
 use query::ProviderImpl;
 use service::tracing::TracingCliArgs;
-
+use tracing::debug;
+use tracing::info;
+use uuid::Uuid;
 
 extern crate parse_duration;
-
-
 
 #[derive(Parser)]
 #[command(propagate_version = true)]
@@ -56,12 +52,6 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     args.tracing.init()?;
 
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(args.tracing.log_level)
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-
     let to_date = match &args.to_date {
         None => Utc::now(),
         Some(dt) => dt.parse::<DateTimeUtc>()?.0.with_timezone(&Utc),
@@ -71,16 +61,24 @@ async fn main() -> Result<(), anyhow::Error> {
     let from_date = to_date - duration;
     let md_path = match args.md_path {
         None => temp_dir().join(format!("{}.db", Uuid::new_v4())),
-        Some(path) => path,
+        Some(path) => {
+            if !path.try_exists()? {
+                return Err(DemoError::FileNotFound(format!("metadata path {:?} doesn't exist", path)).into());
+            }
+
+            path
+        }
     };
 
-    md_path.try_exists()?;
-
     if let Some(ui_path) = &args.ui_path {
-        ui_path.try_exists()?;
+        if !ui_path.try_exists()? {
+            return Err(DemoError::FileNotFound(format!("ui path {:?} doesn't exist", ui_path)).into());
+        }
     }
 
-    args.demo_data_path.try_exists()?;
+    if !args.demo_data_path.try_exists()? {
+        return Err(DemoError::FileNotFound(format!("demo data path {:?} doesn't exist", args.demo_data_path)).into());
+    }
 
     let store = Arc::new(Store::new(md_path.clone()));
     let md = Arc::new(MetadataProvider::try_new(store)?);
@@ -165,12 +163,8 @@ async fn main() -> Result<(), anyhow::Error> {
         auth_cfg.clone(),
     ));
 
-    let svc = platform::http::Service::new(
-        &md,
-        &platform_provider,
-        auth_cfg,
-        args.host,
-    ).set_ui(args.ui_path.clone());
+    let svc = platform::http::Service::new(&md, &platform_provider, auth_cfg, args.host)
+        .set_ui(args.ui_path.clone());
 
     info!("start listening on {}", args.host);
     if args.ui_path.is_some() {

@@ -110,16 +110,17 @@ impl Service {
             return self;
         };
 
-/*        let error_handler = |error: io::Error| async move {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Unhandled internal error: {}", error),
-            )
-        };
-*/
+        //        let error_handler = |error: io::Error| async move {
+        // (
+        // StatusCode::INTERNAL_SERVER_ERROR,
+        // format!("Unhandled internal error: {}", error),
+        // )
+        // };
         let mut router = self.router;
         info!("attaching ui static files handler...");
-        router = router.merge(SpaRouter::new("/assets", path.join("assets")).index_file(path.join("index.html")));
+        router = router.merge(
+            SpaRouter::new("/assets", path.join("assets")).index_file(path.join("index.html")),
+        );
 
         Self {
             router,
@@ -177,9 +178,9 @@ pub async fn print_request_response(
 }
 
 async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes>
-    where
-        B: HttpBody<Data=Bytes>,
-        B::Error: std::fmt::Display,
+where
+    B: HttpBody<Data = Bytes>,
+    B::Error: std::fmt::Display,
 {
     let bytes = match hyper::body::to_bytes(body).await {
         Ok(bytes) => bytes,
@@ -204,12 +205,12 @@ pub struct Json<T>(pub T);
 
 #[async_trait]
 impl<T, S, B> FromRequest<S, B> for Json<T>
-    where
-        T: DeserializeOwned,
-        B: HttpBody + Send + 'static,
-        B::Data: Send,
-        B::Error: Into<BoxError>,
-        S: Send + Sync,
+where
+    T: DeserializeOwned,
+    B: HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<BoxError>,
+    S: Send + Sync,
 {
     type Rejection = ApiError;
 
@@ -255,7 +256,7 @@ impl<T, S, B> FromRequest<S, B> for Json<T>
 }
 
 impl<T> IntoResponse for Json<T>
-    where T: Serialize
+where T: Serialize
 {
     fn into_response(self) -> Response {
         axum::Json(self.0).into_response()
