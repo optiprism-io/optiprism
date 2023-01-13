@@ -3,8 +3,11 @@ pub mod event_segmentation;
 use chrono::DateTime;
 use chrono::Utc;
 use chronoutil::RelativeDuration;
+use serde::Deserialize;
+use serde::Serialize;
 
-#[derive(Clone, Debug)]
+// #[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum QueryTime {
     Between {
         from: DateTime<Utc>,
@@ -27,7 +30,8 @@ impl QueryTime {
     }
 }
 
-#[derive(Clone, Debug)]
+// #[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub enum TimeIntervalUnit {
     Second,
     Minute,

@@ -4,6 +4,9 @@ use datafusion_expr::AggregateFunction;
 
 pub mod logical_plan_builder;
 
+use serde::Deserialize;
+use serde::Serialize;
+
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 use crate::queries::QueryTime;
 use crate::queries::TimeIntervalUnit;
@@ -31,13 +34,15 @@ pub enum SegmentTime {
     },
 }
 
-#[derive(Clone, Debug)]
+// #[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChartType {
     Line,
     Bar,
 }
 
-#[derive(Clone, Debug)]
+// #[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Analysis {
     Linear,
     RollingAverage {
@@ -48,7 +53,8 @@ pub enum Analysis {
     Cumulative,
 }
 
-#[derive(Clone, Debug)]
+// #[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Compare {
     pub offset: usize,
     pub unit: TimeIntervalUnit,
@@ -100,7 +106,8 @@ pub enum QueryPerGroup {
     CountEvents,
 }
 
-#[derive(Clone, Debug)]
+// #[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Query {
     CountEvents,
     CountUniqueGroups,
@@ -124,7 +131,8 @@ pub enum Query {
     },
 }
 
-#[derive(Clone, Debug)]
+// #[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct NamedQuery {
     pub agg: Query,
     pub name: Option<String>,
@@ -136,12 +144,14 @@ impl NamedQuery {
     }
 }
 
-#[derive(Clone, Debug)]
+// #[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Breakdown {
     Property(PropertyRef),
 }
 
-#[derive(Clone, Debug)]
+// #[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
     pub event: EventRef,
     pub filters: Option<Vec<EventFilter>>,

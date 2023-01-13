@@ -18,7 +18,10 @@
 use std::fmt;
 use std::fmt::Debug;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
+use serde::Deserialize;
+use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Hash)]
 pub enum PartitionedAggregateFunction {
     Count,
     Sum,

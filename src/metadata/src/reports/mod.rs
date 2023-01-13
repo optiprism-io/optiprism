@@ -1,9 +1,15 @@
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
+use common::queries::event_segmentation::Analysis;
+use common::queries::event_segmentation::Breakdown;
+use common::queries::event_segmentation::ChartType;
+use common::queries::event_segmentation::Compare;
+use common::queries::event_segmentation::Event;
+use common::queries::QueryTime;
+use common::queries::TimeIntervalUnit;
+use common::types::EventFilter;
 use common::types::OptionalProperty;
-// use crate::queries::event_segmentation::EventSegmentation;
-use query::queries::event_segmentation::EventSegmentation; // FIXME
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -50,6 +56,19 @@ pub struct Report {
 pub enum Type {
     EventSegmentation,
     Funnel,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct EventSegmentation {
+    pub time: QueryTime,
+    pub group: String,
+    pub interval_unit: TimeIntervalUnit,
+    pub chart_type: ChartType,
+    pub analysis: Analysis,
+    pub compare: Option<Compare>,
+    pub events: Vec<Event>,
+    pub filters: Option<Vec<EventFilter>>,
+    pub breakdowns: Option<Vec<Breakdown>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
