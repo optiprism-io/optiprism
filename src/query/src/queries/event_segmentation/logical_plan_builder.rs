@@ -319,7 +319,7 @@ impl LogicalPlanBuilder {
                         input.schema(),
                         col(self.es.group.as_ref()),
                         PartitionedAggregateFunction::Count,
-                        aggregate.clone(),
+                        aggregate.clone().try_into().unwrap(),
                         vec![col(self.es.group.as_ref())],
                     )?,
                     Query::AggregatePropertyPerGroup {
@@ -330,7 +330,7 @@ impl LogicalPlanBuilder {
                         input.schema(),
                         col(self.es.group.as_ref()),
                         aggregate_per_group.clone(),
-                        aggregate.clone(),
+                        aggregate.clone().try_into().unwrap(),
                         vec![executor::block_on(property_col(
                             &self.ctx,
                             &self.metadata,
@@ -341,7 +341,7 @@ impl LogicalPlanBuilder {
                         property,
                         aggregate,
                     } => Expr::AggregateFunction {
-                        fun: aggregate.clone(),
+                        fun: aggregate.clone().try_into().unwrap(),
                         args: vec![executor::block_on(property_col(
                             &self.ctx,
                             &self.metadata,

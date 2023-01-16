@@ -11,6 +11,7 @@ use serde::Serialize;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::Context;
 use crate::ListResponse;
+use crate::PlatformError;
 use crate::Result;
 
 #[async_trait]

@@ -3,13 +3,13 @@ mod tests {
     use axum::http::StatusCode;
     use chrono::DateTime;
     use chrono::Utc;
+    use common::queries::AggregateFunction;
     use platform::queries::event_segmentation::Analysis;
     use platform::queries::event_segmentation::Breakdown;
     use platform::queries::event_segmentation::ChartType;
     use platform::queries::event_segmentation::Event;
     use platform::queries::event_segmentation::EventSegmentation;
     use platform::queries::event_segmentation::Query;
-    use platform::queries::AggregateFunction;
     use platform::queries::PartitionedAggregateFunction;
     use platform::queries::QueryTime;
     use platform::queries::TimeIntervalUnit;

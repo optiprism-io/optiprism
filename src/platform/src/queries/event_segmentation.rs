@@ -2,11 +2,11 @@ use chrono::DateTime;
 use chrono::Utc;
 use common::queries::event_segmentation as query_es_types;
 use common::queries::event_segmentation::NamedQuery;
+use common::queries::AggregateFunction;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::queries::AggregateFunction;
 use crate::queries::PartitionedAggregateFunction;
 use crate::queries::QueryTime;
 use crate::queries::TimeIntervalUnit;
