@@ -264,6 +264,7 @@
     "delete": "Delete Dashboard",
     "deleteConfirm": "You definitely want to delete the dashboard: :name?",
     "addReport": "Add report",
-    "untitledDashboard": "Untitled Dashboard"
+    "untitledDashboard": "Untitled Dashboard",
+    "changeReport": "Change report"
   }
 }

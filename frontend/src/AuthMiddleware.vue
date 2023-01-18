@@ -24,6 +24,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth/auth'
 import { useDashboardsStore } from '@/stores/dashboards'
+import { useReportsStore } from '@/stores/reports/reports'
 import { pagesMap } from '@/router'
 
 const state = ref<'pending' | 'ok' | 'error'>('pending')
@@ -33,6 +34,7 @@ const router = useRouter()
 const commonStore = useCommonStore()
 const authStore = useAuthStore()
 const dashboardsStore = useDashboardsStore()
+const reportsStore = useReportsStore()
 
 const togglePopupCreateCustomEvent = (payload: boolean) => {
     commonStore.togglePopupCreateCustomEvent(payload)
@@ -45,6 +47,9 @@ const applyCreateCustomEvent = () => {
 const getStartData = () => {
     if (!dashboardsStore.dashboards.length) {
         dashboardsStore.getDashboards();
+    }
+    if (!reportsStore.list.length) {
+        reportsStore.getList();
     }
 };
 

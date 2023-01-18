@@ -1,110 +1,83 @@
 <template>
     <div class="dashboards pf-u-p-md pf-u-pb-3xl">
         <div>
-            <div class="dashboards__name pf-u-mb-md">
-                <UiInlineEdit
-                    :value="dashboardName"
-                    @on-input="updateName"
+            <div class="pf-u-mb-md pf-u-display-flex">
+                <div class="dashboards__name pf-u-mr-md">
+                    <UiInlineEdit
+                        :value="dashboardName"
+                        @on-input="updateName"
+                    />
+                </div>
+                <UiSelect
+                    v-if="reportsList.length"
+                    class=" pf-u-mr-md dashboards__add-report"
+                    :items="selectReportsList"
+                    :text-button="t('dashboards.addReport')"
+                    @on-select="addReport"
                 />
             </div>
-            <GridContainer>
-                <GridItem
-                    v-for="(item, i) in newDashboardRows"
-                    :key="i"
-                    :col-lg="12"
-                    class="dashboards__panel"
-                    :class="{
-                        'dashboards__panel_padding': item?.panels.length >= 1 && item?.panels.length < 4
-                    }"
-                >
-                    <div
-                        v-if="item?.panels.length < 4"
-                        class="dashboards__new"
-                        :class="{
-                            'dashboards__new_small': item?.panels.length >= 1
-                        }"
-                        @click="addReport(i)"
+            <GridLayout
+                v-model:layout="layout"
+                :col-num="12"
+                :row-height="ROW_HEIGHT"
+                :minW="3"
+                :minH="4"
+                :useCssTransforms="false"
+            >
+                <template #default="{ gridItemProps }">
+                    <GridItem
+                        v-for="item in layout"
+                        :key="item.i"
+                        v-bind="gridItemProps"
+                        :x="item.x"
+                        :y="item.y"
+                        :w="item.w"
+                        :h="item.h"
+                        :i="item.i"
+                        :minH="item.minH"
+                        :minW="item.minW"
+                        @moved="moved"
+                        @resized="resized"
                     >
-                        <div class="dashboards__new-item pf-u-box-shadow-sm pf-l-flex pf-m-align-items-center pf-m-justify-content-center">
-                            <UiIcon
-                                class="pf-u-font-size-xl dashboards__new-item-icon"
-                                :icon="'fas fa-plus'"
+                        <UiCard>
+                            <template #rightTitle>
+                                <UiDropdown
+                                    class="pf-u-mr-md"
+                                    :items="menuCardReport"
+                                    :has-icon-arrow-button="false"
+                                    :transparent="true"
+                                    :placement-menu="'bottom-end'"
+                                    @select-value="(paylaod: UiDropdownItem<string>) => selectReportDropdown(paylaod, item.i)"
+                                >
+                                    <template #button>
+                                        <button
+                                            class="pf-c-dropdown__toggle pf-m-plain"
+                                            aria-expanded="true"
+                                            type="button"
+                                            aria-label="Actions"
+                                        >
+                                            <i
+                                                class="fas fa-ellipsis-v"
+                                                aria-hidden="true"
+                                            />
+                                        </button>
+                                    </template>
+                                </UiDropdown>
+                            </template>
+                            <DashboardPanel
+                                :height-chart="item.h * ROW_HEIGHT - 20"
+                                :report-id="item.reportId"
                             />
-                        </div>
-                    </div>
-                    <GridContainer>
-                        <GridItem
-                            v-for="(panel, j) in item?.panels"
-                            :key="panel.reportId"
-                            :col-lg="panel.span ?? 6"
-                        >
-                            <UiCard
-                                v-if="panel?.report"
-                                :title="panel?.report?.name"
-                                :link="{
-                                    name: panel.report?.type === ReportType.EventSegmentation ? pagesMap.reportsEventSegmentation.name : pagesMap.funnels.name,
-                                    params: {
-                                        id: panel?.report?.id
-                                    }
-                                }"
-                            >
-                                <template #rightTitle>
-                                    <UiDropdown
-                                        class="pf-u-mr-md"
-                                        :items="menuCardReport"
-                                        :has-icon-arrow-button="false"
-                                        :transparent="true"
-                                        :placement-menu="'bottom-end'"
-                                        @select-value="(paylaod) => selectReportDropdown(paylaod, i, j)"
-                                    >
-                                        <template #button>
-                                            <button
-                                                class="pf-c-dropdown__toggle pf-m-plain"
-                                                aria-expanded="true"
-                                                type="button"
-                                                aria-label="Actions"
-                                            >
-                                                <i
-                                                    class="fas fa-ellipsis-v"
-                                                    aria-hidden="true"
-                                                />
-                                            </button>
-                                        </template>
-                                    </UiDropdown>
-                                </template>
-                                <DashboardPanel
-                                    :report="panel.report"
-                                />
-                            </UiCard>
-                        </GridItem>
-                    </GridContainer>
-                </GridItem>
-                <GridItem
-                    v-if="newDashboardRows.length > 0 && newDashboardRows[newDashboardRows.length - 1].panels.length"
-                    :col-lg="12"
-                    class="dashboards__panel"
-                >
-                    <GridContainer>
-                        <div
-                            class="dashboards__new"
-                            @click="addPanel"
-                        >
-                            <div class="dashboards__new-item dashboards__new-item_small pf-u-box-shadow-sm pf-l-flex pf-m-align-items-center pf-m-justify-content-center">
-                                <UiIcon
-                                    class="pf-u-font-size-xl dashboards__new-item-icon"
-                                    :icon="'fas fa-plus'"
-                                />
-                            </div>
-                        </div>
-                    </GridContainer>
-                </GridItem>
-            </GridContainer>
+                        </UiCard>
+                    </GridItem>
+                </template>
+            </GridLayout>
         </div>
     </div>
     <DashboardReportsPopup
         v-if="dashboardReportsPopup"
-        :reports="reports"
-        :loading="loadingReports"
+        :reports="reportsList"
+        :loading="false"
         @on-select-report="onSelectReport"
         @cancel="closeDashboardReportsPopup"
     />
@@ -116,45 +89,46 @@ import { useRoute, useRouter } from 'vue-router'
 import dashboardService from '@/api/services/dashboards.service'
 import reportsService from '@/api/services/reports.service'
 import {
-    ReportType,
     Report,
 } from '@/api'
-import { UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum } from '@/api'
-import { pagesMap } from '@/router'
+import { DashboardPanel as DashboardPanelType, DashboardPanelTypeEnum } from '@/api'
 import useConfirm from '@/hooks/useConfirm'
-
 import { useDashboardsStore } from '@/stores/dashboards'
 import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
+import { useReportsStore } from '@/stores/reports/reports'
 import usei18n from '@/hooks/useI18n'
 
-import GridContainer from '@/components/grid/GridContainer.vue'
-import GridItem from '@/components/grid/GridItem.vue'
 import UiCard from '@/components/uikit/UiCard/UiCard.vue'
 import DashboardPanel from '@/components/dashboards/DashboardPanel.vue'
 import DashboardReportsPopup from '@/components/dashboards/DashboardReportsPopup.vue'
 import UiInlineEdit from '@/components/uikit/UiInlineEdit.vue'
 import { GenericUiDropdown, UiDropdownItem } from '@/components/uikit/UiDropdown.vue'
+import UiSelect from '@/components/uikit/UiSelect.vue';
 
+const UiDropwdown = GenericUiDropdown<string>()
 const { confirm } = useConfirm()
 const { t } = usei18n()
 const route = useRoute()
 const router = useRouter()
 const commonStore = useCommonStore()
 const lexiconStore = useLexiconStore()
-const UiDropdown = GenericUiDropdown<string>()
 const dashboardsStore = useDashboardsStore()
+const reportsStore = useReportsStore()
 
-interface DashboardPanelType {
-    span: number,
-    reportId?: number
-    report?: Report,
-}
+const ROW_HEIGHT = 56;
 
 interface DashboardRows {
     panels: DashboardPanelType[]
 }
 
+interface Layout extends DashboardPanelType {
+    i: number
+    minH: number,
+    minW: number,
+}
+
+const layout = ref<Layout[]>([]);
 const loadingReports = ref(false)
 const reports = ref<Report[]>([])
 const dashboardReportsPopup = ref(false)
@@ -163,11 +137,14 @@ const dashboardName = ref(t('dashboards.untitledDashboard'))
 const newDashboardRows = ref<DashboardRows[]>([])
 const errorDashboard = ref(false)
 const activeDashboardId = ref<number | null>(null)
+const editPanel = ref<number | null>(null)
+const dashboards = computed(() => dashboardsStore.dashboards)
+const reportsList = computed(() => reportsStore.list)
+
 const dashboardsId = computed((): number[] => {
     return dashboards.value.map(item => Number(item.id))
 });
 
-const dashboards = computed(() => dashboardsStore.dashboards)
 const selections = computed(() => activeDashboardId.value ? [activeDashboardId.value] : [])
 const activeDashboard = computed(() => {
     return dashboards.value.find(item => Number(item.id) === activeDashboardId.value) ?? null
@@ -176,6 +153,11 @@ const activeDashboard = computed(() => {
 const menuCardReport = computed<UiDropdownItem<string>[]>(() => {
     return [
         {
+            key: 0,
+            value: 'edit',
+            nameDisplay: t('dashboards.changeReport'),
+        },
+        {
             key: 1,
             value: 'delete',
             nameDisplay: t('common.delete'),
@@ -183,27 +165,47 @@ const menuCardReport = computed<UiDropdownItem<string>[]>(() => {
     ]
 })
 
-const selectDashboardsText = computed(() => {
-    return activeDashboard.value ? activeDashboard.value.name : t('dashboards.selectDashboard')
+const selectReportsList = computed(() => {
+    return reportsList.value.map(item => {
+        const id = Number(item.id)
+        return {
+            value: id,
+            key: id,
+            nameDisplay: item.name || '',
+        }
+    })
 })
+
+const moved = () => {
+    updateCreateDashboard();
+}
+
+const resized = () => {
+    updateCreateDashboard();
+}
+
+const updateLauout = () => {
+    if (activeDashboard.value) {
+        dashboardName.value = activeDashboard.value?.name || t('dashboards.untitledDashboard')
+        const newLayout = activeDashboard.value?.panels?.map((item: DashboardPanelType, i: number) => {
+            return {
+                ...item,
+                i,
+                minH: 5,
+                minW: 3,
+            }
+        }) || [];
+
+        if (JSON.stringify(newLayout) !== JSON.stringify(layout.value)) {
+            layout.value = newLayout;
+        }
+    }
+}
 
 const onSelectDashboard = (id: number | string) => {
     activeDashboardId.value = Number(id);
     router.push({ query: { id } })
-    if (activeDashboard.value) {
-        dashboardName.value = activeDashboard.value?.name || t('dashboards.untitledDashboard')
-        newDashboardRows.value = activeDashboard.value.rows?.map((item): DashboardRows => {
-            return {
-                panels: item.panels?.map((panel): DashboardPanelType => {
-                    return {
-                        span: panel.span || 6,
-                        reportId: panel.reportId,
-                        report: panel.report
-                    }
-                }) || []
-            }
-        }) || []
-    }
+    updateLauout();
 }
 
 const getReportsList = async () => {
@@ -256,17 +258,17 @@ const updateDashboardSpan = (dashboard: DashboardRows[]) => {
 const updateCreateDashboard = async () => {
     const dataForRequest = {
         name: dashboardName.value,
-        rows: newDashboardRows.value.map(item => {
+        panels: layout.value.map(item => {
             return {
-                panels: item.panels.map((item) => {
-                    return {
-                        span: item.span,
-                        type: UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum.Report,
-                        reportId: Number(item.reportId),
-                    };
-                })
-            };
-        }),
+                type: DashboardPanelTypeEnum.Report,
+                reportId: item.reportId,
+                i: item.i,
+                x: item.x,
+                y: item.y,
+                w: item.w,
+                h: item.h,
+            }
+        })
     }
     if (activeDashboardId.value) {
         await dashboardService.updateDashboard(commonStore.organizationId, commonStore.projectId, activeDashboardId.value, dataForRequest)
@@ -277,57 +279,52 @@ const updateCreateDashboard = async () => {
 }
 
 const onSelectReport = (payload: number) => {
-    newDashboardRows.value[addReportPanels.value].panels.push({
-        span: 6,
-        reportId: payload,
-        report: reports.value.find(item => Number(item.id) === payload)
-    })
-    newDashboardRows.value = updateDashboardSpan(newDashboardRows.value)
+    const items = layout.value;
+    const panelIndex = items.findIndex(item => Number(item.i) === editPanel.value)
+    items[panelIndex].reportId = payload;
+    layout.value = items;
     closeDashboardReportsPopup()
     updateCreateDashboard()
 }
 
 const closeDashboardReportsPopup = () => {
     dashboardReportsPopup.value = false
+    editPanel.value = null
 }
 
-const addReport = (index: number) => {
-    addReportPanels.value = index
-    dashboardReportsPopup.value = true
-    getReportsList()
-}
-
-const addPanel = () => {
-    newDashboardRows.value.push({panels: []})
-    addReport(newDashboardRows.value.length - 1)
-}
-
-const selectReportDropdown = async (payload: UiDropdownItem<string>, indexRow: number, indexPanel: number) => {
-    if (payload.value === 'delete') {
-        const dashboard = [...newDashboardRows.value]
-        const row = dashboard[indexRow]
-        await confirm(t('reports.deleteDashboardConfirm'), {
-            applyButton: t('common.apply'),
-            cancelButton: t('common.cancel'),
-            title: t('reports.delete'),
-            applyButtonClass: 'pf-m-danger',
-        })
-
-        if (row.panels.length === 1 && indexRow) {
-            dashboard.splice(indexRow, 1);
-        } else {
-            row.panels.splice(indexPanel, 1)
-            dashboard[indexRow] = row
-        }
-        newDashboardRows.value = updateDashboardSpan(dashboard)
+const addReport = (payload: number) => {
+    const panel = {
+        type: DashboardPanelTypeEnum.Report,
+        reportId: payload,
+        i: layout.value.length + 1,
+        x: 0,
+        y: 0,
+        w: 3,
+        h: 5,
+        minH: 5,
+        minW: 3,
     }
-    updateCreateDashboard()
+    layout.value = [panel, ...layout.value];
+    setTimeout(() => {
+        updateCreateDashboard();
+    }, 800)
+}
+
+const selectReportDropdown = async (payload: UiDropdownItem<string>, id: number) => {
+    if (payload.value === 'delete') {
+        layout.value = layout.value.filter(item => item.i !== id);
+        setTimeout(() => {
+            updateCreateDashboard();
+        }, 800)
+    }
+    if (payload.value === 'edit') {
+        editPanel.value = id;
+        dashboardReportsPopup.value = true;
+    }
 }
 
 const setNew = () => {
-    newDashboardRows.value = [{
-        panels: []
-    }]
+    layout.value = [];
     activeDashboardId.value = null
     dashboardName.value = t('dashboards.untitledDashboard')
     router.push({
@@ -375,6 +372,14 @@ watch(() => route.query.id, id => {
 
 <style lang="scss">
 .dashboards {
+    .vue-grid-item {
+        .pf-c-card__body {
+            height: calc(100% - 36px);
+        }
+    }
+    &__add-report {
+        max-width: 240px;
+    }
     &__new-item {
         min-height: 250px;
         height: 100%;

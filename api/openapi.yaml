@@ -1721,28 +1721,30 @@ components:
                 type: integer
     DashboardPanel:
       type: object
-      required: [ 'span','type','reportId' ]
+      required: [ 'x', 'y', 'w', 'h', 'type','reportId' ]
       properties:
-        span:
-          type: integer
-          format: int64
-          description: span
         type:
           type: string
           enum: [ 'report' ]
         reportId:
           type: integer
           format: int64
-
-    DashboardRow:
-      type: object
-      required: [ 'panels' ]
-      properties:
-        panels:
-          type: array
-          items:
-            $ref: '#/components/schemas/DashboardPanel'
-
+        x:
+          type: integer
+          format: int64
+          description: x
+        y:
+          type: integer
+          format: int64
+          description: y
+        w:
+          type: integer
+          format: int64
+          description: width
+        h:
+          type: integer
+          format: int64
+          description: height
     CreateDashboardRequest:
       type: object
       required: [ 'name','rows' ]
@@ -1758,11 +1760,10 @@ components:
         description:
           type: string
           description: description
-        rows:
+        panels:
           type: array
           items:
-            $ref: '#/components/schemas/DashboardRow'
-
+            $ref: '#/components/schemas/DashboardPanel'
     UpdateDashboardRequest:
       type: object
       properties:
@@ -1777,28 +1778,10 @@ components:
         description:
           type: string
           description: description
-        rows:
+        panels:
           type: array
           items:
-            type: object
-            required: [ 'panels' ]
-            properties:
-              panels:
-                type: array
-                items:
-                  type: object
-                  required: [ 'span','type','reportId' ]
-                  properties:
-                    span:
-                      type: integer
-                      format: int64
-                      description: span
-                    type:
-                      type: string
-                      enum: [ 'report' ]
-                    reportId:
-                      type: integer
-                      format: int64
+            $ref: '#/components/schemas/DashboardPanel'
     Dashboard:
       type: object
       required: [ 'id','name','rows' ]
@@ -1838,30 +1821,10 @@ components:
         description:
           type: string
           description: description
-        rows:
+        panels:
           type: array
           items:
-            type: object
-            required: [ 'panels' ]
-            properties:
-              panels:
-                type: array
-                items:
-                  type: object
-                  required: [ 'span','type' ]
-                  properties:
-                    span:
-                      type: integer
-                      format: int64
-                      description: project id
-                    type:
-                      type: string
-                      enum: [ 'report' ]
-                    reportId:
-                      type: integer
-                      format: int64
-                    report:
-                      $ref: '#/components/schemas/Report'
+            $ref: '#/components/schemas/DashboardPanel'
     Report:
       type: object
       required: [ 'id','name','type','query' ]
