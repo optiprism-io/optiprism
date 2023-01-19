@@ -86,6 +86,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { pagesMap } from '@/router'
 import dashboardService from '@/api/services/dashboards.service'
 import reportsService from '@/api/services/reports.service'
 import {
@@ -273,7 +274,15 @@ const updateCreateDashboard = async () => {
     if (activeDashboardId.value) {
         await dashboardService.updateDashboard(commonStore.organizationId, commonStore.projectId, activeDashboardId.value, dataForRequest)
     } else {
-        await dashboardService.createDashboard(commonStore.organizationId, commonStore.projectId, dataForRequest)
+        const res = await dashboardService.createDashboard(commonStore.organizationId, commonStore.projectId, dataForRequest)
+        if (res.data?.id) {
+            router.push({
+                name: pagesMap.dashboards.name,
+                query: {
+                    id: res.data.id,
+                },
+            })
+        }
     }
     getDashboardsList()
 }
@@ -339,13 +348,7 @@ const updateName = (payload: string) => {
     updateCreateDashboard()
 }
 
-onMounted(async () => {
-    lexiconStore.getEvents()
-    lexiconStore.getEventProperties()
-    lexiconStore.getUserProperties()
-    if (!dashboards.value?.length) {
-        await getDashboardsList()
-    }
+const initDashboardPage = () => {
     const dashboardId = route.query.id;
 
     if (dashboardId) {
@@ -355,17 +358,31 @@ onMounted(async () => {
             setNew()
         }
     } else {
-        if (dashboards.value.length && dashboards.value[0].id) {
+        if (!route.query.new && dashboards.value.length && dashboards.value[0].id) {
             onSelectDashboard(Number(dashboards.value[0].id))
         } else {
             setNew()
         }
     }
+};
+
+onMounted(async () => {
+    lexiconStore.getEvents()
+    lexiconStore.getEventProperties()
+    lexiconStore.getUserProperties()
+    if (!dashboards.value?.length) {
+        await getDashboardsList()
+    }
+    initDashboardPage()
 })
 
 watch(() => route.query.id, id => {
     if (Number(id) !== activeDashboardId.value) {
-        onSelectDashboard(Number(id))
+        if (id) {
+            onSelectDashboard(Number(id))
+        } else {
+            setNew();
+        }
     }
 })
 </script>

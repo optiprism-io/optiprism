@@ -6,7 +6,9 @@
         <Select
             :grouped="true"
             :items="itemsDashboards"
+            :cloase-after-action="true"
             @select="changeDashboard"
+            @action="selectAction"
         >
             <UiButton
                 class="pf-u-color-light-100 pf-u-h-100"
@@ -86,6 +88,11 @@ const activeDashboardId = computed(() => {
 const itemsDashboards = computed(() => {
     return [
         {
+            action: {
+                icon: 'fas fa-plus-circle',
+                text: 'common.create',
+                type: 'createEvent',
+            },
             items: dashboards.value.map(item => {
                 const id = Number(item.id)
                 return {
@@ -98,7 +105,8 @@ const itemsDashboards = computed(() => {
                     },
                 };
             }),
-            name: ''
+            name: 'Dashboards',
+            type: 'dashboards',
         },
     ];
 });
@@ -120,6 +128,18 @@ const changeDashboard = (payload: { id: number }) => {
         name: pagesMap.dashboards.name,
         query: { id: payload.id }
     })
+}
+
+const selectAction = (payload: string) => {
+    if (payload === 'createEvent') {
+        router.push({
+            name: pagesMap.dashboards.name,
+            query: {
+                new: 1,
+                id: null,
+            },
+        })
+    }
 }
 </script>
 
