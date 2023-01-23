@@ -43,6 +43,14 @@ impl<T> OptionalProperty<T> {
             OptionalProperty::Some(v) => OptionalProperty::Some(v.try_into()?),
         })
     }
+
+    pub fn map<F, U>(self, f: F) -> OptionalProperty<U>
+    where F: FnOnce(T) -> U {
+        match self {
+            OptionalProperty::None => OptionalProperty::None,
+            OptionalProperty::Some(v) => OptionalProperty::Some(f(v)),
+        }
+    }
 }
 
 impl<T> Serialize for OptionalProperty<T>

@@ -84,7 +84,7 @@ impl PlatformProvider {
             accounts: Arc::new(accounts::ProviderImpl::new(md.accounts.clone())),
             auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
             query: Arc::new(queries::ProviderImpl::new(query_prov)),
-            dashboards: Arc::new(stub::Dashboards {}),
+            dashboards: Arc::new(dashboards::ProviderImpl::new(md.dashboards.clone())),
             reports: Arc::new(stub::Reports {}),
             event_records: Arc::new(stub::EventRecords {}),
             group_records: Arc::new(stub::GroupRecords {}),
@@ -169,6 +169,12 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
 #[serde(rename_all = "camelCase")]
 pub struct ResponseMetadata {
     pub next: Option<String>,
+}
+
+impl From<metadata::metadata::ResponseMetadata> for ResponseMetadata {
+    fn from(value: metadata::metadata::ResponseMetadata) -> Self {
+        ResponseMetadata { next: value.next }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Eq, PartialEq)]

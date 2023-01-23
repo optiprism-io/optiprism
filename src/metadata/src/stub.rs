@@ -21,6 +21,11 @@ use crate::custom_events;
 use crate::custom_events::CreateCustomEventRequest;
 use crate::custom_events::CustomEvent;
 use crate::custom_events::UpdateCustomEventRequest;
+use crate::dashboards;
+use crate::dashboards::CreateDashboardRequest;
+use crate::dashboards::Dashboard;
+use crate::dashboards::Panel;
+use crate::dashboards::UpdateDashboardRequest;
 use crate::database;
 use crate::database::Column;
 use crate::database::Table;
@@ -106,6 +111,78 @@ impl accounts::Provider for Accounts {
 
     async fn delete(&self, _id: u64) -> Result<Account> {
         Ok(Self::account())
+    }
+}
+
+pub struct Dashboards {}
+
+#[async_trait]
+impl dashboards::Provider for Dashboards {
+    async fn create(
+        &self,
+        _organization_id: u64,
+        _project_id: u64,
+        _req: CreateDashboardRequest,
+    ) -> Result<Dashboard> {
+        Ok(Dashboards::dashboard())
+    }
+
+    async fn get_by_id(
+        &self,
+        _organization_id: u64,
+        _project_id: u64,
+        _id: u64,
+    ) -> Result<Dashboard> {
+        Ok(Dashboards::dashboard())
+    }
+
+    async fn list(
+        &self,
+        _organization_id: u64,
+        _project_id: u64,
+    ) -> Result<ListResponse<Dashboard>> {
+        Ok(ListResponse {
+            data: vec![Dashboards::dashboard()],
+            meta: ResponseMetadata { next: None },
+        })
+    }
+
+    async fn update(
+        &self,
+        _organization_id: u64,
+        _project_id: u64,
+        _dashboard_id: u64,
+        _req: UpdateDashboardRequest,
+    ) -> Result<Dashboard> {
+        Ok(Dashboards::dashboard())
+    }
+
+    async fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Dashboard> {
+        Ok(Dashboards::dashboard())
+    }
+}
+
+impl Dashboards {
+    pub fn dashboard() -> Dashboard {
+        Dashboard {
+            id: 1,
+            created_at: *DATE_TIME,
+            updated_at: Some(*DATE_TIME),
+            created_by: 1,
+            updated_by: Some(1),
+            project_id: 1,
+            tags: Some(vec!["tag".to_string()]),
+            name: "name".to_string(),
+            description: Some("description".to_string()),
+            panels: vec![Panel {
+                typ: dashboards::Type::Report,
+                report_id: 1,
+                x: 1,
+                y: 2,
+                w: 3,
+                h: 4,
+            }],
+        }
     }
 }
 

@@ -1,7 +1,10 @@
+pub mod provider_impl;
+
 use axum::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use common::types::OptionalProperty;
+pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -54,6 +57,22 @@ pub enum Type {
     Report,
 }
 
+impl From<Type> for metadata::dashboards::Type {
+    fn from(v: Type) -> Self {
+        match v {
+            Type::Report => metadata::dashboards::Type::Report,
+        }
+    }
+}
+
+impl From<metadata::dashboards::Type> for Type {
+    fn from(v: metadata::dashboards::Type) -> Self {
+        match v {
+            metadata::dashboards::Type::Report => Type::Report,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Panel {
@@ -66,10 +85,30 @@ pub struct Panel {
     pub h: usize,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct Row {
-    pub panels: Vec<Panel>,
+impl From<Panel> for metadata::dashboards::Panel {
+    fn from(value: Panel) -> Self {
+        metadata::dashboards::Panel {
+            typ: value.typ.into(),
+            report_id: value.report_id,
+            x: value.x,
+            y: value.y,
+            w: value.w,
+            h: value.h,
+        }
+    }
+}
+
+impl From<metadata::dashboards::Panel> for Panel {
+    fn from(value: metadata::dashboards::Panel) -> Self {
+        Panel {
+            typ: value.typ.into(),
+            report_id: value.report_id,
+            x: value.x,
+            y: value.y,
+            w: value.w,
+            h: value.h,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -85,6 +124,23 @@ pub struct Dashboard {
     pub name: String,
     pub description: Option<String>,
     pub panels: Vec<Panel>,
+}
+
+impl From<metadata::dashboards::Dashboard> for Dashboard {
+    fn from(value: metadata::dashboards::Dashboard) -> Self {
+        Dashboard {
+            id: value.id,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+            created_by: value.created_by,
+            updated_by: value.updated_by,
+            project_id: value.project_id,
+            tags: value.tags,
+            name: value.name,
+            description: value.description,
+            panels: value.panels.into_iter().map(|v| v.into()).collect(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
