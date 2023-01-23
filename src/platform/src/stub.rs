@@ -26,7 +26,6 @@ use crate::dashboards;
 use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
 use crate::dashboards::Panel;
-use crate::dashboards::Row;
 use crate::dashboards::UpdateDashboardRequest;
 use crate::datatype::DataType;
 use crate::datatype::DictionaryDataType;

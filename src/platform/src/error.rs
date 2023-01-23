@@ -11,6 +11,7 @@ use axum::Json;
 use common::error::CommonError;
 use metadata::error::AccountError;
 use metadata::error::CustomEventError;
+use metadata::error::DashboardError;
 use metadata::error::DatabaseError;
 use metadata::error::DictionaryError;
 use metadata::error::EventError;
@@ -159,6 +160,9 @@ impl PlatformError {
                 MetadataError::Team(err) => match err {
                     TeamError::TeamNotFound(_) => ApiError::not_found(err.to_string()),
                     TeamError::TeamAlreadyExist(_) => ApiError::conflict(err.to_string()),
+                },
+                MetadataError::Dashboard(err) => match err {
+                    DashboardError::DashboardNotFound(_) => ApiError::not_found(err.to_string()),
                 },
             },
             PlatformError::Query(err) => match err {
