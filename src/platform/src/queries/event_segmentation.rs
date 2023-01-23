@@ -1,7 +1,6 @@
 use chrono::DateTime;
 use chrono::Utc;
-use query::queries::event_segmentation as query_es_types;
-use query::queries::event_segmentation::NamedQuery;
+use common::query::event_segmentation::NamedQuery;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -38,26 +37,34 @@ pub enum SegmentTime {
     },
 }
 
-impl TryInto<query_es_types::SegmentTime> for SegmentTime {
+impl TryInto<common::query::event_segmentation::SegmentTime> for SegmentTime {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::SegmentTime, Self::Error> {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::SegmentTime, Self::Error> {
         Ok(match self {
-            SegmentTime::Between { from, to } => query_es_types::SegmentTime::Between { from, to },
-            SegmentTime::From(v) => query_es_types::SegmentTime::From(v),
-            SegmentTime::Last { last: n, unit } => query_es_types::SegmentTime::Last {
-                n,
-                unit: unit.try_into()?,
-            },
+            SegmentTime::Between { from, to } => {
+                common::query::event_segmentation::SegmentTime::Between { from, to }
+            }
+            SegmentTime::From(v) => common::query::event_segmentation::SegmentTime::From(v),
+            SegmentTime::Last { last: n, unit } => {
+                common::query::event_segmentation::SegmentTime::Last {
+                    n,
+                    unit: unit.try_into()?,
+                }
+            }
             SegmentTime::AfterFirstUse { within, unit } => {
-                query_es_types::SegmentTime::AfterFirstUse {
+                common::query::event_segmentation::SegmentTime::AfterFirstUse {
                     within,
                     unit: unit.try_into()?,
                 }
             }
-            SegmentTime::WindowEach { unit } => query_es_types::SegmentTime::WindowEach {
-                unit: unit.try_into()?,
-            },
+            SegmentTime::WindowEach { unit } => {
+                common::query::event_segmentation::SegmentTime::WindowEach {
+                    unit: unit.try_into()?,
+                }
+            }
         })
     }
 }
@@ -69,13 +76,15 @@ pub enum ChartType {
     Bar,
 }
 
-impl TryInto<query_es_types::ChartType> for ChartType {
+impl TryInto<common::query::event_segmentation::ChartType> for ChartType {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::ChartType, Self::Error> {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::ChartType, Self::Error> {
         Ok(match self {
-            ChartType::Line => query_es_types::ChartType::Line,
-            ChartType::Bar => query_es_types::ChartType::Bar,
+            ChartType::Line => common::query::event_segmentation::ChartType::Line,
+            ChartType::Bar => common::query::event_segmentation::ChartType::Bar,
         })
     }
 }
@@ -92,18 +101,22 @@ pub enum Analysis {
     Cumulative,
 }
 
-impl TryInto<query_es_types::Analysis> for Analysis {
+impl TryInto<common::query::event_segmentation::Analysis> for Analysis {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::Analysis, Self::Error> {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::Analysis, Self::Error> {
         Ok(match self {
-            Analysis::Linear => query_es_types::Analysis::Linear,
-            Analysis::RollingAverage { window, unit } => query_es_types::Analysis::RollingAverage {
-                window,
-                unit: unit.try_into()?,
-            },
-            Analysis::Logarithmic => query_es_types::Analysis::Logarithmic,
-            Analysis::Cumulative => query_es_types::Analysis::Cumulative,
+            Analysis::Linear => common::query::event_segmentation::Analysis::Linear,
+            Analysis::RollingAverage { window, unit } => {
+                common::query::event_segmentation::Analysis::RollingAverage {
+                    window,
+                    unit: unit.try_into()?,
+                }
+            }
+            Analysis::Logarithmic => common::query::event_segmentation::Analysis::Logarithmic,
+            Analysis::Cumulative => common::query::event_segmentation::Analysis::Cumulative,
         })
     }
 }
@@ -115,11 +128,13 @@ pub struct Compare {
     pub unit: TimeIntervalUnit,
 }
 
-impl TryInto<query_es_types::Compare> for Compare {
+impl TryInto<common::query::event_segmentation::Compare> for Compare {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::Compare, Self::Error> {
-        Ok(query_es_types::Compare {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::Compare, Self::Error> {
+        Ok(common::query::event_segmentation::Compare {
             offset: self.offset,
             unit: self.unit.try_into()?,
         })
@@ -141,21 +156,33 @@ pub enum QueryAggregate {
     Percentile99th,
 }
 
-impl TryInto<query_es_types::QueryAggregate> for QueryAggregate {
+impl TryInto<common::query::event_segmentation::QueryAggregate> for QueryAggregate {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::QueryAggregate, Self::Error> {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::QueryAggregate, Self::Error> {
         Ok(match self {
-            QueryAggregate::Min => query_es_types::QueryAggregate::Min,
-            QueryAggregate::Max => query_es_types::QueryAggregate::Max,
-            QueryAggregate::Sum => query_es_types::QueryAggregate::Sum,
-            QueryAggregate::Avg => query_es_types::QueryAggregate::Avg,
-            QueryAggregate::Median => query_es_types::QueryAggregate::Median,
-            QueryAggregate::DistinctCount => query_es_types::QueryAggregate::DistinctCount,
-            QueryAggregate::Percentile25th => query_es_types::QueryAggregate::Percentile25th,
-            QueryAggregate::Percentile75th => query_es_types::QueryAggregate::Percentile75th,
-            QueryAggregate::Percentile90th => query_es_types::QueryAggregate::Percentile90th,
-            QueryAggregate::Percentile99th => query_es_types::QueryAggregate::Percentile99th,
+            QueryAggregate::Min => common::query::event_segmentation::QueryAggregate::Min,
+            QueryAggregate::Max => common::query::event_segmentation::QueryAggregate::Max,
+            QueryAggregate::Sum => common::query::event_segmentation::QueryAggregate::Sum,
+            QueryAggregate::Avg => common::query::event_segmentation::QueryAggregate::Avg,
+            QueryAggregate::Median => common::query::event_segmentation::QueryAggregate::Median,
+            QueryAggregate::DistinctCount => {
+                common::query::event_segmentation::QueryAggregate::DistinctCount
+            }
+            QueryAggregate::Percentile25th => {
+                common::query::event_segmentation::QueryAggregate::Percentile25th
+            }
+            QueryAggregate::Percentile75th => {
+                common::query::event_segmentation::QueryAggregate::Percentile75th
+            }
+            QueryAggregate::Percentile90th => {
+                common::query::event_segmentation::QueryAggregate::Percentile90th
+            }
+            QueryAggregate::Percentile99th => {
+                common::query::event_segmentation::QueryAggregate::Percentile99th
+            }
         })
     }
 }
@@ -171,18 +198,31 @@ pub enum QueryAggregatePerGroup {
     DistinctCount,
 }
 
-impl TryInto<query_es_types::QueryAggregatePerGroup> for QueryAggregatePerGroup {
+impl TryInto<common::query::event_segmentation::QueryAggregatePerGroup> for QueryAggregatePerGroup {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::QueryAggregatePerGroup, Self::Error> {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::QueryAggregatePerGroup, Self::Error>
+    {
         Ok(match self {
-            QueryAggregatePerGroup::Min => query_es_types::QueryAggregatePerGroup::Min,
-            QueryAggregatePerGroup::Max => query_es_types::QueryAggregatePerGroup::Max,
-            QueryAggregatePerGroup::Sum => query_es_types::QueryAggregatePerGroup::Sum,
-            QueryAggregatePerGroup::Avg => query_es_types::QueryAggregatePerGroup::Avg,
-            QueryAggregatePerGroup::Median => query_es_types::QueryAggregatePerGroup::Median,
+            QueryAggregatePerGroup::Min => {
+                common::query::event_segmentation::QueryAggregatePerGroup::Min
+            }
+            QueryAggregatePerGroup::Max => {
+                common::query::event_segmentation::QueryAggregatePerGroup::Max
+            }
+            QueryAggregatePerGroup::Sum => {
+                common::query::event_segmentation::QueryAggregatePerGroup::Sum
+            }
+            QueryAggregatePerGroup::Avg => {
+                common::query::event_segmentation::QueryAggregatePerGroup::Avg
+            }
+            QueryAggregatePerGroup::Median => {
+                common::query::event_segmentation::QueryAggregatePerGroup::Median
+            }
             QueryAggregatePerGroup::DistinctCount => {
-                query_es_types::QueryAggregatePerGroup::DistinctCount
+                common::query::event_segmentation::QueryAggregatePerGroup::DistinctCount
             }
         })
     }
@@ -194,12 +234,16 @@ pub enum QueryPerGroup {
     CountEvents,
 }
 
-impl TryInto<query_es_types::QueryPerGroup> for QueryPerGroup {
+impl TryInto<common::query::event_segmentation::QueryPerGroup> for QueryPerGroup {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::QueryPerGroup, Self::Error> {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::QueryPerGroup, Self::Error> {
         Ok(match self {
-            QueryPerGroup::CountEvents => query_es_types::QueryPerGroup::CountEvents,
+            QueryPerGroup::CountEvents => {
+                common::query::event_segmentation::QueryPerGroup::CountEvents
+            }
         })
     }
 }
@@ -233,24 +277,32 @@ pub enum Query {
     },
 }
 
-impl TryInto<query_es_types::Query> for &Query {
+impl TryInto<common::query::event_segmentation::Query> for &Query {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::Query, Self::Error> {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::Query, Self::Error> {
         Ok(match self {
-            Query::CountEvents => query_es_types::Query::CountEvents,
-            Query::CountUniqueGroups => query_es_types::Query::CountUniqueGroups,
-            Query::DailyActiveGroups => query_es_types::Query::DailyActiveGroups,
-            Query::WeeklyActiveGroups => query_es_types::Query::WeeklyActiveGroups,
-            Query::MonthlyActiveGroups => query_es_types::Query::MonthlyActiveGroups,
-            Query::CountPerGroup { aggregate } => query_es_types::Query::CountPerGroup {
-                aggregate: aggregate.try_into()?,
-            },
+            Query::CountEvents => common::query::event_segmentation::Query::CountEvents,
+            Query::CountUniqueGroups => common::query::event_segmentation::Query::CountUniqueGroups,
+            Query::DailyActiveGroups => common::query::event_segmentation::Query::DailyActiveGroups,
+            Query::WeeklyActiveGroups => {
+                common::query::event_segmentation::Query::WeeklyActiveGroups
+            }
+            Query::MonthlyActiveGroups => {
+                common::query::event_segmentation::Query::MonthlyActiveGroups
+            }
+            Query::CountPerGroup { aggregate } => {
+                common::query::event_segmentation::Query::CountPerGroup {
+                    aggregate: aggregate.try_into()?,
+                }
+            }
             Query::AggregatePropertyPerGroup {
                 property,
                 aggregate_per_group,
                 aggregate,
-            } => query_es_types::Query::AggregatePropertyPerGroup {
+            } => common::query::event_segmentation::Query::AggregatePropertyPerGroup {
                 property: property.to_owned().try_into()?,
                 aggregate_per_group: aggregate_per_group.try_into()?,
                 aggregate: aggregate.try_into()?,
@@ -258,11 +310,11 @@ impl TryInto<query_es_types::Query> for &Query {
             Query::AggregateProperty {
                 property,
                 aggregate,
-            } => query_es_types::Query::AggregateProperty {
+            } => common::query::event_segmentation::Query::AggregateProperty {
                 property: property.to_owned().try_into()?,
                 aggregate: aggregate.try_into()?,
             },
-            Query::Formula { formula } => query_es_types::Query::QueryFormula {
+            Query::Formula { formula } => common::query::event_segmentation::Query::QueryFormula {
                 formula: formula.clone(),
             },
         })
@@ -278,13 +330,17 @@ pub enum Breakdown {
     },
 }
 
-impl TryInto<query_es_types::Breakdown> for &Breakdown {
+impl TryInto<common::query::event_segmentation::Breakdown> for &Breakdown {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::Breakdown, Self::Error> {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::Breakdown, Self::Error> {
         Ok(match self {
             Breakdown::Property { property } => {
-                query_es_types::Breakdown::Property(property.to_owned().try_into()?)
+                common::query::event_segmentation::Breakdown::Property(
+                    property.to_owned().try_into()?,
+                )
             }
         })
     }
@@ -309,11 +365,13 @@ pub struct Event {
     pub queries: Vec<Query>,
 }
 
-impl TryInto<query_es_types::Event> for &Event {
+impl TryInto<common::query::event_segmentation::Event> for &Event {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::Event, Self::Error> {
-        Ok(query_es_types::Event {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::Event, Self::Error> {
+        Ok(common::query::event_segmentation::Event {
             event: self.event.to_owned().into(),
             filters: self
                 .filters
@@ -337,7 +395,7 @@ impl TryInto<query_es_types::Event> for &Event {
                 .queries
                 .iter()
                 .map(|v| v.try_into())
-                .collect::<std::result::Result<Vec<query_es_types::Query>, _>>()?
+                .collect::<std::result::Result<Vec<common::query::event_segmentation::Query>, _>>()?
                 .iter()
                 .enumerate()
                 .map(|(idx, v)| NamedQuery::new(v.clone(), Some(self.event.name(idx))))
@@ -429,11 +487,14 @@ pub struct EventSegmentation {
     pub segments: Option<Vec<Segment>>,
 }
 
-impl TryInto<query_es_types::EventSegmentation> for EventSegmentation {
+impl TryInto<common::query::event_segmentation::EventSegmentation> for EventSegmentation {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<query_es_types::EventSegmentation, Self::Error> {
-        Ok(query_es_types::EventSegmentation {
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::EventSegmentation, Self::Error>
+    {
+        Ok(common::query::event_segmentation::EventSegmentation {
             time: self.time.try_into()?,
             group: self.group,
             interval_unit: self.interval_unit.try_into()?,
@@ -471,7 +532,6 @@ mod tests {
     use chrono::DateTime;
     use chrono::Utc;
     use query::event_fields;
-    use query::queries::event_segmentation::EventSegmentation as QueryEventSegmentation;
     use serde_json::json;
 
     use crate::error::Result;
@@ -589,7 +649,7 @@ mod tests {
             segments: None,
         };
 
-        let _qes: QueryEventSegmentation = es.clone().try_into()?;
+        let _qes: common::query::event_segmentation::EventSegmentation = es.clone().try_into()?;
         let j = serde_json::to_string_pretty(&es).unwrap();
         print!("1 {}", j);
 

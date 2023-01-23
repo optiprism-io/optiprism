@@ -2,11 +2,11 @@ use arrow::array::ArrayRef;
 use arrow::datatypes::DataType;
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
+use common::query::event_segmentation::EventSegmentation;
 pub use context::Context;
 pub use error::Result;
 pub use provider_impl::ProviderImpl;
 
-use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::PropertyValues;
 pub mod context;
 pub mod error;

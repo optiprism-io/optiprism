@@ -37,6 +37,7 @@ use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::DataType;
+use common::query::PartitionedAggregateFunction;
 use datafusion::physical_plan::expressions::AvgAccumulator;
 use datafusion::physical_plan::expressions::MaxAccumulator;
 use datafusion::physical_plan::expressions::MinAccumulator;
@@ -155,18 +156,6 @@ impl Buffer {
 
     pub fn evaluate(&self) -> DFResult<ScalarValue> {
         self.acc.lock().unwrap().evaluate()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
-pub enum PartitionedAggregateFunction {
-    Count,
-    Sum,
-}
-
-impl fmt::Display for PartitionedAggregateFunction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", format!("{:?}", self).to_uppercase())
     }
 }
 

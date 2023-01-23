@@ -3,10 +3,11 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
-use common::types::EventFilter;
-use common::types::EventRef;
-use common::types::PropValueOperation;
-use common::types::PropertyRef;
+use common::query::EventFilter;
+use common::query::EventRef;
+use common::query::PropValueOperation;
+use common::query::PropertyRef;
+use common::query::QueryTime;
 use datafusion_common::Column;
 use datafusion_common::ExprSchema;
 use datafusion_common::ScalarValue;
@@ -28,7 +29,6 @@ use crate::event_fields;
 use crate::logical_plan::expr::lit_timestamp;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
-use crate::queries::QueryTime;
 use crate::Context;
 use crate::Result;
 
@@ -314,7 +314,7 @@ pub fn named_property_expression(
             Ok(match values_vec.len() {
                 1 => binary_expr(
                     prop_col,
-                    operation.clone().into(),
+                    operation.to_owned().try_into()?,
                     lit(values_vec[0].to_owned()),
                 ),
                 _ => {
@@ -324,7 +324,7 @@ pub fn named_property_expression(
                         .map(|v| {
                             binary_expr(
                                 prop_col.clone(),
-                                operation.clone().into(),
+                                operation.clone().try_into().unwrap(),
                                 lit(v.to_owned()),
                             )
                         })

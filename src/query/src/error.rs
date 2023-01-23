@@ -1,6 +1,7 @@
 use std::result;
 
 use arrow::error::ArrowError;
+use common::error::CommonError;
 use datafusion::error::DataFusionError;
 use metadata::error::MetadataError;
 use thiserror::Error;
@@ -21,6 +22,8 @@ pub enum QueryError {
     Arrow(#[from] ArrowError),
     #[error("metadata {0:?}")]
     Metadata(#[from] MetadataError),
+    #[error("common {0:?}")]
+    Common(#[from] CommonError),
 }
 
 impl QueryError {

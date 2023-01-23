@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use common::types::EventRef;
-use common::types::PropValueOperation;
-use common::types::PropertyRef;
+use common::query::EventRef;
+use common::query::PropValueOperation;
+use common::query::PropertyRef;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;

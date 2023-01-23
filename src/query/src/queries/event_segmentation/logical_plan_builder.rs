@@ -5,9 +5,14 @@ use chrono::prelude::*;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
-use chronoutil::DateRule;
-use common::types::EventFilter;
-use common::types::PropertyRef;
+use common::query::event_segmentation::Breakdown;
+use common::query::event_segmentation::Event;
+use common::query::event_segmentation::EventSegmentation;
+use common::query::event_segmentation::Query;
+use common::query::time_columns;
+use common::query::EventFilter;
+use common::query::PartitionedAggregateFunction;
+use common::query::PropertyRef;
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
@@ -39,12 +44,6 @@ use crate::logical_plan::expr::sorted_distinct_count;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
-use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
-use crate::queries::event_segmentation::Breakdown;
-use crate::queries::event_segmentation::Event;
-use crate::queries::event_segmentation::EventSegmentation;
-use crate::queries::event_segmentation::Query;
-use crate::queries::TimeIntervalUnit;
 use crate::Context;
 
 pub const COL_AGG_NAME: &str = "agg_name";
@@ -318,7 +317,7 @@ impl LogicalPlanBuilder {
                         input.schema(),
                         col(self.es.group.as_ref()),
                         PartitionedAggregateFunction::Count,
-                        aggregate.clone(),
+                        aggregate.to_owned().into(),
                         vec![col(self.es.group.as_ref())],
                     )?,
                     Query::AggregatePropertyPerGroup {
@@ -329,7 +328,7 @@ impl LogicalPlanBuilder {
                         input.schema(),
                         col(self.es.group.as_ref()),
                         aggregate_per_group.clone(),
-                        aggregate.clone(),
+                        aggregate.to_owned().into(),
                         vec![executor::block_on(property_col(
                             &self.ctx,
                             &self.metadata,
@@ -340,7 +339,7 @@ impl LogicalPlanBuilder {
                         property,
                         aggregate,
                     } => Expr::AggregateFunction {
-                        fun: aggregate.clone(),
+                        fun: aggregate.to_owned().into(),
                         args: vec![executor::block_on(property_col(
                             &self.ctx,
                             &self.metadata,
@@ -412,73 +411,9 @@ impl LogicalPlanBuilder {
                 PropertyRef::User(_prop_name) | PropertyRef::Event(_prop_name) => {
                     let prop_col = property_col(&self.ctx, &self.metadata, prop_ref).await?;
                     Ok(prop_col)
-                    // Ok(Expr::Alias(Box::new(prop_col), prop_name.clone()))
                 }
                 PropertyRef::Custom(_) => unimplemented!(),
             },
         }
     }
-}
-
-impl EventSegmentation {
-    pub fn time_columns(&self, cur_time: DateTime<Utc>) -> Vec<String> {
-        let (from, to) = self.time.range(cur_time);
-
-        time_columns(from, to, &self.interval_unit)
-    }
-}
-
-pub fn time_columns(
-    from: DateTime<Utc>,
-    to: DateTime<Utc>,
-    granularity: &TimeIntervalUnit,
-) -> Vec<String> {
-    let from = date_trunc(granularity, from).unwrap();
-    let to = date_trunc(granularity, to).unwrap();
-    let rule = match granularity {
-        TimeIntervalUnit::Second => DateRule::secondly(from),
-        TimeIntervalUnit::Minute => DateRule::minutely(from),
-        TimeIntervalUnit::Hour => DateRule::hourly(from),
-        TimeIntervalUnit::Day => DateRule::daily(from),
-        TimeIntervalUnit::Week => DateRule::weekly(from),
-        TimeIntervalUnit::Month => DateRule::monthly(from),
-        TimeIntervalUnit::Year => DateRule::yearly(from),
-    };
-
-    rule.with_end(to + granularity.relative_duration(1))
-        .map(|dt| dt.naive_utc().to_string())
-        .collect()
-}
-
-pub fn date_trunc(granularity: &TimeIntervalUnit, value: DateTime<Utc>) -> Result<DateTime<Utc>> {
-    let value = Some(value);
-    let value = match granularity {
-        TimeIntervalUnit::Second => value,
-        TimeIntervalUnit::Minute => value.and_then(|d| d.with_second(0)),
-        TimeIntervalUnit::Hour => value
-            .and_then(|d| d.with_second(0))
-            .and_then(|d| d.with_minute(0)),
-        TimeIntervalUnit::Day => value
-            .and_then(|d| d.with_second(0))
-            .and_then(|d| d.with_minute(0))
-            .and_then(|d| d.with_hour(0)),
-        TimeIntervalUnit::Week => value
-            .and_then(|d| d.with_second(0))
-            .and_then(|d| d.with_minute(0))
-            .and_then(|d| d.with_hour(0))
-            .map(|d| d - Duration::seconds(60 * 60 * 24 * d.weekday() as i64)),
-        TimeIntervalUnit::Month => value
-            .and_then(|d| d.with_second(0))
-            .and_then(|d| d.with_minute(0))
-            .and_then(|d| d.with_hour(0))
-            .and_then(|d| d.with_day0(0)),
-        TimeIntervalUnit::Year => value
-            .and_then(|d| d.with_second(0))
-            .and_then(|d| d.with_minute(0))
-            .and_then(|d| d.with_hour(0))
-            .and_then(|d| d.with_day0(0))
-            .and_then(|d| d.with_month0(0)),
-    };
-
-    Ok(value.unwrap())
 }

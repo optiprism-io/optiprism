@@ -3,6 +3,9 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::util::pretty::print_batches;
+    use common::query::EventRef;
+    use common::query::PropValueOperation;
+    use common::query::PropertyRef;
     use common::types::EventRef;
     use common::types::PropValueOperation;
     use common::types::PropertyRef;

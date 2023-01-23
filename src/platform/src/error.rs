@@ -168,6 +168,7 @@ impl PlatformError {
                 QueryError::DataFusion(err) => ApiError::internal(err.to_string()),
                 QueryError::Arrow(err) => ApiError::internal(err.to_string()),
                 QueryError::Metadata(err) => ApiError::internal(err.to_string()),
+                QueryError::Common(err) => ApiError::internal(err.to_string()),
             },
             PlatformError::BadRequest(msg) => ApiError::bad_request(msg),
             PlatformError::Internal(msg) => ApiError::internal(msg),
