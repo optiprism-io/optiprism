@@ -1,7 +1,7 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use common::types::EventRef;
+use common::query::EventRef;
 use common::types::OptionalProperty;
 use metadata::custom_events::provider_impl::MAX_EVENTS_LEVEL;
 use metadata::custom_events::CreateCustomEventRequest;

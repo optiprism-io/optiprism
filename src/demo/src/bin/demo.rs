@@ -63,7 +63,11 @@ async fn main() -> Result<(), anyhow::Error> {
         None => temp_dir().join(format!("{}.db", Uuid::new_v4())),
         Some(path) => {
             if !path.try_exists()? {
-                return Err(DemoError::FileNotFound(format!("metadata path {:?} doesn't exist", path)).into());
+                return Err(DemoError::FileNotFound(format!(
+                    "metadata path {:?} doesn't exist",
+                    path
+                ))
+                .into());
             }
 
             path
@@ -72,12 +76,18 @@ async fn main() -> Result<(), anyhow::Error> {
 
     if let Some(ui_path) = &args.ui_path {
         if !ui_path.try_exists()? {
-            return Err(DemoError::FileNotFound(format!("ui path {:?} doesn't exist", ui_path)).into());
+            return Err(
+                DemoError::FileNotFound(format!("ui path {:?} doesn't exist", ui_path)).into(),
+            );
         }
     }
 
     if !args.demo_data_path.try_exists()? {
-        return Err(DemoError::FileNotFound(format!("demo data path {:?} doesn't exist", args.demo_data_path)).into());
+        return Err(DemoError::FileNotFound(format!(
+            "demo data path {:?} doesn't exist",
+            args.demo_data_path
+        ))
+        .into());
     }
 
     let store = Arc::new(Store::new(md_path.clone()));

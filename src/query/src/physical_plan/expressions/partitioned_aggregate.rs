@@ -19,7 +19,6 @@
 
 use std::cmp::Ordering;
 use std::convert::TryFrom;
-use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::Mutex;

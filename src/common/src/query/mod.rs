@@ -61,37 +61,9 @@ pub enum AggregateFunction {
     Grouping,
 }
 
-impl Into<DFAggregateFunction> for AggregateFunction {
-    fn into(self) -> DFAggregateFunction {
-        match self {
-            AggregateFunction::Count => DFAggregateFunction::Count,
-            AggregateFunction::Sum => DFAggregateFunction::Sum,
-            AggregateFunction::Min => DFAggregateFunction::Min,
-            AggregateFunction::Max => DFAggregateFunction::Max,
-            AggregateFunction::Avg => DFAggregateFunction::Avg,
-            AggregateFunction::Median => DFAggregateFunction::Median,
-            AggregateFunction::ApproxDistinct => DFAggregateFunction::ApproxDistinct,
-            AggregateFunction::ArrayAgg => DFAggregateFunction::ArrayAgg,
-            AggregateFunction::Variance => DFAggregateFunction::Variance,
-            AggregateFunction::VariancePop => DFAggregateFunction::VariancePop,
-            AggregateFunction::Stddev => DFAggregateFunction::Stddev,
-            AggregateFunction::StddevPop => DFAggregateFunction::StddevPop,
-            AggregateFunction::Covariance => DFAggregateFunction::Covariance,
-            AggregateFunction::CovariancePop => DFAggregateFunction::CovariancePop,
-            AggregateFunction::Correlation => DFAggregateFunction::Correlation,
-            AggregateFunction::ApproxPercentileCont => DFAggregateFunction::ApproxPercentileCont,
-            AggregateFunction::ApproxPercentileContWithWeight => {
-                DFAggregateFunction::ApproxPercentileContWithWeight
-            }
-            AggregateFunction::ApproxMedian => DFAggregateFunction::ApproxMedian,
-            AggregateFunction::Grouping => DFAggregateFunction::Grouping,
-        }
-    }
-}
-
-impl Into<AggregateFunction> for DFAggregateFunction {
-    fn into(self) -> AggregateFunction {
-        match self {
+impl From<DFAggregateFunction> for AggregateFunction {
+    fn from(v: DFAggregateFunction) -> AggregateFunction {
+        match v {
             DFAggregateFunction::Count => AggregateFunction::Count,
             DFAggregateFunction::Sum => AggregateFunction::Sum,
             DFAggregateFunction::Min => AggregateFunction::Min,
@@ -113,6 +85,34 @@ impl Into<AggregateFunction> for DFAggregateFunction {
             }
             DFAggregateFunction::ApproxMedian => AggregateFunction::ApproxMedian,
             DFAggregateFunction::Grouping => AggregateFunction::Grouping,
+        }
+    }
+}
+
+impl From<AggregateFunction> for DFAggregateFunction {
+    fn from(v: AggregateFunction) -> DFAggregateFunction {
+        match v {
+            AggregateFunction::Count => DFAggregateFunction::Count,
+            AggregateFunction::Sum => DFAggregateFunction::Sum,
+            AggregateFunction::Min => DFAggregateFunction::Min,
+            AggregateFunction::Max => DFAggregateFunction::Max,
+            AggregateFunction::Avg => DFAggregateFunction::Avg,
+            AggregateFunction::Median => DFAggregateFunction::Median,
+            AggregateFunction::ApproxDistinct => DFAggregateFunction::ApproxDistinct,
+            AggregateFunction::ArrayAgg => DFAggregateFunction::ArrayAgg,
+            AggregateFunction::Variance => DFAggregateFunction::Variance,
+            AggregateFunction::VariancePop => DFAggregateFunction::VariancePop,
+            AggregateFunction::Stddev => DFAggregateFunction::Stddev,
+            AggregateFunction::StddevPop => DFAggregateFunction::StddevPop,
+            AggregateFunction::Covariance => DFAggregateFunction::Covariance,
+            AggregateFunction::CovariancePop => DFAggregateFunction::CovariancePop,
+            AggregateFunction::Correlation => DFAggregateFunction::Correlation,
+            AggregateFunction::ApproxPercentileCont => DFAggregateFunction::ApproxPercentileCont,
+            AggregateFunction::ApproxPercentileContWithWeight => {
+                DFAggregateFunction::ApproxPercentileContWithWeight
+            }
+            AggregateFunction::ApproxMedian => DFAggregateFunction::ApproxMedian,
+            AggregateFunction::Grouping => DFAggregateFunction::Grouping,
         }
     }
 }

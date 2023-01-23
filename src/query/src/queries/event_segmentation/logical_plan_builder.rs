@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::prelude::*;
 use chrono::DateTime;
-use chrono::Duration;
 use chrono::Utc;
 use common::query::event_segmentation::Breakdown;
 use common::query::event_segmentation::Event;
