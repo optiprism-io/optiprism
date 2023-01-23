@@ -516,12 +516,13 @@ impl Dashboards {
             tags: Some(vec!["tag".to_string()]),
             name: "name".to_string(),
             description: Some("description".to_string()),
-            rows: vec![Row {
-                panels: vec![Panel {
-                    span: 1,
-                    typ: dashboards::Type::Report,
-                    report_id: 1,
-                }],
+            panels: vec![Panel {
+                typ: dashboards::Type::Report,
+                report_id: 1,
+                x: 1,
+                y: 2,
+                w: 3,
+                h: 4,
             }],
         }
     }

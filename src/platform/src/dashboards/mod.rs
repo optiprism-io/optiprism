@@ -57,10 +57,13 @@ pub enum Type {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Panel {
-    pub span: usize,
     #[serde(rename = "type")]
     pub typ: Type,
     pub report_id: u64,
+    pub x: usize,
+    pub y: usize,
+    pub w: usize,
+    pub h: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -81,7 +84,7 @@ pub struct Dashboard {
     pub tags: Option<Vec<String>>,
     pub name: String,
     pub description: Option<String>,
-    pub rows: Vec<Row>,
+    pub panels: Vec<Panel>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -90,7 +93,7 @@ pub struct CreateDashboardRequest {
     pub tags: Option<Vec<String>>,
     pub name: String,
     pub description: Option<String>,
-    pub rows: Vec<Row>,
+    pub panels: Vec<Panel>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -103,5 +106,5 @@ pub struct UpdateDashboardRequest {
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub description: OptionalProperty<Option<String>>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
-    pub rows: OptionalProperty<Vec<Row>>,
+    pub panels: OptionalProperty<Vec<Panel>>,
 }
