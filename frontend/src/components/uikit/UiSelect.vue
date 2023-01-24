@@ -6,8 +6,14 @@
             :shown="isOpen"
             @hide="onHide"
         >
-            <span hidden>Choose one</span>
+            <div
+                v-if="$slots.action"
+                @click="onToggle"
+            >
+                <slot name="action" />
+            </div>
             <button
+                v-else
                 class="pf-c-select__toggle"
                 type="button"
                 aria-haspopup="true"

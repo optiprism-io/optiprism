@@ -14,7 +14,15 @@
                     :items="selectReportsList"
                     :text-button="t('dashboards.addReport')"
                     @on-select="addReport"
-                />
+                >
+                    <template #action>
+                        <UiButton
+                            class="dashboards__add-report-button pf-m-main"
+                        >
+                            {{ t('dashboards.addReport') }}
+                        </UiButton>
+                    </template>
+                </UiSelect>
             </div>
             <GridLayout
                 v-model:layout="layout"
@@ -106,6 +114,7 @@ import DashboardReportsPopup from '@/components/dashboards/DashboardReportsPopup
 import UiInlineEdit from '@/components/uikit/UiInlineEdit.vue'
 import { GenericUiDropdown, UiDropdownItem } from '@/components/uikit/UiDropdown.vue'
 import UiSelect from '@/components/uikit/UiSelect.vue';
+import UiButton from '@/components/uikit/UiButton.vue';
 
 const UiDropwdown = GenericUiDropdown<string>()
 const { confirm } = useConfirm()
@@ -256,35 +265,38 @@ const updateDashboardSpan = (dashboard: DashboardRows[]) => {
     })
 }
 
-const updateCreateDashboard = async () => {
-    const dataForRequest = {
-        name: dashboardName.value,
-        panels: layout.value.map(item => {
-            return {
-                type: DashboardPanelTypeEnum.Report,
-                reportId: item.reportId,
-                i: item.i,
-                x: item.x,
-                y: item.y,
-                w: item.w,
-                h: item.h,
-            }
-        })
-    }
-    if (activeDashboardId.value) {
-        await dashboardService.updateDashboard(commonStore.organizationId, commonStore.projectId, activeDashboardId.value, dataForRequest)
-    } else {
-        const res = await dashboardService.createDashboard(commonStore.organizationId, commonStore.projectId, dataForRequest)
-        if (res.data?.id) {
-            router.push({
-                name: pagesMap.dashboards.name,
-                query: {
-                    id: res.data.id,
-                },
+const updateCreateDashboard = async (panels?: Layout[]) => {
+    try {
+        const dataForRequest = {
+            name: dashboardName.value,
+            panels: (panels || layout.value).map(item => {
+                return {
+                    type: DashboardPanelTypeEnum.Report,
+                    reportId: item.reportId,
+                    i: item.i,
+                    x: item.x,
+                    y: item.y,
+                    w: item.w,
+                    h: item.h,
+                }
             })
         }
+        if (activeDashboardId.value) {
+            await dashboardService.updateDashboard(commonStore.organizationId, commonStore.projectId, activeDashboardId.value, dataForRequest)
+        } else {
+            const res = await dashboardService.createDashboard(commonStore.organizationId, commonStore.projectId, dataForRequest)
+            if (res.data?.id) {
+                router.push({
+                    name: pagesMap.dashboards.name,
+                    query: {
+                        id: res.data.id,
+                    },
+                })
+            }
+        }
+    } catch (e) {
+        console.error(e);
     }
-    getDashboardsList()
 }
 
 const onSelectReport = (payload: number) => {
@@ -301,7 +313,7 @@ const closeDashboardReportsPopup = () => {
     editPanel.value = null
 }
 
-const addReport = (payload: number) => {
+const addReport = async (payload: number) => {
     const panel = {
         type: DashboardPanelTypeEnum.Report,
         reportId: payload,
@@ -313,10 +325,8 @@ const addReport = (payload: number) => {
         minH: 5,
         minW: 3,
     }
+    await updateCreateDashboard([panel, ...layout.value]);
     layout.value = [panel, ...layout.value];
-    setTimeout(() => {
-        updateCreateDashboard();
-    }, 800)
 }
 
 const selectReportDropdown = async (payload: UiDropdownItem<string>, id: number) => {
@@ -343,9 +353,10 @@ const setNew = () => {
     })
 }
 
-const updateName = (payload: string) => {
+const updateName = async (payload: string) => {
     dashboardName.value = payload
-    updateCreateDashboard()
+    await updateCreateDashboard()
+    getDashboardsList()
 }
 
 const initDashboardPage = () => {
@@ -394,8 +405,11 @@ watch(() => route.query.id, id => {
             height: calc(100% - 36px);
         }
     }
+    &__add-report-button {
+        width: 100%;
+    }
     &__add-report {
-        max-width: 240px;
+        max-width: 140px;
     }
     &__new-item {
         min-height: 250px;
