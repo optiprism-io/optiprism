@@ -128,10 +128,6 @@ const reportsStore = useReportsStore()
 
 const ROW_HEIGHT = 56;
 
-interface DashboardRows {
-    panels: DashboardPanelType[]
-}
-
 interface Layout extends DashboardPanelType {
     i: number
     minH: number,
@@ -139,13 +135,8 @@ interface Layout extends DashboardPanelType {
 }
 
 const layout = ref<Layout[]>([]);
-const loadingReports = ref(false)
-const reports = ref<Report[]>([])
 const dashboardReportsPopup = ref(false)
-const addReportPanels = ref(0)
 const dashboardName = ref(t('dashboards.untitledDashboard'))
-const newDashboardRows = ref<DashboardRows[]>([])
-const errorDashboard = ref(false)
 const activeDashboardId = ref<number | null>(null)
 const editPanel = ref<number | null>(null)
 const dashboards = computed(() => dashboardsStore.dashboards)
@@ -155,7 +146,6 @@ const dashboardsId = computed((): number[] => {
     return dashboards.value.map(item => Number(item.id))
 });
 
-const selections = computed(() => activeDashboardId.value ? [activeDashboardId.value] : [])
 const activeDashboard = computed(() => {
     return dashboards.value.find(item => Number(item.id) === activeDashboardId.value) ?? null
 })
@@ -218,51 +208,8 @@ const onSelectDashboard = (id: number | string) => {
     updateLauout();
 }
 
-const getReportsList = async () => {
-    loadingReports.value = true
-    try {
-        const res = await reportsService.reportsList(commonStore.organizationId, commonStore.projectId)
-        if (res.data?.dashboards) {
-            reports.value = res.data.dashboards
-        }
-    } catch(error: unknown) {
-        throw Error(JSON.stringify(error))
-    }
-    loadingReports.value = false
-}
-
-const onDeleteDashboard = async () => {
-    try {
-        if (activeDashboardId.value) {
-            await confirm(t('dashboards.deleteConfirm', { name: `<b>${activeDashboard.value?.name}</b>` || '' }), {
-                applyButton: t('common.apply'),
-                cancelButton: t('common.cancel'),
-                title: t('dashboards.delete'),
-                applyButtonClass: 'pf-m-danger',
-            })
-
-            await dashboardService.deleteDashboard(commonStore.organizationId, commonStore.organizationId, activeDashboardId.value)
-        }
-    } catch(error) {
-        errorDashboard.value = true
-    }
-}
-
 const getDashboardsList = async () => {
     await dashboardsStore.getDashboards()
-}
-
-const updateDashboardSpan = (dashboard: DashboardRows[]) => {
-    return dashboard.map(item => {
-        return {
-            panels: item.panels.map(panel => {
-                return {
-                    ...panel,
-                    span: 12 / item.panels.length
-                }
-            })
-        }
-    })
 }
 
 const updateCreateDashboard = async (panels?: Layout[]) => {
