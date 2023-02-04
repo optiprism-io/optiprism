@@ -158,7 +158,7 @@ pub struct UpdateDashboardRequest {
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub tags: OptionalProperty<Option<Vec<String>>>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
-    pub name: OptionalProperty<Option<String>>,
+    pub name: OptionalProperty<String>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
     pub description: OptionalProperty<Option<String>>,
     #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]

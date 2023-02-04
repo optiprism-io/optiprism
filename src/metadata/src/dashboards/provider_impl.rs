@@ -124,11 +124,14 @@ impl Provider for ProviderImpl {
 
         dashboard.updated_at = Some(Utc::now());
         dashboard.updated_by = Some(req.updated_by);
-        if let OptionalProperty::Some(tags) = req.tags {
-            dashboard.tags = tags;
+        if let OptionalProperty::Some(name) = req.name {
+            dashboard.name = name;
         }
         if let OptionalProperty::Some(description) = req.description {
             dashboard.description = description;
+        }
+        if let OptionalProperty::Some(tags) = req.tags {
+            dashboard.tags = tags;
         }
         if let OptionalProperty::Some(panels) = req.panels {
             dashboard.panels = panels;

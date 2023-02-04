@@ -1,5 +1,6 @@
 mod auth;
 mod custom_events;
+mod dashboards;
 mod event_segmentation;
 mod events;
 mod properties;

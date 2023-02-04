@@ -65,7 +65,7 @@ pub struct CreateDashboardRequest {
 pub struct UpdateDashboardRequest {
     pub updated_by: u64,
     pub tags: OptionalProperty<Option<Vec<String>>>,
-    pub name: OptionalProperty<Option<String>>,
+    pub name: OptionalProperty<String>,
     pub description: OptionalProperty<Option<String>>,
     pub panels: OptionalProperty<Vec<Panel>>,
 }
