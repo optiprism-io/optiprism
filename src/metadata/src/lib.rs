@@ -9,6 +9,7 @@ pub mod metadata;
 pub mod organizations;
 pub mod projects;
 pub mod properties;
+pub mod reports;
 pub mod store;
 pub mod stub;
 pub mod teams;

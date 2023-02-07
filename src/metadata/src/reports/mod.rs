@@ -3,6 +3,7 @@ pub mod provider_impl;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
+use common::query::event_segmentation::EventSegmentation;
 use common::types::OptionalProperty;
 pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
@@ -14,24 +15,19 @@ use crate::Result;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Type {
-    Report,
+    EventSegmentation,
+    Funnel,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum Query {
+    EventSegmentation(EventSegmentation),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct Panel {
-    #[serde(rename = "type")]
-    pub typ: Type,
-    pub report_id: u64,
-    pub x: usize,
-    pub y: usize,
-    pub w: usize,
-    pub h: usize,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct Dashboard {
+pub struct Report {
     pub id: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: Option<DateTime<Utc>>,
@@ -41,7 +37,39 @@ pub struct Dashboard {
     pub tags: Option<Vec<String>>,
     pub name: String,
     pub description: Option<String>,
-    pub panels: Vec<Panel>,
+    #[serde(rename = "type")]
+    pub typ: Type,
+    pub query: Query,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateReportRequest {
+    pub tags: Option<Vec<String>>,
+    pub name: String,
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub typ: Type,
+    pub query: Query,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateReportRequest {
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
+    pub tags: OptionalProperty<Option<Vec<String>>>,
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
+    pub name: OptionalProperty<Option<String>>,
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
+    pub description: OptionalProperty<Option<String>>,
+    #[serde(
+        default,
+        rename = "type",
+        skip_serializing_if = "OptionalProperty::is_none"
+    )]
+    pub typ: OptionalProperty<Type>,
+    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
+    pub query: OptionalProperty<Query>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
