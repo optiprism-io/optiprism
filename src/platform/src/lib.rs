@@ -85,7 +85,7 @@ impl PlatformProvider {
             auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
             query: Arc::new(queries::ProviderImpl::new(query_prov)),
             dashboards: Arc::new(dashboards::ProviderImpl::new(md.dashboards.clone())),
-            reports: Arc::new(stub::Reports {}),
+            reports: Arc::new(reports::ProviderImpl::new(md.reports.clone())),
             event_records: Arc::new(stub::EventRecords {}),
             group_records: Arc::new(stub::GroupRecords {}),
         }
@@ -430,7 +430,7 @@ impl TryInto<common::query::EventFilter> for &EventFilter {
     }
 }
 
-impl TryInto<EventFilter> for common::query::EventFilter {
+impl TryInto<EventFilter> for &common::query::EventFilter {
     type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<EventFilter, Self::Error> {
@@ -440,8 +440,8 @@ impl TryInto<EventFilter> for common::query::EventFilter {
                 operation,
                 value,
             } => EventFilter::Property {
-                property: property.try_into()?,
-                operation: operation.try_into()?,
+                property: property.to_owned().try_into()?,
+                operation: operation.to_owned().try_into()?,
                 value: match value {
                     None => None,
                     Some(v) => Some(v.iter().map(scalar_to_json_value).collect::<Result<_>>()?),

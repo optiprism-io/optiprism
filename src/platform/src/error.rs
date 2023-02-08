@@ -19,6 +19,7 @@ use metadata::error::MetadataError;
 use metadata::error::OrganizationError;
 use metadata::error::ProjectError;
 use metadata::error::PropertyError;
+use metadata::error::ReportError;
 use metadata::error::StoreError;
 use metadata::error::TeamError;
 use query::error::QueryError;
@@ -163,6 +164,9 @@ impl PlatformError {
                 },
                 MetadataError::Dashboard(err) => match err {
                     DashboardError::DashboardNotFound(_) => ApiError::not_found(err.to_string()),
+                },
+                MetadataError::Report(err) => match err {
+                    ReportError::ReportNotFound(_) => ApiError::not_found(err.to_string()),
                 },
             },
             PlatformError::Query(err) => match err {

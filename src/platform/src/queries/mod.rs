@@ -70,6 +70,21 @@ impl TryInto<common::query::QueryTime> for QueryTime {
     }
 }
 
+impl TryInto<QueryTime> for common::query::QueryTime {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<QueryTime, Self::Error> {
+        Ok(match self {
+            common::query::QueryTime::Between { from, to } => QueryTime::Between { from, to },
+            common::query::QueryTime::From(from) => QueryTime::From { from },
+            common::query::QueryTime::Last { last, unit } => QueryTime::Last {
+                last,
+                unit: unit.try_into()?,
+            },
+        })
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum SegmentTime {
@@ -114,6 +129,22 @@ impl TryInto<common::query::TimeIntervalUnit> for TimeIntervalUnit {
             TimeIntervalUnit::Week => common::query::TimeIntervalUnit::Week,
             TimeIntervalUnit::Month => common::query::TimeIntervalUnit::Month,
             TimeIntervalUnit::Year => common::query::TimeIntervalUnit::Year,
+        })
+    }
+}
+
+impl TryInto<TimeIntervalUnit> for common::query::TimeIntervalUnit {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<TimeIntervalUnit, Self::Error> {
+        Ok(match self {
+            common::query::TimeIntervalUnit::Second => TimeIntervalUnit::Second,
+            common::query::TimeIntervalUnit::Minute => TimeIntervalUnit::Minute,
+            common::query::TimeIntervalUnit::Hour => TimeIntervalUnit::Hour,
+            common::query::TimeIntervalUnit::Day => TimeIntervalUnit::Day,
+            common::query::TimeIntervalUnit::Week => TimeIntervalUnit::Week,
+            common::query::TimeIntervalUnit::Month => TimeIntervalUnit::Month,
+            common::query::TimeIntervalUnit::Year => TimeIntervalUnit::Year,
         })
     }
 }
@@ -182,6 +213,34 @@ impl TryInto<common::query::AggregateFunction> for &AggregateFunction {
     }
 }
 
+impl TryInto<AggregateFunction> for common::query::AggregateFunction {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<AggregateFunction, Self::Error> {
+        Ok(match self {
+            common::query::AggregateFunction::Count => AggregateFunction::Count,
+            common::query::AggregateFunction::Sum => AggregateFunction::Sum,
+            common::query::AggregateFunction::Min => AggregateFunction::Min,
+            common::query::AggregateFunction::Max => AggregateFunction::Max,
+            common::query::AggregateFunction::Avg => AggregateFunction::Avg,
+            common::query::AggregateFunction::ApproxDistinct => AggregateFunction::ApproxDistinct,
+            common::query::AggregateFunction::ArrayAgg => AggregateFunction::ArrayAgg,
+            common::query::AggregateFunction::Variance => AggregateFunction::Variance,
+            common::query::AggregateFunction::VariancePop => AggregateFunction::VariancePop,
+            common::query::AggregateFunction::Stddev => AggregateFunction::Stddev,
+            common::query::AggregateFunction::StddevPop => AggregateFunction::StddevPop,
+            common::query::AggregateFunction::Covariance => AggregateFunction::Covariance,
+            common::query::AggregateFunction::CovariancePop => AggregateFunction::CovariancePop,
+            common::query::AggregateFunction::Correlation => AggregateFunction::Correlation,
+            common::query::AggregateFunction::ApproxPercentileCont => {
+                AggregateFunction::ApproxPercentileCont
+            }
+            common::query::AggregateFunction::ApproxMedian => AggregateFunction::ApproxMedian,
+            _ => return Err(PlatformError::BadRequest("unimplemented".to_string())),
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PartitionedAggregateFunction {
@@ -209,6 +268,20 @@ impl TryInto<common::query::PartitionedAggregateFunction> for &PartitionedAggreg
                 common::query::PartitionedAggregateFunction::Count
             }
             PartitionedAggregateFunction::Sum => common::query::PartitionedAggregateFunction::Sum,
+            _ => todo!(),
+        })
+    }
+}
+
+impl TryInto<PartitionedAggregateFunction> for common::query::PartitionedAggregateFunction {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<PartitionedAggregateFunction, Self::Error> {
+        Ok(match self {
+            common::query::PartitionedAggregateFunction::Count => {
+                PartitionedAggregateFunction::Count
+            }
+            common::query::PartitionedAggregateFunction::Sum => PartitionedAggregateFunction::Sum,
             _ => todo!(),
         })
     }

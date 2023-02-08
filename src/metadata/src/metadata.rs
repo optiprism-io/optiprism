@@ -12,12 +12,14 @@ use crate::events;
 use crate::organizations;
 use crate::projects;
 use crate::properties;
+use crate::reports;
 use crate::store::Store;
 use crate::stub;
 use crate::Result;
 
 pub struct MetadataProvider {
     pub dashboards: Arc<dyn dashboards::Provider>,
+    pub reports: Arc<dyn reports::Provider>,
     pub events: Arc<dyn events::Provider>,
     pub custom_events: Arc<dyn custom_events::Provider>,
     pub event_properties: Arc<dyn properties::Provider>,
@@ -34,6 +36,7 @@ impl MetadataProvider {
         let events = Arc::new(events::ProviderImpl::new(store.clone()));
         Ok(MetadataProvider {
             dashboards: Arc::new(dashboards::ProviderImpl::new(store.clone())),
+            reports: Arc::new(reports::ProviderImpl::new(store.clone())),
             events: events.clone(),
             custom_events: Arc::new(custom_events::ProviderImpl::new(store.clone(), events)),
             event_properties: Arc::new(properties::ProviderImpl::new_event(store.clone())),
@@ -49,6 +52,7 @@ impl MetadataProvider {
     pub fn new_stub() -> Self {
         MetadataProvider {
             dashboards: Arc::new(stub::Dashboards {}),
+            reports: Arc::new(stub::Reports {}),
             events: Arc::new(stub::Events {}),
             custom_events: Arc::new(stub::CustomEvents {}),
             event_properties: Arc::new(stub::Properties {}),

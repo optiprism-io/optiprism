@@ -19,7 +19,7 @@ use crate::scalar::ScalarValueRef;
 pub mod event_segmentation;
 
 /// Enum of all built-in aggregate functions
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum AggregateFunction {
     /// count
     Count,
@@ -117,7 +117,7 @@ impl From<AggregateFunction> for DFAggregateFunction {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum PartitionedAggregateFunction {
     Count,
     Sum,
@@ -382,7 +382,7 @@ pub enum EventFilter {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum QueryTime {
     Between {
         from: DateTime<Utc>,
@@ -405,7 +405,7 @@ impl QueryTime {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum TimeIntervalUnit {
     Second,
     Minute,

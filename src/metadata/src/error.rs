@@ -39,8 +39,31 @@ impl Dashboard {
 
 #[derive(Error, Debug)]
 pub enum DashboardError {
-    #[error("event not found: {0:?}")]
+    #[error("dashboard not found: {0:?}")]
     DashboardNotFound(Dashboard),
+}
+
+#[derive(Debug)]
+pub struct Report {
+    _organization_id: u64,
+    _project_id: u64,
+    _report_id: u64,
+}
+
+impl Report {
+    pub fn new_with_id(organization_id: u64, project_id: u64, report_id: u64) -> Self {
+        Self {
+            _organization_id: organization_id,
+            _project_id: project_id,
+            _report_id: report_id,
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ReportError {
+    #[error("report not found: {0:?}")]
+    ReportNotFound(Report),
 }
 
 #[derive(Error, Debug)]
@@ -328,6 +351,8 @@ pub enum MetadataError {
     Database(#[from] DatabaseError),
     #[error("dashboard {0:?}")]
     Dashboard(#[from] DashboardError),
+    #[error("report {0:?}")]
+    Report(#[from] ReportError),
     #[error("account {0:?}")]
     Account(#[from] AccountError),
     #[error("organization {0:?}")]

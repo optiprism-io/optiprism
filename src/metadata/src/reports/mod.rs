@@ -45,6 +45,7 @@ pub struct Report {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateReportRequest {
+    pub created_by: u64,
     pub tags: Option<Vec<String>>,
     pub name: String,
     pub description: Option<String>,
@@ -56,40 +57,12 @@ pub struct CreateReportRequest {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateReportRequest {
-    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
-    pub tags: OptionalProperty<Option<Vec<String>>>,
-    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
-    pub name: OptionalProperty<Option<String>>,
-    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
-    pub description: OptionalProperty<Option<String>>,
-    #[serde(
-        default,
-        rename = "type",
-        skip_serializing_if = "OptionalProperty::is_none"
-    )]
-    pub typ: OptionalProperty<Type>,
-    #[serde(default, skip_serializing_if = "OptionalProperty::is_none")]
-    pub query: OptionalProperty<Query>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateDashboardRequest {
-    pub created_by: u64,
-    pub tags: Option<Vec<String>>,
-    pub name: String,
-    pub description: Option<String>,
-    pub panels: Vec<Panel>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateDashboardRequest {
     pub updated_by: u64,
     pub tags: OptionalProperty<Option<Vec<String>>>,
     pub name: OptionalProperty<String>,
     pub description: OptionalProperty<Option<String>>,
-    pub panels: OptionalProperty<Vec<Panel>>,
+    pub typ: OptionalProperty<Type>,
+    pub query: OptionalProperty<Query>,
 }
 
 #[async_trait]
@@ -98,16 +71,16 @@ pub trait Provider: Sync + Send {
         &self,
         organization_id: u64,
         project_id: u64,
-        req: CreateDashboardRequest,
-    ) -> Result<Dashboard>;
-    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard>;
-    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Dashboard>>;
+        req: CreateReportRequest,
+    ) -> Result<Report>;
+    async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report>;
+    async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Report>>;
     async fn update(
         &self,
         organization_id: u64,
         project_id: u64,
-        dashboard_id: u64,
-        req: UpdateDashboardRequest,
-    ) -> Result<Dashboard>;
-    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Dashboard>;
+        report_id: u64,
+        req: UpdateReportRequest,
+    ) -> Result<Report>;
+    async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Report>;
 }

@@ -65,7 +65,8 @@ impl Provider for ProviderImpl {
             tags: req.tags,
             name: req.name,
             description: req.description,
-            panels: req.panels,
+            typ: req.typ,
+            query: req.query,
         };
         let data = serialize(&report)?;
         self.store
@@ -94,7 +95,9 @@ impl Provider for ProviderImpl {
                 id,
             ))
             .into()),
-            Some(value) => Ok(deserialize(&value)?),
+            Some(value) => {
+                return Ok(deserialize(&value)?);
+            }
         }
     }
 
@@ -114,7 +117,6 @@ impl Provider for ProviderImpl {
         req: UpdateReportRequest,
     ) -> Result<Report> {
         let _guard = self.guard.write().await;
-
         let prev_report = self
             .get_by_id(organization_id, project_id, report_id)
             .await?;
@@ -131,8 +133,8 @@ impl Provider for ProviderImpl {
         if let OptionalProperty::Some(tags) = req.tags {
             report.tags = tags;
         }
-        if let OptionalProperty::Some(panels) = req.panels {
-            report.panels = panels;
+        if let OptionalProperty::Some(query) = req.query {
+            report.query = query;
         }
 
         let data = serialize(&report)?;

@@ -2,10 +2,18 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::NaiveDateTime;
 use chrono::Utc;
+use common::query::event_segmentation;
+use common::query::event_segmentation::Analysis;
+use common::query::event_segmentation::ChartType;
+use common::query::event_segmentation::Compare;
+use common::query::event_segmentation::EventSegmentation;
+use common::query::event_segmentation::NamedQuery;
 use common::query::EventFilter;
 use common::query::EventRef;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
+use common::query::QueryTime;
+use common::query::TimeIntervalUnit;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
@@ -49,6 +57,12 @@ use crate::properties;
 use crate::properties::CreatePropertyRequest;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
+use crate::reports;
+use crate::reports::CreateReportRequest;
+use crate::reports::Query;
+use crate::reports::Report;
+use crate::reports::Type;
+use crate::reports::UpdateReportRequest;
 use crate::teams;
 use crate::teams::CreateTeamRequest;
 use crate::teams::Team;
@@ -186,6 +200,81 @@ impl Dashboards {
     }
 }
 
+pub struct Reports {}
+
+#[async_trait]
+impl reports::Provider for Reports {
+    async fn create(
+        &self,
+        _organization_id: u64,
+        _project_id: u64,
+        _req: CreateReportRequest,
+    ) -> Result<Report> {
+        Ok(Reports::report())
+    }
+
+    async fn get_by_id(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Report> {
+        Ok(Reports::report())
+    }
+
+    async fn list(&self, _organization_id: u64, _project_id: u64) -> Result<ListResponse<Report>> {
+        Ok(ListResponse {
+            data: vec![Reports::report()],
+            meta: ResponseMetadata { next: None },
+        })
+    }
+
+    async fn update(
+        &self,
+        _organization_id: u64,
+        _project_id: u64,
+        _report_id: u64,
+        _req: UpdateReportRequest,
+    ) -> Result<Report> {
+        Ok(Reports::report())
+    }
+
+    async fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Report> {
+        Ok(Reports::report())
+    }
+}
+
+impl Reports {
+    pub fn report() -> Report {
+        Report {
+            id: 1,
+            created_at: *DATE_TIME,
+            updated_at: Some(*DATE_TIME),
+            created_by: 1,
+            updated_by: Some(1),
+            project_id: 1,
+            tags: Some(vec!["tag".to_string()]),
+            name: "name".to_string(),
+            description: Some("description".to_string()),
+            typ: Type::EventSegmentation,
+            query: Query::EventSegmentation(EventSegmentation {
+                time: QueryTime::From(*DATE_TIME),
+                group: "group".to_string(),
+                interval_unit: TimeIntervalUnit::Second,
+                chart_type: ChartType::Line,
+                analysis: Analysis::Linear,
+                compare: None,
+                events: vec![event_segmentation::Event {
+                    event: EventRef::Regular(1),
+                    filters: None,
+                    breakdowns: None,
+                    queries: vec![NamedQuery {
+                        agg: event_segmentation::Query::CountEvents,
+                        name: Some("name".to_string()),
+                    }],
+                }],
+                filters: None,
+                breakdowns: None,
+            }),
+        }
+    }
+}
+
 pub struct CustomEvents {}
 
 impl CustomEvents {
@@ -213,6 +302,7 @@ impl CustomEvents {
         }
     }
 }
+
 #[async_trait]
 impl custom_events::Provider for CustomEvents {
     async fn create(
@@ -295,6 +385,7 @@ impl Events {
         }
     }
 }
+
 #[async_trait]
 impl events::Provider for Events {
     async fn create(
@@ -395,6 +486,7 @@ impl Properties {
         }
     }
 }
+
 #[async_trait]
 impl properties::Provider for Properties {
     async fn create(
@@ -460,6 +552,7 @@ impl properties::Provider for Properties {
 }
 
 pub struct Database {}
+
 #[async_trait]
 impl database::Provider for Database {
     async fn create_table(&self, _table: Table) -> Result<()> {
@@ -484,6 +577,7 @@ impl database::Provider for Database {
 }
 
 pub struct Dictionaries {}
+
 #[async_trait]
 impl dictionaries::Provider for Dictionaries {
     async fn get_key_or_create(
@@ -531,6 +625,7 @@ impl Organizations {
         }
     }
 }
+
 #[async_trait]
 impl organizations::Provider for Organizations {
     async fn create(&self, _req: CreateOrganizationRequest) -> Result<Organization> {
@@ -572,6 +667,7 @@ impl Projects {
         }
     }
 }
+
 #[async_trait]
 impl projects::Provider for Projects {
     async fn create(&self, _organization_id: u64, _req: CreateProjectRequest) -> Result<Project> {
@@ -618,6 +714,7 @@ impl Teams {
         }
     }
 }
+
 #[async_trait]
 impl teams::Provider for Teams {
     async fn create(&self, _organization_id: u64, _req: CreateTeamRequest) -> Result<Team> {

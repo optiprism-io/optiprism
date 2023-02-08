@@ -1,5 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::query::time_columns;
 use crate::query::AggregateFunction;
@@ -10,7 +12,7 @@ use crate::query::PropertyRef;
 use crate::query::QueryTime;
 use crate::query::TimeIntervalUnit;
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum SegmentTime {
     Between {
         from: DateTime<Utc>,
@@ -30,13 +32,13 @@ pub enum SegmentTime {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChartType {
     Line,
     Bar,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Analysis {
     Linear,
     RollingAverage {
@@ -47,13 +49,13 @@ pub enum Analysis {
     Cumulative,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Compare {
     pub offset: usize,
     pub unit: TimeIntervalUnit,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum QueryAggregate {
     Min,
     Max,
@@ -84,7 +86,7 @@ impl QueryAggregate {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum QueryAggregatePerGroup {
     Min,
     Max,
@@ -94,12 +96,12 @@ pub enum QueryAggregatePerGroup {
     DistinctCount,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum QueryPerGroup {
     CountEvents,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Query {
     CountEvents,
     CountUniqueGroups,
@@ -123,7 +125,7 @@ pub enum Query {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct NamedQuery {
     pub agg: Query,
     pub name: Option<String>,
@@ -135,12 +137,12 @@ impl NamedQuery {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum Breakdown {
     Property(PropertyRef),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Event {
     pub event: EventRef,
     pub filters: Option<Vec<EventFilter>>,
@@ -164,7 +166,7 @@ impl Event {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct EventSegmentation {
     pub time: QueryTime,
     pub group: String,
