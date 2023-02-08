@@ -41,7 +41,7 @@ time = "0.3.17"
 tokio = { version = "1.23.0", features = ["full"] }
 tower = "0.4.13"
 tower-cookies = { version = "0.8.0", features = ["axum-core"] }
-tower-http = { version = "0.3.5", features = ["fs", "trace"] }
+tower-http = { version = "0.3.5", features = ["fs", "trace","cors"] }
 tracing = "0.1.37"
 url = "2.3.1"
 uuid = { version = "1.2.2", features = ["serde", "v4"] }

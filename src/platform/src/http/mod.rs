@@ -44,6 +44,8 @@ use serde_json::Value;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tower_cookies::CookieManagerLayer;
+use tower_http::cors::Any;
+use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
@@ -98,7 +100,10 @@ impl Service {
             .layer(CookieManagerLayer::new())
             .layer(TraceLayer::new_for_http())
             .layer(middleware::from_fn(print_request_response));
-        // .fallback(fallback);
+
+        let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any);
+
+        router = router.layer(cors);
 
         Self { router, addr }
     }
