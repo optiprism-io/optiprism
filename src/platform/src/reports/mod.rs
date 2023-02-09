@@ -6,6 +6,7 @@ use chrono::Utc;
 use common::types::OptionalProperty;
 pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
+use serde::Deserializer;
 use serde::Serialize;
 
 use crate::queries::event_segmentation::EventSegmentation;
@@ -78,6 +79,7 @@ impl From<Type> for metadata::reports::Type {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(untagged)]
 pub enum Query {
     EventSegmentation(EventSegmentation),
 }
