@@ -20,7 +20,6 @@ pub enum Type {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(untagged)]
 pub enum Query {
     EventSegmentation(EventSegmentation),
 }
@@ -54,7 +53,7 @@ pub struct CreateReportRequest {
     pub query: Query,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateReportRequest {
     pub updated_by: u64,

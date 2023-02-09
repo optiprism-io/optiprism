@@ -78,7 +78,6 @@ impl From<Type> for metadata::reports::Type {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(untagged)]
 pub enum Query {
     EventSegmentation(EventSegmentation),
 }
