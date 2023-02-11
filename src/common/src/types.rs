@@ -6,11 +6,17 @@ use serde::Serializer;
 pub const DECIMAL_PRECISION: u8 = 19;
 pub const DECIMAL_SCALE: i8 = 10;
 
-#[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash, Default)]
+#[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum OptionalProperty<T> {
-    #[default]
     None,
     Some(T),
+}
+
+impl<T> Default for OptionalProperty<T> {
+    #[inline]
+    fn default() -> OptionalProperty<T> {
+        OptionalProperty::None
+    }
 }
 
 impl<T> OptionalProperty<T> {
