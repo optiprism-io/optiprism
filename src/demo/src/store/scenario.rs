@@ -152,7 +152,7 @@ impl Scenario {
                     };
 
                     state.cur_timestamp +=
-                        self.rng.gen_range(add_time..=add_time + add_time / 10) as i64;
+                        self.rng.gen_range(add_time..=add_time + add_time / 10);
                 }
                 let mut coefficients = make_coefficients(&intention);
                 if self.rng.gen::<f64>() < coefficients.global_bounce_rate {

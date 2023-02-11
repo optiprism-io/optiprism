@@ -10,7 +10,6 @@ use crate::reports::Report;
 use crate::reports::UpdateReportRequest;
 use crate::Context;
 use crate::ListResponse;
-use crate::PlatformError;
 use crate::Result;
 
 pub struct ProviderImpl {

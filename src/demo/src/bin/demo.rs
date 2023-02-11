@@ -64,8 +64,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Some(path) => {
             if !path.try_exists()? {
                 return Err(DemoError::FileNotFound(format!(
-                    "metadata path {:?} doesn't exist",
-                    path
+                    "metadata path {path:?} doesn't exist"
                 ))
                 .into());
             }
@@ -77,7 +76,7 @@ async fn main() -> Result<(), anyhow::Error> {
     if let Some(ui_path) = &args.ui_path {
         if !ui_path.try_exists()? {
             return Err(
-                DemoError::FileNotFound(format!("ui path {:?} doesn't exist", ui_path)).into(),
+                DemoError::FileNotFound(format!("ui path {ui_path:?} doesn't exist")).into(),
             );
         }
     }

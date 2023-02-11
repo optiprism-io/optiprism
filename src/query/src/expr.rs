@@ -182,11 +182,10 @@ pub async fn encode_property_dict_values(
                     DataType::UInt8 => ScalarValue::UInt8(Some(key as u8)),
                     DataType::UInt16 => ScalarValue::UInt16(Some(key as u16)),
                     DataType::UInt32 => ScalarValue::UInt32(Some(key as u32)),
-                    DataType::UInt64 => ScalarValue::UInt64(Some(key as u64)),
+                    DataType::UInt64 => ScalarValue::UInt64(Some(key)),
                     _ => {
                         return Err(QueryError::Plan(format!(
-                            "unsupported dictionary type \"{:?}\"",
-                            dict_type
+                            "unsupported dictionary type \"{dict_type:?}\""
                         )));
                     }
                 };
@@ -306,8 +305,7 @@ pub fn named_property_expression(
             // expressions for OR
             let values_vec = values.ok_or_else(|| {
                 QueryError::Plan(format!(
-                    "value should be defined for \"{:?}\" operation",
-                    operation
+                    "value should be defined for \"{operation:?}\" operation"
                 ))
             })?;
 

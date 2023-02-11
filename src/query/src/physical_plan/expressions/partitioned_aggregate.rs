@@ -327,8 +327,7 @@ impl PartitionedAggregateAccumulator {
                 Ok(Box::new(MaxAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>)
             }
             _ => Err(QueryError::Plan(format!(
-                "outer aggregate function \"{:?}\" doesn't supported",
-                outer_agg
+                "outer aggregate function \"{outer_agg:?}\" doesn't supported"
             ))),
         }?;
 

@@ -31,7 +31,7 @@ pub struct ProviderImpl {
 impl ProviderImpl {
     pub fn new(kv: Arc<Store>) -> Self {
         ProviderImpl {
-            store: kv.clone(),
+            store: kv,
             guard: RwLock::new(()),
         }
     }

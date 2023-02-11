@@ -6,7 +6,6 @@ use chrono::Utc;
 use common::types::OptionalProperty;
 pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
-use serde::Deserializer;
 use serde::Serialize;
 
 use crate::queries::event_segmentation::EventSegmentation;

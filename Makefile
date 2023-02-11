@@ -54,7 +54,7 @@ docker-build-demo:
 ifneq ($(shell docker images -q $(DEMO_IMAGE) 2> /dev/null),)
 	$(error image $(DEMO_IMAGE) already exists)
 endif
-	docker buildx build --builder default --ssh default --load --file demo.Dockerfile --platform=linux/arm64 --progress plain -t $(DEMO_IMAGE) .
+	docker buildx build --builder multibuilder --ssh default --load --file demo.Dockerfile --platform=linux/arm64 --progress plain -t $(DEMO_IMAGE) .
 
 docker-publish-demo:
 	$(pushing pushing $(DEMO_IMAGE) docker image...)

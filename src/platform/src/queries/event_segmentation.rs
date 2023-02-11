@@ -1,5 +1,3 @@
-use std::ops::ControlFlow::Break;
-
 use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::NamedQuery;
@@ -399,7 +397,7 @@ impl TryInto<Query> for common::query::event_segmentation::Query {
                 aggregate: aggregate.try_into()?,
             },
             common::query::event_segmentation::Query::QueryFormula { formula } => Query::Formula {
-                formula: formula.clone(),
+                formula,
             },
         })
     }

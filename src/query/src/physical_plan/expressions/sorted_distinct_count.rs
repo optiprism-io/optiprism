@@ -160,8 +160,7 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
         // DataType::Decimal128(_, _) => distinct_count_array!(array, DecimalArray, state),
         other => {
             let message = format!(
-                "Ordered distinct count over array of type \"{:?}\" is not supported",
-                other
+                "Ordered distinct count over array of type \"{other:?}\" is not supported"
             );
             Err(DataFusionError::NotImplemented(message))
         }

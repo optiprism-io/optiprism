@@ -326,7 +326,7 @@ impl EventRef {
             EventRef::Regular { event_name } => {
                 format!("{}_regular_{}", event_name.to_case(Case::Snake), idx)
             }
-            EventRef::Custom { event_id } => format!("{}_custom_{}", event_id, idx),
+            EventRef::Custom { event_id } => format!("{event_id}_custom_{idx}"),
         }
     }
 }

@@ -350,7 +350,7 @@ impl LogicalPlanBuilder {
                 };
 
                 match &query.name {
-                    None => Ok(Expr::Alias(Box::new(q), format!("agg_{}", id))),
+                    None => Ok(Expr::Alias(Box::new(q), format!("agg_{id}"))),
                     Some(name) => Ok(Expr::Alias(Box::new(q), name.clone())),
                 }
             })

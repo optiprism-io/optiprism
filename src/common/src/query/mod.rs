@@ -125,7 +125,7 @@ pub enum PartitionedAggregateFunction {
 
 impl fmt::Display for PartitionedAggregateFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", format!("{:?}", self).to_uppercase())
+        write!(f, "{}", format!("{self:?}").to_uppercase())
     }
 }
 

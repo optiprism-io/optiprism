@@ -282,7 +282,6 @@ impl TryInto<PartitionedAggregateFunction> for common::query::PartitionedAggrega
                 PartitionedAggregateFunction::Count
             }
             common::query::PartitionedAggregateFunction::Sum => PartitionedAggregateFunction::Sum,
-            _ => todo!(),
         })
     }
 }

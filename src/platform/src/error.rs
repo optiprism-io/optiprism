@@ -324,7 +324,7 @@ impl ApiError {
         Self {
             status: self.status,
             code: self.code,
-            message: self.message.map(|msg| format!("{}: {}", msg, inner)),
+            message: self.message.map(|msg| format!("{msg}: {inner}")),
             fields: self.fields,
         }
     }

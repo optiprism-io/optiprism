@@ -5,7 +5,6 @@ use chrono::Utc;
 use common::query::event_segmentation;
 use common::query::event_segmentation::Analysis;
 use common::query::event_segmentation::ChartType;
-use common::query::event_segmentation::Compare;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::NamedQuery;
 use common::query::EventFilter;

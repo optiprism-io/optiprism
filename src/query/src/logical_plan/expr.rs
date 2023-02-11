@@ -67,8 +67,7 @@ pub fn lit_timestamp(data_type: DataType, date_time: &DateTime<Utc>) -> Result<E
         }
         _ => {
             return Err(QueryError::Plan(format!(
-                "unsupported \"{:?}\" timestamp data type",
-                data_type
+                "unsupported \"{data_type:?}\" timestamp data type"
             )));
         }
     }))

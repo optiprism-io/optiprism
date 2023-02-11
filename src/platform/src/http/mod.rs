@@ -44,6 +44,8 @@ use serde_json::Value;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tower_cookies::CookieManagerLayer;
+use tower_http::cors::Any;
+use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
@@ -98,7 +100,13 @@ impl Service {
             .layer(CookieManagerLayer::new())
             .layer(TraceLayer::new_for_http())
             .layer(middleware::from_fn(print_request_response));
-        // .fallback(fallback);
+
+        let cors = CorsLayer::new()
+            .allow_methods(Any)
+            .allow_origin(Any)
+            .allow_headers(Any);
+
+        router = router.layer(cors);
 
         Self { router, addr }
     }
@@ -178,16 +186,15 @@ pub async fn print_request_response(
 }
 
 async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes>
-where
-    B: HttpBody<Data = Bytes>,
-    B::Error: std::fmt::Display,
+    where
+        B: HttpBody<Data=Bytes>,
+        B::Error: std::fmt::Display,
 {
     let bytes = match hyper::body::to_bytes(body).await {
         Ok(bytes) => bytes,
         Err(err) => {
             return Err(PlatformError::BadRequest(format!(
-                "failed to read {} body: {}",
-                direction, err
+                "failed to read {direction} body: {err}"
             )));
         }
     };
@@ -205,12 +212,12 @@ pub struct Json<T>(pub T);
 
 #[async_trait]
 impl<T, S, B> FromRequest<S, B> for Json<T>
-where
-    T: DeserializeOwned,
-    B: HttpBody + Send + 'static,
-    B::Data: Send,
-    B::Error: Into<BoxError>,
-    S: Send + Sync,
+    where
+        T: DeserializeOwned,
+        B: HttpBody + Send + 'static,
+        B::Data: Send,
+        B::Error: Into<BoxError>,
+        S: Send + Sync,
 {
     type Rejection = ApiError;
 
@@ -256,7 +263,7 @@ where
 }
 
 impl<T> IntoResponse for Json<T>
-where T: Serialize
+    where T: Serialize
 {
     fn into_response(self) -> Response {
         axum::Json(self.0).into_response()
