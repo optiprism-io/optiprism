@@ -8,7 +8,9 @@
 
   "errors": {
     "unauthorized": "We're sorry, but we can't authenticate you. You must be logged in to access these pages.",
-    "internal": "Whoops! Something went wrong. Try refreshing the page"
+    "internal": "Whoops! Something went wrong. Try refreshing the page",
+    "requiredInput": "Input is required",
+    "loginIncorrect": "That email and password combination is incorrect"
   },
 
   "userMenu": {

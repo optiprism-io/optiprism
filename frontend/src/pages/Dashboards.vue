@@ -28,9 +28,9 @@
                 v-model:layout="layout"
                 :col-num="12"
                 :row-height="ROW_HEIGHT"
-                :minW="3"
-                :minH="4"
-                :useCssTransforms="false"
+                :min-w="3"
+                :min-h="4"
+                :use-css-transforms="false"
             >
                 <template #default="{ gridItemProps }">
                     <GridItem
@@ -42,8 +42,8 @@
                         :w="item.w"
                         :h="item.h"
                         :i="item.i"
-                        :minH="item.minH"
-                        :minW="item.minW"
+                        :min-h="item.minH"
+                        :min-w="item.minW"
                         @moved="moved"
                         @resized="resized"
                     >
@@ -96,12 +96,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { pagesMap } from '@/router'
 import dashboardService from '@/api/services/dashboards.service'
-import reportsService from '@/api/services/reports.service'
-import {
-    Report,
-} from '@/api'
 import { DashboardPanel as DashboardPanelType, DashboardPanelTypeEnum } from '@/api'
-import useConfirm from '@/hooks/useConfirm'
 import { useDashboardsStore } from '@/stores/dashboards'
 import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
@@ -112,12 +107,10 @@ import UiCard from '@/components/uikit/UiCard/UiCard.vue'
 import DashboardPanel from '@/components/dashboards/DashboardPanel.vue'
 import DashboardReportsPopup from '@/components/dashboards/DashboardReportsPopup.vue'
 import UiInlineEdit from '@/components/uikit/UiInlineEdit.vue'
-import { GenericUiDropdown, UiDropdownItem } from '@/components/uikit/UiDropdown.vue'
+import { UiDropdownItem } from '@/components/uikit/UiDropdown.vue'
 import UiSelect from '@/components/uikit/UiSelect.vue';
 import UiButton from '@/components/uikit/UiButton.vue';
 
-const UiDropwdown = GenericUiDropdown<string>()
-const { confirm } = useConfirm()
 const { t } = usei18n()
 const route = useRoute()
 const router = useRouter()

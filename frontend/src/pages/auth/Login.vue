@@ -53,7 +53,7 @@
                 <div class="pf-c-login__main-body">
                     <form
                         class="pf-c-form login-form"
-                        @submit.prevent="login"
+                        @submit.prevent="actionForm"
                     >
                         <div class="pf-c-form__group pf-u-mb-md login-form__field">
                             <label
@@ -74,6 +74,7 @@
                                 v-model="email"
                                 name="login-email"
                                 :invalid="Boolean(errorFields?.email)"
+                                @input="(e) => onInput(e, 'email')"
                             />
                             <p
                                 v-if="errorFields?.email"
@@ -109,6 +110,7 @@
                                 name="login-password"
                                 type="password"
                                 :invalid="Boolean(errorFields?.password)"
+                                @input="(e) => onInput(e, 'password')"
                             />
                             <p
                                 v-if="errorFields?.password"
@@ -124,11 +126,24 @@
                                 {{ errorFields?.password }}
                             </p>
                         </div>
-                        <div class="pf-c-form__group">
+                        <div class="pf-c-form__group login-form__field">
                             <UiCheckbox
                                 v-model="keepLogged"
                                 :label="$t('login.keep')"
                             />
+                            <p
+                                v-if="errorMain"
+                                class="login-form__field-info pf-c-form__helper-text pf-m-error"
+                                aria-live="polite"
+                            >
+                                <span class="pf-c-form__helper-text-icon">
+                                    <i
+                                        class="fas fa-exclamation-circle"
+                                        aria-hidden="true"
+                                    />
+                                </span>
+                                {{ errorMain }}
+                            </p>
                         </div>
                         <div class="pf-c-form__group pf-m-action">
                             <button
@@ -152,38 +167,77 @@ import { computed, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth/auth'
 import { pagesMap } from '@/router'
 import { ErrorResponse } from '@/api'
+import usei18n from '@/hooks/useI18n'
 import UiInput from '@/components/uikit/UiInput.vue'
 import UiCheckbox from '@/components/uikit/UiCheckbox.vue'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const { t } = usei18n()
 
 const email = ref('')
 const password = ref('')
 const keepLogged = ref(false)
 const errorFields = ref<{ [key: string]: string }>({})
+const errorMain = ref('');
+const loading = ref(false);
 
 const nextPath = computed(() => {
     const next = route.query.next
     return next && typeof next === 'string' ? next : pagesMap.dashboards.path
 })
 
+const onInput = (e: string, type: string) => {
+    errorFields.value[type] = '';
+    errorMain.value = '';
+}
+
 const login = async (): Promise<void | Error> => {
+    loading.value = true;
+    errorFields.value = {};
+    errorMain.value = '';
     try {
         await authStore.login({
             email: email.value,
             password: password.value,
             keepLogged: keepLogged.value,
         })
-
         if (authStore.accessToken) {
             router.push({ path: nextPath.value })
         }
     } catch (e: any) {
-        const errorResponce = e as ErrorResponse
+        const error = (e?.response?.data?.error ?? e?.error);
+        if (error?.fields) {
+            errorFields.value = error?.fields as { [key: string]: string; } || {};
+        }
+        if (error?.status === 401) {
+            errorMain.value = t('errors.loginIncorrect');
+        } else {
+            if (error?.message) {
+                errorMain.value = error?.message;
+            }
+        }
+    }
+    loading.value = false;
+}
 
-        errorFields.value = errorResponce?.fields as { [key: string]: string; };
+const actionForm = () => {
+    if (!email.value.trim() || !password.value.trim()) {
+        if (!email.value) {
+            errorFields.value = {
+                ...errorFields.value,
+                email: t('errors.requiredInput'),
+            }
+        }
+        if (!password.value) {
+            errorFields.value = {
+                ...errorFields.value,
+                password: t('errors.requiredInput'),
+            }
+        }
+    } else {
+        login();
     }
 }
 </script>
