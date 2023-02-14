@@ -29,8 +29,8 @@ export const useCommonStore = defineStore('common', {
         editEventPropertyPopupType: PropertyTypeEnum.EventProperty,
         syncReports: true,
 
-        projectId: 0, // TODO integrations
-        organizationId: 0,
+        projectId: 1, // TODO
+        organizationId: 1,
     }),
     actions: {
         updateEditEventManagementPopupId(payload: number | null) {

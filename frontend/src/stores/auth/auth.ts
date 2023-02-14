@@ -40,11 +40,10 @@ export const useAuthStore = defineStore('auth', {
             }
         },
         async authAccess(): Promise<void> {
-            if (getCookie(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY)) {
+            if (!this.accessToken && getCookie(TOKEN_KEY) && sessionStorage.getItem(TOKEN_KEY)) {
                 if (!this.refreshToken.value) {
                     return
                 }
-
                 try {
                     const res = await authService.refreshToken(this.refreshToken.value)
 
@@ -63,7 +62,7 @@ export const useAuthStore = defineStore('auth', {
             } else {
                 sessionStorage.setItem(TOKEN_KEY, token?.accessToken ?? '')
             }
-            axios.defaults.headers.common[HEADER_KEY] = token?.accessToken ? token.accessToken : ''
+            axios.defaults.headers.common[HEADER_KEY] = token?.accessToken ? `Bearer ${token.accessToken}` : ''
 
             this.accessToken = token.accessToken ?? ''
             this.refreshToken.value = token.refreshToken ?? ''
