@@ -41,9 +41,11 @@ import { inject } from 'vue'
 import { GenericUiDropdown, UiDropdownItem } from '@/components/uikit/UiDropdown.vue'
 import Nav from '@/components/common/Nav.vue'
 import { useAuthStore } from '@/stores/auth/auth'
+import { useDashboardsStore } from '@/stores/dashboards'
 import { useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
+const dashboardsStore = useDashboardsStore()
 const router = useRouter()
 const i18n = inject<any>('i18n')
 const UiDropdown = GenericUiDropdown<string>()
@@ -63,6 +65,8 @@ const userMenu: UiDropdownItem<string>[] = [
 const selectUserMenu = (item: UiDropdownItem<string>) => {
     if (item.value === userMenuMap.LOGOUT) {
         authStore.reset()
+        authStore.$reset()
+        dashboardsStore.$reset()
         router.replace({ name: 'login' })
     }
 }

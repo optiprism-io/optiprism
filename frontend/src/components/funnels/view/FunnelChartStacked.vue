@@ -88,7 +88,7 @@ const humanReadable = (number: number | string): string => {
     return `${thousands ? thousands + ',' : ''}${smallValue}${fractional ? '.' + fractional : ''}`
 }
 
-watch(() => [container.value, dataView.value], () => {
+const update = () => {
     if (!container.value) {
         return
     }
@@ -101,7 +101,7 @@ watch(() => [container.value, dataView.value], () => {
         container: container.value,
         height: props.height,
         width: props.width,
-        autoFit: false,
+        autoFit: true,
         padding: props.liteChart ? [50, 5, 0, 5] : [80, 50, 30, 50],
         renderer: 'canvas'
     });
@@ -145,8 +145,8 @@ watch(() => [container.value, dataView.value], () => {
                 position: 'top',
                 offset: 0,
                 content: (data) => {
-                    const width = props.liteChart ? 40 : 64
-                    const size = props.liteChart ? 11 : 14
+                    const width = props.liteChart ? 39 : 64
+                    const size = props.liteChart ? 10 : 14
 
                     const commonProps = {
                         textAlign: 'left',
@@ -253,11 +253,21 @@ watch(() => [container.value, dataView.value], () => {
         })
 
     chart.value.render();
+}
+
+watch(() => [container.value, dataView.value], () => {
+    update()
 })
+
+watch(() => props.height, (height) => {
+    if (chart.value) {
+        chart.value.changeSize(props.width, height)
+    }
+}, { immediate: true })
 
 watch(() => props.width, (width) => {
     if (chart.value) {
-        chart.value.changeSize(width, 500)
+        chart.value.changeSize(width, props.height)
     }
-}, {immediate: true})
+}, { immediate: true })
 </script>

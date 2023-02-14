@@ -41,7 +41,14 @@
                             }"
                             @hover="hover"
                             @on-search="onSearch"
-                            @action="emit('action', $event)"
+                            @action="
+                                ($event) => {
+                                    if (props.cloaseAfterAction) {
+                                        hide()
+                                    }
+                                    onAction($event)
+                                }
+                            "
                             @edit="emit('edit', $event)"
                         />
                     </div>
@@ -98,6 +105,7 @@ const props = withDefaults(
         popperContainer?: string
         autoHide?: boolean
         multiple?: boolean
+        cloaseAfterAction?: boolean
     }>(),
     {
         showSearch: true,
@@ -109,6 +117,7 @@ const props = withDefaults(
         autoHide: true,
         popperContainer: 'body',
         multiple: false,
+        cloaseAfterAction: false,
     }
 );
 
@@ -211,6 +220,10 @@ const onHide = () => {
     isOpen.value = false;
     search.value = '';
 };
+
+const onAction = (payload: string) => {
+    emit('action', payload);
+}
 
 onBeforeMount(() => {
     isOpen.value = props.isOpenMount;

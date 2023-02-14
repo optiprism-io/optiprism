@@ -24,8 +24,10 @@
     "pinia": "^2.0.22",
     "typescript-cookie": "^1.0.4",
     "vue": "^3.2.39",
+    "vue-grid-layout": "^2.4.0",
     "vue-router": "^4.1.5",
-    "vue-virtualised": "^0.1.8"
+    "vue-virtualised": "^0.1.8",
+    "vue3-drr-grid-layout": "^1.9.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.27.1",

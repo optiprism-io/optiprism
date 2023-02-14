@@ -173,7 +173,6 @@ export default function ({ environment = 'development' } = {}) {
                     meta: {}
                 }
             })
-
             this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports`, (schema, request) => {
                 const body = JSON.parse(request.requestBody);
 
@@ -182,12 +181,13 @@ export default function ({ environment = 'development' } = {}) {
                     ...body,
                 })
             }, { timing: 1100 })
-
+            this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
+                return schema.db.reports.find(request.params.report_id);
+            })
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
                 const body = JSON.parse(request.requestBody);
                 return schema.db.reports.update(request.params.report_id, body)
             }, { timing: 1200 })
-
             this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
                 schema.db.reports.remove(request.params.report_id)
                 return request.params.report_id;
@@ -209,6 +209,8 @@ export default function ({ environment = 'development' } = {}) {
                 return funnelsMocks
             })
 
+
+            /** AUTH */
             this.post(`${BASE_PATH}/v1/auth/login`, (_, request) => {
                 const property = JSON.parse(request.requestBody)
 

@@ -332,10 +332,10 @@ export interface CreateDashboardRequest {
     'description'?: string;
     /**
      * 
-     * @type {Array<DashboardRow>}
+     * @type {Array<DashboardPanel>}
      * @memberof CreateDashboardRequest
      */
-    'rows': Array<DashboardRow>;
+    'panels'?: Array<DashboardPanel>;
 }
 /**
  * 
@@ -735,10 +735,10 @@ export interface Dashboard {
     'description'?: string;
     /**
      * 
-     * @type {Array<DashboardRowsInner>}
+     * @type {Array<DashboardPanel>}
      * @memberof Dashboard
      */
-    'rows': Array<DashboardRowsInner>;
+    'panels'?: Array<DashboardPanel>;
 }
 /**
  * 
@@ -746,12 +746,6 @@ export interface Dashboard {
  * @interface DashboardPanel
  */
 export interface DashboardPanel {
-    /**
-     * span
-     * @type {number}
-     * @memberof DashboardPanel
-     */
-    'span': number;
     /**
      * 
      * @type {string}
@@ -764,6 +758,30 @@ export interface DashboardPanel {
      * @memberof DashboardPanel
      */
     'reportId': number;
+    /**
+     * x
+     * @type {number}
+     * @memberof DashboardPanel
+     */
+    'x': number;
+    /**
+     * y
+     * @type {number}
+     * @memberof DashboardPanel
+     */
+    'y': number;
+    /**
+     * width
+     * @type {number}
+     * @memberof DashboardPanel
+     */
+    'w': number;
+    /**
+     * height
+     * @type {number}
+     * @memberof DashboardPanel
+     */
+    'h': number;
 }
 
 export const DashboardPanelTypeEnum = {
@@ -771,70 +789,6 @@ export const DashboardPanelTypeEnum = {
 } as const;
 
 export type DashboardPanelTypeEnum = typeof DashboardPanelTypeEnum[keyof typeof DashboardPanelTypeEnum];
-
-/**
- * 
- * @export
- * @interface DashboardRow
- */
-export interface DashboardRow {
-    /**
-     * 
-     * @type {Array<DashboardPanel>}
-     * @memberof DashboardRow
-     */
-    'panels': Array<DashboardPanel>;
-}
-/**
- * 
- * @export
- * @interface DashboardRowsInner
- */
-export interface DashboardRowsInner {
-    /**
-     * 
-     * @type {Array<DashboardRowsInnerPanelsInner>}
-     * @memberof DashboardRowsInner
-     */
-    'panels': Array<DashboardRowsInnerPanelsInner>;
-}
-/**
- * 
- * @export
- * @interface DashboardRowsInnerPanelsInner
- */
-export interface DashboardRowsInnerPanelsInner {
-    /**
-     * project id
-     * @type {number}
-     * @memberof DashboardRowsInnerPanelsInner
-     */
-    'span': number;
-    /**
-     * 
-     * @type {string}
-     * @memberof DashboardRowsInnerPanelsInner
-     */
-    'type': DashboardRowsInnerPanelsInnerTypeEnum;
-    /**
-     * 
-     * @type {number}
-     * @memberof DashboardRowsInnerPanelsInner
-     */
-    'reportId'?: number;
-    /**
-     * 
-     * @type {Report}
-     * @memberof DashboardRowsInnerPanelsInner
-     */
-    'report'?: Report;
-}
-
-export const DashboardRowsInnerPanelsInnerTypeEnum = {
-    Report: 'report'
-} as const;
-
-export type DashboardRowsInnerPanelsInnerTypeEnum = typeof DashboardRowsInnerPanelsInnerTypeEnum[keyof typeof DashboardRowsInnerPanelsInnerTypeEnum];
 
 /**
  * 
@@ -4214,56 +4168,11 @@ export interface UpdateDashboardRequest {
     'description'?: string;
     /**
      * 
-     * @type {Array<UpdateDashboardRequestRowsInner>}
+     * @type {Array<DashboardPanel>}
      * @memberof UpdateDashboardRequest
      */
-    'rows'?: Array<UpdateDashboardRequestRowsInner>;
+    'panels'?: Array<DashboardPanel>;
 }
-/**
- * 
- * @export
- * @interface UpdateDashboardRequestRowsInner
- */
-export interface UpdateDashboardRequestRowsInner {
-    /**
-     * 
-     * @type {Array<UpdateDashboardRequestRowsInnerPanelsInner>}
-     * @memberof UpdateDashboardRequestRowsInner
-     */
-    'panels': Array<UpdateDashboardRequestRowsInnerPanelsInner>;
-}
-/**
- * 
- * @export
- * @interface UpdateDashboardRequestRowsInnerPanelsInner
- */
-export interface UpdateDashboardRequestRowsInnerPanelsInner {
-    /**
-     * span
-     * @type {number}
-     * @memberof UpdateDashboardRequestRowsInnerPanelsInner
-     */
-    'span': number;
-    /**
-     * 
-     * @type {string}
-     * @memberof UpdateDashboardRequestRowsInnerPanelsInner
-     */
-    'type': UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum;
-    /**
-     * 
-     * @type {number}
-     * @memberof UpdateDashboardRequestRowsInnerPanelsInner
-     */
-    'reportId': number;
-}
-
-export const UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum = {
-    Report: 'report'
-} as const;
-
-export type UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum = typeof UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum[keyof typeof UpdateDashboardRequestRowsInnerPanelsInnerTypeEnum];
-
 /**
  * Update event request
  * @export

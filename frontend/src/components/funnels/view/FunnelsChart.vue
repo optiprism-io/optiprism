@@ -12,10 +12,17 @@
             <span>{{ item }}</span>
         </div>
     </div>
-    <div class="pf-c-scroll-inner-wrapper">
+    <div
+        :class="{
+            'pf-c-scroll-inner-wrapper': !props.liteChart,
+        }"
+    >
         <div
             ref="container"
-            class="pf-l-flex pf-u-flex-nowrap pf-u-m-lg"
+            class="pf-l-flex pf-u-flex-nowrap"
+            :class="{
+                'pf-u-m-lg': !props.liteChart,
+            }"
         >
             <div
                 v-for="(_, i) in stepIterator"
@@ -60,6 +67,7 @@ type Props = {
     steps?: Step[]
     minWidthStep?: number
     height?: number
+    width?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -155,9 +163,19 @@ const onResize = () => {
     }
 }
 
-watch(container, onResize)
+watch(() => props.width, (width) => {
+    if (width) {
+        containerWidth.value = width - 1;
+    }
+});
+
+const observer = ref<ResizeObserver | null>(null)
 
 onMounted(() => {
+    observer.value = new ResizeObserver(onResize)
+    if (container.value) {
+        observer.value.observe(container.value)
+    }
     window.addEventListener('resize', onResize)
 })
 
