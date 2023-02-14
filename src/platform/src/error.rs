@@ -11,6 +11,7 @@ use axum::Json;
 use common::error::CommonError;
 use metadata::error::AccountError;
 use metadata::error::CustomEventError;
+use metadata::error::DashboardError;
 use metadata::error::DatabaseError;
 use metadata::error::DictionaryError;
 use metadata::error::EventError;
@@ -18,6 +19,7 @@ use metadata::error::MetadataError;
 use metadata::error::OrganizationError;
 use metadata::error::ProjectError;
 use metadata::error::PropertyError;
+use metadata::error::ReportError;
 use metadata::error::StoreError;
 use metadata::error::TeamError;
 use query::error::QueryError;
@@ -160,6 +162,12 @@ impl PlatformError {
                     TeamError::TeamNotFound(_) => ApiError::not_found(err.to_string()),
                     TeamError::TeamAlreadyExist(_) => ApiError::conflict(err.to_string()),
                 },
+                MetadataError::Dashboard(err) => match err {
+                    DashboardError::DashboardNotFound(_) => ApiError::not_found(err.to_string()),
+                },
+                MetadataError::Report(err) => match err {
+                    ReportError::ReportNotFound(_) => ApiError::not_found(err.to_string()),
+                },
             },
             PlatformError::Query(err) => match err {
                 QueryError::Internal(err) => ApiError::internal(err),
@@ -168,6 +176,7 @@ impl PlatformError {
                 QueryError::DataFusion(err) => ApiError::internal(err.to_string()),
                 QueryError::Arrow(err) => ApiError::internal(err.to_string()),
                 QueryError::Metadata(err) => ApiError::internal(err.to_string()),
+                QueryError::Common(err) => ApiError::internal(err.to_string()),
             },
             PlatformError::BadRequest(msg) => ApiError::bad_request(msg),
             PlatformError::Internal(msg) => ApiError::internal(msg),
@@ -315,7 +324,7 @@ impl ApiError {
         Self {
             status: self.status,
             code: self.code,
-            message: self.message.map(|msg| format!("{}: {}", msg, inner)),
+            message: self.message.map(|msg| format!("{msg}: {inner}")),
             fields: self.fields,
         }
     }

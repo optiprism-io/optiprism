@@ -145,15 +145,14 @@ describe('Authorized', () => {
                 tags: ['d'],
                 name: 'test',
                 description: 'desc',
-                rows: [
+                panels: [
                     {
-                        panels: [
-                            {
-                                span: 1,
-                                type: DashboardPanelTypeEnum.Report,
-                                reportId: 1
-                            }
-                        ]
+                        type: DashboardPanelTypeEnum.Report,
+                        reportId: 1,
+                        x: 1,
+                        y: 2,
+                        w: 3,
+                        h: 4,
                     }
                 ]
             })).toBeApiResponse(stubs.dashboard);
@@ -168,15 +167,14 @@ describe('Authorized', () => {
                 tags: ['d'],
                 name: 'test',
                 description: 'desc',
-                rows: [
+                panels: [
                     {
-                        panels: [
-                            {
-                                span: 1,
-                                type: DashboardPanelTypeEnum.Report,
-                                reportId: 1
-                            }
-                        ]
+                        type: DashboardPanelTypeEnum.Report,
+                        reportId: 1,
+                        x: 1,
+                        y: 2,
+                        w: 3,
+                        h: 4,
                     }
                 ]
             })).toBeApiResponse(stubs.dashboard);

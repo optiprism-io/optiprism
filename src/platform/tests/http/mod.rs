@@ -1,9 +1,11 @@
 mod auth;
 mod custom_events;
+mod dashboards;
 mod event_segmentation;
 mod events;
 mod properties;
 mod property_values;
+mod reports;
 
 #[cfg(test)]
 mod tests {

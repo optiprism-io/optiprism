@@ -1,129 +1,10 @@
-use datafusion::logical_expr::Operator;
-use datafusion_common::ScalarValue;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
-use serde_with::serde_as;
-
-use crate::error::CommonError;
-use crate::scalar::ScalarValueRef;
 
 pub const DECIMAL_PRECISION: u8 = 19;
 pub const DECIMAL_SCALE: i8 = 10;
-
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum TimeUnit {
-    Second,
-    Millisecond,
-    Microsecond,
-    Nanosecond,
-}
-
-impl TryInto<TimeUnit> for arrow_schema::TimeUnit {
-    type Error = CommonError;
-
-    fn try_into(self) -> std::result::Result<TimeUnit, Self::Error> {
-        Ok(match self {
-            arrow_schema::TimeUnit::Second => TimeUnit::Second,
-            arrow_schema::TimeUnit::Millisecond => TimeUnit::Millisecond,
-            arrow_schema::TimeUnit::Microsecond => TimeUnit::Microsecond,
-            arrow_schema::TimeUnit::Nanosecond => TimeUnit::Nanosecond,
-        })
-    }
-}
-
-impl TryInto<arrow_schema::TimeUnit> for TimeUnit {
-    type Error = CommonError;
-
-    fn try_into(self) -> std::result::Result<arrow_schema::TimeUnit, Self::Error> {
-        Ok(match self {
-            TimeUnit::Second => arrow_schema::TimeUnit::Second,
-            TimeUnit::Millisecond => arrow_schema::TimeUnit::Millisecond,
-            TimeUnit::Microsecond => arrow_schema::TimeUnit::Microsecond,
-            TimeUnit::Nanosecond => arrow_schema::TimeUnit::Nanosecond,
-        })
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Hash, Eq, PartialEq)]
-pub enum PropertyRef {
-    User(String),
-    Event(String),
-    Custom(u64),
-}
-
-impl PropertyRef {
-    pub fn name(&self) -> String {
-        match self {
-            PropertyRef::User(name) => name.clone(),
-            PropertyRef::Event(name) => name.clone(),
-            PropertyRef::Custom(_id) => unimplemented!(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum EventRef {
-    RegularName(String),
-    // TODO remove this, use only pk(id) addressing
-    Regular(u64),
-    Custom(u64),
-}
-
-impl EventRef {
-    pub fn name(&self) -> String {
-        match self {
-            EventRef::RegularName(name) => name.to_owned(),
-            EventRef::Regular(id) => id.to_string(),
-            EventRef::Custom(id) => id.to_string(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum PropValueOperation {
-    Eq,
-    Neq,
-    Gt,
-    Gte,
-    Lt,
-    Lte,
-    True,
-    False,
-    Exists,
-    Empty,
-    ArrAll,
-    ArrAny,
-    ArrNone,
-    Like,
-    NotLike,
-    Regex,
-    NotRegex,
-}
-
-impl From<PropValueOperation> for Operator {
-    fn from(pv: PropValueOperation) -> Self {
-        match pv {
-            PropValueOperation::Eq => Operator::Eq,
-            PropValueOperation::Neq => Operator::NotEq,
-            PropValueOperation::Like => Operator::Like,
-            _ => panic!("unreachable"),
-        }
-    }
-}
-
-#[serde_as]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub enum EventFilter {
-    Property {
-        property: PropertyRef,
-        operation: PropValueOperation,
-        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
-        value: Option<Vec<ScalarValue>>,
-    },
-}
 
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum OptionalProperty<T> {
@@ -161,6 +42,14 @@ impl<T> OptionalProperty<T> {
             OptionalProperty::None => OptionalProperty::None,
             OptionalProperty::Some(v) => OptionalProperty::Some(v.try_into()?),
         })
+    }
+
+    pub fn map<F, U>(self, f: F) -> OptionalProperty<U>
+    where F: FnOnce(T) -> U {
+        match self {
+            OptionalProperty::None => OptionalProperty::None,
+            OptionalProperty::Some(v) => OptionalProperty::Some(f(v)),
+        }
     }
 }
 

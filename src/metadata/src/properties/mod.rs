@@ -90,7 +90,7 @@ impl Property {
             Namespace::User => "user".to_string(),
         };
 
-        format!("{}_{}", prefix, name)
+        format!("{prefix}_{name}")
     }
 }
 

@@ -75,7 +75,7 @@ impl ProductProvider {
     ) -> Result<Self> {
         let mut rdr = csv::Reader::from_reader(rdr);
         let mut products = Vec::with_capacity(1000);
-        for (id, res) in rdr.deserialize().into_iter().enumerate() {
+        for (id, res) in rdr.deserialize().enumerate() {
             let mut rec: CSVProduct = res?;
             rec.price.rescale(DECIMAL_SCALE as u32);
             let discount_price = if rng.gen::<f64>() < 0.3 {

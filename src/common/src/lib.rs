@@ -1,4 +1,5 @@
 pub mod error;
+pub mod query;
 pub mod rbac;
 pub mod scalar;
 pub mod types;

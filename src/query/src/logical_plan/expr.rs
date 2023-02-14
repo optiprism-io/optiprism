@@ -3,6 +3,7 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
+use common::query::PartitionedAggregateFunction;
 use datafusion_common::DFSchema;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
@@ -25,7 +26,6 @@ use datafusion_expr::Volatility;
 use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate::state_types;
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregate;
-use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregateFunction;
 use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
 use crate::Result;
 
@@ -67,8 +67,7 @@ pub fn lit_timestamp(data_type: DataType, date_time: &DateTime<Utc>) -> Result<E
         }
         _ => {
             return Err(QueryError::Plan(format!(
-                "unsupported \"{:?}\" timestamp data type",
-                data_type
+                "unsupported \"{data_type:?}\" timestamp data type"
             )));
         }
     }))

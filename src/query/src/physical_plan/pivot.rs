@@ -266,8 +266,7 @@ impl PivotStream {
             match self.result_map.get_mut(col_name) {
                 None => {
                     return Err(QueryError::Execution(format!(
-                        "unknown name column \"{:?}\"",
-                        col_name
+                        "unknown name column \"{col_name:?}\""
                     ))
                     .into());
                 }

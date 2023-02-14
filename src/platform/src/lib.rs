@@ -84,8 +84,8 @@ impl PlatformProvider {
             accounts: Arc::new(accounts::ProviderImpl::new(md.accounts.clone())),
             auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
             query: Arc::new(queries::ProviderImpl::new(query_prov)),
-            dashboards: Arc::new(stub::Dashboards {}),
-            reports: Arc::new(stub::Reports {}),
+            dashboards: Arc::new(dashboards::ProviderImpl::new(md.dashboards.clone())),
+            reports: Arc::new(reports::ProviderImpl::new(md.reports.clone())),
             event_records: Arc::new(stub::EventRecords {}),
             group_records: Arc::new(stub::GroupRecords {}),
         }
@@ -171,6 +171,12 @@ pub struct ResponseMetadata {
     pub next: Option<String>,
 }
 
+impl From<metadata::metadata::ResponseMetadata> for ResponseMetadata {
+    fn from(value: metadata::metadata::ResponseMetadata) -> Self {
+        ResponseMetadata { next: value.next }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, Debug, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ListResponse<T>
@@ -253,54 +259,54 @@ pub enum PropValueOperation {
     NotRegex,
 }
 
-impl TryInto<common::types::PropValueOperation> for PropValueOperation {
+impl TryInto<common::query::PropValueOperation> for PropValueOperation {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<common::types::PropValueOperation, Self::Error> {
+    fn try_into(self) -> std::result::Result<common::query::PropValueOperation, Self::Error> {
         Ok(match self {
-            PropValueOperation::Eq => common::types::PropValueOperation::Eq,
-            PropValueOperation::Neq => common::types::PropValueOperation::Neq,
-            PropValueOperation::Gt => common::types::PropValueOperation::Gt,
-            PropValueOperation::Gte => common::types::PropValueOperation::Gte,
-            PropValueOperation::Lt => common::types::PropValueOperation::Lt,
-            PropValueOperation::Lte => common::types::PropValueOperation::Lte,
-            PropValueOperation::True => common::types::PropValueOperation::True,
-            PropValueOperation::False => common::types::PropValueOperation::False,
-            PropValueOperation::Exists => common::types::PropValueOperation::Exists,
-            PropValueOperation::Empty => common::types::PropValueOperation::Empty,
-            PropValueOperation::ArrAll => common::types::PropValueOperation::ArrAll,
-            PropValueOperation::ArrAny => common::types::PropValueOperation::ArrAny,
-            PropValueOperation::ArrNone => common::types::PropValueOperation::ArrNone,
-            PropValueOperation::Regex => common::types::PropValueOperation::Regex,
-            PropValueOperation::Like => common::types::PropValueOperation::Like,
-            PropValueOperation::NotLike => common::types::PropValueOperation::NotLike,
-            PropValueOperation::NotRegex => common::types::PropValueOperation::NotRegex,
+            PropValueOperation::Eq => common::query::PropValueOperation::Eq,
+            PropValueOperation::Neq => common::query::PropValueOperation::Neq,
+            PropValueOperation::Gt => common::query::PropValueOperation::Gt,
+            PropValueOperation::Gte => common::query::PropValueOperation::Gte,
+            PropValueOperation::Lt => common::query::PropValueOperation::Lt,
+            PropValueOperation::Lte => common::query::PropValueOperation::Lte,
+            PropValueOperation::True => common::query::PropValueOperation::True,
+            PropValueOperation::False => common::query::PropValueOperation::False,
+            PropValueOperation::Exists => common::query::PropValueOperation::Exists,
+            PropValueOperation::Empty => common::query::PropValueOperation::Empty,
+            PropValueOperation::ArrAll => common::query::PropValueOperation::ArrAll,
+            PropValueOperation::ArrAny => common::query::PropValueOperation::ArrAny,
+            PropValueOperation::ArrNone => common::query::PropValueOperation::ArrNone,
+            PropValueOperation::Regex => common::query::PropValueOperation::Regex,
+            PropValueOperation::Like => common::query::PropValueOperation::Like,
+            PropValueOperation::NotLike => common::query::PropValueOperation::NotLike,
+            PropValueOperation::NotRegex => common::query::PropValueOperation::NotRegex,
         })
     }
 }
 
-impl TryInto<PropValueOperation> for common::types::PropValueOperation {
+impl TryInto<PropValueOperation> for common::query::PropValueOperation {
     type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<PropValueOperation, Self::Error> {
         Ok(match self {
-            common::types::PropValueOperation::Eq => PropValueOperation::Eq,
-            common::types::PropValueOperation::Neq => PropValueOperation::Neq,
-            common::types::PropValueOperation::Gt => PropValueOperation::Gt,
-            common::types::PropValueOperation::Gte => PropValueOperation::Gte,
-            common::types::PropValueOperation::Lt => PropValueOperation::Lt,
-            common::types::PropValueOperation::Lte => PropValueOperation::Lte,
-            common::types::PropValueOperation::True => PropValueOperation::True,
-            common::types::PropValueOperation::False => PropValueOperation::False,
-            common::types::PropValueOperation::Exists => PropValueOperation::Exists,
-            common::types::PropValueOperation::Empty => PropValueOperation::Empty,
-            common::types::PropValueOperation::ArrAll => PropValueOperation::ArrAll,
-            common::types::PropValueOperation::ArrAny => PropValueOperation::ArrAny,
-            common::types::PropValueOperation::ArrNone => PropValueOperation::ArrNone,
-            common::types::PropValueOperation::Regex => PropValueOperation::Regex,
-            common::types::PropValueOperation::Like => PropValueOperation::Like,
-            common::types::PropValueOperation::NotLike => PropValueOperation::NotLike,
-            common::types::PropValueOperation::NotRegex => PropValueOperation::NotRegex,
+            common::query::PropValueOperation::Eq => PropValueOperation::Eq,
+            common::query::PropValueOperation::Neq => PropValueOperation::Neq,
+            common::query::PropValueOperation::Gt => PropValueOperation::Gt,
+            common::query::PropValueOperation::Gte => PropValueOperation::Gte,
+            common::query::PropValueOperation::Lt => PropValueOperation::Lt,
+            common::query::PropValueOperation::Lte => PropValueOperation::Lte,
+            common::query::PropValueOperation::True => PropValueOperation::True,
+            common::query::PropValueOperation::False => PropValueOperation::False,
+            common::query::PropValueOperation::Exists => PropValueOperation::Exists,
+            common::query::PropValueOperation::Empty => PropValueOperation::Empty,
+            common::query::PropValueOperation::ArrAll => PropValueOperation::ArrAll,
+            common::query::PropValueOperation::ArrAny => PropValueOperation::ArrAny,
+            common::query::PropValueOperation::ArrNone => PropValueOperation::ArrNone,
+            common::query::PropValueOperation::Regex => PropValueOperation::Regex,
+            common::query::PropValueOperation::Like => PropValueOperation::Like,
+            common::query::PropValueOperation::NotLike => PropValueOperation::NotLike,
+            common::query::PropValueOperation::NotRegex => PropValueOperation::NotRegex,
         })
     }
 }
@@ -320,28 +326,28 @@ impl EventRef {
             EventRef::Regular { event_name } => {
                 format!("{}_regular_{}", event_name.to_case(Case::Snake), idx)
             }
-            EventRef::Custom { event_id } => format!("{}_custom_{}", event_id, idx),
+            EventRef::Custom { event_id } => format!("{event_id}_custom_{idx}"),
         }
     }
 }
 
-impl From<EventRef> for common::types::EventRef {
+impl From<EventRef> for common::query::EventRef {
     fn from(e: EventRef) -> Self {
         match e {
-            EventRef::Regular { event_name } => common::types::EventRef::RegularName(event_name),
-            EventRef::Custom { event_id } => common::types::EventRef::Custom(event_id),
+            EventRef::Regular { event_name } => common::query::EventRef::RegularName(event_name),
+            EventRef::Custom { event_id } => common::query::EventRef::Custom(event_id),
         }
     }
 }
 
-impl TryInto<EventRef> for common::types::EventRef {
+impl TryInto<EventRef> for common::query::EventRef {
     type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<EventRef, Self::Error> {
         Ok(match self {
-            common::types::EventRef::RegularName(name) => EventRef::Regular { event_name: name },
-            common::types::EventRef::Regular(_id) => unimplemented!(),
-            common::types::EventRef::Custom(id) => EventRef::Custom { event_id: id },
+            common::query::EventRef::RegularName(name) => EventRef::Regular { event_name: name },
+            common::query::EventRef::Regular(_id) => unimplemented!(),
+            common::query::EventRef::Custom(id) => EventRef::Custom { event_id: id },
         })
     }
 }
@@ -357,30 +363,30 @@ pub enum PropertyRef {
     Custom { property_id: u64 },
 }
 
-impl TryInto<common::types::PropertyRef> for PropertyRef {
+impl TryInto<common::query::PropertyRef> for PropertyRef {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<common::types::PropertyRef, Self::Error> {
+    fn try_into(self) -> std::result::Result<common::query::PropertyRef, Self::Error> {
         Ok(match self {
-            PropertyRef::User { property_name } => common::types::PropertyRef::User(property_name),
+            PropertyRef::User { property_name } => common::query::PropertyRef::User(property_name),
             PropertyRef::Event { property_name } => {
-                common::types::PropertyRef::Event(property_name)
+                common::query::PropertyRef::Event(property_name)
             }
-            PropertyRef::Custom { property_id } => common::types::PropertyRef::Custom(property_id),
+            PropertyRef::Custom { property_id } => common::query::PropertyRef::Custom(property_id),
         })
     }
 }
 
-impl TryInto<PropertyRef> for common::types::PropertyRef {
+impl TryInto<PropertyRef> for common::query::PropertyRef {
     type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<PropertyRef, Self::Error> {
         Ok(match self {
-            common::types::PropertyRef::User(property_name) => PropertyRef::User { property_name },
-            common::types::PropertyRef::Event(property_name) => {
+            common::query::PropertyRef::User(property_name) => PropertyRef::User { property_name },
+            common::query::PropertyRef::Event(property_name) => {
                 PropertyRef::Event { property_name }
             }
-            common::types::PropertyRef::Custom(property_id) => PropertyRef::Custom { property_id },
+            common::query::PropertyRef::Custom(property_id) => PropertyRef::Custom { property_id },
         })
     }
 }
@@ -402,16 +408,16 @@ pub enum EventFilter {
     Group { group_id: u64 },
 }
 
-impl TryInto<common::types::EventFilter> for &EventFilter {
+impl TryInto<common::query::EventFilter> for &EventFilter {
     type Error = PlatformError;
 
-    fn try_into(self) -> std::result::Result<common::types::EventFilter, Self::Error> {
+    fn try_into(self) -> std::result::Result<common::query::EventFilter, Self::Error> {
         Ok(match self {
             EventFilter::Property {
                 property,
                 operation,
                 value,
-            } => common::types::EventFilter::Property {
+            } => common::query::EventFilter::Property {
                 property: property.to_owned().try_into()?,
                 operation: operation.to_owned().try_into()?,
                 value: match value {
@@ -424,18 +430,18 @@ impl TryInto<common::types::EventFilter> for &EventFilter {
     }
 }
 
-impl TryInto<EventFilter> for common::types::EventFilter {
+impl TryInto<EventFilter> for &common::query::EventFilter {
     type Error = PlatformError;
 
     fn try_into(self) -> std::result::Result<EventFilter, Self::Error> {
         Ok(match self {
-            common::types::EventFilter::Property {
+            common::query::EventFilter::Property {
                 property,
                 operation,
                 value,
             } => EventFilter::Property {
-                property: property.try_into()?,
-                operation: operation.try_into()?,
+                property: property.to_owned().try_into()?,
+                operation: operation.to_owned().try_into()?,
                 value: match value {
                     None => None,
                     Some(v) => Some(v.iter().map(scalar_to_json_value).collect::<Result<_>>()?),

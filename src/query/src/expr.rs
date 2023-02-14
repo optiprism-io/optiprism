@@ -3,10 +3,11 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
-use common::types::EventFilter;
-use common::types::EventRef;
-use common::types::PropValueOperation;
-use common::types::PropertyRef;
+use common::query::EventFilter;
+use common::query::EventRef;
+use common::query::PropValueOperation;
+use common::query::PropertyRef;
+use common::query::QueryTime;
 use datafusion_common::Column;
 use datafusion_common::ExprSchema;
 use datafusion_common::ScalarValue;
@@ -28,7 +29,6 @@ use crate::event_fields;
 use crate::logical_plan::expr::lit_timestamp;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::multi_or;
-use crate::queries::QueryTime;
 use crate::Context;
 use crate::Result;
 
@@ -182,11 +182,10 @@ pub async fn encode_property_dict_values(
                     DataType::UInt8 => ScalarValue::UInt8(Some(key as u8)),
                     DataType::UInt16 => ScalarValue::UInt16(Some(key as u16)),
                     DataType::UInt32 => ScalarValue::UInt32(Some(key as u32)),
-                    DataType::UInt64 => ScalarValue::UInt64(Some(key as u64)),
+                    DataType::UInt64 => ScalarValue::UInt64(Some(key)),
                     _ => {
                         return Err(QueryError::Plan(format!(
-                            "unsupported dictionary type \"{:?}\"",
-                            dict_type
+                            "unsupported dictionary type \"{dict_type:?}\""
                         )));
                     }
                 };
@@ -306,15 +305,14 @@ pub fn named_property_expression(
             // expressions for OR
             let values_vec = values.ok_or_else(|| {
                 QueryError::Plan(format!(
-                    "value should be defined for \"{:?}\" operation",
-                    operation
+                    "value should be defined for \"{operation:?}\" operation"
                 ))
             })?;
 
             Ok(match values_vec.len() {
                 1 => binary_expr(
                     prop_col,
-                    operation.clone().into(),
+                    operation.to_owned().try_into()?,
                     lit(values_vec[0].to_owned()),
                 ),
                 _ => {
@@ -324,7 +322,7 @@ pub fn named_property_expression(
                         .map(|v| {
                             binary_expr(
                                 prop_col.clone(),
-                                operation.clone().into(),
+                                operation.clone().try_into().unwrap(),
                                 lit(v.to_owned()),
                             )
                         })

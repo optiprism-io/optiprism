@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
-use common::types::EventRef;
+use common::query::EventRef;
 use common::types::OptionalProperty;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;

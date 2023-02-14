@@ -19,7 +19,6 @@
 
 use std::cmp::Ordering;
 use std::convert::TryFrom;
-use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -37,6 +36,7 @@ use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::DataType;
+use common::query::PartitionedAggregateFunction;
 use datafusion::physical_plan::expressions::AvgAccumulator;
 use datafusion::physical_plan::expressions::MaxAccumulator;
 use datafusion::physical_plan::expressions::MinAccumulator;
@@ -155,18 +155,6 @@ impl Buffer {
 
     pub fn evaluate(&self) -> DFResult<ScalarValue> {
         self.acc.lock().unwrap().evaluate()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
-pub enum PartitionedAggregateFunction {
-    Count,
-    Sum,
-}
-
-impl fmt::Display for PartitionedAggregateFunction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", format!("{:?}", self).to_uppercase())
     }
 }
 
@@ -339,8 +327,7 @@ impl PartitionedAggregateAccumulator {
                 Ok(Box::new(MaxAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>)
             }
             _ => Err(QueryError::Plan(format!(
-                "outer aggregate function \"{:?}\" doesn't supported",
-                outer_agg
+                "outer aggregate function \"{outer_agg:?}\" doesn't supported"
             ))),
         }?;
 

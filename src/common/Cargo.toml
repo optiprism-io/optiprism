@@ -8,8 +8,10 @@ authors = ["Optiprism <dev@optiprism.io>"]
 arrow-schema = { version = "28.0.0", features = ["serde"] }
 async-trait = "0.1.59"
 chrono = { version = "0.4.23", features = ["serde"] }
+chronoutil = "0.2.3"
 datafusion = "15.0.0"
 datafusion-common = "15.0.0"
+datafusion-expr = "15.0.0"
 jsonwebtoken = "8.2.0"
 lazy_static = "1.4.0"
 rand = "0.8.5"

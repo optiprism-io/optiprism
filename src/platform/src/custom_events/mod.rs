@@ -109,7 +109,7 @@ impl TryInto<Event> for metadata::custom_events::Event {
             event: self.event.try_into()?,
             filters: self
                 .filters
-                .map(|v| v.iter().map(|e| e.to_owned().try_into()).collect())
+                .map(|v| v.iter().map(|e| e.try_into()).collect())
                 .transpose()?,
         })
     }

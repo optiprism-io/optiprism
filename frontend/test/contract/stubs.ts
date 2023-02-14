@@ -110,13 +110,16 @@ export const stubs = {
         tags: ['tag'],
         name: 'name',
         description: 'description',
-        rows: [<DashboardRow>{
-            panels: [<DashboardPanel>{
-                span: 1,
+        panels: [
+            <DashboardPanel>{
                 type: DashboardPanelTypeEnum.Report,
-                reportId: 1
-            }]
-        }]
+                reportId: 1,
+                x: 1,
+                y: 2,
+                w: 3,
+                h: 4,
+            }
+        ]
     },
     report: <Report>{
         id: 1,
