@@ -3625,7 +3625,7 @@ export interface ReportsList200Response {
      * @type {Array<Report>}
      * @memberof ReportsList200Response
      */
-    'dashboards'?: Array<Report>;
+    'data'?: Array<Report>;
     /**
      * 
      * @type {ListResponseMetadataMeta}
@@ -3644,7 +3644,7 @@ export interface ReportsList200ResponseAllOf {
      * @type {Array<Report>}
      * @memberof ReportsList200ResponseAllOf
      */
-    'dashboards'?: Array<Report>;
+    'data'?: Array<Report>;
 }
 /**
  * did event condition

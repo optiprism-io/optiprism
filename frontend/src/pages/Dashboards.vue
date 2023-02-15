@@ -9,7 +9,6 @@
                     />
                 </div>
                 <UiSelect
-                    v-if="reportsList.length"
                     class=" pf-u-mr-md dashboards__add-report"
                     :items="selectReportsList"
                     :text-button="t('dashboards.addReport')"
@@ -364,7 +363,6 @@ watch(() => route.query.id, id => {
         color: var(--pf-global--Color--300);
     }
     &__name {
-        max-width: 300px;
         .pf-c-inline-edit__value {
             font-size: 20px;
         }

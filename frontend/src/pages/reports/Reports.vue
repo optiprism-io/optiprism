@@ -148,10 +148,6 @@ const itemsReports = computed(() => {
     })
 })
 
-const setNameReport = (payload: string) => {
-    reportName.value = payload
-}
-
 const onDeleteReport = async () => {
     try {
         await confirm(t('reports.deleteConfirm', { name: `<b>${reportsStore?.activeReport?.name}</b>` || '' }), {
@@ -183,6 +179,11 @@ const onSaveReport = async () => {
     }
     await reportsStore.getList()
     reportsStore.updateDump(reportType.value)
+}
+
+const setNameReport = (payload: string) => {
+    reportName.value = payload
+    onSaveReport()
 }
 
 const setEmptyReport = () => {

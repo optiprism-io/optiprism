@@ -296,7 +296,7 @@ paths:
                 type: object
                 allOf:
                   - properties:
-                      dashboards:
+                      data:
                         type: array
                         items:
                           $ref: '#/components/schemas/Report'

@@ -166,7 +166,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { computed, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth/auth'
 import { pagesMap } from '@/router'
-import { ErrorResponse } from '@/api'
 import usei18n from '@/hooks/useI18n'
 import UiInput from '@/components/uikit/UiInput.vue'
 import UiCheckbox from '@/components/uikit/UiCheckbox.vue'
@@ -178,7 +177,7 @@ const { t } = usei18n()
 
 const email = ref('')
 const password = ref('')
-const keepLogged = ref(false)
+const keepLogged = ref(true)
 const errorFields = ref<{ [key: string]: string }>({})
 const errorMain = ref('');
 const loading = ref(false);
