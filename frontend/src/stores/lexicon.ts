@@ -140,13 +140,13 @@ export const useLexiconStore = defineStore('lexicon', {
 
             try {
                 const res = await schemaService.events(commonStore.organizationId, commonStore.projectId)
-
-                if (res.data?.events) {
-                    this.events = res.data?.events
+                if (res.data?.data) {
+                    this.events = res.data?.data
                 }
-
                 const responseCustomEvents = await schemaService.customEvents(commonStore.organizationId, commonStore.projectId)
-                this.customEvents = <CustomEvent[]>responseCustomEvents.data
+                if (responseCustomEvents?.data?.data) {
+                    this.customEvents = <CustomEvent[]>responseCustomEvents.data?.data || [];
+                }
             } catch (error) {
                 throw new Error('error customEvents')
             }
@@ -159,7 +159,7 @@ export const useLexiconStore = defineStore('lexicon', {
             this.eventPropertiesLoading = true
             try {
                 const res = await schemaService.eventProperties(commonStore.organizationId, commonStore.projectId)
-                if (res.data.data) {
+                if (res?.data?.data) {
                     this.eventProperties = res.data.data
                 }
 
@@ -345,18 +345,17 @@ export const useLexiconStore = defineStore('lexicon', {
         },
         eventsList(state: Lexicon) {
             const eventsList: Group<Item<EventRef, null>[]>[] = [];
-
             const items: Item<EventRef, null>[] = [];
-
-            state.customEvents.forEach((e: CustomEvent) => {
-                items.push({
-                    item: customEventRef(e),
-                    name: e.name,
-                    description: e?.description,
-                    editable: true
+            if (state.customEvents) {
+                state.customEvents.forEach((e: CustomEvent) => {
+                    items.push({
+                        item: customEventRef(e),
+                        name: e.name,
+                        description: e?.description,
+                        editable: true
+                    });
                 });
-            });
-
+            }
             eventsList.push({
                 type: 'custom',
                 name: 'Custom Events',
