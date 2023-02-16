@@ -38,7 +38,6 @@ pub struct Project {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CreateProjectRequest {
     pub created_by: u64,
-    pub organization_id: u64,
     pub name: String,
 }
 

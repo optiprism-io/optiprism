@@ -21,6 +21,11 @@ use service::tracing::TracingCliArgs;
 use tracing::debug;
 use tracing::info;
 use uuid::Uuid;
+use common::rbac::{OrganizationRole, ProjectRole, Role};
+use metadata::accounts::CreateAccountRequest;
+use metadata::organizations::CreateOrganizationRequest;
+use metadata::projects::CreateProjectRequest;
+use platform::auth::password::make_password_hash;
 
 extern crate parse_duration;
 
@@ -66,7 +71,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 return Err(DemoError::FileNotFound(format!(
                     "metadata path {path:?} doesn't exist"
                 ))
-                .into());
+                    .into());
             }
 
             path
@@ -86,12 +91,48 @@ async fn main() -> Result<(), anyhow::Error> {
             "demo data path {:?} doesn't exist",
             args.demo_data_path
         ))
-        .into());
+            .into());
     }
 
     let store = Arc::new(Store::new(md_path.clone()));
     let md = Arc::new(MetadataProvider::try_new(store)?);
 
+    info!("creating org structure and admin account...");
+    {
+        let admin = md.accounts.create(CreateAccountRequest {
+            created_by: None,
+            password_hash: make_password_hash("admin")?,
+            email: "admin@email.com".to_string(),
+            first_name: Some("admin".to_string()),
+            last_name: None,
+            role: Some(Role::Admin),
+            organizations: None,
+            projects: None,
+            teams: None,
+        }).await?;
+
+        let org = md.organizations.create(CreateOrganizationRequest {
+            created_by: admin.id,
+            name: "Test Organization".to_string(),
+        }).await?;
+
+        let proj1 = md.projects.create(org.id, CreateProjectRequest {
+            created_by: admin.id,
+            name: "Test Project".to_string(),
+        }).await?;
+
+        let user = md.accounts.create(CreateAccountRequest {
+            created_by: Some(admin.id),
+            password_hash: make_password_hash("test")?,
+            email: "user@test.com".to_string(),
+            first_name: Some("user".to_string()),
+            last_name: None,
+            role: None,
+            organizations: Some(vec![(org.id, OrganizationRole::Member)]),
+            projects: Some(vec![(proj1.id, ProjectRole::Member)]),
+            teams: None,
+        }).await?;
+    }
     info!("starting demo instance...");
     debug!("metadata path: {:?}", md_path);
     debug!("demo data path: {:?}", args.demo_data_path);

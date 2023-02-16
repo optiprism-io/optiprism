@@ -7,7 +7,8 @@ pub enum Permission {
     All,
     ManageAccounts,
     ViewAccounts,
-    DeleteAccounts,
+    ManageOrganizations,
+    ManageProjects,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
