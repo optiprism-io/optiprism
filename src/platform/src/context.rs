@@ -41,7 +41,13 @@ impl Context {
     pub fn check_permission(&self, permission: Permission) -> Result<()> {
         if let Some(role) = &self.role {
             for (root_role, role_permission) in PERMISSIONS.iter() {
-                if root_role == role && role_permission.contains(&permission) {
+                if *root_role != *role {
+                    continue;
+                }
+                if role_permission.contains(&Permission::All) {
+                    return Ok(());
+                }
+                if role_permission.contains(&permission) {
                     return Ok(());
                 }
             }
@@ -55,9 +61,19 @@ impl Context {
         organization_id: u64,
         permission: OrganizationPermission,
     ) -> Result<()> {
+        if self.check_permission(Permission::ManageOrganizations).is_ok() {
+            return Ok(());
+        }
         let role = self.get_organization_role(organization_id)?;
         for (org_role, role_permission) in ORGANIZATION_PERMISSIONS.iter() {
-            if *org_role == role && role_permission.contains(&permission) {
+            if *org_role != role {
+                continue;
+            }
+
+            if role_permission.contains(&OrganizationPermission::All) {
+                return Ok(());
+            }
+            if role_permission.contains(&permission) {
                 return Ok(());
             }
         }
@@ -71,6 +87,9 @@ impl Context {
         project_id: u64,
         permission: ProjectPermission,
     ) -> Result<()> {
+        if self.check_permission(Permission::ManageProjects).is_ok() {
+            return Ok(());
+        }
         if let Ok(role) = self.get_organization_role(organization_id) {
             match role {
                 OrganizationRole::Owner => return Ok(()),
@@ -82,7 +101,14 @@ impl Context {
         let role = self.get_project_role(project_id)?;
 
         for (proj_role, role_permission) in PROJECT_PERMISSIONS.iter() {
-            if *proj_role == role && role_permission.contains(&permission) {
+            if *proj_role != role {
+                continue;
+            }
+
+            if role_permission.contains(&ProjectPermission::All) {
+                return Ok(());
+            }
+            if role_permission.contains(&permission) {
                 return Ok(());
             }
         }
@@ -117,7 +143,7 @@ impl Context {
 
 #[async_trait]
 impl<S> FromRequestParts<S> for Context
-where S: Send + Sync
+    where S: Send + Sync
 {
     type Rejection = PlatformError;
 
