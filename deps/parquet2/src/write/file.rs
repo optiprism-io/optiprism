@@ -165,12 +165,6 @@ impl<W: Write> FileWriter<W> {
         if self.offset == 0 {
             self.start()?;
         }
-        for group in self.row_groups.iter() {
-            println!("{:?}",group);
-        }
-        for group in self.page_specs.iter() {
-            println!("{:?}",group);
-        }
         if self.state != State::Started {
             return Err(Error::InvalidParameter(
                 "End cannot be called twice".to_string(),
@@ -229,7 +223,6 @@ impl<W: Write> FileWriter<W> {
             None,
             None,
         );
-        println!("{:?}",metadata);
         let len = end_file(&mut self.writer, &metadata)?;
         self.state = State::Finished;
         self.metadata = Some(metadata);

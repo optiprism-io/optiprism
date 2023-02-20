@@ -57,7 +57,6 @@ pub fn write_page<W: Write>(
     offset: u64,
     compressed_page: &CompressedPage,
 ) -> Result<PageWriteSpec> {
-    println!("{offset}");
     let num_values = compressed_page.num_values();
     let selected_rows = compressed_page.selected_rows();
     let header = match &compressed_page {

@@ -1,7 +1,7 @@
 use std::fs::File;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::schema::Repetition;
-use parquet2::schema::types::{FieldInfo, ParquetType, PhysicalType, PrimitiveLogicalType, PrimitiveType};
+use parquet2::schema::types::{FieldInfo, ParquetType, PhysicalType, PrimitiveConvertedType, PrimitiveLogicalType, PrimitiveType};
 use parquet2::write::{DynIter, DynStreamingIterator, FileSeqWriter, FileWriter, Version, WriteOptions};
 
 use store::error::Result;
@@ -19,9 +19,10 @@ fn main() -> anyhow::Result<()> {
             id: None,
         },
         logical_type: Some(PrimitiveLogicalType::String),
-        converted_type: None,
+        converted_type: Some(PrimitiveConvertedType::Uint8),
         physical_type: PhysicalType::ByteArray,
     };
+    // TODO fix infinite execution with this schema, figure out how to define schema correctly
     let schema = SchemaDescriptor::new(
         "schema".to_string(),
         vec![
@@ -37,7 +38,6 @@ fn main() -> anyhow::Result<()> {
         ],
     );
 
-    println!("s1: {:?}",schema);
     let schema = {
         let mut reader = File::open("/tmp/optiprism/0.parquet")?;
         // we can read its metadata:
@@ -45,7 +45,6 @@ fn main() -> anyhow::Result<()> {
 
         metadata.schema().to_owned()
     };
-    println!("s2: {:?}",schema);
     let mut file = std::fs::File::create(format!("/tmp/optiprism/merged.parquet"))?;
 
     let mut seq_writer = FileSeqWriter::new(
@@ -103,9 +102,8 @@ fn main() -> anyhow::Result<()> {
         // we can then read the row groups into chunks
         let chunks = arrow2::io::parquet::read::FileReader::new(reader, metadata.row_groups, schema, Some(1024 * 8 * 8), None, None);
         for maybe_chunk in chunks {
-            println!("x");
             let chunk = maybe_chunk?;
-            println!("{:?}", chunk);
+            // println!("{:?}", chunk);
         }
     }
     Ok(())

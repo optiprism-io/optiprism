@@ -107,7 +107,9 @@ impl<W: Write> FileSeqWriter<W> {
 
         state.columns.push(column_chunk);
         state.page_specs.push(specs);
-        state.cur_col += 1;
+        if state.cur_col + 1 < self.schema.columns().len() {
+            state.cur_col += 1;
+        }
 
         Ok(())
     }
@@ -133,7 +135,12 @@ impl<W: Write> FileSeqWriter<W> {
             .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
             .sum();
 
-        let num_rows = state.page_specs[0].iter().filter(|x| is_data_page(x)).fold(0, |acc, x| acc + x.num_values);
+        // TODO fix this this
+        let num_rows = state
+            .page_specs[0]
+            .iter()
+            .filter(|x| is_data_page(x))
+            .fold(0, |acc, x| acc + x.num_values);
         let row_group = RowGroup {
             columns: state.columns,
             total_byte_size,
@@ -146,8 +153,6 @@ impl<W: Write> FileSeqWriter<W> {
 
         self.page_specs.push(state.page_specs);
         self.row_groups.push(row_group);
-        // self.offset += total_byte_size as u64;
-        // println!("w offset: {}", self.offset);
         Ok(())
     }
 
@@ -164,12 +169,6 @@ impl<W: Write> FileSeqWriter<W> {
     }
 
     pub fn end(&mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<u64> {
-        for group in self.row_groups.iter() {
-            println!("{:?}",group);
-        }
-        for group in self.page_specs.iter() {
-            println!("{:?}",group);
-        }
         if self.offset == 0 {
             self.start()?;
         }
@@ -233,7 +232,6 @@ impl<W: Write> FileSeqWriter<W> {
             None,
         );
 
-        println!("{:?}",metadata);
         let len = end_file(&mut self.writer, &metadata)?;
         self.state = State::Finished;
         self.metadata = Some(metadata);
