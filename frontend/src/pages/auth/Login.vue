@@ -126,24 +126,17 @@
                                 {{ errorFields?.password }}
                             </p>
                         </div>
-                        <div class="pf-c-form__group login-form__field">
+                        <div class="pf-c-form__group login-form__field pf-u-mb-md">
                             <UiCheckbox
                                 v-model="keepLogged"
                                 :label="$t('login.keep')"
+                                class="pf-u-mb-md"
                             />
-                            <p
+                            <UiAlert
+                                class="login-form__field-info-main pf-c-form__helper-text pf-m-error"
                                 v-if="errorMain"
-                                class="login-form__field-info pf-c-form__helper-text pf-m-error"
-                                aria-live="polite"
-                            >
-                                <span class="pf-c-form__helper-text-icon">
-                                    <i
-                                        class="fas fa-exclamation-circle"
-                                        aria-hidden="true"
-                                    />
-                                </span>
-                                {{ errorMain }}
-                            </p>
+                                :item="errorMainItem"
+                            />
                         </div>
                         <div class="pf-c-form__group pf-m-action">
                             <button
@@ -169,6 +162,8 @@ import { pagesMap } from '@/router'
 import usei18n from '@/hooks/useI18n'
 import UiInput from '@/components/uikit/UiInput.vue'
 import UiCheckbox from '@/components/uikit/UiCheckbox.vue'
+import UiAlert from '@/components/uikit/UiAlert.vue'
+import { AlertTypeEnum } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -181,6 +176,15 @@ const keepLogged = ref(true)
 const errorFields = ref<{ [key: string]: string }>({})
 const errorMain = ref('');
 const loading = ref(false);
+
+const errorMainItem = computed(() => {
+    return {
+        id: '0',
+        type: AlertTypeEnum.Danger,
+        text: errorMain.value,
+        noClose: true,
+    };
+});
 
 const nextPath = computed(() => {
     const next = route.query.next
@@ -254,10 +258,13 @@ const actionForm = () => {
     &__field {
         position: relative;
     }
-
     &__field-info {
         position: absolute;
         bottom: -1.5rem;
+        left: 0;
+    }
+    &__field-info-main {
+        position: absolute;
         left: 0;
     }
 }
