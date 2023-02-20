@@ -48,7 +48,7 @@ const getEventProperties = (eventRef: EventRef) => {
     const properties: Group<Item<PropertyRef, null>[]>[] = [];
 
     if (eventRef.type === EventType.Regular) {
-        const eventProperties = lexiconStore.findEventProperties(eventRef.id)
+        const eventProperties = lexiconStore.findEventProperties(eventRef)
 
         if (eventProperties.length) {
             const items: Item<PropertyRef, null>[] = [];
@@ -67,7 +67,7 @@ const getEventProperties = (eventRef: EventRef) => {
             properties.push({ name: 'Event Properties', items, });
         }
 
-        const eventCustomProperties = lexiconStore.findEventCustomProperties(eventRef.id);
+        const eventCustomProperties = lexiconStore.findEventCustomProperties(eventRef);
 
         if (eventCustomProperties.length) {
             const items: Item<PropertyRef, null>[] = [];

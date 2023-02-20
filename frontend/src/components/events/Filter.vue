@@ -29,7 +29,7 @@
                         :class="[props.forPreview ? 'pf-m-control pf-m-small' : 'pf-m-secondary']"
                         :disabled="props.forPreview"
                     >
-                        {{ propertyName(filter.propRef) }}
+                        {{ filter.propRef?.name || propertyName(filter.propRef) }}
                     </UiButton>
                 </PropertySelect>
                 <PropertySelect

@@ -31,15 +31,12 @@ const ERROR_INTERNAL_ID = 'Internal'
 const closeAlert = (id: string) => alertsStore.closeAlert(id)
 
 axios.interceptors.response.use(res => res, async err => {
-    const originalConfig = err.config
-    if (err.response) {
-
-        switch (err.response.status) {
+    const originalConfig = err?.config;
+    console.log(`ERROR: code '${err?.code}', message: '${err?.message}', url: '${err?.config?.url}'`);
+    if (err?.response) {
+        switch (err?.response?.status || err?.error?.status) {
             case 400:
-                if (err.response.data) {
-                    return Promise.reject(err.response.data)
-                }
-                break
+                return Promise.resolve()
             case 401:
                 if (!originalConfig._retry) {
                     originalConfig._retry = true;
@@ -62,7 +59,7 @@ axios.interceptors.response.use(res => res, async err => {
                         return Promise.resolve()
                     }
                 }
-                break
+                return Promise.reject(err)
             case 500:
             case 503:
                 if (!alertsStore.items.find(item => item.id === ERROR_INTERNAL_ID)) {
@@ -77,7 +74,7 @@ axios.interceptors.response.use(res => res, async err => {
                 break
         }
     }
-    return Promise.reject(err)
+    return Promise.resolve();
 })
 </script>
 

@@ -37,7 +37,7 @@ const items = computed(() => {
 
     if (props.propertyRef) {
         if (props.propertyRef.type === PropertyType.Event) {
-            const prop = lexiconStore.findEventPropertyById(props.propertyRef.id);
+            const prop = lexiconStore.findEventProperty(props.propertyRef)
             findOperations(prop.dataType || DataType.String, prop.nullable, prop.isArray).forEach(op =>
                 ret.push({
                     item: op.id,

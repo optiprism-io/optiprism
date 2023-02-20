@@ -285,7 +285,8 @@ onBeforeMount(async () => {
                         return {
                             propRef: {
                                 type: filter.propertyType,
-                                id: filter.propertyId
+                                id: filter?.propertyId || 0,
+                                name: filter?.propertyName || '',
                             },
                             opId: filter.operation,
                             values: filter.value,

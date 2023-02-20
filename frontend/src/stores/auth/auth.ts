@@ -46,8 +46,7 @@ export const useAuthStore = defineStore('auth', {
                 }
                 try {
                     const res = await authService.refreshToken(this.refreshToken.value)
-
-                    await this.setToken(res.data, !!localStorage.getItem('keepLogged'))
+                    await this.setToken(res?.data, !!localStorage.getItem('keepLogged'))
                 } catch (error) {
                     throw new Error(JSON.stringify(error))
                 }

@@ -77,12 +77,11 @@ const getEventSegmentation = async () => {
     eventSegmentationLoading.value = true
     try {
         const res = await reportsService.eventSegmentation(commonStore.organizationId, commonStore.projectId,  eventsStore.propsForEventSegmentationResult)
-
         if (res) {
             eventSegmentation.value = res.data as DataTableResponse
         }
     } catch (error) {
-        throw new Error('error Get Event Segmentation')
+        throw new Error('error event segmentation')
     }
     eventSegmentationLoading.value = false
 }
