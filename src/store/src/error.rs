@@ -1,9 +1,10 @@
 use std::result;
-use arrow::error::ArrowError;
-use parquet::errors::ParquetError;
+// use parquet::errors::ParquetError;
 use thiserror::Error;
+use arrow2::error::Error as ArrowError;
+use parquet2::error::Error as ParquetError;
 
-pub type Result<T> = result::Result<T, QueryError>;
+pub type Result<T> = result::Result<T, StoreError>;
 
 #[derive(Error, Debug)]
 pub enum StoreError {
@@ -12,6 +13,7 @@ pub enum StoreError {
     #[error("parquet {0:?}")]
     Parquet(#[from] ParquetError),
     #[error("execution {0:?}")]
+    Execution(String),
     #[error("arrow {0:?}")]
     Arrow(#[from] ArrowError),
 }
