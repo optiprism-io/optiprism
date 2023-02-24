@@ -18,6 +18,11 @@ arrow2 = { path = "../../deps/arrow2" ,features = ["io_parquet","compute_arithme
 #arrow2 = { version = "0.15.0", features = ["io_parquet","compute_arithmetics"] }
 
 [[bin]]
+name = "intervals"
+test = false
+bench = false
+
+[[bin]]
 name = "parquet2"
 test = false
 bench = false
