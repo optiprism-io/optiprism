@@ -16,6 +16,12 @@ bytes = "1.3.0"
 parquet2 = { path = "../../deps/parquet2" }
 arrow2 = { path = "../../deps/arrow2" ,features = ["io_parquet","compute_arithmetics"]}
 #arrow2 = { version = "0.15.0", features = ["io_parquet","compute_arithmetics"] }
+rayon = "1.6.1"
+futures = "0.3.25"
+[[bin]]
+name = "merge_parquet"
+test = false
+bench = false
 
 [[bin]]
 name = "intervals"

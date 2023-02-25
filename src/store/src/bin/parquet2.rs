@@ -69,7 +69,7 @@ fn main() -> anyhow::Result<()> {
         None,
     );
 
-    for file_id in 0..=1 {
+    /*for file_id in 0..=1 {
         let mut reader = File::open(format!("/tmp/optiprism/{file_id}.parquet"))?;
         let metadata = parquet2::read::read_metadata(&mut reader)?;
 
@@ -92,7 +92,7 @@ fn main() -> anyhow::Result<()> {
             seq_writer.end_row_group()?;
         }
     }
-    seq_writer.end(None)?;
+    seq_writer.end(None)?;*/
 
     {
         let mut reader = File::open("/tmp/optiprism/merged.parquet")?;
@@ -114,18 +114,12 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-enum KeyOrdering {
-    Ascending,
-    Descending,
-}
-
 struct FileMerger<'a, R, W> where R: Read, W: Write {
     readers: Vec<R>,
     reader_page_buffers: Vec<CompressedPage>,
     reader_cursors: Vec<usize>,
     schemas: Vec<SchemaDescriptor>,
     schema: SchemaDescriptor,
-    sorting_cols: Vec<KeyOrdering>,
     writer: FileSeqWriter<W>,
 }
 
