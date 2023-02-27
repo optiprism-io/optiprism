@@ -30,10 +30,23 @@ const ERROR_INTERNAL_ID = 'Internal'
 
 const closeAlert = (id: string) => alertsStore.closeAlert(id)
 
+const createErrorGeneral = (res: ErrorResponse) => {
+    if (!alertsStore.items.find(item => item.id === ERROR_INTERNAL_ID)) {
+        alertsStore.createAlert({
+            id: ERROR_INTERNAL_ID,
+            type: 'danger',
+            text: res?.message ?? $t('errors.internal')
+        })
+    }
+}
+
 axios.interceptors.response.use(res => res, async err => {
     const originalConfig = err?.config;
     console.log(`ERROR: code '${err?.code}', message: '${err?.message}', url: '${err?.config?.url}'`);
     if (err?.response) {
+        if (err.code === 'ERR_NETWORK') {
+            createErrorGeneral(err.response);
+        }
         switch (err?.response?.status || err?.error?.status) {
             case 400:
                 if (err.response?.data) {
@@ -65,14 +78,7 @@ axios.interceptors.response.use(res => res, async err => {
                 return Promise.reject(err)
             case 500:
             case 503:
-                if (!alertsStore.items.find(item => item.id === ERROR_INTERNAL_ID)) {
-                    const res = err.response as ErrorResponse
-                    alertsStore.createAlert({
-                        id: ERROR_INTERNAL_ID,
-                        type: 'danger',
-                        text: res.message ?? $t('errors.internal')
-                    })
-                }
+                createErrorGeneral(err.response);
                 break
         }
     }
