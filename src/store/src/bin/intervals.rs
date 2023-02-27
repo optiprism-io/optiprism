@@ -42,7 +42,7 @@ fn merge(ints: &[Interval]) -> Vec<Interval> {
     for (i, _) in ints.iter().enumerate() {
         let i = i as i64;
         let a = min + i * size;
-        let mut b = a + size - 1;
+        let mut b = a + size ;
         if i == ints.len() as i64 - 1 && b != max {
             b = max;
         }
@@ -141,6 +141,7 @@ fn main() -> anyhow::Result<()> {
                 println!("merge of queue: {:?}", merge_queue);
                 let mr: Vec<Vec<Interval>> = merge_queue.par_drain(..).map(|v| merge(&v)).collect();
                 mr.into_iter().for_each(|v| v.into_iter().for_each(|v| merge_result.push(v)));
+
             }
         }
         l += 1;

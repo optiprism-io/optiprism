@@ -24,6 +24,12 @@ test = false
 bench = false
 
 [[bin]]
+name = "copilot_merge"
+test = false
+bench = false
+
+
+[[bin]]
 name = "intervals"
 test = false
 bench = false
