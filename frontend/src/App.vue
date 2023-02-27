@@ -36,7 +36,10 @@ axios.interceptors.response.use(res => res, async err => {
     if (err?.response) {
         switch (err?.response?.status || err?.error?.status) {
             case 400:
-                return Promise.resolve()
+                if (err.response?.data) {
+                    return Promise.reject(err.response.data);
+                }
+                break;
             case 401:
                 if (!originalConfig._retry) {
                     originalConfig._retry = true;
@@ -64,7 +67,6 @@ axios.interceptors.response.use(res => res, async err => {
             case 503:
                 if (!alertsStore.items.find(item => item.id === ERROR_INTERNAL_ID)) {
                     const res = err.response as ErrorResponse
-
                     alertsStore.createAlert({
                         id: ERROR_INTERNAL_ID,
                         type: 'danger',

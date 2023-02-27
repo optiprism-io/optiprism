@@ -51,6 +51,15 @@
                     </h1>
                 </header>
                 <div class="pf-c-login__main-body">
+                    <div
+                        class="pf-c-login__main-error-wrap"
+                    >
+                        <UiAlert
+                            v-if="errorMain"
+                            class="pf-c-login__main-error pf-c-form__helper-text pf-m-error pf-u-mb-lg"
+                            :item="errorMainItem"
+                        />
+                    </div>
                     <form
                         class="pf-c-form login-form"
                         @submit.prevent="actionForm"
@@ -126,16 +135,11 @@
                                 {{ errorFields?.password }}
                             </p>
                         </div>
-                        <div class="pf-c-form__group login-form__field pf-u-mb-md">
+                        <div class="pf-c-form__group login-form__field">
                             <UiCheckbox
                                 v-model="keepLogged"
                                 :label="$t('login.keep')"
                                 class="pf-u-mb-md"
-                            />
-                            <UiAlert
-                                class="login-form__field-info-main pf-c-form__helper-text pf-m-error"
-                                v-if="errorMain"
-                                :item="errorMainItem"
                             />
                         </div>
                         <div class="pf-c-form__group pf-m-action">
@@ -215,7 +219,7 @@ const login = async (): Promise<void | Error> => {
             errorFields.value = error?.fields as { [key: string]: string; } || {};
         }
         if (error?.status === 401) {
-            errorMain.value = t('errors.loginIncorrect');
+            errorMain.value = error?.message;
         } else {
             if (error?.message) {
                 errorMain.value = error?.message;
@@ -250,6 +254,16 @@ const actionForm = () => {
     img.pf-c-brand {
         @media screen and (min-width: 1200px) {
             max-width: 400px;
+        }
+    }
+    &__main-body {
+        position: relative;
+    }
+    &__main-error {
+        &-wrap {
+            margin-bottom: .7rem;
+            min-height: 2rem;
+            position: relative;
         }
     }
 }
