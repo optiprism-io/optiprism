@@ -51,69 +51,30 @@
                     </h1>
                 </header>
                 <div class="pf-c-login__main-body">
-                    <div
-                        class="pf-c-login__main-error-wrap"
+                    <UiForm
+                        class="login-form"
+                        :error-main="errorMain"
+                        @submit="actionForm"
                     >
-                        <UiAlert
-                            v-if="errorMain"
-                            class="pf-c-login__main-error pf-c-form__helper-text pf-m-error pf-u-mb-lg"
-                            :item="errorMainItem"
-                        />
-                    </div>
-                    <form
-                        class="pf-c-form login-form"
-                        @submit.prevent="actionForm"
-                    >
-                        <div class="pf-c-form__group pf-u-mb-md login-form__field">
-                            <label
-                                class="pf-c-form__label"
-                                for="login-demo-form-username"
-                            >
-                                <span class="pf-c-form__label-text">
-                                    Email
-                                </span>
-                                <span
-                                    class="pf-c-form__label-required"
-                                    aria-hidden="true"
-                                >
-                                    &#42;
-                                </span>
-                            </label>
+                        <UiFormGroup
+                            :label="'Email'"
+                            :error="errorFields?.email"
+                            :for="'login-email'"
+                            :required="true"
+                        >
                             <UiInput
                                 v-model="email"
                                 name="login-email"
                                 :invalid="Boolean(errorFields?.email)"
                                 @input="(e) => onInput(e, 'email')"
                             />
-                            <p
-                                v-if="errorFields?.email"
-                                class="login-form__field-info pf-c-form__helper-text pf-m-error"
-                                aria-live="polite"
-                            >
-                                <span class="pf-c-form__helper-text-icon">
-                                    <i
-                                        class="fas fa-exclamation-circle"
-                                        aria-hidden="true"
-                                    />
-                                </span>
-                                {{ errorFields?.email }}
-                            </p>
-                        </div>
-                        <div class="pf-c-form__group pf-u-mb-md login-form__field">
-                            <label
-                                class="pf-c-form__label"
-                                for="login-demo-form-password"
-                            >
-                                <span class="pf-c-form__label-text">
-                                    {{ $t('login.password') }}
-                                </span>
-                                <span
-                                    class="pf-c-form__label-required"
-                                    aria-hidden="true"
-                                >
-                                    &#42;
-                                </span>
-                            </label>
+                        </UiFormGroup>
+                        <UiFormGroup
+                            :label="$t('login.password')"
+                            :error="errorFields?.password"
+                            :for="'login-password'"
+                            :required="true"
+                        >
                             <UiInput
                                 v-model="password"
                                 name="login-password"
@@ -121,36 +82,25 @@
                                 :invalid="Boolean(errorFields?.password)"
                                 @input="(e) => onInput(e, 'password')"
                             />
-                            <p
-                                v-if="errorFields?.password"
-                                class="login-form__field-info pf-c-form__helper-text pf-m-error"
-                                aria-live="polite"
-                            >
-                                <span class="pf-c-form__helper-text-icon">
-                                    <i
-                                        class="fas fa-exclamation-circle"
-                                        aria-hidden="true"
-                                    />
-                                </span>
-                                {{ errorFields?.password }}
-                            </p>
-                        </div>
-                        <div class="pf-c-form__group login-form__field">
+                        </UiFormGroup>
+                        <UiFormGroup>
                             <UiCheckbox
                                 v-model="keepLogged"
                                 :label="$t('login.keep')"
                                 class="pf-u-mb-md"
                             />
-                        </div>
-                        <div class="pf-c-form__group pf-m-action">
+                        </UiFormGroup>
+                        <UiFormGroup
+                            :action="true"
+                        >
                             <button
                                 class="pf-c-button pf-m-primary pf-m-block"
                                 type="submit"
                             >
                                 {{ $t('login.logIn') }}
                             </button>
-                        </div>
-                    </form>
+                        </UiFormGroup>
+                    </UiForm>
                 </div>
             </main>
             <footer class="pf-c-login__footer" />
@@ -166,7 +116,8 @@ import { pagesMap } from '@/router'
 import usei18n from '@/hooks/useI18n'
 import UiInput from '@/components/uikit/UiInput.vue'
 import UiCheckbox from '@/components/uikit/UiCheckbox.vue'
-import UiAlert from '@/components/uikit/UiAlert.vue'
+import UiForm from '@/components/uikit/UiForm.vue'
+import UiFormGroup from '@/components/uikit/UiFormGroup.vue'
 import { AlertTypeEnum } from '@/types'
 
 const route = useRoute()

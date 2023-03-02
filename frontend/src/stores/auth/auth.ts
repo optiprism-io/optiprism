@@ -40,12 +40,13 @@ export const useAuthStore = defineStore('auth', {
             }
         },
         async authAccess(): Promise<void> {
-            if (!this.accessToken && getCookie(TOKEN_KEY) && sessionStorage.getItem(TOKEN_KEY)) {
+            if (!this.accessToken && (getCookie(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY))) {
                 if (!this.refreshToken.value) {
                     return
                 }
                 try {
                     const res = await authService.refreshToken(this.refreshToken.value)
+                    removeCookie(TOKEN_KEY)
                     await this.setToken(res?.data, !!localStorage.getItem('keepLogged'))
                 } catch (error) {
                     throw new Error(JSON.stringify(error))
