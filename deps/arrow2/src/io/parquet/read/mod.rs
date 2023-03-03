@@ -1,7 +1,7 @@
 //! APIs to read from Parquet format.
 #![allow(clippy::type_complexity)]
 
-mod deserialize;
+pub mod deserialize;
 mod file;
 pub mod indexes;
 mod row_group;

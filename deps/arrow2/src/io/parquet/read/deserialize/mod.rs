@@ -7,13 +7,12 @@ mod nested;
 mod nested_utils;
 mod null;
 mod primitive;
-mod simple;
+pub mod simple;
 mod struct_;
 mod utils;
 
 use parquet2::read::get_page_iterator as _get_page_iterator;
 use parquet2::schema::types::PrimitiveType;
-
 use crate::{
     array::{Array, DictionaryKey, FixedSizeListArray, ListArray},
     datatypes::{DataType, Field, IntervalUnit},
@@ -23,7 +22,7 @@ use crate::{
 
 pub use self::nested_utils::{init_nested, InitNested, NestedArrayIter, NestedState};
 pub use self::struct_::StructIterator;
-use simple::page_iter_to_arrays;
+pub use simple::page_iter_to_arrays;
 
 use super::*;
 

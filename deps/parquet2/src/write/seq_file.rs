@@ -163,6 +163,7 @@ impl<W: Write> FileSeqWriter<W> {
 
         let mut spec = write_page(&mut self.writer, self.offset, compressed_page)?;
         self.offset += spec.bytes_written;
+        // todo fix
         spec.num_rows = Some(spec.num_values);
         self.row_group_state.cur_col_page_specs.push(spec);
         Ok(())

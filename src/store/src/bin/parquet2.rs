@@ -6,19 +6,48 @@ use std::path::{Path, PathBuf};
 use std::task::Wake;
 use arrow2::array::{Array, MutablePrimitiveArray};
 use arrow2::chunk::Chunk;
-use arrow2::datatypes::Schema;
-use arrow2::io::parquet::read::{column_iter_to_arrays, fallible_streaming_iterator};
+use arrow2::datatypes::{DataType, Schema, TimeUnit};
+use arrow2::io::parquet::read::{column_iter_to_arrays, fallible_streaming_iterator, Pages, ParquetError};
+use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
 use parquet2::encoding::Encoding;
 use parquet2::metadata::SchemaDescriptor;
-use parquet2::page::{CompressedPage, DataPage, DictPage, Page, split_buffer};
-use parquet2::read::get_page_iterator;
+use parquet2::page::{CompressedDataPage, CompressedPage, DataPage, DictPage, Page, split_buffer};
+use parquet2::read::{decompress, get_page_iterator};
 use parquet2::schema::Repetition;
 use parquet2::schema::types::{FieldInfo, ParquetType, PhysicalType, PrimitiveConvertedType, PrimitiveLogicalType, PrimitiveType};
 use parquet2::write::{DynIter, DynStreamingIterator, FileSeqWriter, FileWriter, Version, WriteOptions};
-
+use fallible_streaming_iterator::FallibleStreamingIterator;
+use arrow2::io::parquet::read;
+use parquet2::error::Error;
 use store::error::Result;
 use store::parquet::SequentialWriter;
 use crate::init::init;
+
+fn from_physical_type(t: &PhysicalType) -> DataType {
+    match t {
+        PhysicalType::Boolean => DataType::Boolean,
+        PhysicalType::Int32 => DataType::Int32,
+        PhysicalType::Int64 => DataType::Int64,
+        PhysicalType::Float => DataType::Float32,
+        PhysicalType::Double => DataType::Float64,
+        PhysicalType::ByteArray => DataType::Utf8,
+        PhysicalType::FixedLenByteArray(l) => DataType::FixedSizeBinary(*l),
+        PhysicalType::Int96 => DataType::Timestamp(TimeUnit::Nanosecond, None),
+    }
+}
+
+fn data_page_to_array(page: CompressedDataPage, buf: &mut Vec<u8>) -> Result<Box<dyn Array>> {
+    let stats = page.statistics().unwrap()?;
+
+    let num_rows = page.num_values() + stats.null_count().or_else(|| Some(0)).unwrap() as usize;
+    let physical_type = stats.physical_type();
+    let primitive_type = PrimitiveType::from_physical("f".to_string(), physical_type.to_owned());
+    let data_type = from_physical_type(physical_type);
+    let decompressed_page = decompress(CompressedPage::Data(page), buf)?;
+    let iter = fallible_streaming_iterator::convert(std::iter::once(Ok(&decompressed_page)));
+    let mut r = page_iter_to_arrays(iter, &primitive_type, data_type, None, num_rows)?;
+    Ok(r.next().unwrap()?)
+}
 
 fn main() -> anyhow::Result<()> {
     println!("init");
@@ -69,10 +98,11 @@ fn main() -> anyhow::Result<()> {
         None,
     );
 
-    /*for file_id in 0..=1 {
+    for file_id in 0..=1 {
         let mut reader = File::open(format!("/tmp/optiprism/{file_id}.parquet"))?;
         let metadata = parquet2::read::read_metadata(&mut reader)?;
 
+        let mut arr_buf = vec![];
         for row_group in metadata.row_groups {
             for column in row_group.columns().iter() {
                 let pages = parquet2::read::get_page_iterator(
@@ -84,7 +114,13 @@ fn main() -> anyhow::Result<()> {
                 )?;
 
                 for maybe_page in pages {
-                    seq_writer.write_page(&maybe_page?)?;
+                    let p = maybe_page?;
+                    if let CompressedPage::Data(p) = p {
+                        let arr = data_page_to_array(p, &mut arr_buf)?;
+                        println!("{:?}", arr);
+                    }
+
+                    // seq_writer.write_page(&p)?;
                 }
                 seq_writer.end_column()?;
             }
@@ -92,9 +128,9 @@ fn main() -> anyhow::Result<()> {
             seq_writer.end_row_group()?;
         }
     }
-    seq_writer.end(None)?;*/
+    seq_writer.end(None)?;
 
-    {
+    /*{
         let mut reader = File::open("/tmp/optiprism/merged.parquet")?;
         // we can read its metadata:
         let metadata = arrow2::io::parquet::read::read_metadata(&mut reader)?;
@@ -110,79 +146,13 @@ fn main() -> anyhow::Result<()> {
             let chunk = maybe_chunk?;
             println!("{:?}", chunk);
         }
-    }
+    }*/
     Ok(())
-}
-
-struct FileMerger<'a, R, W> where R: Read, W: Write {
-    readers: Vec<R>,
-    reader_page_buffers: Vec<CompressedPage>,
-    reader_cursors: Vec<usize>,
-    schemas: Vec<SchemaDescriptor>,
-    schema: SchemaDescriptor,
-    writer: FileSeqWriter<W>,
-}
-
-impl<'a> Ord for PageRef<'a> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        todo!()
-    }
-}
-
-struct Slice {
-    reader: usize,
-    page: bool,
-    index: usize,
-    len: usize,
-}
-
-impl<R, W> FileMerger<R, W> where R: Read, W: Write {
-    pub fn merge(readers: Vec<R>, schemas: Vec<SchemaDescriptor>, writer: W) -> Result<()> {
-        let mut m = Self { readers, schemas, writer };
-
-        m._merge()
-    }
-
-    fn next_page(&mut self, col_id: usize) -> Result<Option<CompressedPage>> {}
-    fn next_sorted_pages(&mut self) -> Result<(Vec<Vec<CompressedPage>>, Vec<Slice>)> {
-        let c1 = MutablePrimitiveArray::new();
-        let c2 = MutablePrimitiveArray::new();
-    }
-
-    fn _merge(&mut self) -> Result<()> {
-        loop {
-            let slices = self.next_sorting_slices();
-            // sort
-            for (col_id, ordering) in self.sorting_cols.iter().enumerate() {
-                let page = self.next_merged_page(col_id)?;
-                self.writer.write_page(&page)?;
-
-                self.writer.end_column()?;
-            }
-            self.writer.end_row_group()?;
-        }
-        self.writer.end(None)?;
-        Ok(())
-        /*let pages = get_page_iterator(column_metadata, &mut reader, None, vec![], 1024 * 1024)?;
-        // ANCHOR: decompress
-        let mut decompress_buffer = vec![];
-        let mut dict = None;
-        for maybe_page in pages {
-            let page = maybe_page?;
-            let page = parquet2::read::decompress(page, &mut decompress_buffer)?;
-            let iter = fallible_streaming_iterator::convert(std::iter::once(Ok(&page)));
-            // let mut iter = column_iter_to_arrays(vec![iter], vec![&type_], field, None).unwrap();
-            // yield iter.next().unwrap();
-        }
-
-        Ok(());*/
-    }
 }
 
 mod init {
     use arrow2::array::{Array, BooleanArray, Int64Array, Utf8Array};
     use arrow2::chunk::Chunk;
-    use arrow2::compute::merge_sort::merge_sort_slices;
     use arrow2::datatypes::{Field, Schema};
     use arrow2::io::parquet::write::{FileWriter, RowGroupIterator, WriteOptions};
     use parquet2::compression::CompressionOptions;

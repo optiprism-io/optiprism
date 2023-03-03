@@ -4,6 +4,7 @@ use parquet2::{
     },
     types::int96_to_i64_ns,
 };
+use parquet2::page::CompressedDataPage;
 
 use crate::{
     array::{Array, DictionaryKey, MutablePrimitiveArray, PrimitiveArray},
@@ -22,29 +23,29 @@ use super::primitive;
 /// Converts an iterator of arrays to a trait object returning trait objects
 #[inline]
 fn dyn_iter<'a, A, I>(iter: I) -> ArrayIter<'a>
-where
-    A: Array,
-    I: Iterator<Item = Result<A>> + Send + Sync + 'a,
+    where
+        A: Array,
+        I: Iterator<Item=Result<A>> + Send + Sync + 'a,
 {
     Box::new(iter.map(|x| x.map(|x| Box::new(x) as Box<dyn Array>)))
 }
 
 /// Converts an iterator of [MutablePrimitiveArray] into an iterator of [PrimitiveArray]
 #[inline]
-fn iden<T, I>(iter: I) -> impl Iterator<Item = Result<PrimitiveArray<T>>>
-where
-    T: NativeType,
-    I: Iterator<Item = Result<MutablePrimitiveArray<T>>>,
+fn iden<T, I>(iter: I) -> impl Iterator<Item=Result<PrimitiveArray<T>>>
+    where
+        T: NativeType,
+        I: Iterator<Item=Result<MutablePrimitiveArray<T>>>,
 {
     iter.map(|x| x.map(|x| x.into()))
 }
 
 #[inline]
-fn op<T, I, F>(iter: I, op: F) -> impl Iterator<Item = Result<PrimitiveArray<T>>>
-where
-    T: NativeType,
-    I: Iterator<Item = Result<MutablePrimitiveArray<T>>>,
-    F: Fn(T) -> T + Copy,
+fn op<T, I, F>(iter: I, op: F) -> impl Iterator<Item=Result<PrimitiveArray<T>>>
+    where
+        T: NativeType,
+        I: Iterator<Item=Result<MutablePrimitiveArray<T>>>,
+        F: Fn(T) -> T + Copy,
 {
     iter.map(move |x| {
         x.map(move |mut x| {
@@ -200,7 +201,7 @@ pub fn page_iter_to_arrays<'a, I: Pages + 'a>(
         (PhysicalType::FixedLenByteArray(n), Decimal(_, _)) if *n > 16 => {
             return Err(Error::NotYetImplemented(format!(
                 "Can't decode Decimal128 type from Fixed Size Byte Array of len {n:?}"
-            )))
+            )));
         }
         (PhysicalType::FixedLenByteArray(n), Decimal(_, _)) => {
             let n = *n;
@@ -277,12 +278,12 @@ pub fn page_iter_to_arrays<'a, I: Pages + 'a>(
         (_, Dictionary(key_type, _, _)) => {
             return match_integer_type!(key_type, |$K| {
                 dict_read::<$K, _>(pages, physical_type, logical_type, data_type, num_rows, chunk_size)
-            })
+            });
         }
         (from, to) => {
             return Err(Error::NotYetImplemented(format!(
                 "Reading parquet type {from:?} to {to:?} still not implemented"
-            )))
+            )));
         }
     })
 }
@@ -525,7 +526,7 @@ fn dict_read<'a, K: DictionaryKey, I: Pages + 'a>(
         other => {
             return Err(Error::nyi(format!(
                 "Reading dictionaries of type {other:?}"
-            )))
+            )));
         }
     })
 }
