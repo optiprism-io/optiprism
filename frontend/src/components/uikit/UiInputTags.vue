@@ -1,9 +1,9 @@
 <template>
     <div class="ui-input-tags">
         <UiInput
-            v-if="edit || !props.value.length"
+            v-if="edit || !props.value?.length"
             :value="inputValue"
-            :mount-focus="Boolean(props.value.length)"
+            :mount-focus="Boolean(props.value?.length)"
             @input="onInput"
             @blur="onBlur"
         />
