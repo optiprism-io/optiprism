@@ -52,58 +52,6 @@ fn data_page_to_array(page: CompressedDataPage, buf: &mut Vec<u8>) -> Result<Box
 #[derive(Debug)]
 struct ReorderSlices {}
 
-// type MergeTask = Vec<SortItem>;
-
-// struct MergeResult(Vec<SortItem>);
-
-// type MergeItem = (Vec<ArrayWithStats>, Option<usize>);
-
-
-/*enum SortItem {
-    Merged(Vec<ArrayWithStats>),
-    Unmerged(Vec<CompressedDataPageWithStats>, usize),
-}
-*/
-fn cmp_values(lhs: &[Value], rhs: &[Value]) -> std::cmp::Ordering {
-    for (l, r) in lhs.iter().zip(rhs.iter()) {
-        match (*l).cmp(r) {
-            std::cmp::Ordering::Equal => continue,
-            x => return x
-        }
-    }
-    std::cmp::Ordering::Equal
-}
-
-impl SortItem {
-    pub fn new_merged(arrs: Vec<ArrayWithStats>) -> Self {
-        Self::Merged(arrs)
-    }
-
-    pub fn new_unmerged(pages: Vec<CompressedDataPageWithStats>, stream: usize) -> Self {
-        Self::Unmerged(pages, stream)
-    }
-
-    pub fn min_values(&self) -> Vec<Value> {
-        match self {
-            Self::Merged(arrs) => arrs.iter().map(|arr| arr.min_value).collect(),
-            Self::Unmerged(pages, _) => pages.iter().map(|page| page.min_value).collect(),
-        }
-    }
-
-    pub fn max_values(&self) -> Vec<Value> {
-        match self {
-            Self::Merged(arrs) => arrs.iter().map(|arr| arr.max_value).collect(),
-            Self::Unmerged(pages, _) => pages.iter().map(|page| page.max_value).collect(),
-        }
-    }
-}
-
-/*impl From<MergeResult> for SortItem {
-    fn from(result: MergeResult) -> Self {
-        Self::new_merged(result.0.into_iter().next().unwrap())
-    }
-}*/
-
 #[defer(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Copy)]
 enum OptionalValue {
     Boolean(Option<bool>),
@@ -167,32 +115,157 @@ impl From<Vec<u8>> for Value {
     }
 }
 
-#[derive(Debug)]
-struct PagesRow {
-    pages: Vec<Page>,
-    stream: Option<usize>,
+fn get_page_min_max_values(page: &CompressedDataPage) -> Result<(Value, Value)> {
+    let stats = page.statistics();
+    if stats.is_none() {
+        return Err(StoreError::Internal("no stats".to_string()));
+    }
+
+    let stats = stats.unwrap()?;
+
+    let (min_value, max_value) = match stats.physical_type() {
+        PhysicalType::Boolean => {
+            let stats = stats.as_any().downcast_ref::<BooleanStatistics>().unwrap();
+            if stats.min_value.is_none() || stats.max_value.is_none() {
+                return Err(StoreError::Internal("no stats".to_string()));
+            }
+            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+        }
+        PhysicalType::Int32 => {
+            let stats = stats.as_any().downcast_ref::<PrimitiveStatistics<i32>>().unwrap();
+            if stats.min_value.is_none() || stats.max_value.is_none() {
+                return Err(StoreError::Internal("no stats".to_string()));
+            }
+            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+        }
+        PhysicalType::Int64 => {
+            let stats = stats.as_any().downcast_ref::<PrimitiveStatistics<i64>>().unwrap();
+            if stats.min_value.is_none() || stats.max_value.is_none() {
+                return Err(StoreError::Internal("no stats".to_string()));
+            }
+            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+        }
+        PhysicalType::Int96 => {
+            let stats = stats.as_any().downcast_ref::<PrimitiveStatistics<[u32; 3]>>().unwrap();
+            if stats.min_value.is_none() || stats.max_value.is_none() {
+                return Err(StoreError::Internal("no stats".to_string()));
+            }
+            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+        }
+        PhysicalType::Float => {
+            let stats = stats.as_any().downcast_ref::<PrimitiveStatistics<f32>>().unwrap();
+            if stats.min_value.is_none() || stats.max_value.is_none() {
+                return Err(StoreError::Internal("no stats".to_string()));
+            }
+            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+        }
+        PhysicalType::Double => {
+            let stats = stats.as_any().downcast_ref::<PrimitiveStatistics<f64>>().unwrap();
+            if stats.min_value.is_none() || stats.max_value.is_none() {
+                return Err(StoreError::Internal("no stats".to_string()));
+            }
+            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+        }
+        PhysicalType::ByteArray => {
+            let stats = stats.as_any().downcast_ref::<BinaryStatistics>().unwrap();
+            if stats.min_value.is_none() || stats.max_value.is_none() {
+                return Err(StoreError::Internal("no stats".to_string()));
+            }
+            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+        }
+        PhysicalType::FixedLenByteArray(_) => {
+            let stats = stats.as_any().downcast_ref::<FixedLenStatistics>().unwrap();
+            if stats.min_value.is_none() || stats.max_value.is_none() {
+                return Err(StoreError::Internal("no stats".to_string()));
+            }
+            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+        }
+    };
+
+    Ok((min_value, max_value))
 }
 
-impl PagesRow {
-    pub fn from_compressed(pages: Vec<CompressedDataPage>, stream: usize) -> Self {
-        Self {
-            pages: pages.into_iter().map(|page| Page::from_compressed(page, None).unwrap()).collect(),
-            stream: Some(stream),
+struct CompressedDataPages {
+    pages: Vec<CompressedDataPage>,
+    min_values: Vec<Value>,
+    max_values: Vec<Value>,
+    stream: usize,
+}
+
+impl CompressedDataPages {
+    pub fn new(pages: Vec<CompressedDataPage>, stream: usize) -> Self {
+        let (min_values, max_values) = pages.iter().map(|page| {
+            let (min, max) = get_page_min_max_values(&page).unwrap();
+            (min, max)
+        }).unzip();
+
+        CompressedDataPages {
+            pages,
+            min_values,
+            max_values,
+            stream,
         }
     }
 
     pub fn min_values(&self) -> Vec<Value> {
-        self.pages.iter().map(|page| page.min_value).collect()
+        self.min_values.clone()
     }
+
     pub fn max_values(&self) -> Vec<Value> {
-        self.pages.iter().map(|page| page.max_value).collect()
+        self.max_values.clone()
     }
 }
+
+trait Values {
+    fn values(&self) -> Vec<Value>;
+}
+
+struct MergedValueRows<T>(Vec<T>);
+
+impl MergedValueRows<T> where T: Values {
+    pub fn min_values(&self) -> Vec<Value> {
+        self.0[0].values()
+    }
+
+    pub fn max_values(&self) -> Vec<Value> {
+        self.0[self.0.len() - 1].values()
+    }
+}
+
+enum PagesRow<T> {
+    CompressedDataPages(CompressedDataPages),
+    MergedValueRows(MergedValueRows<T>),
+}
+
+impl PagesRow<T> {
+    pub fn from_compressed(pages: Vec<CompressedDataPage>, stream: usize) -> Self {
+        Self::CompressedDataPages(CompressedDataPages::new(pages, stream))
+    }
+
+    pub fn from_merged_value_rows(rows: Vec<T>) -> Self {
+        Self::MergedValueRows(MergedValueRows(rows))
+    }
+    pub fn min_values(&self) -> Vec<Value> {
+        match self {
+            Self::CompressedDataPages(pages) => pages.min_values(),
+            Self::MergedValueRows(rows) => rows.min_values(),
+        }
+    }
+    pub fn max_values(&self) -> Vec<Value> {
+        match self {
+            Self::CompressedDataPages(pages) => pages.max_values(),
+            Self::MergedValueRows(rows) => rows.max_values(),
+        }
+    }
+}
+
+trait ValueRows {}
 
 #[derive(Debug)]
 enum PageData {
     Compressed(CompressedDataPage),
-    Array(Box<dyn Array>),
+    Arrow(Box<dyn Array>),
+    Values(Vec<Value>),
 }
 
 #[derive(Debug)]
@@ -200,12 +273,11 @@ struct Page {
     data: PageData,
     min_value: Value,
     max_value: Value,
-    reorder: Option<ReorderSlices>,
 }
 
 impl Page {
-    pub fn from_compressed(data: CompressedDataPage, reorder: Option<ReorderSlices>) -> Result<Self> {
-        let stats = page.statistics();
+    pub fn from_compressed(data: CompressedDataPage) -> Result<Self> {
+        let stats = data.statistics();
         if stats.is_none() {
             return Err(StoreError::Internal("no stats".to_string()));
         }
@@ -275,23 +347,32 @@ impl Page {
             data: PageData::Compressed(data),
             min_value,
             max_value,
-            reorder,
         })
     }
 
-    pub fn from_array(array: Box<dyn Array>, min_value: Value, max_value: Value, reorder: Option<ReorderSlices>) -> Self {
+    pub fn from_arrow(array: Box<dyn Array>, min_value: Value, max_value: Value) -> Self {
         Self {
-            data: PageData::Array(array),
+            data: PageData::Arrow(array),
             min_value,
             max_value,
-            reorder,
         }
     }
 
+    pub fn from_values(values: Vec<Value>) -> Self {
+        let min_value = values[0].to_owned();
+        let max_value = values[values.len() - 1].to_owned();
+        assert!(min_value <= max_value);
+
+        Self {
+            data: PageData::Values(values),
+            min_value,
+            max_value,
+        }
+    }
     pub fn to_compressed(self) -> CompressedPage {
         match self.data {
             PageData::Compressed(page) => CompressedPage::Data(page),
-            PageData::Array(arr) => panic!("not compressed"),
+            PageData::Arrow(arr) => panic!("not compressed"),
         }
     }
 }
@@ -299,7 +380,29 @@ impl Page {
 #[derive(Debug, Clone)]
 struct Int64Int64Row(usize, usize, i64, i64);
 
-impl Ord for Int64Int64Row {
+struct TwoColRow<A, B>(usize, usize, A, B);
+
+impl<A, B> Ord for TwoColRow<A, B> where A: Ord, B: Ord {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (&self.2, &self.3).cmp(&(&other.2, &other.3))
+    }
+}
+
+impl<A, B> PartialOrd for TwoColRow<A, B> where A: PartialOrd, B: PartialOrd {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<A, B> PartialEq for TwoColRow<A, B> where A: PartialEq, B: PartialEq {
+    fn eq(&self, other: &Self) -> bool {
+        (&self.0, &self.2, &self.3) == (&self.0, &other.2, &other.3)
+    }
+}
+
+impl<A, B> Eq for TwoColRow<A, B> where A: Eq, B: Eq {}
+
+impl Ord for TwoColRow {
     fn cmp(&self, other: &Self) -> Ordering {
         (self.2, &self.3).cmp(&(other.2, &other.3))
     }
@@ -348,7 +451,7 @@ struct FileMerger<'a, R, W>
     pages_per_chunk: usize,
 }
 
-fn merge_int64_int64_arrays(streams: Vec<(PrimitiveArray<i64>, PrimitiveArray<i64>)>) -> Vec<Int64Int64Row> {
+fn merge_int64_int64_arrays(streams: Vec<(PrimitiveArray<i64>, PrimitiveArray<i64>)>) -> PagesRow {
     let mut vals: Vec<Int64Int64Row> = streams
         .into_iter()
         .map(|(stream, c1, c2)| c1.values_iter().zip(c2.values_iter()).enumerate()
@@ -541,7 +644,7 @@ impl<R, W> FileMerger<R, W>
                             let page = CompressedPage::Data(data_page);
                             self.writer.write_page(&page)?;
                         }
-                        PageData::Array(arr) => {
+                        PageData::Arrow(arr) => {
                             let opts = WriteOptions {
                                 write_statistics: true,
                                 compression: CompressionOptions::Snappy, // todo

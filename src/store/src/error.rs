@@ -15,5 +15,7 @@ pub enum StoreError {
     #[error("execution {0:?}")]
     Execution(String),
     #[error("arrow {0:?}")]
-    Arrow(#[from] ArrowError),
+    Arrow(#[from] arrow::error::ArrowError),
+    #[error("arrow2 {0:?}")]
+    Arrow2(#[from] arrow2::error::Error),
 }

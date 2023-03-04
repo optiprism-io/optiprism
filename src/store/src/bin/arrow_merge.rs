@@ -1,8 +1,16 @@
 use std::cmp::Ordering;
+use std::{mem, ptr};
+use std::ptr::addr_of_mut;
+use std::sync::Arc;
+use arrow::ffi::ArrowArray;
+use arrow_array::{ArrayRef, make_array};
 use arrow2::compute::merge_sort::{merge_sort_slices, take_arrays};
-use arrow2::array::{Int32Array, PrimitiveArray};
+use arrow2::array::{Array, BinaryArray, BooleanArray, Int32Array, ListArray, MutableListArray, MutablePrimitiveArray, PrimitiveArray, Utf8Array};
 use arrow2::compute::merge_sort::{slices, SortOptions};
-use arrow2::error::Result;
+use arrow2::datatypes::Field;
+use arrow2::ffi;
+use store::error::Result;
+use arrow2::array::TryExtend;
 
 #[derive(Debug, Clone)]
 /// usize(stream), usize(row_id), i32(val1), i32(val2)
@@ -38,7 +46,74 @@ fn streams_to_val_rows(streams: Vec<(usize, PrimitiveArray<i32>, PrimitiveArray<
     vals
 }
 
+fn export2(array: Box<dyn Array>) -> (ffi::ArrowArray, ffi::ArrowSchema) {
+    // importing an array requires an associated field so that the consumer knows its datatype.
+    // Thus, we need to export both
+    let field = Field::new("a", array.data_type().clone(), true);
+    (
+        ffi::export_array_to_c(array),
+        ffi::export_field_to_c(&field),
+    )
+}
+
+pub use arrow_schema::ffi::{FFI_ArrowSchema, Flags};
+pub use arrow_data::ffi::FFI_ArrowArray;
+use arrow2::ffi::ArrowSchema;
+
+
+
+
 fn main() {
+    let arr1 = {
+        let arr2 = Box::new(Int32Array::from(&[Some(1), Some(1), Some(2), None])) as Box<dyn Array>;
+        let dt = arr2.data_type().to_owned();
+        arrow2_to_arrow1(arr2, Field::new("a", dt, true)).unwrap()
+    };
+    println!("{:?}", arr1);
+
+    let arr2 = {
+        let arr2 = Box::new(BooleanArray::from(&[Some(true), Some(false), Some(true), None])) as Box<dyn Array>;
+        let dt = arr2.data_type().to_owned();
+        arrow2_to_arrow1(arr2, Field::new("a", dt, true)).unwrap()
+    };
+    println!("{:?}", arr2);
+
+    let arr3 = {
+        let arr2 = Box::new(Utf8Array::<i32>::from(&[Some("a"), Some("b"), Some("c"), None])) as Box<dyn Array>;
+        let dt = arr2.data_type().to_owned();
+        arrow2_to_arrow1(arr2, Field::new("a", dt, true)).unwrap()
+    };
+    println!("{:?}", arr3);
+
+    let arr4 = {
+        let arr2 = Box::new(Utf8Array::<i64>::from(&[Some("a"), Some("b"), Some("c"), None])) as Box<dyn Array>;
+        let dt = arr2.data_type().to_owned();
+        arrow2_to_arrow1(arr2, Field::new("a", dt, true)).unwrap()
+    };
+    println!("{:?}", arr4);
+
+    let arr5 = {
+        let arr2 = Box::new(BinaryArray::<i32>::from([Some([1, 2].as_ref()), None, Some([3].as_ref())]));
+        let dt = arr2.data_type().to_owned();
+        arrow2_to_arrow1(arr2, Field::new("a", dt, true)).unwrap()
+    };
+    println!("{:?}", arr5);
+
+    let arr6 = {
+        let data = vec![
+            Some(vec![Some(1i32), Some(2), Some(3)]),
+            Some(vec![Some(4), Some(5)]),
+            Some(vec![Some(6i32), Some(7), Some(8)]),
+        ];
+        let mut array = MutableListArray::<i32, MutablePrimitiveArray<i32>>::new();
+        array.try_extend(data).unwrap();
+        let arr2: ListArray<i32> = array.into();
+
+        let dt = arr2.data_type().to_owned();
+        arrow2_to_arrow1(Box::new(arr2), Field::new("a", dt, true)).unwrap()
+    };
+    println!("{:?}", arr6);
+    return;
     //0
     let a1 = Int32Array::from_slice(&[1, 1, 2, 2]);
     let a2 = Int32Array::from_slice(&[1, 2, 2, 3]);
