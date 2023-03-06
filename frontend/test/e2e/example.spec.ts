@@ -1,20 +1,13 @@
 import {test, expect} from '@playwright/test';
 
-test('homepage has Playwright in title and get started link linking to the intro page', async ({page}) => {
-    await page.goto('https://playwright.dev/');
+const authFile = 'playwright/.auth/user.json';
+test('authenticate', async ({page}) => {
+    await page.goto('http://localhost:4173/login?next=/dashboards');
+    const loginForm = await page.locator('.login-form');
+    await loginForm.locator('[name=login-email]').fill('login');
+    await loginForm.locator('[name=login-password]').fill('password');
+    await loginForm.locator('button:text("Log in")').click();
+    // End of authentication steps.
 
-    // Expect a title "to contain" a substring.
-    await expect(page).toHaveTitle(/Playwright/);
-
-    // create a locator
-    const getStarted = page.getByText('Get Started');
-
-    // Expect an attribute "to be strictly equal" to the value.
-    await expect(getStarted).toHaveAttribute('href', '/docs/intro');
-
-    // Click the get started link.
-    await getStarted.click();
-
-    // Expects the URL to contain intro.
-    await expect(page).toHaveURL(/.*intro/);
+    await page.context().storageState({path: authFile});
 });
