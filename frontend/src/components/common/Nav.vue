@@ -62,7 +62,7 @@ const configNav = [
         activeKey: 'events',
     },
     {
-        name: i18n.$t('users.title'),
+        name: 'users.title',
         to: 'users',
         activeKey: 'users',
     },

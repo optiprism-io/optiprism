@@ -162,10 +162,11 @@ export const useLexiconStore = defineStore('lexicon', {
                 this.eventProperties = res.data.data
             }
 
-            const resCustom = await schemaService.eventCustomProperties(commonStore.organizationId, commonStore.projectId)
-            if (resCustom?.data?.events) {
-                this.eventCustomProperties = resCustom.data.events
-            }
+            // TODO will be added in the next updates
+            // const resCustom = await schemaService.eventCustomProperties(commonStore.organizationId, commonStore.projectId)
+            // if (resCustom?.data?.events) {
+            //     this.eventCustomProperties = resCustom.data.events
+            // }
             this.eventPropertiesLoading = false
         },
         async getUserProperties() {

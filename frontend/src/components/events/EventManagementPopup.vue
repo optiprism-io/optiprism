@@ -51,7 +51,7 @@ import UiDescriptionList, { Item, ActionPayload } from '@/components/uikit/UiDes
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue'
 
 import propertiesColumnsConfig from '@/configs/events/propertiesTable.json'
-import { eventValuesConfig, Item as EventValuesConfig } from '@/configs/events/eventValues'
+import { eventValuesConfig, Item as EventValuesConfig, EventValuesConfigKeysEnum } from '@/configs/events/eventValues'
 
 export type EventObject = {
     [key: string]: string | string[] | boolean
@@ -113,6 +113,21 @@ const getTableRows = (properties: Property[] | EventCustomProperty[]) => {
     })
 }
 
+const getValueEventItems = (key: EventValuesConfigKeysEnum) => {
+    if (props.event) {
+        switch (key) {
+            case EventValuesConfigKeysEnum.Status:
+                return key in props.event ? props.event[key] === 'enabled' : '';
+            case EventValuesConfigKeysEnum.Tags:
+                return props.event[key] || [];
+            default:
+                return editEvent.value && key in editEvent.value ? (editEvent.value[key] || '') : key in props.event ? (props.event[key] || '')  : '';
+        }
+    } else {
+        return '';
+    }
+}
+
 const itemsTabs = computed(() => {
     return mapTabs.map(key => {
         return {
@@ -129,23 +144,19 @@ const eventItems = computed<Item[]>(() => {
 
     if (event) {
         const keys = (Object.keys(eventValuesConfig) as (keyof typeof props.event)[])
-
         keys.forEach(key => {
             const config: EventValuesConfig = eventValuesConfig[key];
-
             if (key in event) {
                 const item: Item = {
                     label: i18n.$t(config.string),
                     key,
-                    value: key === 'status' ? event[key] === 'enabled' : editEvent.value && key in editEvent.value ? editEvent.value[key] : event[key],
+                    value: getValueEventItems(key),
                     component: config.component || 'p'
                 }
-
                 items.push(item)
             }
         })
     }
-
     return items
 })
 

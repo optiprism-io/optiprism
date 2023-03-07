@@ -113,7 +113,8 @@ import {
     EventType,
     EventStatus,
     UpdateCustomEventRequest,
-    Value
+    Value,
+    CustomEventStatus,
 } from '@/api'
 const i18n = inject<any>('i18n')
 
@@ -194,6 +195,8 @@ const resultEvent = computed(() => {
         name: eventName.value,
         description: eventDescription.value,
         tags: eventTags.value,
+        status: CustomEventStatus.Enabled,
+        isSystem: false,
         events: events.value.map((item): CustomEventEvent => {
             const event = lexiconStore.findEventById(item.ref.id)
 
