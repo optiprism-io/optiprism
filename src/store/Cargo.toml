@@ -24,8 +24,9 @@ arrow2 = { path = "../../deps/arrow2", features = ["io_parquet", "compute_arithm
 #arrow2 = { version = "0.15.0", features = ["io_parquet","compute_arithmetics"] }
 rayon = "1.6.1"
 futures = "0.3.25"
+
 [[bin]]
-name = "merge_parquet"
+name = "merge_parquet2"
 test = false
 bench = false
 
@@ -41,6 +42,11 @@ bench = false
 
 [[bin]]
 name = "intervals"
+test = false
+bench = false
+
+[[bin]]
+name = "intervals3"
 test = false
 bench = false
 

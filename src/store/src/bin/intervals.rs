@@ -18,6 +18,7 @@ impl Interval {
     pub fn new(stream: usize, from: i64, to: i64) -> Self {
         Self { stream, from, to }
     }
+
 }
 
 impl Debug for Interval {
@@ -42,7 +43,7 @@ fn merge(ints: &[Interval]) -> Vec<Interval> {
     for (i, _) in ints.iter().enumerate() {
         let i = i as i64;
         let a = min + i * size;
-        let mut b = a + size ;
+        let mut b = a + size;
         if i == ints.len() as i64 - 1 && b != max {
             b = max;
         }
@@ -54,7 +55,6 @@ fn merge(ints: &[Interval]) -> Vec<Interval> {
 }
 
 fn main() -> anyhow::Result<()> {
-
     let s1 = vec![Interval::new(0, 1, 10), Interval::new(0, 13, 20)];
     let s2 = vec![Interval::new(1, 2, 4), Interval::new(1, 5, 8), Interval::new(1, 12, 20), Interval::new(1, 21, 22)];
     let s3 = vec![Interval::new(2, 11, 12), Interval::new(2, 13, 15), Interval::new(2, 16, 18)];
@@ -63,12 +63,20 @@ fn main() -> anyhow::Result<()> {
     let s2 = vec![Interval::new(0, 1, 10), Interval::new(0, 10, 20), Interval::new(0, 20, 30)];
     let s3 = vec![Interval::new(0, 1, 10), Interval::new(0, 10, 20), Interval::new(0, 20, 30)];
 
-    let threads = 2; // threads
+    let threads = 1; // threads
     let mut streams = vec![
         s1.iter(),
         s2.iter(),
         s3.iter(),
     ];
+    let mut sorter = BinaryHeap::<Interval>::new();
+    for stream in streams.iter_mut() {
+        if let Some(int) = stream.next() {
+            sorter.push(*int);
+        }
+    }
+
+
     let mut merge_queue: Vec<Vec<Interval>> = Vec::new();
     let mut merge_result = BinaryHeap::<Interval>::new();
     let mut sorter = BinaryHeap::<Interval>::new();
@@ -141,7 +149,9 @@ fn main() -> anyhow::Result<()> {
                 println!("merge of queue: {:?}", merge_queue);
                 let mr: Vec<Vec<Interval>> = merge_queue.par_drain(..).map(|v| merge(&v)).collect();
                 mr.into_iter().for_each(|v| v.into_iter().for_each(|v| merge_result.push(v)));
-
+                if let Some(int) = merge_result.pop() {
+                    sorter.push(int);
+                }
             }
         }
         l += 1;

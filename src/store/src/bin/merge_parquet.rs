@@ -13,7 +13,6 @@ use parquet2::write::{Compressor, FileSeqWriter, Version};
 use rayon::prelude::*;
 use arrow2::datatypes::{DataType, PrimitiveType, TimeUnit};
 use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
-use arrow2::io::parquet::read::deserialize::simple::data_page_to_array;
 use parquet2::schema::types::{ParquetType, PhysicalType};
 use parquet2::statistics::{BinaryStatistics, BooleanStatistics, FixedLenStatistics, PrimitiveStatistics};
 use store::error::{Result, StoreError};
@@ -52,7 +51,7 @@ fn data_page_to_array(page: CompressedDataPage, buf: &mut Vec<u8>) -> Result<Box
 #[derive(Debug)]
 struct ReorderSlices {}
 
-#[defer(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Copy)]
+#[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Copy)]
 enum OptionalValue {
     Boolean(Option<bool>),
     Int32(Option<i32>),
@@ -62,7 +61,7 @@ enum OptionalValue {
     ByteArray(Option<Vec<u8>>),
 }
 
-#[defer(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Copy)]
+#[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone, Copy)]
 enum Value {
     Boolean(bool),
     Int32(i32),
