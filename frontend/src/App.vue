@@ -41,7 +41,6 @@ const createErrorGeneral = (res: ErrorResponse) => {
 }
 
 axios.interceptors.response.use(res => res, async err => {
-    const originalConfig = err?.config;
     console.log(`ERROR: code '${err?.code}', message: '${err?.message}', url: '${err?.config?.url}'`);
     if (err?.response) {
         if (err.code === 'ERR_NETWORK') {
@@ -54,8 +53,8 @@ axios.interceptors.response.use(res => res, async err => {
                 }
                 break;
             case 401:
-                await authStore.onRefreshToken()
-                return Promise.reject(err)
+                await authStore.onRefreshToken();
+                return Promise.reject(err);
             case 500:
             case 503:
                 createErrorGeneral(err.response);
