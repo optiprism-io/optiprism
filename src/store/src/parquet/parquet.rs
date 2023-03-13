@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Seek};
 use futures::stream::iter;
@@ -169,6 +170,44 @@ pub struct CompressedDataPagesRow {
     pub stream: usize,
 }
 
+
+impl Eq for CompressedDataPagesRow {}
+
+impl PartialOrd for CompressedDataPagesRow {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(other.cmp(self))
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        other.min_values < self.min_values
+    }
+    #[inline]
+    fn le(&self, other: &Self) -> bool {
+        other.min_values <= self.min_values
+    }
+    #[inline]
+    fn gt(&self, other: &Self) -> bool {
+        other.min_values > self.min_values
+    }
+    #[inline]
+    fn ge(&self, other: &Self) -> bool {
+        other.min_values >= self.min_values
+    }
+}
+
+impl Ord for CompressedDataPagesRow {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.min_values.cmp(&self.min_values)
+    }
+}
+
+impl PartialEq for CompressedDataPagesRow {
+    fn eq(&self, other: &Self) -> bool {
+        self.min_values == other.min_values && self.max_values == other.max_values
+    }
+}
+
+
 impl CompressedDataPagesRow {
     pub fn new_from_pages(pages: Vec<CompressedPage>, stream: usize) -> Self {
         let data_pages = pages.into_iter().map(|p| {
@@ -180,6 +219,7 @@ impl CompressedDataPagesRow {
         }).collect();
         Self::new(data_pages, stream)
     }
+
     pub fn new(pages: Vec<CompressedDataPage>, stream: usize) -> Self {
         let (min_values, max_values) = pages.iter().map(|page| {
             let (min, max) = get_page_min_max_values(&page).unwrap();
@@ -220,19 +260,18 @@ pub struct CompressedPageIterator<R> {
     reader: R,
     metadata: FileMetaData,
     row_group_cursors: HashMap<ColumnPath, usize>,
-    chunk_buffer: HashMap<ColumnPath, VecDeque<CompressedPage>>>,
+    chunk_buffer: HashMap<ColumnPath, VecDeque<CompressedPage>>,
     max_page_size: usize,
 }
 
 impl<R: Read + Seek> CompressedPageIterator<R> {
     pub fn try_new(mut reader: R) -> Result<Self> {
         let metadata = parquet2::read::read_metadata(&mut reader)?;
-        let chunk_buffer = (0..metadata.schema().columns().len()).map(|i| VecDeque::new()).collect();
         Ok(Self {
             reader,
             metadata,
-            row_group_cursors: vec![0; metadata.schema().columns().len()],
-            chunk_buffer,
+            row_group_cursors: HashMap::new(),
+            chunk_buffer: HashMap::new(),
             max_page_size: 1024 * 1024,
         })
     }
@@ -276,7 +315,13 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
         )?;
 
         for page in pages {
-            self.chunk_buffer[col_path].push_back(page?);
+            let page = page?;
+            match self.chunk_buffer.get_mut(col_path) {
+                Some(buf) => buf.push_back(page),
+                None => {
+                    self.chunk_buffer.insert(col_path.to_owned(), VecDeque::from(vec![page]));
+                }
+            }
         }
 
         self.next_page(col_path)

@@ -10,6 +10,8 @@ pub type Result<T> = result::Result<T, StoreError>;
 pub enum StoreError {
     #[error("internal {0:?}")]
     Internal(String),
+    #[error("invalid parameter {0:?}")]
+    InvalidParameter(String),
     #[error("parquet {0:?}")]
     Parquet(#[from] ParquetError),
     #[error("execution {0:?}")]

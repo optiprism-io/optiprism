@@ -106,7 +106,7 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(mut rows
             *arr_iters[row_id].1.next().unwrap(),
         );
         sort.push(mr);
-        streams.set(rows[row_id].stream, true)
+        streams.set(rows[row_id].stream, true);
     }
 
     while let Some(TwoColMergeRow(row_idx, v1, v2)) = sort.pop() {
@@ -124,7 +124,7 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(mut rows
                 );
 
                 sort.push(mr);
-                streams.set(rows[row_idx].stream, true)
+                streams.set(rows[row_idx].stream, true);
             }
             None => {}
         }

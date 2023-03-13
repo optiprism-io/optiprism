@@ -3,7 +3,7 @@
 // pub mod dictionary;
 pub mod error;
 pub mod arrow_conversion;
-// pub mod parquet;
+pub mod parquet;
 // mod table;
 // mod iterator;
 // mod parquet;
