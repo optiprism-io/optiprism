@@ -54,27 +54,7 @@ axios.interceptors.response.use(res => res, async err => {
                 }
                 break;
             case 401:
-                if (!originalConfig._retry) {
-                    originalConfig._retry = true;
-                    try {
-                        await authStore.authAccess()
-                    } catch (_error: any) {
-                        const res = _error as ErrorResponse
-                        router.replace({
-                            name: pagesMap.login.name,
-                            query: { next: route.path }
-                        })
-
-                        if (!alertsStore.items.find(item => item.id === ERROR_UNAUTHORIZED_ID)) {
-                            alertsStore.createAlert({
-                                id: ERROR_UNAUTHORIZED_ID,
-                                type: 'danger',
-                                text: res.message ?? $t('errors.unauthorized')
-                            })
-                        }
-                        return Promise.resolve()
-                    }
-                }
+                await authStore.onRefreshToken()
                 return Promise.reject(err)
             case 500:
             case 503:

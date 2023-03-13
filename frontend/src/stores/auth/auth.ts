@@ -27,7 +27,7 @@ export const useAuthStore = defineStore('auth', {
     }),
     getters: {
         isAuthenticated(): boolean {
-            return !!this.accessToken && !!this.refreshToken?.value
+            return !!this.accessToken && !!localStorage.getItem(REFRESH_KEY)
         },
     },
     actions: {
@@ -40,15 +40,24 @@ export const useAuthStore = defineStore('auth', {
             }
         },
         async authAccess(): Promise<void> {
-            if (!this.accessToken && (getCookie(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY))) {
-                if (!this.refreshToken.value) {
-                    return
-                }
+            const accessToken = getCookie(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+            const refreshToken = localStorage.getItem(REFRESH_KEY) || '';
+            if (accessToken) {
+                await this.setToken({
+                    accessToken,
+                    refreshToken,
+                }, !!localStorage.getItem('keepLogged'))
+            }
+        },
+        async onRefreshToken(): Promise<void> {
+            const refreshToken = localStorage.getItem(REFRESH_KEY) || '';
+            if (refreshToken) {
                 try {
-                    const res = await authService.refreshToken(this.refreshToken.value)
+                    const res = await authService.refreshToken(refreshToken)
                     removeCookie(TOKEN_KEY)
                     await this.setToken(res?.data, !!localStorage.getItem('keepLogged'))
                 } catch (error) {
+                    this.reset();
                     throw new Error(JSON.stringify(error))
                 }
             }
@@ -63,7 +72,6 @@ export const useAuthStore = defineStore('auth', {
                 sessionStorage.setItem(TOKEN_KEY, token?.accessToken ?? '')
             }
             axios.defaults.headers.common[HEADER_KEY] = token?.accessToken ? `Bearer ${token.accessToken}` : ''
-
             this.accessToken = token.accessToken ?? ''
             this.refreshToken.value = token.refreshToken ?? ''
         },
