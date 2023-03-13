@@ -64,16 +64,16 @@ impl<'a> Values<'a> {
 
 #[derive(Debug)]
 pub(super) struct ValuesDictionary<'a, T>
-where
-    T: NativeType,
+    where
+        T: NativeType,
 {
     pub values: hybrid_rle::HybridRleDecoder<'a>,
     pub dict: &'a Vec<T>,
 }
 
 impl<'a, T> ValuesDictionary<'a, T>
-where
-    T: NativeType,
+    where
+        T: NativeType,
 {
     pub fn try_new(page: &'a DataPage, dict: &'a Vec<T>) -> Result<Self> {
         let values = utils::dict_indices_decoder(page)?;
@@ -90,8 +90,8 @@ where
 // The state of a `DataPage` of `Primitive` parquet primitive type
 #[derive(Debug)]
 pub(super) enum State<'a, T>
-where
-    T: NativeType,
+    where
+        T: NativeType,
 {
     Optional(OptionalPageValidity<'a>, Values<'a>),
     Required(Values<'a>),
@@ -102,8 +102,8 @@ where
 }
 
 impl<'a, T> utils::PageState<'a> for State<'a, T>
-where
-    T: NativeType,
+    where
+        T: NativeType,
 {
     fn len(&self) -> usize {
         match self {
@@ -119,10 +119,10 @@ where
 
 #[derive(Debug)]
 pub(super) struct PrimitiveDecoder<T, P, F>
-where
-    T: NativeType,
-    P: ParquetNativeType,
-    F: Fn(P) -> T,
+    where
+        T: NativeType,
+        P: ParquetNativeType,
+        F: Fn(P) -> T,
 {
     phantom: std::marker::PhantomData<T>,
     phantom_p: std::marker::PhantomData<P>,
@@ -130,10 +130,10 @@ where
 }
 
 impl<T, P, F> PrimitiveDecoder<T, P, F>
-where
-    T: NativeType,
-    P: ParquetNativeType,
-    F: Fn(P) -> T,
+    where
+        T: NativeType,
+        P: ParquetNativeType,
+        F: Fn(P) -> T,
 {
     #[inline]
     pub(super) fn new(op: F) -> Self {
@@ -152,10 +152,10 @@ impl<T: std::fmt::Debug> utils::DecodedState for (Vec<T>, MutableBitmap) {
 }
 
 impl<'a, T, P, F> utils::Decoder<'a> for PrimitiveDecoder<T, P, F>
-where
-    T: NativeType,
-    P: ParquetNativeType,
-    F: Copy + Fn(P) -> T,
+    where
+        T: NativeType,
+        P: ParquetNativeType,
+        F: Copy + Fn(P) -> T,
 {
     type State = State<'a, T>;
     type Dict = Vec<T>;
@@ -287,11 +287,11 @@ pub(super) fn finish<T: NativeType>(
 /// An [`Iterator`] adapter over [`Pages`] assumed to be encoded as primitive arrays
 #[derive(Debug)]
 pub struct Iter<T, I, P, F>
-where
-    I: Pages,
-    T: NativeType,
-    P: ParquetNativeType,
-    F: Fn(P) -> T,
+    where
+        I: Pages,
+        T: NativeType,
+        P: ParquetNativeType,
+        F: Fn(P) -> T,
 {
     iter: I,
     data_type: DataType,
@@ -304,12 +304,11 @@ where
 }
 
 impl<T, I, P, F> Iter<T, I, P, F>
-where
-    I: Pages,
-    T: NativeType,
-
-    P: ParquetNativeType,
-    F: Copy + Fn(P) -> T,
+    where
+        I: Pages,
+        T: NativeType,
+        P: ParquetNativeType,
+        F: Copy + Fn(P) -> T,
 {
     pub fn new(
         iter: I,
@@ -332,11 +331,11 @@ where
 }
 
 impl<T, I, P, F> Iterator for Iter<T, I, P, F>
-where
-    I: Pages,
-    T: NativeType,
-    P: ParquetNativeType,
-    F: Copy + Fn(P) -> T,
+    where
+        I: Pages,
+        T: NativeType,
+        P: ParquetNativeType,
+        F: Copy + Fn(P) -> T,
 {
     type Item = Result<MutablePrimitiveArray<T>>;
 
@@ -361,10 +360,10 @@ where
 }
 
 pub(super) fn deserialize_plain<T, P, F>(values: &[u8], op: F) -> Vec<T>
-where
-    T: NativeType,
-    P: ParquetNativeType,
-    F: Copy + Fn(P) -> T,
+    where
+        T: NativeType,
+        P: ParquetNativeType,
+        F: Copy + Fn(P) -> T,
 {
     values
         .chunks_exact(std::mem::size_of::<P>())

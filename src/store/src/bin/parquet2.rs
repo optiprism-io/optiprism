@@ -20,7 +20,6 @@ use fallible_streaming_iterator::FallibleStreamingIterator;
 use arrow2::io::parquet::read;
 use parquet2::error::Error;
 use store::error::Result;
-use store::parquet::SequentialWriter;
 use crate::init::init;
 
 fn from_physical_type(t: &PhysicalType) -> DataType {
@@ -93,7 +92,7 @@ fn main() -> anyhow::Result<()> {
         schema.clone(),
         WriteOptions {
             write_statistics: true,
-            version: Version::V1,
+            version: Version::V2,
         },
         None,
     );
@@ -102,7 +101,6 @@ fn main() -> anyhow::Result<()> {
         let mut reader = File::open(format!("/tmp/optiprism/{file_id}.parquet"))?;
         let metadata = parquet2::read::read_metadata(&mut reader)?;
 
-        let mut arr_buf = vec![];
         for row_group in metadata.row_groups {
             for column in row_group.columns().iter() {
                 let pages = parquet2::read::get_page_iterator(
@@ -114,13 +112,13 @@ fn main() -> anyhow::Result<()> {
                 )?;
 
                 for maybe_page in pages {
-                    let p = maybe_page?;
-                    if let CompressedPage::Data(p) = p {
+                    let page = maybe_page?;
+                    /*if let CompressedPage::Data(p) = p {
                         let arr = data_page_to_array(p, &mut arr_buf)?;
                         println!("{:?}", arr);
                     }
-
-                    // seq_writer.write_page(&p)?;
+*/
+                    seq_writer.write_page(&page)?;
                 }
                 seq_writer.end_column()?;
             }
@@ -177,17 +175,17 @@ mod init {
                   vec![ // row group 1
                         Box::new(Utf8Array::<i64>::from_slice(["a", "c"])),
                         Box::new(Int64Array::from_slice([1, 2])),
-                        Box::new(Int64Array::from_slice([1, 1])),
+                        // Box::new(Int64Array::from_slice([1, 1])),
                   ],
                   vec![ // row group 2
                         Box::new(Utf8Array::<i64>::from_slice(["c"])),
                         Box::new(Int64Array::from_slice([3])),
-                        Box::new(Int64Array::from_slice([1])),
+                        // Box::new(Int64Array::from_slice([1])),
                   ],
                   vec![ // row group 3
                         Box::new(Utf8Array::<i64>::from_slice(["d", "e"])),
                         Box::new(Int64Array::from_slice([1, 1])),
-                        Box::new(Int64Array::from_slice([1, 1])),
+                        // Box::new(Int64Array::from_slice([1, 1])),
                   ],
             ],
             /*vec![ // file3

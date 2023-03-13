@@ -22,7 +22,7 @@ pub struct CompressedDataPage {
     pub(crate) buffer: Vec<u8>,
     pub(crate) compression: Compression,
     uncompressed_page_size: usize,
-    pub(crate) descriptor: Descriptor,
+    pub descriptor: Descriptor,
 
     // The offset and length in rows
     pub(crate) selected_rows: Option<Vec<Interval>>,

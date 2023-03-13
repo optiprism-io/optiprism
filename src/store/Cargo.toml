@@ -5,7 +5,9 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
+bitmaps = "3.2.0"
 fallible-streaming-iterator = "0.1.9"
+ordered-float = "3.4.0"
 anyhow = "1.0.66"
 arrow = { version = "34.0.0", features = ["ffi"] }
 arrow-array = "34.0.0"
@@ -57,5 +59,10 @@ bench = false
 
 [[bin]]
 name = "parquet"
+test = false
+bench = false
+
+[[bin]]
+name = "parquet3"
 test = false
 bench = false

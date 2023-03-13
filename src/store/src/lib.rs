@@ -1,7 +1,9 @@
+#![feature(slice_take)]
+
 // pub mod dictionary;
 pub mod error;
-pub mod parquet;
 pub mod arrow_conversion;
+// pub mod parquet;
 // mod table;
 // mod iterator;
 // mod parquet;

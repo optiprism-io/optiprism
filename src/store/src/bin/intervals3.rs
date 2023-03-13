@@ -89,9 +89,9 @@ fn main() -> anyhow::Result<()> {
     let s2 = vec![Interval::new(1, 1, 10), Interval::new(1, 11, 20), Interval::new(1, 21, 30)];
     let s3 = vec![Interval::new(2, 1, 10), Interval::new(2, 11, 20), Interval::new(2, 21, 30)];
 
-    // let s1 = vec![Interval::new(0, 1, 10), Interval::new(0, 10, 20), Interval::new(0, 20, 30), Interval::new(0, 50, 60)];
-    // let s2 = vec![Interval::new(1, 3, 5), Interval::new(1, 6, 8), Interval::new(1, 40, 45), Interval::new(1, 61, 69)];
-    // let s3 = vec![Interval::new(2, 20, 22), Interval::new(2, 22, 23), Interval::new(2, 23, 24), Interval::new(2, 24, 25), Interval::new(2, 60, 61), Interval::new(2, 80, 81)];
+    let s1 = vec![Interval::new(0, 1, 10), Interval::new(0, 10, 20), Interval::new(0, 20, 30), Interval::new(0, 50, 60)];
+    let s2 = vec![Interval::new(1, 3, 5), Interval::new(1, 6, 8), Interval::new(1, 40, 45), Interval::new(1, 61, 69)];
+    let s3 = vec![Interval::new(2, 20, 22), Interval::new(2, 22, 23), Interval::new(2, 23, 24), Interval::new(2, 24, 25), Interval::new(2, 60, 61), Interval::new(2, 80, 81)];
 
     println!("s1: {:?}", s1);
     println!("s2: {:?}", s2);
@@ -121,8 +121,13 @@ fn main() -> anyhow::Result<()> {
         }
 
         mq.push(int);
+        let mut ms = vec![];
         while merge_interval(&mq).intersects(sorter.peek()) {
+            if ms.contains(&sorter.peek().unwrap().stream) {
+                break;
+            }
             println!("{:?} intersects with {:?}", int, sorter.peek());
+            ms.push(sorter.peek().unwrap().stream);
             let next = sorter.pop().unwrap();
             if let Some(next) = streams[next.stream].next() {
                 println!("pop next {:?}", next);
@@ -143,6 +148,33 @@ fn main() -> anyhow::Result<()> {
             res.push(int);
             println!("result {:?}", res);
         }
+        /*println!("pop {:?}", int);
+
+        let mut buf = vec![int];
+
+        while int.intersects(sorter.peek()) {
+            println!("intersects with {:?}", sorter.peek());
+            buf.push(sorter.pop().unwrap());
+        }
+
+        for int in buf.iter() {
+            if let Some(next) = streams[int.stream].next() {
+                println!("pop next {:?}", next);
+                sorter.push(*next);
+            }
+        }
+
+        if buf.len() == 1 {
+            println!("{:?}", buf[0]);
+            res.push(buf[0]);
+            continue;
+        }
+
+        println!("merge {:?}", buf);
+        for int in merge(&buf).into_iter() {
+            println!("{:?}", int);
+            res.push(int);
+        }*/
     }
 
     println!("final: {:?}", res);
