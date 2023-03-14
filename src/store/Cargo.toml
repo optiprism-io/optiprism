@@ -5,6 +5,10 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
+test-log = "0.2.11"
+env_logger = "*"
+tracing-subscriber = {version = "0.3", default-features = false, features = ["env-filter", "fmt"]}
+tracing = "0.1.37"
 bitmaps = "3.2.0"
 fallible-streaming-iterator = "0.1.9"
 ordered-float = "3.4.0"

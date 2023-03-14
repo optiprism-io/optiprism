@@ -1,3 +1,4 @@
+use tracing::error;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::schema::types::ParquetType;
 use crate::error::{Result, StoreError};
@@ -16,21 +17,14 @@ pub fn try_merge_fields(left: &ParquetType, right: &ParquetType) -> Result<Parqu
             field_info: other_field_info,
             logical_type: other_logical_type,
             converted_type: other_converted_type,
-        }) => {
-            if field_info != other_field_info || logical_type != other_logical_type || converted_type != other_converted_type {
-                return Err(StoreError::InvalidParameter("Group types are not equal".to_string()));
+        }) if field_info == other_field_info && logical_type == other_logical_type && converted_type == other_converted_type => {
+            let mut fields = fields.to_owned();
+            for other_field in other_fields.iter() {
+                match fields.iter_mut().find(|f| f.name() == other_field.name()) {
+                    None => fields.push(other_field.to_owned()),
+                    Some(merged_field) => *merged_field = try_merge_fields(merged_field, other_field)?
+                }
             }
-
-            let fields = fields
-                .iter()
-                .map(|f| {
-                    let other_field = other_fields.iter().find(|other_f| other_f.name() == f.name());
-                    match other_field {
-                        None => Ok(f.to_owned()),
-                        Some(other_field) => try_merge_fields(f, other_field)
-                    }
-                })
-                .collect::<Result<Vec<ParquetType>>>()?;
 
             ParquetType::GroupType {
                 field_info: field_info.to_owned(),
@@ -39,7 +33,10 @@ pub fn try_merge_fields(left: &ParquetType, right: &ParquetType) -> Result<Parqu
                 fields,
             }
         }
-        _ => return Err(StoreError::InvalidParameter("Primitive types are not equal".to_string()))
+        _ => {
+            error!("Types {:#?} and {:#?} are not equal", left, right);
+            return Err(StoreError::InvalidParameter(format!("Types are not equal")));
+        }
     };
 
     Ok(merged)
@@ -69,10 +66,187 @@ mod tests {
     use parquet2::schema::io_message::from_message;
     use parquet2::schema::Repetition;
     use parquet2::schema::types::{FieldInfo, GroupConvertedType, GroupLogicalType, ParquetType, PhysicalType, PrimitiveLogicalType, PrimitiveType};
-    use crate::parquet::schema::try_merge_fields;
+    use crate::parquet::schema::{try_merge_fields, try_merge_schemas};
+    use test_log::test;
+    use parquet2::metadata::SchemaDescriptor;
+
+    fn left_schema() -> ParquetType {
+        ParquetType::GroupType {
+            field_info: FieldInfo {
+                name: "1".to_string(),
+                repetition: Repetition::Required,
+                id: None,
+            },
+            logical_type: Some(GroupLogicalType::List),
+            converted_type: Some(GroupConvertedType::List),
+            fields: vec![
+                ParquetType::PrimitiveType(PrimitiveType {
+                    field_info: FieldInfo {
+                        name: "1.1".to_string(),
+                        repetition: Repetition::Optional,
+                        id: None,
+                    },
+                    converted_type: None,
+                    logical_type: None,
+                    physical_type: PhysicalType::Int32,
+                }),
+                ParquetType::GroupType {
+                    field_info: FieldInfo {
+                        name: "1.2".to_string(),
+                        repetition: Repetition::Required,
+                        id: None,
+                    },
+                    logical_type: Some(GroupLogicalType::List),
+                    converted_type: Some(GroupConvertedType::List),
+                    fields: vec![
+                        ParquetType::PrimitiveType(PrimitiveType {
+                            field_info: FieldInfo {
+                                name: "1.2.1".to_string(),
+                                repetition: Repetition::Optional,
+                                id: None,
+                            },
+                            converted_type: None,
+                            logical_type: None,
+                            physical_type: PhysicalType::Int32,
+                        })
+                    ],
+                },
+            ],
+        }
+    }
+
+    fn right_schema() -> ParquetType {
+        ParquetType::GroupType {
+            field_info: FieldInfo {
+                name: "1".to_string(),
+                repetition: Repetition::Required,
+                id: None,
+            },
+            logical_type: Some(GroupLogicalType::List),
+            converted_type: Some(GroupConvertedType::List),
+            fields: vec![
+                ParquetType::PrimitiveType(PrimitiveType {
+                    field_info: FieldInfo {
+                        name: "1.3".to_string(),
+                        repetition: Repetition::Optional,
+                        id: None,
+                    },
+                    converted_type: None,
+                    logical_type: None,
+                    physical_type: PhysicalType::Int32,
+                }),
+                ParquetType::GroupType {
+                    field_info: FieldInfo {
+                        name: "1.2".to_string(),
+                        repetition: Repetition::Required,
+                        id: None,
+                    },
+                    logical_type: Some(GroupLogicalType::List),
+                    converted_type: Some(GroupConvertedType::List),
+                    fields: vec![
+                        ParquetType::PrimitiveType(PrimitiveType {
+                            field_info: FieldInfo {
+                                name: "1.2.2".to_string(),
+                                repetition: Repetition::Optional,
+                                id: None,
+                            },
+                            converted_type: None,
+                            logical_type: None,
+                            physical_type: PhysicalType::Int32,
+                        }),
+                        ParquetType::PrimitiveType(PrimitiveType {
+                            field_info: FieldInfo {
+                                name: "1.2.3".to_string(),
+                                repetition: Repetition::Optional,
+                                id: None,
+                            },
+                            converted_type: None,
+                            logical_type: None,
+                            physical_type: PhysicalType::Int32,
+                        }),
+                    ],
+                },
+            ],
+        }
+    }
+
+    fn expected_schema() -> ParquetType {
+        ParquetType::GroupType {
+            field_info: FieldInfo {
+                name: "1".to_string(),
+                repetition: Repetition::Required,
+                id: None,
+            },
+            logical_type: Some(GroupLogicalType::List),
+            converted_type: Some(GroupConvertedType::List),
+            fields: vec![
+                ParquetType::PrimitiveType(PrimitiveType {
+                    field_info: FieldInfo {
+                        name: "1.1".to_string(),
+                        repetition: Repetition::Optional,
+                        id: None,
+                    },
+                    converted_type: None,
+                    logical_type: None,
+                    physical_type: PhysicalType::Int32,
+                }),
+                ParquetType::GroupType {
+                    field_info: FieldInfo {
+                        name: "1.2".to_string(),
+                        repetition: Repetition::Required,
+                        id: None,
+                    },
+                    logical_type: Some(GroupLogicalType::List),
+                    converted_type: Some(GroupConvertedType::List),
+                    fields: vec![
+                        ParquetType::PrimitiveType(PrimitiveType {
+                            field_info: FieldInfo {
+                                name: "1.2.1".to_string(),
+                                repetition: Repetition::Optional,
+                                id: None,
+                            },
+                            converted_type: None,
+                            logical_type: None,
+                            physical_type: PhysicalType::Int32,
+                        }),
+                        ParquetType::PrimitiveType(PrimitiveType {
+                            field_info: FieldInfo {
+                                name: "1.2.2".to_string(),
+                                repetition: Repetition::Optional,
+                                id: None,
+                            },
+                            converted_type: None,
+                            logical_type: None,
+                            physical_type: PhysicalType::Int32,
+                        }),
+                        ParquetType::PrimitiveType(PrimitiveType {
+                            field_info: FieldInfo {
+                                name: "1.2.3".to_string(),
+                                repetition: Repetition::Optional,
+                                id: None,
+                            },
+                            converted_type: None,
+                            logical_type: None,
+                            physical_type: PhysicalType::Int32,
+                        }),
+                    ],
+                },
+                ParquetType::PrimitiveType(PrimitiveType {
+                    field_info: FieldInfo {
+                        name: "1.3".to_string(),
+                        repetition: Repetition::Optional,
+                        id: None,
+                    },
+                    converted_type: None,
+                    logical_type: None,
+                    physical_type: PhysicalType::Int32,
+                }),
+            ],
+        }
+    }
 
     #[test]
-    fn test_merge_primitive_fields() -> anyhow::Result<()> {
+    fn test_merge_primitive_fields_mismatch() -> anyhow::Result<()> {
         let l = ParquetType::PrimitiveType(PrimitiveType {
             field_info: FieldInfo {
                 name: "a".to_string(),
@@ -87,7 +261,7 @@ mod tests {
         let r = ParquetType::PrimitiveType(PrimitiveType {
             field_info: FieldInfo {
                 name: "a".to_string(),
-                repetition: Repetition::Optional,
+                repetition: Repetition::Required,
                 id: None,
             },
             converted_type: None,
@@ -95,16 +269,13 @@ mod tests {
             physical_type: PhysicalType::Int32,
         });
 
-        let merged = try_merge_fields(&l, &r)?;
-
-        println!("{:?}", merged);
-        // assert_eq!(merged, l);
+        assert!(try_merge_fields(&l, &r).is_err());
 
         Ok(())
     }
 
     #[test]
-    fn test_merge_group_fields() -> anyhow::Result<()> {
+    fn test_merge_group_types_mismatch() -> anyhow::Result<()> {
         let l = ParquetType::GroupType {
             field_info: FieldInfo {
                 name: "a".to_string(),
@@ -127,54 +298,50 @@ mod tests {
             ],
         };
 
-
         let r = ParquetType::GroupType {
             field_info: FieldInfo {
                 name: "a".to_string(),
                 repetition: Repetition::Required,
                 id: None,
             },
-            logical_type: Some(GroupLogicalType::List),
+            logical_type: Some(GroupLogicalType::Map),
             converted_type: Some(GroupConvertedType::List),
             fields: vec![
                 ParquetType::PrimitiveType(PrimitiveType {
                     field_info: FieldInfo {
-                        name: "b".to_string(),
+                        name: "a".to_string(),
                         repetition: Repetition::Optional,
                         id: None,
                     },
                     converted_type: None,
                     logical_type: None,
-                    physical_type: PhysicalType::Int64,
-                }),
-                ParquetType::GroupType {
-                    field_info: FieldInfo {
-                        name: "a".to_string(),
-                        repetition: Repetition::Required,
-                        id: None,
-                    },
-                    logical_type: Some(GroupLogicalType::List),
-                    converted_type: Some(GroupConvertedType::List),
-                    fields: vec![
-                        ParquetType::PrimitiveType(PrimitiveType {
-                            field_info: FieldInfo {
-                                name: "a".to_string(),
-                                repetition: Repetition::Optional,
-                                id: None,
-                            },
-                            converted_type: None,
-                            logical_type: None,
-                            physical_type: PhysicalType::Int32,
-                        })
-                    ],
-                }
+                    physical_type: PhysicalType::Int32,
+                })
             ],
         };
 
-        let merged = try_merge_fields(&l, &r)?;
+        assert!(try_merge_fields(&l, &r).is_err());
 
-        println!("{:?}", merged);
-        // assert_eq!(merged, l);
+        Ok(())
+    }
+
+    #[test]
+    fn test_merge_fields() -> anyhow::Result<()> {
+        let merged = try_merge_fields(&left_schema(), &right_schema())?;
+        assert_eq!(merged, expected_schema());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_merge_schemas() -> anyhow::Result<()> {
+        let l = SchemaDescriptor::new("a".to_string(), vec![left_schema()]);
+        let r = SchemaDescriptor::new("b".to_string(), vec![right_schema()]);
+        let exp = SchemaDescriptor::new("m".to_string(), vec![expected_schema()]);
+        let merged = try_merge_schemas(vec![&l, &r], "m".to_string())?;
+        assert_eq!(merged.name(), "m");
+        assert_eq!(merged.fields(), exp.fields());
+        assert_eq!(merged.columns(), exp.columns());
 
         Ok(())
     }
