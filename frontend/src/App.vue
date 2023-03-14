@@ -42,10 +42,12 @@ const createErrorGeneral = (res: ErrorResponse) => {
 
 axios.interceptors.response.use(res => res, async err => {
     console.log(`ERROR: code '${err?.code}', message: '${err?.message}', url: '${err?.config?.url}'`);
+
     if (err?.response) {
         if (err.code === 'ERR_NETWORK') {
             createErrorGeneral(err.response);
         }
+
         switch (err?.response?.status || err?.error?.status) {
             case 400:
                 if (err.response?.data) {
@@ -61,6 +63,7 @@ axios.interceptors.response.use(res => res, async err => {
                 break
         }
     }
+
     return Promise.resolve();
 })
 </script>
