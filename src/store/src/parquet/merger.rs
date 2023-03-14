@@ -46,11 +46,12 @@ impl<R, W> FileMerger<R, W>
         R: Read + Seek,
         W: Write,
 {
-    pub fn try_new(mut page_streams: Vec<CompressedPageIterator<R>>, writer: W, index_cols: Vec<ColumnDescriptor>, pages_per_chunk: usize, name: String) -> Result<Self> {
+    pub fn try_new(mut page_streams: Vec<CompressedPageIterator<R>>, writer: W, index_cols: Vec<ColumnDescriptor>, page_size: usize, pages_per_chunk: usize, name: String) -> Result<Self> {
         let schemas = page_streams.iter().map(|ps| ps.schema()).collect::<Vec<_>>();
         let schema = try_merge_schemas(schemas, name)?;
         let opts = WriteOptions { write_statistics: true, version: Version::V2 };
         let seq_writer = FileSeqWriter::new(writer, schema.clone(), opts, None);
+
         Ok(Self {
             index_cols,
             schema,
@@ -62,8 +63,8 @@ impl<R, W> FileMerger<R, W>
             result: (Vec::with_capacity(pages_per_chunk), Vec::with_capacity(pages_per_chunk)),
             writer: seq_writer,
             pages_per_chunk,
-            page_size: 0,
-            null_pages_cache: Default::default(),
+            page_size,
+            null_pages_cache: HashMap::new(),
         })
     }
 
