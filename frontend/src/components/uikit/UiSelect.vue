@@ -1,7 +1,7 @@
 <template>
     <div class="pf-c-select">
         <VDropdown
-            placement="bottom-start"
+            :placement="props.placement"
             :triggers="[]"
             :shown="isOpen"
             @hide="onHide"
@@ -115,6 +115,10 @@ export default defineComponent({
         typehead: Boolean,
         clearable: Boolean,
         fullText: Boolean,
+        placement: {
+            type: String as PropType<'bottom-start' | 'bottom-end'>,
+            default: 'bottom-start',
+        },
     },
     emits: [
         'onSelect',

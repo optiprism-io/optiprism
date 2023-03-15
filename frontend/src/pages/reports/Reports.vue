@@ -16,6 +16,7 @@
                 <div class="report__name">
                     <UiInlineEdit
                         :value="reportName"
+                        :placeholder-value="t('reports.untitledReport')"
                         @on-input="setNameReport"
                     />
                 </div>
@@ -98,7 +99,7 @@ const breakdownsStore = useBreakdownsStore()
 const stepsStore = useStepsStore()
 const { confirm } = useConfirm()
 
-const reportName = ref(t('reports.untitledReport'))
+const reportName = ref('');
 
 const items = computed(() => {
     const mapTabs = [
@@ -169,7 +170,7 @@ const onSaveReport = async () => {
     if (reportsStore.reportId) {
         await reportsStore.editReport(reportName.value, reportType.value)
     } else {
-        await reportsStore.createReport(reportName.value, reportType.value)
+        await reportsStore.createReport(reportName.value || t('reports.untitledReport'), reportType.value)
 
         router.push({
             params: {
@@ -188,7 +189,7 @@ const setNameReport = (payload: string) => {
 
 const setEmptyReport = () => {
     reportsStore.reportId = 0
-    reportName.value = t('reports.untitledReport')
+    reportName.value = '';
     eventsStore.$reset()
     filterGroupsStore.$reset()
     segmentsStore.$reset()

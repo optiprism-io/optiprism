@@ -14,6 +14,7 @@ const EXPIRES_DAYS = 30
 export interface AuthState {
   accessToken: string | null
   refreshToken: LocalStorageAccessor,
+  refreshing: boolean,
 }
 
 interface LoginPayload extends LoginRequest {
@@ -24,6 +25,7 @@ export const useAuthStore = defineStore('auth', {
     state: (): AuthState => ({
         accessToken: null,
         refreshToken: new LocalStorageAccessor(REFRESH_KEY),
+        refreshing: false,
     }),
     getters: {
         isAuthenticated(): boolean {
@@ -40,7 +42,7 @@ export const useAuthStore = defineStore('auth', {
             }
         },
         async authAccess(): Promise<void> {
-            const accessToken = getCookie(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+            const accessToken = !!localStorage.getItem('keepLogged') ? getCookie(TOKEN_KEY) : sessionStorage.getItem(TOKEN_KEY);
             const refreshToken = localStorage.getItem(REFRESH_KEY) || '';
             if (accessToken) {
                 await this.setToken({
@@ -51,19 +53,21 @@ export const useAuthStore = defineStore('auth', {
         },
         async onRefreshToken(): Promise<void> {
             const refreshToken = localStorage.getItem(REFRESH_KEY) || '';
-            if (refreshToken) {
+            if (refreshToken && !this.refreshing) {
+                this.refreshing = true;
                 try {
                     const res = await authService.refreshToken(refreshToken)
-                    removeCookie(TOKEN_KEY)
-                    await this.setToken(res?.data, !!localStorage.getItem('keepLogged'))
+                    this.reset();
+                    this.setToken(res?.data, !!localStorage.getItem('keepLogged'))
                 } catch (error) {
                     this.reset();
                     throw new Error(JSON.stringify(error))
                 }
+                this.refreshing = false;
             }
         },
         setToken(token: TokensResponse, keepLogged?: boolean): void {
-            if (keepLogged && !getCookie(TOKEN_KEY)) {
+            if (keepLogged) {
                 setCookie(TOKEN_KEY, token?.accessToken ?? '', {
                     expires: EXPIRES_DAYS
                 })

@@ -5,18 +5,20 @@
             'pf-m-inline-editable': isEditable,
         }"
     >
-        <div class="pf-c-inline-edit__group">
+        <div
+            class="pf-c-inline-edit__group"
+            @click="setEditable(true)"
+        >
             <div
                 class="pf-c-inline-edit__value"
             >
-                {{ value }}
+                {{ value || props.placeholderValue }}
             </div>
             <div class="pf-c-inline-edit__action pf-m-enable-editable">
                 <button
                     class="pf-c-button pf-m-plain"
                     type="button"
                     aria-label="Edit"
-                    @click="setEditable(true)"
                 >
                     <i
                         class="fas fa-pencil-alt"
@@ -71,10 +73,12 @@ import { ref } from 'vue'
 
 interface Props {
     value: number | string
+    placeholderValue?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
     value: '',
+    placeholderValue: '',
 })
 
 const emit = defineEmits([

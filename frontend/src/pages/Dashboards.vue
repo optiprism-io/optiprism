@@ -1,17 +1,50 @@
 <template>
-    <div class="dashboards pf-u-p-md pf-u-pb-3xl">
+    <div class="dashboards pf-c-page__main-section pf-u-p-md pf-u-pb-3xl">
         <div>
-            <div class="pf-u-mb-md pf-u-display-flex">
+            <div class="pf-u-mb-sm pf-u-display-flex pf-u-justify-content-space-between pf-u-align-items-center">
                 <div class="dashboards__name pf-u-mr-md">
                     <UiInlineEdit
                         :value="dashboardName"
+                        :placeholder-value="$t('dashboards.untitledDashboard')"
                         @on-input="updateName"
                     />
                 </div>
+                <UiButton
+                    v-show="activeDashboardId"
+                    class="pf-m-link"
+                    :before-icon="'fas fa-plus'"
+                    @click="router.push({ query: { id: null } })"
+                >
+                    {{ $t('dashboards.createDashboard') }}
+                </UiButton>
+                <UiButton
+                    v-show="activeDashboardId"
+                    class="pf-u-ml-auto pf-m-link pf-m-danger"
+                    :before-icon="'fas fa-trash'"
+                    @click="onDeleteDashboard"
+                >
+                    {{ $t('dashboards.delete') }}
+                </UiButton>
+                <div
+                    v-if="dashboardsList.length"
+                    :class="{
+                        'pf-u-ml-lg': activeDashboardId,
+                        'pf-u-ml-auto': !activeDashboardId,
+                    }"
+                >
+                    <UiSelect
+                        class="report__select"
+                        :items="dashboardsList"
+                        :text-button="dashboardSelectText"
+                        :selections="[Number(activeDashboardId)]"
+                        @on-select="onSelectDashboard"
+                    />
+                </div>
                 <UiSelect
-                    class=" pf-u-mr-md dashboards__add-report"
+                    class=" pf-u-mr-md pf-u-ml-lg dashboards__add-report"
                     :items="selectReportsList"
                     :text-button="t('dashboards.addReport')"
+                    :placement="'bottom-end'"
                     @on-select="addReport"
                 >
                     <template #action>
@@ -91,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { pagesMap } from '@/router'
 import dashboardService from '@/api/services/dashboards.service'
@@ -119,6 +152,7 @@ const dashboardsStore = useDashboardsStore()
 const reportsStore = useReportsStore()
 
 const ROW_HEIGHT = 56;
+const CREATE = 'createDashboard';
 
 interface Layout extends DashboardPanelType {
     i: number
@@ -128,7 +162,7 @@ interface Layout extends DashboardPanelType {
 
 const layout = ref<Layout[]>([]);
 const dashboardReportsPopup = ref(false)
-const dashboardName = ref(t('dashboards.untitledDashboard'))
+const dashboardName = ref('');
 const activeDashboardId = ref<number | null>(null)
 const editPanel = ref<number | null>(null)
 const dashboards = computed(() => dashboardsStore.dashboards)
@@ -157,6 +191,21 @@ const menuCardReport = computed<UiDropdownItem<string>[]>(() => {
     ]
 })
 
+const dashboardSelectText = computed(() => {
+    return activeDashboard.value ? activeDashboard.value.name : t('dashboards.selectDashboard');
+});
+
+const dashboardsList = computed(() => {
+    return dashboards.value.map(item => {
+        const id = Number(item.id)
+        return {
+            value: id,
+            key: id,
+            nameDisplay: item.name || '',
+        }
+    });
+});
+
 const selectReportsList = computed(() => {
     return reportsList.value.map(item => {
         const id = Number(item.id)
@@ -178,7 +227,7 @@ const resized = () => {
 
 const updateLauout = () => {
     if (activeDashboard.value) {
-        dashboardName.value = activeDashboard.value?.name || t('dashboards.untitledDashboard')
+        dashboardName.value = activeDashboard.value?.name || '';
         const newLayout = activeDashboard.value?.panels?.map((item: DashboardPanelType, i: number) => {
             return {
                 ...item,
@@ -195,9 +244,13 @@ const updateLauout = () => {
 }
 
 const onSelectDashboard = (id: number | string) => {
-    activeDashboardId.value = Number(id);
-    router.push({ query: { id } })
-    updateLauout();
+    if (id === CREATE) {
+        setNew();
+    } else {
+        activeDashboardId.value = Number(id);
+        router.push({ query: { id } })
+        updateLauout();
+    }
 }
 
 const getDashboardsList = async () => {
@@ -207,7 +260,7 @@ const getDashboardsList = async () => {
 const updateCreateDashboard = async (panels?: Layout[]) => {
     try {
         const dataForRequest = {
-            name: dashboardName.value,
+            name: dashboardName.value || t('dashboards.untitledDashboard'),
             panels: (panels || layout.value).map(item => {
                 return {
                     type: DashboardPanelTypeEnum.Report,
@@ -237,6 +290,19 @@ const updateCreateDashboard = async (panels?: Layout[]) => {
         console.error(e);
     }
 }
+
+const onDeleteDashboard = async () => {
+    if (activeDashboardId.value) {
+        await dashboardService.deleteDashboard(commonStore.organizationId, commonStore.projectId, activeDashboardId.value);
+        await getDashboardsList();
+
+        if (dashboardsId.value?.length) {
+            router.push({ query: { id: dashboardsId.value[0] } });
+        } else {
+            setNew();
+        }
+    }
+};
 
 const onSelectReport = (payload: number) => {
     const items = layout.value;
@@ -284,7 +350,7 @@ const selectReportDropdown = async (payload: UiDropdownItem<string>, id: number)
 const setNew = () => {
     layout.value = [];
     activeDashboardId.value = null
-    dashboardName.value = t('dashboards.untitledDashboard')
+    dashboardName.value = '';
     router.push({
         query: {
             id: null,
@@ -308,13 +374,13 @@ const initDashboardPage = () => {
             setNew()
         }
     } else {
-        if (!route.query.new && dashboards.value.length && dashboards.value[0].id) {
-            onSelectDashboard(Number(dashboards.value[0].id))
-        } else {
-            setNew()
-        }
+        setNew()
     }
 };
+
+const reportSelectAction = (payload: any) => {
+    // TODO
+}
 
 onMounted(async () => {
     lexiconStore.getEvents()
@@ -325,6 +391,10 @@ onMounted(async () => {
     }
     initDashboardPage()
 })
+
+onUnmounted(() => {
+    activeDashboardId.value = null;
+});
 
 watch(() => route.query.id, id => {
     if (Number(id) !== activeDashboardId.value) {

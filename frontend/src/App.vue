@@ -47,7 +47,6 @@ axios.interceptors.response.use(res => res, async err => {
         if (err.code === 'ERR_NETWORK') {
             createErrorGeneral(err.response);
         }
-
         switch (err?.response?.status || err?.error?.status) {
             case 400:
                 if (err.response?.data) {
