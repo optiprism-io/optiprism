@@ -10,6 +10,7 @@
             @click="setEditable(true)"
         >
             <div
+                v-if="!props.hideText"
                 class="pf-c-inline-edit__value"
             >
                 {{ value || props.placeholderValue }}
@@ -32,6 +33,7 @@
                 <input
                     class="pf-c-form-control"
                     type="text"
+                    ref="input"
                     :value="valueEdit"
                     @input="updateValue"
                 >
@@ -74,19 +76,23 @@ import { ref } from 'vue'
 interface Props {
     value: number | string
     placeholderValue?: string
+    hideText?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     value: '',
     placeholderValue: '',
+    hideText: false,
 })
 
 const emit = defineEmits([
-    'on-input'
+    'on-input',
+    'on-edit',
 ])
 
 const valueEdit = ref<string | number>('')
 const isEditable = ref(false)
+const input = ref<HTMLCanvasElement | null>(null)
 
 const updateValue = (e: Event) => {
     const target = e.target as HTMLInputElement
@@ -94,8 +100,15 @@ const updateValue = (e: Event) => {
 }
 
 const setEditable = (payload: boolean) => {
+    const inputElement = input.value
+    emit('on-edit', payload);
     valueEdit.value = props.value
     isEditable.value = payload
+    setTimeout(() => {
+        if (payload && inputElement) {
+            inputElement.focus()
+        }
+    }, 300);
 }
 
 const onInput = () => {

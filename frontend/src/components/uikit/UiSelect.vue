@@ -15,6 +15,9 @@
             <button
                 v-else
                 class="pf-c-select__toggle"
+                :class="{
+                    'pf-c-dropdown__toggle pf-m-plain pf-m-text': props.isTextSelect,
+                }"
                 type="button"
                 aria-haspopup="true"
                 aria-expanded="false"
@@ -93,6 +96,7 @@ export interface UiSelectItem<T> {
     nameDisplay: string;
     value: T;
     disabled?: boolean;
+    isTextSelect?: boolean;
 }
 
 export default defineComponent({
@@ -115,6 +119,7 @@ export default defineComponent({
         typehead: Boolean,
         clearable: Boolean,
         fullText: Boolean,
+        isTextSelect: Boolean,
         placement: {
             type: String as PropType<'bottom-start' | 'bottom-end'>,
             default: 'bottom-start',

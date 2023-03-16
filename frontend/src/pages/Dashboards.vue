@@ -1,17 +1,32 @@
 <template>
     <div class="dashboards pf-c-page__main-section pf-u-p-md pf-u-pb-3xl">
         <div>
-            <div class="pf-u-mb-sm pf-u-display-flex pf-u-justify-content-space-between pf-u-align-items-center">
+            <div class="dashboards__nav pf-u-mb-sm pf-u-display-flex pf-u-justify-content-space-between pf-u-align-items-center">
+                <div
+                    v-if="dashboardsList.length && !editableNameDashboard"
+                    class="pf-u-mr-md"
+                >
+                    <UiSelect
+                        class="dashboards__select"
+                        :items="dashboardsList"
+                        :text-button="dashboardSelectText"
+                        :is-text-select="true"
+                        :selections="[Number(activeDashboardId)]"
+                        @on-select="onSelectDashboard"
+                    />
+                </div>
                 <div class="dashboards__name pf-u-mr-md">
                     <UiInlineEdit
                         :value="dashboardName"
+                        :hide-text="true"
                         :placeholder-value="$t('dashboards.untitledDashboard')"
                         @on-input="updateName"
+                        @on-edit="onEditNameDashboard"
                     />
                 </div>
                 <UiButton
                     v-show="activeDashboardId"
-                    class="pf-m-link"
+                    class="pf-m-link dashboards__nav-item dashboards__nav-item_new"
                     :before-icon="'fas fa-plus'"
                     @click="router.push({ query: { id: null } })"
                 >
@@ -19,42 +34,20 @@
                 </UiButton>
                 <UiButton
                     v-show="activeDashboardId"
-                    class="pf-u-ml-auto pf-m-link pf-m-danger"
+                    class="pf-m-link pf-m-danger"
                     :before-icon="'fas fa-trash'"
                     @click="onDeleteDashboard"
                 >
                     {{ $t('dashboards.delete') }}
                 </UiButton>
-                <div
-                    v-if="dashboardsList.length"
-                    :class="{
-                        'pf-u-ml-lg': activeDashboardId,
-                        'pf-u-ml-auto': !activeDashboardId,
-                    }"
-                >
-                    <UiSelect
-                        class="report__select"
-                        :items="dashboardsList"
-                        :text-button="dashboardSelectText"
-                        :selections="[Number(activeDashboardId)]"
-                        @on-select="onSelectDashboard"
-                    />
-                </div>
                 <UiSelect
-                    class=" pf-u-mr-md pf-u-ml-lg dashboards__add-report"
+                    class="pf-u-ml-auto pf-u-mr-md dashboards__add-report"
                     :items="selectReportsList"
                     :text-button="t('dashboards.addReport')"
                     :placement="'bottom-end'"
+                    :is-text-select="true"
                     @on-select="addReport"
-                >
-                    <template #action>
-                        <UiButton
-                            class="dashboards__add-report-button pf-m-main"
-                        >
-                            {{ t('dashboards.addReport') }}
-                        </UiButton>
-                    </template>
-                </UiSelect>
+                />
             </div>
             <GridLayout
                 v-model:layout="layout"
@@ -161,6 +154,7 @@ interface Layout extends DashboardPanelType {
 }
 
 const layout = ref<Layout[]>([]);
+const editableNameDashboard = ref(false)
 const dashboardReportsPopup = ref(false)
 const dashboardName = ref('');
 const activeDashboardId = ref<number | null>(null)
@@ -382,6 +376,10 @@ const reportSelectAction = (payload: any) => {
     // TODO
 }
 
+const onEditNameDashboard = (payload: boolean) => {
+    editableNameDashboard.value = payload;
+};
+
 onMounted(async () => {
     lexiconStore.getEvents()
     lexiconStore.getEventProperties()
@@ -414,11 +412,21 @@ watch(() => route.query.id, id => {
             height: calc(100% - 36px);
         }
     }
+    &__add-report,
+    .pf-c-inline-edit__input,
+    &__select {
+        width: 200px;
+    }
+    &__nav {
+        min-height: 34px;
+        &-item {
+            &_new {
+                margin-left: -12px;
+            }
+        }
+    }
     &__add-report-button {
         width: 100%;
-    }
-    &__add-report {
-        max-width: 140px;
     }
     &__new-item {
         min-height: 250px;
@@ -433,6 +441,7 @@ watch(() => route.query.id, id => {
         color: var(--pf-global--Color--300);
     }
     &__name {
+        min-width: 66px;
         .pf-c-inline-edit__value {
             font-size: 20px;
         }
