@@ -13,6 +13,7 @@ pub mod parquet;
 use error::Result;
 
 pub mod test_util {
+    use anyhow::anyhow;
     use arrow2::array::{Array, BooleanArray, Float64Array, Int32Array, Int64Array, ListArray, MutableBooleanArray, MutableListArray, MutablePrimitiveArray, MutableUtf8Array, Utf8Array};
     use arrow2::datatypes::{DataType, Field};
     use arrow2::types::NativeType;
@@ -296,6 +297,7 @@ pub mod test_util {
     ///
     /// # Example
     ///     let data = r#"
+    /// ```markdown
     /// +---+-------+------+-------+-------+
     /// | a |     b |    c |     d | e     |
     /// +---+-------+------+-------+-------+
@@ -303,6 +305,7 @@ pub mod test_util {
     /// | 2 |       |      |   1,2 | b     |
     /// | 3 | false | lala |       |       |
     /// +---+-------+------+-------+-------+
+    /// ```
     ///     "#;
     ///     let fields = vec![
     ///         Field::new("a", DataType::Int64, true),
@@ -328,6 +331,11 @@ pub mod test_util {
         let mut out: Vec<Vec<Value>> = vec![vec![]; fields.len()];
         for row in data.lines().skip(4) {
             let v = row.split('|').skip(1).collect::<Vec<_>>();
+            // skip non-data lines
+            if v.len() != fields.len() {
+                continue;
+            }
+
             for ((idx, val), field) in v.into_iter().take(fields.len()).enumerate().zip(fields.iter()) {
                 match field.data_type() {
                     DataType::Int64 | DataType::Int32 | DataType::Float64 | DataType::Boolean | DataType::Utf8 => out[idx].push(Value::parse(val, field.data_type())?),
@@ -397,5 +405,9 @@ pub mod test_util {
         }).collect::<Vec<_>>();
 
         Ok(result)
+    }
+
+    pub fn write_parquet_from_arrays(arrs: Vec<Box<dyn Array>>, page_size: usize, pages_per_row_group: usize) -> anyhow::Result<()> {
+        Ok(())
     }
 }
