@@ -523,7 +523,7 @@ pub fn array_to_page_simple(
     .map(Page::Data)
 }
 
-fn array_to_page_nested(
+pub fn array_to_page_nested(
     array: &dyn Array,
     type_: ParquetPrimitiveType,
     nested: &[Nested],

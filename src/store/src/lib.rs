@@ -13,11 +13,21 @@ pub mod parquet;
 use error::Result;
 
 pub mod test_util {
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::Path;
     use anyhow::anyhow;
     use arrow2::array::{Array, BooleanArray, Float64Array, Int32Array, Int64Array, ListArray, MutableBooleanArray, MutableListArray, MutablePrimitiveArray, MutableUtf8Array, Utf8Array};
-    use arrow2::datatypes::{DataType, Field};
+    use arrow2::datatypes::{DataType, Field, PhysicalType, Schema};
     use arrow2::types::NativeType;
     use arrow2::array::{TryExtend};
+    use arrow2::chunk::Chunk;
+    use arrow2::io::parquet::write::{array_to_page_nested, array_to_page_simple, FileWriter, RowGroupIterator, to_parquet_schema, transverse, WriteOptions};
+    use parquet2::compression::CompressionOptions;
+    use parquet2::encoding::Encoding;
+    use parquet2::schema::types::PrimitiveType;
+    use parquet2::write::{FileSeqWriter, Version};
+    use crate::parquet::parquet::arrays_to_pages;
 
     #[derive(Debug, Clone)]
     pub enum ListValue {
@@ -330,13 +340,13 @@ pub mod test_util {
     pub fn parse_markdown_table(data: &str, fields: &[Field]) -> anyhow::Result<Vec<Box<dyn Array>>> {
         let mut out: Vec<Vec<Value>> = vec![vec![]; fields.len()];
         for row in data.lines().skip(4) {
-            let v = row.split('|').skip(1).collect::<Vec<_>>();
+            let v = row.split('|').skip(1).take(fields.len()).collect::<Vec<_>>();
             // skip non-data lines
             if v.len() != fields.len() {
                 continue;
             }
 
-            for ((idx, val), field) in v.into_iter().take(fields.len()).enumerate().zip(fields.iter()) {
+            for ((idx, val), field) in v.into_iter().enumerate().zip(fields.iter()) {
                 match field.data_type() {
                     DataType::Int64 | DataType::Int32 | DataType::Float64 | DataType::Boolean | DataType::Utf8 => out[idx].push(Value::parse(val, field.data_type())?),
                     DataType::List(f) => {
@@ -407,7 +417,49 @@ pub mod test_util {
         Ok(result)
     }
 
-    pub fn write_parquet_from_arrays(arrs: Vec<Box<dyn Array>>, page_size: usize, pages_per_row_group: usize) -> anyhow::Result<()> {
+    pub fn create_parquet_from_arrays(mut arrs: Vec<Box<dyn Array>>, path: impl AsRef<Path>, fields: Vec<Field>, page_size: usize, pages_per_row_group: usize) -> anyhow::Result<()> {
+        let schema = Schema::from(fields);
+
+        let options = WriteOptions {
+            write_statistics: true,
+            compression: CompressionOptions::Snappy,
+            version: Version::V2,
+            data_pagesize_limit: Some(page_size),
+        };
+
+
+        let mut idx = 0;
+        let mut chunks = vec![];
+        while idx < arrs[0].len() {
+            let mut chunk = vec![];
+            for arr in arrs.iter_mut() {
+                let end = std::cmp::min(idx + pages_per_row_group, arr.len());
+                let slice = arr.sliced(idx, end - idx);
+                chunk.push(slice);
+            }
+            chunks.push(Ok(Chunk::new(chunk)));
+            idx += pages_per_row_group;
+        }
+
+        println!("{:#?}", chunks);
+        let encodings = schema
+            .fields
+            .iter()
+            .map(|f| transverse(&f.data_type, |_| Encoding::Plain))
+            .collect();
+
+        let row_groups = RowGroupIterator::try_new(chunks.into_iter(), &schema, options, encodings)?;
+
+        // Create a new empty file
+        let file = File::create(path)?;
+
+        let mut writer = FileWriter::try_new(file, schema, options)?;
+
+        for group in row_groups {
+            writer.write(group?)?;
+        }
+        let _size = writer.end(None)?;
+
         Ok(())
     }
 }

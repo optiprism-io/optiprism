@@ -20,51 +20,7 @@ use store::error::Result;
 use store::parquet::parquet::arrays_to_pages;
 use arrow2::array::{TryExtend};
 use arrow2::offset::Offset;
-use store::test_util::parse_markdown_table;
-
-fn create_parquet_file(
-    path: impl AsRef<Path>,
-    row_groups: Vec<Vec<Vec<Box<dyn Array>>>>,
-    fnames: Vec<&str>,
-) -> anyhow::Result<()> {
-    let mut file = std::fs::File::create(path)?;
-
-    let fields = row_groups[0]
-        .iter()
-        .zip(fnames.iter())
-        .map(|(arr, name)| Field::new(*name, arr[0].data_type().to_owned(), true))
-        .collect::<Vec<_>>();
-
-    let parquet_schema = to_parquet_schema(&Schema::from(fields))?;
-    let mut seq_writer = FileSeqWriter::new(
-        file,
-        parquet_schema,
-        WriteOptions {
-            write_statistics: true,
-            version: Version::V2,
-        },
-        None,
-    );
-
-    for row_group in row_groups.into_iter() {
-        for col in row_group.into_iter() {
-            for (page, fname) in col.into_iter().zip(fnames.iter()) {
-                let f = Field::new(*fname, page.data_type().to_owned(), true);
-                if let ParquetType::PrimitiveType(pt) = to_parquet_type(&f)? {
-                    let mut pages = arrays_to_pages(&[page], vec![pt], vec![])?;
-                    seq_writer.write_page(&CompressedPage::Data(pages.pop().unwrap()))?;
-                } else {
-                    panic!("not a primitive type");
-                }
-            }
-            seq_writer.end_column()?;
-        }
-        seq_writer.end_row_group()?;
-    }
-    seq_writer.end(None)?;
-    Ok(())
-}
-
+use store::test_util::{create_parquet_from_arrays, parse_markdown_table};
 
 #[test]
 fn test() -> anyhow::Result<()> {
@@ -86,8 +42,8 @@ fn test() -> anyhow::Result<()> {
     ];
 
     let parsed = parse_markdown_table(data, &fields)?;
-
     println!("{:#?}", parsed);
+    create_parquet_from_arrays(parsed, "/tmp/optiprism/test.parquet", fields, 2, 2)?;
     // create_parquet_file("/tmp/optiprism/test.parquet", data, vec!["a", "b", "c"])?;
 
     Ok(())
