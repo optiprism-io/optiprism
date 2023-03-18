@@ -1,24 +1,46 @@
 use std::cmp::Ordering;
-use std::collections::{HashMap, VecDeque};
-use std::io::{Read, Seek};
-use futures::stream::iter;
-use futures::StreamExt;
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::io::Read;
+use std::io::Seek;
+
 use arrow2::array::Array;
 use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
-use arrow2::io::parquet::write::{array_to_page_simple, WriteOptions};
+use arrow2::io::parquet::write::array_to_page_simple;
+use arrow2::io::parquet::write::WriteOptions;
+use futures::stream::iter;
+use futures::StreamExt;
 use parquet2::compression::CompressionOptions;
 use parquet2::encoding::Encoding;
-use parquet2::metadata::{FileMetaData, RowGroupMetaData, SchemaDescriptor};
-use parquet2::page::{CompressedDataPage, CompressedPage, Page};
+use parquet2::metadata::FileMetaData;
+use parquet2::metadata::RowGroupMetaData;
+use parquet2::metadata::SchemaDescriptor;
+use parquet2::page::CompressedDataPage;
+use parquet2::page::CompressedPage;
+use parquet2::page::Page;
 use parquet2::read::decompress;
-use parquet2::schema::types::{ParquetType, PhysicalType, PrimitiveType};
-use parquet2::statistics::{BinaryStatistics, BooleanStatistics, FixedLenStatistics, PrimitiveStatistics};
-use parquet2::write::{compress, Compressor, Version};
-use crate::error::{Result, StoreError};
-use crate::parquet::{from_physical_type, ReorderSlice, Value};
-use crate::parquet::arrow::ArrowRow;
+use parquet2::schema::types::ParquetType;
+use parquet2::schema::types::PhysicalType;
+use parquet2::schema::types::PrimitiveType;
+use parquet2::statistics::BinaryStatistics;
+use parquet2::statistics::BooleanStatistics;
+use parquet2::statistics::FixedLenStatistics;
+use parquet2::statistics::PrimitiveStatistics;
+use parquet2::write::compress;
+use parquet2::write::Compressor;
+use parquet2::write::Version;
 
-pub fn check_intersection(rows: &[CompressedDataPagesRow], other: Option<&CompressedDataPagesRow>) -> bool {
+use crate::error::Result;
+use crate::error::StoreError;
+use crate::parquet::arrow::ArrowRow;
+use crate::parquet::from_physical_type;
+use crate::parquet::ReorderSlice;
+use crate::parquet::Value;
+
+pub fn check_intersection(
+    rows: &[CompressedDataPagesRow],
+    other: Option<&CompressedDataPagesRow>,
+) -> bool {
     if other.is_none() {
         return false;
     }
@@ -41,7 +63,10 @@ pub fn check_intersection(rows: &[CompressedDataPagesRow], other: Option<&Compre
     min_values <= other.max_values() && max_values >= other.min_values
 }
 
-pub fn data_pages_to_arrays(pages: Vec<CompressedDataPage>, buf: &mut Vec<u8>) -> Result<Vec<Box<dyn Array>>> {
+pub fn data_pages_to_arrays(
+    pages: Vec<CompressedDataPage>,
+    buf: &mut Vec<u8>,
+) -> Result<Vec<Box<dyn Array>>> {
     pages
         .into_iter()
         .map(|page| data_page_to_array(page, buf))
@@ -62,7 +87,11 @@ pub fn data_page_to_array(page: CompressedDataPage, buf: &mut Vec<u8>) -> Result
     Ok(r.next().unwrap()?)
 }
 
-pub fn arrays_to_pages(arrs: &[Box<dyn Array>], types: Vec<PrimitiveType>, buf: Vec<u8>) -> Result<Vec<CompressedDataPage>> {
+pub fn arrays_to_pages(
+    arrs: &[Box<dyn Array>],
+    types: Vec<PrimitiveType>,
+    buf: Vec<u8>,
+) -> Result<Vec<CompressedDataPage>> {
     let opts = WriteOptions {
         write_statistics: true,
         compression: CompressionOptions::Snappy, // todo
@@ -76,16 +105,21 @@ pub fn arrays_to_pages(arrs: &[Box<dyn Array>], types: Vec<PrimitiveType>, buf: 
         .map(|(arr, typ)| array_to_page_simple(arr.as_ref(), typ, opts, Encoding::Plain))
         .collect::<std::result::Result<Vec<Page>, _>>()?;
 
-    let cp = pages.into_iter().map(|page| compress(page, vec![], CompressionOptions::Snappy)).collect::<std::result::Result<Vec<CompressedPage>, _>>()?;
+    let cp = pages
+        .into_iter()
+        .map(|page| compress(page, vec![], CompressionOptions::Snappy))
+        .collect::<std::result::Result<Vec<CompressedPage>, _>>()?;
 
-
-    let r = cp.into_iter().map(|p| {
-        if let CompressedPage::Data(dp) = p {
-            dp
-        } else {
-            unimplemented!("dicts are not supported")
-        }
-    }).collect::<Vec<_>>();
+    let r = cp
+        .into_iter()
+        .map(|p| {
+            if let CompressedPage::Data(dp) = p {
+                dp
+            } else {
+                unimplemented!("dicts are not supported")
+            }
+        })
+        .collect::<Vec<_>>();
 
     Ok(r)
 }
@@ -99,62 +133,103 @@ pub fn get_page_min_max_values(page: &CompressedDataPage) -> Result<(Value, Valu
     let stats = stats.unwrap()?;
 
     let (min_value, max_value) = match stats.physical_type() {
-        PhysicalType::Boolean => {
-            let stats = stats.as_any().downcast_ref::<BooleanStatistics>().unwrap();
-            if stats.min_value.is_none() || stats.max_value.is_none() {
-                return Err(StoreError::Internal("no stats".to_string()));
-            }
-            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
-        }
         PhysicalType::Int32 => {
-            let stats = stats.as_any().downcast_ref::<PrimitiveStatistics<i32>>().unwrap();
+            let stats = stats
+                .as_any()
+                .downcast_ref::<PrimitiveStatistics<i32>>()
+                .unwrap();
             if stats.min_value.is_none() || stats.max_value.is_none() {
-                return Err(StoreError::Internal("no stats".to_string()));
+                return Err(StoreError::Internal("no int32 stats".to_string()));
             }
-            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+            (
+                Value::from(stats.min_value.unwrap()),
+                Value::from(stats.max_value.unwrap()),
+            )
         }
         PhysicalType::Int64 => {
-            let stats = stats.as_any().downcast_ref::<PrimitiveStatistics<i64>>().unwrap();
+            let stats = stats
+                .as_any()
+                .downcast_ref::<PrimitiveStatistics<i64>>()
+                .unwrap();
             if stats.min_value.is_none() || stats.max_value.is_none() {
-                return Err(StoreError::Internal("no stats".to_string()));
+                return Err(StoreError::Internal("no int64 stats".to_string()));
             }
-            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+            (
+                Value::from(stats.min_value.unwrap()),
+                Value::from(stats.max_value.unwrap()),
+            )
         }
         PhysicalType::Int96 => {
-            let stats = stats.as_any().downcast_ref::<PrimitiveStatistics<[u32; 3]>>().unwrap();
+            let stats = stats
+                .as_any()
+                .downcast_ref::<PrimitiveStatistics<[u32; 3]>>()
+                .unwrap();
             if stats.min_value.is_none() || stats.max_value.is_none() {
-                return Err(StoreError::Internal("no stats".to_string()));
+                return Err(StoreError::Internal("no int96 stats".to_string()));
             }
-            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+            (
+                Value::from(stats.min_value.unwrap()),
+                Value::from(stats.max_value.unwrap()),
+            )
         }
         PhysicalType::Float => {
-            let stats = stats.as_any().downcast_ref::<PrimitiveStatistics<f32>>().unwrap();
+            let stats = stats
+                .as_any()
+                .downcast_ref::<PrimitiveStatistics<f32>>()
+                .unwrap();
             if stats.min_value.is_none() || stats.max_value.is_none() {
-                return Err(StoreError::Internal("no stats".to_string()));
+                return Err(StoreError::Internal("no float32 stats".to_string()));
             }
-            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+            (
+                Value::from(stats.min_value.unwrap()),
+                Value::from(stats.max_value.unwrap()),
+            )
         }
         PhysicalType::Double => {
-            let stats = stats.as_any().downcast_ref::<PrimitiveStatistics<f64>>().unwrap();
+            let stats = stats
+                .as_any()
+                .downcast_ref::<PrimitiveStatistics<f64>>()
+                .unwrap();
             if stats.min_value.is_none() || stats.max_value.is_none() {
-                return Err(StoreError::Internal("no stats".to_string()));
+                return Err(StoreError::Internal("no float64 stats".to_string()));
             }
-            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+            (
+                Value::from(stats.min_value.unwrap()),
+                Value::from(stats.max_value.unwrap()),
+            )
         }
         PhysicalType::ByteArray => {
-            let stats = stats.as_any().downcast_ref::<BinaryStatistics>().unwrap().to_owned();
+            let stats = stats
+                .as_any()
+                .downcast_ref::<BinaryStatistics>()
+                .unwrap()
+                .to_owned();
+            // println!("ss1 {:#?}", stats);
             if stats.min_value.is_none() || stats.max_value.is_none() {
-                return Err(StoreError::Internal("no stats".to_string()));
+                return Err(StoreError::Internal("no byte array stats".to_string()));
             }
-            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+            (
+                Value::from(stats.min_value.unwrap()),
+                Value::from(stats.max_value.unwrap()),
+            )
         }
         PhysicalType::FixedLenByteArray(_) => {
-            let stats = stats.as_any().downcast_ref::<FixedLenStatistics>().unwrap().to_owned();
+            let stats = stats
+                .as_any()
+                .downcast_ref::<FixedLenStatistics>()
+                .unwrap()
+                .to_owned();
             if stats.min_value.is_none() || stats.max_value.is_none() {
-                return Err(StoreError::Internal("no stats".to_string()));
+                return Err(StoreError::Internal(
+                    "no fixed len byte array stats".to_string(),
+                ));
             }
-            (Value::from(stats.min_value.unwrap()), Value::from(stats.max_value.unwrap()))
+            (
+                Value::from(stats.min_value.unwrap()),
+                Value::from(stats.max_value.unwrap()),
+            )
         }
+        _ => unimplemented!(),
     };
 
     Ok((min_value, max_value))
@@ -169,7 +244,6 @@ pub struct CompressedDataPagesRow {
     pub max_values: Vec<Value>,
     pub stream: usize,
 }
-
 
 impl Eq for CompressedDataPagesRow {}
 
@@ -207,24 +281,29 @@ impl PartialEq for CompressedDataPagesRow {
     }
 }
 
-
 impl CompressedDataPagesRow {
     pub fn new_from_pages(pages: Vec<CompressedPage>, stream: usize) -> Self {
-        let data_pages = pages.into_iter().map(|p| {
-            if let CompressedPage::Data(dp) = p {
-                dp
-            } else {
-                unimplemented!("dicts are not supported")
-            }
-        }).collect();
+        let data_pages = pages
+            .into_iter()
+            .map(|p| {
+                if let CompressedPage::Data(dp) = p {
+                    dp
+                } else {
+                    unimplemented!("dicts are not supported")
+                }
+            })
+            .collect();
         Self::new(data_pages, stream)
     }
 
     pub fn new(pages: Vec<CompressedDataPage>, stream: usize) -> Self {
-        let (min_values, max_values) = pages.iter().map(|page| {
-            let (min, max) = get_page_min_max_values(&page).unwrap();
-            (min, max)
-        }).unzip();
+        let (min_values, max_values) = pages
+            .iter()
+            .map(|page| {
+                let (min, max) = get_page_min_max_values(&page).unwrap();
+                (min, max)
+            })
+            .unzip();
 
         CompressedDataPagesRow {
             pages,
@@ -281,20 +360,32 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
     }
 
     pub fn get_col_path(&self, col_id: usize) -> ColumnPath {
-        self.metadata.schema().columns()[col_id].path_in_schema.clone()
+        self.metadata.schema().columns()[col_id]
+            .path_in_schema
+            .clone()
     }
 
     pub fn contains_column(&self, col_path: &ColumnPath) -> bool {
-        self.metadata.schema().columns().iter().find(|col| col.path_in_schema.eq(col_path)).is_some()
+        self.metadata
+            .schema()
+            .columns()
+            .iter()
+            .find(|col| col.path_in_schema.eq(col_path))
+            .is_some()
     }
 
     pub fn next_page(&mut self, col_path: &ColumnPath) -> Result<Option<CompressedPage>> {
         if !self.contains_column(col_path) {
-            return Err(StoreError::Internal(format!("column {:?} not found", col_path)));
+            return Err(StoreError::Internal(format!(
+                "column {:?} not found",
+                col_path
+            )));
         }
 
         if let Some(buf) = self.chunk_buffer.get_mut(col_path) {
             if let Some(page) = buf.pop_front() {
+                println!(">");
+
                 return Ok(Some(page));
             }
         }
@@ -305,7 +396,12 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
         }
 
         let row_group = &self.metadata.row_groups[row_group_id];
-        let column = row_group.columns().iter().find(|col| col.descriptor().path_in_schema.eq(col_path)).unwrap();
+        let column = row_group
+            .columns()
+            .iter()
+            .find(|col| col.descriptor().path_in_schema.eq(col_path))
+            .unwrap();
+
         let pages = parquet2::read::get_page_iterator(
             column,
             &mut self.reader,
@@ -319,11 +415,15 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
             match self.chunk_buffer.get_mut(col_path) {
                 Some(buf) => buf.push_back(page),
                 None => {
-                    self.chunk_buffer.insert(col_path.to_owned(), VecDeque::from(vec![page]));
+                    self.chunk_buffer
+                        .insert(col_path.to_owned(), VecDeque::from(vec![page]));
                 }
             }
         }
+        self.row_group_cursors
+            .insert(col_path.to_owned(), row_group_id + 1);
 
+        println!("$$");
         self.next_page(col_path)
     }
 }

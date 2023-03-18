@@ -1,19 +1,21 @@
-use parquet2::{
-    encoding::Encoding,
-    page::DataPage,
-    schema::types::PrimitiveType,
-    statistics::{serialize_statistics, BinaryStatistics, ParquetStatistics, Statistics},
-};
+use parquet2::encoding::Encoding;
+use parquet2::page::DataPage;
+use parquet2::schema::types::PrimitiveType;
+use parquet2::statistics::serialize_statistics;
+use parquet2::statistics::BinaryStatistics;
+use parquet2::statistics::ParquetStatistics;
+use parquet2::statistics::Statistics;
 
-use super::super::binary::{encode_delta, ord_binary};
+use super::super::binary::encode_delta;
+use super::super::binary::ord_binary;
 use super::super::utils;
 use super::super::WriteOptions;
-use crate::{
-    array::{Array, Utf8Array},
-    error::{Error, Result},
-    io::parquet::read::schema::is_nullable,
-    offset::Offset,
-};
+use crate::array::Array;
+use crate::array::Utf8Array;
+use crate::error::Error;
+use crate::error::Result;
+use crate::io::parquet::read::schema::is_nullable;
+use crate::offset::Offset;
 
 pub(crate) fn encode_plain<O: Offset>(
     array: &Utf8Array<O>,
@@ -73,7 +75,7 @@ pub fn array_to_page<O: Offset>(
                 "Datatype {:?} cannot be encoded by {:?} encoding",
                 array.data_type(),
                 encoding
-            )))
+            )));
         }
     }
 

@@ -1,8 +1,8 @@
 #![feature(slice_take)]
 
 // pub mod dictionary;
-pub mod error;
 pub mod arrow_conversion;
+pub mod error;
 pub mod parquet;
 // mod table;
 // mod iterator;
@@ -16,17 +16,39 @@ pub mod test_util {
     use std::fs::File;
     use std::io::Write;
     use std::path::Path;
+
     use anyhow::anyhow;
-    use arrow2::array::{Array, BooleanArray, Float64Array, Int32Array, Int64Array, ListArray, MutableBooleanArray, MutableListArray, MutablePrimitiveArray, MutableUtf8Array, Utf8Array};
-    use arrow2::datatypes::{DataType, Field, PhysicalType, Schema};
-    use arrow2::types::NativeType;
-    use arrow2::array::{TryExtend};
+    use arrow2::array::Array;
+    use arrow2::array::BooleanArray;
+    use arrow2::array::Float64Array;
+    use arrow2::array::Int32Array;
+    use arrow2::array::Int64Array;
+    use arrow2::array::ListArray;
+    use arrow2::array::MutableBooleanArray;
+    use arrow2::array::MutableListArray;
+    use arrow2::array::MutablePrimitiveArray;
+    use arrow2::array::MutableUtf8Array;
+    use arrow2::array::TryExtend;
+    use arrow2::array::Utf8Array;
     use arrow2::chunk::Chunk;
-    use arrow2::io::parquet::write::{array_to_page_nested, array_to_page_simple, FileWriter, RowGroupIterator, to_parquet_schema, transverse, WriteOptions};
+    use arrow2::datatypes::DataType;
+    use arrow2::datatypes::Field;
+    use arrow2::datatypes::PhysicalType;
+    use arrow2::datatypes::Schema;
+    use arrow2::io::parquet::write::array_to_page_nested;
+    use arrow2::io::parquet::write::array_to_page_simple;
+    use arrow2::io::parquet::write::to_parquet_schema;
+    use arrow2::io::parquet::write::transverse;
+    use arrow2::io::parquet::write::FileWriter;
+    use arrow2::io::parquet::write::RowGroupIterator;
+    use arrow2::io::parquet::write::WriteOptions;
+    use arrow2::types::NativeType;
     use parquet2::compression::CompressionOptions;
     use parquet2::encoding::Encoding;
     use parquet2::schema::types::PrimitiveType;
-    use parquet2::write::{FileSeqWriter, Version};
+    use parquet2::write::FileSeqWriter;
+    use parquet2::write::Version;
+
     use crate::parquet::parquet::arrays_to_pages;
 
     #[derive(Debug, Clone)]
@@ -51,7 +73,7 @@ pub mod test_util {
                 DataType::Float64 => ListValue::Float(data.parse()?),
                 DataType::Boolean => ListValue::Bool(data.parse()?),
                 DataType::Utf8 => ListValue::String(data.parse()?),
-                _ => unimplemented!("{:?}", data_type)
+                _ => unimplemented!("{:?}", data_type),
             })
         }
     }
@@ -60,7 +82,7 @@ pub mod test_util {
         fn into(self) -> i64 {
             match self {
                 ListValue::Int64(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -69,7 +91,7 @@ pub mod test_util {
         fn into(self) -> i32 {
             match self {
                 ListValue::Int32(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -78,7 +100,7 @@ pub mod test_util {
         fn into(self) -> f64 {
             match self {
                 ListValue::Float(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -87,7 +109,7 @@ pub mod test_util {
         fn into(self) -> bool {
             match self {
                 ListValue::Bool(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -96,7 +118,7 @@ pub mod test_util {
         fn into(self) -> String {
             match self {
                 ListValue::String(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -115,7 +137,7 @@ pub mod test_util {
         fn from(value: Value) -> Self {
             match value {
                 Value::Int32(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -124,7 +146,7 @@ pub mod test_util {
         fn from(value: Value) -> Self {
             match value {
                 Value::Int64(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -133,7 +155,7 @@ pub mod test_util {
         fn from(value: Value) -> Self {
             match value {
                 Value::Float(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -142,7 +164,7 @@ pub mod test_util {
         fn from(value: Value) -> Self {
             match value {
                 Value::Bool(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -151,7 +173,7 @@ pub mod test_util {
         fn from(value: Value) -> Self {
             match value {
                 Value::String(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -160,17 +182,16 @@ pub mod test_util {
         fn from(value: Value) -> Self {
             match value {
                 Value::List(v) => v,
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
-
 
     impl Into<Option<Vec<i64>>> for Value {
         fn into(self) -> Option<Vec<i64>> {
             match self {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -179,7 +200,7 @@ pub mod test_util {
         fn into(self) -> Option<Vec<i32>> {
             match self {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -188,7 +209,7 @@ pub mod test_util {
         fn into(self) -> Option<Vec<f64>> {
             match self {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -197,7 +218,7 @@ pub mod test_util {
         fn into(self) -> Option<Vec<String>> {
             match self {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }
     }
@@ -205,11 +226,15 @@ pub mod test_util {
     impl Into<Option<Vec<bool>>> for Value {
         fn into(self) -> Option<Vec<bool>> {
             match self {
-                Value::List(v) => v.map(|v| v.into_iter().map(|v| match v {
-                    ListValue::Bool(v) => v,
-                    _ => unimplemented!()
-                }).collect()),
-                _ => unimplemented!()
+                Value::List(v) => v.map(|v| {
+                    v.into_iter()
+                        .map(|v| match v {
+                            ListValue::Bool(v) => v,
+                            _ => unimplemented!(),
+                        })
+                        .collect()
+                }),
+                _ => unimplemented!(),
             }
         }
     }
@@ -225,15 +250,15 @@ pub mod test_util {
                     DataType::Boolean => Value::Bool(None),
                     DataType::Utf8 => Value::String(None),
                     DataType::List(_) => Value::List(None),
-                    _ => unimplemented!()
-                }
+                    _ => unimplemented!(),
+                },
                 false => match data_type {
                     DataType::Int64 => Value::Int64(Some(data.parse()?)),
                     DataType::Int32 => Value::Int32(Some(data.parse()?)),
                     DataType::Float64 => Value::Float(Some(data.parse()?)),
                     DataType::Boolean => Value::Bool(Some(data.parse()?)),
                     DataType::Utf8 => Value::String(Some(data.parse()?)),
-                    _ => unimplemented!()
+                    _ => unimplemented!(),
                 },
             };
 
@@ -265,7 +290,9 @@ pub mod test_util {
         }};
     }
 
-    pub fn create_list_primitive_array<N: NativeType, U: AsRef<[N]>, T: AsRef<[Option<U>]>>(data: T) -> ListArray<i32> {
+    pub fn create_list_primitive_array<N: NativeType, U: AsRef<[N]>, T: AsRef<[Option<U>]>>(
+        data: T,
+    ) -> ListArray<i32> {
         let iter = data.as_ref().iter().map(|x| {
             x.as_ref()
                 .map(|x| x.as_ref().iter().map(|x| Some(*x)).collect::<Vec<_>>())
@@ -275,7 +302,9 @@ pub mod test_util {
         array.into()
     }
 
-    pub fn create_list_bool_array<U: AsRef<[bool]>, T: AsRef<[Option<U>]>>(data: T) -> ListArray<i32> {
+    pub fn create_list_bool_array<U: AsRef<[bool]>, T: AsRef<[Option<U>]>>(
+        data: T,
+    ) -> ListArray<i32> {
         let iter = data.as_ref().iter().map(|x| {
             x.as_ref()
                 .map(|x| x.as_ref().iter().map(|x| Some(*x)).collect::<Vec<_>>())
@@ -285,10 +314,16 @@ pub mod test_util {
         array.into()
     }
 
-    pub fn create_list_string_array<U: AsRef<[String]>, T: AsRef<[Option<U>]>>(data: T) -> ListArray<i32> {
+    pub fn create_list_string_array<U: AsRef<[String]>, T: AsRef<[Option<U>]>>(
+        data: T,
+    ) -> ListArray<i32> {
         let iter = data.as_ref().iter().map(|x| {
-            x.as_ref()
-                .map(|x| x.as_ref().iter().map(|x| Some(x.to_owned())).collect::<Vec<_>>())
+            x.as_ref().map(|x| {
+                x.as_ref()
+                    .iter()
+                    .map(|x| Some(x.to_owned()))
+                    .collect::<Vec<_>>()
+            })
         });
         let mut array = MutableListArray::<i32, MutableUtf8Array<i32>>::new();
         array.try_extend(iter).unwrap();
@@ -336,11 +371,17 @@ pub mod test_util {
     ///    //  ListArray[[1, 2, 3], [1, 2], None],
     ///    //  ListArray[[a, b, c], [b], None],
     ///    // ]
-    ///
-    pub fn parse_markdown_table(data: &str, fields: &[Field]) -> anyhow::Result<Vec<Box<dyn Array>>> {
+    pub fn parse_markdown_table(
+        data: &str,
+        fields: &[Field],
+    ) -> anyhow::Result<Vec<Box<dyn Array>>> {
         let mut out: Vec<Vec<Value>> = vec![vec![]; fields.len()];
         for row in data.lines().skip(4) {
-            let v = row.split('|').skip(1).take(fields.len()).collect::<Vec<_>>();
+            let v = row
+                .split('|')
+                .skip(1)
+                .take(fields.len())
+                .collect::<Vec<_>>();
             // skip non-data lines
             if v.len() != fields.len() {
                 continue;
@@ -348,23 +389,31 @@ pub mod test_util {
 
             for ((idx, val), field) in v.into_iter().enumerate().zip(fields.iter()) {
                 match field.data_type() {
-                    DataType::Int64 | DataType::Int32 | DataType::Float64 | DataType::Boolean | DataType::Utf8 => out[idx].push(Value::parse(val, field.data_type())?),
+                    DataType::Int64
+                    | DataType::Int32
+                    | DataType::Float64
+                    | DataType::Boolean
+                    | DataType::Utf8 => out[idx].push(Value::parse(val, field.data_type())?),
                     DataType::List(f) => {
                         if val.trim().is_empty() {
                             out[idx].push(Value::List(None));
                             continue;
                         }
                         let split = val.trim().split(',');
-                        let vals = split.map(|v| ListValue::parse(v, f.data_type()).unwrap()).collect();
+                        let vals = split
+                            .map(|v| ListValue::parse(v, f.data_type()).unwrap())
+                            .collect();
                         out[idx].push(Value::List(Some(vals)));
                     }
-                    _ => unimplemented!()
+                    _ => unimplemented!(),
                 }
             }
         }
 
-        let result = out.into_iter().zip(fields.iter()).map(|(vals, field)| {
-            match field.data_type() {
+        let result = out
+            .into_iter()
+            .zip(fields.iter())
+            .map(|(vals, field)| match field.data_type() {
                 DataType::Int64 => {
                     let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
                     Int64Array::from(vals).boxed()
@@ -382,42 +431,52 @@ pub mod test_util {
                     BooleanArray::from(vals).boxed()
                 }
                 DataType::Utf8 => {
-                    let vals: Vec<Option<String>> = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                    let vals: Vec<Option<String>> =
+                        vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
                     Utf8Array::<i64>::from(vals).boxed()
                 }
-                DataType::List(f) => {
-                    match f.data_type {
-                        DataType::Int64 => {
-                            let vals: Vec<Option<Vec<i64>>> = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                            create_list_primitive_array(vals).boxed()
-                        }
-                        DataType::Int32 => {
-                            let vals: Vec<Option<Vec<i32>>> = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                            create_list_primitive_array(vals).boxed()
-                        }
-                        DataType::Float64 => {
-                            let vals: Vec<Option<Vec<f64>>> = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                            create_list_primitive_array(vals).boxed()
-                        }
-                        DataType::Boolean => {
-                            let vals: Vec<Option<Vec<bool>>> = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                            create_list_bool_array(vals).boxed()
-                        }
-                        DataType::Utf8 => {
-                            let vals: Vec<Option<Vec<String>>> = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                            create_list_string_array(vals).boxed()
-                        }
-                        _ => unimplemented!()
+                DataType::List(f) => match f.data_type {
+                    DataType::Int64 => {
+                        let vals: Vec<Option<Vec<i64>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_primitive_array(vals).boxed()
                     }
-                }
-                _ => unimplemented!()
-            }
-        }).collect::<Vec<_>>();
+                    DataType::Int32 => {
+                        let vals: Vec<Option<Vec<i32>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_primitive_array(vals).boxed()
+                    }
+                    DataType::Float64 => {
+                        let vals: Vec<Option<Vec<f64>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_primitive_array(vals).boxed()
+                    }
+                    DataType::Boolean => {
+                        let vals: Vec<Option<Vec<bool>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_bool_array(vals).boxed()
+                    }
+                    DataType::Utf8 => {
+                        let vals: Vec<Option<Vec<String>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_string_array(vals).boxed()
+                    }
+                    _ => unimplemented!(),
+                },
+                _ => unimplemented!(),
+            })
+            .collect::<Vec<_>>();
 
         Ok(result)
     }
 
-    pub fn create_parquet_from_arrays(mut arrs: Vec<Box<dyn Array>>, path: impl AsRef<Path>, fields: Vec<Field>, page_size: usize, pages_per_row_group: usize) -> anyhow::Result<()> {
+    pub fn create_parquet_from_arrays(
+        mut arrs: Vec<Box<dyn Array>>,
+        path: impl AsRef<Path>,
+        fields: Vec<Field>,
+        page_size: usize,
+        pages_per_row_group: usize,
+    ) -> anyhow::Result<()> {
         let schema = Schema::from(fields);
 
         let options = WriteOptions {
@@ -426,7 +485,6 @@ pub mod test_util {
             version: Version::V2,
             data_pagesize_limit: Some(page_size),
         };
-
 
         let mut idx = 0;
         let mut chunks = vec![];
@@ -441,14 +499,14 @@ pub mod test_util {
             idx += pages_per_row_group;
         }
 
-        println!("{:#?}", chunks);
         let encodings = schema
             .fields
             .iter()
             .map(|f| transverse(&f.data_type, |_| Encoding::Plain))
             .collect();
 
-        let row_groups = RowGroupIterator::try_new(chunks.into_iter(), &schema, options, encodings)?;
+        let row_groups =
+            RowGroupIterator::try_new(chunks.into_iter(), &schema, options, encodings)?;
 
         // Create a new empty file
         let file = File::create(path)?;

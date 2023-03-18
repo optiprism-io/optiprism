@@ -1,7 +1,10 @@
 use std::cmp::Ordering;
 use std::collections::btree_map::BTreeMap;
-use std::collections::{BinaryHeap, VecDeque};
-use std::fmt::{Debug, Formatter};
+use std::collections::BinaryHeap;
+use std::collections::VecDeque;
+use std::fmt::Debug;
+use std::fmt::Formatter;
+
 use anyhow;
 use rayon::prelude::*;
 
@@ -78,31 +81,76 @@ fn merge(ints: &[Interval]) -> Vec<Interval> {
 
 fn main() -> anyhow::Result<()> {
     let s1 = vec![Interval::new(0, 1, 10), Interval::new(0, 13, 20)];
-    let s2 = vec![Interval::new(1, 2, 4), Interval::new(1, 5, 8), Interval::new(1, 12, 20), Interval::new(1, 21, 22)];
-    let s3 = vec![Interval::new(2, 11, 12), Interval::new(2, 13, 15), Interval::new(2, 16, 18)];
+    let s2 = vec![
+        Interval::new(1, 2, 4),
+        Interval::new(1, 5, 8),
+        Interval::new(1, 12, 20),
+        Interval::new(1, 21, 22),
+    ];
+    let s3 = vec![
+        Interval::new(2, 11, 12),
+        Interval::new(2, 13, 15),
+        Interval::new(2, 16, 18),
+    ];
 
-    let s1 = vec![Interval::new(0, 1, 10), Interval::new(0, 10, 20), Interval::new(0, 20, 30)];
-    let s2 = vec![Interval::new(1, 1, 10), Interval::new(1, 10, 20), Interval::new(1, 20, 30)];
-    let s3 = vec![Interval::new(2, 1, 10), Interval::new(2, 10, 20), Interval::new(2, 20, 30)];
+    let s1 = vec![
+        Interval::new(0, 1, 10),
+        Interval::new(0, 10, 20),
+        Interval::new(0, 20, 30),
+    ];
+    let s2 = vec![
+        Interval::new(1, 1, 10),
+        Interval::new(1, 10, 20),
+        Interval::new(1, 20, 30),
+    ];
+    let s3 = vec![
+        Interval::new(2, 1, 10),
+        Interval::new(2, 10, 20),
+        Interval::new(2, 20, 30),
+    ];
 
-    let s1 = vec![Interval::new(0, 1, 10), Interval::new(0, 11, 20), Interval::new(0, 21, 30)];
-    let s2 = vec![Interval::new(1, 1, 10), Interval::new(1, 11, 20), Interval::new(1, 21, 30)];
-    let s3 = vec![Interval::new(2, 1, 10), Interval::new(2, 11, 20), Interval::new(2, 21, 30)];
+    let s1 = vec![
+        Interval::new(0, 1, 10),
+        Interval::new(0, 11, 20),
+        Interval::new(0, 21, 30),
+    ];
+    let s2 = vec![
+        Interval::new(1, 1, 10),
+        Interval::new(1, 11, 20),
+        Interval::new(1, 21, 30),
+    ];
+    let s3 = vec![
+        Interval::new(2, 1, 10),
+        Interval::new(2, 11, 20),
+        Interval::new(2, 21, 30),
+    ];
 
-    let s1 = vec![Interval::new(0, 1, 10), Interval::new(0, 10, 20), Interval::new(0, 20, 30), Interval::new(0, 50, 60)];
-    let s2 = vec![Interval::new(1, 3, 5), Interval::new(1, 6, 8), Interval::new(1, 40, 45), Interval::new(1, 61, 69)];
-    let s3 = vec![Interval::new(2, 20, 22), Interval::new(2, 22, 23), Interval::new(2, 23, 24), Interval::new(2, 24, 25), Interval::new(2, 60, 61), Interval::new(2, 80, 81)];
+    let s1 = vec![
+        Interval::new(0, 1, 10),
+        Interval::new(0, 10, 20),
+        Interval::new(0, 20, 30),
+        Interval::new(0, 50, 60),
+    ];
+    let s2 = vec![
+        Interval::new(1, 3, 5),
+        Interval::new(1, 6, 8),
+        Interval::new(1, 40, 45),
+        Interval::new(1, 61, 69),
+    ];
+    let s3 = vec![
+        Interval::new(2, 20, 22),
+        Interval::new(2, 22, 23),
+        Interval::new(2, 23, 24),
+        Interval::new(2, 24, 25),
+        Interval::new(2, 60, 61),
+        Interval::new(2, 80, 81),
+    ];
 
     println!("s1: {:?}", s1);
     println!("s2: {:?}", s2);
     println!("s3: {:?}", s3);
     let threads = 4; // threads
-    let mut streams = vec![
-        s1.iter(),
-        s2.iter(),
-        s3.iter(),
-    ];
-
+    let mut streams = vec![s1.iter(), s2.iter(), s3.iter()];
 
     let mut sorter = BinaryHeap::<Interval>::new();
     for stream in streams.iter_mut() {
@@ -114,7 +162,7 @@ fn main() -> anyhow::Result<()> {
     let mut res = vec![];
     let mut mq = vec![];
     while let Some(int) = sorter.pop() {
-        println!("pop {:?}", int);
+        println!("pop {:#?}", int);
         if let Some(next) = streams[int.stream].next() {
             println!("pop next {:?}", next);
             sorter.push(*next);
