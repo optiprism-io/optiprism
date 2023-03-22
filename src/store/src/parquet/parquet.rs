@@ -87,6 +87,16 @@ pub fn data_page_to_array(page: CompressedDataPage, buf: &mut Vec<u8>) -> Result
     Ok(r.next().unwrap()?)
 }
 
+pub fn array_to_page(arr: Box<dyn Array>, typ: PrimitiveType, buf: Vec<u8>) -> Result<CompressedPage> {
+    let mut arrs = arrays_to_pages(
+        &vec![arr],
+        vec![typ],
+        buf,
+    )?;
+
+    Ok(CompressedPage::Data(arrs.pop().unwrap()))
+}
+
 pub fn arrays_to_pages(
     arrs: &[Box<dyn Array>],
     types: Vec<PrimitiveType>,

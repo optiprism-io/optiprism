@@ -9,7 +9,7 @@ use std::ops::Range;
 use std::ops::RangeBounds;
 use std::rc::Rc;
 
-use arrow2::array::Array;
+use arrow2::array::{Array, new_null_array};
 use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
 use arrow2::array::FixedSizeBinaryArray;
@@ -18,6 +18,7 @@ use arrow2::array::Float64Array;
 use arrow2::array::Int32Array;
 use arrow2::array::Int64Array;
 use arrow2::datatypes::DataType;
+use arrow2::io::parquet::read::schema::parquet_to_arrow_schema;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedDataPage;
@@ -35,7 +36,7 @@ use crate::error::Result;
 use crate::error::StoreError;
 use crate::parquet::arrow::merge;
 use crate::parquet::arrow::ArrowRow;
-use crate::parquet::parquet::arrays_to_pages;
+use crate::parquet::parquet::{array_to_page, arrays_to_pages};
 use crate::parquet::parquet::check_intersection;
 use crate::parquet::parquet::data_page_to_array;
 use crate::parquet::parquet::data_pages_to_arrays;
@@ -46,9 +47,9 @@ use crate::parquet::parquet::CompressedPageIterator;
 use crate::parquet::schema::try_merge_schemas;
 
 pub struct FileMerger<R, W>
-where
-    R: Read,
-    W: Write,
+    where
+        R: Read,
+        W: Write,
 {
     index_cols: Vec<ColumnDescriptor>,
     schema: SchemaDescriptor,
@@ -61,7 +62,7 @@ where
     writer: FileSeqWriter<W>,
     pages_per_chunk: usize,
     page_size: usize,
-    null_pages_cache: HashMap<(PhysicalType, usize), Rc<CompressedPage>>,
+    null_pages_cache: HashMap<(DataType, usize), Rc<CompressedPage>>,
 }
 
 #[derive(Debug, Clone)]
@@ -73,9 +74,9 @@ pub enum MergeReorder {
 }
 
 impl<R, W> FileMerger<R, W>
-where
-    R: Read + Seek,
-    W: Write,
+    where
+        R: Read + Seek,
+        W: Write,
 {
     pub fn try_new(
         mut page_streams: Vec<CompressedPageIterator<R>>,
@@ -124,55 +125,18 @@ where
 
     fn make_null_page(
         &mut self,
-        col: &ColumnDescriptor,
+        cd: &ColumnDescriptor,
         num_rows: usize,
     ) -> Result<Rc<CompressedPage>> {
-        let physical_type = col.descriptor.primitive_type.physical_type.clone();
-        let cache_key = (physical_type, num_rows);
+        let field = parquet_to_arrow_schema(vec![cd.base_type.clone()].as_slice()).pop().unwrap();
+        let cache_key = (field.data_type.clone(), num_rows);
         if let Some(page) = self.null_pages_cache.get(&cache_key) {
             return Ok(Rc::clone(page));
         }
+        let arr = new_null_array(field.data_type, num_rows);
 
-        let arr = match physical_type {
-            PhysicalType::Boolean => {
-                Box::new(BooleanArray::new_null(DataType::Boolean, num_rows)) as Box<dyn Array>
-            }
-            PhysicalType::Int32 => {
-                Box::new(Int32Array::new_null(DataType::Int32, num_rows)) as Box<dyn Array>
-            }
-            PhysicalType::Int64 => {
-                Box::new(Int64Array::new_null(DataType::Int64, num_rows)) as Box<dyn Array>
-            }
-            PhysicalType::Int96 => {
-                unimplemented!()
-            }
-            PhysicalType::Float => {
-                Box::new(Float32Array::new_null(DataType::Float32, num_rows)) as Box<dyn Array>
-            }
-            PhysicalType::Double => {
-                Box::new(Float64Array::new_null(DataType::Float64, num_rows)) as Box<dyn Array>
-            }
-            PhysicalType::ByteArray => {
-                // todo check if i64 offset is correct
-                Box::new(BinaryArray::<i64>::new_null(DataType::Binary, num_rows)) as Box<dyn Array>
-            }
-            PhysicalType::FixedLenByteArray(l) => {
-                // todo check if i64 offset is correct
-                Box::new(FixedSizeBinaryArray::new_null(
-                    DataType::FixedSizeBinary(l),
-                    num_rows,
-                )) as Box<dyn Array>
-            }
-        };
-
-        let mut arrs = arrays_to_pages(
-            &vec![arr],
-            vec![col.descriptor.primitive_type.clone()],
-            vec![],
-        )?;
-
-        let page = CompressedPage::Data(arrs.pop().unwrap());
-        self.null_pages_cache.insert(cache_key, Rc::new(page));
+        let page = array_to_page(arr, cd.descriptor.primitive_type.clone(), vec![])?;
+        self.null_pages_cache.insert(cache_key.clone(), Rc::new(page));
 
         let rc = self.null_pages_cache.get(&cache_key).unwrap();
         Ok(Rc::clone(rc))
