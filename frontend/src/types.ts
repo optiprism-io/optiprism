@@ -136,3 +136,11 @@ export enum Group {
     User = 'user',
     Country = 'country'
 }
+
+export const AlertTypeEnum = {
+    Default: 'default',
+    Info: 'info',
+    Success: 'success',
+    Warning: 'warning',
+    Danger: 'danger',
+} as const

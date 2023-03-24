@@ -1,13 +1,6 @@
 import { defineStore } from 'pinia'
 import { nanoid } from 'nanoid'
-
-export const AlertTypeEnum = {
-    Default: 'default',
-    Info: 'info',
-    Success: 'success',
-    Warning: 'warning',
-    Danger: 'danger',
-} as const
+import { AlertTypeEnum } from '@/types'
 
 export type AlertTypeEnum = typeof AlertTypeEnum[keyof typeof AlertTypeEnum]
 

@@ -15,24 +15,33 @@ export type Item = {
 
 export const DisplayName = 'displayName'
 
+export const EventValuesConfigKeysEnum = {
+    DisplayName: 'displayName',
+    Description: 'description',
+    Status: 'status',
+    Tags: 'tags'
+} as const;
+export type EventValuesConfigKeysEnum = typeof EventValuesConfigKeysEnum[keyof typeof EventValuesConfigKeysEnum];
+
+
 export const eventValuesConfig = {
     [DisplayName]: {
-        'key': DisplayName,
+        'key': EventValuesConfigKeysEnum.DisplayName,
         'string': 'events.event_management.popup.event_columns.displayName',
         'component': UiInput,
     },
     'description': {
-        'key': 'description',
+        'key': EventValuesConfigKeysEnum.Description,
         'string': 'events.event_management.popup.event_columns.description',
         'component': UiTextarea,
     },
     'status': {
-        'key': 'status',
+        'key': EventValuesConfigKeysEnum.Status,
         'string': 'events.event_management.popup.event_columns.status',
         'component': UiSwitch
     },
     'tags': {
-        'key': 'tags',
+        'key': EventValuesConfigKeysEnum.Tags,
         'string': 'events.event_management.popup.event_columns.tags',
         'component': UiInputTags,
     }

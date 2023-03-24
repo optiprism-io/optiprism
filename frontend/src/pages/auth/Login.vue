@@ -51,60 +51,30 @@
                     </h1>
                 </header>
                 <div class="pf-c-login__main-body">
-                    <form
-                        class="pf-c-form login-form"
-                        @submit.prevent="actionForm"
+                    <UiForm
+                        class="login-form"
+                        :error-main="errorMain"
+                        @submit="actionForm"
                     >
-                        <div class="pf-c-form__group pf-u-mb-md login-form__field">
-                            <label
-                                class="pf-c-form__label"
-                                for="login-demo-form-username"
-                            >
-                                <span class="pf-c-form__label-text">
-                                    Email
-                                </span>
-                                <span
-                                    class="pf-c-form__label-required"
-                                    aria-hidden="true"
-                                >
-                                    &#42;
-                                </span>
-                            </label>
+                        <UiFormGroup
+                            :label="'Email'"
+                            :error="errorFields?.email"
+                            :for="'login-email'"
+                            :required="true"
+                        >
                             <UiInput
                                 v-model="email"
                                 name="login-email"
                                 :invalid="Boolean(errorFields?.email)"
                                 @input="(e) => onInput(e, 'email')"
                             />
-                            <p
-                                v-if="errorFields?.email"
-                                class="login-form__field-info pf-c-form__helper-text pf-m-error"
-                                aria-live="polite"
-                            >
-                                <span class="pf-c-form__helper-text-icon">
-                                    <i
-                                        class="fas fa-exclamation-circle"
-                                        aria-hidden="true"
-                                    />
-                                </span>
-                                {{ errorFields?.email }}
-                            </p>
-                        </div>
-                        <div class="pf-c-form__group pf-u-mb-md login-form__field">
-                            <label
-                                class="pf-c-form__label"
-                                for="login-demo-form-password"
-                            >
-                                <span class="pf-c-form__label-text">
-                                    {{ $t('login.password') }}
-                                </span>
-                                <span
-                                    class="pf-c-form__label-required"
-                                    aria-hidden="true"
-                                >
-                                    &#42;
-                                </span>
-                            </label>
+                        </UiFormGroup>
+                        <UiFormGroup
+                            :label="$t('login.password')"
+                            :error="errorFields?.password"
+                            :for="'login-password'"
+                            :required="true"
+                        >
                             <UiInput
                                 v-model="password"
                                 name="login-password"
@@ -112,48 +82,25 @@
                                 :invalid="Boolean(errorFields?.password)"
                                 @input="(e) => onInput(e, 'password')"
                             />
-                            <p
-                                v-if="errorFields?.password"
-                                class="login-form__field-info pf-c-form__helper-text pf-m-error"
-                                aria-live="polite"
-                            >
-                                <span class="pf-c-form__helper-text-icon">
-                                    <i
-                                        class="fas fa-exclamation-circle"
-                                        aria-hidden="true"
-                                    />
-                                </span>
-                                {{ errorFields?.password }}
-                            </p>
-                        </div>
-                        <div class="pf-c-form__group login-form__field">
+                        </UiFormGroup>
+                        <UiFormGroup>
                             <UiCheckbox
                                 v-model="keepLogged"
                                 :label="$t('login.keep')"
+                                class="pf-u-mb-md"
                             />
-                            <p
-                                v-if="errorMain"
-                                class="login-form__field-info pf-c-form__helper-text pf-m-error"
-                                aria-live="polite"
-                            >
-                                <span class="pf-c-form__helper-text-icon">
-                                    <i
-                                        class="fas fa-exclamation-circle"
-                                        aria-hidden="true"
-                                    />
-                                </span>
-                                {{ errorMain }}
-                            </p>
-                        </div>
-                        <div class="pf-c-form__group pf-m-action">
+                        </UiFormGroup>
+                        <UiFormGroup
+                            :action="true"
+                        >
                             <button
                                 class="pf-c-button pf-m-primary pf-m-block"
                                 type="submit"
                             >
                                 {{ $t('login.logIn') }}
                             </button>
-                        </div>
-                    </form>
+                        </UiFormGroup>
+                    </UiForm>
                 </div>
             </main>
             <footer class="pf-c-login__footer" />
@@ -162,14 +109,16 @@
 </template>
 
 <script lang="ts" setup>
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { computed, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth/auth'
 import { pagesMap } from '@/router'
-import { ErrorResponse } from '@/api'
 import usei18n from '@/hooks/useI18n'
 import UiInput from '@/components/uikit/UiInput.vue'
 import UiCheckbox from '@/components/uikit/UiCheckbox.vue'
+import UiForm from '@/components/uikit/UiForm.vue'
+import UiFormGroup from '@/components/uikit/UiFormGroup.vue'
+import { AlertTypeEnum } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -178,10 +127,19 @@ const { t } = usei18n()
 
 const email = ref('')
 const password = ref('')
-const keepLogged = ref(false)
+const keepLogged = ref(true)
 const errorFields = ref<{ [key: string]: string }>({})
 const errorMain = ref('');
 const loading = ref(false);
+
+const errorMainItem = computed(() => {
+    return {
+        id: '0',
+        type: AlertTypeEnum.Danger,
+        text: errorMain.value,
+        noClose: true,
+    };
+});
 
 const nextPath = computed(() => {
     const next = route.query.next
@@ -212,7 +170,7 @@ const login = async (): Promise<void | Error> => {
             errorFields.value = error?.fields as { [key: string]: string; } || {};
         }
         if (error?.status === 401) {
-            errorMain.value = t('errors.loginIncorrect');
+            errorMain.value = error?.message;
         } else {
             if (error?.message) {
                 errorMain.value = error?.message;
@@ -249,16 +207,29 @@ const actionForm = () => {
             max-width: 400px;
         }
     }
+    &__main-body {
+        position: relative;
+    }
+    &__main-error {
+        &-wrap {
+            margin-bottom: .7rem;
+            min-height: 2rem;
+            position: relative;
+        }
+    }
 }
 
 .login-form {
     &__field {
         position: relative;
     }
-
     &__field-info {
         position: absolute;
         bottom: -1.5rem;
+        left: 0;
+    }
+    &__field-info-main {
+        position: absolute;
         left: 0;
     }
 }

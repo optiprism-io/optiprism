@@ -17,10 +17,10 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref, watch } from 'vue'
 import Header from '@/components/common/Header.vue'
 import CreateCustomEvent from '@/components/events/CreateCustomEvent.vue'
 import { useCommonStore } from '@/stores/common'
-import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth/auth'
 import { useDashboardsStore } from '@/stores/dashboards'
@@ -28,6 +28,7 @@ import { useReportsStore } from '@/stores/reports/reports'
 import { pagesMap } from '@/router'
 
 const state = ref<'pending' | 'ok' | 'error'>('pending')
+const REFRESH_KEY = 'refreshToken'
 
 const route = useRoute()
 const router = useRouter()
@@ -54,9 +55,9 @@ const getStartData = () => {
 };
 
 const init = async (): Promise<void> => {
-    await authStore.authAccess()
-
-    if (!authStore.isAuthenticated) {
+    await authStore.authAccess();
+    const isAuth = !!authStore.accessToken && !!localStorage.getItem(REFRESH_KEY);
+    if (!isAuth) {
         await router.replace({
             name: pagesMap.login.name,
             query: { next: route.path }

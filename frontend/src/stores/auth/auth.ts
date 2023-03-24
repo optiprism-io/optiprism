@@ -14,6 +14,7 @@ const EXPIRES_DAYS = 30
 export interface AuthState {
   accessToken: string | null
   refreshToken: LocalStorageAccessor,
+  refreshing: boolean,
 }
 
 interface LoginPayload extends LoginRequest {
@@ -24,10 +25,11 @@ export const useAuthStore = defineStore('auth', {
     state: (): AuthState => ({
         accessToken: null,
         refreshToken: new LocalStorageAccessor(REFRESH_KEY),
+        refreshing: false,
     }),
     getters: {
         isAuthenticated(): boolean {
-            return !!this.accessToken && !!this.refreshToken?.value
+            return !!this.accessToken && !!localStorage.getItem(REFRESH_KEY)
         },
     },
     actions: {
@@ -40,22 +42,32 @@ export const useAuthStore = defineStore('auth', {
             }
         },
         async authAccess(): Promise<void> {
-            if (getCookie(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY)) {
-                if (!this.refreshToken.value) {
-                    return
-                }
-
+            const accessToken = localStorage.getItem('keepLogged') ? getCookie(TOKEN_KEY) : sessionStorage.getItem(TOKEN_KEY);
+            const refreshToken = localStorage.getItem(REFRESH_KEY) || '';
+            if (accessToken) {
+                this.setToken({
+                    accessToken,
+                    refreshToken,
+                }, !!localStorage.getItem('keepLogged'))
+            }
+        },
+        async onRefreshToken(): Promise<void> {
+            const refreshToken = localStorage.getItem(REFRESH_KEY) || '';
+            if (refreshToken && !this.refreshing) {
+                this.refreshing = true;
                 try {
-                    const res = await authService.refreshToken(this.refreshToken.value)
-
-                    await this.setToken(res.data, !!localStorage.getItem('keepLogged'))
+                    const res = await authService.refreshToken(refreshToken)
+                    this.reset();
+                    this.setToken(res?.data, !!localStorage.getItem('keepLogged'))
                 } catch (error) {
+                    this.reset();
                     throw new Error(JSON.stringify(error))
                 }
+                this.refreshing = false;
             }
         },
         setToken(token: TokensResponse, keepLogged?: boolean): void {
-            if (keepLogged && !getCookie(TOKEN_KEY)) {
+            if (keepLogged) {
                 setCookie(TOKEN_KEY, token?.accessToken ?? '', {
                     expires: EXPIRES_DAYS
                 })
@@ -63,8 +75,7 @@ export const useAuthStore = defineStore('auth', {
             } else {
                 sessionStorage.setItem(TOKEN_KEY, token?.accessToken ?? '')
             }
-            axios.defaults.headers.common[HEADER_KEY] = token?.accessToken ? token.accessToken : ''
-
+            axios.defaults.headers.common[HEADER_KEY] = token?.accessToken ? `Bearer ${token.accessToken}` : ''
             this.accessToken = token.accessToken ?? ''
             this.refreshToken.value = token.refreshToken ?? ''
         },

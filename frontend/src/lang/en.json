@@ -8,7 +8,7 @@
 
   "errors": {
     "unauthorized": "We're sorry, but we can't authenticate you. You must be logged in to access these pages.",
-    "internal": "Whoops! Something went wrong. Try refreshing the page",
+    "internal": "Something gone wrong, please try again later",
     "requiredInput": "Input is required",
     "loginIncorrect": "That email and password combination is incorrect"
   },
@@ -262,6 +262,7 @@
   "dashboards": {
     "title": "Dashboards",
     "selectDashboard": "Select Dashboard",
+    "createDashboard": "Create new dashboard",
     "newDashboard": "New Dashboard",
     "delete": "Delete Dashboard",
     "deleteConfirm": "You definitely want to delete the dashboard: :name?",

@@ -166,6 +166,7 @@ import Query from '@/components/events/Events/Query.vue';
 import {Group, Item} from '@/components/Select/SelectTypes';
 import schemaService from '@/api/services/schema.service'
 import useCustomEvent from '@/components/events/Events/CustomEventHooks'
+import { useEventName } from '@/helpers/useEventName';
 import {
     EventType,
     PropertyType,
@@ -342,11 +343,10 @@ const removeBreakdown = (breakdownIdx: number): void => {
 };
 
 const eventName = (ref: EventRef): string => {
-    const event = lexiconStore.findEventById(ref.id)
-
+    const eventName = useEventName()
     switch (ref.type) {
         case EventType.Regular:
-            return event.displayName || event.name
+            return ref.name || eventName(ref);
         case EventType.Custom:
             return lexiconStore.findCustomEventById(ref.id).name
     }

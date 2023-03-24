@@ -296,7 +296,7 @@ paths:
                 type: object
                 allOf:
                   - properties:
-                      dashboards:
+                      data:
                         type: array
                         items:
                           $ref: '#/components/schemas/Report'
@@ -476,7 +476,7 @@ paths:
                 type: object
                 allOf:
                   - properties:
-                      events:
+                      data:
                         type: array
                         items:
                           $ref: '#/components/schemas/Event'
@@ -589,8 +589,9 @@ paths:
               schema:
                 type: object
                 allOf:
-                  - properties:
-                      events:
+                  - type: object
+                    properties:
+                      data:
                         type: array
                         items:
                           $ref: '#/components/schemas/CustomEvent'

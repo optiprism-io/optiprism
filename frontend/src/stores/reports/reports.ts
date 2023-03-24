@@ -73,7 +73,6 @@ export const useReportsStore = defineStore('reports', {
         },
         activeReport(): null | Report {
             const report = this.list.find(item => item.id && Number(item.id) === Number(this.reportId))
-
             return report ?? null
         },
         reportsId(): number[] {
@@ -87,12 +86,10 @@ export const useReportsStore = defineStore('reports', {
         },
         async getList() {
             const commonStore = useCommonStore()
-
             try {
                 const res = await reportsService.reportsList(commonStore.organizationId, commonStore.projectId)
-
-                if (res.data?.dashboards) {
-                    this.list = res.data.dashboards
+                if (res.data?.data) {
+                    this.list = res.data.data
                 }
             } catch (e) {
                 throw new Error('error reportsList');
@@ -101,14 +98,12 @@ export const useReportsStore = defineStore('reports', {
         async createReport(name: string, type: ReportType) {
             this.saveLoading = true
             const commonStore = useCommonStore()
-
             try {
                 const res = await reportsService.createReport(commonStore.organizationId, commonStore.projectId, {
                     type,
                     name,
                     query: getReport(type)
                 })
-
                 if (res.data?.id) {
                     this.reportId = Number(res.data.id)
                 }
@@ -121,7 +116,6 @@ export const useReportsStore = defineStore('reports', {
         async editReport(name: string, type: ReportType) {
             this.saveLoading = true
             const commonStore = useCommonStore()
-
             await reportsService.updateReport(commonStore.organizationId, commonStore.projectId, Number(this.reportId), {
                 name,
                 query: getReport(type)
@@ -130,7 +124,6 @@ export const useReportsStore = defineStore('reports', {
         },
         async deleteReport(reportId: number) {
             const commonStore = useCommonStore()
-
             await reportsService.deleteReport(commonStore.organizationId, commonStore.projectId, Number(reportId))
         },
     },

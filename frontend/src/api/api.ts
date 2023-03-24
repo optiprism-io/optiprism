@@ -522,7 +522,7 @@ export interface CustomEventsList200Response {
      * @type {Array<CustomEvent>}
      * @memberof CustomEventsList200Response
      */
-    'events'?: Array<CustomEvent>;
+    'data'?: Array<CustomEvent>;
     /**
      * 
      * @type {ListResponseMetadataMeta}
@@ -541,7 +541,7 @@ export interface CustomEventsList200ResponseAllOf {
      * @type {Array<CustomEvent>}
      * @memberof CustomEventsList200ResponseAllOf
      */
-    'events'?: Array<CustomEvent>;
+    'data'?: Array<CustomEvent>;
 }
 /**
  * 
@@ -2021,7 +2021,7 @@ export interface EventsList200Response {
      * @type {Array<Event>}
      * @memberof EventsList200Response
      */
-    'events'?: Array<Event>;
+    'data'?: Array<Event>;
     /**
      * 
      * @type {ListResponseMetadataMeta}
@@ -2040,7 +2040,7 @@ export interface EventsList200ResponseAllOf {
      * @type {Array<Event>}
      * @memberof EventsList200ResponseAllOf
      */
-    'events'?: Array<Event>;
+    'data'?: Array<Event>;
 }
 /**
  * 
@@ -3625,7 +3625,7 @@ export interface ReportsList200Response {
      * @type {Array<Report>}
      * @memberof ReportsList200Response
      */
-    'dashboards'?: Array<Report>;
+    'data'?: Array<Report>;
     /**
      * 
      * @type {ListResponseMetadataMeta}
@@ -3644,7 +3644,7 @@ export interface ReportsList200ResponseAllOf {
      * @type {Array<Report>}
      * @memberof ReportsList200ResponseAllOf
      */
-    'dashboards'?: Array<Report>;
+    'data'?: Array<Report>;
 }
 /**
  * did event condition

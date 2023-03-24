@@ -16,6 +16,7 @@
                 <div class="report__name">
                     <UiInlineEdit
                         :value="reportName"
+                        :placeholder-value="t('reports.untitledReport')"
                         @on-input="setNameReport"
                     />
                 </div>
@@ -98,7 +99,7 @@ const breakdownsStore = useBreakdownsStore()
 const stepsStore = useStepsStore()
 const { confirm } = useConfirm()
 
-const reportName = ref(t('reports.untitledReport'))
+const reportName = ref('');
 
 const items = computed(() => {
     const mapTabs = [
@@ -148,10 +149,6 @@ const itemsReports = computed(() => {
     })
 })
 
-const setNameReport = (payload: string) => {
-    reportName.value = payload
-}
-
 const onDeleteReport = async () => {
     try {
         await confirm(t('reports.deleteConfirm', { name: `<b>${reportsStore?.activeReport?.name}</b>` || '' }), {
@@ -173,7 +170,7 @@ const onSaveReport = async () => {
     if (reportsStore.reportId) {
         await reportsStore.editReport(reportName.value, reportType.value)
     } else {
-        await reportsStore.createReport(reportName.value, reportType.value)
+        await reportsStore.createReport(reportName.value || t('reports.untitledReport'), reportType.value)
 
         router.push({
             params: {
@@ -185,9 +182,14 @@ const onSaveReport = async () => {
     reportsStore.updateDump(reportType.value)
 }
 
+const setNameReport = (payload: string) => {
+    reportName.value = payload
+    onSaveReport()
+}
+
 const setEmptyReport = () => {
     reportsStore.reportId = 0
-    reportName.value = t('reports.untitledReport')
+    reportName.value = '';
     eventsStore.$reset()
     filterGroupsStore.$reset()
     segmentsStore.$reset()
@@ -202,7 +204,11 @@ const onSelectTab = () => {
 }
 
 const updateReport = async (id: number) => {
-    await reportToStores(Number(id))
+    try {
+        await reportToStores(Number(id))
+    } catch(e) {
+        throw new Error('cannot update report');
+    }
     reportName.value = reportsStore.activeReport?.name ?? t('reports.untitledReport')
     reportsStore.updateDump(reportType.value)
 }

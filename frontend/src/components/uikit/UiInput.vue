@@ -10,6 +10,7 @@
         :name="props.name"
         :type="props.type"
         :aria-invalid="invalid"
+        :autocomplete="props.autocomplete"
         @input="updateValue"
         @blur="blur"
     >
@@ -31,6 +32,7 @@ interface Props {
     label?: string
     error?: string
     invalid?: boolean
+    autocomplete?: 'new-password' | 'current-password' | 'username'
 }
 
 const props = withDefaults(defineProps<Props>(), {

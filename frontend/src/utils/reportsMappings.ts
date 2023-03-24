@@ -103,20 +103,14 @@ const getTime = (props: GetTime) => {
 const getValues = async (props: GetValues) => {
     const commonStore = useCommonStore()
     let valuesList: Value[] = []
-
-    try {
-        const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
-            propertyType: props.propertyType || PropertyType.User,
-            eventType: props.eventType || EventType.Regular,
-        })
-
-        if (res.data.data) {
-            valuesList = res.data.data
-        }
-    } catch (error) {
-        throw new Error('error get events values')
+    const res = await schemaService.propertyValues(commonStore.organizationId, commonStore.projectId, {
+        propertyType: props.propertyType || PropertyType.User,
+        eventType: props.eventType || EventType.Regular,
+        propertyName: props.propertyName,
+    });
+    if (res?.data?.data) {
+        valuesList = res.data.data;
     }
-
     return valuesList
 }
 
@@ -125,7 +119,8 @@ const computedFilter = async (eventName: string | undefined, eventType: EventTyp
         return {
             propRef: {
                 type: filter.propertyType as PropertyType,
-                id: Number(filter.propertyId)
+                id: filter?.propertyId || 0,
+                name: filter.propertyName || '',
             },
             opId: filter.operation,
             values: filter.value || [],
@@ -145,6 +140,7 @@ const mapReportToEvents = async (items: EventSegmentationEvent[]): Promise<Event
             ref: {
                 type: item.eventType,
                 id: item.eventId || 0,
+                name: item.eventName || '',
             },
             filters: item.filters ? await computedFilter(item.eventName, item.eventType, item.filters) as Filter[] : [],
             queries: item.queries.map((row, i): EventQuery => {
@@ -169,7 +165,8 @@ const mapReportToEvents = async (items: EventSegmentationEvent[]): Promise<Event
                     case QueryAggregatePropertyPerGroupTypeEnum.AggregatePropertyPerGroup:
                         queryRef.propRef = {
                             type: query.propertyType,
-                            id: query.propertyId || 0
+                            id: query.propertyId || 0,
+                            name: query.propertyName || '',
                         }
                     case QueryAggregatePropertyTypeEnum.AggregateProperty:
                     case QueryAggregatePropertyPerGroupTypeEnum.AggregatePropertyPerGroup:
@@ -187,7 +184,8 @@ const mapReportToEvents = async (items: EventSegmentationEvent[]): Promise<Event
                 return {
                     propRef: {
                         type: row.propertyType as PropertyType,
-                        id: row.propertyId || 0
+                        id: row.propertyId || 0,
+                        name: row.propertyName || '',
                     }
                 }
             }) : [],
@@ -220,6 +218,7 @@ const mapReportToFilterGroups = async (items: EventGroupedFiltersGroupsInner[]):
                     propRef: {
                         type: filter.propertyType,
                         id: filter.propertyId || 0,
+                        name: filter.propertyName || '',
                     },
                     opId: filter.operation,
                     values: filter.value || [],
@@ -255,6 +254,7 @@ const mapReportToSegments = async (items: EventSegmentationSegment[]): Promise<S
                                 ref: {
                                     type: condition.eventType || EventType.Regular,
                                     id: condition.eventId || 0,
+                                    name: condition.eventName || '',
                                 }
                             }
                         }
@@ -316,7 +316,8 @@ const mapReportToSegments = async (items: EventSegmentationSegment[]): Promise<S
                             const property: Property = lexiconStore.findEventPropertyByName(condition.propertyName) || lexiconStore.findUserPropertyByName(condition.propertyName)
                             res.propRef = {
                                 type: PropertyType.User,
-                                id: property.id
+                                id: property?.id,
+                                name: property.name || property.displayName,
                             }
                             res.valuesList = await getValues({
                                 propertyName: property.name,
@@ -340,7 +341,8 @@ const mapReportToBreakdowns = (items: BreakdownByProperty[]): EventBreakdown[] =
             return {
                 propRef: {
                     type: item.propertyType,
-                    id: item.propertyId ?? 0
+                    id: item.propertyId ?? 0,
+                    name: item.propertyName || '',
                 }
             }
         } else {
@@ -356,7 +358,8 @@ export const mapReportToSteps = async (items: FunnelQueryStepsInner[]): Promise<
                 return {
                     event: {
                         type: event.eventType,
-                        id: event.eventId ?? 0
+                        id: event.eventId ?? 0,
+                        name: event.eventName || '',
                     },
                     filters: event.filters ? await computedFilter(event.eventName, event.eventType, event.filters) : [],
                 }

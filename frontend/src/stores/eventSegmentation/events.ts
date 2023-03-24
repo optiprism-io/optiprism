@@ -164,8 +164,8 @@ export const useEventsStore = defineStore('events', {
 
             this.events.forEach(item => {
                 const eventRef = item.ref;
-                items.push(...computedEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef.id)));
-                items.push(...computedEventProperties(PropertyType.Custom, lexiconStore.findEventCustomProperties(eventRef.id)));
+                items.push(...computedEventProperties(PropertyType.Event, lexiconStore.findEventProperties(eventRef)));
+                items.push(...computedEventProperties(PropertyType.Custom, lexiconStore.findEventCustomProperties(eventRef)));
             });
 
             return [
@@ -240,12 +240,14 @@ export const useEventsStore = defineStore('events', {
                         eventType: item.ref.type as EventType,
                         eventId: item.ref.id,
                         filters: item.filters.filter(item => item.propRef).map((filter): EventFilterByProperty => {
-                            const propertyId = filter.propRef?.id || 0;
+                            const ref = filter.propRef;
+                            const propertyId = ref?.id || 0;
+                            const eventProperty = ref?.name ? lexiconStore.findEventPropertyByName(ref.name) : lexiconStore.findEventPropertyById(propertyId);
                             let name = '';
 
                             switch (filter.propRef?.type || 'event') {
                                 case PropertyType.Event:
-                                    name = lexiconStore.findEventPropertyById(propertyId).name
+                                    name = ref?.name || eventProperty.name;
                                     break;
                                 case PropertyType.Custom:
                                     name = lexiconStore.findEventCustomPropertyById(propertyId)?.name || ''
