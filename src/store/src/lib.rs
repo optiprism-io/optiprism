@@ -42,6 +42,7 @@ pub mod test_util {
     use arrow2::io::parquet::write::FileWriter;
     use arrow2::io::parquet::write::RowGroupIterator;
     use arrow2::io::parquet::write::WriteOptions;
+    use arrow2::offset::Offset;
     use arrow2::types::NativeType;
     use parquet2::compression::CompressionOptions;
     use parquet2::encoding::Encoding;
@@ -49,7 +50,6 @@ pub mod test_util {
     use parquet2::write::FileSeqWriter;
     use parquet2::write::Version;
 
-    use crate::parquet::parquet::arrays_to_pages;
 
     #[derive(Debug, Clone)]
     pub enum ListValue {
@@ -290,33 +290,33 @@ pub mod test_util {
         }};
     }
 
-    pub fn create_list_primitive_array<N: NativeType, U: AsRef<[N]>, T: AsRef<[Option<U>]>>(
+    pub fn create_list_primitive_array<O: Offset, N: NativeType, U: AsRef<[N]>, T: AsRef<[Option<U>]>>(
         data: T,
-    ) -> ListArray<i32> {
+    ) -> ListArray<O> {
         let iter = data.as_ref().iter().map(|x| {
             x.as_ref()
                 .map(|x| x.as_ref().iter().map(|x| Some(*x)).collect::<Vec<_>>())
         });
-        let mut array = MutableListArray::<i32, MutablePrimitiveArray<N>>::new();
+        let mut array = MutableListArray::<O, MutablePrimitiveArray<N>>::new();
         array.try_extend(iter).unwrap();
         array.into()
     }
 
-    pub fn create_list_bool_array<U: AsRef<[bool]>, T: AsRef<[Option<U>]>>(
+    pub fn create_list_bool_array<O: Offset, U: AsRef<[bool]>, T: AsRef<[Option<U>]>>(
         data: T,
-    ) -> ListArray<i32> {
+    ) -> ListArray<O> {
         let iter = data.as_ref().iter().map(|x| {
             x.as_ref()
                 .map(|x| x.as_ref().iter().map(|x| Some(*x)).collect::<Vec<_>>())
         });
-        let mut array = MutableListArray::<i32, MutableBooleanArray>::new();
+        let mut array = MutableListArray::<O, MutableBooleanArray>::new();
         array.try_extend(iter).unwrap();
         array.into()
     }
 
-    pub fn create_list_string_array<U: AsRef<[String]>, T: AsRef<[Option<U>]>>(
+    pub fn create_list_string_array<O: Offset, U: AsRef<[String]>, T: AsRef<[Option<U>]>>(
         data: T,
-    ) -> ListArray<i32> {
+    ) -> ListArray<O> {
         let iter = data.as_ref().iter().map(|x| {
             x.as_ref().map(|x| {
                 x.as_ref()
@@ -325,7 +325,7 @@ pub mod test_util {
                     .collect::<Vec<_>>()
             })
         });
-        let mut array = MutableListArray::<i32, MutableUtf8Array<i32>>::new();
+        let mut array = MutableListArray::<O, MutableUtf8Array<i32>>::new();
         array.try_extend(iter).unwrap();
         array.into()
     }
@@ -343,13 +343,11 @@ pub mod test_util {
     /// # Example
     ///     let data = r#"
     /// ```markdown
-    /// +---+-------+------+-------+-------+
-    /// | a |     b |    c |     d | e     |
-    /// +---+-------+------+-------+-------+
-    /// | 1 |  true | test | 1,2,3 | a,b,c |
-    /// | 2 |       |      |   1,2 | b     |
+    /// | a | b     | c    | d     | e     |
+    /// |---|-------|------|-------|-------|
+    /// | 1 | true  | test | 1,2,3 | a,b,c |
+    /// | 2 |       |      | 1,2   | b     |
     /// | 3 | false | lala |       |       |
-    /// +---+-------+------+-------+-------+
     /// ```
     ///     "#;
     ///     let fields = vec![
@@ -376,7 +374,7 @@ pub mod test_util {
         fields: &[Field],
     ) -> anyhow::Result<Vec<Box<dyn Array>>> {
         let mut out: Vec<Vec<Value>> = vec![vec![]; fields.len()];
-        for row in data.lines().skip(4) {
+        for row in data.lines().skip(3) {
             let v = row
                 .split('|')
                 .skip(1)
@@ -394,7 +392,7 @@ pub mod test_util {
                     | DataType::Float64
                     | DataType::Boolean
                     | DataType::Utf8 => out[idx].push(Value::parse(val, field.data_type())?),
-                    DataType::List(f) => {
+                    DataType::List(f) | DataType::LargeList(f) => {
                         if val.trim().is_empty() {
                             out[idx].push(Value::List(None));
                             continue;
@@ -439,27 +437,55 @@ pub mod test_util {
                     DataType::Int64 => {
                         let vals: Vec<Option<Vec<i64>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_primitive_array(vals).boxed()
+                        create_list_primitive_array::<i32, _, _, _>(vals).boxed()
                     }
                     DataType::Int32 => {
                         let vals: Vec<Option<Vec<i32>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_primitive_array(vals).boxed()
+                        create_list_primitive_array::<i32, _, _, _>(vals).boxed()
                     }
                     DataType::Float64 => {
                         let vals: Vec<Option<Vec<f64>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_primitive_array(vals).boxed()
+                        create_list_primitive_array::<i32, _, _, _>(vals).boxed()
                     }
                     DataType::Boolean => {
                         let vals: Vec<Option<Vec<bool>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_bool_array(vals).boxed()
+                        create_list_bool_array::<i32, _, _>(vals).boxed()
                     }
                     DataType::Utf8 => {
                         let vals: Vec<Option<Vec<String>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_string_array(vals).boxed()
+                        create_list_string_array::<i32, _, _>(vals).boxed()
+                    }
+                    _ => unimplemented!(),
+                },
+                DataType::LargeList(f) => match f.data_type {
+                    DataType::Int64 => {
+                        let vals: Vec<Option<Vec<i64>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_primitive_array::<i64, _, _, _>(vals).boxed()
+                    }
+                    DataType::Int32 => {
+                        let vals: Vec<Option<Vec<i32>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_primitive_array::<i64, _, _, _>(vals).boxed()
+                    }
+                    DataType::Float64 => {
+                        let vals: Vec<Option<Vec<f64>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_primitive_array::<i64, _, _, _>(vals).boxed()
+                    }
+                    DataType::Boolean => {
+                        let vals: Vec<Option<Vec<bool>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_bool_array::<i64, _, _>(vals).boxed()
+                    }
+                    DataType::Utf8 => {
+                        let vals: Vec<Option<Vec<String>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_string_array::<i64, _, _>(vals).boxed()
                     }
                     _ => unimplemented!(),
                 },
@@ -483,7 +509,7 @@ pub mod test_util {
             write_statistics: true,
             compression: CompressionOptions::Snappy,
             version: Version::V2,
-            data_pagesize_limit: Some(page_size),
+            data_pagesize_limit: None,
         };
 
         let mut idx = 0;
@@ -491,7 +517,7 @@ pub mod test_util {
         while idx < arrs[0].len() {
             let mut chunk = vec![];
             for arr in arrs.iter_mut() {
-                let end = std::cmp::min(idx + pages_per_row_group, arr.len());
+                let end = std::cmp::min(idx + (pages_per_row_group * page_size), arr.len());
                 let slice = arr.sliced(idx, end - idx);
                 chunk.push(slice);
             }

@@ -195,7 +195,7 @@ fn to_primitive_type_inner(primitive_type: &PrimitiveType) -> DataType {
 /// Entry point for converting parquet primitive type to arrow type.
 ///
 /// This function takes care of repetition.
-fn to_primitive_type(primitive_type: &PrimitiveType) -> DataType {
+pub fn to_primitive_type(primitive_type: &PrimitiveType) -> DataType {
     let base_type = to_primitive_type_inner(primitive_type);
 
     if primitive_type.field_info.repetition == Repetition::Repeated {
@@ -346,7 +346,7 @@ fn to_list(fields: &[ParquetType], parent_name: &str) -> Option<DataType> {
 ///
 /// If this schema is a group type and none of its children is reserved in the
 /// conversion, the result is Ok(None).
-pub(crate) fn to_data_type(type_: &ParquetType) -> Option<DataType> {
+pub fn to_data_type(type_: &ParquetType) -> Option<DataType> {
     match type_ {
         ParquetType::PrimitiveType(primitive) => Some(to_primitive_type(primitive)),
         ParquetType::GroupType {

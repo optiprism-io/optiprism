@@ -6,13 +6,16 @@ use std::io::Seek;
 
 use arrow2::array::Array;
 use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
-use arrow2::io::parquet::write::array_to_page_simple;
+use arrow2::io::parquet::write::{array_to_columns, array_to_page_simple};
 use arrow2::io::parquet::write::WriteOptions;
 use futures::stream::iter;
 use futures::StreamExt;
+use arrow2::io::parquet::read::column_iter_to_arrays;
+use arrow2::io::parquet::read::schema::convert::{to_data_type, to_primitive_type};
+use arrow2::io::parquet::read::schema::parquet_to_arrow_schema;
 use parquet2::compression::CompressionOptions;
 use parquet2::encoding::Encoding;
-use parquet2::metadata::FileMetaData;
+use parquet2::metadata::{ColumnDescriptor, FileMetaData};
 use parquet2::metadata::RowGroupMetaData;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedDataPage;
@@ -69,35 +72,60 @@ pub fn data_pages_to_arrays(
 ) -> Result<Vec<Box<dyn Array>>> {
     pages
         .into_iter()
-        .map(|page| data_page_to_array(page, buf))
+        .map(|page| {
+            let pt = page.descriptor.primitive_type.clone();
+            data_page_to_array_simple(page, &pt, buf)
+        })
         .collect::<Result<Vec<Box<dyn Array>>>>()
 }
 
-pub fn data_page_to_array(page: CompressedDataPage, buf: &mut Vec<u8>) -> Result<Box<dyn Array>> {
-    let stats = page.statistics().unwrap()?;
-
+pub fn data_page_to_array_simple(page: CompressedDataPage, primitive_type: &PrimitiveType, buf: &mut Vec<u8>) -> Result<Box<dyn Array>> {
     // let num_rows = page.num_values() + stats.null_count().or_else(|| Some(0)).unwrap() as usize;
     let num_rows = page.num_values();
-    let physical_type = stats.physical_type();
-    let primitive_type = PrimitiveType::from_physical("f".to_string(), physical_type.to_owned());
-    let data_type = from_physical_type(physical_type);
+    // todo check if this is correct
+    let data_type = to_primitive_type(&primitive_type);
     let decompressed_page = decompress(CompressedPage::Data(page), buf)?;
     let iter = fallible_streaming_iterator::convert(std::iter::once(Ok(&decompressed_page)));
     let mut r = page_iter_to_arrays(iter, &primitive_type, data_type, None, num_rows)?;
     Ok(r.next().unwrap()?)
 }
 
-pub fn array_to_page(arr: Box<dyn Array>, typ: PrimitiveType, buf: Vec<u8>) -> Result<CompressedPage> {
-    let mut arrs = arrays_to_pages(
-        &vec![arr],
-        vec![typ],
-        buf,
+pub fn data_page_to_array(page: CompressedDataPage, cd: &ColumnDescriptor, buf: &mut Vec<u8>) -> Result<Box<dyn Array>> {
+    let num_rows = page.num_values();
+    let decompressed_page = decompress(CompressedPage::Data(page), buf)?;
+    let iter = fallible_streaming_iterator::convert(std::iter::once(Ok(&decompressed_page)));
+    let field = parquet_to_arrow_schema(vec![cd.base_type.clone()].as_slice()).pop().unwrap();
+    println!("fff: {:#?}", field);
+    let mut a = column_iter_to_arrays(
+        vec![iter],
+        vec![&cd.descriptor.primitive_type.clone()],
+        field,
+        None,
+        num_rows,
     )?;
-
-    Ok(CompressedPage::Data(arrs.pop().unwrap()))
+    Ok(a.next().unwrap()?)
 }
 
-pub fn arrays_to_pages(
+pub fn array_to_page(arr: Box<dyn Array>, typ: ParquetType) -> Result<CompressedPage> {
+    let opts = WriteOptions {
+        write_statistics: true,
+        compression: CompressionOptions::Snappy, // todo
+        version: Version::V2,
+        data_pagesize_limit: None,
+    };
+
+    println!("arr: {:#?}", arr);
+    let pages = array_to_columns(arr, typ, opts, &[Encoding::Plain])?.pop().unwrap();
+    let mut cp = pages
+        .into_iter()
+        .map(|page| compress(page.unwrap(), vec![], CompressionOptions::Snappy))
+        .collect::<std::result::Result<Vec<CompressedPage>, _>>()?;
+
+    println!("cp: {:#?}", cp);
+    Ok(cp.pop().unwrap())
+}
+
+/*pub fn arrays_to_pages(
     arrs: &[Box<dyn Array>],
     types: Vec<PrimitiveType>,
     buf: Vec<u8>,
@@ -132,7 +160,7 @@ pub fn arrays_to_pages(
         .collect::<Vec<_>>();
 
     Ok(r)
-}
+}*/
 
 pub fn get_page_min_max_values(page: &CompressedDataPage) -> Result<(Value, Value)> {
     let stats = page.statistics();
@@ -338,8 +366,11 @@ impl CompressedDataPagesRow {
     }
 
     pub fn from_arrow_row(row: ArrowRow, types: Vec<PrimitiveType>, buf: Vec<u8>) -> Result<Self> {
-        let res = arrays_to_pages(&row.arrs, types, buf)?;
-        Ok(CompressedDataPagesRow::new(res, row.stream))
+        let pages = row.arrs.into_iter().zip(types.into_iter()).map(|(arr, typ)| array_to_page(arr, ParquetType::PrimitiveType(typ))).collect::<Result<Vec<_>>>()?.into_iter().map(|v| match v {
+            CompressedPage::Data(v) => v,
+            CompressedPage::Dict(_) => unimplemented!()
+        }).collect::<Vec<_>>();
+        Ok(CompressedDataPagesRow::new(pages, row.stream))
     }
 }
 
@@ -385,13 +416,13 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
     }
 
     pub fn next_page(&mut self, col_path: &ColumnPath) -> Result<Option<CompressedPage>> {
-        if !self.contains_column(col_path) {
-            return Err(StoreError::Internal(format!(
-                "column {:?} not found",
-                col_path
-            )));
-        }
-
+        /*        if !self.contains_column(col_path) {
+                    return Err(StoreError::Internal(format!(
+                        "column {:?} not found",
+                        col_path
+                    )));
+                }
+        */
         if let Some(buf) = self.chunk_buffer.get_mut(col_path) {
             if let Some(page) = buf.pop_front() {
                 println!(">");
@@ -425,6 +456,9 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
             match self.chunk_buffer.get_mut(col_path) {
                 Some(buf) => buf.push_back(page),
                 None => {
+                    if let CompressedPage::Data(p) = &page {
+                        println!("PPPPr {}", p.num_values());
+                    }
                     self.chunk_buffer
                         .insert(col_path.to_owned(), VecDeque::from(vec![page]));
                 }

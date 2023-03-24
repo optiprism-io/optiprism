@@ -187,7 +187,7 @@ pub(super) fn build_page<R: Read>(
     buffer: &mut Vec<u8>,
 ) -> Result<Option<CompressedPage>> {
     let page_header = read_page_header(&mut reader.reader, reader.max_page_size)?;
-
+    println!("page_header: {}", page_header.data_page_header_v2.clone().unwrap().num_values.clone());
     reader.seen_num_values += get_page_header(&page_header)?
         .map(|x| x.num_values() as i64)
         .unwrap_or_default();

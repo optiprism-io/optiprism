@@ -52,6 +52,7 @@ pub fn create_list(
     let (mut offsets, validity) = nested.nested.pop().unwrap().inner();
     match data_type.to_logical_type() {
         DataType::List(_) => {
+            println!("DataType::List(_)");
             offsets.push(values.len() as i64);
 
             let offsets = offsets.iter().map(|x| *x as i32).collect::<Vec<_>>();
@@ -68,6 +69,7 @@ pub fn create_list(
             ))
         }
         DataType::LargeList(_) => {
+            println!("DataType::LargeList(_)");
             offsets.push(values.len() as i64);
 
             Box::new(ListArray::<i64>::new(

@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::cmp;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
@@ -9,7 +10,7 @@ use std::ops::Range;
 use std::ops::RangeBounds;
 use std::rc::Rc;
 
-use arrow2::array::{Array, new_null_array};
+use arrow2::array::{Array, ListArray, MutableArray, MutableListArray, MutablePrimitiveArray, new_null_array, PrimitiveArray, TryExtend, TryPush};
 use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
 use arrow2::array::FixedSizeBinaryArray;
@@ -17,13 +18,16 @@ use arrow2::array::Float32Array;
 use arrow2::array::Float64Array;
 use arrow2::array::Int32Array;
 use arrow2::array::Int64Array;
-use arrow2::datatypes::DataType;
+use arrow2::datatypes::{DataType, Field};
+use arrow2::ffi::mmap::slice;
+use arrow2::io::parquet::read::column_iter_to_arrays;
 use arrow2::io::parquet::read::schema::parquet_to_arrow_schema;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedDataPage;
 use parquet2::page::CompressedPage;
 use parquet2::page::Page;
+use parquet2::read::decompress;
 use parquet2::schema::types::FieldInfo;
 use parquet2::schema::types::ParquetType;
 use parquet2::schema::types::PhysicalType;
@@ -36,7 +40,7 @@ use crate::error::Result;
 use crate::error::StoreError;
 use crate::parquet::arrow::merge;
 use crate::parquet::arrow::ArrowRow;
-use crate::parquet::parquet::{array_to_page, arrays_to_pages};
+use crate::parquet::parquet::{array_to_page};
 use crate::parquet::parquet::check_intersection;
 use crate::parquet::parquet::data_page_to_array;
 use crate::parquet::parquet::data_pages_to_arrays;
@@ -46,6 +50,11 @@ use crate::parquet::parquet::CompressedDataPagesRow;
 use crate::parquet::parquet::CompressedPageIterator;
 use crate::parquet::schema::try_merge_schemas;
 
+enum OwnArray {
+    Int64(Int64Array),
+    List(ListArray<i32>),
+}
+
 pub struct FileMerger<R, W>
     where
         R: Read,
@@ -54,7 +63,7 @@ pub struct FileMerger<R, W>
     index_cols: Vec<ColumnDescriptor>,
     schema: SchemaDescriptor,
     page_streams: Vec<CompressedPageIterator<R>>,
-    current_arrs: Vec<HashMap<ColumnPath, Box<dyn Array>>>,
+    current_arrs: Vec<HashMap<ColumnPath, OwnArray>>,
     current_arrs_idx: Vec<HashMap<ColumnPath, usize>>,
     sorter: BinaryHeap<CompressedDataPagesRow>,
     merge_queue: Vec<CompressedDataPagesRow>,
@@ -135,7 +144,7 @@ impl<R, W> FileMerger<R, W>
         }
         let arr = new_null_array(field.data_type, num_rows);
 
-        let page = array_to_page(arr, cd.descriptor.primitive_type.clone(), vec![])?;
+        let page = array_to_page(arr, cd.base_type.clone())?;
         self.null_pages_cache.insert(cache_key.clone(), Rc::new(page));
 
         let rc = self.null_pages_cache.get(&cache_key).unwrap();
@@ -157,6 +166,7 @@ impl<R, W> FileMerger<R, W>
 
                 self.writer.end_column()?;
             }
+
 
             // todo avoid cloning
             let cols = self
@@ -205,6 +215,7 @@ impl<R, W> FileMerger<R, W>
     ) -> Result<CompressedPage> {
         let col_path: ColumnPath = col.path_in_schema.clone();
 
+        println!("cp {:#?}", col);
         let mut buf = vec![];
         let col_exist_per_stream = self
             .page_streams
@@ -215,19 +226,27 @@ impl<R, W> FileMerger<R, W>
             })
             .collect::<Vec<bool>>();
 
-        let mut idx = 0;
         let mut arrs = self
             .current_arrs
             .iter_mut()
             .enumerate()
             .map(|(stream_id, cols)| {
                 if streams.contains(&stream_id) {
-                    cols.remove(&col_path)
+                    match cols.remove(&col_path) {
+                        None => None,
+                        Some(v) => {
+                            if let OwnArray::List(arr) = v {
+                                Some(arr)
+                            } else {
+                                None
+                            }
+                        }
+                    }
                 } else {
                     None
                 }
             })
-            .collect::<Vec<Option<Box<dyn Array>>>>();
+            .collect::<Vec<_>>();
 
         let mut arrs_idx: Vec<usize> = self
             .current_arrs_idx
@@ -238,30 +257,39 @@ impl<R, W> FileMerger<R, W>
             })
             .collect();
 
-        let mut out: Vec<Option<i64>> = vec![];
+        let mut out = MutableListArray::<i32, MutablePrimitiveArray<i64>>::with_capacity(reorder.len());
         for idx in 0..reorder.len() {
             let stream_id = reorder[idx];
             if !col_exist_per_stream[stream_id] {
-                out.push(None);
+                out.push_null();
                 continue;
             }
 
             if arrs[stream_id].is_none() {
                 let page = self.page_streams[stream_id].next_page(&col_path)?.unwrap();
                 if let CompressedPage::Data(page) = page {
-                    let arr = data_page_to_array(page, &mut buf)?;
-                    arrs[stream_id] = Some(arr);
+                    let any_arr = data_page_to_array(page, &col, &mut buf)?;
+                    println!("any arr {:#?}", any_arr.data_type());
+                    let list_arr = any_arr.as_any().downcast_ref::<ListArray<i32>>().unwrap().clone();
+                    arrs[stream_id] = Some(list_arr.clone());
                     arrs_idx[stream_id] = 0;
                 }
             }
 
             let arr = arrs[stream_id].as_ref().unwrap();
             if arr.is_null(arrs_idx[stream_id]) {
-                out.push(None);
+                out.push_null();
             } else {
-                // todo fix with macro
-                let i64arr = arr.as_any().downcast_ref::<Int64Array>().unwrap();
-                out.push(Some(i64arr.value(arrs_idx[stream_id])));
+                // todo fix with array downcast
+                // let b = arr.value(arrs_idx[stream_id]).as_any().downcast_ref::<PrimitiveArray<i64>>().unwrap().clone();
+                let all_vals = arr.values().as_any().downcast_ref::<PrimitiveArray<i64>>().unwrap().clone();
+
+                let (start, end) = arr.offsets().start_end(arrs_idx[stream_id]);
+                let length = end - start;
+                // safety: the invariant of the struct
+                let g = all_vals.sliced(start, length);
+                    out.try_push(Some(g))?;
+                // out.try_extend(Some(arr.value(arrs_idx[stream_id])));
             }
 
             if arrs_idx[stream_id] == arr.len() - 1 {
@@ -271,26 +299,26 @@ impl<R, W> FileMerger<R, W>
                 arrs_idx[stream_id] += 1;
             }
         }
+
         for (stream_id, maybe_arr) in arrs.into_iter().enumerate() {
             if let Some(arr) = maybe_arr {
-                self.current_arrs[stream_id].insert(col_path.clone(), arr);
-            }/* else {
-                self.current_arrs[stream_id].remove(&col_path);
-            }*/
+                self.current_arrs[stream_id].insert(col_path.clone(), OwnArray::List(arr));
+            }
         }
 
         for (stream_id, idx) in arrs_idx.into_iter().enumerate() {
             self.current_arrs_idx[stream_id].insert(col_path.clone(), idx);
         }
 
-        let out_arr = Int64Array::from(out);
-        let mut pages = arrays_to_pages(
-            &vec![out_arr.boxed()],
-            vec![col.descriptor.primitive_type.clone()],
-            vec![],
-        )?;
+        let page = match array_to_page(
+            out.as_box(),
+            col.base_type.clone(),
+        )? {
+            CompressedPage::Data(v) => v,
+            CompressedPage::Dict(_) => unimplemented!(),
+        };
 
-        Ok(CompressedPage::Data(pages.pop().unwrap()))
+        Ok(CompressedPage::Data(page))
     }
 
     fn merge_queue(&mut self) -> Result<()> {

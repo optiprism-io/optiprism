@@ -2,7 +2,7 @@
 use crate::datatypes::Schema;
 use crate::error::Result;
 
-mod convert;
+pub mod convert;
 mod metadata;
 
 pub use convert::parquet_to_arrow_schema;
