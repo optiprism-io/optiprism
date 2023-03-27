@@ -95,7 +95,6 @@ pub fn data_page_to_array(page: CompressedDataPage, cd: &ColumnDescriptor, buf: 
     let decompressed_page = decompress(CompressedPage::Data(page), buf)?;
     let iter = fallible_streaming_iterator::convert(std::iter::once(Ok(&decompressed_page)));
     let field = parquet_to_arrow_schema(vec![cd.base_type.clone()].as_slice()).pop().unwrap();
-    println!("fff: {:#?}", field);
     let mut a = column_iter_to_arrays(
         vec![iter],
         vec![&cd.descriptor.primitive_type.clone()],
@@ -121,7 +120,6 @@ pub fn array_to_page(arr: Box<dyn Array>, typ: ParquetType) -> Result<Compressed
         .map(|page| compress(page.unwrap(), vec![], CompressionOptions::Snappy))
         .collect::<std::result::Result<Vec<CompressedPage>, _>>()?;
 
-    println!("cp: {:#?}", cp);
     Ok(cp.pop().unwrap())
 }
 

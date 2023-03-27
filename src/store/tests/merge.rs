@@ -173,7 +173,7 @@ fn test_merger() -> anyhow::Result<()> {
 
     let chunks = chunks.into_iter().map(|c| c.unwrap()).collect::<Vec<_>>();
     let names = schema.fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
-    println!("{}",print::write(&chunks, &names));
+    println!("{}", print::write(&chunks, &names));
     Ok(())
 }
 
@@ -299,6 +299,71 @@ fn test_merger2() -> anyhow::Result<()> {
 
     let chunks = chunks.into_iter().map(|c| c.unwrap()).collect::<Vec<_>>();
     let names = schema.fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
-    println!("{}",print::write(&chunks, &names));
+    println!("{}", print::write(&chunks, &names));
+    Ok(())
+}
+
+#[test]
+fn test_merger3() -> anyhow::Result<()> {
+    let iter1 = {
+        let data = r#"
+| a | b | c     |
+|---|---|-------|
+| 1 | 1 | 1     |
+| 1 | 2 |       |
+| 1 | 3 | 1     |
+| 2 | 1 | 1     |
+| 3 | 1 | 1     |
+| 3 | 2 | 1     |
+| 3 | 3 | 3     |
+    "#;
+
+        let fields = vec![
+            Field::new("a", DataType::Int64, true),
+            Field::new("b", DataType::Int64, true),
+            Field::new("c", DataType::Int64, true),
+        ];
+
+        let parsed = parse_markdown_table(data, &fields)?;
+        println!("{:?}", parsed);
+        create_parquet_from_arrays(
+            parsed.clone(),
+            "/tmp/optiprism/p1.parquet",
+            fields.clone(),
+            2,
+            2,
+        )?;
+
+        CompressedPageIterator::try_new(File::open("/tmp/optiprism/p1.parquet")?)?
+    };
+
+    let iter2 = CompressedPageIterator::try_new(File::open("/tmp/optiprism/p1.parquet")?)?;
+
+    let w = File::create("/tmp/optiprism/merged.parquet")?;
+    let mut merger = FileMerger::try_new(
+        vec![iter1, iter2],
+        w,
+        2,
+        2,
+        2,
+        "merged".to_string(),
+    )?;
+    merger.merge()?;
+
+    let mut reader = File::open("/tmp/optiprism/merged.parquet")?;
+
+    // we can read its metadata:
+    let metadata = read::read_metadata(&mut reader)?;
+
+    // and infer a [`Schema`] from the `metadata`.
+    let schema = read::infer_schema(&metadata)?;
+
+
+    // we can then read the row groups into chunks
+    let chunks = read::FileReader::new(reader, metadata.row_groups, schema.clone(), Some(1024 * 8 * 8), None, None);
+
+    let chunks = chunks.into_iter().map(|c| c.unwrap()).collect::<Vec<_>>();
+    let names = schema.fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
+    println!("{}", print::write(&chunks, &names));
     Ok(())
 }

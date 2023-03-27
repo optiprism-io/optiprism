@@ -12,6 +12,8 @@ pub enum StoreError {
     Internal(String),
     #[error("invalid parameter {0:?}")]
     InvalidParameter(String),
+    #[error("not yet supported {0:?}")]
+    NotYetSupported(String),
     #[error("parquet {0:?}")]
     Parquet(#[from] ParquetError),
     #[error("execution {0:?}")]

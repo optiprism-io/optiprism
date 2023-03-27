@@ -10,7 +10,7 @@ use std::ops::Range;
 use std::ops::RangeBounds;
 use std::rc::Rc;
 
-use arrow2::array::{Array, ListArray, MutableArray, MutableListArray, MutablePrimitiveArray, new_null_array, PrimitiveArray, TryExtend, TryPush};
+use arrow2::array::{Array, ListArray, MutableArray, MutableListArray, MutablePrimitiveArray, new_null_array, PrimitiveArray, TryExtend, TryPush, Utf8Array};
 use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
 use arrow2::array::FixedSizeBinaryArray;
@@ -18,17 +18,21 @@ use arrow2::array::Float32Array;
 use arrow2::array::Float64Array;
 use arrow2::array::Int32Array;
 use arrow2::array::Int64Array;
+use arrow2::bitmap::Bitmap;
+use arrow2::datatypes::PhysicalType as ArrowPhysicalType;
 use arrow2::datatypes::{DataType, Field};
 use arrow2::ffi::mmap::slice;
 use arrow2::io::parquet::read::column_iter_to_arrays;
 use arrow2::io::parquet::read::schema::parquet_to_arrow_schema;
+use arrow2::offset::OffsetsBuffer;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedDataPage;
 use parquet2::page::CompressedPage;
 use parquet2::page::Page;
 use parquet2::read::decompress;
-use parquet2::schema::types::FieldInfo;
+use parquet2::schema::Repetition;
+use parquet2::schema::types::{FieldInfo, GroupLogicalType};
 use parquet2::schema::types::ParquetType;
 use parquet2::schema::types::PhysicalType;
 use parquet2::schema::types::PrimitiveType;
@@ -50,9 +54,237 @@ use crate::parquet::parquet::CompressedDataPagesRow;
 use crate::parquet::parquet::CompressedPageIterator;
 use crate::parquet::schema::try_merge_schemas;
 
-enum OwnArray {
+
+enum TmpListArray {
+    Int64Array(Int64Array),
+    BooleanArray(BooleanArray),
+    FixedSizeBinaryArray(FixedSizeBinaryArray),
+    BinaryArray(BinaryArray<i32>),
+    Utf8Array(Utf8Array<i32>),
+}
+
+// this is a temporary array used to merge data pages avoiding downcasting
+enum TmpArray {
     Int64(Int64Array),
-    List(ListArray<i32>),
+    Boolean(BooleanArray),
+    FixedSizeBinary(FixedSizeBinaryArray),
+    Binary(BinaryArray<i32>),
+    Utf8(Utf8Array<i32>),
+    ListInt64(Int64Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListBoolean(BooleanArray, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListFixedSizeBinary(FixedSizeBinaryArray, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListBinary(BinaryArray<i32>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListUtf8(Utf8Array<i32>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+}
+
+
+fn column_to_field(cd: &ColumnDescriptor) -> Field {
+    parquet_to_arrow_schema(vec![cd.base_type.clone()].as_slice()).pop().unwrap()
+}
+
+macro_rules! pop_tmp_array {
+    ($self:expr, $ty:ty) => {{
+
+    }}
+}
+
+
+macro_rules! merge_arrays {
+    ($self:expr,$tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr)=> {{
+        let col_path: ColumnPath = $col.path_in_schema.clone();
+        let mut buf = vec![];
+        let col_exist_per_stream = $self
+            .page_streams
+            .iter()
+            .enumerate()
+            .map(|(stream_id, stream)| {
+                $streams.contains(&stream_id) && stream.contains_column(&col_path)
+            })
+            .collect::<Vec<bool>>();
+
+        let mut arrs = $self
+            .tmp_arrays
+            .iter_mut()
+            .enumerate()
+            .map(|(stream_id, cols)| {
+                if $streams.contains(&stream_id) {
+                    match cols.remove(&col_path) {
+                        None => None,
+                        Some(v) => {
+                            if let $tmp_ty(arr) = v {
+                                Some(arr)
+                            } else {
+                                None
+                            }
+                        }
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let mut arrs_idx: Vec<usize> = $self
+            .tmp_array_idx
+            .iter()
+            .map(|cols| match cols.get(&col_path) {
+                Some(idx) => *idx,
+                None => 0,
+            })
+            .collect();
+
+        let mut out = <$out_ty>::with_capacity($reorder.len());
+        for idx in 0..$reorder.len() {
+            let stream_id = $reorder[idx];
+            if !col_exist_per_stream[stream_id] {
+                out.push_null();
+                continue;
+            }
+
+            if arrs[stream_id].is_none() {
+                let page = $self.page_streams[stream_id].next_page(&col_path)?.unwrap();
+                if let CompressedPage::Data(page) = page {
+                    let any_arr = data_page_to_array(page, &$col, &mut buf)?;
+                    println!("any arr {:#?}", any_arr.data_type());
+                    let tmp_arr = any_arr.as_any().downcast_ref::<$in_ty>().unwrap().clone();
+                    arrs[stream_id] = Some(tmp_arr);
+                    arrs_idx[stream_id] = 0;
+                }
+            }
+
+            let cur_idx = arrs_idx[stream_id];
+            let arr = arrs[stream_id].as_ref().unwrap();
+            if arr.is_null(cur_idx) {
+                out.push_null();
+            } else {
+                out.push(Some(arr.value(cur_idx)));
+            }
+
+            if cur_idx == arr.len() - 1 {
+                arrs[stream_id] = None;
+                arrs_idx[stream_id] = 0;
+            } else {
+                arrs_idx[stream_id] += 1;
+            }
+        }
+
+        for (stream_id, maybe_arr) in arrs.into_iter().enumerate() {
+            if let Some(arr) = maybe_arr {
+                $self.tmp_arrays[stream_id].insert(col_path.clone(), $tmp_ty(arr));
+            }
+        }
+
+        for (stream_id, idx) in arrs_idx.into_iter().enumerate() {
+            $self.tmp_array_idx[stream_id].insert(col_path.clone(), idx);
+        }
+
+        out.as_box()
+    }}
+}
+
+macro_rules! merge_list_arrays {
+    ($self:expr,$offset:ty, $tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr)=> {{
+        let col_path: ColumnPath = $col.path_in_schema.clone();
+        let mut buf = vec![];
+        let col_exist_per_stream = $self
+            .page_streams
+            .iter()
+            .enumerate()
+            .map(|(stream_id, stream)| {
+                $streams.contains(&stream_id) && stream.contains_column(&col_path)
+            })
+            .collect::<Vec<bool>>();
+
+        let mut arrs = $self
+            .tmp_arrays
+            .iter_mut()
+            .enumerate()
+            .map(|(stream_id, cols)| {
+                if $streams.contains(&stream_id) {
+                    match cols.remove(&col_path) {
+                        None => None,
+                        Some(v) => {
+                            if let $tmp_ty(arr, offsets, validity, num_vals) = v {
+                                Some((arr, offsets, validity,num_vals))
+                            } else {
+                                None
+                            }
+                        }
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let mut arrs_idx: Vec<usize> = $self
+            .tmp_array_idx
+            .iter()
+            .map(|cols| match cols.get(&col_path) {
+                Some(idx) => *idx,
+                None => 0,
+            })
+            .collect();
+
+        let mut out = <$out_ty>::with_capacity($reorder.len());
+        for idx in 0..$reorder.len() {
+            let stream_id = $reorder[idx];
+            if !col_exist_per_stream[stream_id] {
+                out.push_null();
+                continue;
+            }
+
+            if arrs[stream_id].is_none() {
+                let page = $self.page_streams[stream_id].next_page(&col_path)?.unwrap();
+                if let CompressedPage::Data(page) = page {
+                    let any_arr = data_page_to_array(page, &$col, &mut buf)?;
+                    println!("any arr {:#?}", any_arr.data_type());
+                    let list_arr = any_arr.as_any().downcast_ref::<ListArray<$offset>>().unwrap().clone();
+                    let arr = list_arr.values().as_any().downcast_ref::<$in_ty>().unwrap().clone();
+                    let offsets = list_arr.offsets().clone();
+                    let validity = list_arr.validity().map(|v| v.clone());
+                    arrs[stream_id] = Some((arr, offsets, validity, list_arr.len()));
+                    arrs_idx[stream_id] = 0;
+                }
+            }
+
+            let cur_idx = arrs_idx[stream_id];
+            let (arr, offsets, validity, num_vals) = arrs[stream_id].as_ref().unwrap();
+            if validity.as_ref().map(|x| !x.get_bit(cur_idx)).unwrap_or(false) {
+                out.push_null();
+            } else {
+                println!("stream id {}",stream_id);
+                println!("cur idx {}", cur_idx);
+                println!("arr {:?} {}", arr,arr.len());
+                println!("offsets len {}", offsets.len());
+                println!("{:?}", arrs[stream_id]);
+                let (start, end) = offsets.start_end(cur_idx);
+                let length = end - start;
+                // TODO avoid clone?
+                let vals = arr.clone().sliced(start, length);
+                out.try_push(Some(vals))?;
+            }
+
+            if cur_idx == *num_vals-1 {
+                arrs[stream_id] = None;
+                arrs_idx[stream_id] = 0;
+            } else {
+                arrs_idx[stream_id] += 1;
+            }
+        }
+
+        for (stream_id, maybe_arr) in arrs.into_iter().enumerate() {
+            if let Some((a, o, v,l)) = maybe_arr {
+                $self.tmp_arrays[stream_id].insert(col_path.clone(), $tmp_ty(a, o, v,l));
+            }
+        }
+
+        for (stream_id, idx) in arrs_idx.into_iter().enumerate() {
+            $self.tmp_array_idx[stream_id].insert(col_path.clone(), idx);
+        }
+
+        out.as_box()
+    }}
 }
 
 pub struct FileMerger<R, W>
@@ -63,8 +295,8 @@ pub struct FileMerger<R, W>
     index_cols: Vec<ColumnDescriptor>,
     schema: SchemaDescriptor,
     page_streams: Vec<CompressedPageIterator<R>>,
-    current_arrs: Vec<HashMap<ColumnPath, OwnArray>>,
-    current_arrs_idx: Vec<HashMap<ColumnPath, usize>>,
+    tmp_arrays: Vec<HashMap<ColumnPath, TmpArray>>,
+    tmp_array_idx: Vec<HashMap<ColumnPath, usize>>,
     sorter: BinaryHeap<CompressedDataPagesRow>,
     merge_queue: Vec<CompressedDataPagesRow>,
     result: (Vec<Vec<CompressedPage>>, Vec<MergeReorder>),
@@ -72,6 +304,58 @@ pub struct FileMerger<R, W>
     pages_per_chunk: usize,
     page_size: usize,
     null_pages_cache: HashMap<(DataType, usize), Rc<CompressedPage>>,
+}
+
+
+fn validate_schema(schema: &SchemaDescriptor, index_cols: usize) -> Result<()> {
+    if schema.fields().len() < index_cols {
+        return Err(StoreError::InvalidParameter(format!(
+            "Index columns count {} is greater than schema fields count {}",
+            index_cols,
+            schema.fields().len()
+        )));
+    }
+
+    for col_id in 0..index_cols {
+        match &schema.fields()[col_id] {
+            ParquetType::PrimitiveType(pt) => if pt.field_info.repetition == Repetition::Required {
+                return Err(StoreError::NotYetSupported(format!("index field {} has repetition which doesn't supported", pt.field_info.name)));
+            }
+            ParquetType::GroupType { field_info, .. } => return Err(StoreError::NotYetSupported(format!("index group field {} doesn't supported", field_info.name)))
+        }
+        if let ParquetType::PrimitiveType(pt) = &schema.fields()[col_id] {
+            if pt.field_info.repetition == Repetition::Required {
+                return Err(StoreError::NotYetSupported(format!("index field {} has repetition which doesn't supported", pt.field_info.name)));
+            }
+        }
+    }
+
+    for root_field in schema.fields().iter() {
+        match root_field {
+            ParquetType::PrimitiveType(_) => {}
+            ParquetType::GroupType { fields, logical_type, .. } => {
+                match logical_type {
+                    None => return Err(StoreError::NotYetSupported(format!("group field {} doesn't have logical type", root_field.get_field_info().name))),
+                    Some(GroupLogicalType::List) => {}
+                    _ => return Err(StoreError::NotYetSupported(format!("group  field {} has unsupported logical type. Only List is supported", root_field.get_field_info().name)))
+                }
+
+                match fields.len() {
+                    0 => return Err(StoreError::InvalidParameter(format!("invalid group type {}", root_field.get_field_info().name))),
+                    1 => {
+                        if let ParquetType::GroupType { fields, .. } = &fields[0] {
+                            if let ParquetType::GroupType { .. } = &fields[0] {
+                                return Err(StoreError::NotYetSupported(format!("group field {} has a complex type, only single primitive field is supported", root_field.get_field_info().name)));
+                            }
+                        }
+                    }
+                    _ => return Err(StoreError::NotYetSupported(format!("field {} has a group type with multiple fields, only single primitive field is supported", root_field.get_field_info().name)))
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
@@ -101,6 +385,8 @@ impl<R, W> FileMerger<R, W>
             .map(|ps| ps.schema())
             .collect::<Vec<_>>();
         let schema = try_merge_schemas(schemas, name)?;
+        validate_schema(&schema, index_cols)?;
+
         let opts = WriteOptions {
             write_statistics: true,
             version: Version::V2,
@@ -111,7 +397,7 @@ impl<R, W> FileMerger<R, W>
             .map(|idx| schema.columns()[idx].to_owned())
             .collect::<Vec<_>>();
 
-        let col_res = (0..index_cols.len())
+        let idx_result = (0..index_cols.len())
             .into_iter()
             .map(|_| Vec::with_capacity(pages_per_chunk))
             .collect::<Vec<_>>();
@@ -120,11 +406,11 @@ impl<R, W> FileMerger<R, W>
             index_cols,
             schema,
             page_streams,
-            current_arrs: (0..streams_n).into_iter().map(|_| HashMap::new()).collect(),
-            current_arrs_idx: (0..streams_n).into_iter().map(|_| HashMap::new()).collect(),
+            tmp_arrays: (0..streams_n).into_iter().map(|_| HashMap::new()).collect(),
+            tmp_array_idx: (0..streams_n).into_iter().map(|_| HashMap::new()).collect(),
             sorter: BinaryHeap::new(),
             merge_queue: Vec::with_capacity(100),
-            result: (col_res, Vec::with_capacity(pages_per_chunk)),
+            result: (idx_result, Vec::with_capacity(pages_per_chunk)),
             writer: seq_writer,
             pages_per_chunk,
             page_size,
@@ -137,7 +423,7 @@ impl<R, W> FileMerger<R, W>
         cd: &ColumnDescriptor,
         num_rows: usize,
     ) -> Result<Rc<CompressedPage>> {
-        let field = parquet_to_arrow_schema(vec![cd.base_type.clone()].as_slice()).pop().unwrap();
+        let field = column_to_field(cd);
         let cache_key = (field.data_type.clone(), num_rows);
         if let Some(page) = self.null_pages_cache.get(&cache_key) {
             return Ok(Rc::clone(page));
@@ -213,105 +499,37 @@ impl<R, W> FileMerger<R, W>
         reorder: &[usize],
         streams: &[usize],
     ) -> Result<CompressedPage> {
-        let col_path: ColumnPath = col.path_in_schema.clone();
+        let dt = column_to_field(col).data_type;
 
-        println!("cp {:#?}", col);
-        let mut buf = vec![];
-        let col_exist_per_stream = self
-            .page_streams
-            .iter()
-            .enumerate()
-            .map(|(stream_id, stream)| {
-                streams.contains(&stream_id) && stream.contains_column(&col_path)
-            })
-            .collect::<Vec<bool>>();
-
-        let mut arrs = self
-            .current_arrs
-            .iter_mut()
-            .enumerate()
-            .map(|(stream_id, cols)| {
-                if streams.contains(&stream_id) {
-                    match cols.remove(&col_path) {
-                        None => None,
-                        Some(v) => {
-                            if let OwnArray::List(arr) = v {
-                                Some(arr)
-                            } else {
-                                None
+        println!("col {:?} pt {:?}", col, dt.to_physical_type());
+        let out = match dt.to_physical_type() {
+            ArrowPhysicalType::Primitive(v) => {
+                match v {
+                    arrow2::types::PrimitiveType::Int64 => merge_arrays!(self, TmpArray::Int64,Int64Array,MutablePrimitiveArray<i64>,col,reorder,streams),
+                    _ => unimplemented!()
+                }
+            }
+            ArrowPhysicalType::List => {
+                match dt {
+                    DataType::List(f) => {
+                        match f.data_type.to_physical_type() {
+                            ArrowPhysicalType::Primitive(v) => {
+                                match v {
+                                    arrow2::types::PrimitiveType::Int64 => merge_list_arrays!(self, i32, TmpArray::ListInt64,Int64Array,MutableListArray<i32,MutablePrimitiveArray<i64>>,col,reorder,streams),
+                                    _ => unimplemented!()
+                                }
                             }
+                            _ => unimplemented!(),
                         }
                     }
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let mut arrs_idx: Vec<usize> = self
-            .current_arrs_idx
-            .iter()
-            .map(|cols| match cols.get(&col_path) {
-                Some(idx) => *idx,
-                None => 0,
-            })
-            .collect();
-
-        let mut out = MutableListArray::<i32, MutablePrimitiveArray<i64>>::with_capacity(reorder.len());
-        for idx in 0..reorder.len() {
-            let stream_id = reorder[idx];
-            if !col_exist_per_stream[stream_id] {
-                out.push_null();
-                continue;
-            }
-
-            if arrs[stream_id].is_none() {
-                let page = self.page_streams[stream_id].next_page(&col_path)?.unwrap();
-                if let CompressedPage::Data(page) = page {
-                    let any_arr = data_page_to_array(page, &col, &mut buf)?;
-                    println!("any arr {:#?}", any_arr.data_type());
-                    let list_arr = any_arr.as_any().downcast_ref::<ListArray<i32>>().unwrap().clone();
-                    arrs[stream_id] = Some(list_arr.clone());
-                    arrs_idx[stream_id] = 0;
+                    _ => unimplemented!()
                 }
             }
-
-            let arr = arrs[stream_id].as_ref().unwrap();
-            if arr.is_null(arrs_idx[stream_id]) {
-                out.push_null();
-            } else {
-                // todo fix with array downcast
-                // let b = arr.value(arrs_idx[stream_id]).as_any().downcast_ref::<PrimitiveArray<i64>>().unwrap().clone();
-                let all_vals = arr.values().as_any().downcast_ref::<PrimitiveArray<i64>>().unwrap().clone();
-
-                let (start, end) = arr.offsets().start_end(arrs_idx[stream_id]);
-                let length = end - start;
-                // safety: the invariant of the struct
-                let g = all_vals.sliced(start, length);
-                    out.try_push(Some(g))?;
-                // out.try_extend(Some(arr.value(arrs_idx[stream_id])));
-            }
-
-            if arrs_idx[stream_id] == arr.len() - 1 {
-                arrs[stream_id] = None;
-                arrs_idx[stream_id] = 0;
-            } else {
-                arrs_idx[stream_id] += 1;
-            }
-        }
-
-        for (stream_id, maybe_arr) in arrs.into_iter().enumerate() {
-            if let Some(arr) = maybe_arr {
-                self.current_arrs[stream_id].insert(col_path.clone(), OwnArray::List(arr));
-            }
-        }
-
-        for (stream_id, idx) in arrs_idx.into_iter().enumerate() {
-            self.current_arrs_idx[stream_id].insert(col_path.clone(), idx);
-        }
+            _ => unimplemented!()
+        };
 
         let page = match array_to_page(
-            out.as_box(),
+            out,
             col.base_type.clone(),
         )? {
             CompressedPage::Data(v) => v,
