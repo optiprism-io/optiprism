@@ -1080,7 +1080,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/group-records/{id}:
+  /v1/organizations/{organizationId}/projects/{projectId}/group-records/{group}/{id}:
     get:
       summary: Get group record
       operationId: getGroupRecord
@@ -1091,6 +1091,12 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
+        - name: group
+          in: path
+          description: Group name
+          required: true
+          schema:
+            type: string
         - name: id
           in: path
           description: Group Record ID
@@ -1127,6 +1133,12 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
+        - name: group
+          in: path
+          description: Group name
+          required: true
+          schema:
+            type: string
         - name: id
           in: path
           description: Group Record ID
@@ -1134,6 +1146,7 @@ paths:
           schema:
             type: integer
             format: int64
+
       requestBody:
         required: true
         content:
@@ -1159,7 +1172,7 @@ paths:
           $ref: '#/components/responses/Internal'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/organizations/{organizationId}/projects/{projectId}/group-records/search:
+  /v1/organizations/{organizationId}/projects/{projectId}/group-records/{group}/search:
     post:
       summary: List group records
       operationId: groupRecordsList
@@ -1170,6 +1183,12 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
+        - name: group
+          in: path
+          description: Group name
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -2365,8 +2384,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/EventSegmentationSegment'
-        filters:
-          $ref: '#/components/schemas/EventGroupedFilters'
     FunnelQuery:
       type: object
       required: ["time", "group", "steps", "timeWindow", "chartType", "count", "stepOrder"]
