@@ -18,7 +18,7 @@
                 <div class="dashboards__name pf-u-mr-md">
                     <UiInlineEdit
                         :value="dashboardName"
-                        :hide-text="true"
+                        :hide-text="!!dashboardName"
                         :placeholder-value="$t('dashboards.untitledDashboard')"
                         @on-input="updateName"
                         @on-edit="onEditNameDashboard"

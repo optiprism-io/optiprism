@@ -75,6 +75,7 @@
   },
 
   "reports": {
+    "createReport": "Create Report",
     "untitledReport": "Untitled Report",
     "title": "Reports",
     "sync": "Sync the query data between reports",

@@ -13,50 +13,50 @@
         </div>
         <template v-else>
             <div class="pf-u-mb-sm pf-u-display-flex pf-u-justify-content-space-between pf-u-align-items-center">
-                <div class="report__name">
+                <div
+                    v-if="itemsReports.length && !editableNameReport"
+                    class="pf-u-mr-md"
+                >
+                    <UiSelect
+                        class="dashboards__select"
+                        :items="itemsReports"
+                        :text-button="reportSelectText"
+                        :is-text-select="true"
+                        :selections="[Number(reportsStore.reportId)]"
+                        @on-select="onSelectReport"
+                    />
+                </div>
+                <div class="report__name pf-u-mr-md">
                     <UiInlineEdit
                         :value="reportName"
+                        :hide-text="!!reportName"
                         :placeholder-value="t('reports.untitledReport')"
                         @on-input="setNameReport"
+                        @on-edit="onEditNameReport"
                     />
                 </div>
                 <UiButton
                     v-show="reportsStore.reportId"
-                    class="pf-u-ml-auto pf-m-link pf-m-danger"
+                    class="pf-m-link report__nav-item report__nav-item_new"
+                    :before-icon="'fas fa-plus'"
+                    @click="router.push({ query: { id: null } })"
+                >
+                    {{ $t('reports.createReport') }}
+                </UiButton>
+                <UiButton
+                    v-show="reportsStore.reportId"
+                    class="pf-m-link pf-m-danger"
                     :before-icon="'fas fa-trash'"
                     @click="onDeleteReport"
                 >
-                    {{ $t('reports.delete') }}
+                    {{ $t('dashboards.delete') }}
                 </UiButton>
                 <UiSwitch
-                    :class="{
-                        'pf-u-ml-lg': reportsStore.reportId,
-                        'pf-u-ml-auto': !reportsStore.reportId,
-                    }"
+                    class="pf-u-ml-auto pf-u-mr-md"
                     :value="commonStore.syncReports"
                     :label="$t('reports.sync')"
                     @input="(value: boolean) => commonStore.syncReports = value"
                 />
-                <div
-                    v-if="itemsReports.length"
-                    class="pf-u-ml-lg"
-                >
-                    <UiSelect
-                        class="report__select"
-                        :items="itemsReports"
-                        :text-button="reportSelectText"
-                        :selections="[reportsStore.reportId]"
-                        @on-select="onSelectReport"
-                    />
-                </div>
-                <UiButton
-                    v-if="isChangedReport"
-                    class="pf-m-primary pf-u-ml-lg"
-                    :progress="reportsStore.saveLoading"
-                    @click="onSaveReport"
-                >
-                    {{ $t('reports.save') }}
-                </UiButton>
             </div>
             <router-view />
         </template>
@@ -99,6 +99,7 @@ const breakdownsStore = useBreakdownsStore()
 const stepsStore = useStepsStore()
 const { confirm } = useConfirm()
 
+const editableNameReport = ref(false);
 const reportName = ref('');
 
 const items = computed(() => {
@@ -124,7 +125,7 @@ const items = computed(() => {
             ...item,
             active: route.name === item.value,
         }
-    })
+    });
 })
 
 const reportSelectText = computed(() => {
@@ -148,6 +149,10 @@ const itemsReports = computed(() => {
         }
     })
 })
+
+const onEditNameReport = (payload: boolean) => {
+    editableNameReport.value = payload;
+};
 
 const onDeleteReport = async () => {
     try {
@@ -226,20 +231,16 @@ onMounted(async () => {
     eventsStore.initPeriod()
     await reportsStore.getList()
     const reportId = route.params.id;
-
-    if (reportId) {
-        if (reportsStore.reportsId.includes(Number(reportId))) {
-            updateReport(Number(reportId))
-        } else {
-            reportsStore.reportId = 0
-            router.push({
-                params: {
-                    id: null,
-                }
-            })
-        }
+    if (reportId && reportsStore?.reportsId.includes(Number(reportId))) {
+        updateReport(Number(reportId))
+    } else {
+        reportsStore.reportId = 0
+        router.push({
+            params: {
+                id: null,
+            }
+        })
     }
-
     reportsStore.loading = false
 })
 </script>
@@ -251,10 +252,16 @@ onMounted(async () => {
             font-size: 20px;
         }
     }
-
     &__select {
         width: 200px;
     }
+    &__nav {
+        min-height: 34px;
+        &-item {
+            &_new {
+                margin-left: -12px;
+            }
+        }
+    }
 }
-
 </style>

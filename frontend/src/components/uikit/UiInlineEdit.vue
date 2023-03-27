@@ -116,3 +116,11 @@ const onInput = () => {
     setEditable(false)
 }
 </script>
+
+<style lang="scss">
+.pf-c-inline-edit {
+    &__value {
+        cursor: pointer;
+    }
+}
+</style>
