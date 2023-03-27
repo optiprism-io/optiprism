@@ -1197,7 +1197,7 @@ paths:
               $ref: '#/components/schemas/GroupRecordsListRequest'
       responses:
         '200':
-          description: events list
+          description: groups list
           content:
             application/json:
               schema:
