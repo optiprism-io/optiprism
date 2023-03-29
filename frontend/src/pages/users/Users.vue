@@ -12,7 +12,7 @@
                         :show-select-columns="true"
                         @on-action="onAction"
                     />
-                    {{  groupStore.users }}
+                    {{ groupStore.users }}
                 </UiCardContainer>
             </template>
         </ToolsLayout>
