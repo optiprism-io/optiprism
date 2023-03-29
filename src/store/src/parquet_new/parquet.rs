@@ -1,0 +1,427 @@
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::io::Read;
+use std::io::Seek;
+use std::simd::usizex2;
+
+use arrow2::array::Array;
+use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
+use arrow2::io::parquet::write::{array_to_columns, array_to_page_simple};
+use arrow2::io::parquet::write::WriteOptions;
+use futures::stream::iter;
+use futures::StreamExt;
+use arrow2::compute::concatenate::concatenate;
+use arrow2::io::parquet::read::column_iter_to_arrays;
+use arrow2::io::parquet::read::schema::convert::{to_data_type, to_primitive_type};
+use arrow2::io::parquet::read::schema::parquet_to_arrow_schema;
+use parquet2::compression::CompressionOptions;
+use parquet2::encoding::Encoding;
+use parquet2::metadata::{ColumnDescriptor, FileMetaData};
+use parquet2::metadata::RowGroupMetaData;
+use parquet2::metadata::SchemaDescriptor;
+use parquet2::page::CompressedDataPage;
+use parquet2::page::CompressedPage;
+use parquet2::page::Page;
+use parquet2::read::decompress;
+use parquet2::schema::types::ParquetType;
+use parquet2::schema::types::PhysicalType;
+use parquet2::schema::types::PrimitiveType;
+use parquet2::statistics::BinaryStatistics;
+use parquet2::statistics::BooleanStatistics;
+use parquet2::statistics::FixedLenStatistics;
+use parquet2::statistics::PrimitiveStatistics;
+use parquet2::write::compress;
+use parquet2::write::Compressor;
+use parquet2::write::Version;
+
+use crate::error::Result;
+use crate::error::StoreError;
+use crate::parquet_new::arrow::{ArrowChunk};
+use crate::parquet_new::from_physical_type;
+use crate::parquet_new::ReorderSlice;
+use crate::parquet_new::Value;
+
+
+macro_rules! min_max_values {
+    ($first_stats:expr,$last_stats:expr,$ty:ty)=>{{
+        match (first_stats.as_any().downcast_ref::<$ty>(), last_stats.as_any().downcast_ref::<$ty>()) {
+            (Some(first), Some(last)) => {
+                (
+                    Value::from(first.min_value.unwrap()),
+                    Value::from(last.max_value.unwrap()),
+                )
+            },
+            _ => return Err(StoreError::Internal("no stats".to_string()))
+        }
+    }}
+}
+pub fn check_intersection(
+    chunks: &[IndexChunk],
+    other: Option<&IndexChunk>,
+) -> bool {
+    if other.is_none() {
+        return false;
+    }
+
+    let mut iter = chunks.iter();
+    let first = iter.next().unwrap();
+    let mut min_values = first.min_values();
+    let mut max_values = first.max_values();
+    for row in iter {
+        if row.min_values <= min_values {
+            min_values = row.min_values();
+        }
+        if row.max_values >= max_values {
+            max_values = row.max_values();
+        }
+    }
+
+    let other = other.unwrap();
+
+    min_values <= other.max_values() && max_values >= other.min_values
+}
+
+pub fn pages_to_arrays_simple(
+    pages: Vec<CompressedPage>,
+    buf: &mut Vec<u8>,
+) -> Result<Vec<Box<dyn Array>>> {
+    pages
+        .into_iter()
+        .map(|page|
+            match page {
+                CompressedPage::Data(page) => page,
+                _ => panic!("not a data page"),
+            }
+        ).map(|page| {
+        let pt = page.descriptor.primitive_type.clone();
+        data_page_to_array_simple(page, &pt, buf)
+    })
+        .collect::<Result<Vec<Box<dyn Array>>>>()
+}
+
+pub fn data_page_to_array_simple(page: CompressedDataPage, primitive_type: &PrimitiveType, buf: &mut Vec<u8>) -> Result<Box<dyn Array>> {
+    // let num_rows = page.num_values() + stats.null_count().or_else(|| Some(0)).unwrap() as usize;
+    let num_rows = page.num_values();
+    // todo check if this is correct
+    let data_type = to_primitive_type(&primitive_type);
+    let decompressed_page = decompress(CompressedPage::Data(page), buf)?;
+    let iter = fallible_streaming_iterator::convert(std::iter::once(Ok(&decompressed_page)));
+    let mut r = page_iter_to_arrays(iter, &primitive_type, data_type, None, num_rows)?;
+    Ok(r.next().unwrap()?)
+}
+
+pub fn pages_to_arrays<P: IntoIterator<Item=CompressedPage>>(pages: P, cd: &ColumnDescriptor, buf: &mut Vec<u8>) -> Result<Vec<dyn Array>> {
+    let arrs = pages.map(|page| data_page_to_array(page, cd, buf)).collect::<Result<Vec<Box<dyn Array>>>>()?;
+    Ok(arrs)
+}
+
+pub fn data_page_to_array(page: CompressedDataPage, cd: &ColumnDescriptor, buf: &mut Vec<u8>) -> Result<Box<dyn Array>> {
+    let num_rows = page.num_values();
+    let decompressed_page = decompress(CompressedPage::Data(page), buf)?;
+    let iter = fallible_streaming_iterator::convert(std::iter::once(Ok(&decompressed_page)));
+    let field = parquet_to_arrow_schema(vec![cd.base_type.clone()].as_slice()).pop().unwrap();
+    let mut a = column_iter_to_arrays(
+        vec![iter],
+        vec![&cd.descriptor.primitive_type.clone()],
+        field,
+        None,
+        num_rows,
+    )?;
+    Ok(a.next().unwrap()?)
+}
+
+pub fn array_to_page(arr: Box<dyn Array>, typ: ParquetType) -> Result<CompressedPage> {
+    let opts = WriteOptions {
+        write_statistics: true,
+        compression: CompressionOptions::Snappy, // todo
+        version: Version::V2,
+        data_pagesize_limit: None,
+    };
+
+    println!("arr: {:#?}", arr);
+    let pages = array_to_columns(arr, typ, opts, &[Encoding::Plain])?.pop().unwrap();
+    let mut cp = pages
+        .into_iter()
+        .map(|page| compress(page.unwrap(), vec![], CompressionOptions::Snappy))
+        .collect::<std::result::Result<Vec<CompressedPage>, _>>()?;
+
+    Ok(cp.pop().unwrap())
+}
+
+pub fn array_to_pages_simple(arr: Box<dyn Array>, typ: ParquetType, data_pagesize_limit: usize) -> Result<Vec<CompressedPage>> {
+    let opts = WriteOptions {
+        write_statistics: true,
+        compression: CompressionOptions::Snappy, // todo
+        version: Version::V2,
+        data_pagesize_limit: Some(data_pagesize_limit),
+    };
+
+    println!("arr: {:#?}", arr);
+    let pages = array_to_columns(arr, typ, opts, &[Encoding::Plain])?.pop().unwrap();
+    let compressed = pages
+        .into_iter()
+        .map(|page| compress(page.unwrap(), vec![], CompressionOptions::Snappy))
+        .collect::<std::result::Result<Vec<CompressedPage>, _>>()?;
+
+    Ok(compressed)
+}
+
+pub fn get_page_min_max_values(pages: &[CompressedPage]) -> Result<(Value, Value)> {
+    match (pages.first(), pages.last()) {
+        (Some(&CompressedPage::Data(first)), Some(&CompressedPage::Data(last))) => {
+            let (first_stats, last_stats) = (first.statistics(), last.statistics());
+            if first_stats.is_none() || last_stats.is_none() {
+                return Err(StoreError::Internal("no stats".to_string()));
+            }
+
+            let (first_stats, last_stats) = (first_stats.unwrap()?, last_stats.unwrap()?);
+
+            let (min_value, max_value) = match first_stats.physical_type() {
+                PhysicalType::Int32 => min_max_values!(first_stats, last_stats, PrimitiveStatistics<i32>),
+                PhysicalType::Int64 => min_max_values!(first_stats, last_stats, PrimitiveStatistics<i64>),
+                PhysicalType::Int96 => min_max_values!(first_stats, last_stats, PrimitiveStatistics<[u32;3]>),
+                PhysicalType::Float => min_max_values!(first_stats, last_stats, PrimitiveStatistics<f32>),
+                PhysicalType::Double => min_max_values!(first_stats, last_stats, PrimitiveStatistics<f64>),
+                PhysicalType::ByteArray => min_max_values!(first_stats, last_stats, BinaryStatistics),
+                PhysicalType::FixedLenByteArray(_) => min_max_values!(first_stats, last_stats, FixedLenStatistics),
+                _ => unimplemented!(),
+            };
+
+            Ok((min_value, max_value))
+        }
+        _ => {
+            return Err(StoreError::Internal("compressed page should be data".to_string()));
+        }
+    }
+}
+
+
+#[derive(Debug)]
+pub struct IndexChunk {
+    pub cols: Vec<Vec<CompressedPage>>,
+    pub min_values: Vec<Value>,
+    pub max_values: Vec<Value>,
+    pub stream: usize,
+}
+
+impl Eq for IndexChunk {}
+
+impl PartialOrd for IndexChunk {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(other.cmp(self))
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        other.min_values < self.min_values
+    }
+    #[inline]
+    fn le(&self, other: &Self) -> bool {
+        other.min_values <= self.min_values
+    }
+    #[inline]
+    fn gt(&self, other: &Self) -> bool {
+        other.min_values > self.min_values
+    }
+    #[inline]
+    fn ge(&self, other: &Self) -> bool {
+        other.min_values >= self.min_values
+    }
+}
+
+impl Ord for IndexChunk {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.min_values.cmp(&self.min_values)
+    }
+}
+
+impl PartialEq for IndexChunk {
+    fn eq(&self, other: &Self) -> bool {
+        self.min_values == other.min_values && self.max_values == other.max_values
+    }
+}
+
+impl IndexChunk {
+    pub fn new_from_pages(cols: Vec<Vec<CompressedPage>>, stream: usize) -> Self {
+        Self::new(cols, stream)
+    }
+
+    pub fn new(cols: Vec<Vec<CompressedPage>>, stream: usize) -> Self {
+        let (min_values, max_values) = cols
+            .iter()
+            .map(|pages| {
+                let (min, max) = get_page_min_max_values(pages.as_slice()).unwrap();
+                (min, max)
+            })
+            .unzip();
+
+        IndexChunk {
+            cols: pages,
+            min_values,
+            max_values,
+            stream,
+        }
+    }
+
+    pub fn min_values(&self) -> Vec<Value> {
+        self.min_values.clone()
+    }
+
+    pub fn max_values(&self) -> Vec<Value> {
+        self.max_values.clone()
+    }
+
+    pub fn to_arrow_chunk(self, buf: &mut Vec<u8>, index_cols: &[ColumnDescriptor]) -> Result<ArrowChunk> {
+        let cols = self.cols
+            .into_iter()
+            .zip(index_cols.iter())
+            .map(|(pages, cd)| {
+                let data_type = match &pages[0] {
+                    CompressedPage::Data(data) => to_primitive_type(&cd.descriptor.primitive_type),
+                    _ => unimplemented!(),
+                };
+
+                let num_rows = pages.iter().map(|page| {
+                    match page {
+                        CompressedPage::Data(page) => page.num_values(),
+                        _ => unimplemented!(),
+                    }
+                }).sum();
+                pages
+                    .into_iter()
+                    .map(|page| decompress(page, buf))
+                    .collect::<Result<Vec<Page>>>()
+                    .and_then(|pages| {
+                        let iter = pages
+                            .into_iter()
+                            .map(|page| Ok(page))
+                            .collect::<Vec<_>>();
+                        let pages = fallible_streaming_iterator::convert(iter.into_iter());
+
+                        page_iter_to_arrays(pages, &cd.descriptor.primitive_type, data_type, None, num_rows)
+                            .and_then(|mut arrs| arrs.next().unwrap()).into()
+                    }).collect::<Result<Vec<_>>>()
+            })
+            .collect::<Result<Vec<Vec<_>>>>()?;
+
+        Ok(ArrowChunk::new(cols, self.stream))
+    }
+}
+
+pub type ColumnPath = Vec<String>;
+
+pub struct CompressedPageIterator<R> {
+    reader: R,
+    metadata: FileMetaData,
+    row_group_cursors: HashMap<ColumnPath, usize>,
+    chunk_buffer: HashMap<ColumnPath, VecDeque<CompressedPage>>,
+    max_page_size: usize,
+}
+
+impl<R: Read + Seek> CompressedPageIterator<R> {
+    pub fn try_new(mut reader: R) -> Result<Self> {
+        let metadata = parquet2::read::read_metadata(&mut reader)?;
+        Ok(Self {
+            reader,
+            metadata,
+            row_group_cursors: HashMap::new(),
+            chunk_buffer: HashMap::new(),
+            max_page_size: 1024 * 1024,
+        })
+    }
+
+    pub fn schema(&self) -> &SchemaDescriptor {
+        self.metadata.schema()
+    }
+
+    pub fn get_col_path(&self, col_id: usize) -> ColumnPath {
+        self.metadata.schema().columns()[col_id]
+            .path_in_schema
+            .clone()
+    }
+
+    pub fn contains_column(&self, col_path: &ColumnPath) -> bool {
+        self.metadata
+            .schema()
+            .columns()
+            .iter()
+            .find(|col| col.path_in_schema.eq(col_path))
+            .is_some()
+    }
+
+    pub fn next_chunk(&mut self, col_path: &ColumnPath) -> Result<Option<Vec<CompressedPage>>> {
+        self.chunk_buffer.get_mut(col_path).and_then(|buf| {
+            Some(buf.clear())
+        });
+
+        let row_group_id = *(self.row_group_cursors.get(col_path).or(Some(&0)).unwrap());
+        if row_group_id > self.metadata.row_groups.len() - 1 {
+            return Ok(None);
+        }
+
+        let row_group = &self.metadata.row_groups[row_group_id];
+        let column = row_group
+            .columns()
+            .iter()
+            .find(|col| col.descriptor().path_in_schema.eq(col_path))
+            .unwrap();
+
+        let pages = parquet2::read::get_page_iterator(
+            column,
+            &mut self.reader,
+            None,
+            vec![],
+            self.max_page_size,
+        )?;
+
+        let col = pages.into_iter().map(|page| page.and_then(|page| match page {
+            CompressedPage::Data(pd) => {
+                Ok(pd)
+            }
+            _ => Err(StoreError::NotImplemented("Only data pages are supported".to_string()))
+        })).collect::<Result<Vec<_>>>()?;
+
+        self.row_group_cursors
+            .insert(col_path.to_owned(), row_group_id + 1);
+
+        Ok(Some(col))
+    }
+
+    pub fn next_page(&mut self, col_path: &ColumnPath) -> Result<Option<CompressedPage>> {
+        /*        if !self.contains_column(col_path) {
+                    return Err(StoreError::Internal(format!(
+                        "column {:?} not found",
+                        col_path
+                    )));
+                }
+        */
+
+        let page = self
+            .chunk_buffer
+            .get_mut(col_path)
+            .and_then(|buf| buf.pop_front())
+            .or_else(|| {
+                let maybe_chunk = self.next_chunk(col_path)?;
+                if maybe_chunk.is_none() {
+                    return None;
+                }
+
+                let mut chunk = maybe_chunk.unwrap();
+                self
+                    .chunk_buffer
+                    .get_mut(col_path)
+                    .and_then(|buf| {
+                        for page in chunk {
+                            buf.push_back(page);
+                        }
+                        buf.pop_front()
+                    })
+                    .or_else(|| {
+                        self.chunk_buffer.insert(col_path.to_owned(), VecDeque::from(chunk));
+                        buf.pop_front()
+                    })
+            });
+
+        Ok(page)
+    }
+}

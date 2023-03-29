@@ -6,8 +6,6 @@ pub mod parquet;
 pub mod arrow;
 pub mod merger;
 pub mod schema;
-pub mod chunk_merger;
-// pub mod merge;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
 pub enum Value {

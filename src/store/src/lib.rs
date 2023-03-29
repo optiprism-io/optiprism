@@ -4,10 +4,10 @@
 pub mod arrow_conversion;
 pub mod error;
 pub mod parquet;
+pub mod parquet_new;
 // mod table;
 // mod iterator;
 // mod parquet;
-// mod parquet2;
 
 // pub mod schema;
 use error::Result;
@@ -509,20 +509,18 @@ pub mod test_util {
             write_statistics: true,
             compression: CompressionOptions::Snappy,
             version: Version::V2,
-            data_pagesize_limit: None,
+            data_pagesize_limit: Some(20),
         };
 
         let mut idx = 0;
         let mut chunks = vec![];
         while idx < arrs[0].len() {
-            let mut chunk = vec![];
-            for arr in arrs.iter_mut() {
-                let end = std::cmp::min(idx + (pages_per_row_group * page_size), arr.len());
-                let slice = arr.sliced(idx, end - idx);
-                chunk.push(slice);
-            }
+            println!("idx {idx} pages_per_row_group {pages_per_row_group} page_size {page_size} len {}",arrs[0].len());
+            let end = std::cmp::min(idx + (pages_per_row_group * page_size), arrs[0].len());
+            let chunk = arrs.iter().map(|arr| arr.sliced(idx, end - idx)).collect::<Vec<_>>();
+            println!("{:?}",chunk);
             chunks.push(Ok(Chunk::new(chunk)));
-            idx += pages_per_row_group;
+            idx += pages_per_row_group * page_size;
         }
 
         let encodings = schema

@@ -42,17 +42,17 @@ use parquet2::write::WriteOptions;
 
 use crate::error::Result;
 use crate::error::StoreError;
-use crate::parquet::arrow::merge;
-use crate::parquet::arrow::ArrowRow;
-use crate::parquet::parquet::{array_to_page};
-use crate::parquet::parquet::check_intersection;
-use crate::parquet::parquet::data_page_to_array;
-use crate::parquet::parquet::data_pages_to_arrays;
-use crate::parquet::parquet::ColumnPath;
-use crate::parquet::parquet::CompressedDataPagesColumns;
-use crate::parquet::parquet::CompressedDataPagesRow;
-use crate::parquet::parquet::CompressedPageIterator;
-use crate::parquet::schema::try_merge_schemas;
+use crate::parquet_new::arrow::merge;
+use crate::parquet_new::arrow::ArrowChunk;
+use crate::parquet_new::parquet::{array_to_page, array_to_pages_simple, ColumnPath, IndexChunk};
+use crate::parquet_new::parquet::check_intersection;
+use crate::parquet_new::parquet::data_page_to_array;
+use crate::parquet_new::parquet::data_pages_to_arrays;
+use crate::parquet_new::parquet_new::ColumnPath;
+use crate::parquet_new::parquet::CompressedDataPagesColumns;
+use crate::parquet_new::parquet::CompressedDataPagesRow;
+use crate::parquet_new::parquet::CompressedPageIterator;
+use crate::parquet_new::schema::try_merge_schemas;
 
 
 enum TmpListArray {
@@ -297,13 +297,14 @@ pub struct FileMerger<R, W>
     page_streams: Vec<CompressedPageIterator<R>>,
     tmp_arrays: Vec<HashMap<ColumnPath, TmpArray>>,
     tmp_array_idx: Vec<HashMap<ColumnPath, usize>>,
-    sorter: BinaryHeap<CompressedDataPagesRow>,
-    merge_queue: Vec<CompressedDataPagesRow>,
-    result: (Vec<Vec<CompressedPage>>, Vec<MergeReorder>),
+    sorter: BinaryHeap<IndexChunk>,
+    merge_queue: Vec<IndexChunk>,
+    result_buffer: (Vec<Vec<CompressedPage>>, Vec<MergeReorder>),
     writer: FileSeqWriter<W>,
     pages_per_chunk: usize,
     page_size: usize,
     null_pages_cache: HashMap<(DataType, usize), Rc<CompressedPage>>,
+    data_page_size_limit: usize,
 }
 
 
@@ -360,9 +361,8 @@ fn validate_schema(schema: &SchemaDescriptor, index_cols: usize) -> Result<()> {
 
 #[derive(Debug, Clone)]
 pub enum MergeReorder {
-    // stream_id and
-    StreamPage(usize, usize),
-    // first vector - stream_id to pick from, second vector - streams which are merged
+    PickFromStream(usize, usize),
+    // first vector - stream_id to pick from, second vector - streams which were merged
     Merge(Vec<usize>, Vec<usize>),
 }
 
@@ -410,7 +410,7 @@ impl<R, W> FileMerger<R, W>
             tmp_array_idx: (0..streams_n).into_iter().map(|_| HashMap::new()).collect(),
             sorter: BinaryHeap::new(),
             merge_queue: Vec::with_capacity(100),
-            result: (idx_result, Vec::with_capacity(pages_per_chunk)),
+            result_buffer: (idx_result, Vec::with_capacity(pages_per_chunk)),
             writer: seq_writer,
             pages_per_chunk,
             page_size,
@@ -418,28 +418,33 @@ impl<R, W> FileMerger<R, W>
         })
     }
 
-    fn make_null_page(
+    fn next_stream_index_chunk(&mut self, stream_id: usize) -> Result<Option<IndexChunk>> {
+        let mut pages = Vec::with_capacity(self.index_cols.len());
+        for col in &self.index_cols {
+            let page = self.page_streams[stream_id].next_chunk(&col.path_in_schema)?;
+            if page.is_none() {
+                return Ok(None);
+            }
+            pages.push(page.unwrap());
+        }
+
+        Ok(Some(IndexChunk::new(pages, stream_id)))
+    }
+
+    fn make_null_pages(
         &mut self,
         cd: &ColumnDescriptor,
         num_rows: usize,
-    ) -> Result<Rc<CompressedPage>> {
+        data_pagesize_limit: usize,
+    ) -> Result<Vec<CompressedPage>> {
         let field = column_to_field(cd);
-        let cache_key = (field.data_type.clone(), num_rows);
-        if let Some(page) = self.null_pages_cache.get(&cache_key) {
-            return Ok(Rc::clone(page));
-        }
         let arr = new_null_array(field.data_type, num_rows);
-
-        let page = array_to_page(arr, cd.base_type.clone())?;
-        self.null_pages_cache.insert(cache_key.clone(), Rc::new(page));
-
-        let rc = self.null_pages_cache.get(&cache_key).unwrap();
-        Ok(Rc::clone(rc))
+        Ok(array_to_pages_simple(arr, cd.base_type.clone(), data_pagesize_limit)?)
     }
 
     pub fn merge(&mut self) -> Result<()> {
         for stream_id in 0..self.page_streams.len() {
-            if let Some(row) = self.next_compressed_row(stream_id)? {
+            if let Some(row) = self.next_stream_index_chunk(stream_id)? {
                 self.sorter.push(row);
             }
         }
@@ -466,20 +471,23 @@ impl<R, W> FileMerger<R, W>
             for col in cols.iter() {
                 for reorder in reorder.iter() {
                     match reorder {
-                        MergeReorder::StreamPage(stream_id, num_rows) => {
-                            if self.page_streams[*stream_id].contains_column(&col.path_in_schema) {
-                                let page = self.page_streams[*stream_id]
-                                    .next_page(&col.path_in_schema)?
-                                    .unwrap();
-                                self.writer.write_page(&page)?;
+                        MergeReorder::PickFromStream(stream_id, num_rows) => {
+                            let pages = if self.page_streams[*stream_id].contains_column(&col.path_in_schema) {
+                                self.page_streams[*stream_id]
+                                    .next_chunk(&col.path_in_schema)?
+                                    .unwrap()
                             } else {
-                                let null_page = self.make_null_page(&col, *num_rows)?;
-                                self.writer.write_page(&null_page)?;
+                                self.make_null_pages(&col, *num_rows, self.data_page_size_limit)?
+                            };
+                            for page in pages {
+                                self.writer.write_page(&page)?;
                             }
                         }
                         MergeReorder::Merge(reorder, streams) => {
-                            let page = self.merge_data(&col, reorder, streams)?;
-                            self.writer.write_page(&page)?;
+                            let pages = self.merge_data(&col, reorder, streams)?;
+                            for page in pages {
+                                self.writer.write_page(&page)?;
+                            }
                         }
                     }
                 }
@@ -498,7 +506,7 @@ impl<R, W> FileMerger<R, W>
         col: &ColumnDescriptor,
         reorder: &[usize],
         streams: &[usize],
-    ) -> Result<CompressedPage> {
+    ) -> Result<Vec<CompressedPage>> {
         let dt = column_to_field(col).data_type;
 
         println!("col {:?} pt {:?}", col, dt.to_physical_type());
@@ -548,13 +556,13 @@ impl<R, W> FileMerger<R, W>
     fn merge_queue(&mut self) -> Result<()> {
         println!("merge queue {:?}", self.merge_queue);
         let mut buf = vec![];
-        let queue = self
+        let chunks = self
             .merge_queue
             .drain(..)
-            .map(|row| row.to_arrow_row(&mut buf))
+            .map(|chunk| chunk.to_arrow_chunk(&mut buf, &self.index_cols))
             .collect::<Result<Vec<_>>>()?;
 
-        let merge_result = merge(queue, self.page_size)?;
+        let merge_result = merge(chunks)?;
         println!("merge result {:?}", merge_result);
 
         for (arrow_row, reorder, streams) in merge_result {
@@ -563,50 +571,36 @@ impl<R, W> FileMerger<R, W>
                 .iter()
                 .map(|cd| cd.descriptor.primitive_type.clone())
                 .collect::<Vec<_>>();
-            let row = CompressedDataPagesRow::from_arrow_row(arrow_row, types, vec![])?;
+            IndexChunk::new_from_pages()
+            let row = IndexChunk::from_arrow_row(arrow_row, types, vec![])?;
             self.push_to_result(row, MergeReorder::Merge(reorder, streams))
         }
 
         Ok(())
     }
 
-    fn next_compressed_row(&mut self, stream_id: usize) -> Result<Option<CompressedDataPagesRow>> {
-        let mut stream = &mut self.page_streams[stream_id];
-        let mut pages: Vec<CompressedPage> = Vec::with_capacity(self.index_cols.len());
-        for col in self.index_cols.iter() {
-            match stream.next_page(&col.path_in_schema)? {
-                None => return Ok(None),
-                Some(page) => pages.push(page),
-            }
-        }
-
-        Ok(Some(CompressedDataPagesRow::new_from_pages(
-            pages, stream_id,
-        )))
-    }
-
     fn push_to_result(&mut self, row: CompressedDataPagesRow, reorder: MergeReorder) {
         for (col_id, page) in row.pages.into_iter().enumerate() {
-            self.result.0[col_id].push(CompressedPage::Data(page));
+            self.result_buffer.0[col_id].push(CompressedPage::Data(page));
         }
-        self.result.1.push(reorder);
+        self.result_buffer.1.push(reorder);
     }
 
     fn next_index_chunk(
         &mut self,
-    ) -> Result<Option<(Vec<Vec<CompressedPage>>, Vec<MergeReorder>)>> {
-        while let Some(row) = self.sorter.pop() {
-            println!("pop {:?}", row);
-            if let Some(next) = self.next_compressed_row(row.stream)? {
+    ) -> Result<Option<(IndexChunk, Vec<MergeReorder>)>> {
+        while let Some(chunk) = self.sorter.pop() {
+            println!("pop {:?}", chunk);
+            if let Some(next) = self.next_stream_index_chunk(chunk.stream)? {
                 println!("pop next {:?}", next);
                 self.sorter.push(next);
             }
 
-            self.merge_queue.push(row);
+            self.merge_queue.push(chunk);
             while check_intersection(&self.merge_queue, self.sorter.peek()) {
                 println!("queue intersects with {:?}", self.sorter.peek());
                 let next = self.sorter.pop().unwrap();
-                if let Some(row) = self.next_compressed_row(next.stream)? {
+                if let Some(row) = self.next_stream_index_chunk(next.stream)? {
                     println!("pop next {:?}", row);
                     self.sorter.push(row);
                 }
@@ -619,12 +613,12 @@ impl<R, W> FileMerger<R, W>
                 println!("push to result");
 
                 let row = self.merge_queue.pop().unwrap();
-                let num_vals = row.pages[0].num_values();
+                let num_vals = row.cols[0].num_values();
                 let row_stream = row.stream;
-                self.push_to_result(row, MergeReorder::StreamPage(row_stream, num_vals));
+                self.push_to_result(row, MergeReorder::PickFromStream(row_stream, num_vals));
             }
 
-            println!("result {:?}", self.result);
+            println!("result {:?}", self.result_buffer);
             if let Some(res) = self.try_drain_result(self.pages_per_chunk) {
                 return Ok(Some(res));
             }
@@ -637,17 +631,17 @@ impl<R, W> FileMerger<R, W>
         &mut self,
         num: usize,
     ) -> Option<(Vec<Vec<CompressedPage>>, Vec<MergeReorder>)> {
-        if self.result.0[0].is_empty() {
+        if self.result_buffer.0[0].is_empty() {
             return None;
         }
-        let end = cmp::min(self.result.0[0].len(), num);
+        let end = cmp::min(self.result_buffer.0[0].len(), num);
         let cols = self
-            .result
+            .result_buffer
             .0
             .iter_mut()
             .map(|v| v.drain(..end).collect::<Vec<_>>())
             .collect::<Vec<_>>();
-        let reorder = self.result.1.drain(0..end).collect::<Vec<_>>();
+        let reorder = self.result_buffer.1.drain(0..end).collect::<Vec<_>>();
 
         return Some((cols, reorder));
 

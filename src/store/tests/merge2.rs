@@ -44,8 +44,8 @@ use parquet2::write::FileSeqWriter;
 use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 use store::error::Result;
-use store::parquet::merger::FileMerger;
-use store::parquet::parquet::CompressedPageIterator;
+use store::parquet_new::merger::FileMerger;
+use store::parquet_new::parquet::CompressedPageIterator;
 use store::test_util::create_parquet_from_arrays;
 use store::test_util::parse_markdown_table;
 
