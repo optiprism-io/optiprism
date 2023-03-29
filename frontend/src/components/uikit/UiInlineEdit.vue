@@ -31,9 +31,9 @@
         <div class="pf-c-inline-edit__group">
             <div class="pf-c-inline-edit__input">
                 <input
+                    ref="input"
                     class="pf-c-form-control"
                     type="text"
-                    ref="input"
                     :value="valueEdit"
                     @input="updateValue"
                 >

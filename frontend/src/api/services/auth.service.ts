@@ -1,6 +1,5 @@
-import {AuthApi, Configuration} from '@/api'
-import {BASE_PATH} from '@/api/base';
-import {config} from '@/api/services/config';
+import { AuthApi } from '@/api';
+import { config } from '@/api/services/config';
 
 const api = new AuthApi(config);
 
