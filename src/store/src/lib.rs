@@ -1,4 +1,7 @@
 #![feature(slice_take)]
+#![feature(let_chains)]
+
+extern crate core;
 
 // pub mod dictionary;
 pub mod arrow_conversion;

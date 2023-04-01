@@ -15,6 +15,21 @@ use parquet2::write::Compressor;
 use crate::parquet::Value;
 
 #[derive(Debug)]
+pub struct MergedArrowChunk {
+    pub arrs: Vec<Box<dyn Array>>,
+    pub reorder: Vec<usize>,
+}
+
+impl MergedArrowChunk {
+    pub fn new(arrs: Vec<Box<dyn Array>>, reorder: Vec<usize>) -> Self {
+        Self {
+            arrs,
+            reorder,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct ArrowChunk {
     pub stream: usize,
     pub arrs: Vec<Box<dyn Array>>,
@@ -62,35 +77,33 @@ impl<A, B> PartialEq for TwoColMergeRow<A, B> where A: Eq, B: Eq {
 
 impl<A, B> Eq for TwoColMergeRow<A, B> where A: Eq, B: Eq {}
 
-pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(mut rows: Vec<ArrowChunk>) -> Result<(ArrowChunk, Vec<usize>, Vec<usize>)> {
-    let mut arr_iters = rows.iter().map(|row| {
+pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(mut chunks: Vec<ArrowChunk>, array_size: usize) -> Result<Vec<MergedArrowChunk>> {
+    let mut arr_iters = chunks.iter().map(|row| {
         let arr1 = row.arrs[0].as_any().downcast_ref::<PrimitiveArray<T1>>().unwrap().values_iter();
         let arr2 = row.arrs[1].as_any().downcast_ref::<PrimitiveArray<T2>>().unwrap().values_iter();
         (arr1, arr2)
     }).collect::<Vec<_>>();
 
-    let mut sort = BinaryHeap::<TwoColMergeRow<T1, T2>>::with_capacity(rows.len());
+    let mut sort = BinaryHeap::<TwoColMergeRow<T1, T2>>::with_capacity(array_size);
 
-    let array_size = rows.iter().map(|row| row.len()).sum();
+    let mut res = vec![];
     let mut out_col1 = Vec::with_capacity(array_size);
     let mut out_col2 = Vec::with_capacity(array_size);
     let mut order = Vec::with_capacity(array_size);
-    let mut streams = Bitmap::<256>::new();
 
-    for row_id in 0..rows.len() {
+    for row_id in 0..chunks.len() {
         let mr = TwoColMergeRow(
             row_id,
             *arr_iters[row_id].0.next().unwrap(),
             *arr_iters[row_id].1.next().unwrap(),
         );
         sort.push(mr);
-        streams.set(rows[row_id].stream, true);
     }
 
     while let Some(TwoColMergeRow(row_idx, v1, v2)) = sort.pop() {
         out_col1.push(v1);
         out_col2.push(v2);
-        order.push(rows[row_idx].stream);
+        order.push(chunks[row_idx].stream);
         match arr_iters[row_idx].0.next() {
             Some(v1) => {
                 let v2 = arr_iters[row_idx].1.next().unwrap();
@@ -102,38 +115,47 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(mut rows
                 );
 
                 sort.push(mr);
-                streams.set(rows[row_idx].stream, true);
             }
             None => {}
         }
+
+        if out_col1.len() >= array_size {
+            let out = vec![
+                PrimitiveArray::<T1>::from_vec(out_col1.drain(..).collect()).boxed(),
+                PrimitiveArray::<T2>::from_vec(out_col2.drain(..).collect()).boxed(),
+            ];
+            let arr_order = order.drain(..).collect();
+            res.push(MergedArrowChunk::new(out , arr_order));
+        }
     }
 
-    let out_row = vec![
-        Box::new(PrimitiveArray::<T1>::from_vec(mem::take(&mut out_col1))) as Box<dyn Array>,
-        Box::new(PrimitiveArray::<T2>::from_vec(mem::take(&mut out_col2))) as Box<dyn Array>,
-    ];
+    if !out_col1.is_empty() {
+        let out = vec![
+            PrimitiveArray::<T1>::from_vec(out_col1.drain(..).collect()).boxed(),
+            PrimitiveArray::<T2>::from_vec(out_col2.drain(..).collect()).boxed(),
+        ];
+        let arr_order = order.drain(..).collect();
+        res.push(MergedArrowChunk::new(out, arr_order));
+    }
 
-    let arr_order = mem::take(&mut order);
-    let arr_streams = streams.into_iter().collect();
-
-    Ok((ArrowChunk::new(out_row, 0), arr_order, arr_streams))
+    Ok(res)
 }
 
 
-pub fn merge(rows: Vec<ArrowChunk>) -> Result<(ArrowChunk, Vec<usize>, Vec<usize>)> {
-    match rows[0].arrs.len() {
+pub fn merge(chunks: Vec<ArrowChunk>, array_size: usize) -> Result<Vec<MergedArrowChunk>> {
+    match chunks[0].arrs.len() {
         2 => {
-            match (rows[0].arrs[0].data_type().to_physical_type(), rows[0].arrs[1].data_type().to_physical_type()) {
+            match (chunks[0].arrs[0].data_type().to_physical_type(), chunks[0].arrs[1].data_type().to_physical_type()) {
                 (arrow2::datatypes::PhysicalType::Primitive(a), arrow2::datatypes::PhysicalType::Primitive(b)) => {
                     match (a, b) {
-                        (PrimitiveType::Int64, PrimitiveType::Int64) => merge_two_primitives::<i64, i64>(rows),
+                        (PrimitiveType::Int64, PrimitiveType::Int64) => merge_two_primitives::<i64, i64>(chunks, array_size),
                         _ => unimplemented!("merge not implemented for {:?} {:?} primitive types", a, b)
                     }
                 }
-                _ => unimplemented!("merge not implemented for {:?} {:?} types", rows[0].arrs[0].data_type(), rows[0].arrs[1].data_type())
+                _ => unimplemented!("merge not implemented for {:?} {:?} types", chunks[0].arrs[0].data_type(), chunks[0].arrs[1].data_type())
             }
         }
-        _ => unimplemented!("merge not implemented for {:?} columns", rows[0].arrs.len())
+        _ => unimplemented!("merge not implemented for {:?} columns", chunks[0].arrs.len())
     }
 }
 

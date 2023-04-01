@@ -156,6 +156,7 @@ fn test_merger() -> anyhow::Result<()> {
         2,
         2,
         2,
+        2,
         "merged".to_string(),
     )?;
     merger.merge()?;
@@ -284,6 +285,7 @@ fn test_merger2() -> anyhow::Result<()> {
         2,
         2,
         2,
+        2,
         "merged".to_string(),
     )?;
     merger.merge()?;
@@ -313,12 +315,9 @@ fn test_merger3() -> anyhow::Result<()> {
 | a | b | c     |
 |---|---|-------|
 | 1 | 1 | 1     |
-| 1 | 2 |       |
-| 1 | 3 | 1     |
-| 2 | 1 | 1     |
-| 3 | 1 | 1     |
-| 3 | 2 | 1     |
-| 3 | 3 | 3     |
+| 2 | 2 |       |
+| 2 | 2 |       |
+| 2 | 2 | 2      |
     "#;
 
         let fields = vec![
@@ -346,6 +345,7 @@ fn test_merger3() -> anyhow::Result<()> {
     let mut merger = FileMerger::try_new(
         vec![iter1, iter2],
         w,
+        2,
         2,
         2,
         2,
@@ -450,7 +450,7 @@ fn test_merger5() -> anyhow::Result<()> {
             out[0].push(idx);
             out[1].push(v);
             out[2].push(c);
-            c+=1;
+            c += 1;
         }
     }
 

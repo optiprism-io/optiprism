@@ -469,3 +469,11 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
         self.next_page(col_path)
     }
 }
+
+mod tests {
+    #[test]
+    fn test_iterator() {
+
+    }
+
+}

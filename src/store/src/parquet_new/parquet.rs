@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::io::Read;
 use std::io::Seek;
-use std::simd::usizex2;
 
 use arrow2::array::Array;
 use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
@@ -12,7 +11,7 @@ use arrow2::io::parquet::write::WriteOptions;
 use futures::stream::iter;
 use futures::StreamExt;
 use arrow2::compute::concatenate::concatenate;
-use arrow2::io::parquet::read::column_iter_to_arrays;
+use arrow2::io::parquet::read::{column_iter_to_arrays, ParquetError};
 use arrow2::io::parquet::read::schema::convert::{to_data_type, to_primitive_type};
 use arrow2::io::parquet::read::schema::parquet_to_arrow_schema;
 use parquet2::compression::CompressionOptions;
@@ -37,19 +36,20 @@ use parquet2::write::Version;
 
 use crate::error::Result;
 use crate::error::StoreError;
-use crate::parquet_new::arrow::{ArrowChunk};
+use crate::parquet_new::arrow::{ArrowChunk, MergedArrowChunk};
 use crate::parquet_new::from_physical_type;
+use crate::parquet_new::merger::MergeReorder;
 use crate::parquet_new::ReorderSlice;
 use crate::parquet_new::Value;
 
 
 macro_rules! min_max_values {
     ($first_stats:expr,$last_stats:expr,$ty:ty)=>{{
-        match (first_stats.as_any().downcast_ref::<$ty>(), last_stats.as_any().downcast_ref::<$ty>()) {
+        match ($first_stats.as_any().downcast_ref::<$ty>(), $last_stats.as_any().downcast_ref::<$ty>()) {
             (Some(first), Some(last)) => {
                 (
-                    Value::from(first.min_value.unwrap()),
-                    Value::from(last.max_value.unwrap()),
+                    Value::from(first.min_value.clone().unwrap()),
+                    Value::from(last.max_value.clone().unwrap()),
                 )
             },
             _ => return Err(StoreError::Internal("no stats".to_string()))
@@ -57,8 +57,8 @@ macro_rules! min_max_values {
     }}
 }
 pub fn check_intersection(
-    chunks: &[IndexChunk],
-    other: Option<&IndexChunk>,
+    chunks: &[PagesChunk],
+    other: Option<&PagesChunk>,
 ) -> bool {
     if other.is_none() {
         return false;
@@ -111,9 +111,27 @@ pub fn data_page_to_array_simple(page: CompressedDataPage, primitive_type: &Prim
     Ok(r.next().unwrap()?)
 }
 
-pub fn pages_to_arrays<P: IntoIterator<Item=CompressedPage>>(pages: P, cd: &ColumnDescriptor, buf: &mut Vec<u8>) -> Result<Vec<dyn Array>> {
-    let arrs = pages.map(|page| data_page_to_array(page, cd, buf)).collect::<Result<Vec<Box<dyn Array>>>>()?;
-    Ok(arrs)
+pub fn pages_to_arrays(pages: Vec<CompressedPage>, cd: &ColumnDescriptor, chunk_size: Option<usize>, buf: &mut Vec<u8>) -> Result<Vec<Box<dyn Array>>> {
+    let data_type = to_primitive_type(&cd.descriptor.primitive_type);
+    let num_rows = pages.iter().map(|page| {
+        match page {
+            CompressedPage::Data(page) => page.num_values(),
+            _ => unimplemented!(),
+        }
+    }).sum();
+
+    let decompressed_pages = pages
+        .into_iter()
+        .map(|page| decompress(page, buf))
+        .collect::<parquet2::error::Result<Vec<_>>>()?;
+
+    let iter = decompressed_pages
+        .iter()
+        .map(|page| Ok(page))
+        .collect::<Vec<std::result::Result<_, ParquetError>>>();
+    let fallible_pages = fallible_streaming_iterator::convert(iter.into_iter());
+    let res = page_iter_to_arrays(fallible_pages, &cd.descriptor.primitive_type, data_type, chunk_size, num_rows)?;
+    Ok(res.collect::<arrow2::error::Result<Vec<_>>>()?)
 }
 
 pub fn data_page_to_array(page: CompressedDataPage, cd: &ColumnDescriptor, buf: &mut Vec<u8>) -> Result<Box<dyn Array>> {
@@ -129,24 +147,6 @@ pub fn data_page_to_array(page: CompressedDataPage, cd: &ColumnDescriptor, buf: 
         num_rows,
     )?;
     Ok(a.next().unwrap()?)
-}
-
-pub fn array_to_page(arr: Box<dyn Array>, typ: ParquetType) -> Result<CompressedPage> {
-    let opts = WriteOptions {
-        write_statistics: true,
-        compression: CompressionOptions::Snappy, // todo
-        version: Version::V2,
-        data_pagesize_limit: None,
-    };
-
-    println!("arr: {:#?}", arr);
-    let pages = array_to_columns(arr, typ, opts, &[Encoding::Plain])?.pop().unwrap();
-    let mut cp = pages
-        .into_iter()
-        .map(|page| compress(page.unwrap(), vec![], CompressionOptions::Snappy))
-        .collect::<std::result::Result<Vec<CompressedPage>, _>>()?;
-
-    Ok(cp.pop().unwrap())
 }
 
 pub fn array_to_pages_simple(arr: Box<dyn Array>, typ: ParquetType, data_pagesize_limit: usize) -> Result<Vec<CompressedPage>> {
@@ -168,27 +168,28 @@ pub fn array_to_pages_simple(arr: Box<dyn Array>, typ: ParquetType, data_pagesiz
 }
 
 pub fn get_page_min_max_values(pages: &[CompressedPage]) -> Result<(Value, Value)> {
-    match (pages.first(), pages.last()) {
+    match (pages.first().as_ref(), pages.last().as_ref()) {
         (Some(&CompressedPage::Data(first)), Some(&CompressedPage::Data(last))) => {
-            let (first_stats, last_stats) = (first.statistics(), last.statistics());
-            if first_stats.is_none() || last_stats.is_none() {
-                return Err(StoreError::Internal("no stats".to_string()));
+            match (first.statistics(), last.statistics()) {
+                (Some(first_stats), Some(last_stats)) => {
+                    let first_stats = first_stats?;
+                    let last_stats = last_stats?;
+
+                    let (min_value, max_value) = match first_stats.physical_type() {
+                        PhysicalType::Int32 => min_max_values!(first_stats, last_stats, PrimitiveStatistics<i32>),
+                        PhysicalType::Int64 => min_max_values!(first_stats, last_stats, PrimitiveStatistics<i64>),
+                        PhysicalType::Int96 => min_max_values!(first_stats, last_stats, PrimitiveStatistics<[u32;3]>),
+                        PhysicalType::Float => min_max_values!(first_stats, last_stats, PrimitiveStatistics<f32>),
+                        PhysicalType::Double => min_max_values!(first_stats, last_stats, PrimitiveStatistics<f64>),
+                        PhysicalType::ByteArray => min_max_values!(first_stats, last_stats, BinaryStatistics),
+                        PhysicalType::FixedLenByteArray(_) => min_max_values!(first_stats, last_stats, FixedLenStatistics),
+                        _ => unimplemented!(),
+                    };
+
+                    Ok((min_value, max_value))
+                }
+                _ => return Err(StoreError::Internal("no stats".to_string()))
             }
-
-            let (first_stats, last_stats) = (first_stats.unwrap()?, last_stats.unwrap()?);
-
-            let (min_value, max_value) = match first_stats.physical_type() {
-                PhysicalType::Int32 => min_max_values!(first_stats, last_stats, PrimitiveStatistics<i32>),
-                PhysicalType::Int64 => min_max_values!(first_stats, last_stats, PrimitiveStatistics<i64>),
-                PhysicalType::Int96 => min_max_values!(first_stats, last_stats, PrimitiveStatistics<[u32;3]>),
-                PhysicalType::Float => min_max_values!(first_stats, last_stats, PrimitiveStatistics<f32>),
-                PhysicalType::Double => min_max_values!(first_stats, last_stats, PrimitiveStatistics<f64>),
-                PhysicalType::ByteArray => min_max_values!(first_stats, last_stats, BinaryStatistics),
-                PhysicalType::FixedLenByteArray(_) => min_max_values!(first_stats, last_stats, FixedLenStatistics),
-                _ => unimplemented!(),
-            };
-
-            Ok((min_value, max_value))
         }
         _ => {
             return Err(StoreError::Internal("compressed page should be data".to_string()));
@@ -198,16 +199,29 @@ pub fn get_page_min_max_values(pages: &[CompressedPage]) -> Result<(Value, Value
 
 
 #[derive(Debug)]
-pub struct IndexChunk {
+pub struct MergedPagesChunk(pub PagesChunk, pub MergeReorder);
+
+impl MergedPagesChunk {
+    pub fn new(chunk: PagesChunk, merge_reorder: MergeReorder) -> Self {
+        Self(chunk, merge_reorder)
+    }
+
+    pub fn num_values(&self) -> usize {
+        self.0.num_values()
+    }
+}
+
+#[derive(Debug)]
+pub struct PagesChunk {
     pub cols: Vec<Vec<CompressedPage>>,
     pub min_values: Vec<Value>,
     pub max_values: Vec<Value>,
     pub stream: usize,
 }
 
-impl Eq for IndexChunk {}
+impl Eq for PagesChunk {}
 
-impl PartialOrd for IndexChunk {
+impl PartialOrd for PagesChunk {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(other.cmp(self))
     }
@@ -229,23 +243,19 @@ impl PartialOrd for IndexChunk {
     }
 }
 
-impl Ord for IndexChunk {
+impl Ord for PagesChunk {
     fn cmp(&self, other: &Self) -> Ordering {
         other.min_values.cmp(&self.min_values)
     }
 }
 
-impl PartialEq for IndexChunk {
+impl PartialEq for PagesChunk {
     fn eq(&self, other: &Self) -> bool {
         self.min_values == other.min_values && self.max_values == other.max_values
     }
 }
 
-impl IndexChunk {
-    pub fn new_from_pages(cols: Vec<Vec<CompressedPage>>, stream: usize) -> Self {
-        Self::new(cols, stream)
-    }
-
+impl PagesChunk {
     pub fn new(cols: Vec<Vec<CompressedPage>>, stream: usize) -> Self {
         let (min_values, max_values) = cols
             .iter()
@@ -255,8 +265,8 @@ impl IndexChunk {
             })
             .unzip();
 
-        IndexChunk {
-            cols: pages,
+        Self {
+            cols,
             min_values,
             max_values,
             stream,
@@ -271,40 +281,45 @@ impl IndexChunk {
         self.max_values.clone()
     }
 
+    pub fn num_values(&self) -> usize {
+        self.cols[0].iter().map(|page| match page {
+            CompressedPage::Data(page) => page.num_values(),
+            _ => unimplemented!()
+        }).sum()
+    }
     pub fn to_arrow_chunk(self, buf: &mut Vec<u8>, index_cols: &[ColumnDescriptor]) -> Result<ArrowChunk> {
         let cols = self.cols
             .into_iter()
             .zip(index_cols.iter())
-            .map(|(pages, cd)| {
-                let data_type = match &pages[0] {
-                    CompressedPage::Data(data) => to_primitive_type(&cd.descriptor.primitive_type),
-                    _ => unimplemented!(),
-                };
-
-                let num_rows = pages.iter().map(|page| {
-                    match page {
-                        CompressedPage::Data(page) => page.num_values(),
-                        _ => unimplemented!(),
-                    }
-                }).sum();
-                pages
-                    .into_iter()
-                    .map(|page| decompress(page, buf))
-                    .collect::<Result<Vec<Page>>>()
-                    .and_then(|pages| {
-                        let iter = pages
-                            .into_iter()
-                            .map(|page| Ok(page))
-                            .collect::<Vec<_>>();
-                        let pages = fallible_streaming_iterator::convert(iter.into_iter());
-
-                        page_iter_to_arrays(pages, &cd.descriptor.primitive_type, data_type, None, num_rows)
-                            .and_then(|mut arrs| arrs.next().unwrap()).into()
-                    }).collect::<Result<Vec<_>>>()
-            })
-            .collect::<Result<Vec<Vec<_>>>>()?;
+            .map(|(pages, cd)|
+                pages_to_arrays(pages, cd, None, buf)
+                    .and_then(|mut res| Ok(res.pop().unwrap())))
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(ArrowChunk::new(cols, self.stream))
+    }
+
+    pub fn from_arrow(arrs: &[Box<dyn Array>], index_cols: &[ColumnDescriptor]) -> Result<Self> {
+        let opts = WriteOptions {
+            write_statistics: true,
+            compression: CompressionOptions::Snappy, // todo
+            version: Version::V2,
+            data_pagesize_limit: None,
+        };
+        let cols = arrs
+            .into_iter()
+            .zip(index_cols.iter())
+            .map(|(arr, cd)|
+                array_to_columns(arr, cd.base_type.clone(), opts, &[Encoding::Plain])
+                    .and_then(|mut res| res.pop().unwrap().collect::<arrow2::error::Result<Vec<_>>>())
+                    .and_then(|pages|
+                        pages.into_iter()
+                            .map(|page| compress(page, vec![], CompressionOptions::Snappy))
+                            .collect::<parquet2::error::Result<Vec<_>>>()
+                            .map_err(|e| arrow2::error::Error::from_external_error(Box::new(e)))))
+            .collect::<arrow2::error::Result<Vec<_>>>()?;
+
+        Ok(Self::new(cols, 0))
     }
 }
 
@@ -321,11 +336,13 @@ pub struct CompressedPageIterator<R> {
 impl<R: Read + Seek> CompressedPageIterator<R> {
     pub fn try_new(mut reader: R) -> Result<Self> {
         let metadata = parquet2::read::read_metadata(&mut reader)?;
+        let chunk_buffer = metadata.schema().columns().iter().map(|col| (col.path_in_schema.clone(), VecDeque::new())).collect();
+        let row_group_cursors = metadata.schema().columns().iter().map(|col| (col.path_in_schema.clone(), 0)).collect();
         Ok(Self {
             reader,
             metadata,
-            row_group_cursors: HashMap::new(),
-            chunk_buffer: HashMap::new(),
+            row_group_cursors,
+            chunk_buffer,
             max_page_size: 1024 * 1024,
         })
     }
@@ -354,7 +371,7 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
             Some(buf.clear())
         });
 
-        let row_group_id = *(self.row_group_cursors.get(col_path).or(Some(&0)).unwrap());
+        let row_group_id = *self.row_group_cursors.get(col_path).unwrap();
         if row_group_id > self.metadata.row_groups.len() - 1 {
             return Ok(None);
         }
@@ -374,12 +391,7 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
             self.max_page_size,
         )?;
 
-        let col = pages.into_iter().map(|page| page.and_then(|page| match page {
-            CompressedPage::Data(pd) => {
-                Ok(pd)
-            }
-            _ => Err(StoreError::NotImplemented("Only data pages are supported".to_string()))
-        })).collect::<Result<Vec<_>>>()?;
+        let col = pages.into_iter().map(|page| page.map_err(|err| StoreError::from(err)).and_then(|page| Ok(page))).collect::<Result<Vec<_>>>()?;
 
         self.row_group_cursors
             .insert(col_path.to_owned(), row_group_id + 1);
@@ -396,32 +408,38 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
                 }
         */
 
-        let page = self
+        let a = self
             .chunk_buffer
-            .get_mut(col_path)
-            .and_then(|buf| buf.pop_front())
-            .or_else(|| {
-                let maybe_chunk = self.next_chunk(col_path)?;
-                if maybe_chunk.is_none() {
-                    return None;
-                }
+            .get_mut(col_path);
 
-                let mut chunk = maybe_chunk.unwrap();
-                self
-                    .chunk_buffer
-                    .get_mut(col_path)
-                    .and_then(|buf| {
-                        for page in chunk {
-                            buf.push_back(page);
+        println!("next page {:?}", col_path);
+        println!("chunk buffer len {:?}", self.chunk_buffer.get(col_path).unwrap().len());
+        let need_next = self.chunk_buffer.get(col_path).unwrap().is_empty();
+        println!("need next {}", need_next);
+        let maybe_page = if need_next {
+            match self.next_chunk(col_path)? {
+                None => None,
+                Some(pages) => {
+                    println!("buf pages {:?}", pages);
+                    match self.chunk_buffer.get_mut(col_path) {
+                        Some(buf) => {
+                            for page in pages {
+                                buf.push_back(page);
+                            }
+
+                            buf.pop_front()
                         }
-                        buf.pop_front()
-                    })
-                    .or_else(|| {
-                        self.chunk_buffer.insert(col_path.to_owned(), VecDeque::from(chunk));
-                        buf.pop_front()
-                    })
-            });
+                        _ => unreachable!()
+                    }
+                }
+            }
+        } else {
+            match self.chunk_buffer.get_mut(col_path) {
+                Some(buf) => buf.pop_front(),
+                _ => unreachable!()
+            }
+        };
 
-        Ok(page)
+        Ok(maybe_page)
     }
 }
