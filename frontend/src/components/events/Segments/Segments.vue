@@ -161,5 +161,9 @@ provide('editEvent', (payload: number) => {
     commonStore.togglePopupCreateCustomEvent(true)
 })
 
-watch(segmentsStore.segments, () => emit('get-event-segmentation'))
+segmentsStore.$subscribe((mutation) => {
+    if (mutation.type === 'direct') {
+        emit('get-event-segmentation');
+    }
+});
 </script>

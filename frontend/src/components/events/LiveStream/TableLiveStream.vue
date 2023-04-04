@@ -10,7 +10,7 @@
                         <template #after>
                             <UiDatePicker
                                 :value="calendarValue"
-                                :last-count="lastCount"
+                                :last-count="liveStreamStore.period.last"
                                 :active-tab-controls="liveStreamStore.period.type"
                                 @on-apply="onApplyPeriod"
                             >
@@ -103,7 +103,6 @@ import { EventCell as EventCellType } from '@/components/events/EventCell.vue'
 import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue'
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
-import UiSpinner from '@/components/uikit/UiSpinner.vue'
 import DataEmptyPlaceholder from '@/components/common/data/DataEmptyPlaceholder.vue';
 import DataLoader from '@/components/common/data/DataLoader.vue';
 import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue'
@@ -221,18 +220,10 @@ const tableData = computed(() => {
     })
 })
 
-const perios = computed(() => {
-    return liveStreamStore.period
-})
-
-const lastCount = computed(() => {
-    return perios.value.last
-})
-
 const calendarValue = computed(() => {
     return {
-        from: perios.value.from,
-        to: perios.value.to,
+        from: liveStreamStore.period?.from,
+        to: liveStreamStore.period?.to,
         multiple: false,
         dates: [],
     }

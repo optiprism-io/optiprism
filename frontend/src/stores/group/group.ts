@@ -2,9 +2,10 @@ import { defineStore } from 'pinia';
 import { GroupRecord, EventRecordsListRequestTime } from '@/api';
 import { groupRecordsService } from '@/api/services/groupRecords.service';
 import { useCommonStore } from '@/stores/common';
+import { useSegmentsStore } from '@/stores/reports/segments';
 
 export type Group = {
-    users: GroupRecord[],
+    items: GroupRecord[],
     loadingList: boolean,
     controlsPeriod: string | number;
     period: {
@@ -17,7 +18,7 @@ export type Group = {
 
 export const useGroupStore = defineStore('groupStore', {
     state: (): Group => ({
-        users: [],
+        items: [],
         loadingList: false,
         controlsPeriod: '30',
         period: {
@@ -30,15 +31,16 @@ export const useGroupStore = defineStore('groupStore', {
     actions: {
         async getList() {
             const commonStore = useCommonStore();
+            const segmentsStore = useSegmentsStore();
             try {
                 const res = await groupRecordsService.getList(commonStore.organizationId, commonStore.organizationId, {
                     time: this.timeRequest,
-                    group: 'users',
-                    // TODO  segments: EventSegmentationSegment[] / filters: EventGroupedFilters
+                    group: 'users', // TODO any group to use
+                    segments: segmentsStore.segmentationItems,
                 });
 
                 if (res?.data?.data) {
-                    this.users = res.data.data
+                    this.items = res.data.data
                 }
             } catch (e) {
                 console.error('error update event property');
@@ -52,6 +54,9 @@ export const useGroupStore = defineStore('groupStore', {
         },
     },
     getters: {
+        isPeriodActive(): boolean {
+            return Boolean(this.period.from) && Boolean(this.period.to) && this.controlsPeriod === 'calendar';
+        },
         timeRequest(): EventRecordsListRequestTime {
             switch (this.period.type) {
                 case 'last':

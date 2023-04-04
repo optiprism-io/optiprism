@@ -41,7 +41,7 @@
                 :value="props.from"
                 type="text"
                 placeholder="From"
-                @input="(e: Event) => onSelectBetween(e, 'from')"
+                @input="onSelectBetween($event, 'from')"
             />
             <span>-</span>
             <UiInput
@@ -49,7 +49,7 @@
                 :value="props.to"
                 type="text"
                 placeholder="To"
-                @input="(e: Event) => onSelectBetween(e, 'to')"
+                @input="onSelectBetween($event, 'to')"
             />
         </div>
         <div
@@ -131,22 +131,16 @@ const itemsEach = computed(() => {
     })
 })
 
-const onSelectLastCount = (e: Event) => {
-    const target = e.target as HTMLInputElement
-    emit('on-select-last-count', Number(target.value))
+const onSelectLastCount = (value: string) => {
+    emit('on-select-last-count', Number(value));
 }
 
-const onSelectSinceDate = (e: Event) => {
-    const target = e.target as HTMLInputElement
-    emit('on-change-since', target.value)
+const onSelectSinceDate = (value: string) => {
+    emit('on-change-since', value);
 }
 
-const onSelectBetween = (e: Event, type: 'from' | 'to') => {
-    const target = e.target as HTMLInputElement
-    emit('on-change-between', {
-        type,
-        value: target.value,
-    })
+const onSelectBetween = (value: string, type: 'from' | 'to') => {
+    emit('on-change-between', { type, value });
 }
 
 const onSelectEach = (payload: Each) => emit('on-change-each', payload)

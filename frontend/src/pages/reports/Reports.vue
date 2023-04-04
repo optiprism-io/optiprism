@@ -225,9 +225,9 @@ const onSelectReport = (id: number) => {
 
 onMounted(async () => {
     reportsStore.loading = true
-    lexiconStore.getEvents()
-    lexiconStore.getEventProperties()
-    lexiconStore.getUserProperties()
+    // lexiconStore.getEvents()
+    // lexiconStore.getEventProperties()
+    // lexiconStore.getUserProperties()
     eventsStore.initPeriod()
     await reportsStore.getList()
     const reportId = route.params.id;

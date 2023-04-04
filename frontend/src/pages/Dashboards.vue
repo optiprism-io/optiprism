@@ -381,9 +381,6 @@ const onEditNameDashboard = (payload: boolean) => {
 };
 
 onMounted(async () => {
-    lexiconStore.getEvents()
-    lexiconStore.getEventProperties()
-    lexiconStore.getUserProperties()
     if (!dashboards.value?.length) {
         await getDashboardsList()
     }

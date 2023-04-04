@@ -138,6 +138,7 @@ const emit = defineEmits<{
 
 const popupWrapper = ref<HTMLDivElement>()
 const initialBodyOverflow = ref('')
+const boxMargin = computed(() => props.centered ? 'auto' : '50px auto auto')
 
 const onClickOutside = (e: MouseEvent) => {
     if (!props.closableOverlay) {
@@ -168,7 +169,6 @@ const escHandler = (e: KeyboardEvent) => {
     }
 }
 
-
 onMounted(() => {
     if (props.saveBodyOverflow) {
         initialBodyOverflow.value = document.body.style.overflow
@@ -198,10 +198,7 @@ onUnmounted(() => {
     if (props.saveBodyOverflow) {
         document.body.style.overflow = initialBodyOverflow.value
     }
-})
-
-const boxMargin = computed(() => props.centered ? 'auto' : '50px auto auto')
-
+});
 </script>
 <style lang="scss">
 $text-color: #171B24;

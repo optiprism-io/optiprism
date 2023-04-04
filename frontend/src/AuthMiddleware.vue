@@ -25,6 +25,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth/auth'
 import { useDashboardsStore } from '@/stores/dashboards'
 import { useReportsStore } from '@/stores/reports/reports'
+import { useLexiconStore } from '@/stores/lexicon';
 import { pagesMap } from '@/router'
 
 const state = ref<'pending' | 'ok' | 'error'>('pending')
@@ -36,6 +37,7 @@ const commonStore = useCommonStore()
 const authStore = useAuthStore()
 const dashboardsStore = useDashboardsStore()
 const reportsStore = useReportsStore()
+const lexiconStore = useLexiconStore();
 
 const togglePopupCreateCustomEvent = (payload: boolean) => {
     commonStore.togglePopupCreateCustomEvent(payload)
@@ -46,6 +48,10 @@ const applyCreateCustomEvent = () => {
 }
 
 const getStartData = () => {
+    lexiconStore.getEvents();
+    lexiconStore.getEventProperties();
+    lexiconStore.getUserProperties();
+
     if (!dashboardsStore.dashboards.length) {
         dashboardsStore.getDashboards();
     }
