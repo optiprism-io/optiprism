@@ -5,7 +5,6 @@
             :items="items"
         />
         <router-view />
-
         <EventPropertyPopup
             v-if="commonStore.showEventPropertyPopup"
             :loading="propertyPopupLoading"

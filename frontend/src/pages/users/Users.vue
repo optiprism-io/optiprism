@@ -38,8 +38,6 @@
                             </UiToggleGroup>
                         </template>
                     </UiTable>
-                    <!-- TODO table data format -->
-                    {{ groupStore.items }}
                 </UiCardContainer>
             </template>
         </ToolsLayout>
@@ -49,21 +47,24 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted } from 'vue';
 import { useGroupStore } from '@/stores/group/group';
-import { Action } from '@/components/uikit/UiTable/UiTable';
+import { Row, Action } from '@/components/uikit/UiTable/UiTable';
 import { useSegmentsStore } from '@/stores/reports/segments';
+import { GroupRecord } from '@/api';
 
 import Segments from '@/components/events/Segments/Segments.vue';
-import UiTable from '@/components/uikit/UiTable/UiTable.vue';
 import ToolsLayout from '@/layout/tools/ToolsLayout.vue';
 import UiCardContainer from '@/components/uikit/UiCard/UiCardContainer.vue';
 import UiCard from '@/components/uikit/UiCard/UiCard.vue';
-import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue'
+import UiTable from '@/components/uikit/UiTable/UiTable.vue';
+import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue';
 import UiDatePickerWrappet, { DataPickerPeriod } from '@/components/uikit/UiDatePickerWrappet.vue';
+import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue';
+import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue';
 import { I18N } from '@/utils/i18n';
 
 const i18n = inject('i18n') as I18N;
 const groupStore = useGroupStore();
-const segmentsStore = useSegmentsStore()
+const segmentsStore = useSegmentsStore();
 
 const itemsPeriod = computed(() => {
     return ['7', '30', '90'].map((key): UiToggleGroupItem => ({
@@ -75,11 +76,57 @@ const itemsPeriod = computed(() => {
 });
 
 const items = computed(() => {
-    return [];
+    return groupStore.items.map((item: GroupRecord): Row => {
+        return [
+            {
+                key: 'id',
+                value: 'id',
+                title: item.id,
+                component: UiTablePressedCell,
+                action: {
+                    type: item.id,
+                    name: item.group,
+                }
+            },
+            {
+                key: 'group',
+                title: item.group,
+                nowrap: true,
+            },
+            {
+                key: 'properties',
+                title: Object.keys(item.properties).reduce((string, key) => {
+                    return string += `${key}: ${item.properties[key]}; `;
+                }, ''),
+                nowrap: true,
+            },
+            {
+                title: 'action',
+                key: 'action',
+                value: item.id,
+                component: UiCellToolMenu,
+                items: [
+                    {
+                        label: i18n.$t('common.edit'),
+                        value: 'edit',
+                    },
+                ],
+                type: 'action'
+            },
+        ]
+    })
 });
 
 const columns = computed(() => {
-    return [];
+    return ['id', 'group', 'properties', 'action'].map(key => {
+        const isAction = key === 'action';
+        return {
+            value: key,
+            title: isAction ? '' : i18n.$t(`groups.columns.${key}`),
+            default: isAction,
+            type: isAction? 'action' : '',
+        };
+    })
 });
 
 const onAction = (payload: Action) => {

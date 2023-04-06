@@ -200,6 +200,14 @@
     }
   },
 
+  "groups": {
+    "columns": {
+      "id": "ID",
+      "group": "Group",
+      "properties": "Properties"
+    }
+  },
+
   "funnels": {
     "funnels": "Funnels",
     "untitledFunnel": "Untitled Funnel",

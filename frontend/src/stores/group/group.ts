@@ -6,7 +6,8 @@ import { useSegmentsStore } from '@/stores/reports/segments';
 
 export type Group = {
     items: GroupRecord[],
-    loadingList: boolean,
+    loading: boolean,
+    loadingOne: boolean,
     controlsPeriod: string | number;
     period: {
         from: string,
@@ -19,7 +20,8 @@ export type Group = {
 export const useGroupStore = defineStore('groupStore', {
     state: (): Group => ({
         items: [],
-        loadingList: false,
+        loading: false,
+        loadingOne: false,
         controlsPeriod: '30',
         period: {
             from: '',
@@ -30,6 +32,7 @@ export const useGroupStore = defineStore('groupStore', {
     }),
     actions: {
         async getList() {
+            this.loading = true;
             const commonStore = useCommonStore();
             const segmentsStore = useSegmentsStore();
             try {
@@ -45,6 +48,7 @@ export const useGroupStore = defineStore('groupStore', {
             } catch (e) {
                 console.error('error update event property');
             }
+            this.loading = false;
         },
         get() {
             // TODO
@@ -83,6 +87,9 @@ export const useGroupStore = defineStore('groupStore', {
                         unit: 'day'
                     }
             }
+        },
+        isNoData(): boolean {
+            return !this.items.length && !this.loading
         },
     },
 });
