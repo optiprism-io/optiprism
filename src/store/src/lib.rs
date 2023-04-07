@@ -21,7 +21,7 @@ pub mod test_util {
     use std::path::Path;
 
     use anyhow::anyhow;
-    use arrow2::array::Array;
+    use arrow2::array::{Array, BinaryArray, FixedSizeBinaryArray, MutableBinaryArray, MutableFixedSizeBinaryArray, PrimitiveArray};
     use arrow2::array::BooleanArray;
     use arrow2::array::Float64Array;
     use arrow2::array::Int32Array;
@@ -269,28 +269,165 @@ pub mod test_util {
         }
     }
 
-    macro_rules! make_arrays {
-    ($type:tt $(, $page:tt)*) => {{
-        vec!($(vec!$page),*).into_iter().map(|vals| $type::from_slice(vals).boxed()).collect::<Vec<_>>()
-    }};
-}
+    pub fn gen_idx_primitive_array<T: NativeType + num_traits::NumCast>(n: usize) -> PrimitiveArray<T> {
+        let mut ret = Vec::with_capacity(n);
 
-    macro_rules! make_nullable_arrays {
-        ($type:ident $(, $page:tt)*) => {{
-            vec!($(vec!$page),*).iter().map(|vals| $type::from(vals).boxed()).collect::<Vec<_>>()
-        }};
+        for idx in 0..n {
+            for _ in 0..idx {
+                ret.push(T::from(idx).unwrap());
+            }
+        }
+
+        PrimitiveArray::<T>::from_slice(ret)
     }
 
-    macro_rules! make_utf_arrays {
-        ($($page:tt),*) => {{
-            vec!($(vec!$page),*).into_iter().map(|vals| Utf8Array::<i64>::from_slice(vals).boxed()).collect::<Vec<_>>()
-        }};
+    pub fn gen_secondary_idx_primitive_array<T: NativeType + num_traits::NumCast>(
+        n: usize,
+    ) -> PrimitiveArray<T> {
+        let mut ret = Vec::with_capacity(n);
+
+        for idx in 0..n {
+            for v in 1..idx {
+                ret.push(T::from(v).unwrap());
+            }
+        }
+
+        PrimitiveArray::<T>::from_slice(ret)
     }
 
-    macro_rules! make_nullable_utf_arrays {
-        ($($page:tt),*) => {{
-            vec!($(vec!$page),*).into_iter().map(|vals| Utf8Array::<i64>::from(vals).boxed()).collect::<Vec<_>>()
-        }};
+    pub fn gen_primitive_data_array<T: NativeType + num_traits::NumCast>(
+        n: usize,
+        nulls: Option<usize>,
+    ) -> PrimitiveArray<T> {
+        let mut ret = Vec::with_capacity(n);
+
+        for idx in 0..n {
+            if nulls.is_some() && idx % nulls.unwrap() == 0 {
+                ret.push(None);
+            } else {
+                ret.push(Some(T::from(idx).unwrap()));
+            }
+        }
+
+        PrimitiveArray::<T>::from(ret)
+    }
+
+
+    pub fn gen_utf8_data_array<T: Offset>(n: usize, nulls: Option<usize>) -> Utf8Array<T> {
+        let mut ret = Vec::with_capacity(n);
+
+        for idx in 0..n {
+            if nulls.is_some() && idx % nulls.unwrap() == 0 {
+                ret.push(None);
+            } else {
+                ret.push(Some(format!("{idx}")));
+            }
+        }
+
+        Utf8Array::<T>::from(ret)
+    }
+
+    pub fn gen_binary_data_array<T: Offset>(n: usize, nulls: Option<usize>) -> BinaryArray<T> {
+        let mut ret = Vec::with_capacity(n);
+
+        for idx in 0..n {
+            if nulls.is_some() && idx % nulls.unwrap() == 0 {
+                ret.push(None);
+            } else {
+                ret.push(Some(format!("{idx}")));
+            }
+        }
+
+        BinaryArray::<T>::from(ret)
+    }
+
+
+    pub fn gen_fixed_size_binary_data_array(
+        n: usize,
+        nulls: Option<usize>,
+        size: usize,
+    ) -> FixedSizeBinaryArray {
+        let mut ret = Vec::with_capacity(n);
+
+        for idx in 0..n {
+            if nulls.is_some() && idx % nulls.unwrap() == 0 {
+                ret.push(None);
+            } else {
+                ret.push(Some(format!("{:0size$}", idx, size = size)));
+            }
+        }
+
+        FixedSizeBinaryArray::from_iter(ret, size)
+    }
+
+    pub fn gen_boolean_data_array(n: usize, nulls: Option<usize>) -> BooleanArray {
+        let mut ret = Vec::with_capacity(n);
+
+        for idx in 0..n {
+            if nulls.is_some() && idx % nulls.unwrap() == 0 {
+                ret.push(None);
+            } else {
+                ret.push(Some(idx % 2 == 0));
+            }
+        }
+
+        BooleanArray::from(ret)
+    }
+
+    pub fn gen_primitive_data_list_array<O: Offset, N: NativeType + num_traits::NumCast>(n: usize, nulls: Option<usize>) -> ListArray<O> {
+        let mut vals = Vec::with_capacity(n);
+
+        for idx in 0..n {
+            if nulls.is_some() && idx % nulls.unwrap() == 0 {
+                vals.push(None);
+            } else {
+                vals.push(Some(vec![N::from(idx).unwrap()]));
+            }
+        }
+
+        create_list_primitive_array::<O, N, _, _>(vals)
+    }
+
+    pub fn gen_utf8_data_list_array<O: Offset>(n: usize, nulls: Option<usize>) -> ListArray<O> {
+        let mut vals = Vec::with_capacity(n);
+
+        for idx in 0..n {
+            if nulls.is_some() && idx % nulls.unwrap() == 0 {
+                vals.push(None);
+            } else {
+                vals.push(Some(vec![format!("{idx}")]));
+            }
+        }
+
+        create_list_utf8_array::<O, _, _>(vals)
+    }
+
+    pub fn gen_binary_data_list_array<O: Offset>(n: usize, nulls: Option<usize>) -> ListArray<O> {
+        let mut ret = Vec::with_capacity(n);
+
+        for idx in 0..n {
+            if nulls.is_some() && idx % nulls.unwrap() == 0 {
+                ret.push(None);
+            } else {
+                ret.push(Some(vec![format!("{idx}")]));
+            }
+        }
+
+        create_list_binary_array::<O, _, _>(ret)
+    }
+
+    pub fn gen_boolean_data_list_array<O: Offset>(n: usize, nulls: Option<usize>) -> ListArray<O> {
+        let mut vals = Vec::with_capacity(n);
+
+        for idx in 0..n {
+            if nulls.is_some() && idx % nulls.unwrap() == 0 {
+                vals.push(None);
+            } else {
+                vals.push(Some(vec![idx % 2 == 0]));
+            }
+        }
+
+        create_list_bool_array::<O, _, _>(vals)
     }
 
     pub fn create_list_primitive_array<O: Offset, N: NativeType, U: AsRef<[N]>, T: AsRef<[Option<U>]>>(
@@ -317,7 +454,7 @@ pub mod test_util {
         array.into()
     }
 
-    pub fn create_list_string_array<O: Offset, U: AsRef<[String]>, T: AsRef<[Option<U>]>>(
+    pub fn create_list_utf8_array<O: Offset, U: AsRef<[String]>, T: AsRef<[Option<U>]>>(
         data: T,
     ) -> ListArray<O> {
         let iter = data.as_ref().iter().map(|x| {
@@ -329,6 +466,22 @@ pub mod test_util {
             })
         });
         let mut array = MutableListArray::<O, MutableUtf8Array<i32>>::new();
+        array.try_extend(iter).unwrap();
+        array.into()
+    }
+
+    pub fn create_list_binary_array<O: Offset, U: AsRef<[String]>, T: AsRef<[Option<U>]>>(
+        data: T,
+    ) -> ListArray<O> {
+        let iter = data.as_ref().iter().map(|x| {
+            x.as_ref().map(|x| {
+                x.as_ref()
+                    .iter()
+                    .map(|x| Some(x.to_owned()))
+                    .collect::<Vec<_>>()
+            })
+        });
+        let mut array = MutableListArray::<O, MutableBinaryArray<i32>>::new();
         array.try_extend(iter).unwrap();
         array.into()
     }
@@ -460,7 +613,7 @@ pub mod test_util {
                     DataType::Utf8 => {
                         let vals: Vec<Option<Vec<String>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_string_array::<i32, _, _>(vals).boxed()
+                        create_list_utf8_array::<i32, _, _>(vals).boxed()
                     }
                     _ => unimplemented!(),
                 },
@@ -488,7 +641,7 @@ pub mod test_util {
                     DataType::Utf8 => {
                         let vals: Vec<Option<Vec<String>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_string_array::<i64, _, _>(vals).boxed()
+                        create_list_utf8_array::<i64, _, _>(vals).boxed()
                     }
                     _ => unimplemented!(),
                 },
@@ -518,10 +671,10 @@ pub mod test_util {
         let mut idx = 0;
         let mut chunks = vec![];
         while idx < arrs[0].len() {
-            println!("idx {idx} pages_per_row_group {pages_per_row_group} page_size {page_size} len {}",arrs[0].len());
+            println!("idx {idx} pages_per_row_group {pages_per_row_group} page_size {page_size} len {}", arrs[0].len());
             let end = std::cmp::min(idx + (pages_per_row_group * page_size), arrs[0].len());
             let chunk = arrs.iter().map(|arr| arr.sliced(idx, end - idx)).collect::<Vec<_>>();
-            println!("{:?}",chunk);
+            println!("{:?}", chunk);
             chunks.push(Ok(Chunk::new(chunk)));
             idx += pages_per_row_group * page_size;
         }

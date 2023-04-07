@@ -196,7 +196,7 @@ fn test_merger2() -> anyhow::Result<()> {
 
         let fields = vec![
             Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
+            Field::new("b", DataType::Int32, true),
             Field::new("c", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
             Field::new("d", DataType::Utf8, true),
             Field::new("e", DataType::List(Box::new(Field::new("1", DataType::Utf8, true))), true),
@@ -230,7 +230,7 @@ fn test_merger2() -> anyhow::Result<()> {
 
         let fields = vec![
             Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
+            Field::new("b", DataType::Int32, true),
             Field::new("c", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
         ];
 
@@ -261,7 +261,7 @@ fn test_merger2() -> anyhow::Result<()> {
 
         let fields = vec![
             Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
+            Field::new("b", DataType::Int32, true),
             Field::new("c", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
         ];
 

@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
+num-traits = "0.2.15"
 test-log = "0.2.11"
 env_logger = "*"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }

@@ -323,6 +323,7 @@ impl CompressedDataPagesRow {
             .into_iter()
             .map(|p| {
                 if let CompressedPage::Data(dp) = p {
+                    println!("nnumv {}",dp.num_values());
                     dp
                 } else {
                     unimplemented!("dicts are not supported")

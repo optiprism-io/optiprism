@@ -5,7 +5,7 @@ use std::io::BufReader;
 use std::io::Cursor;
 use std::path::Path;
 
-use arrow2::array::Array;
+use arrow2::array::{Array, BinaryArray, FixedSizeBinaryArray};
 use arrow2::array::BooleanArray;
 use arrow2::array::Float64Array;
 use arrow2::array::Int32Array;
@@ -46,8 +46,48 @@ use parquet2::write::WriteOptions;
 use store::error::Result;
 use store::parquet_new::merger::FileMerger;
 use store::parquet_new::parquet::CompressedPageIterator;
-use store::test_util::create_parquet_from_arrays;
+use store::test_util::{create_list_primitive_array, create_parquet_from_arrays, gen_binary_data_array, gen_binary_data_list_array, gen_boolean_data_array, gen_boolean_data_list_array, gen_fixed_size_binary_data_array, gen_idx_primitive_array, gen_primitive_data_array, gen_primitive_data_list_array, gen_secondary_idx_primitive_array, gen_utf8_data_array, gen_utf8_data_list_array};
 use store::test_util::parse_markdown_table;
+
+
+#[test]
+fn test() {
+    let a = gen_idx_primitive_array::<i32>(100);
+    println!("{:?}", a);
+    let b = gen_secondary_idx_primitive_array::<i32>(100);
+    println!("{:?}", b);
+
+    let c = gen_primitive_data_array::<i32>(b.len(), Some(123));
+    println!("22 {:?}", c);
+
+    let d = gen_utf8_data_array::<i32>(10, Some(2));
+    println!("{:?}", d);
+    let d = gen_utf8_data_array::<i64>(10, Some(2));
+    println!("{:?}", d);
+
+    let d = gen_boolean_data_array(100, None::<usize>);
+    println!("{:?}", d);
+    let d = gen_binary_data_array::<i32>(100, None::<usize>);
+    println!("{:?}", d);
+    let d = gen_fixed_size_binary_data_array(100, None::<usize>, 10);
+    println!("{:?}", d);
+
+    let vals = vec![Some(vec![1, 2, 3]), Some(vec![1, 2, 3])];
+    let b = create_list_primitive_array::<i32, _, _, _>(vals).boxed();
+    println!("{:?}", b);
+
+    let b = gen_primitive_data_list_array::<i32, u32>(100, Some(4));
+    println!("{:?}", b);
+
+    let b = gen_utf8_data_list_array::<i32>(100, Some(4));
+    println!("{:?}", b);
+
+    let b = gen_boolean_data_list_array::<i32>(100, Some(4));
+    println!("{:?}", b);
+
+    let b = gen_binary_data_list_array::<i32>(100, Some(4));
+    println!("{:?}", b);
+}
 
 #[test]
 fn test_merger() -> anyhow::Result<()> {
@@ -197,7 +237,7 @@ fn test_merger2() -> anyhow::Result<()> {
 
         let fields = vec![
             Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
+            Field::new("b", DataType::Int32, true),
             Field::new("c", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
             Field::new("d", DataType::Utf8, true),
             Field::new("e", DataType::List(Box::new(Field::new("1", DataType::Utf8, true))), true),
@@ -231,7 +271,7 @@ fn test_merger2() -> anyhow::Result<()> {
 
         let fields = vec![
             Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
+            Field::new("b", DataType::Int32, true),
             Field::new("c", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
         ];
 
@@ -262,7 +302,7 @@ fn test_merger2() -> anyhow::Result<()> {
 
         let fields = vec![
             Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
+            Field::new("b", DataType::Int32, true),
             Field::new("c", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
         ];
 
@@ -419,8 +459,32 @@ fn test_merger4() -> anyhow::Result<()> {
     Ok(())
 }
 
+
+fn gen_arrays(idx_fields: Vec<Field>, data_fields: Vec<Field>) -> Vec<Box<dyn Array>> {
+    let out = vec![];
+
+    /*    for (idx, field) in idx_fields.iter().enumerate() {
+            match field.data_type {
+                DataType::Int64 =>
+            }
+        }*/
+
+    out
+}
+
 #[test]
 fn test_merger5() -> anyhow::Result<()> {
+    let data = gen_arrays(
+        vec![
+            Field::new("a", DataType::Int64, true),
+            Field::new("b", DataType::Int64, true),
+        ],
+        vec![
+            Field::new("c", DataType::Int64, true),
+            Field::new("d", DataType::Int64, true),
+        ],
+    );
+
     let data = r#"
 | a | b | c     |
 |---|---|-------|

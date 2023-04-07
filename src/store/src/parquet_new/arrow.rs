@@ -149,6 +149,7 @@ pub fn merge(chunks: Vec<ArrowChunk>, array_size: usize) -> Result<Vec<MergedArr
                 (arrow2::datatypes::PhysicalType::Primitive(a), arrow2::datatypes::PhysicalType::Primitive(b)) => {
                     match (a, b) {
                         (PrimitiveType::Int64, PrimitiveType::Int64) => merge_two_primitives::<i64, i64>(chunks, array_size),
+                        (PrimitiveType::Int64, PrimitiveType::Int32) => merge_two_primitives::<i64, i32>(chunks, array_size),
                         _ => unimplemented!("merge not implemented for {:?} {:?} primitive types", a, b)
                     }
                 }
