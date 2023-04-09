@@ -281,18 +281,52 @@ pub mod test_util {
         PrimitiveArray::<T>::from_slice(ret)
     }
 
+    pub fn gen_idx_primitive_array_from_arrow_type(pt: &arrow2::types::PrimitiveType, n: usize) -> Box<dyn Array> {
+        match pt {
+            arrow2::types::PrimitiveType::Int8 => gen_idx_primitive_array::<i8>(n).boxed(),
+            arrow2::types::PrimitiveType::Int16 => gen_idx_primitive_array::<i16>(n).boxed(),
+            arrow2::types::PrimitiveType::Int32 => gen_idx_primitive_array::<i32>(n).boxed(),
+            arrow2::types::PrimitiveType::Int64 => gen_idx_primitive_array::<i64>(n).boxed(),
+            arrow2::types::PrimitiveType::Int128 => gen_idx_primitive_array::<i128>(n).boxed(),
+            arrow2::types::PrimitiveType::UInt8 => gen_idx_primitive_array::<u8>(n).boxed(),
+            arrow2::types::PrimitiveType::UInt16 => gen_idx_primitive_array::<u16>(n).boxed(),
+            arrow2::types::PrimitiveType::UInt32 => gen_idx_primitive_array::<u32>(n).boxed(),
+            arrow2::types::PrimitiveType::UInt64 => gen_idx_primitive_array::<u64>(n).boxed(),
+            arrow2::types::PrimitiveType::Float32 => gen_idx_primitive_array::<f32>(n).boxed(),
+            arrow2::types::PrimitiveType::Float64 => gen_idx_primitive_array::<f64>(n).boxed(),
+            _ => unimplemented!()
+        }.to_boxed()
+    }
+
     pub fn gen_secondary_idx_primitive_array<T: NativeType + num_traits::NumCast>(
         n: usize,
     ) -> PrimitiveArray<T> {
         let mut ret = Vec::with_capacity(n);
 
         for idx in 0..n {
-            for v in 1..idx {
+            for v in 0..idx {
                 ret.push(T::from(v).unwrap());
             }
         }
 
         PrimitiveArray::<T>::from_slice(ret)
+    }
+
+    pub fn gen_secondary_idx_primitive_array_from_arrow_type(pt: &arrow2::types::PrimitiveType, n: usize) -> Box<dyn Array> {
+        match pt {
+            arrow2::types::PrimitiveType::Int8 => gen_secondary_idx_primitive_array::<i8>(n).boxed(),
+            arrow2::types::PrimitiveType::Int16 => gen_secondary_idx_primitive_array::<i16>(n).boxed(),
+            arrow2::types::PrimitiveType::Int32 => gen_secondary_idx_primitive_array::<i32>(n).boxed(),
+            arrow2::types::PrimitiveType::Int64 => gen_secondary_idx_primitive_array::<i64>(n).boxed(),
+            arrow2::types::PrimitiveType::Int128 => gen_secondary_idx_primitive_array::<i128>(n).boxed(),
+            arrow2::types::PrimitiveType::UInt8 => gen_secondary_idx_primitive_array::<u8>(n).boxed(),
+            arrow2::types::PrimitiveType::UInt16 => gen_secondary_idx_primitive_array::<u16>(n).boxed(),
+            arrow2::types::PrimitiveType::UInt32 => gen_secondary_idx_primitive_array::<u32>(n).boxed(),
+            arrow2::types::PrimitiveType::UInt64 => gen_secondary_idx_primitive_array::<u64>(n).boxed(),
+            arrow2::types::PrimitiveType::Float32 => gen_secondary_idx_primitive_array::<f32>(n).boxed(),
+            arrow2::types::PrimitiveType::Float64 => gen_secondary_idx_primitive_array::<f64>(n).boxed(),
+            _ => unimplemented!()
+        }.to_boxed()
     }
 
     pub fn gen_primitive_data_array<T: NativeType + num_traits::NumCast>(
@@ -312,6 +346,22 @@ pub mod test_util {
         PrimitiveArray::<T>::from(ret)
     }
 
+    pub fn gen_primitive_data_array_from_arrow_type(pt: &arrow2::types::PrimitiveType, n: usize, nulls: Option<usize>) -> Box<dyn Array> {
+        match pt {
+            arrow2::types::PrimitiveType::Int8 => gen_primitive_data_array::<i8>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Int16 => gen_primitive_data_array::<i16>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Int32 => gen_primitive_data_array::<i32>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Int64 => gen_primitive_data_array::<i64>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Int128 => gen_primitive_data_array::<i128>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::UInt8 => gen_primitive_data_array::<u8>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::UInt16 => gen_primitive_data_array::<u16>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::UInt32 => gen_primitive_data_array::<u32>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::UInt64 => gen_primitive_data_array::<u64>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Float32 => gen_primitive_data_array::<f32>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Float64 => gen_primitive_data_array::<f64>(n, nulls).boxed(),
+            _ => unimplemented!()
+        }.to_boxed()
+    }
 
     pub fn gen_utf8_data_array<T: Offset>(n: usize, nulls: Option<usize>) -> Utf8Array<T> {
         let mut ret = Vec::with_capacity(n);
@@ -388,7 +438,24 @@ pub mod test_util {
         create_list_primitive_array::<O, N, _, _>(vals)
     }
 
-    pub fn gen_utf8_data_list_array<O: Offset>(n: usize, nulls: Option<usize>) -> ListArray<O> {
+    pub fn gen_primitive_data_list_array_from_arrow_type(pt: &arrow2::types::PrimitiveType, n: usize, nulls: Option<usize>) -> Box<dyn Array> {
+        match pt {
+            arrow2::types::PrimitiveType::Int8 => gen_primitive_data_list_array::<i32, i8>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Int16 => gen_primitive_data_list_array::<i32, i16>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Int32 => gen_primitive_data_list_array::<i32, i32>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Int64 => gen_primitive_data_list_array::<i32, i64>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Int128 => gen_primitive_data_list_array::<i32, i128>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::UInt8 => gen_primitive_data_list_array::<i32, u8>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::UInt16 => gen_primitive_data_list_array::<i32, u16>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::UInt32 => gen_primitive_data_list_array::<i32, u32>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::UInt64 => gen_primitive_data_list_array::<i32, u64>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Float32 => gen_primitive_data_list_array::<i32, f32>(n, nulls).boxed(),
+            arrow2::types::PrimitiveType::Float64 => gen_primitive_data_list_array::<i32, f64>(n, nulls).boxed(),
+            _ => unimplemented!()
+        }.to_boxed()
+    }
+
+    pub fn gen_utf8_data_list_array<O: Offset, O2: Offset>(n: usize, nulls: Option<usize>) -> ListArray<O> {
         let mut vals = Vec::with_capacity(n);
 
         for idx in 0..n {
@@ -399,10 +466,10 @@ pub mod test_util {
             }
         }
 
-        create_list_utf8_array::<O, _, _>(vals)
+        create_list_utf8_array::<O, O2, _, _>(vals)
     }
 
-    pub fn gen_binary_data_list_array<O: Offset>(n: usize, nulls: Option<usize>) -> ListArray<O> {
+    pub fn gen_binary_data_list_array<O: Offset, O2: Offset>(n: usize, nulls: Option<usize>) -> ListArray<O> {
         let mut ret = Vec::with_capacity(n);
 
         for idx in 0..n {
@@ -413,7 +480,7 @@ pub mod test_util {
             }
         }
 
-        create_list_binary_array::<O, _, _>(ret)
+        create_list_binary_array::<O, O2, _, _>(ret)
     }
 
     pub fn gen_boolean_data_list_array<O: Offset>(n: usize, nulls: Option<usize>) -> ListArray<O> {
@@ -454,7 +521,7 @@ pub mod test_util {
         array.into()
     }
 
-    pub fn create_list_utf8_array<O: Offset, U: AsRef<[String]>, T: AsRef<[Option<U>]>>(
+    pub fn create_list_utf8_array<O: Offset, O2: Offset, U: AsRef<[String]>, T: AsRef<[Option<U>]>>(
         data: T,
     ) -> ListArray<O> {
         let iter = data.as_ref().iter().map(|x| {
@@ -465,12 +532,12 @@ pub mod test_util {
                     .collect::<Vec<_>>()
             })
         });
-        let mut array = MutableListArray::<O, MutableUtf8Array<i32>>::new();
+        let mut array = MutableListArray::<O, MutableUtf8Array<O2>>::new();
         array.try_extend(iter).unwrap();
         array.into()
     }
 
-    pub fn create_list_binary_array<O: Offset, U: AsRef<[String]>, T: AsRef<[Option<U>]>>(
+    pub fn create_list_binary_array<O: Offset, O2: Offset, U: AsRef<[String]>, T: AsRef<[Option<U>]>>(
         data: T,
     ) -> ListArray<O> {
         let iter = data.as_ref().iter().map(|x| {
@@ -481,7 +548,7 @@ pub mod test_util {
                     .collect::<Vec<_>>()
             })
         });
-        let mut array = MutableListArray::<O, MutableBinaryArray<i32>>::new();
+        let mut array = MutableListArray::<O, MutableBinaryArray<O2>>::new();
         array.try_extend(iter).unwrap();
         array.into()
     }
@@ -613,7 +680,12 @@ pub mod test_util {
                     DataType::Utf8 => {
                         let vals: Vec<Option<Vec<String>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_utf8_array::<i32, _, _>(vals).boxed()
+                        create_list_utf8_array::<i32, i32, _, _>(vals).boxed()
+                    }
+                    DataType::LargeUtf8 => {
+                        let vals: Vec<Option<Vec<String>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_utf8_array::<i32, i64, _, _>(vals).boxed()
                     }
                     _ => unimplemented!(),
                 },
@@ -641,7 +713,12 @@ pub mod test_util {
                     DataType::Utf8 => {
                         let vals: Vec<Option<Vec<String>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_utf8_array::<i64, _, _>(vals).boxed()
+                        create_list_utf8_array::<i64, i32, _, _>(vals).boxed()
+                    }
+                    DataType::LargeUtf8 => {
+                        let vals: Vec<Option<Vec<String>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_utf8_array::<i64, i64, _, _>(vals).boxed()
                     }
                     _ => unimplemented!(),
                 },
@@ -652,12 +729,70 @@ pub mod test_util {
         Ok(result)
     }
 
+    pub fn gen_arrays_for_parquet(fields: &[Field], idx_fields: usize, max_partition_size: usize, nulls: Option<usize>) -> Vec<Box<dyn Array>> {
+        let idx_arrs = match idx_fields {
+            1 => {
+                let arr = match &fields[0].data_type.to_physical_type() {
+                    PhysicalType::Primitive(pt) => gen_idx_primitive_array_from_arrow_type(pt, max_partition_size),
+                    _ => unimplemented!("only support primitive type for idx field")
+                };
+                vec![arr]
+            }
+            2 => {
+                let arr1 = match &fields[0].data_type.to_physical_type() {
+                    PhysicalType::Primitive(pt) => gen_idx_primitive_array_from_arrow_type(pt, max_partition_size),
+                    _ => unimplemented!("only support primitive type for idx field")
+                };
+                let arr2 = match &fields[1].data_type.to_physical_type() {
+                    PhysicalType::Primitive(pt) => gen_secondary_idx_primitive_array_from_arrow_type(pt, max_partition_size),
+                    _ => unimplemented!("only support primitive type for idx field")
+                };
+                vec![
+                    arr1,
+                    arr2,
+                ]
+            }
+            _ => unimplemented!("only support 1 or 2 idx fields")
+        };
+
+        let len = idx_arrs[0].len();
+
+        let data_arrs = fields.iter().skip(idx_fields).map(|field| {
+            match &field.data_type.to_physical_type() {
+                PhysicalType::Boolean => gen_boolean_data_array(len, nulls).boxed(),
+                PhysicalType::Primitive(pt) => gen_primitive_data_array_from_arrow_type(pt, len, nulls),
+                PhysicalType::Binary => gen_binary_data_array::<i32>(len, nulls).boxed(),
+                PhysicalType::FixedSizeBinary => gen_fixed_size_binary_data_array(len, nulls, 5).boxed(),
+                PhysicalType::LargeBinary => gen_binary_data_array::<i64>(len, nulls).boxed(),
+                PhysicalType::Utf8 => gen_utf8_data_array::<i32>(len, nulls).boxed(),
+                PhysicalType::LargeUtf8 => gen_utf8_data_array::<i64>(len, nulls).boxed(),
+                PhysicalType::List => {
+                    match &field.data_type {
+                        DataType::List(f) => match &f.data_type.to_physical_type() {
+                            PhysicalType::Boolean => gen_boolean_data_list_array::<i32>(len, nulls).boxed(),
+                            PhysicalType::Primitive(pt) => gen_primitive_data_list_array_from_arrow_type(pt, len, nulls),
+                            PhysicalType::Binary => gen_binary_data_list_array::<i32, i32>(len, nulls).boxed(),
+                            PhysicalType::LargeBinary => gen_binary_data_list_array::<i32, i64>(len, nulls).boxed(),
+                            PhysicalType::Utf8 => gen_utf8_data_list_array::<i32, i32>(len, nulls).boxed(),
+                            PhysicalType::LargeUtf8 => gen_utf8_data_list_array::<i32, i64>(len, nulls).boxed(),
+                            _ => unimplemented!()
+                        }
+                        _ => unimplemented!()
+                    }
+                }
+                _ => unimplemented!(),
+            }
+        }).collect::<Vec<_>>();
+
+        [idx_arrs, data_arrs].concat().to_vec()
+    }
+
     pub fn create_parquet_from_arrays(
         mut arrs: Vec<Box<dyn Array>>,
-        path: impl AsRef<Path>,
         fields: Vec<Field>,
-        page_size: usize,
-        pages_per_row_group: usize,
+        path: impl AsRef<Path>,
+        data_pagesize_limit: Option<usize>,
+        values_per_row_group: usize,
     ) -> anyhow::Result<()> {
         let schema = Schema::from(fields);
 
@@ -665,18 +800,18 @@ pub mod test_util {
             write_statistics: true,
             compression: CompressionOptions::Snappy,
             version: Version::V2,
-            data_pagesize_limit: Some(20),
+            data_pagesize_limit,
         };
 
         let mut idx = 0;
         let mut chunks = vec![];
         while idx < arrs[0].len() {
-            println!("idx {idx} pages_per_row_group {pages_per_row_group} page_size {page_size} len {}", arrs[0].len());
-            let end = std::cmp::min(idx + (pages_per_row_group * page_size), arrs[0].len());
+            println!("idx {idx} values_per_row_group {values_per_row_group} data_pagesize_limit {:?} total len {}", data_pagesize_limit, arrs[0].len());
+            let end = std::cmp::min(idx + values_per_row_group, arrs[0].len());
             let chunk = arrs.iter().map(|arr| arr.sliced(idx, end - idx)).collect::<Vec<_>>();
             println!("{:?}", chunk);
             chunks.push(Ok(Chunk::new(chunk)));
-            idx += pages_per_row_group * page_size;
+            idx += values_per_row_group;
         }
 
         let encodings = schema
