@@ -41,13 +41,18 @@
                 </UiCardContainer>
             </template>
         </ToolsLayout>
+        <PropertiesManagementPopup
+            v-if="groupStore.propertyPopup"
+            :properties="propertiesPopup"
+            @apply="onClosePropertyPopup"
+        />
     </section>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onMounted, onUnmounted } from 'vue';
-import { useGroupStore } from '@/stores/group/group';
+import { computed, inject, onMounted, onUnmounted, ref } from 'vue';
 import { Row, Action } from '@/components/uikit/UiTable/UiTable';
+import { useGroupStore } from '@/stores/group/group';
 import { useSegmentsStore } from '@/stores/reports/segments';
 import { GroupRecord } from '@/api';
 
@@ -60,11 +65,13 @@ import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGro
 import UiDatePickerWrappet, { DataPickerPeriod } from '@/components/uikit/UiDatePickerWrappet.vue';
 import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue';
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue';
+import PropertiesManagementPopup from '@/components/groups/PropertiesManagementPopup.vue';
 import { I18N } from '@/utils/i18n';
 
 const i18n = inject('i18n') as I18N;
 const groupStore = useGroupStore();
 const segmentsStore = useSegmentsStore();
+const propertiesPopup = ref({});
 
 const itemsPeriod = computed(() => {
     return ['7', '30', '90'].map((key): UiToggleGroupItem => ({
@@ -130,7 +137,11 @@ const columns = computed(() => {
 });
 
 const onAction = (payload: Action) => {
-    // TODO action table
+    const item = groupStore.items.find(item => item.id === payload.type);
+    if (item) {
+        propertiesPopup.value = item.properties;
+    }
+    groupStore.propertyPopup = true;
 };
 
 const updateData = () => {
@@ -141,6 +152,10 @@ const onSelectPerion = (payload: string) => {
     groupStore.controlsPeriod = payload;
     groupStore.period.type = 'notCustom';
     updateData();
+};
+
+const onClosePropertyPopup = () => {
+    propertiesPopup.value = {};
 };
 
 const onSelectData = (payload: DataPickerPeriod, controlsPeriod: string) => {

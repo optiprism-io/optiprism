@@ -71,7 +71,12 @@
   },
 
   "users": {
-    "title": "Users"
+    "title": "Users",
+    "properties": "Properties",
+    "columns": {
+      "key": "Key",
+      "value": "Value"
+    }
   },
 
   "reports": {

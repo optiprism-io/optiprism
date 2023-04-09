@@ -9,6 +9,7 @@ export type Group = {
     loading: boolean,
     loadingOne: boolean,
     controlsPeriod: string | number;
+    propertyPopup: boolean,
     period: {
         from: string,
         to: string,
@@ -29,6 +30,7 @@ export const useGroupStore = defineStore('groupStore', {
             type: 'last',
             last: 30,
         },
+        propertyPopup: false,
     }),
     actions: {
         async getList() {
