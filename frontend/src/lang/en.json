@@ -72,6 +72,7 @@
 
   "users": {
     "title": "Users",
+    "user": "User",
     "properties": "Properties",
     "columns": {
       "key": "Key",

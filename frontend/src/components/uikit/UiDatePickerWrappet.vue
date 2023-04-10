@@ -41,7 +41,7 @@ export type DataPickerPeriod = {
 
 interface Props extends DataPickerPeriod {
     isPeriodActive: boolean
-};
+}
 
 const i18n = inject('i18n') as I18N;
 

@@ -55,3 +55,8 @@ VITE_API_BASE_PATH=http://localhost:8089/api yarn start:dev
 ```
 openapi-generator generate -i ../api/openapi.yaml -g typescript-axios -o ./src/api
 ```
+
+Run command before push
+```
+yarn check:eslint && yarn check:vue-tsc
+```

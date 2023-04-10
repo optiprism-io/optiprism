@@ -9,6 +9,7 @@
                 :title="$t('events.segments.label')"
             >
                 <Segments
+                    :is-one="true"
                     @get-event-segmentation="updateData"
                 />
             </UiCard>
@@ -43,7 +44,7 @@
         </ToolsLayout>
         <PropertiesManagementPopup
             v-if="groupStore.propertyPopup"
-            :properties="propertiesPopup"
+            :item="selectedItes"
             @apply="onClosePropertyPopup"
         />
     </section>
@@ -71,7 +72,7 @@ import { I18N } from '@/utils/i18n';
 const i18n = inject('i18n') as I18N;
 const groupStore = useGroupStore();
 const segmentsStore = useSegmentsStore();
-const propertiesPopup = ref({});
+const selectedItes = ref<GroupRecord | null>(null);
 
 const itemsPeriod = computed(() => {
     return ['7', '30', '90'].map((key): UiToggleGroupItem => ({
@@ -139,7 +140,7 @@ const columns = computed(() => {
 const onAction = (payload: Action) => {
     const item = groupStore.items.find(item => item.id === payload.type);
     if (item) {
-        propertiesPopup.value = item.properties;
+        selectedItes.value = item;
     }
     groupStore.propertyPopup = true;
 };
@@ -155,7 +156,7 @@ const onSelectPerion = (payload: string) => {
 };
 
 const onClosePropertyPopup = () => {
-    propertiesPopup.value = {};
+    selectedItes.value = null;
 };
 
 const onSelectData = (payload: DataPickerPeriod, controlsPeriod: string) => {

@@ -11,7 +11,10 @@
             @on-rename="onRenameSegment"
             @add-condition="addCondition"
         />
-        <div class="pf-l-flex">
+        <div
+            v-if="isShowAddSegment"
+            class="pf-l-flex"
+        >
             <UiButton
                 class="pf-m-main"
                 :is-link="true"
@@ -49,8 +52,8 @@ import { conditions } from '@/configs/events/segmentCondition'
 import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
 import { PropertyRef } from '@/types/events'
 import { DidEventCountTypeEnum } from '@/api'
-const i18n = inject<any>('i18n')
 
+const i18n = inject<any>('i18n')
 const segmentsStore = useSegmentsStore()
 const eventsStore = useEventsStore()
 const lexiconStore = useLexiconStore()
@@ -59,6 +62,14 @@ const commonStore = useCommonStore()
 const emit = defineEmits<{
     (e: 'get-event-segmentation'): void
 }>()
+
+const props = defineProps<{
+    isOne?: boolean,
+}>();
+
+const isShowAddSegment =  computed(() => {
+    return !(props?.isOne && segmentsStore.segments.length);
+});
 
 const conditionAggregateItems = computed(() => {
     return aggregates.map(item => {
