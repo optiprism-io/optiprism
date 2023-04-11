@@ -10,7 +10,7 @@ use std::ops::{Range, SubAssign};
 use std::ops::RangeBounds;
 use std::rc::Rc;
 
-use arrow2::array::{Array, ListArray, MutableArray, MutableBinaryArray, MutableListArray, MutablePrimitiveArray, new_null_array, PrimitiveArray, TryExtend, TryPush, Utf8Array};
+use arrow2::array::{Array, Int16Array, Int8Array, ListArray, MutableArray, MutableBinaryArray, MutableListArray, MutablePrimitiveArray, new_null_array, PrimitiveArray, TryExtend, TryPush, UInt16Array, UInt32Array, UInt64Array, UInt8Array, Utf8Array};
 use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
 use arrow2::array::FixedSizeBinaryArray;
@@ -64,16 +64,38 @@ enum TmpListArray {
 
 // this is a temporary array used to merge data pages avoiding downcasting
 enum TmpArray {
+    Int8(Int8Array),
+    Int16(Int16Array),
+    Int32(Int32Array),
     Int64(Int64Array),
+    UInt8(UInt8Array),
+    UInt16(UInt16Array),
+    UInt32(UInt32Array),
+    UInt64(UInt64Array),
+    Float32(Float32Array),
+    Float64(Float64Array),
     Boolean(BooleanArray),
     FixedSizeBinary(FixedSizeBinaryArray),
     Binary(BinaryArray<i32>),
+    LargeBinary(BinaryArray<i64>),
     Utf8(Utf8Array<i32>),
+    LargeUtf8(Utf8Array<i64>),
+    ListInt8(Int8Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListInt16(Int16Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListInt32(Int32Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListInt64(Int64Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListUInt8(UInt8Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListUInt16(UInt16Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListUInt32(UInt32Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListUInt64(UInt64Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListFloat32(Float32Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListFloat64(Float64Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListBoolean(BooleanArray, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListFixedSizeBinary(FixedSizeBinaryArray, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListBinary(BinaryArray<i32>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListLargeBinary(BinaryArray<i64>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListUtf8(Utf8Array<i32>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListLargeUtf8(Utf8Array<i64>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
 }
 
 
@@ -319,16 +341,17 @@ fn validate_schema(schema: &SchemaDescriptor, index_cols: usize) -> Result<()> {
 
     for col_id in 0..index_cols {
         match &schema.fields()[col_id] {
-            ParquetType::PrimitiveType(pt) => if pt.field_info.repetition == Repetition::Required {
+            /*ParquetType::PrimitiveType(pt) => if pt.field_info.repetition == Repetition::Required {
                 return Err(StoreError::NotYetSupported(format!("index field {} has repetition which doesn't supported", pt.field_info.name)));
-            }
-            ParquetType::GroupType { field_info, .. } => return Err(StoreError::NotYetSupported(format!("index group field {} doesn't supported", field_info.name)))
+            }*/
+            ParquetType::GroupType { field_info, .. } => return Err(StoreError::NotYetSupported(format!("index group field {} doesn't supported", field_info.name))),
+            _ => {}
         }
-        if let ParquetType::PrimitiveType(pt) = &schema.fields()[col_id] {
+        /*if let ParquetType::PrimitiveType(pt) = &schema.fields()[col_id] {
             if pt.field_info.repetition == Repetition::Required {
                 return Err(StoreError::NotYetSupported(format!("index field {} has repetition which doesn't supported", pt.field_info.name)));
             }
-        }
+        }*/
     }
 
     for root_field in schema.fields().iter() {
@@ -522,8 +545,9 @@ impl<R, W> FileMerger<R, W>
         let out = match dt.to_physical_type() {
             ArrowPhysicalType::Primitive(v) => {
                 match v {
+                    arrow2::types::PrimitiveType::Int8 => merge_arrays!(self, TmpArray::Int64,Int64Array,MutablePrimitiveArray<i64>,col,reorder,streams),
                     arrow2::types::PrimitiveType::Int64 => merge_arrays!(self, TmpArray::Int64,Int64Array,MutablePrimitiveArray<i64>,col,reorder,streams),
-                    _ => unimplemented!()
+                    _ => unimplemented!("{:?}", v)
                 }
             }
             ArrowPhysicalType::Utf8 => {
@@ -569,7 +593,7 @@ impl<R, W> FileMerger<R, W>
         let merged_chunks = merge(arrow_chunks, self.array_page_size)?;
 
         for chunk in merged_chunks {
-            println!("merged chunk {:?}",chunk);
+            println!("merged chunk {:?}", chunk);
             let pages_chunk = PagesChunk::from_arrow(chunk.arrs.as_slice(), &self.index_cols)?;
             let merged_chunk = MergedPagesChunk::new(pages_chunk, MergeReorder::Merge(chunk.reorder, streams.clone()));
             self.result_buffer.push_back(merged_chunk);

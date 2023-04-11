@@ -46,7 +46,7 @@ use parquet2::write::WriteOptions;
 use store::error::Result;
 use store::parquet::merger::FileMerger;
 use store::parquet::parquet::CompressedPageIterator;
-use store::test_util::create_parquet_from_arrays;
+use store::test_util::create_parquet_file_from_chunk;
 use store::test_util::parse_markdown_table;
 
 #[test]
@@ -73,7 +73,7 @@ fn test_merger() -> anyhow::Result<()> {
 
         let parsed = parse_markdown_table(data, &fields)?;
         println!("{:?}", parsed);
-        create_parquet_from_arrays(
+        create_parquet_file_from_chunk(
             parsed.clone(),
             "/tmp/optiprism/p1.parquet",
             fields.clone(),
@@ -105,7 +105,7 @@ fn test_merger() -> anyhow::Result<()> {
         ];
 
         let parsed = parse_markdown_table(data, &fields)?;
-        create_parquet_from_arrays(
+        create_parquet_file_from_chunk(
             parsed.clone(),
             "/tmp/optiprism/p2.parquet",
             fields.clone(),
@@ -138,7 +138,7 @@ fn test_merger() -> anyhow::Result<()> {
         ];
 
         let parsed = parse_markdown_table(data, &fields)?;
-        create_parquet_from_arrays(
+        create_parquet_file_from_chunk(
             parsed.clone(),
             "/tmp/optiprism/p3.parquet",
             fields.clone(),
@@ -204,7 +204,7 @@ fn test_merger2() -> anyhow::Result<()> {
 
         let parsed = parse_markdown_table(data, &fields)?;
         println!("{:?}", parsed);
-        create_parquet_from_arrays(
+        create_parquet_file_from_chunk(
             parsed.clone(),
             "/tmp/optiprism/p1.parquet",
             fields.clone(),
@@ -235,7 +235,7 @@ fn test_merger2() -> anyhow::Result<()> {
         ];
 
         let parsed = parse_markdown_table(data, &fields)?;
-        create_parquet_from_arrays(
+        create_parquet_file_from_chunk(
             parsed.clone(),
             "/tmp/optiprism/p2.parquet",
             fields.clone(),
@@ -266,7 +266,7 @@ fn test_merger2() -> anyhow::Result<()> {
         ];
 
         let parsed = parse_markdown_table(data, &fields)?;
-        create_parquet_from_arrays(
+        create_parquet_file_from_chunk(
             parsed.clone(),
             "/tmp/optiprism/p3.parquet",
             fields.clone(),
@@ -329,7 +329,7 @@ fn test_merger3() -> anyhow::Result<()> {
 
         let parsed = parse_markdown_table(data, &fields)?;
         println!("{:?}", parsed);
-        create_parquet_from_arrays(
+        create_parquet_file_from_chunk(
             parsed.clone(),
             "/tmp/optiprism/p1.parquet",
             fields.clone(),
@@ -392,7 +392,7 @@ fn test_merger4() -> anyhow::Result<()> {
     ];
 
     let parsed = parse_markdown_table(data, &fields)?;
-    create_parquet_from_arrays(
+    create_parquet_file_from_chunk(
         parsed.clone(),
         "/tmp/optiprism/p3.parquet",
         fields.clone(),
