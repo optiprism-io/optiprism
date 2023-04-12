@@ -5,7 +5,6 @@ use parquet2::schema::types::PhysicalType;
 pub mod parquet;
 pub mod arrow;
 pub mod merger;
-pub mod schema;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
 pub enum Value {

@@ -568,11 +568,11 @@ impl<R, W> FileMerger<R, W>
             if out.len() == 1 {
                 return Ok(Some(out));
             }
-            println!("merge {:?} to ({min},{max})", out);
+            // println!("merge {:?} to ({min},{max})", out);
             self.merge_queue.push(out);
             // it is time to merge
             if self.merge_queue.len() == self.merge_threads {
-                println!("merge of queue: {:?}", self.merge_queue);
+                // println!("merge of queue: {:?}", self.merge_queue);
                 let res: Vec<PagesRow> = self.merge_queue
                     .par_drain(..)
                     .map(|v| merge(v))

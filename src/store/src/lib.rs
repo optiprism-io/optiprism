@@ -6,7 +6,6 @@ extern crate core;
 // pub mod dictionary;
 pub mod arrow_conversion;
 pub mod error;
-pub mod parquet;
 pub mod parquet_new;
 // mod table;
 // mod iterator;
@@ -1022,7 +1021,6 @@ pub mod test_util {
         let mut idx = 0;
         let mut chunks = vec![];
         while idx < chunk.len() {
-
             let end = std::cmp::min(idx + values_per_row_group, chunk.len());
             let arrs = chunk
                 .arrays()
