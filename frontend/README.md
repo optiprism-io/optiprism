@@ -43,7 +43,7 @@ VITE_MOCK_API=true yarn start:dev
 
 For run with API
 ```
-docker run -it -p 8089:8080 optiprismio/demo:v0.1.7
+docker run -it -p 8089:8080 optiprismio/demo:v0.1.9
 VITE_API_BASE_PATH=http://localhost:8089/api yarn start:dev
 ```
 

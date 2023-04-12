@@ -11,13 +11,22 @@
             <UiTabs
                 class="pf-u-mb-md"
                 :items="itemsTabs"
-                @on-select="onSelectTab"
             />
-            <UiTable
-                :compact="true"
-                :items="itemsProperties"
-                :columns="columnsProperties"
-                @on-action="onActionProperty"
+            <PropertiesManagementLine
+                class="properties-panagement-popup__line"
+                :hide-controls="true"
+                :bold-text="true"
+                :value="$t('users.columns.value')"
+                :value-key="$t('users.columns.key')"
+            />
+            <PropertiesManagementLine
+                class="properties-panagement-popup__line"
+                v-for="(item, i) in itemsProperties"
+                :key="i"
+                :hide-controls="false"
+                :value="item.value"
+                :value-key="item.key"
+                @apply="onApplyChangePropery"
             />
         </div>
     </UiPopupWindow>
@@ -26,6 +35,7 @@
 <script lang="ts" setup>
 import { computed, inject, ref } from 'vue';
 import { Action, Row } from '@/components/uikit/UiTable/UiTable';
+import PropertiesManagementLine, { ApplyPayload } from './PropertiesManagementLine.vue';
 import { Value } from '@/api';
 import { I18N } from '@/utils/i18n';
 
@@ -61,19 +71,11 @@ const title = computed(() => `${i18n.$t('users.user')}: ${props.item?.id}`);
 
 const itemsProperties = computed(() => {
     return props?.item?.properties ? Object.keys(props.item.properties).map((key, i) => {
-        return [
-            {
-                key: 'key',
-                title: key,
-                nowrap: true,
-            },
-            {
-                key: 'value',
-                title: props?.item?.properties[key] || '',
-                nowrap: true,
-            },
-            // TODO IconColumnEdit
-        ]
+        return {
+            key,
+            value: props.item?.properties[key] || '',
+            index: i,
+        };
     }) : [];
 });
 
@@ -86,12 +88,6 @@ const columnsProperties = computed(() => {
         {
             value: 'value',
             title: i18n.$t('users.columns.value'),
-        },
-        {
-            value: 'action',
-            title: i18n.$t('groups.columns.action'),
-            default: true,
-            type: 'action',
         },
     ];
 });
@@ -106,12 +102,8 @@ const itemsTabs = computed(() => {
     })
 });
 
-const onActionProperty = () => {
-    // TODO edit property in inputCompnentsCell
-};
-
-const onSelectTab = () => {
-    // TODO
+const onApplyChangePropery = (payload: ApplyPayload) => {
+    console.log(payload) // TODO edit property in inputCompnentsCell
 };
 
 const close = () => {
@@ -123,3 +115,15 @@ const apply = () => {
     groupStore.propertyPopup = false;
 };
 </script>
+
+<style lang="scss">
+.properties-panagement-popup {
+    .pf-c-table {
+        margin-right: 80px;
+    }
+    &__line {
+        border-bottom: 1px solid var(--pf-global--BorderColor--dark-100);
+    }
+}
+
+</style>
