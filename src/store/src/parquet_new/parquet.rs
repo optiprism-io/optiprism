@@ -210,7 +210,7 @@ pub fn data_page_to_array(page: CompressedDataPage, cd: &ColumnDescriptor, field
 pub fn array_to_pages_simple(arr: Box<dyn Array>, typ: ParquetType, data_pagesize_limit: usize) -> Result<Vec<CompressedPage>> {
     let opts = WriteOptions {
         write_statistics: true,
-        compression: CompressionOptions::Snappy, // todo
+        compression: CompressionOptions::Uncompressed, // todo
         version: Version::V2,
         data_pagesize_limit: Some(data_pagesize_limit),
     };
@@ -219,7 +219,7 @@ pub fn array_to_pages_simple(arr: Box<dyn Array>, typ: ParquetType, data_pagesiz
     let pages = array_to_columns(arr, typ, opts, &[Encoding::Plain])?.pop().unwrap();
     let compressed = pages
         .into_iter()
-        .map(|page| compress(page.unwrap(), vec![], CompressionOptions::Snappy))
+        .map(|page| compress(page.unwrap(), vec![], CompressionOptions::Uncompressed))
         .collect::<std::result::Result<Vec<CompressedPage>, _>>()?;
 
     Ok(compressed)

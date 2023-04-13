@@ -3,10 +3,13 @@ use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Cursor;
+use std::io::Write;
 use std::path::Path;
 
-use arrow2::array::Array;
+use arrow2::array::{Array, Int128Array};
+use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
+use arrow2::array::FixedSizeBinaryArray;
 use arrow2::array::Float64Array;
 use arrow2::array::Int32Array;
 use arrow2::array::Int64Array;
@@ -20,6 +23,8 @@ use arrow2::array::PrimitiveArray;
 use arrow2::array::TryExtend;
 use arrow2::array::Utf8Array;
 use arrow2::buffer::Buffer;
+use arrow2::chunk::Chunk;
+use arrow2::compute::concatenate::concatenate;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
@@ -33,428 +38,266 @@ use arrow2::io::csv::read::ReaderBuilder;
 use arrow2::io::parquet::read;
 use arrow2::io::parquet::write::to_parquet_schema;
 use arrow2::io::parquet::write::to_parquet_type;
+use arrow2::io::parquet::write::transverse;
+use arrow2::io::parquet::write::FileWriter;
+use arrow2::io::parquet::write::RowGroupIterator;
 use arrow2::io::print;
 use arrow2::offset::Offset;
 use arrow2::types::NativeType;
+use arrow_schema::DataType::LargeUtf8;
 use parquet2::compression::CompressionOptions;
+use parquet2::encoding::Encoding;
 use parquet2::page::CompressedPage;
-use parquet2::read::{get_page_iterator, read_metadata};
+use parquet2::read::get_page_iterator;
+use parquet2::read::read_metadata;
 use parquet2::schema::types::ParquetType;
 use parquet2::write::FileSeqWriter;
 use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 use store::error::Result;
-use store::parquet::merger::FileMerger;
-use store::parquet::parquet::CompressedPageIterator;
+use store::parquet_new::merger::Merger;
+use store::parquet_new::parquet::CompressedPageIterator;
+use store::test_util::create_list_primitive_array;
 use store::test_util::create_parquet_file_from_chunk;
+use store::test_util::create_parquet_from_chunk;
+use store::test_util::gen_binary_data_array;
+use store::test_util::gen_binary_data_list_array;
+use store::test_util::gen_boolean_data_array;
+use store::test_util::gen_boolean_data_list_array;
+use store::test_util::gen_chunk_for_parquet;
+use store::test_util::gen_fixed_size_binary_data_array;
+use store::test_util::gen_idx_primitive_array;
+use store::test_util::gen_primitive_data_array;
+use store::test_util::gen_primitive_data_list_array;
+use store::test_util::gen_secondary_idx_primitive_array;
+use store::test_util::gen_utf8_data_array;
+use store::test_util::gen_utf8_data_list_array;
 use store::test_util::parse_markdown_table;
+use store::test_util::unmerge_chunk;
+use tracing::trace;
+use tracing::warn;
+use tracing_test::traced_test;
 
+#[traced_test]
 #[test]
-fn test_merger() -> anyhow::Result<()> {
-    let iter1 = {
-        let data = r#"
-| a | b | c | f |
-|---|---|---|---|
-| 1 | 1 | 1 |   |
-| 1 | 2 | 2 | 1 |
-| 1 | 3 | 3 |   |
-| 2 | 1 |   | 2 |
-| 3 | 1 | 1 |   |
-| 3 | 2 | 2 | 3 |
-| 3 | 3 | 3 |   |
-    "#;
-
-        let fields = vec![
-            Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
-            Field::new("c", DataType::Int64, true),
-            Field::new("f", DataType::Int64, true),
-        ];
-
-        let parsed = parse_markdown_table(data, &fields)?;
-        println!("{:?}", parsed);
-        create_parquet_file_from_chunk(
-            parsed.clone(),
-            "/tmp/optiprism/p1.parquet",
-            fields.clone(),
-            2,
-            2,
-        )?;
-
-        CompressedPageIterator::try_new(File::open("/tmp/optiprism/p1.parquet")?)?
-    };
-
-    let iter2 = {
-        let data = r#"
-| a | b | c | d     |
-|---|---|---|-------|
-| 1 | 1 | 1 | 1,2,3 |
-| 1 | 2 | 2 |       |
-| 1 | 3 | 3 | 1     |
-| 2 | 1 |   | 1,2   |
-| 3 | 1 | 1 | 1     |
-| 3 | 2 | 2 | 1,3   |
-| 3 | 3 | 3 | 3     |
-    "#;
-
-        let fields = vec![
-            Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
-            Field::new("c", DataType::Int64, true),
-            Field::new("d", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
-        ];
-
-        let parsed = parse_markdown_table(data, &fields)?;
-        create_parquet_file_from_chunk(
-            parsed.clone(),
-            "/tmp/optiprism/p2.parquet",
-            fields.clone(),
-            2,
-            2,
-        )?;
-
-        CompressedPageIterator::try_new(File::open("/tmp/optiprism/p2.parquet")?)?
-    };
-
-    let iter3 = {
-        let data = r#"
-| a | b | c | d   | e   |
-|---|---|---|-----|-----|
-| 1 | 1 | 1 |     | 1   |
-| 1 | 2 | 2 | 1,2 | 2   |
-| 1 | 3 | 3 | 2   | 3,4 |
-| 2 | 1 |   | 3   | 1   |
-| 3 | 1 | 1 | 4   | 2   |
-| 3 | 2 | 2 | 4,1 | 3,4 |
-| 3 | 3 | 3 |     |     |
-    "#;
-
-        let fields = vec![
-            Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
-            Field::new("c", DataType::Int64, true),
-            Field::new("d", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
-            Field::new("e", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
-        ];
-
-        let parsed = parse_markdown_table(data, &fields)?;
-        create_parquet_file_from_chunk(
-            parsed.clone(),
-            "/tmp/optiprism/p3.parquet",
-            fields.clone(),
-            2,
-            2,
-        )?;
-
-        CompressedPageIterator::try_new(File::open("/tmp/optiprism/p3.parquet")?)?
-    };
-
-    let w = File::create("/tmp/optiprism/merged.parquet")?;
-    let mut merger = FileMerger::try_new(
-        vec![iter1, iter2, iter3],
-        w,
-        2,
-        2,
-        2,
-        "merged".to_string(),
-    )?;
-    merger.merge()?;
-
-    let mut reader = File::open("/tmp/optiprism/p3.parquet")?;
-
-    // we can read its metadata:
-    let metadata = read::read_metadata(&mut reader)?;
-
-    // and infer a [`Schema`] from the `metadata`.
-    let schema = read::infer_schema(&metadata)?;
-
-
-    // we can then read the row groups into chunks
-    let chunks = read::FileReader::new(reader, metadata.row_groups, schema.clone(), Some(1024 * 8 * 8), None, None);
-
-    let chunks = chunks.into_iter().map(|c| c.unwrap()).collect::<Vec<_>>();
-    let names = schema.fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
-    println!("{}", print::write(&chunks, &names));
-    Ok(())
-}
-
-
-#[test]
-fn test_merger2() -> anyhow::Result<()> {
-    let iter1 = {
-        let data = r#"
-| a | b | c     | d | e           |
-|---|---|-------|---|-------------|
-| 1 | 1 | 1,2,3 | a | a,b         |
-| 1 | 2 |       | b | c           |
-| 1 | 3 | 1     | c | e           |
-| 2 | 1 | 1,2   | d | f,e         |
-| 3 | 1 | 1     | e |             |
-| 3 | 2 | 1,3   |   | e,f         |
-| 3 | 3 | 3     | g | qwe qwe ыва |
-    "#;
-
-        let fields = vec![
-            Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int32, true),
-            Field::new("c", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
-            Field::new("d", DataType::Utf8, true),
-            Field::new("e", DataType::List(Box::new(Field::new("1", DataType::Utf8, true))), true),
-        ];
-
-        let parsed = parse_markdown_table(data, &fields)?;
-        println!("{:?}", parsed);
-        create_parquet_file_from_chunk(
-            parsed.clone(),
-            "/tmp/optiprism/p1.parquet",
-            fields.clone(),
-            1,
-            1,
-        )?;
-
-        CompressedPageIterator::try_new(File::open("/tmp/optiprism/p1.parquet")?)?
-    };
-
-    let iter2 = {
-        let data = r#"
-| a | b | c     |
-|---|---|-------|
-| 1 | 1 | 1,2,3 |
-| 1 | 2 |       |
-| 1 | 3 | 1     |
-| 2 | 1 | 1,2   |
-| 3 | 1 | 1     |
-| 3 | 2 | 1,3   |
-| 3 | 3 | 3     |
-    "#;
-
-        let fields = vec![
-            Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int32, true),
-            Field::new("c", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
-        ];
-
-        let parsed = parse_markdown_table(data, &fields)?;
-        create_parquet_file_from_chunk(
-            parsed.clone(),
-            "/tmp/optiprism/p2.parquet",
-            fields.clone(),
-            2,
-            2,
-        )?;
-
-        CompressedPageIterator::try_new(File::open("/tmp/optiprism/p2.parquet")?)?
-    };
-
-    let iter3 = {
-        let data = r#"
-| a | b | c     |
-|---|---|-------|
-| 1 | 1 | 1,2,3 |
-| 1 | 2 |       |
-| 1 | 3 | 1     |
-| 2 | 1 | 1,2   |
-| 3 | 1 | 1     |
-| 3 | 2 | 1,3   |
-| 3 | 3 | 3     |
-    "#;
-
-        let fields = vec![
-            Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int32, true),
-            Field::new("c", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
-        ];
-
-        let parsed = parse_markdown_table(data, &fields)?;
-        create_parquet_file_from_chunk(
-            parsed.clone(),
-            "/tmp/optiprism/p3.parquet",
-            fields.clone(),
-            5,
-            1,
-        )?;
-
-        CompressedPageIterator::try_new(File::open("/tmp/optiprism/p3.parquet")?)?
-    };
-
-    let w = File::create("/tmp/optiprism/merged.parquet")?;
-    let mut merger = FileMerger::try_new(
-        vec![iter1, iter2, iter3],
-        w,
-        2,
-        2,
-        2,
-        "merged".to_string(),
-    )?;
-    merger.merge()?;
-
-    let mut reader = File::open("/tmp/optiprism/merged.parquet")?;
-
-    // we can read its metadata:
-    let metadata = read::read_metadata(&mut reader)?;
-
-    // and infer a [`Schema`] from the `metadata`.
-    let schema = read::infer_schema(&metadata)?;
-
-
-    // we can then read the row groups into chunks
-    let chunks = read::FileReader::new(reader, metadata.row_groups, schema.clone(), Some(1024 * 8 * 8), None, None);
-
-    let chunks = chunks.into_iter().map(|c| c.unwrap()).collect::<Vec<_>>();
-    let names = schema.fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
-    println!("{}", print::write(&chunks, &names));
-    Ok(())
-}
-
-#[test]
-fn test_merger3() -> anyhow::Result<()> {
-    let iter1 = {
-        let data = r#"
-| a | b | c     |
-|---|---|-------|
-| 1 | 1 | 1     |
-| 1 | 2 |       |
-| 1 | 3 | 1     |
-| 2 | 1 | 1     |
-| 3 | 1 | 1     |
-| 3 | 2 | 1     |
-| 3 | 3 | 3     |
-    "#;
-
-        let fields = vec![
-            Field::new("a", DataType::Int64, true),
-            Field::new("b", DataType::Int64, true),
-            Field::new("c", DataType::Int64, true),
-        ];
-
-        let parsed = parse_markdown_table(data, &fields)?;
-        println!("{:?}", parsed);
-        create_parquet_file_from_chunk(
-            parsed.clone(),
-            "/tmp/optiprism/p1.parquet",
-            fields.clone(),
-            2,
-            2,
-        )?;
-
-        CompressedPageIterator::try_new(File::open("/tmp/optiprism/p1.parquet")?)?
-    };
-
-    let iter2 = CompressedPageIterator::try_new(File::open("/tmp/optiprism/p1.parquet")?)?;
-
-    let w = File::create("/tmp/optiprism/merged.parquet")?;
-    let mut merger = FileMerger::try_new(
-        vec![iter1, iter2],
-        w,
-        2,
-        2,
-        2,
-        "merged".to_string(),
-    )?;
-    merger.merge()?;
-
-    let mut reader = File::open("/tmp/optiprism/merged.parquet")?;
-
-    // we can read its metadata:
-    let metadata = read::read_metadata(&mut reader)?;
-
-    // and infer a [`Schema`] from the `metadata`.
-    let schema = read::infer_schema(&metadata)?;
-
-
-    // we can then read the row groups into chunks
-    let chunks = read::FileReader::new(reader, metadata.row_groups, schema.clone(), Some(1024 * 8 * 8), None, None);
-
-    let chunks = chunks.into_iter().map(|c| c.unwrap()).collect::<Vec<_>>();
-    let names = schema.fields.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
-    println!("{}", print::write(&chunks, &names));
-    Ok(())
-}
-
-#[test]
-fn test_merger4() -> anyhow::Result<()> {
-    let data = r#"
-| a | b | c     |
-|---|---|-------|
-| 1 | 1 | 1,2,3 |
-| 1 | 2 |       |
-| 1 | 3 | 1     |
-| 2 | 1 | 1,2   |
-| 3 | 1 | 1     |
-| 3 | 2 | 1,3   |
-| 3 | 3 | 3     |
-    "#;
-
+fn test() -> anyhow::Result<()> {
     let fields = vec![
-        Field::new("a", DataType::Int64, true),
-        Field::new("b", DataType::Int64, true),
-        Field::new("c", DataType::List(Box::new(Field::new("1", DataType::Int64, true))), true),
+        Field::new("idx1", DataType::Int64, false),
+        Field::new("idx2", DataType::Int32, false),
+        Field::new("d1", DataType::UInt64, true),
+        Field::new("d2", DataType::Float64, true),
+        Field::new("d3", DataType::Utf8, true),
+        Field::new("d4", DataType::LargeUtf8, true),
+        Field::new("d5", DataType::Binary, true),
+        Field::new("d6", DataType::LargeBinary, true),
+        Field::new("d7", DataType::Boolean, true),
+        Field::new(
+            "dl1",
+            DataType::List(Box::new(Field::new("f", DataType::Int64, false))),
+            true,
+        ),
+        Field::new(
+            "dl2",
+            DataType::List(Box::new(Field::new("f", DataType::Float64, false))),
+            true,
+        ),
+        Field::new(
+            "dl3",
+            DataType::List(Box::new(Field::new("f", DataType::Utf8, false))),
+            true,
+        ),
+        Field::new(
+            "dl4",
+            DataType::List(Box::new(Field::new("f", DataType::LargeUtf8, false))),
+            true,
+        ),
+        Field::new(
+            "dl5",
+            DataType::List(Box::new(Field::new("f", DataType::Binary, false))),
+            true,
+        ),
+        Field::new(
+            "dl6",
+            DataType::List(Box::new(Field::new("f", DataType::LargeBinary, false))),
+            true,
+        ),
+        Field::new(
+            "dl7",
+            DataType::List(Box::new(Field::new("f", DataType::Boolean, false))),
+            true,
+        ),
     ];
+    let names = fields
+        .iter()
+        .map(|f| f.name.to_string())
+        .collect::<Vec<_>>();
 
-    let parsed = parse_markdown_table(data, &fields)?;
-    create_parquet_file_from_chunk(
-        parsed.clone(),
-        "/tmp/optiprism/p3.parquet",
-        fields.clone(),
-        2,
-        2,
-    )?;
+    let initial_chunk = gen_chunk_for_parquet(&fields, 2, 10, None);
+    let chunk_len = initial_chunk.len();
+    println!("original chunk");
+    println!("{}", print::write(&[initial_chunk.clone()], &names));
+    let out_count = 3;
+    // let
+    // let row_group_size = chunk_len / out_count / 5;
+    let row_group_size = 5;
+    let data_page_limit = Some(5);
+    let out_chunks = unmerge_chunk(initial_chunk.clone(), out_count, row_group_size);
+    for (idx, c) in out_chunks.iter().enumerate() {
+        println!("out chunk #{idx}");
+        println!("{}", print::write(&[c.clone()], &names));
+    }
+    assert_eq!(chunk_len, out_chunks.iter().map(|c| c.len()).sum::<usize>());
 
-    let path = "/tmp/optiprism/p2.parquet";
-    CompressedPageIterator::try_new(File::open(path)?)?;
-
-    let mut reader = std::fs::File::open(path)?;
-    let metadata = read_metadata(&mut reader)?;
-    for row_group in metadata.row_groups.iter() {
-        println!("rg");
-        for column in row_group.columns().iter() {
-            println!("col");
-            for page in get_page_iterator(column, &mut reader, None, vec![], 1024 * 1024)? {
-                let page = page?;
-                println!("{:?}", page);
+    let readers = out_chunks
+        .into_iter()
+        .map(|chunk| {
+            let mut w = Cursor::new(vec![]);
+            create_parquet_from_chunk(
+                chunk,
+                fields.clone(),
+                &mut w,
+                data_page_limit,
+                row_group_size,
+            )
+                .unwrap();
+            let metadata = read::read_metadata(&mut w).unwrap();
+            for f in metadata.schema().fields().iter() {
+                println!("- {:?}", f);
             }
-        }
-    }
+            let schema = read::infer_schema(&metadata).unwrap();
+            for f in schema.fields.iter() {
+                println!("{} {:?}", f.name, f.data_type);
+            }
+            w
+        })
+        .collect::<Vec<_>>();
 
+    let mut out = Cursor::new(vec![]);
+    let data_page_size_limit = 10;
+    let row_group_values_limit = 2;
+    let arrow_page_size = 3;
+    let mut merger = Merger::try_new(
+        readers,
+        &mut out,
+        2,
+        data_page_size_limit,
+        row_group_values_limit,
+        arrow_page_size,
+    )?;
+    merger.merge()?;
+
+    let metadata = read::read_metadata(&mut out)?;
+    let schema = read::infer_schema(&metadata)?;
+    let mut chunks = read::FileReader::new(
+        out,
+        metadata.row_groups,
+        schema,
+        Some(1024 * 1024),
+        None,
+        None,
+    );
+
+    let chunks = chunks.map(|chunk| chunk.unwrap()).collect::<Vec<_>>();
+    let arrs = (0..fields.len())
+        .into_iter()
+        .map(|arr_id| {
+            let to_concat = chunks
+                .iter()
+                .map(|chunk| chunk.arrays()[arr_id].as_ref())
+                .collect::<Vec<_>>();
+            concatenate(&to_concat).unwrap()
+        })
+        .collect::<Vec<_>>();
+
+    let final_chunk = Chunk::new(arrs);
+
+    println!(
+        "final merged \n{}",
+        print::write(&[final_chunk.clone()], &names)
+    );
+    assert_eq!(initial_chunk, final_chunk);
     Ok(())
 }
 
-#[test]
-fn test_merger5() -> anyhow::Result<()> {
-    let data = r#"
-| a | b | c     |
-|---|---|-------|
-| 1 | 1 | 1,2,3 |
-| 1 | 2 |       |
-| 1 | 3 | 1     |
-| 2 | 1 | 1,2   |
-| 3 | 1 | 1     |
-| 3 | 2 | 1,3   |
-| 3 | 3 | 3     |
-    "#;
+fn write_chunk(w: impl Write, schema: Schema, chunk: Chunk<Box<dyn Array>>) -> Result<()> {
+    let options = arrow2::io::parquet::write::WriteOptions {
+        write_statistics: true,
+        compression: CompressionOptions::Uncompressed,
+        version: Version::V2,
+        data_pagesize_limit: None,
+    };
 
-    let fields = vec![
-        Field::new("a", DataType::Int64, true),
-        Field::new("b", DataType::Int64, true),
-        Field::new("c", DataType::Int64, true),
+    let iter = vec![Ok(chunk)];
+
+    let encodings = schema
+        .fields
+        .iter()
+        .map(|f| transverse(&f.data_type, |_| Encoding::Plain))
+        .collect();
+
+    let row_groups = RowGroupIterator::try_new(iter.into_iter(), &schema, options, encodings)?;
+
+    let mut writer = FileWriter::try_new(w, schema, options)?;
+
+    for group in row_groups {
+        writer.write(group?)?;
+    }
+    let _size = writer.end(None)?;
+    Ok(())
+}
+
+#[traced_test]
+#[test]
+fn test2() {
+    let arrs = vec![
+        Int64Array::from_vec(vec![0, 1]).boxed(),
+        Int128Array::from_vec(vec![1i128, 2]).to(DataType::Decimal(9, 1)).boxed(),
     ];
 
-    let n = 100;
-    let f = 3;
+    println!("ppp {:?}", DataType::Decimal(39, 1).to_physical_type());
+    let schema = Schema::from(vec![
+        Field::new("idx1", arrs[0].data_type().clone(), true),
+        Field::new("f", DataType::Decimal(9, 1), true),
+    ]);
 
-    let mut out: Vec<Vec<i64>> = vec![vec![]; 3];
-
-    let mut c = 0;
-    for idx in 1..n {
-        for v in 1..idx {
-            out[0].push(idx);
-            out[1].push(v);
-            out[2].push(c);
-            c+=1;
-        }
+    let chunk = Chunk::new(arrs);
+    let mut out1 = Cursor::new(vec![]);
+    write_chunk(&mut out1, schema.clone(), chunk.clone()).unwrap();
+    println!("?");
+    let metadata = read::read_metadata(&mut out1).unwrap();
+    let schema = read::infer_schema(&metadata).unwrap();
+    for f in schema.fields.iter() {
+        println!("out1 {} {:?}", f.name, f.data_type);
     }
 
-    println!("{:?}", out);
+    let mut out2 = Cursor::new(vec![]);
+    write_chunk(&mut out2, schema, chunk).unwrap();
 
-    Ok(())
+    let mut merged = Cursor::new(vec![]);
+    let mut merger = Merger::try_new(
+        vec![out1, out2],
+        &mut merged,
+        1,
+        2,
+        4,
+        2,
+    )
+        .unwrap();
+    merger.merge().unwrap();
+
+    let metadata = read::read_metadata(&mut merged).unwrap();
+    let schema = read::infer_schema(&metadata).unwrap();
+
+    let mut chunks = read::FileReader::new(
+        merged,
+        metadata.row_groups,
+        schema,
+        Some(1024 * 1024),
+        None,
+        None,
+    );
+
+    for chunk in chunks {
+        println!("{:?}", chunk.unwrap());
+    }
 }

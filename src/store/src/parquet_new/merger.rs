@@ -13,7 +13,7 @@ use std::ops::RangeBounds;
 use std::ops::SubAssign;
 use std::rc::Rc;
 
-use arrow2::array::new_null_array;
+use arrow2::array::{Int128Array, new_null_array};
 use arrow2::array::Array;
 use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
@@ -44,6 +44,7 @@ use arrow2::bitmap::Bitmap;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
 use arrow2::datatypes::PhysicalType as ArrowPhysicalType;
+use arrow2::datatypes::PrimitiveType as ArrowPrimitiveType;
 use arrow2::datatypes::Schema;
 use arrow2::ffi::mmap::slice;
 use arrow2::io::parquet::read::column_iter_to_arrays;
@@ -59,6 +60,7 @@ use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedDataPage;
 use parquet2::page::CompressedPage;
 use parquet2::page::Page;
+use parquet2::page::Page::Data;
 use parquet2::read::decompress;
 use parquet2::schema::types::FieldInfo;
 use parquet2::schema::types::GroupLogicalType;
@@ -86,20 +88,13 @@ use crate::parquet_new::parquet::CompressedPageIterator;
 use crate::parquet_new::parquet::MergedPagesChunk;
 use crate::parquet_new::parquet::PagesChunk;
 
-enum TmpListArray {
-    Int64Array(Int64Array),
-    BooleanArray(BooleanArray),
-    FixedSizeBinaryArray(FixedSizeBinaryArray),
-    BinaryArray(BinaryArray<i32>),
-    Utf8Array(Utf8Array<i32>),
-}
-
 // this is a temporary array used to merge data pages avoiding downcasting
 enum TmpArray {
     Int8(Int8Array),
     Int16(Int16Array),
     Int32(Int32Array),
     Int64(Int64Array),
+    Int128(Int128Array),
     UInt8(UInt8Array),
     UInt16(UInt16Array),
     UInt32(UInt32Array),
@@ -116,6 +111,7 @@ enum TmpArray {
     ListInt16(Int16Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListInt32(Int32Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListInt64(Int64Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
+    ListInt128(Int128Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListUInt8(UInt8Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListUInt16(UInt16Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListUInt32(UInt32Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
@@ -135,7 +131,7 @@ enum TmpArray {
     ListLargeUtf8(Utf8Array<i64>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
 }
 
-macro_rules! merge_arrays {
+macro_rules! merge_arrays_inner {
     ($self:expr,$field:expr,$tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
         let col_path: ColumnPath = $col.path_in_schema.clone();
         let mut buf = vec![];
@@ -192,7 +188,6 @@ macro_rules! merge_arrays {
                 // println!("page {:#?}", page);
                 if let CompressedPage::Data(page) = page {
                     let any_arr = data_page_to_array(page, &$col, $field.clone(), &mut buf)?;
-                    println!("any arr {:#?}", any_arr.data_type());
                     let tmp_arr = any_arr.as_any().downcast_ref::<$in_ty>().unwrap().clone();
                     arrs[stream_id] = Some(tmp_arr);
                     arrs_idx[stream_id] = 0;
@@ -225,11 +220,27 @@ macro_rules! merge_arrays {
             $self.tmp_array_idx[stream_id].insert(col_path.clone(), idx);
         }
 
+        out
+    }};
+}
+
+macro_rules! merge_arrays {
+    ($self:expr,$field:expr,$tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
+        let mut out = merge_arrays_inner!($self,$field,$tmp_ty,$in_ty,$out_ty,$col,$reorder,$streams);
+
         out.as_box()
     }};
 }
 
-macro_rules! merge_list_arrays {
+macro_rules! merge_primitive_arrays {
+    ($self:expr,$field:expr,$tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
+        let out = merge_arrays_inner!($self,$field,$tmp_ty,$in_ty,$out_ty,$col,$reorder,$streams);
+
+        out.to($field.data_type().to_owned()).as_box()
+    }};
+}
+
+macro_rules! merge_list_arrays_inner {
     ($self:expr,$field:expr,$offset:ty, $tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
         let col_path: ColumnPath = $col.path_in_schema.clone();
         let mut buf = vec![];
@@ -285,7 +296,6 @@ macro_rules! merge_list_arrays {
                 let page = $self.page_streams[stream_id].next_page(&col_path)?.unwrap();
                 if let CompressedPage::Data(page) = page {
                     let any_arr = data_page_to_array(page, &$col, $field.clone(), &mut buf)?;
-                    // println!("any arr {:#?}", any_arr.data_type());
                     let list_arr = any_arr
                         .as_any()
                         .downcast_ref::<ListArray<$offset>>()
@@ -343,14 +353,135 @@ macro_rules! merge_list_arrays {
             $self.tmp_array_idx[stream_id].insert(col_path.clone(), idx);
         }
 
-        out.as_box()
+        out
     }};
 }
 
+macro_rules! merge_list_arrays {
+    ($self:expr,$field:expr,$offset:ty, $tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
+        let mut out = merge_list_arrays_inner!($self,$field,$offset,$tmp_ty,$in_ty,$out_ty,$col,$reorder,$streams);
+
+        out.as_box()
+    }}
+}
+
+macro_rules! merge_list_primitive_arrays {
+    ($self:expr,$field:expr,$offset:ty, $tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
+        let col_path: ColumnPath = $col.path_in_schema.clone();
+        let mut buf = vec![];
+        let col_exist_per_stream = $self
+            .page_streams
+            .iter()
+            .enumerate()
+            .map(|(stream_id, stream)| {
+                $streams.contains(&stream_id) && stream.contains_column(&col_path)
+            })
+            .collect::<Vec<bool>>();
+
+        let mut arrs = $self
+            .tmp_arrays
+            .iter_mut()
+            .enumerate()
+            .map(|(stream_id, cols)| {
+                if $streams.contains(&stream_id) {
+                    match cols.remove(&col_path) {
+                        None => None,
+                        Some(v) => {
+                            if let $tmp_ty(arr, offsets, validity, num_vals) = v {
+                                Some((arr, offsets, validity, num_vals))
+                            } else {
+                                None
+                            }
+                        }
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let mut arrs_idx: Vec<usize> = $self
+            .tmp_array_idx
+            .iter()
+            .map(|cols| match cols.get(&col_path) {
+                Some(idx) => *idx,
+                None => 0,
+            })
+            .collect();
+
+        let mut out = <$out_ty>::with_capacity($reorder.len());
+        for idx in 0..$reorder.len() {
+            let stream_id = $reorder[idx];
+            if !col_exist_per_stream[stream_id] {
+                out.push_null();
+                continue;
+            }
+
+            if arrs[stream_id].is_none() {
+                let page = $self.page_streams[stream_id].next_page(&col_path)?.unwrap();
+                if let CompressedPage::Data(page) = page {
+                    let any_arr = data_page_to_array(page, &$col, $field.clone(), &mut buf)?;
+                    let list_arr = any_arr
+                        .as_any()
+                        .downcast_ref::<ListArray<$offset>>()
+                        .unwrap()
+                        .clone();
+                    let arr = list_arr
+                        .values()
+                        .as_any()
+                        .downcast_ref::<$in_ty>()
+                        .unwrap()
+                        .clone()
+                        .to($field.data_type().clone());
+                    let offsets = list_arr.offsets().clone();
+                    let validity = list_arr.validity().map(|v| v.clone());
+                    arrs[stream_id] = Some((arr, offsets, validity, list_arr.len()));
+                    arrs_idx[stream_id] = 0;
+                }
+            }
+
+            let cur_idx = arrs_idx[stream_id];
+            let (arr, offsets, validity, num_vals) = arrs[stream_id].as_ref().unwrap();
+            if validity
+                .as_ref()
+                .map(|x| !x.get_bit(cur_idx))
+                .unwrap_or(false)
+            {
+                out.push_null();
+            } else {
+                let (start, end) = offsets.start_end(cur_idx);
+                let length = end - start;
+                // TODO avoid clone?
+                let vals = arr.clone().sliced(start, length);
+                out.try_push(Some(vals.into_iter()))?;
+            }
+
+            if cur_idx == *num_vals - 1 {
+                arrs[stream_id] = None;
+                arrs_idx[stream_id] = 0;
+            } else {
+                arrs_idx[stream_id] += 1;
+            }
+        }
+
+        for (stream_id, maybe_arr) in arrs.into_iter().enumerate() {
+            if let Some((a, o, v, l)) = maybe_arr {
+                $self.tmp_arrays[stream_id].insert(col_path.clone(), $tmp_ty(a, o, v, l));
+            }
+        }
+
+        for (stream_id, idx) in arrs_idx.into_iter().enumerate() {
+            $self.tmp_array_idx[stream_id].insert(col_path.clone(), idx);
+        }
+
+        out.as_box()
+    }}
+}
+
 pub struct Merger<R, W>
-where
-    R: Read,
-    W: Write,
+    where
+        R: Read,
+        W: Write,
 {
     index_cols: Vec<ColumnDescriptor>,
     parquet_schema: SchemaDescriptor,
@@ -471,9 +602,9 @@ pub enum MergeReorder {
 }
 
 impl<R, W> Merger<R, W>
-where
-    R: Read + Seek,
-    W: Write,
+    where
+        R: Read + Seek,
+        W: Write,
 {
     pub fn try_new(
         mut readers: Vec<R>,
@@ -482,7 +613,6 @@ where
         data_page_size_limit: usize,
         row_group_values_limit: usize,
         array_page_size: usize,
-        name: String,
     ) -> Result<Self> {
         let arrow_schemas = readers
             .iter_mut()
@@ -643,112 +773,8 @@ where
         reorder: &[usize],
         streams: &[usize],
     ) -> Result<Vec<CompressedPage>> {
-        let out = match field.data_type() {
-            DataType::Int8 => merge_arrays!(
-                self,
-                field,
-                TmpArray::Int8,
-                Int8Array,
-                MutablePrimitiveArray<i8>,
-                col,
-                reorder,
-                streams
-            ),
-            DataType::Int16 => merge_arrays!(
-                self,
-                field,
-                TmpArray::Int16,
-                Int16Array,
-                MutablePrimitiveArray<i16>,
-                col,
-                reorder,
-                streams
-            ),
-            DataType::Int32 | DataType::Date32 | DataType::Time32(_) => merge_arrays!(
-                self,
-                field,
-                TmpArray::Int32,
-                Int32Array,
-                MutablePrimitiveArray<i32>,
-                col,
-                reorder,
-                streams
-            ),
-            DataType::Int64
-            | DataType::Date64
-            | DataType::Time64(_)
-            | DataType::Timestamp(_, _)
-            | DataType::Duration(_) => merge_arrays!(
-                self,
-                field,
-                TmpArray::Int64,
-                Int64Array,
-                MutablePrimitiveArray<i64>,
-                col,
-                reorder,
-                streams
-            ),
-            DataType::UInt8 => merge_arrays!(
-                self,
-                field,
-                TmpArray::UInt8,
-                UInt8Array,
-                MutablePrimitiveArray<u8>,
-                col,
-                reorder,
-                streams
-            ),
-            DataType::UInt16 => merge_arrays!(
-                self,
-                field,
-                TmpArray::UInt16,
-                UInt16Array,
-                MutablePrimitiveArray<u16>,
-                col,
-                reorder,
-                streams
-            ),
-            DataType::UInt32 => merge_arrays!(
-                self,
-                field,
-                TmpArray::UInt32,
-                UInt32Array,
-                MutablePrimitiveArray<u32>,
-                col,
-                reorder,
-                streams
-            ),
-            DataType::UInt64 => merge_arrays!(
-                self,
-                field,
-                TmpArray::UInt64,
-                UInt64Array,
-                MutablePrimitiveArray<u64>,
-                col,
-                reorder,
-                streams
-            ),
-            DataType::Float32 => merge_arrays!(
-                self,
-                field,
-                TmpArray::Float32,
-                Float32Array,
-                MutablePrimitiveArray<f32>,
-                col,
-                reorder,
-                streams
-            ),
-            DataType::Float64 => merge_arrays!(
-                self,
-                field,
-                TmpArray::Float64,
-                Float64Array,
-                MutablePrimitiveArray<f64>,
-                col,
-                reorder,
-                streams
-            ),
-            DataType::Boolean => merge_arrays!(
+        let out = match field.data_type().to_physical_type() {
+            ArrowPhysicalType::Boolean => merge_arrays!(
                 self,
                 field,
                 TmpArray::Boolean,
@@ -758,7 +784,121 @@ where
                 reorder,
                 streams
             ),
-            DataType::Binary => merge_arrays!(
+            ArrowPhysicalType::Primitive(pt) => match pt {
+                ArrowPrimitiveType::Int8 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::Int8,
+                Int8Array,
+                MutablePrimitiveArray<i8>,
+                col,
+                reorder,
+                streams
+            ),
+                ArrowPrimitiveType::Int16 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::Int16,
+                Int16Array,
+                MutablePrimitiveArray<i16>,
+                col,
+                reorder,
+                streams
+            ),
+                ArrowPrimitiveType::Int32 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::Int32,
+                Int32Array,
+                MutablePrimitiveArray<i32>,
+                col,
+                reorder,
+                streams
+            ),
+                ArrowPrimitiveType::Int64 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::Int64,
+                Int64Array,
+                MutablePrimitiveArray<i64>,
+                col,
+                reorder,
+                streams
+            ),
+                ArrowPrimitiveType::Int128 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::Int128,
+                Int128Array,
+                MutablePrimitiveArray<i128>,
+                col,
+                reorder,
+                streams
+            )
+                ,
+                ArrowPrimitiveType::UInt8 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::UInt8,
+                UInt8Array,
+                MutablePrimitiveArray<u8>,
+                col,
+                reorder,
+                streams
+            ),
+                ArrowPrimitiveType::UInt16 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::UInt16,
+                UInt16Array,
+                MutablePrimitiveArray<u16>,
+                col,
+                reorder,
+                streams
+            ),
+                ArrowPrimitiveType::UInt32 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::UInt32,
+                UInt32Array,
+                MutablePrimitiveArray<u32>,
+                col,
+                reorder,
+                streams
+            ),
+                ArrowPrimitiveType::UInt64 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::UInt64,
+                UInt64Array,
+                MutablePrimitiveArray<u64>,
+                col,
+                reorder,
+                streams
+            ),
+                ArrowPrimitiveType::Float32 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::Float32,
+                Float32Array,
+                MutablePrimitiveArray<f32>,
+                col,
+                reorder,
+                streams
+            ),
+                ArrowPrimitiveType::Float64 => merge_primitive_arrays!(
+                self,
+                field,
+                TmpArray::Float64,
+                Float64Array,
+                MutablePrimitiveArray<f64>,
+                col,
+                reorder,
+                streams
+            ),
+                _ => unreachable!()
+            }
+            ArrowPhysicalType::Binary => merge_arrays!(
                 self,
                 field,
                 TmpArray::Binary,
@@ -768,7 +908,7 @@ where
                 reorder,
                 streams
             ),
-            DataType::LargeBinary => merge_arrays!(
+            ArrowPhysicalType::LargeBinary => merge_arrays!(
                 self,
                 field,
                 TmpArray::LargeBinary,
@@ -778,7 +918,7 @@ where
                 reorder,
                 streams
             ),
-            DataType::Utf8 => merge_arrays!(
+            ArrowPhysicalType::Utf8 => merge_arrays!(
                 self,
                 field,
                 TmpArray::Utf8,
@@ -788,7 +928,7 @@ where
                 reorder,
                 streams
             ),
-            DataType::LargeUtf8 => merge_arrays!(
+            ArrowPhysicalType::LargeUtf8 => merge_arrays!(
                 self,
                 field,
                 TmpArray::LargeUtf8,
@@ -798,94 +938,45 @@ where
                 reorder,
                 streams
             ),
-            DataType::Decimal(precision, _) => {
-                let precision = *precision;
-                if precision <= 9 {
-                    merge_arrays!(
-                        self,
-                        field,
-                        TmpArray::Int32,
-                        Int32Array,
-                        MutablePrimitiveArray<i32>,
-                        col,
-                        reorder,
-                        streams
-                    )
-                } else if precision <= 18 {
-                    merge_arrays!(
-                        self,
-                        field,
-                        TmpArray::Int64,
-                        Int64Array,
-                        MutablePrimitiveArray<i64>,
-                        col,
-                        reorder,
-                        streams
-                    )
-                } else {
-                    unimplemented!("df")
+            ArrowPhysicalType::List => if let DataType::List(inner) = field.data_type() {
+                match inner.data_type.to_physical_type() {
+                    ArrowPhysicalType::Boolean => merge_list_arrays!(self, field, i32, TmpArray::ListBoolean,BooleanArray,MutableListArray<i32,MutableBooleanArray>,col,reorder,streams),
+                    ArrowPhysicalType::Primitive(pt) => match pt {
+                        ArrowPrimitiveType::Int8 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListInt8,Int8Array,MutableListArray<i32,MutablePrimitiveArray<i8>>,col,reorder,streams),
+                        ArrowPrimitiveType::Int16 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListInt16,Int16Array,MutableListArray<i32,MutablePrimitiveArray<i16>>,col,reorder,streams),
+                        ArrowPrimitiveType::Int32 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListInt32,Int32Array,MutableListArray<i32,MutablePrimitiveArray<i32>>,col,reorder,streams),
+                        ArrowPrimitiveType::Int64 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListInt64,Int64Array,MutableListArray<i32,MutablePrimitiveArray<i64>>,col,reorder,streams),
+                        ArrowPrimitiveType::Int128 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListInt128,Int128Array,MutableListArray<i32,MutablePrimitiveArray<i128>>,col,reorder,streams),
+                        ArrowPrimitiveType::UInt8 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListUInt8,UInt8Array,MutableListArray<i32,MutablePrimitiveArray<u8>>,col,reorder,streams),
+                        ArrowPrimitiveType::UInt16 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListUInt16,UInt16Array,MutableListArray<i32,MutablePrimitiveArray<u16>>,col,reorder,streams),
+                        ArrowPrimitiveType::UInt32 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListUInt32,UInt32Array,MutableListArray<i32,MutablePrimitiveArray<u32>>,col,reorder,streams),
+                        ArrowPrimitiveType::UInt64 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListUInt64,UInt64Array,MutableListArray<i32,MutablePrimitiveArray<u64>>,col,reorder,streams),
+                        ArrowPrimitiveType::Float32 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListFloat32,Float32Array,MutableListArray<i32,MutablePrimitiveArray<f32>>,col,reorder,streams),
+                        ArrowPrimitiveType::Float64 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListFloat64,Float64Array,MutableListArray<i32,MutablePrimitiveArray<f64>>,col,reorder,streams),
+                        _ => unreachable!()
+                    }
+                    ArrowPhysicalType::Binary => merge_list_arrays!(self, field, i32, TmpArray::ListBinary,BinaryArray<i32>,MutableListArray<i32,MutableBinaryArray<i32>>,col,reorder,streams),
+                    ArrowPhysicalType::LargeBinary => merge_list_arrays!(self, field, i32, TmpArray::ListLargeBinary,BinaryArray<i64>,MutableListArray<i32,MutableBinaryArray<i64>>,col,reorder,streams),
+                    ArrowPhysicalType::Utf8 => merge_list_arrays!(self, field, i32, TmpArray::ListUtf8,Utf8Array<i32>,MutableListArray<i32,MutableUtf8Array<i32>>,col,reorder,streams),
+                    ArrowPhysicalType::LargeUtf8 => merge_list_arrays!(self, field, i32, TmpArray::ListLargeUtf8,Utf8Array<i64>,MutableListArray<i32,MutableUtf8Array<i64>>,col,reorder,streams),
+                    _ => unreachable!()
                 }
-            }
-            DataType::List(f) => match f.data_type {
-                DataType::Int8 => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListInt8,Int8Array,MutableListArray<i32,MutablePrimitiveArray<i8>>,col,reorder,streams)
-                }
-                DataType::Int16 => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListInt16,Int16Array,MutableListArray<i32,MutablePrimitiveArray<i16>>,col,reorder,streams)
-                }
-                DataType::Int32 | DataType::Date32 | DataType::Time32(_) => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListInt32,Int32Array,MutableListArray<i32,MutablePrimitiveArray<i32>>,col,reorder,streams)
-                }
-                DataType::Int64
-                | DataType::Date64
-                | DataType::Time64(_)
-                | DataType::Timestamp(_, _)
-                | DataType::Duration(_) => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListInt64,Int64Array,MutableListArray<i32,MutablePrimitiveArray<i64>>,col,reorder,streams)
-                }
-                DataType::UInt8 => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListUInt8,UInt8Array,MutableListArray<i32,MutablePrimitiveArray<u8>>,col,reorder,streams)
-                }
-                DataType::UInt16 => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListUInt16,UInt16Array,MutableListArray<i32,MutablePrimitiveArray<u16>>,col,reorder,streams)
-                }
-                DataType::UInt32 => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListUInt32,UInt32Array,MutableListArray<i32,MutablePrimitiveArray<u32>>,col,reorder,streams)
-                }
-                DataType::UInt64 => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListUInt64,UInt64Array,MutableListArray<i32,MutablePrimitiveArray<u64>>,col,reorder,streams)
-                }
-                DataType::Float32 => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListFloat32,Float32Array,MutableListArray<i32,MutablePrimitiveArray<f32>>,col,reorder,streams)
-                }
-                DataType::Float64 => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListFloat64,Float64Array,MutableListArray<i32,MutablePrimitiveArray<f64>>,col,reorder,streams)
-                }
-                DataType::Boolean => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListBoolean,BooleanArray,MutableListArray<i32,MutableBooleanArray>,col,reorder,streams)
-                }
-                DataType::Binary => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListBinary,BinaryArray<i32>,MutableListArray<i32,MutableBinaryArray<i32>>,col,reorder,streams)
-                }
-                DataType::LargeBinary => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListLargeBinary,BinaryArray<i64>,MutableListArray<i32,MutableBinaryArray<i64>>,col,reorder,streams)
-                }
-                DataType::Utf8 => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListUtf8,Utf8Array<i32>,MutableListArray<i32,MutableUtf8Array<i32>>,col,reorder,streams)
-                }
-                DataType::LargeUtf8 => {
-                    merge_list_arrays!(self, field, i32, TmpArray::ListLargeUtf8,Utf8Array<i64>,MutableListArray<i32,MutableUtf8Array<i64>>,col,reorder,streams)
-                }
-                _ => unimplemented!(),
+            } else {
+                unreachable!()
             },
-            _ => unimplemented!(),
+            _ => unreachable!()
         };
 
-        Ok(array_to_pages_simple(
+
+        println!("dt {:?} {:?}", out.data_type(), out.data_type().to_physical_type());
+        println!("bt {:?}", col.base_type);
+        let pages = array_to_pages_simple(
             out,
             col.base_type.clone(),
             self.data_page_size_limit,
-        )?)
+        )?;
+
+        Ok(pages)
     }
 
     fn merge_queue(&mut self) -> Result<()> {
