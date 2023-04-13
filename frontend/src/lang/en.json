@@ -18,6 +18,7 @@
   },
 
   "common": {
+    "addPropery": "Add property",
     "ok": "Ok",
     "types": {
       "string": "String",

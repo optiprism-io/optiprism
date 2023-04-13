@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { GroupRecord, EventRecordsListRequestTime } from '@/api';
+import { GroupRecord, EventRecordsListRequestTime, Value } from '@/api';
 import { groupRecordsService } from '@/api/services/groupRecords.service';
 import { useCommonStore } from '@/stores/common';
 import { useSegmentsStore } from '@/stores/reports/segments';
@@ -38,7 +38,7 @@ export const useGroupStore = defineStore('groupStore', {
             const commonStore = useCommonStore();
             const segmentsStore = useSegmentsStore();
             try {
-                const res = await groupRecordsService.getList(commonStore.organizationId, commonStore.organizationId, {
+                const res = await groupRecordsService.getList(commonStore.organizationId, commonStore.projectId, {
                     time: this.timeRequest,
                     group: 'users', // TODO any group to use
                     segments: segmentsStore.segmentationItems,
@@ -52,11 +52,19 @@ export const useGroupStore = defineStore('groupStore', {
             }
             this.loading = false;
         },
-        get() {
-            // TODO
-        },
-        update() {
-            // TODO
+        async update(payload: {
+            id: number
+            properties: { [key: string]: Value; },
+        }) {
+            this.loading = true;
+            try {
+                const commonStore = useCommonStore();
+                groupRecordsService.updated(commonStore.organizationId, commonStore.projectId, payload.id, { properties: payload.properties })
+                this.getList();
+            } catch (e) {
+                this.loading = false;
+                console.error('error update event property');
+            }
         },
     },
     getters: {

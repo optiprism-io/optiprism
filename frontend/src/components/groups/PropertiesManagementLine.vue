@@ -74,7 +74,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, inject } from 'vue';
+import { ref, computed, inject, onBeforeMount } from 'vue';
 import { Value } from '@/api';
 import UiInput from '@/components/uikit/UiInput.vue';
 import { I18N } from '@/utils/i18n';
@@ -91,11 +91,13 @@ type Props = {
     index?: number
     hideControls?: boolean
     boldText?: boolean
+    startEdit?: boolean
 };
 
 const props = withDefaults(defineProps<Props>(), {
     boldText: false,
     hideControls: false,
+    startEdit: false,
     index: 0,
 });
 const emit = defineEmits<{
@@ -128,6 +130,12 @@ const onEdit = () => {
 const onDelete = () => {
     emit('delete', (props?.index || 0));
 };
+
+onBeforeMount(() => {
+    editKey.value = props.valueKey;
+    editValue.value = String(props.value);
+    editMode.value = props.startEdit;
+});
 </script>
 
 <style lang="scss">

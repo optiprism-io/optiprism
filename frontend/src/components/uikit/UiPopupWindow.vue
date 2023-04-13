@@ -55,7 +55,12 @@
                     v-if="props.applyButton || props.cancelButton"
                     class="pf-c-modal-box__footer"
                 >
-                    <div class="pf-c-action-list">
+                    <div
+                        class="pf-c-action-list"
+                        :class="{
+                            'pf-u-justify-content-flex-end': props.actionButtonsRight
+                        }"
+                    >
                         <div
                             v-if="props.applyButton"
                             class="pf-c-action-list__item"
@@ -102,7 +107,6 @@ export interface Props {
     applyButtonClass?: string
     cancelButton?: string
     content?: string
-
     closable?: boolean
     applyLoading?: boolean
     applyDisabled?: boolean
@@ -110,7 +114,7 @@ export interface Props {
     noRemoveBodyOverflow?: boolean
     fullWidth?: boolean
     closableOverlay?: boolean
-
+    actionButtonsRight?: boolean
     size?: 'pf-m-md' | 'pf-m-sm' | 'pf-m-lg' | null
     centered?: boolean
 }
@@ -121,7 +125,7 @@ const props = withDefaults(defineProps<Props>(), {
     applyButton: undefined,
     applyDisabled: false,
     cancelButton: undefined,
-
+    actionButtonsRight: false,
     size: 'pf-m-sm',
     closable: true,
     fullWidth: true,
