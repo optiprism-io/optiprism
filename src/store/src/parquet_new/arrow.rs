@@ -54,6 +54,28 @@ impl ArrowChunk {
     }
 }
 
+pub struct OneColMergeRow<A>(usize, A);
+
+impl<A> Ord for OneColMergeRow<A> where A: Ord {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.1.cmp(&other.1).reverse()
+    }
+}
+
+impl<A> PartialOrd for OneColMergeRow<A> where A: Ord {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<A> PartialEq for OneColMergeRow<A> where A: Eq {
+    fn eq(&self, other: &Self) -> bool {
+        self.1 == other.1
+    }
+}
+
+impl<A> Eq for OneColMergeRow<A> where A: Eq {}
+
 pub struct TwoColMergeRow<A, B>(usize, A, B);
 
 impl<A, B> Ord for TwoColMergeRow<A, B> where A: Ord, B: Ord {
@@ -75,6 +97,60 @@ impl<A, B> PartialEq for TwoColMergeRow<A, B> where A: Eq, B: Eq {
 }
 
 impl<A, B> Eq for TwoColMergeRow<A, B> where A: Eq, B: Eq {}
+
+pub fn merge_one_primitive<T: NativeType + Ord>(mut chunks: Vec<ArrowChunk>, array_size: usize) -> Result<Vec<MergedArrowChunk>> {
+    let mut arr_iters = chunks.iter().map(|row| {
+        row.arrs[0].as_any().downcast_ref::<PrimitiveArray<T>>().unwrap().values_iter()
+    }).collect::<Vec<_>>();
+
+    let mut sort = BinaryHeap::<OneColMergeRow<T>>::with_capacity(array_size);
+
+    let mut res = vec![];
+    let mut out_col = Vec::with_capacity(array_size);
+    let mut order = Vec::with_capacity(array_size);
+
+    for row_id in 0..chunks.len() {
+        let mr = OneColMergeRow(
+            row_id,
+            *arr_iters[row_id].next().unwrap(),
+        );
+        sort.push(mr);
+    }
+
+    while let Some(OneColMergeRow(row_idx, v)) = sort.pop() {
+        out_col.push(v);
+        order.push(chunks[row_idx].stream);
+        match arr_iters[row_idx].next() {
+            Some(v) => {
+                let mr = OneColMergeRow(
+                    row_idx,
+                    *v,
+                );
+
+                sort.push(mr);
+            }
+            None => {}
+        }
+
+        if out_col.len() >= array_size {
+            let out = vec![
+                PrimitiveArray::<T>::from_vec(out_col.drain(..).collect()).boxed(),
+            ];
+            let arr_order = order.drain(..).collect();
+            res.push(MergedArrowChunk::new(out, arr_order));
+        }
+    }
+
+    if !out_col.is_empty() {
+        let out = vec![
+            PrimitiveArray::<T>::from_vec(out_col.drain(..).collect()).boxed(),
+        ];
+        let arr_order = order.drain(..).collect();
+        res.push(MergedArrowChunk::new(out, arr_order));
+    }
+
+    Ok(res)
+}
 
 pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(mut chunks: Vec<ArrowChunk>, array_size: usize) -> Result<Vec<MergedArrowChunk>> {
     let mut arr_iters = chunks.iter().map(|row| {
@@ -140,16 +216,26 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(mut chun
     Ok(res)
 }
 
-
 pub fn merge_chunks(chunks: Vec<ArrowChunk>, array_size: usize) -> Result<Vec<MergedArrowChunk>> {
     match chunks[0].arrs.len() {
+        1 => {
+            match chunks[0].arrs[0].data_type().to_physical_type() {
+                arrow2::datatypes::PhysicalType::Primitive(pt) => {
+                    match pt {
+                        PrimitiveType::Int64 => merge_one_primitive::<i64>(chunks, array_size),
+                        _ => unimplemented!("merge is not implemented for {pt:?} primitive type")
+                    }
+                }
+                _ => unimplemented!("merge not implemented for {:?} type", chunks[0].arrs[0].data_type())
+            }
+        }
         2 => {
             match (chunks[0].arrs[0].data_type().to_physical_type(), chunks[0].arrs[1].data_type().to_physical_type()) {
                 (arrow2::datatypes::PhysicalType::Primitive(a), arrow2::datatypes::PhysicalType::Primitive(b)) => {
                     match (a, b) {
                         (PrimitiveType::Int64, PrimitiveType::Int64) => merge_two_primitives::<i64, i64>(chunks, array_size),
                         (PrimitiveType::Int64, PrimitiveType::Int32) => merge_two_primitives::<i64, i32>(chunks, array_size),
-                        _ => unimplemented!("merge not implemented for {:?} {:?} primitive types", a, b)
+                        _ => unimplemented!("merge is not implemented for {a:?} {b:?} primitive types")
                     }
                 }
                 _ => unimplemented!("merge not implemented for {:?} {:?} types", chunks[0].arrs[0].data_type(), chunks[0].arrs[1].data_type())
@@ -261,6 +347,35 @@ mod tests {
         let res = try_merge_schemas(vec![s1.clone(), s2]);
         assert!(res.is_err());
         Ok(())
+    }
+
+    #[test]
+    fn test_merge_one_vec() {
+        let row1 = {
+            let arr1: Box<dyn Array> = Box::new(PrimitiveArray::<i64>::from_vec(vec![1, 1, 2, 2, 2]));
+            ArrowChunk::new(vec![arr1], 0)
+        };
+        let row2 = {
+            let arr1: Box<dyn Array> = Box::new(PrimitiveArray::<i64>::from_vec(vec![3, 3, 4, 4, 4]));
+            ArrowChunk::new(vec![arr1], 0)
+        };
+        let row3 = {
+            let arr1: Box<dyn Array> = Box::new(PrimitiveArray::<i64>::from_vec(vec![1, 1, 2, 2, 2]));
+            ArrowChunk::new(vec![arr1], 7)
+        };
+        let row4 = {
+            let arr1: Box<dyn Array> = Box::new(PrimitiveArray::<i64>::from_vec(vec![1, 1, 2, 2, 2]));
+            ArrowChunk::new(vec![arr1], 9)
+        };
+        let row5 = {
+            let arr1: Box<dyn Array> = Box::new(PrimitiveArray::<i64>::from_vec(vec![4]));
+            ArrowChunk::new(vec![arr1], 9)
+        };
+
+        let arr1_exp = Box::new(PrimitiveArray::<i64>::from_vec(vec![1]));
+        let res = merge_chunks(vec![row1, row2, row3, row4, row5], 12).unwrap();
+
+        println!("{:?}", res);
     }
 
     #[test]

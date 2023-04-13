@@ -257,13 +257,11 @@ fn write_chunk(w: impl Write, schema: Schema, chunk: Chunk<Box<dyn Array>>) -> R
 fn test2() {
     let arrs = vec![
         Int64Array::from(&[Some(0), Some(1)]).boxed(),
-        Int64Array::from(&[Some(0), Some(1)]).boxed(),
         Int64Array::from(&[Some(1232222123), Some(3453222245)]).boxed(),
     ];
 
     let schema = Schema::from(vec![
         Field::new("idx1", arrs[0].data_type().clone(), true),
-        Field::new("idx2", arrs[1].data_type().clone(), true),
         Field::new("f", DataType::Date64, true),
     ]);
 
@@ -284,7 +282,7 @@ fn test2() {
     let mut merger = Merger::try_new(
         vec![out1, out2],
         &mut merged,
-        2,
+        1,
         2,
         2,
         2,

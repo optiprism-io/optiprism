@@ -23,3 +23,9 @@ pub enum StoreError {
     #[error("arrow2 {0:?}")]
     Arrow2(#[from] arrow2::error::Error),
 }
+
+impl StoreError {
+    pub fn nyi<T>(msg: impl Into<String>) -> Result<T> {
+        Err(StoreError::NotYetSupported(msg.into()))
+    }
+}
