@@ -20,13 +20,13 @@
                 :value-key="$t('users.columns.key')"
             />
             <PropertiesManagementLine
-                class="properties-panagement-popup__line"
-                v-for="(item, i) in itemsProperties"
+                v-for="(property, i) in itemsProperties"
                 :key="i"
+                class="properties-panagement-popup__line"
                 :hide-controls="false"
                 :index="i"
-                :value="item.value"
-                :value-key="item.key"
+                :value="property.value"
+                :value-key="property.key"
                 @apply="onApplyChangePropery"
                 @delete="onDeleteLine"
             />
