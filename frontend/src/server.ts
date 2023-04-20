@@ -39,7 +39,7 @@ export default function ({ environment = 'development' } = {}) {
             this.namespace = 'api'
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/events`, (schema) => {
-                return { events: schema.db.events }
+                return { data: schema.db.events }
             }, { timing: 100 })
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/events/:event_id`, (schema, request) => {
