@@ -32,7 +32,7 @@ import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar';
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
 import { I18N } from '@/utils/i18n';
 
-export type DataPickerPeriod = {
+export interface DataPickerPeriod {
     from: string
     to: string
     last: number
