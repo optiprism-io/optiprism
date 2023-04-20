@@ -17,7 +17,7 @@ export type ResponseUseDataTable = {
     pieChart: any[]
 }
 
-export default function     useDataTable(payload: DataTableResponse): ResponseUseDataTable {
+export default function useDataTable(payload: DataTableResponse): ResponseUseDataTable {
     const hasData = Boolean(payload?.columns && payload?.columns.length)
     const dimensionColumns = payload?.columns ? payload.columns.filter(column => column.type === 'dimension') : []
     const metricColumns = payload?.columns ? payload?.columns.filter(column => column.type === 'metric') : []

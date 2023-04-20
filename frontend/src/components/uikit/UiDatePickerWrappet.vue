@@ -37,7 +37,7 @@ export interface DataPickerPeriod {
     to: string
     last: number
     type: string
-};
+}
 
 interface Props extends DataPickerPeriod {
     isPeriodActive: boolean

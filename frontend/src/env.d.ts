@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { defineComponent } from 'vue'
+import { $T } from '@/utils/i18n'
 
 declare module '*.vue' {
     const component: ReturnType<typeof defineComponent>
@@ -8,7 +9,7 @@ declare module '*.vue' {
 
 declare module '@vue/runtime-core' {
     interface ComponentCustomProperties {
-        $t: (key: string) => string
+        $t: $T
     }
 }
 declare module 'v-tooltip';

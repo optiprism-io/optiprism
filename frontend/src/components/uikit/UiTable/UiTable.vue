@@ -163,7 +163,9 @@ const toggleColumns = (payload: string) => {
 
 onMounted(() => {
     props.columns.map(item => {
-        activeColumns.value.push(item.value)
+        if (!item.notActiveStart) {
+            activeColumns.value.push(item.value)
+        }
 
         if (!item.default) {
             columnsSelect.value.push({

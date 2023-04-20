@@ -263,6 +263,46 @@ export default function ({ environment = 'development' } = {}) {
                 schema.db.dashboards.remove(request.params.dashboard_id)
                 return request.params.dashboard_id;
             }, { timing: 110 })
+
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/group-records/search`, () => {
+                return {
+                    data: [
+                        {
+                            'id': 1,
+                            'group': 'users',
+                            'properties': {
+                                'createdAt': '2017-07-21T17:32:28Z',
+                                'Name': 'Sam',
+                                'Age': 26
+                            }
+                        },
+                        {
+                            'id': 2,
+                            'group': 'users',
+                            'properties': {
+                                'Name': 'Nick',
+                                'Age': 30
+                            }
+                        },
+                        {
+                            'id': 3,
+                            'group': 'users',
+                            'properties': {
+                                'Name': 'Sam2',
+                                'Age': 26
+                            }
+                        },
+                        {
+                            'id': 4,
+                            'group': 'users',
+                            'properties': {
+                                'Name': 'Nick2',
+                                'Age': 30,
+                            }
+                        }
+                    ],
+                };
+            });
         }
     });
 }

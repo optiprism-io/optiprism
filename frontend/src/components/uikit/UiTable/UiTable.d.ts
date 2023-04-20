@@ -42,6 +42,7 @@ export type Column = {
     enabled?: boolean
     default?: boolean
     type?: string
+    notActiveStart?: boolean
 }
 
 export type Cell = {

@@ -18,7 +18,7 @@ export type Group = {
     },
 };
 
-export const useGroupStore = defineStore('groupStore', {
+export const useGroupStore = defineStore('group', {
     state: (): Group => ({
         items: [],
         loading: false,

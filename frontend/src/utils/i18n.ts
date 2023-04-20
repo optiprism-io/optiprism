@@ -45,7 +45,7 @@ const i18n = {
         const error = validateKey(key)
         if (error) {
             logError(error)
-            return
+            return '';
         }
 
         for (const currentDictionary of this.currentDictionaries) {

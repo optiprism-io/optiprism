@@ -185,7 +185,7 @@ const props = withDefaults(defineProps<Props>(), {
     loading: false,
 })
 
-const dataTable = computed(() => useDataTable(props.eventSegmentation))
+const dataTable = computed(() => useDataTable(props.eventSegmentation || {}))
 
 const emit = defineEmits<{
     (e: 'get-event-segmentation'): void

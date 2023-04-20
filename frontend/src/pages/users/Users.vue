@@ -133,6 +133,7 @@ const columns = computed(() => {
             title: isAction ? '' : i18n.$t(`groups.columns.${key}`),
             default: isAction,
             type: isAction? 'action' : '',
+            notActiveStart: key === 'properties',
         };
     })
 });
