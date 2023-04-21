@@ -1,3 +1,5 @@
+#![feature(trace_macros)]
+
 use std::fs::File;
 use std::io;
 use std::io::BufRead;
@@ -25,7 +27,7 @@ use arrow2::array::Utf8Array;
 use arrow2::buffer::Buffer;
 use arrow2::chunk::Chunk;
 use arrow2::compute::concatenate::concatenate;
-use arrow2::datatypes::DataType;
+use arrow2::datatypes::{DataType, IntervalUnit, TimeUnit};
 use arrow2::datatypes::Field;
 use arrow2::datatypes::Schema;
 use arrow2::io::csv::read::deserialize_batch;
@@ -81,52 +83,42 @@ use tracing_test::traced_test;
 #[traced_test]
 #[test]
 fn test() -> anyhow::Result<()> {
-    let fields = vec![
-        Field::new("idx1", DataType::Int64, false),
-        Field::new("idx2", DataType::Int32, false),
-        Field::new("d1", DataType::UInt64, true),
-        Field::new("d2", DataType::Float64, true),
-        Field::new("d3", DataType::Utf8, true),
-        Field::new("d4", DataType::LargeUtf8, true),
-        Field::new("d5", DataType::Binary, true),
-        Field::new("d6", DataType::LargeBinary, true),
-        Field::new("d7", DataType::Boolean, true),
-        Field::new(
-            "dl1",
-            DataType::List(Box::new(Field::new("f", DataType::Int64, false))),
-            true,
-        ),
-        Field::new(
-            "dl2",
-            DataType::List(Box::new(Field::new("f", DataType::Float64, false))),
-            true,
-        ),
-        Field::new(
-            "dl3",
-            DataType::List(Box::new(Field::new("f", DataType::Utf8, false))),
-            true,
-        ),
-        Field::new(
-            "dl4",
-            DataType::List(Box::new(Field::new("f", DataType::LargeUtf8, false))),
-            true,
-        ),
-        Field::new(
-            "dl5",
-            DataType::List(Box::new(Field::new("f", DataType::Binary, false))),
-            true,
-        ),
-        Field::new(
-            "dl6",
-            DataType::List(Box::new(Field::new("f", DataType::LargeBinary, false))),
-            true,
-        ),
-        Field::new(
-            "dl7",
-            DataType::List(Box::new(Field::new("f", DataType::Boolean, false))),
-            true,
-        ),
+    let data_fields = vec![
+        Field::new("f1", DataType::Boolean, true),
+        Field::new("f2", DataType::Int8, true),
+        Field::new("f3", DataType::Int16, true),
+        Field::new("f4", DataType::Int32, true),
+        Field::new("f5", DataType::Int64, true),
+        Field::new("f6", DataType::UInt8, true),
+        Field::new("f7", DataType::UInt16, true),
+        Field::new("f9", DataType::UInt32, true),
+        Field::new("f10", DataType::UInt64, true),
+        Field::new("f11", DataType::Float32, true),
+        Field::new("f12", DataType::Float64, true),
+        Field::new("f13", DataType::Timestamp(TimeUnit::Second, None), true),
+        Field::new("f14", DataType::Timestamp(TimeUnit::Second, Some("Utc".to_string())), true),
+        Field::new("f15", DataType::Date32, true),
+        Field::new("f16", DataType::Date64, true),
+        Field::new("f17", DataType::Time32(TimeUnit::Second), true),
+        Field::new("f18", DataType::Time64(TimeUnit::Second), true),
+        Field::new("f19", DataType::Duration(TimeUnit::Second), true),
+        Field::new("f20", DataType::Interval(IntervalUnit::YearMonth), true),
+        Field::new("f21", DataType::Binary, true),
+        Field::new("f22", DataType::FixedSizeBinary(32), true),
+        Field::new("f23", DataType::LargeBinary, true),
+        Field::new("f24", DataType::Utf8, true),
+        Field::new("f25", DataType::LargeUtf8, true),
     ];
+
+    let list_fields = data_fields.iter().map(|field| {
+        Field::new(format!("list_{}", field.name()), DataType::List(Box::new(field.to_owned())), true)
+    }).collect::<Vec<_>>();
+    let large_list_fields = data_fields.iter().map(|field| {
+        Field::new(format!("large_list_{}", field.name()), DataType::List(Box::new(field.to_owned())), true)
+    }).collect::<Vec<_>>();
+
+    let fields = [data_fields, list_fields, large_list_fields].concat();
+
     let names = fields
         .iter()
         .map(|f| f.name.to_string())
@@ -215,7 +207,12 @@ fn test() -> anyhow::Result<()> {
         "final merged \n{}",
         print::write(&[final_chunk.clone()], &names)
     );
-    assert_eq!(initial_chunk, final_chunk);
+    for idx in 0..initial_chunk.arrays().len() {
+        println!("idx {idx}");
+        println!("initial data type: {:?}", initial_chunk.arrays()[idx].data_type());
+        println!("result data type: {:?}", final_chunk.arrays()[idx].data_type());
+        debug_assert_eq!(initial_chunk.arrays()[idx], final_chunk.arrays()[idx]);
+    }
     Ok(())
 }
 

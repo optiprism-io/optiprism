@@ -366,7 +366,7 @@ macro_rules! merge_list_arrays {
 }
 
 macro_rules! merge_list_primitive_arrays {
-    ($self:expr,$field:expr,$offset:ty, $tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
+    ($self:expr,$field:expr,$inner_field:expr,$offset:ty, $tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
         let col_path: ColumnPath = $col.path_in_schema.clone();
         let mut buf = vec![];
         let col_exist_per_stream = $self
@@ -421,6 +421,8 @@ macro_rules! merge_list_primitive_arrays {
                 let page = $self.page_streams[stream_id].next_page(&col_path)?.unwrap();
                 if let CompressedPage::Data(page) = page {
                     let any_arr = data_page_to_array(page, &$col, $field.clone(), &mut buf)?;
+                    println!("f {:?}",$field);
+                    println!("any arr{any_arr:?}");
                     let list_arr = any_arr
                         .as_any()
                         .downcast_ref::<ListArray<$offset>>()
@@ -432,7 +434,7 @@ macro_rules! merge_list_primitive_arrays {
                         .downcast_ref::<$in_ty>()
                         .unwrap()
                         .clone()
-                        .to($field.data_type().clone());
+                        .to($inner_field.data_type().clone());
                     let offsets = list_arr.offsets().clone();
                     let validity = list_arr.validity().map(|v| v.clone());
                     arrs[stream_id] = Some((arr, offsets, validity, list_arr.len()));
@@ -939,20 +941,21 @@ impl<R, W> Merger<R, W>
                 streams
             ),
             ArrowPhysicalType::List => if let DataType::List(inner) = field.data_type() {
+                let inner_field = *inner.to_owned();
                 match inner.data_type.to_physical_type() {
                     ArrowPhysicalType::Boolean => merge_list_arrays!(self, field, i32, TmpArray::ListBoolean,BooleanArray,MutableListArray<i32,MutableBooleanArray>,col,reorder,streams),
                     ArrowPhysicalType::Primitive(pt) => match pt {
-                        ArrowPrimitiveType::Int8 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListInt8,Int8Array,MutableListArray<i32,MutablePrimitiveArray<i8>>,col,reorder,streams),
-                        ArrowPrimitiveType::Int16 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListInt16,Int16Array,MutableListArray<i32,MutablePrimitiveArray<i16>>,col,reorder,streams),
-                        ArrowPrimitiveType::Int32 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListInt32,Int32Array,MutableListArray<i32,MutablePrimitiveArray<i32>>,col,reorder,streams),
-                        ArrowPrimitiveType::Int64 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListInt64,Int64Array,MutableListArray<i32,MutablePrimitiveArray<i64>>,col,reorder,streams),
-                        ArrowPrimitiveType::Int128 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListInt128,Int128Array,MutableListArray<i32,MutablePrimitiveArray<i128>>,col,reorder,streams),
-                        ArrowPrimitiveType::UInt8 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListUInt8,UInt8Array,MutableListArray<i32,MutablePrimitiveArray<u8>>,col,reorder,streams),
-                        ArrowPrimitiveType::UInt16 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListUInt16,UInt16Array,MutableListArray<i32,MutablePrimitiveArray<u16>>,col,reorder,streams),
-                        ArrowPrimitiveType::UInt32 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListUInt32,UInt32Array,MutableListArray<i32,MutablePrimitiveArray<u32>>,col,reorder,streams),
-                        ArrowPrimitiveType::UInt64 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListUInt64,UInt64Array,MutableListArray<i32,MutablePrimitiveArray<u64>>,col,reorder,streams),
-                        ArrowPrimitiveType::Float32 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListFloat32,Float32Array,MutableListArray<i32,MutablePrimitiveArray<f32>>,col,reorder,streams),
-                        ArrowPrimitiveType::Float64 => merge_list_primitive_arrays!(self, field, i32, TmpArray::ListFloat64,Float64Array,MutableListArray<i32,MutablePrimitiveArray<f64>>,col,reorder,streams),
+                        ArrowPrimitiveType::Int8 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt8,Int8Array,MutableListArray<i32,MutablePrimitiveArray<i8>>,col,reorder,streams),
+                        ArrowPrimitiveType::Int16 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt16,Int16Array,MutableListArray<i32,MutablePrimitiveArray<i16>>,col,reorder,streams),
+                        ArrowPrimitiveType::Int32 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt32,Int32Array,MutableListArray<i32,MutablePrimitiveArray<i32>>,col,reorder,streams),
+                        ArrowPrimitiveType::Int64 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt64,Int64Array,MutableListArray<i32,MutablePrimitiveArray<i64>>,col,reorder,streams),
+                        ArrowPrimitiveType::Int128 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt128,Int128Array,MutableListArray<i32,MutablePrimitiveArray<i128>>,col,reorder,streams),
+                        ArrowPrimitiveType::UInt8 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt8,UInt8Array,MutableListArray<i32,MutablePrimitiveArray<u8>>,col,reorder,streams),
+                        ArrowPrimitiveType::UInt16 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt16,UInt16Array,MutableListArray<i32,MutablePrimitiveArray<u16>>,col,reorder,streams),
+                        ArrowPrimitiveType::UInt32 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt32,UInt32Array,MutableListArray<i32,MutablePrimitiveArray<u32>>,col,reorder,streams),
+                        ArrowPrimitiveType::UInt64 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt64,UInt64Array,MutableListArray<i32,MutablePrimitiveArray<u64>>,col,reorder,streams),
+                        ArrowPrimitiveType::Float32 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListFloat32,Float32Array,MutableListArray<i32,MutablePrimitiveArray<f32>>,col,reorder,streams),
+                        ArrowPrimitiveType::Float64 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListFloat64,Float64Array,MutableListArray<i32,MutablePrimitiveArray<f64>>,col,reorder,streams),
                         _ => unreachable!()
                     }
                     ArrowPhysicalType::Binary => merge_list_arrays!(self, field, i32, TmpArray::ListBinary,BinaryArray<i32>,MutableListArray<i32,MutableBinaryArray<i32>>,col,reorder,streams),
