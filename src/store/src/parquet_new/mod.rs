@@ -1,10 +1,11 @@
+use arrow2::datatypes::DataType;
+use arrow2::datatypes::TimeUnit;
 use ordered_float::OrderedFloat;
-use arrow2::datatypes::{DataType, TimeUnit};
 use parquet2::schema::types::PhysicalType;
 
-pub mod parquet;
 pub mod arrow;
 pub mod merger;
+pub mod parquet;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
 pub enum Value {

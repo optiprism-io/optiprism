@@ -30,6 +30,9 @@ arrow2 = { git = "ssh://git@github.com/optiprism-io/arrow2.git", features = ["io
 rayon = "1.6.1"
 futures = "0.3.25"
 tracing-test = "0.2.4"
+
+[dev-dependencies]
+rstest = "0.17.0"
 #[[bin]]
 #name = "merge_parquet2"
 #test = false

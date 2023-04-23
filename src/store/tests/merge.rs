@@ -7,6 +7,7 @@ use std::io::BufReader;
 use std::io::Cursor;
 use std::io::Write;
 use std::path::Path;
+use rstest::rstest;
 
 use arrow2::array::{Array, Int128Array};
 use arrow2::array::BinaryArray;
@@ -59,7 +60,7 @@ use parquet2::write::WriteOptions;
 use store::error::Result;
 use store::parquet_new::merger::Merger;
 use store::parquet_new::parquet::CompressedPageIterator;
-use store::test_util::create_list_primitive_array;
+use store::test_util::{create_list_primitive_array, create_parquet_from_chunks, PrimaryIndexType};
 use store::test_util::create_parquet_file_from_chunk;
 use store::test_util::create_parquet_from_chunk;
 use store::test_util::gen_binary_data_array;
@@ -80,101 +81,71 @@ use tracing::trace;
 use tracing::warn;
 use tracing_test::traced_test;
 
-#[traced_test]
-#[test]
-fn test() -> anyhow::Result<()> {
-    let data_fields = vec![
-        Field::new("f1", DataType::Boolean, true),
-        Field::new("f2", DataType::Int8, true),
-        Field::new("f3", DataType::Int16, true),
-        Field::new("f4", DataType::Int32, true),
-        Field::new("f5", DataType::Int64, true),
-        Field::new("f6", DataType::UInt8, true),
-        Field::new("f7", DataType::UInt16, true),
-        Field::new("f9", DataType::UInt32, true),
-        Field::new("f10", DataType::UInt64, true),
-        Field::new("f11", DataType::Float32, true),
-        Field::new("f12", DataType::Float64, true),
-        Field::new("f13", DataType::Timestamp(TimeUnit::Second, None), true),
-        Field::new("f14", DataType::Timestamp(TimeUnit::Second, Some("Utc".to_string())), true),
-        Field::new("f15", DataType::Date32, true),
-        Field::new("f16", DataType::Date64, true),
-        Field::new("f17", DataType::Time32(TimeUnit::Second), true),
-        Field::new("f18", DataType::Time64(TimeUnit::Second), true),
-        Field::new("f19", DataType::Duration(TimeUnit::Second), true),
-        Field::new("f20", DataType::Interval(IntervalUnit::YearMonth), true),
-        Field::new("f21", DataType::Binary, true),
-        Field::new("f22", DataType::FixedSizeBinary(32), true),
-        Field::new("f23", DataType::LargeBinary, true),
-        Field::new("f24", DataType::Utf8, true),
-        Field::new("f25", DataType::LargeUtf8, true),
-    ];
+struct TestCase {
+    idx_fields: Vec<Field>,
+    primary_index_type: PrimaryIndexType,
+    data_fields: Vec<Field>,
+    gen_null_values_periodicity: Option<usize>,
+    gen_missing_cols_periodicity: Option<usize>,
+    gen_exclusive_row_groups_periodicity: Option<usize>,
+    gen_out_streams_count: usize,
+    gen_row_group_size: usize,
+    gen_data_page_limit: Option<usize>,
+    out_data_page_size_limit: usize,
+    out_row_group_values_limit: usize,
+    out_arrow_page_size: usize,
+}
 
-    let list_fields = data_fields.iter().map(|field| {
-        Field::new(format!("list_{}", field.name()), DataType::List(Box::new(field.to_owned())), true)
-    }).collect::<Vec<_>>();
-    let large_list_fields = data_fields.iter().map(|field| {
-        Field::new(format!("large_list_{}", field.name()), DataType::List(Box::new(field.to_owned())), true)
-    }).collect::<Vec<_>>();
-
-    let fields = [data_fields, list_fields, large_list_fields].concat();
+fn test_merge(tc: TestCase) -> anyhow::Result<()> {
+    let idx_cols_len = tc.idx_fields.len();
+    let fields = [tc.idx_fields, tc.data_fields].concat();
 
     let names = fields
         .iter()
         .map(|f| f.name.to_string())
         .collect::<Vec<_>>();
 
-    let initial_chunk = gen_chunk_for_parquet(&fields, 2, 10, None);
-    let chunk_len = initial_chunk.len();
-    println!("original chunk");
-    println!("{}", print::write(&[initial_chunk.clone()], &names));
-    let out_count = 3;
-    // let
-    // let row_group_size = chunk_len / out_count / 5;
-    let row_group_size = 5;
-    let data_page_limit = Some(5);
-    let out_chunks = unmerge_chunk(initial_chunk.clone(), out_count, row_group_size);
-    for (idx, c) in out_chunks.iter().enumerate() {
-        println!("out chunk #{idx}");
-        println!("{}", print::write(&[c.clone()], &names));
+    let initial_chunk = gen_chunk_for_parquet(&fields, idx_cols_len, tc.primary_index_type, tc.gen_null_values_periodicity);
+    trace!("original chunk");
+    trace!("{}", print::write(&[initial_chunk.clone()], &names));
+    let out_chunks = unmerge_chunk(
+        initial_chunk.clone(),
+        tc.gen_out_streams_count,
+        tc.gen_row_group_size,
+        tc.gen_exclusive_row_groups_periodicity,
+    );
+
+    for (stream_id, chunks) in out_chunks.iter().enumerate() {
+        for (chunk_id,chunk) in chunks.iter().enumerate(){
+            trace!("stream #{stream_id} out chunk #{chunk_id}");
+            trace!("{}", print::write(&[chunk.clone()], &names));
+        }
     }
-    assert_eq!(chunk_len, out_chunks.iter().map(|c| c.len()).sum::<usize>());
 
     let readers = out_chunks
         .into_iter()
-        .map(|chunk| {
+        .map(|chunks| {
             let mut w = Cursor::new(vec![]);
-            create_parquet_from_chunk(
-                chunk,
+            create_parquet_from_chunks(
+                chunks,
                 fields.clone(),
                 &mut w,
-                data_page_limit,
-                row_group_size,
+                tc.gen_data_page_limit,
             )
                 .unwrap();
-            let metadata = read::read_metadata(&mut w).unwrap();
-            for f in metadata.schema().fields().iter() {
-                println!("- {:?}", f);
-            }
-            let schema = read::infer_schema(&metadata).unwrap();
-            for f in schema.fields.iter() {
-                println!("{} {:?}", f.name, f.data_type);
-            }
+
             w
         })
         .collect::<Vec<_>>();
 
     let mut out = Cursor::new(vec![]);
-    let data_page_size_limit = 10;
-    let row_group_values_limit = 2;
-    let arrow_page_size = 3;
     let mut merger = Merger::try_new(
         readers,
         &mut out,
-        2,
-        data_page_size_limit,
-        row_group_values_limit,
-        arrow_page_size,
+        idx_cols_len,
+        tc.out_data_page_size_limit,
+        tc.out_row_group_values_limit,
+        tc.out_arrow_page_size,
     )?;
     merger.merge()?;
 
@@ -188,6 +159,7 @@ fn test() -> anyhow::Result<()> {
         None,
         None,
     );
+
 
     let chunks = chunks.map(|chunk| chunk.unwrap()).collect::<Vec<_>>();
     let arrs = (0..fields.len())
@@ -203,98 +175,103 @@ fn test() -> anyhow::Result<()> {
 
     let final_chunk = Chunk::new(arrs);
 
-    println!(
+    trace!(
         "final merged \n{}",
         print::write(&[final_chunk.clone()], &names)
     );
-    for idx in 0..initial_chunk.arrays().len() {
-        println!("idx {idx}");
-        println!("initial data type: {:?}", initial_chunk.arrays()[idx].data_type());
-        println!("result data type: {:?}", final_chunk.arrays()[idx].data_type());
-        debug_assert_eq!(initial_chunk.arrays()[idx], final_chunk.arrays()[idx]);
-    }
-    Ok(())
-}
 
-fn write_chunk(w: impl Write, schema: Schema, chunk: Chunk<Box<dyn Array>>) -> Result<()> {
-    let options = arrow2::io::parquet::write::WriteOptions {
-        write_statistics: true,
-        compression: CompressionOptions::Uncompressed,
-        version: Version::V2,
-        data_pagesize_limit: None,
-    };
+    debug_assert_eq!(initial_chunk, final_chunk);
 
-    let iter = vec![Ok(chunk)];
-
-    let encodings = schema
-        .fields
-        .iter()
-        .map(|f| transverse(&f.data_type, |_| Encoding::Plain))
-        .collect();
-
-    let row_groups = RowGroupIterator::try_new(iter.into_iter(), &schema, options, encodings)?;
-
-    let mut writer = FileWriter::try_new(w, schema, options)?;
-
-    for group in row_groups {
-        writer.write(group?)?;
-    }
-    let _size = writer.end(None)?;
     Ok(())
 }
 
 #[traced_test]
 #[test]
-fn test2() {
-    let arrs = vec![
-        Int64Array::from_vec(vec![0, 1]).boxed(),
-        Int128Array::from_vec(vec![1i128, 2]).to(DataType::Decimal(9, 1)).boxed(),
+fn test() -> anyhow::Result<()> {
+    let data_fields = vec![
+        Field::new("f1", DataType::Boolean, true),
+        Field::new("f2", DataType::Int8, true),
+        Field::new("f3", DataType::Int16, true),
+        Field::new("f4", DataType::Int32, true),
+        Field::new("f5", DataType::Int64, true),
+        Field::new("f6", DataType::UInt8, true),
+        Field::new("f7", DataType::UInt16, true),
+        Field::new("f9", DataType::UInt32, true),
+        Field::new("f10", DataType::UInt64, true),
+        Field::new("f11", DataType::Float32, true),
+        Field::new("f12", DataType::Float64, true),
+        Field::new("f13", DataType::Timestamp(TimeUnit::Millisecond, None), true),
+        Field::new("f14", DataType::Timestamp(TimeUnit::Millisecond, Some("Utc".to_string())), true),
+        Field::new("f15", DataType::Date32, true),
+        Field::new("f16", DataType::Date64, true),
+        Field::new("f17", DataType::Time32(TimeUnit::Millisecond), true),
+        Field::new("f18", DataType::Time64(TimeUnit::Microsecond), true),
+        Field::new("f19", DataType::Duration(TimeUnit::Millisecond), true),
+        Field::new("f20", DataType::Binary, true),
+        Field::new("f21", DataType::LargeBinary, true),
+        Field::new("f22", DataType::Utf8, true),
+        Field::new("f23", DataType::LargeUtf8, true),
+        // Field::new("f24", DataType::Interval(IntervalUnit::DayTime), true), // TODO: support interval
+        // Field::new("f25",DataType::FixedSizeBinary(10), true), // TODO: support fixed size binary
     ];
 
-    println!("ppp {:?}", DataType::Decimal(39, 1).to_physical_type());
-    let schema = Schema::from(vec![
-        Field::new("idx1", arrs[0].data_type().clone(), true),
-        Field::new("f", DataType::Decimal(9, 1), true),
-    ]);
+    let data_list_fields = data_fields.iter().map(|field| {
+        let inner = Field::new("item", field.data_type.clone(), field.is_nullable);
+        Field::new(format!("list_{}", field.name), DataType::List(Box::new(inner)), true)
+    }).collect::<Vec<_>>();
+    let data_fields = [data_fields, data_list_fields].concat();
 
-    let chunk = Chunk::new(arrs);
-    let mut out1 = Cursor::new(vec![]);
-    write_chunk(&mut out1, schema.clone(), chunk.clone()).unwrap();
-    println!("?");
-    let metadata = read::read_metadata(&mut out1).unwrap();
-    let schema = read::infer_schema(&metadata).unwrap();
-    for f in schema.fields.iter() {
-        println!("out1 {} {:?}", f.name, f.data_type);
+    let cases = vec![
+        TestCase {
+            idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+            data_fields: data_fields.clone(),
+            gen_null_values_periodicity: None,
+            gen_missing_cols_periodicity: None,
+            primary_index_type: PrimaryIndexType::Sequential(100),
+            gen_out_streams_count: 2,
+            gen_row_group_size: 5,
+            gen_data_page_limit: Some(5),
+            out_data_page_size_limit: 10,
+            out_row_group_values_limit: 2,
+            out_arrow_page_size: 3,
+            gen_exclusive_row_groups_periodicity: None,
+        },
+        TestCase {
+            idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+            data_fields: data_fields.clone(),
+            gen_null_values_periodicity: Some(1),
+            gen_missing_cols_periodicity: Some(1),
+            primary_index_type: PrimaryIndexType::Sequential(100),
+            gen_out_streams_count: 2,
+            gen_row_group_size: 5,
+            gen_data_page_limit: Some(5),
+            out_data_page_size_limit: 10,
+            out_row_group_values_limit: 2,
+            out_arrow_page_size: 3,
+            gen_exclusive_row_groups_periodicity: None,
+        },
+        TestCase {
+            idx_fields: vec![
+                Field::new("idx1", DataType::Int64, false),
+                Field::new("idx2", DataType::Int64, false),
+            ],
+            data_fields: data_fields.clone(),
+            gen_null_values_periodicity: Some(1),
+            gen_missing_cols_periodicity: Some(2),
+            primary_index_type: PrimaryIndexType::Partitioned(10),
+            gen_out_streams_count: 2,
+            gen_row_group_size: 5,
+            gen_data_page_limit: Some(5),
+            out_data_page_size_limit: 10,
+            out_row_group_values_limit: 2,
+            out_arrow_page_size: 3,
+            gen_exclusive_row_groups_periodicity: None,
+        },
+    ];
+
+    for case in cases.into_iter() {
+        test_merge(case)?;
     }
 
-    let mut out2 = Cursor::new(vec![]);
-    write_chunk(&mut out2, schema, chunk).unwrap();
-
-    let mut merged = Cursor::new(vec![]);
-    let mut merger = Merger::try_new(
-        vec![out1, out2],
-        &mut merged,
-        1,
-        2,
-        4,
-        2,
-    )
-        .unwrap();
-    merger.merge().unwrap();
-
-    let metadata = read::read_metadata(&mut merged).unwrap();
-    let schema = read::infer_schema(&metadata).unwrap();
-
-    let mut chunks = read::FileReader::new(
-        merged,
-        metadata.row_groups,
-        schema,
-        Some(1024 * 1024),
-        None,
-        None,
-    );
-
-    for chunk in chunks {
-        println!("{:?}", chunk.unwrap());
-    }
+    Ok(())
 }

@@ -13,13 +13,14 @@ use std::ops::RangeBounds;
 use std::ops::SubAssign;
 use std::rc::Rc;
 
-use arrow2::array::{Int128Array, new_null_array};
+use arrow2::array::new_null_array;
 use arrow2::array::Array;
 use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
 use arrow2::array::FixedSizeBinaryArray;
 use arrow2::array::Float32Array;
 use arrow2::array::Float64Array;
+use arrow2::array::Int128Array;
 use arrow2::array::Int16Array;
 use arrow2::array::Int32Array;
 use arrow2::array::Int64Array;
@@ -82,7 +83,6 @@ use crate::parquet_new::parquet::array_to_pages_simple;
 use crate::parquet_new::parquet::check_intersection;
 use crate::parquet_new::parquet::data_page_to_array;
 use crate::parquet_new::parquet::pages_to_arrays;
-use crate::parquet_new::parquet::try_merge_schemas as try_merge_parquet_schemas;
 use crate::parquet_new::parquet::ColumnPath;
 use crate::parquet_new::parquet::CompressedPageIterator;
 use crate::parquet_new::parquet::MergedPagesChunk;
@@ -185,7 +185,6 @@ macro_rules! merge_arrays_inner {
 
             if arrs[stream_id].is_none() {
                 let page = $self.page_streams[stream_id].next_page(&col_path)?.unwrap();
-                // println!("page {:#?}", page);
                 if let CompressedPage::Data(page) = page {
                     let any_arr = data_page_to_array(page, &$col, $field.clone(), &mut buf)?;
                     let tmp_arr = any_arr.as_any().downcast_ref::<$in_ty>().unwrap().clone();
@@ -226,7 +225,9 @@ macro_rules! merge_arrays_inner {
 
 macro_rules! merge_arrays {
     ($self:expr,$field:expr,$tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
-        let mut out = merge_arrays_inner!($self,$field,$tmp_ty,$in_ty,$out_ty,$col,$reorder,$streams);
+        let mut out = merge_arrays_inner!(
+            $self, $field, $tmp_ty, $in_ty, $out_ty, $col, $reorder, $streams
+        );
 
         out.as_box()
     }};
@@ -234,7 +235,9 @@ macro_rules! merge_arrays {
 
 macro_rules! merge_primitive_arrays {
     ($self:expr,$field:expr,$tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
-        let out = merge_arrays_inner!($self,$field,$tmp_ty,$in_ty,$out_ty,$col,$reorder,$streams);
+        let out = merge_arrays_inner!(
+            $self, $field, $tmp_ty, $in_ty, $out_ty, $col, $reorder, $streams
+        );
 
         out.to($field.data_type().to_owned()).as_box()
     }};
@@ -323,11 +326,6 @@ macro_rules! merge_list_arrays_inner {
             {
                 out.push_null();
             } else {
-                // println!("stream id {}",stream_id);
-                // println!("cur idx {}", cur_idx);
-                // println!("arr {:?} {}", arr,arr.len());
-                // println!("offsets len {}", offsets.len());
-                // println!("{:?}", arrs[stream_id]);
                 let (start, end) = offsets.start_end(cur_idx);
                 let length = end - start;
                 // TODO avoid clone?
@@ -359,10 +357,12 @@ macro_rules! merge_list_arrays_inner {
 
 macro_rules! merge_list_arrays {
     ($self:expr,$field:expr,$offset:ty, $tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
-        let mut out = merge_list_arrays_inner!($self,$field,$offset,$tmp_ty,$in_ty,$out_ty,$col,$reorder,$streams);
+        let mut out = merge_list_arrays_inner!(
+            $self, $field, $offset, $tmp_ty, $in_ty, $out_ty, $col, $reorder, $streams
+        );
 
         out.as_box()
-    }}
+    }};
 }
 
 macro_rules! merge_list_primitive_arrays {
@@ -421,8 +421,6 @@ macro_rules! merge_list_primitive_arrays {
                 let page = $self.page_streams[stream_id].next_page(&col_path)?.unwrap();
                 if let CompressedPage::Data(page) = page {
                     let any_arr = data_page_to_array(page, &$col, $field.clone(), &mut buf)?;
-                    println!("f {:?}",$field);
-                    println!("any arr{any_arr:?}");
                     let list_arr = any_arr
                         .as_any()
                         .downcast_ref::<ListArray<$offset>>()
@@ -477,7 +475,7 @@ macro_rules! merge_list_primitive_arrays {
         }
 
         out.as_box()
-    }}
+    }};
 }
 
 pub struct Merger<R, W>
@@ -499,101 +497,6 @@ pub struct Merger<R, W>
     array_page_size: usize,
     null_pages_cache: HashMap<(DataType, usize), Rc<CompressedPage>>,
     data_page_size_limit: usize,
-}
-
-fn validate_schema(schema: &SchemaDescriptor, index_cols: usize) -> Result<()> {
-    if schema.fields().len() < index_cols {
-        return Err(StoreError::InvalidParameter(format!(
-            "Index columns count {} is greater than schema fields count {}",
-            index_cols,
-            schema.fields().len()
-        )));
-    }
-
-    for col_id in 0..index_cols {
-        match &schema.fields()[col_id] {
-            // ParquetType::PrimitiveType(pt) => if pt.field_info.repetition == Repetition::Required {
-            // return Err(StoreError::NotYetSupported(format!("index field {} has repetition which doesn't supported", pt.field_info.name)));
-            // }
-            ParquetType::GroupType { field_info, .. } => {
-                return Err(StoreError::NotYetSupported(format!(
-                    "index group field {} doesn't supported",
-                    field_info.name
-                )));
-            }
-            _ => {}
-        }
-        // if let ParquetType::PrimitiveType(pt) = &schema.fields()[col_id] {
-        // if pt.field_info.repetition == Repetition::Required {
-        // return Err(StoreError::NotYetSupported(format!("index field {} has repetition which doesn't supported", pt.field_info.name)));
-        // }
-        // }
-    }
-
-    for root_field in schema.fields().iter() {
-        match root_field {
-            ParquetType::PrimitiveType(_) => {}
-            ParquetType::GroupType {
-                fields,
-                logical_type,
-                ..
-            } => {
-                match logical_type {
-                    None => {
-                        return Err(StoreError::NotYetSupported(format!(
-                            "group field {} doesn't have logical type",
-                            root_field.get_field_info().name
-                        )));
-                    }
-                    Some(GroupLogicalType::List) => {}
-                    _ => {
-                        return Err(StoreError::NotYetSupported(format!(
-                            "group  field {} has unsupported logical type. Only List is supported",
-                            root_field.get_field_info().name
-                        )));
-                    }
-                }
-
-                match fields.len() {
-                    0 => {
-                        return Err(StoreError::InvalidParameter(format!(
-                            "invalid group type {}",
-                            root_field.get_field_info().name
-                        )));
-                    }
-                    1 => {
-                        if let ParquetType::GroupType { fields, .. } = &fields[0] {
-                            if let ParquetType::GroupType { .. } = &fields[0] {
-                                return Err(StoreError::NotYetSupported(format!(
-                                    "group field {} has a complex type, only single primitive field is supported",
-                                    root_field.get_field_info().name
-                                )));
-                            }
-                        }
-                    }
-                    _ => {
-                        return Err(StoreError::NotYetSupported(format!(
-                            "field {} has a group type with multiple fields, only single primitive field is supported",
-                            root_field.get_field_info().name
-                        )));
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-pub struct IndexChunk {
-    pub cols: Vec<Vec<CompressedPage>>,
-    reorder: MergeReorder,
-}
-
-impl IndexChunk {
-    pub fn new(cols: Vec<Vec<CompressedPage>>, reorder: MergeReorder) -> Self {
-        Self { cols, reorder }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -628,14 +531,6 @@ impl<R, W> Merger<R, W>
             .map(|r| CompressedPageIterator::try_new(r))
             .collect::<Result<Vec<_>>>()?;
         let streams_n = page_streams.len();
-        // let schemas = page_streams
-        // .iter()
-        // .map(|ps| ps.schema())
-        // .collect::<Vec<_>>();
-        //
-        // let parquet_schema = try_merge_parquet_schemas(schemas, name)?;
-        // println!("parquet schema\n{:?}", parquet_schema);
-        // validate_schema(&parquet_schema, index_cols)?;
 
         let opts = WriteOptions {
             write_statistics: true,
@@ -788,118 +683,120 @@ impl<R, W> Merger<R, W>
             ),
             ArrowPhysicalType::Primitive(pt) => match pt {
                 ArrowPrimitiveType::Int8 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::Int8,
-                Int8Array,
-                MutablePrimitiveArray<i8>,
-                col,
-                reorder,
-                streams
-            ),
+                    self,
+                    field,
+                    TmpArray::Int8,
+                    Int8Array,
+                    MutablePrimitiveArray<i8>,
+                    col,
+                    reorder,
+                    streams
+                ),
                 ArrowPrimitiveType::Int16 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::Int16,
-                Int16Array,
-                MutablePrimitiveArray<i16>,
-                col,
-                reorder,
-                streams
-            ),
+                    self,
+                    field,
+                    TmpArray::Int16,
+                    Int16Array,
+                    MutablePrimitiveArray<i16>,
+                    col,
+                    reorder,
+                    streams
+                ),
                 ArrowPrimitiveType::Int32 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::Int32,
-                Int32Array,
-                MutablePrimitiveArray<i32>,
-                col,
-                reorder,
-                streams
-            ),
+                    self,
+                    field,
+                    TmpArray::Int32,
+                    Int32Array,
+                    MutablePrimitiveArray<i32>,
+                    col,
+                    reorder,
+                    streams
+                ),
                 ArrowPrimitiveType::Int64 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::Int64,
-                Int64Array,
-                MutablePrimitiveArray<i64>,
-                col,
-                reorder,
-                streams
-            ),
+                    self,
+                    field,
+                    TmpArray::Int64,
+                    Int64Array,
+                    MutablePrimitiveArray<i64>,
+                    col,
+                    reorder,
+                    streams
+                ),
                 ArrowPrimitiveType::Int128 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::Int128,
-                Int128Array,
-                MutablePrimitiveArray<i128>,
-                col,
-                reorder,
-                streams
-            )
-                ,
+                    self,
+                    field,
+                    TmpArray::Int128,
+                    Int128Array,
+                    MutablePrimitiveArray<i128>,
+                    col,
+                    reorder,
+                    streams
+                ),
                 ArrowPrimitiveType::UInt8 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::UInt8,
-                UInt8Array,
-                MutablePrimitiveArray<u8>,
-                col,
-                reorder,
-                streams
-            ),
+                    self,
+                    field,
+                    TmpArray::UInt8,
+                    UInt8Array,
+                    MutablePrimitiveArray<u8>,
+                    col,
+                    reorder,
+                    streams
+                ),
                 ArrowPrimitiveType::UInt16 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::UInt16,
-                UInt16Array,
-                MutablePrimitiveArray<u16>,
-                col,
-                reorder,
-                streams
-            ),
+                    self,
+                    field,
+                    TmpArray::UInt16,
+                    UInt16Array,
+                    MutablePrimitiveArray<u16>,
+                    col,
+                    reorder,
+                    streams
+                ),
                 ArrowPrimitiveType::UInt32 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::UInt32,
-                UInt32Array,
-                MutablePrimitiveArray<u32>,
-                col,
-                reorder,
-                streams
-            ),
+                    self,
+                    field,
+                    TmpArray::UInt32,
+                    UInt32Array,
+                    MutablePrimitiveArray<u32>,
+                    col,
+                    reorder,
+                    streams
+                ),
                 ArrowPrimitiveType::UInt64 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::UInt64,
-                UInt64Array,
-                MutablePrimitiveArray<u64>,
-                col,
-                reorder,
-                streams
-            ),
+                    self,
+                    field,
+                    TmpArray::UInt64,
+                    UInt64Array,
+                    MutablePrimitiveArray<u64>,
+                    col,
+                    reorder,
+                    streams
+                ),
                 ArrowPrimitiveType::Float32 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::Float32,
-                Float32Array,
-                MutablePrimitiveArray<f32>,
-                col,
-                reorder,
-                streams
-            ),
+                    self,
+                    field,
+                    TmpArray::Float32,
+                    Float32Array,
+                    MutablePrimitiveArray<f32>,
+                    col,
+                    reorder,
+                    streams
+                ),
                 ArrowPrimitiveType::Float64 => merge_primitive_arrays!(
-                self,
-                field,
-                TmpArray::Float64,
-                Float64Array,
-                MutablePrimitiveArray<f64>,
-                col,
-                reorder,
-                streams
-            ),
-                _ => unreachable!()
-            }
+                    self,
+                    field,
+                    TmpArray::Float64,
+                    Float64Array,
+                    MutablePrimitiveArray<f64>,
+                    col,
+                    reorder,
+                    streams
+                ),
+                _ => unreachable!(
+                    "Unsupported physical type {:?}",
+                    field.data_type().to_physical_type()
+                ),
+            },
             ArrowPhysicalType::Binary => merge_arrays!(
                 self,
                 field,
@@ -940,50 +837,82 @@ impl<R, W> Merger<R, W>
                 reorder,
                 streams
             ),
-            ArrowPhysicalType::List => if let DataType::List(inner) = field.data_type() {
-                let inner_field = *inner.to_owned();
-                match inner.data_type.to_physical_type() {
-                    ArrowPhysicalType::Boolean => merge_list_arrays!(self, field, i32, TmpArray::ListBoolean,BooleanArray,MutableListArray<i32,MutableBooleanArray>,col,reorder,streams),
-                    ArrowPhysicalType::Primitive(pt) => match pt {
-                        ArrowPrimitiveType::Int8 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt8,Int8Array,MutableListArray<i32,MutablePrimitiveArray<i8>>,col,reorder,streams),
-                        ArrowPrimitiveType::Int16 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt16,Int16Array,MutableListArray<i32,MutablePrimitiveArray<i16>>,col,reorder,streams),
-                        ArrowPrimitiveType::Int32 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt32,Int32Array,MutableListArray<i32,MutablePrimitiveArray<i32>>,col,reorder,streams),
-                        ArrowPrimitiveType::Int64 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt64,Int64Array,MutableListArray<i32,MutablePrimitiveArray<i64>>,col,reorder,streams),
-                        ArrowPrimitiveType::Int128 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt128,Int128Array,MutableListArray<i32,MutablePrimitiveArray<i128>>,col,reorder,streams),
-                        ArrowPrimitiveType::UInt8 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt8,UInt8Array,MutableListArray<i32,MutablePrimitiveArray<u8>>,col,reorder,streams),
-                        ArrowPrimitiveType::UInt16 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt16,UInt16Array,MutableListArray<i32,MutablePrimitiveArray<u16>>,col,reorder,streams),
-                        ArrowPrimitiveType::UInt32 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt32,UInt32Array,MutableListArray<i32,MutablePrimitiveArray<u32>>,col,reorder,streams),
-                        ArrowPrimitiveType::UInt64 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt64,UInt64Array,MutableListArray<i32,MutablePrimitiveArray<u64>>,col,reorder,streams),
-                        ArrowPrimitiveType::Float32 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListFloat32,Float32Array,MutableListArray<i32,MutablePrimitiveArray<f32>>,col,reorder,streams),
-                        ArrowPrimitiveType::Float64 => merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListFloat64,Float64Array,MutableListArray<i32,MutablePrimitiveArray<f64>>,col,reorder,streams),
-                        _ => unreachable!()
+            ArrowPhysicalType::List => {
+                if let DataType::List(inner) = field.data_type() {
+                    let inner_field = *inner.to_owned();
+                    match inner.data_type.to_physical_type() {
+                        ArrowPhysicalType::Boolean => {
+                            merge_list_arrays!(self, field, i32, TmpArray::ListBoolean,BooleanArray,MutableListArray<i32,MutableBooleanArray>,col,reorder,streams)
+                        }
+                        ArrowPhysicalType::Primitive(pt) => match pt {
+                            ArrowPrimitiveType::Int8 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt8,Int8Array,MutableListArray<i32,MutablePrimitiveArray<i8>>,col,reorder,streams)
+                            }
+                            ArrowPrimitiveType::Int16 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt16,Int16Array,MutableListArray<i32,MutablePrimitiveArray<i16>>,col,reorder,streams)
+                            }
+                            ArrowPrimitiveType::Int32 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt32,Int32Array,MutableListArray<i32,MutablePrimitiveArray<i32>>,col,reorder,streams)
+                            }
+                            ArrowPrimitiveType::Int64 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt64,Int64Array,MutableListArray<i32,MutablePrimitiveArray<i64>>,col,reorder,streams)
+                            }
+                            ArrowPrimitiveType::Int128 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListInt128,Int128Array,MutableListArray<i32,MutablePrimitiveArray<i128>>,col,reorder,streams)
+                            }
+                            ArrowPrimitiveType::UInt8 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt8,UInt8Array,MutableListArray<i32,MutablePrimitiveArray<u8>>,col,reorder,streams)
+                            }
+                            ArrowPrimitiveType::UInt16 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt16,UInt16Array,MutableListArray<i32,MutablePrimitiveArray<u16>>,col,reorder,streams)
+                            }
+                            ArrowPrimitiveType::UInt32 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt32,UInt32Array,MutableListArray<i32,MutablePrimitiveArray<u32>>,col,reorder,streams)
+                            }
+                            ArrowPrimitiveType::UInt64 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListUInt64,UInt64Array,MutableListArray<i32,MutablePrimitiveArray<u64>>,col,reorder,streams)
+                            }
+                            ArrowPrimitiveType::Float32 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListFloat32,Float32Array,MutableListArray<i32,MutablePrimitiveArray<f32>>,col,reorder,streams)
+                            }
+                            ArrowPrimitiveType::Float64 => {
+                                merge_list_primitive_arrays!(self, field, inner_field,i32, TmpArray::ListFloat64,Float64Array,MutableListArray<i32,MutablePrimitiveArray<f64>>,col,reorder,streams)
+                            }
+                            _ => unreachable!("list primitive type {pt:?} is not supported"),
+                        },
+                        ArrowPhysicalType::Binary => {
+                            merge_list_arrays!(self, field, i32, TmpArray::ListBinary,BinaryArray<i32>,MutableListArray<i32,MutableBinaryArray<i32>>,col,reorder,streams)
+                        }
+                        ArrowPhysicalType::LargeBinary => {
+                            merge_list_arrays!(self, field, i32, TmpArray::ListLargeBinary,BinaryArray<i64>,MutableListArray<i32,MutableBinaryArray<i64>>,col,reorder,streams)
+                        }
+                        ArrowPhysicalType::Utf8 => {
+                            merge_list_arrays!(self, field, i32, TmpArray::ListUtf8,Utf8Array<i32>,MutableListArray<i32,MutableUtf8Array<i32>>,col,reorder,streams)
+                        }
+                        ArrowPhysicalType::LargeUtf8 => {
+                            merge_list_arrays!(self, field, i32, TmpArray::ListLargeUtf8,Utf8Array<i64>,MutableListArray<i32,MutableUtf8Array<i64>>,col,reorder,streams)
+                        }
+                        _ => unreachable!(
+                            "list type {:?} is not supported",
+                            inner.data_type.to_physical_type()
+                        ),
                     }
-                    ArrowPhysicalType::Binary => merge_list_arrays!(self, field, i32, TmpArray::ListBinary,BinaryArray<i32>,MutableListArray<i32,MutableBinaryArray<i32>>,col,reorder,streams),
-                    ArrowPhysicalType::LargeBinary => merge_list_arrays!(self, field, i32, TmpArray::ListLargeBinary,BinaryArray<i64>,MutableListArray<i32,MutableBinaryArray<i64>>,col,reorder,streams),
-                    ArrowPhysicalType::Utf8 => merge_list_arrays!(self, field, i32, TmpArray::ListUtf8,Utf8Array<i32>,MutableListArray<i32,MutableUtf8Array<i32>>,col,reorder,streams),
-                    ArrowPhysicalType::LargeUtf8 => merge_list_arrays!(self, field, i32, TmpArray::ListLargeUtf8,Utf8Array<i64>,MutableListArray<i32,MutableUtf8Array<i64>>,col,reorder,streams),
-                    _ => unreachable!()
+                } else {
+                    unreachable!("list field {:?} type is not supported", field.data_type())
                 }
-            } else {
-                unreachable!()
-            },
-            _ => unreachable!()
+            }
+            _ => unreachable!(
+                "unsupported physical type {:?}",
+                field.data_type().to_physical_type()
+            ),
         };
 
-
-        println!("dt {:?} {:?}", out.data_type(), out.data_type().to_physical_type());
-        println!("bt {:?}", col.base_type);
-        let pages = array_to_pages_simple(
-            out,
-            col.base_type.clone(),
-            self.data_page_size_limit,
-        )?;
+        let pages = array_to_pages_simple(out, col.base_type.clone(), self.data_page_size_limit)?;
 
         Ok(pages)
     }
 
     fn merge_queue(&mut self) -> Result<()> {
-        // println!("merge queue {:?}", self.merge_queue);
         let mut buf = vec![];
         let arrow_chunks = self
             .merge_queue
@@ -996,11 +925,9 @@ impl<R, W> Merger<R, W>
             .map(|chunk| chunk.stream)
             .collect::<Vec<_>>();
         streams.dedup();
-        // println!("to merge {:?}", arrow_chunks);
         let merged_chunks = merge_chunks(arrow_chunks, self.array_page_size)?;
 
         for chunk in merged_chunks {
-            // println!("merged chunk {:?}", chunk);
             let pages_chunk = PagesChunk::from_arrow(chunk.arrs.as_slice(), &self.index_cols)?;
             let merged_chunk = MergedPagesChunk::new(
                 pages_chunk,
@@ -1014,18 +941,14 @@ impl<R, W> Merger<R, W>
 
     fn next_index_chunk(&mut self) -> Result<Option<Vec<MergedPagesChunk>>> {
         while let Some(chunk) = self.sorter.pop() {
-            // println!("pop {:#?}", chunk);
             if let Some(next) = self.next_stream_index_chunk(chunk.stream)? {
-                // println!("pop next {:#?}", next);
                 self.sorter.push(next);
             }
 
             self.merge_queue.push(chunk);
             while check_intersection(&self.merge_queue, self.sorter.peek()) {
-                // println!("queue intersects with {:?}", self.sorter.peek());
                 let next = self.sorter.pop().unwrap();
                 if let Some(row) = self.next_stream_index_chunk(next.stream)? {
-                    // println!("pop next {:?}", row);
                     self.sorter.push(row);
                 }
                 self.merge_queue.push(next);
@@ -1034,8 +957,6 @@ impl<R, W> Merger<R, W>
             if self.merge_queue.len() > 1 {
                 self.merge_queue()?;
             } else {
-                // println!("push to result");
-
                 let chunk = self.merge_queue.pop().unwrap();
                 let num_vals = chunk.num_values();
                 let chunk_stream = chunk.stream;
@@ -1045,7 +966,6 @@ impl<R, W> Merger<R, W>
                 ));
             }
 
-            // println!("result {:?}", self.result_buffer);
             if let Some(res) = self.try_drain_result(self.row_group_values_limit) {
                 return Ok(Some(res));
             }
@@ -1055,9 +975,7 @@ impl<R, W> Merger<R, W>
     }
 
     fn try_drain_result(&mut self, values_limit: usize) -> Option<Vec<MergedPagesChunk>> {
-        // println!("try drain");
         if self.result_buffer.is_empty() {
-            // println!("empty");
             return None;
         }
         let mut res = vec![];
@@ -1066,7 +984,6 @@ impl<R, W> Merger<R, W>
         values_limit -= first.num_values() as i64;
         res.push(first);
         while values_limit > 0 && !self.result_buffer.is_empty() {
-            // println!("try");
             let next_values = self.result_buffer.front().unwrap().num_values() as i64;
             if values_limit - next_values < 0 {
                 break;
