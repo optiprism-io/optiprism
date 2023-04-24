@@ -496,7 +496,7 @@ pub struct Merger<R, W>
     row_group_values_limit: usize,
     array_page_size: usize,
     null_pages_cache: HashMap<(DataType, usize), Rc<CompressedPage>>,
-    data_page_size_limit: usize,
+    data_page_size_limit: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -515,7 +515,7 @@ impl<R, W> Merger<R, W>
         mut readers: Vec<R>,
         writer: W,
         index_cols: usize,
-        data_page_size_limit: usize,
+        data_page_size_limit: Option<usize>,
         row_group_values_limit: usize,
         array_page_size: usize,
     ) -> Result<Self> {
@@ -578,7 +578,7 @@ impl<R, W> Merger<R, W>
         cd: &ColumnDescriptor,
         field: Field,
         num_rows: usize,
-        data_pagesize_limit: usize,
+        data_pagesize_limit: Option<usize>,
     ) -> Result<Vec<CompressedPage>> {
         let arr = new_null_array(field.data_type, num_rows);
         Ok(array_to_pages_simple(
@@ -623,7 +623,7 @@ impl<R, W> Merger<R, W>
                 .collect::<Vec<_>>();
             for (col, field) in cols.into_iter().zip(fields.into_iter()) {
                 for chunk in chunks.iter() {
-                    match &chunk.1 {
+                    let pages = match &chunk.1 {
                         MergeReorder::PickFromStream(stream_id, num_rows) => {
                             let pages = if self.page_streams[*stream_id]
                                 .contains_column(&col.path_in_schema)
@@ -639,16 +639,18 @@ impl<R, W> Merger<R, W>
                                     self.data_page_size_limit,
                                 )?
                             };
-                            for page in pages {
-                                self.writer.write_page(&page)?;
-                            }
+
+                            pages
                         }
                         MergeReorder::Merge(reorder, streams) => {
                             let pages = self.merge_data(&col, field.clone(), reorder, streams)?;
-                            for page in pages {
-                                self.writer.write_page(&page)?;
-                            }
+
+                            pages
                         }
+                    };
+
+                    for page in pages {
+                        self.writer.write_page(&page)?;
                     }
                 }
 

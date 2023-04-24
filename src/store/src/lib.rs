@@ -16,7 +16,7 @@ use error::Result;
 
 pub mod test_util {
     use std::fs::File;
-    use std::io::Write;
+    use std::io::{Read, Seek, Write};
     use std::path::Path;
 
     use anyhow::anyhow;
@@ -44,6 +44,7 @@ pub mod test_util {
     use arrow2::datatypes::Field;
     use arrow2::datatypes::PhysicalType;
     use arrow2::datatypes::Schema;
+    use arrow2::io::parquet::read;
     use arrow2::io::parquet::write::array_to_page_nested;
     use arrow2::io::parquet::write::array_to_page_simple;
     use arrow2::io::parquet::write::to_parquet_schema;
@@ -392,17 +393,36 @@ pub mod test_util {
         }
     }
 
+    pub fn native_type_length<N: NativeType>() -> usize {
+        match N::PRIMITIVE {
+            arrow2::types::PrimitiveType::Int8 => i8::MAX as usize,
+            arrow2::types::PrimitiveType::Int16 => i16::MAX as usize,
+            arrow2::types::PrimitiveType::Int32 => i32::MAX as usize,
+            arrow2::types::PrimitiveType::Int64 => i64::MAX as usize,
+            arrow2::types::PrimitiveType::Int128 => i128::MAX as usize,
+            arrow2::types::PrimitiveType::UInt8 => u8::MAX as usize,
+            arrow2::types::PrimitiveType::UInt16 => u16::MAX as usize,
+            arrow2::types::PrimitiveType::UInt32 => u32::MAX as usize,
+            arrow2::types::PrimitiveType::UInt64 => u64::MAX as usize,
+            arrow2::types::PrimitiveType::Float32 => f32::MAX as usize,
+            arrow2::types::PrimitiveType::Float64 => f64::MAX as usize,
+            _ => unreachable!(),
+        }
+    }
+
     pub fn gen_primitive_data_array<T: NativeType + num_traits::NumCast>(
         n: usize,
         nulls: Option<usize>,
     ) -> PrimitiveArray<T> {
         let mut ret = Vec::with_capacity(n);
-
+        let div = native_type_length::<T>();
         for idx in 0..n {
             if nulls.is_some() && idx % nulls.unwrap() == 0 {
                 ret.push(None);
             } else {
-                ret.push(Some(T::from(idx).unwrap()));
+                let a = std::mem::size_of::<T>();
+                // println!("{}", idx % div);
+                ret.push(Some(T::from(idx % div).unwrap()));
             }
         }
 
@@ -498,12 +518,12 @@ pub mod test_util {
         nulls: Option<usize>,
     ) -> ListArray<O> {
         let mut vals = Vec::with_capacity(n);
-
+        let div = native_type_length::<N>();
         for idx in 0..n {
             if nulls.is_some() && idx % nulls.unwrap() == 0 {
                 vals.push(None);
             } else {
-                vals.push(Some(vec![N::from(idx).unwrap()]));
+                vals.push(Some(vec![N::from(idx % div).unwrap()]));
             }
         }
 
@@ -845,7 +865,7 @@ pub mod test_util {
         fields: &[Field],
         idx_fields: usize,
         primary_idx_type: PrimaryIndexType,
-        nulls: Option<usize>,
+        nulls_periodicity: Option<usize>,
     ) -> Chunk<Box<dyn Array>> {
         let idx_arrs = match idx_fields {
             1 => {
@@ -884,71 +904,78 @@ pub mod test_util {
         let data_arrs = fields
             .iter()
             .skip(idx_fields)
-            .map(|field| match &field.data_type.to_physical_type() {
-                PhysicalType::Boolean => gen_boolean_data_array(len, nulls).boxed(),
-                PhysicalType::Primitive(pt) => {
-                    gen_primitive_data_array_from_arrow_type(pt, field.data_type.clone(), len, nulls)
-                }
-                PhysicalType::Binary => gen_binary_data_array::<i32>(len, nulls).boxed(),
-                PhysicalType::FixedSizeBinary => {
-                    if let DataType::FixedSizeBinary(size) = &field.data_type {
-                        gen_fixed_size_binary_data_array(len, nulls, *size).boxed()
-                    } else {
-                        unimplemented!()
+            .map(|field| {
+                let nulls_periodicity = if !field.is_nullable {
+                    None
+                } else {
+                    nulls_periodicity
+                };
+                match &field.data_type.to_physical_type() {
+                    PhysicalType::Boolean => gen_boolean_data_array(len, nulls_periodicity).boxed(),
+                    PhysicalType::Primitive(pt) => {
+                        gen_primitive_data_array_from_arrow_type(pt, field.data_type.clone(), len, nulls_periodicity)
                     }
+                    PhysicalType::Binary => gen_binary_data_array::<i32>(len, nulls_periodicity).boxed(),
+                    PhysicalType::FixedSizeBinary => {
+                        if let DataType::FixedSizeBinary(size) = &field.data_type {
+                            gen_fixed_size_binary_data_array(len, nulls_periodicity, *size).boxed()
+                        } else {
+                            unimplemented!()
+                        }
+                    }
+                    PhysicalType::LargeBinary => gen_binary_data_array::<i64>(len, nulls_periodicity).boxed(),
+                    PhysicalType::Utf8 => gen_utf8_data_array::<i32>(len, nulls_periodicity).boxed(),
+                    PhysicalType::LargeUtf8 => gen_utf8_data_array::<i64>(len, nulls_periodicity).boxed(),
+                    PhysicalType::List => match &field.data_type {
+                        DataType::List(inner) => match &inner.data_type.to_physical_type() {
+                            PhysicalType::Boolean => {
+                                gen_boolean_data_list_array::<i32>(len, nulls_periodicity).boxed()
+                            }
+                            PhysicalType::Primitive(pt) => {
+                                gen_primitive_data_list_array_from_arrow_type::<i32>(pt, field.data_type.clone(), len, nulls_periodicity)
+                            }
+                            PhysicalType::Binary => {
+                                gen_binary_data_list_array::<i32, i32>(len, nulls_periodicity).boxed()
+                            }
+                            PhysicalType::LargeBinary => {
+                                gen_binary_data_list_array::<i32, i64>(len, nulls_periodicity).boxed()
+                            }
+                            PhysicalType::Utf8 => {
+                                gen_utf8_data_list_array::<i32, i32>(len, nulls_periodicity).boxed()
+                            }
+                            PhysicalType::LargeUtf8 => {
+                                gen_utf8_data_list_array::<i32, i64>(len, nulls_periodicity).boxed()
+                            }
+                            _ => unimplemented!("{:?}", inner.data_type),
+                        },
+                        _ => unimplemented!(),
+                    },
+                    PhysicalType::LargeList => match &field.data_type {
+                        DataType::LargeList(inner) => match &field.data_type.to_physical_type() {
+                            PhysicalType::Boolean => {
+                                gen_boolean_data_list_array::<i64>(len, nulls_periodicity).boxed()
+                            }
+                            PhysicalType::Primitive(pt) => {
+                                gen_primitive_data_list_array_from_arrow_type::<i64>(pt, field.data_type.clone(), len, nulls_periodicity)
+                            }
+                            PhysicalType::Binary => {
+                                gen_binary_data_list_array::<i64, i32>(len, nulls_periodicity).boxed()
+                            }
+                            PhysicalType::LargeBinary => {
+                                gen_binary_data_list_array::<i64, i64>(len, nulls_periodicity).boxed()
+                            }
+                            PhysicalType::Utf8 => {
+                                gen_utf8_data_list_array::<i64, i32>(len, nulls_periodicity).boxed()
+                            }
+                            PhysicalType::LargeUtf8 => {
+                                gen_utf8_data_list_array::<i64, i64>(len, nulls_periodicity).boxed()
+                            }
+                            _ => unimplemented!("{:?}", field.data_type),
+                        },
+                        _ => unimplemented!(),
+                    },
+                    _ => unimplemented!(),
                 }
-                PhysicalType::LargeBinary => gen_binary_data_array::<i64>(len, nulls).boxed(),
-                PhysicalType::Utf8 => gen_utf8_data_array::<i32>(len, nulls).boxed(),
-                PhysicalType::LargeUtf8 => gen_utf8_data_array::<i64>(len, nulls).boxed(),
-                PhysicalType::List => match &field.data_type {
-                    DataType::List(inner) => match &inner.data_type.to_physical_type() {
-                        PhysicalType::Boolean => {
-                            gen_boolean_data_list_array::<i32>(len, nulls).boxed()
-                        }
-                        PhysicalType::Primitive(pt) => {
-                            gen_primitive_data_list_array_from_arrow_type::<i32>(pt, field.data_type.clone(), len, nulls)
-                        }
-                        PhysicalType::Binary => {
-                            gen_binary_data_list_array::<i32, i32>(len, nulls).boxed()
-                        }
-                        PhysicalType::LargeBinary => {
-                            gen_binary_data_list_array::<i32, i64>(len, nulls).boxed()
-                        }
-                        PhysicalType::Utf8 => {
-                            gen_utf8_data_list_array::<i32, i32>(len, nulls).boxed()
-                        }
-                        PhysicalType::LargeUtf8 => {
-                            gen_utf8_data_list_array::<i32, i64>(len, nulls).boxed()
-                        }
-                        _ => unimplemented!("{:?}", inner.data_type),
-                    },
-                    _ => unimplemented!(),
-                },
-                PhysicalType::LargeList => match &field.data_type {
-                    DataType::LargeList(inner) => match &field.data_type.to_physical_type() {
-                        PhysicalType::Boolean => {
-                            gen_boolean_data_list_array::<i64>(len, nulls).boxed()
-                        }
-                        PhysicalType::Primitive(pt) => {
-                            gen_primitive_data_list_array_from_arrow_type::<i64>(pt, field.data_type.clone(), len, nulls)
-                        }
-                        PhysicalType::Binary => {
-                            gen_binary_data_list_array::<i64, i32>(len, nulls).boxed()
-                        }
-                        PhysicalType::LargeBinary => {
-                            gen_binary_data_list_array::<i64, i64>(len, nulls).boxed()
-                        }
-                        PhysicalType::Utf8 => {
-                            gen_utf8_data_list_array::<i64, i32>(len, nulls).boxed()
-                        }
-                        PhysicalType::LargeUtf8 => {
-                            gen_utf8_data_list_array::<i64, i64>(len, nulls).boxed()
-                        }
-                        _ => unimplemented!("{:?}", field.data_type),
-                    },
-                    _ => unimplemented!(),
-                },
-                _ => unimplemented!(),
             })
             .collect::<Vec<_>>();
 
@@ -964,11 +991,11 @@ pub mod test_util {
     ) -> Vec<Vec<Chunk<Box<dyn Array>>>> {
         let mut idx = 0;
         let mut cur_row_group = 0;
-        let mut buf: Vec<Vec<Chunk<Box<dyn Array>>>> = vec![vec![]; out_count];
+        let mut res: Vec<Vec<Chunk<Box<dyn Array>>>> = vec![vec![]; out_count];
         while idx < chunk.len() {
             match exclusive_row_groups_periodicity {
                 // take chunk exclusively for one stream. To test picking during merge
-                Some(n) if n % cur_row_group == 0 => {
+                Some(n) if cur_row_group % n == 0 => {
                     let end = std::cmp::min(idx + values_per_row_group, chunk.len());
                     // make a slice from original chunk
                     let out = chunk
@@ -976,7 +1003,10 @@ pub mod test_util {
                         .iter()
                         .map(|arr| arr.sliced(idx, end - idx))
                         .collect::<Vec<_>>();
-                    buf[out_count % cur_row_group].push(Chunk::new(out));
+                    // round robin stream assignment
+                    let stream_id = cur_row_group % out_count;
+                    let chunk = Chunk::new(out);
+                    res[stream_id].push(chunk);
 
                     idx += values_per_row_group;
                 }
@@ -986,28 +1016,25 @@ pub mod test_util {
                     let to_take = values_per_row_group * out_count;
                     let end = std::cmp::min(idx + to_take, chunk.len());
 
-                    let out = (0..out_count)
-                        .into_iter()
-                        .map(|out_id| {
-                            // calculate indexes for each out. Example: slice 1..10, 3 outs. We'll take [1, 4, 7, 10], [2, 5, 8], [3, 6, 9]
-                            let take_idx = (0..end - idx)
-                                .into_iter()
-                                .skip(out_id)
-                                .step_by(out_count)
-                                .map(|v| (v + idx) as i64)
-                                .collect();
-                            let take_idx = PrimitiveArray::from_vec(take_idx);
-                            // actual take
-                            chunk
-                                .arrays()
-                                .iter()
-                                .map(|arr| take(arr.as_ref(), &take_idx).unwrap())
-                                .collect::<Vec<_>>()
-                        })
-                        .collect::<Vec<_>>();
-                    for (i, out) in out.into_iter().enumerate() {
-                        buf[i].push(Chunk::new(out));
+                    for stream_id in 0..out_count {
+                        // calculate indexes for each out. Example: slice 1..10, 3 outs. We'll take [1, 4, 7, 10], [2, 5, 8], [3, 6, 9]
+                        let take_idx = (0..end - idx)
+                            .into_iter()
+                            .skip(stream_id)
+                            .step_by(out_count)
+                            .map(|v| (v + idx) as i64)
+                            .collect();
+                        let take_idx = PrimitiveArray::from_vec(take_idx);
+                        // actual take
+                        let out = chunk
+                            .arrays()
+                            .iter()
+                            .map(|arr| take(arr.as_ref(), &take_idx).unwrap())
+                            .collect::<Vec<_>>();
+
+                        res[stream_id].push(Chunk::new(out));
                     }
+
                     idx += to_take;
                 }
             }
@@ -1015,24 +1042,28 @@ pub mod test_util {
             cur_row_group += 1;
         }
 
-        buf
+        res
+    }
 
-        /*// concatenate all the chunk of each out to single one
-        buf.into_iter()
-            .map(|chunks| {
-                let arrs = (0..chunks[0].arrays().len())
-                    .into_iter()
-                    .map(|arr_id| {
-                        let to_concat = chunks
-                            .iter()
-                            .map(|chunk| chunk.arrays()[arr_id].as_ref())
-                            .collect::<Vec<_>>();
-                        concatenate(&to_concat).unwrap()
-                    })
-                    .collect::<Vec<_>>();
-                Chunk::new(arrs)
-            })
-            .collect::<Vec<_>>()*/
+    pub fn read_parquet_as_one_chunk<R: Read + Seek>(reader: &mut R) -> Chunk<Box<dyn Array>> {
+        concat_chunks(read_parquet(reader))
+    }
+
+    pub fn read_parquet<R: Read + Seek>(reader: &mut R) -> Vec<Chunk<Box<dyn Array>>> {
+        let metadata = read::read_metadata(reader).unwrap();
+        let schema = read::infer_schema(&metadata).unwrap();
+        let mut chunks = read::FileReader::new(
+            reader,
+            metadata.row_groups,
+            schema,
+            Some(1024 * 1024 * 1024),
+            None,
+            None,
+        );
+
+        chunks
+            .map(|chunk| chunk.unwrap())
+            .collect::<Vec<_>>()
     }
 
     pub fn concat_chunks(chunks: Vec<Chunk<Box<dyn Array>>>) -> Chunk<Box<dyn Array>> {
@@ -1047,6 +1078,35 @@ pub mod test_util {
             })
             .collect::<Vec<_>>();
         Chunk::new(arrs)
+    }
+
+    pub fn make_missing_columns(chunk: Chunk<Box<dyn Array>>, nth: usize, shift: usize, idx_cols_len: usize) -> Chunk<Box<dyn Array>> {
+        let arrs = chunk
+            .columns()
+            .into_iter()
+            .enumerate()
+            .filter_map(|(col_id, col)|
+                if col_id >= idx_cols_len && (col_id + shift) % nth == 0 {
+                    None
+                } else {
+                    Some(col.to_owned())
+                }
+            )
+            .collect::<Vec<_>>();
+
+        Chunk::new(arrs)
+    }
+
+    pub fn make_missing_fields(fields: Vec<Field>, nth: usize, shift: usize, idx_cols_len: usize) -> Vec<Field> {
+        fields
+            .iter()
+            .enumerate()
+            .filter_map(|(field_id, field)| if field_id >= idx_cols_len && (field_id + shift) % nth == 0 {
+                None
+            } else {
+                Some(field.to_owned())
+            })
+            .collect::<Vec<_>>()
     }
 
     pub fn create_parquet_from_chunk<W: Write>(

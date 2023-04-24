@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
+[profile.test]
+#lto = "fat"
+#codegen-units = 1
+opt-level = 3
+
 [dependencies]
 num-traits = "0.2.15"
 #test-log = "0.2.11"

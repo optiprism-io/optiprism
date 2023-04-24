@@ -143,13 +143,13 @@ pub fn data_page_to_array(
 pub fn array_to_pages_simple(
     arr: Box<dyn Array>,
     typ: ParquetType,
-    data_pagesize_limit: usize,
+    data_pagesize_limit: Option<usize>,
 ) -> Result<Vec<CompressedPage>> {
     let opts = WriteOptions {
         write_statistics: true,
         compression: CompressionOptions::Uncompressed, // todo
         version: Version::V2,
-        data_pagesize_limit: Some(data_pagesize_limit),
+        data_pagesize_limit: data_pagesize_limit,
     };
 
     let pages = array_to_columns(arr, typ, opts, &[Encoding::Plain])?
