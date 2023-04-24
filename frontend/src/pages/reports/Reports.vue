@@ -72,7 +72,6 @@ import { ReportType } from '@/api'
 import { reportToStores } from '@/utils/reportsMappings'
 
 import useConfirm from '@/hooks/useConfirm'
-import { useLexiconStore } from '@/stores/lexicon'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 import { useReportsStore } from '@/stores/reports/reports'
 import { useCommonStore } from '@/stores/common'
@@ -89,7 +88,6 @@ import UiSpinner from '@/components/uikit/UiSpinner.vue'
 const { t } = usei18n()
 const route = useRoute()
 const router = useRouter()
-const lexiconStore = useLexiconStore()
 const eventsStore = useEventsStore()
 const reportsStore = useReportsStore()
 const commonStore = useCommonStore()
@@ -225,9 +223,6 @@ const onSelectReport = (id: number) => {
 
 onMounted(async () => {
     reportsStore.loading = true
-    // lexiconStore.getEvents()
-    // lexiconStore.getEventProperties()
-    // lexiconStore.getUserProperties()
     eventsStore.initPeriod()
     await reportsStore.getList()
     const reportId = route.params.id;

@@ -273,7 +273,8 @@ export default function ({ environment = 'development' } = {}) {
                             'properties': {
                                 'createdAt': '2017-07-21T17:32:28Z',
                                 'Name': 'Sam',
-                                'Age': 26
+                                'Age': 26,
+                                lang: 'de',
                             }
                         },
                         {
@@ -298,6 +299,7 @@ export default function ({ environment = 'development' } = {}) {
                             'properties': {
                                 'Name': 'Nick2',
                                 'Age': 30,
+                                lang: 'en'
                             }
                         }
                     ],

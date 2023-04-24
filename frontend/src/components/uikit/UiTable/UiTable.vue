@@ -131,21 +131,37 @@ const emit = defineEmits<{
     (e: 'on-action', payload: Action): void
 }>()
 
-const activeColumns = ref<string[]>([])
-const columnsSelect = ref<UiSelectItem<string>[]>([])
 const defaultColumns = ref<string[]>([])
+const disabledColumns = ref<string[]>([])
+
+const columnsSelect = computed(() => {
+    return props.columns.reduce((acc: UiSelectItem<string>[], column) => {
+        if (!column.default) {
+            acc.push({
+                key: column.value,
+                nameDisplay: column.title,
+                value: column.value,
+            });
+        }
+        return acc;
+    }, []);
+});
+
+const activeColumns = computed(() => {
+    return props.columns.filter(item => !disabledColumns.value.includes(item.value)).map(item => item.value);
+});
 
 const columnsButtonText = computed(() => {
     return `${columnsSelect.value.length} ${i18n.$t('common.columns')}`
 })
 
 const visibleColumns = computed(() => {
-    return props.columns.filter(item => !props.showSelectColumns || item.default || activeColumns.value.includes(item.value))
+    return props.columns.filter(item => !props.showSelectColumns || item.default || !disabledColumns.value.includes(item.value))
 })
 
 const visibleItems = computed(() => {
     return props.items.map(row => {
-        return row.filter(cell => !props.showSelectColumns || defaultColumns.value.includes(cell.key) || activeColumns.value.includes(cell.key))
+        return row.filter(cell => !props.showSelectColumns || defaultColumns.value.includes(cell.key) || !disabledColumns.value.includes(cell.key))
     })
 })
 
@@ -154,28 +170,12 @@ const onAction = (payload: Action) => {
 }
 
 const toggleColumns = (payload: string) => {
-    if (activeColumns.value.includes(payload)) {
-        activeColumns.value = activeColumns.value.filter(item => item !== payload)
+    if (disabledColumns.value.includes(payload)) {
+        disabledColumns.value = disabledColumns.value.filter(item => item !== payload)
     } else {
-        activeColumns.value.push(payload)
+        disabledColumns.value.push(payload)
     }
 }
-
-onMounted(() => {
-    props.columns.map(item => {
-        if (!item.notActiveStart) {
-            activeColumns.value.push(item.value)
-        }
-
-        if (!item.default) {
-            columnsSelect.value.push({
-                key: item.value,
-                nameDisplay: item.title,
-                value: item.value,
-            })
-        }
-    })
-})
 </script>
 
 <style lang="scss">
