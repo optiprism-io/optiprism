@@ -1,29 +1,32 @@
-use std::fmt;
-use std::fmt::Display;
-use std::fmt::Formatter;
 use std::result;
 
-use datafusion::error::DataFusionError;
+use arrow2::error::Error as ArrowError;
+use parquet2::error::Error as ParquetError;
+// use parquet::errors::ParquetError;
+use thiserror::Error;
 
 pub type Result<T> = result::Result<T, StoreError>;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum StoreError {
-    DataFusionError(DataFusionError),
-    Plan(String),
+    #[error("internal {0:?}")]
+    Internal(String),
+    #[error("invalid parameter {0:?}")]
+    InvalidParameter(String),
+    #[error("not yet supported {0:?}")]
+    NotYetSupported(String),
+    #[error("parquet {0:?}")]
+    Parquet(#[from] ParquetError),
+    #[error("execution {0:?}")]
+    Execution(String),
+    #[error("arrow {0:?}")]
+    Arrow(#[from] arrow::error::ArrowError),
+    #[error("arrow2 {0:?}")]
+    Arrow2(#[from] arrow2::error::Error),
 }
 
-impl Display for StoreError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            StoreError::Plan(desc) => write!(f, "Plan error: {desc}"),
-            StoreError::DataFusionError(err) => write!(f, "DataFusion error: {err}"),
-        }
-    }
-}
-
-impl From<DataFusionError> for StoreError {
-    fn from(err: DataFusionError) -> Self {
-        Self::DataFusionError(err)
+impl StoreError {
+    pub fn nyi<T>(msg: impl Into<String>) -> Result<T> {
+        Err(StoreError::NotYetSupported(msg.into()))
     }
 }
