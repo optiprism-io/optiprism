@@ -396,9 +396,9 @@ impl TryInto<Query> for common::query::event_segmentation::Query {
                 property: property.try_into()?,
                 aggregate: aggregate.try_into()?,
             },
-            common::query::event_segmentation::Query::QueryFormula { formula } => Query::Formula {
-                formula,
-            },
+            common::query::event_segmentation::Query::QueryFormula { formula } => {
+                Query::Formula { formula }
+            }
         })
     }
 }

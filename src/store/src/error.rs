@@ -1,8 +1,9 @@
 use std::result;
-// use parquet::errors::ParquetError;
-use thiserror::Error;
+
 use arrow2::error::Error as ArrowError;
 use parquet2::error::Error as ParquetError;
+// use parquet::errors::ParquetError;
+use thiserror::Error;
 
 pub type Result<T> = result::Result<T, StoreError>;
 

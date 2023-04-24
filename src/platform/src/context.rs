@@ -61,7 +61,10 @@ impl Context {
         organization_id: u64,
         permission: OrganizationPermission,
     ) -> Result<()> {
-        if self.check_permission(Permission::ManageOrganizations).is_ok() {
+        if self
+            .check_permission(Permission::ManageOrganizations)
+            .is_ok()
+        {
             return Ok(());
         }
         let role = self.get_organization_role(organization_id)?;
@@ -143,7 +146,7 @@ impl Context {
 
 #[async_trait]
 impl<S> FromRequestParts<S> for Context
-    where S: Send + Sync
+where S: Send + Sync
 {
     type Rejection = PlatformError;
 

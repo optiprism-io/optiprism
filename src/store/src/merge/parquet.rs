@@ -18,6 +18,7 @@ use arrow2::io::parquet::write::array_to_page_simple;
 use arrow2::io::parquet::write::WriteOptions;
 use futures::stream::iter;
 use futures::StreamExt;
+use ordered_float::OrderedFloat;
 use parquet2::compression::CompressionOptions;
 use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
@@ -42,12 +43,62 @@ use tracing::error;
 
 use crate::error::Result;
 use crate::error::StoreError;
-use crate::parquet_new::arrow::ArrowChunk;
-use crate::parquet_new::arrow::MergedArrowChunk;
-use crate::parquet_new::from_physical_type;
-use crate::parquet_new::merger::MergeReorder;
-use crate::parquet_new::ReorderSlice;
-use crate::parquet_new::Value;
+use crate::merge::arrow::ArrowChunk;
+use crate::merge::arrow::MergedArrowChunk;
+use crate::merge::merger::MergeReorder;
+
+#[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
+pub enum Value {
+    Boolean(bool),
+    Int32(i32),
+    Int64(i64),
+    Int96([u32; 3]),
+    Float(OrderedFloat<f32>),
+    Double(OrderedFloat<f64>),
+    ByteArray(Vec<u8>),
+}
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Value::Boolean(value)
+    }
+}
+
+impl From<i32> for Value {
+    fn from(value: i32) -> Self {
+        Value::Int32(value)
+    }
+}
+
+impl From<i64> for Value {
+    fn from(value: i64) -> Self {
+        Value::Int64(value)
+    }
+}
+
+impl From<[u32; 3]> for Value {
+    fn from(value: [u32; 3]) -> Self {
+        Value::Int96(value)
+    }
+}
+
+impl From<f32> for Value {
+    fn from(value: f32) -> Self {
+        Value::Float(OrderedFloat(value))
+    }
+}
+
+impl From<f64> for Value {
+    fn from(value: f64) -> Self {
+        Value::Double(OrderedFloat(value))
+    }
+}
+
+impl From<Vec<u8>> for Value {
+    fn from(value: Vec<u8>) -> Self {
+        Value::ByteArray(value)
+    }
+}
 
 macro_rules! min_max_values {
     ($first_stats:expr,$last_stats:expr,$ty:ty) => {{
@@ -149,7 +200,7 @@ pub fn array_to_pages_simple(
         write_statistics: true,
         compression: CompressionOptions::Uncompressed, // todo
         version: Version::V2,
-        data_pagesize_limit: data_pagesize_limit,
+        data_pagesize_limit,
     };
 
     let pages = array_to_columns(arr, typ, opts, &[Encoding::Plain])?

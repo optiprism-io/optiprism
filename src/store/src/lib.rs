@@ -6,7 +6,7 @@ extern crate core;
 // pub mod dictionary;
 pub mod arrow_conversion;
 pub mod error;
-pub mod parquet_new;
+pub mod merge;
 // mod table;
 // mod iterator;
 // mod parquet;
@@ -16,11 +16,14 @@ use error::Result;
 
 pub mod test_util {
     use std::fs::File;
-    use std::io::{Read, Seek, Write};
+    use std::io::Read;
+    use std::io::Seek;
+    use std::io::Write;
     use std::path::Path;
 
     use anyhow::anyhow;
-    use arrow2::array::{Array, MutableArray, MutableFixedSizeListArray};
+    use arrow::ipc::FixedSizeBinary;
+    use arrow2::array::Array;
     use arrow2::array::BinaryArray;
     use arrow2::array::BooleanArray;
     use arrow2::array::FixedSizeBinaryArray;
@@ -28,9 +31,11 @@ pub mod test_util {
     use arrow2::array::Int32Array;
     use arrow2::array::Int64Array;
     use arrow2::array::ListArray;
+    use arrow2::array::MutableArray;
     use arrow2::array::MutableBinaryArray;
     use arrow2::array::MutableBooleanArray;
     use arrow2::array::MutableFixedSizeBinaryArray;
+    use arrow2::array::MutableFixedSizeListArray;
     use arrow2::array::MutableListArray;
     use arrow2::array::MutablePrimitiveArray;
     use arrow2::array::MutableUtf8Array;
@@ -52,9 +57,9 @@ pub mod test_util {
     use arrow2::io::parquet::write::FileWriter;
     use arrow2::io::parquet::write::RowGroupIterator;
     use arrow2::io::parquet::write::WriteOptions;
-    use arrow2::offset::{Offset, Offsets};
+    use arrow2::offset::Offset;
+    use arrow2::offset::Offsets;
     use arrow2::types::NativeType;
-    use arrow::ipc::FixedSizeBinary;
     use parquet2::compression::CompressionOptions;
     use parquet2::encoding::Encoding;
     use parquet2::schema::types::PrimitiveType;
@@ -321,17 +326,39 @@ pub mod test_util {
         _type: PrimaryIndexType,
     ) -> Box<dyn Array> {
         match pt {
-            arrow2::types::PrimitiveType::Int8 => gen_idx_primitive_array::<i8>(_type).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Int16 => gen_idx_primitive_array::<i16>(_type).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Int32 => gen_idx_primitive_array::<i32>(_type).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Int64 => gen_idx_primitive_array::<i64>(_type).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Int128 => gen_idx_primitive_array::<i128>(_type).to(dt).boxed(),
-            arrow2::types::PrimitiveType::UInt8 => gen_idx_primitive_array::<u8>(_type).to(dt).boxed(),
-            arrow2::types::PrimitiveType::UInt16 => gen_idx_primitive_array::<u16>(_type).to(dt).boxed(),
-            arrow2::types::PrimitiveType::UInt32 => gen_idx_primitive_array::<u32>(_type).to(dt).boxed(),
-            arrow2::types::PrimitiveType::UInt64 => gen_idx_primitive_array::<u64>(_type).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Float32 => gen_idx_primitive_array::<f32>(_type).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Float64 => gen_idx_primitive_array::<f64>(_type).to(dt).boxed(),
+            arrow2::types::PrimitiveType::Int8 => {
+                gen_idx_primitive_array::<i8>(_type).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Int16 => {
+                gen_idx_primitive_array::<i16>(_type).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Int32 => {
+                gen_idx_primitive_array::<i32>(_type).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Int64 => {
+                gen_idx_primitive_array::<i64>(_type).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Int128 => {
+                gen_idx_primitive_array::<i128>(_type).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::UInt8 => {
+                gen_idx_primitive_array::<u8>(_type).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::UInt16 => {
+                gen_idx_primitive_array::<u16>(_type).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::UInt32 => {
+                gen_idx_primitive_array::<u32>(_type).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::UInt64 => {
+                gen_idx_primitive_array::<u64>(_type).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Float32 => {
+                gen_idx_primitive_array::<f32>(_type).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Float64 => {
+                gen_idx_primitive_array::<f64>(_type).to(dt).boxed()
+            }
             _ => unimplemented!(),
         }
     }
@@ -436,18 +463,42 @@ pub mod test_util {
         nulls: Option<usize>,
     ) -> Box<dyn Array> {
         match pt {
-            arrow2::types::PrimitiveType::Int8 => gen_primitive_data_array::<i8>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Int16 => gen_primitive_data_array::<i16>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Int32 => gen_primitive_data_array::<i32>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Int64 => gen_primitive_data_array::<i64>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Int128 => gen_primitive_data_array::<i128>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::UInt8 => gen_primitive_data_array::<u8>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::UInt16 => gen_primitive_data_array::<u16>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::UInt32 => gen_primitive_data_array::<u32>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::UInt64 => gen_primitive_data_array::<u64>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Float32 => gen_primitive_data_array::<f32>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::Float64 => gen_primitive_data_array::<f64>(n, nulls).to(dt).boxed(),
-            arrow2::types::PrimitiveType::DaysMs => gen_primitive_data_array::<i64>(n, nulls).to(dt).boxed(),
+            arrow2::types::PrimitiveType::Int8 => {
+                gen_primitive_data_array::<i8>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Int16 => {
+                gen_primitive_data_array::<i16>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Int32 => {
+                gen_primitive_data_array::<i32>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Int64 => {
+                gen_primitive_data_array::<i64>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Int128 => {
+                gen_primitive_data_array::<i128>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::UInt8 => {
+                gen_primitive_data_array::<u8>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::UInt16 => {
+                gen_primitive_data_array::<u16>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::UInt32 => {
+                gen_primitive_data_array::<u32>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::UInt64 => {
+                gen_primitive_data_array::<u64>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Float32 => {
+                gen_primitive_data_array::<f32>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::Float64 => {
+                gen_primitive_data_array::<f64>(n, nulls).to(dt).boxed()
+            }
+            arrow2::types::PrimitiveType::DaysMs => {
+                gen_primitive_data_array::<i64>(n, nulls).to(dt).boxed()
+            }
             _ => unimplemented!("{:?}", pt),
         }
     }
@@ -537,20 +588,45 @@ pub mod test_util {
         nulls: Option<usize>,
     ) -> Box<dyn Array> {
         match pt {
-            arrow2::types::PrimitiveType::Int8 => gen_primitive_data_list_array::<O, i8>(n, dt, nulls),
-            arrow2::types::PrimitiveType::Int16 => gen_primitive_data_list_array::<O, i16>(n, dt, nulls),
-            arrow2::types::PrimitiveType::Int32 => gen_primitive_data_list_array::<O, i32>(n, dt, nulls),
-            arrow2::types::PrimitiveType::Int64 => gen_primitive_data_list_array::<O, i64>(n, dt, nulls),
-            arrow2::types::PrimitiveType::Int128 => gen_primitive_data_list_array::<O, i128>(n, dt, nulls),
-            arrow2::types::PrimitiveType::UInt8 => gen_primitive_data_list_array::<O, u8>(n, dt, nulls),
-            arrow2::types::PrimitiveType::UInt16 => gen_primitive_data_list_array::<O, u16>(n, dt, nulls),
-            arrow2::types::PrimitiveType::UInt32 => gen_primitive_data_list_array::<O, u32>(n, dt, nulls),
-            arrow2::types::PrimitiveType::UInt64 => gen_primitive_data_list_array::<O, u64>(n, dt, nulls),
-            arrow2::types::PrimitiveType::Float32 => gen_primitive_data_list_array::<O, f32>(n, dt, nulls),
-            arrow2::types::PrimitiveType::Float64 => gen_primitive_data_list_array::<O, f64>(n, dt, nulls),
-            arrow2::types::PrimitiveType::DaysMs => gen_primitive_data_list_array::<O, i64>(n, dt, nulls),
+            arrow2::types::PrimitiveType::Int8 => {
+                gen_primitive_data_list_array::<O, i8>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::Int16 => {
+                gen_primitive_data_list_array::<O, i16>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::Int32 => {
+                gen_primitive_data_list_array::<O, i32>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::Int64 => {
+                gen_primitive_data_list_array::<O, i64>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::Int128 => {
+                gen_primitive_data_list_array::<O, i128>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::UInt8 => {
+                gen_primitive_data_list_array::<O, u8>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::UInt16 => {
+                gen_primitive_data_list_array::<O, u16>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::UInt32 => {
+                gen_primitive_data_list_array::<O, u32>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::UInt64 => {
+                gen_primitive_data_list_array::<O, u64>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::Float32 => {
+                gen_primitive_data_list_array::<O, f32>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::Float64 => {
+                gen_primitive_data_list_array::<O, f64>(n, dt, nulls)
+            }
+            arrow2::types::PrimitiveType::DaysMs => {
+                gen_primitive_data_list_array::<O, i64>(n, dt, nulls)
+            }
             _ => unimplemented!("{:?}", pt),
-        }.boxed()
+        }
+        .boxed()
     }
 
     pub fn gen_utf8_data_list_array<O: Offset, O2: Offset>(
@@ -623,7 +699,8 @@ pub mod test_util {
             unreachable!()
         };
 
-        let mut array = MutableListArray::new_from(MutablePrimitiveArray::<N>::new().to(inner_dt), dt, 0);
+        let mut array =
+            MutableListArray::new_from(MutablePrimitiveArray::<N>::new().to(inner_dt), dt, 0);
         array.try_extend(iter).unwrap();
 
         array.into()
@@ -682,7 +759,6 @@ pub mod test_util {
         array.try_extend(iter).unwrap();
         array.into()
     }
-
 
     /// Parses a markdown table into a vector of arrays:
     ///  * Types supported: Int64, Int32, Float64, Boolean, Utf8, List
@@ -791,17 +867,20 @@ pub mod test_util {
                     DataType::Int64 => {
                         let vals: Vec<Option<Vec<i64>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_primitive_array::<i32, _, _, _>(vals, field.data_type.clone()).boxed()
+                        create_list_primitive_array::<i32, _, _, _>(vals, field.data_type.clone())
+                            .boxed()
                     }
                     DataType::Int32 => {
                         let vals: Vec<Option<Vec<i32>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_primitive_array::<i32, _, _, _>(vals, field.data_type.clone()).boxed()
+                        create_list_primitive_array::<i32, _, _, _>(vals, field.data_type.clone())
+                            .boxed()
                     }
                     DataType::Float64 => {
                         let vals: Vec<Option<Vec<f64>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_primitive_array::<i32, _, _, _>(vals, field.data_type.clone()).boxed()
+                        create_list_primitive_array::<i32, _, _, _>(vals, field.data_type.clone())
+                            .boxed()
                     }
                     DataType::Boolean => {
                         let vals: Vec<Option<Vec<bool>>> =
@@ -824,17 +903,20 @@ pub mod test_util {
                     DataType::Int64 => {
                         let vals: Vec<Option<Vec<i64>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_primitive_array::<i64, _, _, _>(vals, inner.data_type.clone()).boxed()
+                        create_list_primitive_array::<i64, _, _, _>(vals, inner.data_type.clone())
+                            .boxed()
                     }
                     DataType::Int32 => {
                         let vals: Vec<Option<Vec<i32>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_primitive_array::<i64, _, _, _>(vals, inner.data_type.clone()).boxed()
+                        create_list_primitive_array::<i64, _, _, _>(vals, inner.data_type.clone())
+                            .boxed()
                     }
                     DataType::Float64 => {
                         let vals: Vec<Option<Vec<f64>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                        create_list_primitive_array::<i64, _, _, _>(vals, inner.data_type.clone()).boxed()
+                        create_list_primitive_array::<i64, _, _, _>(vals, inner.data_type.clone())
+                            .boxed()
                     }
                     DataType::Boolean => {
                         let vals: Vec<Option<Vec<bool>>> =
@@ -870,24 +952,33 @@ pub mod test_util {
         let idx_arrs = match idx_fields {
             1 => {
                 let arr = match &fields[0].data_type.to_physical_type() {
-                    PhysicalType::Primitive(pt) => {
-                        gen_idx_primitive_array_from_arrow_type(pt, fields[0].data_type.clone(), primary_idx_type)
-                    }
+                    PhysicalType::Primitive(pt) => gen_idx_primitive_array_from_arrow_type(
+                        pt,
+                        fields[0].data_type.clone(),
+                        primary_idx_type,
+                    ),
                     _ => unimplemented!("only support primitive type for idx field"),
                 };
                 vec![arr]
             }
             2 => {
                 let arr1 = match &fields[0].data_type.to_physical_type() {
-                    PhysicalType::Primitive(pt) => {
-                        gen_idx_primitive_array_from_arrow_type(pt, fields[0].data_type.clone(), primary_idx_type.clone())
-                    }
+                    PhysicalType::Primitive(pt) => gen_idx_primitive_array_from_arrow_type(
+                        pt,
+                        fields[0].data_type.clone(),
+                        primary_idx_type.clone(),
+                    ),
                     _ => unimplemented!("only support primitive type for idx field"),
                 };
                 let arr2 = match &fields[1].data_type.to_physical_type() {
                     PhysicalType::Primitive(pt) => {
-                        if let PrimaryIndexType::Partitioned(max_partition_size) = primary_idx_type {
-                            gen_secondary_idx_primitive_array_from_arrow_type(pt, fields[1].data_type.clone(), max_partition_size)
+                        if let PrimaryIndexType::Partitioned(max_partition_size) = primary_idx_type
+                        {
+                            gen_secondary_idx_primitive_array_from_arrow_type(
+                                pt,
+                                fields[1].data_type.clone(),
+                                max_partition_size,
+                            )
                         } else {
                             unimplemented!("only support partition for secondary idx field")
                         }
@@ -912,10 +1003,15 @@ pub mod test_util {
                 };
                 match &field.data_type.to_physical_type() {
                     PhysicalType::Boolean => gen_boolean_data_array(len, nulls_periodicity).boxed(),
-                    PhysicalType::Primitive(pt) => {
-                        gen_primitive_data_array_from_arrow_type(pt, field.data_type.clone(), len, nulls_periodicity)
+                    PhysicalType::Primitive(pt) => gen_primitive_data_array_from_arrow_type(
+                        pt,
+                        field.data_type.clone(),
+                        len,
+                        nulls_periodicity,
+                    ),
+                    PhysicalType::Binary => {
+                        gen_binary_data_array::<i32>(len, nulls_periodicity).boxed()
                     }
-                    PhysicalType::Binary => gen_binary_data_array::<i32>(len, nulls_periodicity).boxed(),
                     PhysicalType::FixedSizeBinary => {
                         if let DataType::FixedSizeBinary(size) = &field.data_type {
                             gen_fixed_size_binary_data_array(len, nulls_periodicity, *size).boxed()
@@ -923,22 +1019,35 @@ pub mod test_util {
                             unimplemented!()
                         }
                     }
-                    PhysicalType::LargeBinary => gen_binary_data_array::<i64>(len, nulls_periodicity).boxed(),
-                    PhysicalType::Utf8 => gen_utf8_data_array::<i32>(len, nulls_periodicity).boxed(),
-                    PhysicalType::LargeUtf8 => gen_utf8_data_array::<i64>(len, nulls_periodicity).boxed(),
+                    PhysicalType::LargeBinary => {
+                        gen_binary_data_array::<i64>(len, nulls_periodicity).boxed()
+                    }
+                    PhysicalType::Utf8 => {
+                        gen_utf8_data_array::<i32>(len, nulls_periodicity).boxed()
+                    }
+                    PhysicalType::LargeUtf8 => {
+                        gen_utf8_data_array::<i64>(len, nulls_periodicity).boxed()
+                    }
                     PhysicalType::List => match &field.data_type {
                         DataType::List(inner) => match &inner.data_type.to_physical_type() {
                             PhysicalType::Boolean => {
                                 gen_boolean_data_list_array::<i32>(len, nulls_periodicity).boxed()
                             }
                             PhysicalType::Primitive(pt) => {
-                                gen_primitive_data_list_array_from_arrow_type::<i32>(pt, field.data_type.clone(), len, nulls_periodicity)
+                                gen_primitive_data_list_array_from_arrow_type::<i32>(
+                                    pt,
+                                    field.data_type.clone(),
+                                    len,
+                                    nulls_periodicity,
+                                )
                             }
                             PhysicalType::Binary => {
-                                gen_binary_data_list_array::<i32, i32>(len, nulls_periodicity).boxed()
+                                gen_binary_data_list_array::<i32, i32>(len, nulls_periodicity)
+                                    .boxed()
                             }
                             PhysicalType::LargeBinary => {
-                                gen_binary_data_list_array::<i32, i64>(len, nulls_periodicity).boxed()
+                                gen_binary_data_list_array::<i32, i64>(len, nulls_periodicity)
+                                    .boxed()
                             }
                             PhysicalType::Utf8 => {
                                 gen_utf8_data_list_array::<i32, i32>(len, nulls_periodicity).boxed()
@@ -956,13 +1065,20 @@ pub mod test_util {
                                 gen_boolean_data_list_array::<i64>(len, nulls_periodicity).boxed()
                             }
                             PhysicalType::Primitive(pt) => {
-                                gen_primitive_data_list_array_from_arrow_type::<i64>(pt, field.data_type.clone(), len, nulls_periodicity)
+                                gen_primitive_data_list_array_from_arrow_type::<i64>(
+                                    pt,
+                                    field.data_type.clone(),
+                                    len,
+                                    nulls_periodicity,
+                                )
                             }
                             PhysicalType::Binary => {
-                                gen_binary_data_list_array::<i64, i32>(len, nulls_periodicity).boxed()
+                                gen_binary_data_list_array::<i64, i32>(len, nulls_periodicity)
+                                    .boxed()
                             }
                             PhysicalType::LargeBinary => {
-                                gen_binary_data_list_array::<i64, i64>(len, nulls_periodicity).boxed()
+                                gen_binary_data_list_array::<i64, i64>(len, nulls_periodicity)
+                                    .boxed()
                             }
                             PhysicalType::Utf8 => {
                                 gen_utf8_data_list_array::<i64, i32>(len, nulls_periodicity).boxed()
@@ -1061,9 +1177,7 @@ pub mod test_util {
             None,
         );
 
-        chunks
-            .map(|chunk| chunk.unwrap())
-            .collect::<Vec<_>>()
+        chunks.map(|chunk| chunk.unwrap()).collect::<Vec<_>>()
     }
 
     pub fn concat_chunks(chunks: Vec<Chunk<Box<dyn Array>>>) -> Chunk<Box<dyn Array>> {
@@ -1080,31 +1194,43 @@ pub mod test_util {
         Chunk::new(arrs)
     }
 
-    pub fn make_missing_columns(chunk: Chunk<Box<dyn Array>>, nth: usize, shift: usize, idx_cols_len: usize) -> Chunk<Box<dyn Array>> {
+    pub fn make_missing_columns(
+        chunk: Chunk<Box<dyn Array>>,
+        nth: usize,
+        shift: usize,
+        idx_cols_len: usize,
+    ) -> Chunk<Box<dyn Array>> {
         let arrs = chunk
             .columns()
             .into_iter()
             .enumerate()
-            .filter_map(|(col_id, col)|
+            .filter_map(|(col_id, col)| {
                 if col_id >= idx_cols_len && (col_id + shift) % nth == 0 {
                     None
                 } else {
                     Some(col.to_owned())
                 }
-            )
+            })
             .collect::<Vec<_>>();
 
         Chunk::new(arrs)
     }
 
-    pub fn make_missing_fields(fields: Vec<Field>, nth: usize, shift: usize, idx_cols_len: usize) -> Vec<Field> {
+    pub fn make_missing_fields(
+        fields: Vec<Field>,
+        nth: usize,
+        shift: usize,
+        idx_cols_len: usize,
+    ) -> Vec<Field> {
         fields
             .iter()
             .enumerate()
-            .filter_map(|(field_id, field)| if field_id >= idx_cols_len && (field_id + shift) % nth == 0 {
-                None
-            } else {
-                Some(field.to_owned())
+            .filter_map(|(field_id, field)| {
+                if field_id >= idx_cols_len && (field_id + shift) % nth == 0 {
+                    None
+                } else {
+                    Some(field.to_owned())
+                }
             })
             .collect::<Vec<_>>()
     }
@@ -1172,14 +1298,16 @@ pub mod test_util {
             data_pagesize_limit,
         };
 
-
         let encodings = schema
             .fields
             .iter()
             .map(|f| transverse(&f.data_type, |_| Encoding::Plain))
             .collect();
 
-        let chunks = chunks.into_iter().map(|chunk| Ok(chunk)).collect::<Vec<_>>();
+        let chunks = chunks
+            .into_iter()
+            .map(|chunk| Ok(chunk))
+            .collect::<Vec<_>>();
         let row_groups =
             RowGroupIterator::try_new(chunks.into_iter(), &schema, options, encodings)?;
 

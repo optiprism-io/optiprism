@@ -159,9 +159,8 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
         // TODO Enable once https://github.com/apache/arrow-datafusion/pull/1394 is released
         // DataType::Decimal128(_, _) => distinct_count_array!(array, DecimalArray, state),
         other => {
-            let message = format!(
-                "Ordered distinct count over array of type \"{other:?}\" is not supported"
-            );
+            let message =
+                format!("Ordered distinct count over array of type \"{other:?}\" is not supported");
             Err(DataFusionError::NotImplemented(message))
         }
     }

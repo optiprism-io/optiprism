@@ -75,18 +75,18 @@ use parquet2::write::WriteOptions;
 
 use crate::error::Result;
 use crate::error::StoreError;
-use crate::parquet_new::arrow::merge_chunks;
-use crate::parquet_new::arrow::try_merge_schemas as try_merge_arrow_schemas;
-use crate::parquet_new::arrow::ArrowChunk;
-use crate::parquet_new::parquet;
-use crate::parquet_new::parquet::array_to_pages_simple;
-use crate::parquet_new::parquet::check_intersection;
-use crate::parquet_new::parquet::data_page_to_array;
-use crate::parquet_new::parquet::pages_to_arrays;
-use crate::parquet_new::parquet::ColumnPath;
-use crate::parquet_new::parquet::CompressedPageIterator;
-use crate::parquet_new::parquet::MergedPagesChunk;
-use crate::parquet_new::parquet::PagesChunk;
+use crate::merge::arrow::merge_chunks;
+use crate::merge::arrow::try_merge_schemas as try_merge_arrow_schemas;
+use crate::merge::arrow::ArrowChunk;
+use crate::merge::parquet;
+use crate::merge::parquet::array_to_pages_simple;
+use crate::merge::parquet::check_intersection;
+use crate::merge::parquet::data_page_to_array;
+use crate::merge::parquet::pages_to_arrays;
+use crate::merge::parquet::ColumnPath;
+use crate::merge::parquet::CompressedPageIterator;
+use crate::merge::parquet::MergedPagesChunk;
+use crate::merge::parquet::PagesChunk;
 
 // this is a temporary array used to merge data pages avoiding downcasting
 enum TmpArray {
@@ -479,9 +479,9 @@ macro_rules! merge_list_primitive_arrays {
 }
 
 pub struct Merger<R, W>
-    where
-        R: Read,
-        W: Write,
+where
+    R: Read,
+    W: Write,
 {
     index_cols: Vec<ColumnDescriptor>,
     parquet_schema: SchemaDescriptor,
@@ -507,9 +507,9 @@ pub enum MergeReorder {
 }
 
 impl<R, W> Merger<R, W>
-    where
-        R: Read + Seek,
-        W: Write,
+where
+    R: Read + Seek,
+    W: Write,
 {
     pub fn try_new(
         mut readers: Vec<R>,

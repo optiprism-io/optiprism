@@ -62,8 +62,8 @@ use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 use rstest::rstest;
 use store::error::Result;
-use store::parquet_new::merger::Merger;
-use store::parquet_new::parquet::CompressedPageIterator;
+use store::merge::merger::Merger;
+use store::merge::parquet::CompressedPageIterator;
 use store::test_util::concat_chunks;
 use store::test_util::create_list_primitive_array;
 use store::test_util::create_parquet_file_from_chunk;
@@ -427,7 +427,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
                 Some(2),
                 (stream_id + 1) * (stream_id + 1),
             )
-                .unwrap();
+            .unwrap();
 
             w
         })
@@ -520,16 +520,35 @@ fn test_missing_columns() -> anyhow::Result<()> {
 
     let exp = vec![
         PrimitiveArray::<i64>::from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9]).boxed(),
-        PrimitiveArray::<i64>::from(vec![Some(1), Some(2), None, Some(4), Some(5), None, Some(7), Some(8), None]).boxed(),
-        PrimitiveArray::<i64>::from(vec![Some(1), None, Some(3), Some(4), None, Some(6), Some(7), None, Some(9)]).boxed(),
+        PrimitiveArray::<i64>::from(vec![
+            Some(1),
+            Some(2),
+            None,
+            Some(4),
+            Some(5),
+            None,
+            Some(7),
+            Some(8),
+            None,
+        ])
+        .boxed(),
+        PrimitiveArray::<i64>::from(vec![
+            Some(1),
+            None,
+            Some(3),
+            Some(4),
+            None,
+            Some(6),
+            Some(7),
+            None,
+            Some(9),
+        ])
+        .boxed(),
     ];
 
     let exp = Chunk::new(exp);
 
-    trace!(
-        "expected\n{}",
-        print::write(&[exp.clone()], &names)
-    );
+    trace!("expected\n{}", print::write(&[exp.clone()], &names));
     debug_assert_eq!(exp, final_chunk);
 
     Ok(())
