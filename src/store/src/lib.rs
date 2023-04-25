@@ -20,6 +20,7 @@ pub mod test_util {
     use std::io::Seek;
     use std::io::Write;
     use std::path::Path;
+    use std::time::Instant;
 
     use anyhow::anyhow;
     use arrow::ipc::FixedSizeBinary;
@@ -626,7 +627,7 @@ pub mod test_util {
             }
             _ => unimplemented!("{:?}", pt),
         }
-        .boxed()
+            .boxed()
     }
 
     pub fn gen_utf8_data_list_array<O: Offset, O2: Offset>(
@@ -1112,6 +1113,7 @@ pub mod test_util {
             match exclusive_row_groups_periodicity {
                 // take chunk exclusively for one stream. To test picking during merge
                 Some(n) if cur_row_group % n == 0 => {
+                    let start = Instant::now();
                     let end = std::cmp::min(idx + values_per_row_group, chunk.len());
                     // make a slice from original chunk
                     let out = chunk
@@ -1123,11 +1125,13 @@ pub mod test_util {
                     let stream_id = cur_row_group % out_count;
                     let chunk = Chunk::new(out);
                     res[stream_id].push(chunk);
+                    println!("exclusive {:?}", start.elapsed());
 
                     idx += values_per_row_group;
                 }
                 // split between multiple out chunks. To test actual merge of intersected chunks. Example: slice 1..10, 3 outs. We'll take [1, 4, 7, 10], [2, 5, 8], [3, 6, 9]
                 _ => {
+                    let start = Instant::now();
                     // try to take values enough to split between all the out chunks
                     let to_take = values_per_row_group * out_count;
                     let end = std::cmp::min(idx + to_take, chunk.len());
@@ -1150,7 +1154,7 @@ pub mod test_util {
 
                         res[stream_id].push(Chunk::new(out));
                     }
-
+                    println!("unmerge {:?}", start.elapsed());
                     idx += to_take;
                 }
             }
@@ -1293,7 +1297,7 @@ pub mod test_util {
 
         let options = WriteOptions {
             write_statistics: true,
-            compression: CompressionOptions::Snappy,
+            compression: CompressionOptions::Uncompressed,
             version: Version::V2,
             data_pagesize_limit,
         };

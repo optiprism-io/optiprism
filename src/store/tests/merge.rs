@@ -1,5 +1,7 @@
 #![feature(trace_macros)]
 
+use std::env::temp_dir;
+use std::fs::create_dir_all;
 use std::fs::File;
 use std::io;
 use std::io::BufRead;
@@ -7,6 +9,7 @@ use std::io::BufReader;
 use std::io::Cursor;
 use std::io::Write;
 use std::path::Path;
+use std::path::PathBuf;
 use std::time::Instant;
 
 use arrow2::array::Array;
@@ -92,6 +95,7 @@ use tracing::trace;
 use tracing::warn;
 use tracing_test::traced_test;
 
+#[derive(Clone)]
 struct TestCase {
     idx_fields: Vec<Field>,
     primary_index_type: PrimaryIndexType,
@@ -160,7 +164,7 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
     )?;
     let start = Instant::now();
     merger.merge()?;
-    println!("{:?}", start.elapsed());
+    println!("merge {:?}", start.elapsed());
 
     let metadata = read::read_metadata(&mut out)?;
     let schema = read::infer_schema(&metadata)?;
@@ -181,11 +185,98 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
         print::write(&[final_chunk.clone()], &names)
     );
 
-    println!("{}", initial_chunk.len());
     // notice: if chunks look equal, but assert fails, probably data types are different
     debug_assert_eq!(initial_chunk, final_chunk);
 
     Ok(())
+}
+
+enum ProfileStep {
+    Generate,
+    Merge,
+}
+
+fn stream_parquet_path(stream_id: usize) -> PathBuf {
+    let mut path = temp_dir();
+    path.push(format!("optiprism/tests/merge"));
+    create_dir_all(path.clone()).unwrap();
+    path.push(format!("{stream_id}.parquet"));
+
+    path
+}
+
+fn profile(tc: TestCase, step: ProfileStep) {
+    let start = Instant::now();
+    match step {
+        ProfileStep::Generate => {
+            let idx_cols_len = tc.idx_fields.len();
+            let fields = [tc.idx_fields, tc.data_fields].concat();
+
+            let initial_chunk = gen_chunk_for_parquet(
+                &fields,
+                idx_cols_len,
+                tc.primary_index_type,
+                tc.gen_null_values_periodicity,
+            );
+            let start = Instant::now();
+            let out_streams_chunks = unmerge_chunk(
+                initial_chunk.clone(),
+                tc.gen_out_streams_count,
+                tc.gen_row_group_size,
+                tc.gen_exclusive_row_groups_periodicity,
+            );
+
+            println!("unmerge {:?}", start.elapsed());
+
+            let lens = out_streams_chunks
+                .iter()
+                .map(|chunks| chunks.iter().fold(0, |acc, chunk| acc + chunk.len()))
+                .collect::<Vec<_>>();
+            for len in lens.iter() {
+                println!("stream len {len}");
+            }
+
+            for chunks in out_streams_chunks.iter() {
+                println!("stream chunks {}", chunks.len());
+            }
+
+            let start = Instant::now();
+            out_streams_chunks
+                .into_iter()
+                .enumerate()
+                .for_each(|(stream_id, chunks)| {
+                    let mut w = File::create(stream_parquet_path(stream_id)).unwrap();
+                    create_parquet_from_chunks(
+                        chunks,
+                        fields.clone(),
+                        &mut w,
+                        tc.gen_data_page_limit,
+                    )
+                    .unwrap();
+                });
+            println!("create parquets {:?}", start.elapsed());
+        }
+        ProfileStep::Merge => {
+            let idx_cols_len = tc.idx_fields.len();
+            let readers = (0..tc.gen_out_streams_count)
+                .into_iter()
+                .map(|stream_id| File::open(stream_parquet_path(stream_id)).unwrap())
+                .collect::<Vec<_>>();
+
+            let mut out = Cursor::new(vec![]);
+            let mut merger = Merger::try_new(
+                readers,
+                &mut out,
+                idx_cols_len,
+                tc.out_data_page_size_limit,
+                tc.out_row_group_values_limit,
+                tc.out_arrow_page_size,
+            )
+            .unwrap();
+            merger.merge().unwrap();
+        }
+    }
+    println!("{:?}", start.elapsed());
 }
 
 // #[traced_test]
@@ -240,109 +331,221 @@ fn test_merge() -> anyhow::Result<()> {
     let data_fields = [data_fields, data_list_fields].concat();
 
     let cases = vec![
-        TestCase {
-            idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
-            data_fields: data_fields.clone(),
-            gen_null_values_periodicity: None,
-            gen_exclusive_row_groups_periodicity: None,
-            primary_index_type: PrimaryIndexType::Sequential(100),
-            gen_out_streams_count: 10,
-            gen_row_group_size: 5,
-            gen_data_page_limit: None,
-            out_data_page_size_limit: Some(10),
-            out_row_group_values_limit: 2,
-            out_arrow_page_size: 3,
-        },
-        TestCase {
-            idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
-            data_fields: data_fields.clone(),
-            gen_null_values_periodicity: None,
-            gen_exclusive_row_groups_periodicity: None,
-            primary_index_type: PrimaryIndexType::Sequential(100),
-            gen_out_streams_count: 2,
-            gen_row_group_size: 5,
-            gen_data_page_limit: Some(5),
-            out_data_page_size_limit: Some(10),
-            out_row_group_values_limit: 2,
-            out_arrow_page_size: 3,
-        },
-        TestCase {
-            idx_fields: vec![
-                Field::new("idx1", DataType::Int64, false),
-                Field::new("idx2", DataType::Int64, false),
-            ],
-            data_fields: data_fields.clone(),
-            gen_null_values_periodicity: Some(5),
-            gen_exclusive_row_groups_periodicity: Some(3),
-            primary_index_type: PrimaryIndexType::Partitioned(10),
-            gen_out_streams_count: 2,
-            gen_row_group_size: 5,
-            gen_data_page_limit: Some(5),
-            out_data_page_size_limit: Some(10),
-            out_row_group_values_limit: 2,
-            out_arrow_page_size: 3,
-        },
-        TestCase {
-            idx_fields: vec![
-                Field::new("idx1", DataType::Int64, false),
-                Field::new("idx2", DataType::Int64, false),
-            ],
-            data_fields: data_fields.clone(),
-            gen_null_values_periodicity: None,
-            gen_exclusive_row_groups_periodicity: None,
-            primary_index_type: PrimaryIndexType::Partitioned(1000),
-            gen_out_streams_count: 10,
-            gen_row_group_size: 1000,
-            gen_data_page_limit: None,
-            out_data_page_size_limit: None,
-            out_row_group_values_limit: 1000,
-            out_arrow_page_size: 500,
-        },
-        TestCase {
-            idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
-            data_fields: data_fields.clone(),
-            gen_null_values_periodicity: None,
-            gen_exclusive_row_groups_periodicity: None,
-            primary_index_type: PrimaryIndexType::Partitioned(1000),
-            gen_out_streams_count: 10,
-            gen_row_group_size: 1000,
-            gen_data_page_limit: None,
-            out_data_page_size_limit: None,
-            out_row_group_values_limit: 1000,
-            out_arrow_page_size: 500,
-        },
+        // TestCase {
+        // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+        // data_fields: data_fields.clone(),
+        // gen_null_values_periodicity: None,
+        // gen_exclusive_row_groups_periodicity: None,
+        // primary_index_type: PrimaryIndexType::Sequential(100),
+        // gen_out_streams_count: 10,
+        // gen_row_group_size: 5,
+        // gen_data_page_limit: None,
+        // out_data_page_size_limit: Some(10),
+        // out_row_group_values_limit: 2,
+        // out_arrow_page_size: 3,
+        // },
+        // TestCase {
+        // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+        // data_fields: data_fields.clone(),
+        // gen_null_values_periodicity: None,
+        // gen_exclusive_row_groups_periodicity: None,
+        // primary_index_type: PrimaryIndexType::Sequential(100),
+        // gen_out_streams_count: 2,
+        // gen_row_group_size: 5,
+        // gen_data_page_limit: Some(5),
+        // out_data_page_size_limit: Some(10),
+        // out_row_group_values_limit: 2,
+        // out_arrow_page_size: 3,
+        // },
+        // TestCase {
+        // idx_fields: vec![
+        // Field::new("idx1", DataType::Int64, false),
+        // Field::new("idx2", DataType::Int64, false),
+        // ],
+        // data_fields: data_fields.clone(),
+        // gen_null_values_periodicity: Some(5),
+        // gen_exclusive_row_groups_periodicity: Some(3),
+        // primary_index_type: PrimaryIndexType::Partitioned(10),
+        // gen_out_streams_count: 2,
+        // gen_row_group_size: 5,
+        // gen_data_page_limit: Some(5),
+        // out_data_page_size_limit: Some(10),
+        // out_row_group_values_limit: 2,
+        // out_arrow_page_size: 3,
+        // },
+        // TestCase {
+        // idx_fields: vec![
+        // Field::new("idx1", DataType::Int64, false),
+        // Field::new("idx2", DataType::Int64, false),
+        // ],
+        // data_fields: data_fields.clone(),
+        // gen_null_values_periodicity: None,
+        // gen_exclusive_row_groups_periodicity: None,
+        // primary_index_type: PrimaryIndexType::Partitioned(1000),
+        // gen_out_streams_count: 10,
+        // gen_row_group_size: 1000,
+        // gen_data_page_limit: None,
+        // out_data_page_size_limit: None,
+        // out_row_group_values_limit: 1000,
+        // out_arrow_page_size: 500,
+        // },
+        // TestCase {
+        // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+        // data_fields: data_fields.clone(),
+        // gen_null_values_periodicity: None,
+        // gen_exclusive_row_groups_periodicity: None,
+        // primary_index_type: PrimaryIndexType::Partitioned(1000),
+        // gen_out_streams_count: 10,
+        // gen_row_group_size: 1000,
+        // gen_data_page_limit: None,
+        // out_data_page_size_limit: None,
+        // out_row_group_values_limit: 1000,
+        // out_arrow_page_size: 500,
+        // },
+        // TestCase {
+        // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+        // data_fields: data_fields.clone(),
+        // gen_null_values_periodicity: None,
+        // gen_exclusive_row_groups_periodicity: None,
+        // primary_index_type: PrimaryIndexType::Sequential(100_000),
+        // gen_out_streams_count: 10,
+        // gen_row_group_size: 1000,
+        // gen_data_page_limit: None,
+        // out_data_page_size_limit: None,
+        // out_row_group_values_limit: 1000,
+        // out_arrow_page_size: 500,
+        // },
+        // TestCase {
+        // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+        // data_fields: data_fields.clone(),
+        // gen_null_values_periodicity: None,
+        // gen_exclusive_row_groups_periodicity: None,
+        // primary_index_type: PrimaryIndexType::Sequential(1_000_000),
+        // gen_out_streams_count: 3,
+        // gen_row_group_size: 1000,
+        // gen_data_page_limit: None,
+        // out_data_page_size_limit: None,
+        // out_row_group_values_limit: 1000,
+        // out_arrow_page_size: 500,
+        // },
+        // TestCase {
+        // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+        // data_fields: data_fields.clone(),
+        // gen_null_values_periodicity: None,
+        // gen_exclusive_row_groups_periodicity: None,
+        // primary_index_type: PrimaryIndexType::Sequential(1_000_000),
+        // gen_out_streams_count: 3,
+        // gen_row_group_size: 1000,
+        // gen_data_page_limit: Some(100),
+        // out_data_page_size_limit: None,
+        // out_row_group_values_limit: 1000,
+        // out_arrow_page_size: 500,
+        // },
+        // TestCase {
+        // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+        // data_fields: data_fields.clone(),
+        // gen_null_values_periodicity: None,
+        // gen_exclusive_row_groups_periodicity: Some(2),
+        // primary_index_type: PrimaryIndexType::Sequential(1_000_000),
+        // gen_out_streams_count: 3,
+        // gen_row_group_size: 1000,
+        // gen_data_page_limit: Some(100),
+        // out_data_page_size_limit: None,
+        // out_row_group_values_limit: 1000,
+        // out_arrow_page_size: 500,
+        // },
         TestCase {
             idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
             data_fields: data_fields.clone(),
             gen_null_values_periodicity: None,
             gen_exclusive_row_groups_periodicity: None,
             primary_index_type: PrimaryIndexType::Sequential(100_000),
-            gen_out_streams_count: 10,
-            gen_row_group_size: 1000,
-            gen_data_page_limit: None,
-            out_data_page_size_limit: None,
-            out_row_group_values_limit: 1000,
-            out_arrow_page_size: 500,
-        },
-        TestCase {
-            idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
-            data_fields: data_fields.clone(),
-            gen_null_values_periodicity: None,
-            gen_exclusive_row_groups_periodicity: None,
-            primary_index_type: PrimaryIndexType::Sequential(1_000_000),
             gen_out_streams_count: 3,
             gen_row_group_size: 1000,
-            gen_data_page_limit: None,
+            gen_data_page_limit: Some(100),
             out_data_page_size_limit: None,
             out_row_group_values_limit: 1000,
             out_arrow_page_size: 500,
         },
+        // TestCase {
+        // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
+        // data_fields: data_fields.clone(),
+        // gen_null_values_periodicity: None,
+        // gen_exclusive_row_groups_periodicity: Some(1),
+        // primary_index_type: PrimaryIndexType::Sequential(100_000),
+        // gen_out_streams_count: 3,
+        // gen_row_group_size: 1000,
+        // gen_data_page_limit: Some(100),
+        // out_data_page_size_limit: None,
+        // out_row_group_values_limit: 1000,
+        // out_arrow_page_size: 500,
+        // },
+    ];
+
+    for case in cases.into_iter() {
+        roundtrip(case)?;
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_profile_merge() {
+    let data_fields = vec![
+        Field::new("f1", DataType::Boolean, true),
+        Field::new("f2", DataType::Int8, true),
+        Field::new("f3", DataType::Int16, true),
+        Field::new("f4", DataType::Int32, false),
+        Field::new("f5", DataType::Int64, true),
+        Field::new("f6", DataType::UInt8, true),
+        Field::new("f7", DataType::UInt16, false),
+        Field::new("f9", DataType::UInt32, true),
+        Field::new("f10", DataType::UInt64, true),
+        Field::new("f11", DataType::Float32, true),
+        Field::new("f12", DataType::Float64, true),
+        Field::new(
+            "f13",
+            DataType::Timestamp(TimeUnit::Millisecond, None),
+            true,
+        ),
+        Field::new(
+            "f14",
+            DataType::Timestamp(TimeUnit::Millisecond, Some("Utc".to_string())),
+            true,
+        ),
+        Field::new("f15", DataType::Date32, true),
+        Field::new("f16", DataType::Date64, true),
+        Field::new("f17", DataType::Time32(TimeUnit::Millisecond), true),
+        Field::new("f18", DataType::Time64(TimeUnit::Microsecond), true),
+        Field::new("f19", DataType::Duration(TimeUnit::Millisecond), true),
+        Field::new("f20", DataType::Binary, true),
+        Field::new("f21", DataType::LargeBinary, true),
+        Field::new("f22", DataType::Utf8, true),
+        Field::new("f23", DataType::LargeUtf8, true),
+        // Field::new("f24", DataType::Interval(IntervalUnit::DayTime), true), // TODO: support interval
+        // Field::new("f25",DataType::FixedSizeBinary(10), true), // TODO: support fixed size binary
+    ];
+
+    let data_list_fields = data_fields
+        .iter()
+        .map(|field| {
+            let inner = Field::new("item", field.data_type.clone(), field.is_nullable);
+            Field::new(
+                format!("list_{}", field.name),
+                DataType::List(Box::new(inner)),
+                true,
+            )
+        })
+        .collect::<Vec<_>>();
+    let data_fields = [data_fields, data_list_fields].concat();
+
+    let cases = vec![
         TestCase {
             idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
             data_fields: data_fields.clone(),
             gen_null_values_periodicity: None,
             gen_exclusive_row_groups_periodicity: None,
-            primary_index_type: PrimaryIndexType::Sequential(1_000_000),
+            primary_index_type: PrimaryIndexType::Sequential(100_000),
             gen_out_streams_count: 3,
             gen_row_group_size: 1000,
             gen_data_page_limit: Some(100),
@@ -355,7 +558,7 @@ fn test_merge() -> anyhow::Result<()> {
             data_fields: data_fields.clone(),
             gen_null_values_periodicity: None,
             gen_exclusive_row_groups_periodicity: Some(2),
-            primary_index_type: PrimaryIndexType::Sequential(1_000_000),
+            primary_index_type: PrimaryIndexType::Sequential(100_000),
             gen_out_streams_count: 3,
             gen_row_group_size: 1000,
             gen_data_page_limit: Some(100),
@@ -365,11 +568,7 @@ fn test_merge() -> anyhow::Result<()> {
         },
     ];
 
-    for case in cases.into_iter() {
-        roundtrip(case)?;
-    }
-
-    Ok(())
+    profile(cases[1].clone(), ProfileStep::Generate);
 }
 
 #[traced_test]
