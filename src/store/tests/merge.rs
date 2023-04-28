@@ -196,16 +196,18 @@ enum ProfileStep {
     Merge,
 }
 
-fn stream_parquet_path(stream_id: usize) -> PathBuf {
-    let mut path = temp_dir();
-    path.push(format!("optiprism/tests/merge"));
+fn stream_parquet_path(stream_id: usize, case_id: usize) -> PathBuf {
+    // let mut path = temp_dir();
+    // path.push(format!("optiprism/tests/merge"));
+    let mut path = PathBuf::from(format!("tests/merge/{case_id}/"));
+    // path.push(format!("tests/merge/{case_id}/"));
     create_dir_all(path.clone()).unwrap();
     path.push(format!("{stream_id}.parquet"));
 
     path
 }
 
-fn profile(tc: TestCase, step: ProfileStep) {
+fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
     let start = Instant::now();
     match step {
         ProfileStep::Generate => {
@@ -228,31 +230,19 @@ fn profile(tc: TestCase, step: ProfileStep) {
 
             println!("unmerge {:?}", start.elapsed());
 
-            let lens = out_streams_chunks
-                .iter()
-                .map(|chunks| chunks.iter().fold(0, |acc, chunk| acc + chunk.len()))
-                .collect::<Vec<_>>();
-            for len in lens.iter() {
-                println!("stream len {len}");
-            }
-
-            for chunks in out_streams_chunks.iter() {
-                println!("stream chunks {}", chunks.len());
-            }
-
             let start = Instant::now();
             out_streams_chunks
                 .into_iter()
                 .enumerate()
                 .for_each(|(stream_id, chunks)| {
-                    let mut w = File::create(stream_parquet_path(stream_id)).unwrap();
+                    let mut w = File::create(stream_parquet_path(stream_id, case_id)).unwrap();
                     create_parquet_from_chunks(
                         chunks,
                         fields.clone(),
                         &mut w,
                         tc.gen_data_page_limit,
                     )
-                    .unwrap();
+                        .unwrap();
                 });
             println!("create parquets {:?}", start.elapsed());
         }
@@ -260,7 +250,7 @@ fn profile(tc: TestCase, step: ProfileStep) {
             let idx_cols_len = tc.idx_fields.len();
             let readers = (0..tc.gen_out_streams_count)
                 .into_iter()
-                .map(|stream_id| File::open(stream_parquet_path(stream_id)).unwrap())
+                .map(|stream_id| File::open(stream_parquet_path(stream_id, case_id)).unwrap())
                 .collect::<Vec<_>>();
 
             let mut out = Cursor::new(vec![]);
@@ -272,7 +262,7 @@ fn profile(tc: TestCase, step: ProfileStep) {
                 tc.out_row_group_values_limit,
                 tc.out_arrow_page_size,
             )
-            .unwrap();
+                .unwrap();
             merger.merge().unwrap();
         }
     }
@@ -459,27 +449,29 @@ fn test_merge() -> anyhow::Result<()> {
             data_fields: data_fields.clone(),
             gen_null_values_periodicity: None,
             gen_exclusive_row_groups_periodicity: None,
-            primary_index_type: PrimaryIndexType::Sequential(100_000),
+            primary_index_type: PrimaryIndexType::Sequential(100),
             gen_out_streams_count: 3,
             gen_row_group_size: 1000,
-            gen_data_page_limit: Some(100),
+            gen_data_page_limit: Some(1000),
             out_data_page_size_limit: None,
             out_row_group_values_limit: 1000,
             out_arrow_page_size: 500,
         },
-        // TestCase {
-        // idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
-        // data_fields: data_fields.clone(),
-        // gen_null_values_periodicity: None,
-        // gen_exclusive_row_groups_periodicity: Some(1),
-        // primary_index_type: PrimaryIndexType::Sequential(100_000),
-        // gen_out_streams_count: 3,
-        // gen_row_group_size: 1000,
-        // gen_data_page_limit: Some(100),
-        // out_data_page_size_limit: None,
-        // out_row_group_values_limit: 1000,
-        // out_arrow_page_size: 500,
-        // },
+        TestCase {
+            idx_fields: vec![Field::new("idx1", DataType::Int64, false),
+                             Field::new("idx2", DataType::Int64, false),
+                             ],
+            data_fields: data_fields.clone(),
+            gen_null_values_periodicity: None,
+            gen_exclusive_row_groups_periodicity: Some(2),
+            primary_index_type: PrimaryIndexType::Partitioned(100),
+            gen_out_streams_count: 3,
+            gen_row_group_size: 1000,
+            gen_data_page_limit: Some(1000),
+            out_data_page_size_limit: None,
+            out_row_group_values_limit: 1000,
+            out_arrow_page_size: 500,
+        },
     ];
 
     for case in cases.into_iter() {
@@ -489,7 +481,7 @@ fn test_merge() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test]
+// #[test]
 fn test_profile_merge() {
     let data_fields = vec![
         Field::new("f1", DataType::Boolean, true),
@@ -526,18 +518,18 @@ fn test_profile_merge() {
         // Field::new("f25",DataType::FixedSizeBinary(10), true), // TODO: support fixed size binary
     ];
 
-    let data_list_fields = data_fields
-        .iter()
-        .map(|field| {
-            let inner = Field::new("item", field.data_type.clone(), field.is_nullable);
-            Field::new(
-                format!("list_{}", field.name),
-                DataType::List(Box::new(inner)),
-                true,
-            )
-        })
-        .collect::<Vec<_>>();
-    let data_fields = [data_fields, data_list_fields].concat();
+    /*    let data_list_fields = data_fields
+            .iter()
+            .map(|field| {
+                let inner = Field::new("item", field.data_type.clone(), field.is_nullable);
+                Field::new(
+                    format!("list_{}", field.name),
+                    DataType::List(Box::new(inner)),
+                    true,
+                )
+            })
+            .collect::<Vec<_>>();
+        let data_fields = [data_fields, data_list_fields].concat();*/
 
     let cases = vec![
         TestCase {
@@ -548,7 +540,7 @@ fn test_profile_merge() {
             primary_index_type: PrimaryIndexType::Sequential(100_000),
             gen_out_streams_count: 3,
             gen_row_group_size: 1000,
-            gen_data_page_limit: Some(100),
+            gen_data_page_limit: Some(1000),
             out_data_page_size_limit: None,
             out_row_group_values_limit: 1000,
             out_arrow_page_size: 500,
@@ -561,17 +553,20 @@ fn test_profile_merge() {
             primary_index_type: PrimaryIndexType::Sequential(100_000),
             gen_out_streams_count: 3,
             gen_row_group_size: 1000,
-            gen_data_page_limit: Some(100),
+            gen_data_page_limit: Some(1000),
             out_data_page_size_limit: None,
             out_row_group_values_limit: 1000,
             out_arrow_page_size: 500,
         },
     ];
 
-    profile(cases[1].clone(), ProfileStep::Generate);
+    profile(cases[1].clone(), 1, ProfileStep::Merge);
+    /*for (idx, case) in cases.into_iter().enumerate() {
+        profile(case, idx, ProfileStep::Merge);
+    }*/
 }
 
-#[traced_test]
+// #[traced_test]
 #[test]
 fn test_different_row_group_sizes() -> anyhow::Result<()> {
     let streams = 3;
@@ -626,7 +621,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
                 Some(2),
                 (stream_id + 1) * (stream_id + 1),
             )
-            .unwrap();
+                .unwrap();
 
             w
         })
@@ -659,7 +654,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[traced_test]
+// #[traced_test]
 #[test]
 fn test_missing_columns() -> anyhow::Result<()> {
     let cols = vec![
@@ -730,7 +725,7 @@ fn test_missing_columns() -> anyhow::Result<()> {
             Some(8),
             None,
         ])
-        .boxed(),
+            .boxed(),
         PrimitiveArray::<i64>::from(vec![
             Some(1),
             None,
@@ -742,7 +737,7 @@ fn test_missing_columns() -> anyhow::Result<()> {
             None,
             Some(9),
         ])
-        .boxed(),
+            .boxed(),
     ];
 
     let exp = Chunk::new(exp);

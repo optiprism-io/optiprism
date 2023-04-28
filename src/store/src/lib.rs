@@ -1113,25 +1113,26 @@ pub mod test_util {
             match exclusive_row_groups_periodicity {
                 // take chunk exclusively for one stream. To test picking during merge
                 Some(n) if cur_row_group % n == 0 => {
-                    let start = Instant::now();
                     let end = std::cmp::min(idx + values_per_row_group, chunk.len());
                     // make a slice from original chunk
                     let out = chunk
                         .arrays()
                         .iter()
-                        .map(|arr| arr.sliced(idx, end - idx))
+                        .map(|arr| {
+                            let take_idx = PrimitiveArray::from_vec((idx..end).into_iter().map(|v| v as i64).collect());
+                            take(arr.as_ref(), &take_idx).unwrap()
+                            // arr.sliced(idx, end - idx) // TODO slice is not working, producing enormous pages amount while writing to parquet
+                        })
                         .collect::<Vec<_>>();
                     // round robin stream assignment
                     let stream_id = cur_row_group % out_count;
                     let chunk = Chunk::new(out);
                     res[stream_id].push(chunk);
-                    println!("exclusive {:?}", start.elapsed());
 
                     idx += values_per_row_group;
                 }
                 // split between multiple out chunks. To test actual merge of intersected chunks. Example: slice 1..10, 3 outs. We'll take [1, 4, 7, 10], [2, 5, 8], [3, 6, 9]
                 _ => {
-                    let start = Instant::now();
                     // try to take values enough to split between all the out chunks
                     let to_take = values_per_row_group * out_count;
                     let end = std::cmp::min(idx + to_take, chunk.len());
@@ -1154,7 +1155,6 @@ pub mod test_util {
 
                         res[stream_id].push(Chunk::new(out));
                     }
-                    println!("unmerge {:?}", start.elapsed());
                     idx += to_take;
                 }
             }
