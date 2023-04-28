@@ -2360,11 +2360,8 @@ components:
           example: user
         searchTerm:
           type: string
-        segments:
-          description: array of segments
-          type: array
-          items:
-            $ref: '#/components/schemas/EventSegmentationSegment'
+        segment:
+          $ref: '#/components/schemas/EventSegmentationSegment'
         filters:
           $ref: '#/components/schemas/EventGroupedFilters'
     FunnelQuery:

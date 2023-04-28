@@ -6,7 +6,7 @@
             </template>
             <UiCard
                 class="pf-c-card pf-m-compact pf-u-h-100"
-                :title="$t('events.segments.label')"
+                :title="$t('events.segments.segment')"
             >
                 <Segments
                     :is-one="true"

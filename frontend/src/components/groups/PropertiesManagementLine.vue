@@ -10,6 +10,7 @@
                     class="pf-u-px-lg pf-u-py-md"
                     :required="true"
                     :name="'key'"
+                    @blur="onEdit"
                 />
             </div>
             <div class="properties-management-line__input pf-u-w-100">
@@ -18,12 +19,14 @@
                     class="pf-u-px-lg pf-u-py-md"
                     :required="true"
                     :name="'key'"
+                    @blur="onEdit"
                 />
             </div>
         </div>
         <div
             v-else
             class="properties-management-line__values pf-u-display-flex pf-u-w-100"
+            @click="onEdit"
         >
             <div
                 class="properties-management-line__item pf-u-align-items-center pf-u-display-flex pf-u-w-100 pf-u-px-lg"
@@ -140,10 +143,17 @@ onBeforeMount(() => {
 
 <style lang="scss">
 .properties-management-line {
+    &:hover {
+        cursor: pointer;
+        .properties-management-line__controls {
+            opacity: 1;
+        }
+    }
     &__table {
         margin-left: 80px;
     }
     &__controls {
+        opacity: 0;
         &_hide {
             pointer-events: none;
             opacity: 0;

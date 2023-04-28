@@ -13,8 +13,9 @@ import eventSegmentationsMocks from '@/mocks/eventSegmentations/eventSegmentatio
 import eventMocks from '@/mocks/eventSegmentations/events.json';
 import eventPropertiesMocks from '@/mocks/eventSegmentations/eventProperties.json';
 import customEventsMocks from '@/mocks/eventSegmentations/customEvents.json';
-import reportsMocks from '@/mocks/reports/reports.json'
-import dashboardsMocks from '@/mocks/dashboards'
+import reportsMocks from '@/mocks/reports/reports.json';
+import dashboardsMocks from '@/mocks/dashboards';
+import groupRecordsMocks from '@/mocks/groupRecords.json';
 
 const alphabet = '0123456789';
 const nanoid = customAlphabet(alphabet, 4);
@@ -32,7 +33,8 @@ export default function ({ environment = 'development' } = {}) {
                 userProperties: userPropertiesMocks,
                 reports: reportsMocks,
                 dashboards: dashboardsMocks,
-            })
+                groupRecords: groupRecordsMocks,
+            });
         },
 
         routes() {
@@ -173,6 +175,7 @@ export default function ({ environment = 'development' } = {}) {
                     meta: {}
                 }
             })
+
             this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports`, (schema, request) => {
                 const body = JSON.parse(request.requestBody);
 
@@ -181,13 +184,16 @@ export default function ({ environment = 'development' } = {}) {
                     ...body,
                 })
             }, { timing: 1100 })
+
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
                 return schema.db.reports.find(request.params.report_id);
             })
+
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
                 const body = JSON.parse(request.requestBody);
                 return schema.db.reports.update(request.params.report_id, body)
             }, { timing: 1200 })
+
             this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports/:report_id`, (schema, request) => {
                 schema.db.reports.remove(request.params.report_id)
                 return request.params.report_id;
@@ -208,7 +214,6 @@ export default function ({ environment = 'development' } = {}) {
             this.post(`${BASE_PATH}/organizations/:organization_id/projects/:project_id/queries/funnel`, (schema, request) => {
                 return funnelsMocks
             })
-
 
             /** AUTH */
             this.post(`${BASE_PATH}/v1/auth/login`, (_, request) => {
@@ -248,6 +253,7 @@ export default function ({ environment = 'development' } = {}) {
                     meta: {}
                 }
             })
+
             this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards`, (schema, request) => {
                 const body = JSON.parse(request.requestBody)
                 return schema.db.dashboards.insert({
@@ -255,56 +261,38 @@ export default function ({ environment = 'development' } = {}) {
                     ...body,
                 })
             }, { timing: 130 })
+
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards/:dashboard_id`, (schema, request) => {
                 const property = JSON.parse(request.requestBody)
                 return schema.db.dashboards.update(request.params.dashboard_id, property)
             }, { timing: 135 })
+
             this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/dashboards/:dashboard_id`, (schema, request) => {
                 schema.db.dashboards.remove(request.params.dashboard_id)
                 return request.params.dashboard_id;
             }, { timing: 110 })
 
-            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/group-records/search`, () => {
+            /**
+             * Group-records
+             *
+             * post
+             * put
+             */
+            this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/group-records/search`, (schema) => {
                 return {
-                    data: [
-                        {
-                            'id': 1,
-                            'group': 'users',
-                            'properties': {
-                                'createdAt': '2017-07-21T17:32:28Z',
-                                'Name': 'Sam',
-                                'Age': 26,
-                                lang: 'de',
-                            }
-                        },
-                        {
-                            'id': 2,
-                            'group': 'users',
-                            'properties': {
-                                'Name': 'Nick',
-                                'Age': 30
-                            }
-                        },
-                        {
-                            'id': 3,
-                            'group': 'users',
-                            'properties': {
-                                'Name': 'Sam2',
-                                'Age': 26
-                            }
-                        },
-                        {
-                            'id': 4,
-                            'group': 'users',
-                            'properties': {
-                                'Name': 'Nick2',
-                                'Age': 30,
-                                lang: 'en'
-                            }
-                        }
-                    ],
+                    data: schema.db.groupRecords,
                 };
-            });
+            }, { timing: 110 });
+
+            this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/group-records/:id`, (schema, request) => {
+                const body = JSON.parse(request.requestBody);
+                console.log(body, request.params.id, 'body');
+
+                return schema.db.groupRecords.update(request.params.id, body)
+            }, { timing: 220 });
+            /**
+             * end Group-records
+             */
         }
     });
 }

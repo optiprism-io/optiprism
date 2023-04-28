@@ -4,6 +4,10 @@ import { groupRecordsService } from '@/api/services/groupRecords.service';
 import { useCommonStore } from '@/stores/common';
 import { useSegmentsStore } from '@/stores/reports/segments';
 
+export type GroupMap = {
+    [key: number]: GroupRecord;
+};
+
 export type Group = {
     items: GroupRecord[],
     loading: boolean,
@@ -33,36 +37,43 @@ export const useGroupStore = defineStore('group', {
         propertyPopup: false,
     }),
     actions: {
-        async getList() {
-            this.loading = true;
+        async getList(noLoading?: boolean) {
+            if (!noLoading) {
+                this.loading = true;
+            }
             const commonStore = useCommonStore();
             const segmentsStore = useSegmentsStore();
             try {
                 const res = await groupRecordsService.getList(commonStore.organizationId, commonStore.projectId, {
                     time: this.timeRequest,
                     group: 'users', // TODO any group to use
-                    segments: segmentsStore.segmentationItems,
+                    segment: segmentsStore.segmentationItems[0],
                 });
-
                 if (res?.data?.data) {
                     this.items = res.data.data
                 }
             } catch (e) {
                 console.error('error update event property');
             }
-            this.loading = false;
-        },
-        async update(payload: {
-            id: number
-            properties: { [key: string]: Value; },
-        }) {
-            this.loading = true;
-            try {
-                const commonStore = useCommonStore();
-                groupRecordsService.updated(commonStore.organizationId, commonStore.projectId, payload.id, { properties: payload.properties })
-                this.getList();
-            } catch (e) {
+            if (!noLoading) {
                 this.loading = false;
+            }
+        },
+        async update(payload: { id: number, properties: { [key: string]: Value; }, noLoading?: boolean }) {
+            const commonStore = useCommonStore();
+            if (!payload.noLoading) {
+                this.loading = true;
+            }
+            try {
+                const res = await groupRecordsService.updated(commonStore.organizationId, commonStore.projectId, payload.id, { properties: payload.properties });
+                await this.getList(payload.noLoading || true);
+
+                console.log(res.data, 'res');
+
+            } catch (e) {
+                if (!payload.noLoading) {
+                    this.loading = false;
+                }
                 console.error('error update event property');
             }
         },

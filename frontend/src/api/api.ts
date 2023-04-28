@@ -2668,11 +2668,11 @@ export interface GroupRecordsListRequest {
      */
     'searchTerm'?: string;
     /**
-     * array of segments
-     * @type {Array<EventSegmentationSegment>}
+     * 
+     * @type {EventSegmentationSegment}
      * @memberof GroupRecordsListRequest
      */
-    'segments'?: Array<EventSegmentationSegment>;
+    'segment'?: EventSegmentationSegment;
     /**
      * 
      * @type {EventGroupedFilters}

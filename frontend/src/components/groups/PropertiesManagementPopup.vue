@@ -3,7 +3,7 @@
         :title="title"
         :apply-loading="props.loading"
         class="properties-panagement-popup"
-        :apply-button="$t('common.ok')"
+        :apply-button="$t('common.close')"
         @apply="apply"
         @cancel="close"
     >
@@ -53,14 +53,10 @@
 
 <script lang="ts" setup>
 import { computed, inject, ref } from 'vue';
-import { Action, Row } from '@/components/uikit/UiTable/UiTable';
 import PropertiesManagementLine, { ApplyPayload } from './PropertiesManagementLine.vue';
 import { Value } from '@/api';
 import { I18N } from '@/utils/i18n';
-
 import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue';
-import UiTable from '@/components/uikit/UiTable/UiTable.vue';
-import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue';
 import { useGroupStore } from '@/stores/group/group';
 import { GroupRecord } from '@/api';
 
@@ -98,19 +94,6 @@ const itemsProperties = computed(() => {
     }) : [];
 });
 
-const columnsProperties = computed(() => {
-    return [
-        {
-            value: 'key',
-            title: i18n.$t('users.columns.key'),
-        },
-        {
-            value: 'value',
-            title: i18n.$t('users.columns.value'),
-        },
-    ];
-});
-
 const itemsTabs = computed(() => {
     return mapTabs.map(key => {
         return {
@@ -140,6 +123,7 @@ const onApplyChangePropery = (payload: ApplyPayload) => {
         groupStore.update({
             id: props.item.id,
             properties,
+            noLoading: true,
         });
         createNewLine.value = false;
     }
