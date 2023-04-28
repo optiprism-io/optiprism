@@ -125,21 +125,14 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
         tc.primary_index_type,
         tc.gen_null_values_periodicity,
     );
-    trace!("original chunk");
-    trace!("{}", print::write(&[initial_chunk.clone()], &names));
+    /*trace!("original chunk");
+    trace!("{}", print::write(&[initial_chunk.clone()], &names));*/
     let out_streams_chunks = unmerge_chunk(
         initial_chunk.clone(),
         tc.gen_out_streams_count,
         tc.gen_row_group_size,
         tc.gen_exclusive_row_groups_periodicity,
     );
-
-    for (stream_id, chunks) in out_streams_chunks.iter().enumerate() {
-        for (chunk_id, chunk) in chunks.iter().enumerate() {
-            trace!("stream #{stream_id} out chunk #{chunk_id}");
-            trace!("{}", print::write(&[chunk.clone()], &names));
-        }
-    }
 
     let readers = out_streams_chunks
         .into_iter()
@@ -179,11 +172,6 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
 
     let chunks = chunks.map(|chunk| chunk.unwrap()).collect::<Vec<_>>();
     let final_chunk = concat_chunks(chunks);
-
-    trace!(
-        "final merged \n{}",
-        print::write(&[final_chunk.clone()], &names)
-    );
 
     // notice: if chunks look equal, but assert fails, probably data types are different
     debug_assert_eq!(initial_chunk, final_chunk);
@@ -235,7 +223,7 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
                 .into_iter()
                 .enumerate()
                 .for_each(|(stream_id, chunks)| {
-                    let mut w = File::create(stream_parquet_path(stream_id, case_id)).unwrap();
+                    let mut w = Cursor::new(vec![]);
                     create_parquet_from_chunks(
                         chunks,
                         fields.clone(),
@@ -458,9 +446,10 @@ fn test_merge() -> anyhow::Result<()> {
             out_arrow_page_size: 500,
         },
         TestCase {
-            idx_fields: vec![Field::new("idx1", DataType::Int64, false),
-                             Field::new("idx2", DataType::Int64, false),
-                             ],
+            idx_fields: vec![
+                Field::new("idx1", DataType::Int64, false),
+                Field::new("idx2", DataType::Int64, false),
+            ],
             data_fields: data_fields.clone(),
             gen_null_values_periodicity: None,
             gen_exclusive_row_groups_periodicity: Some(2),
@@ -518,18 +507,18 @@ fn test_profile_merge() {
         // Field::new("f25",DataType::FixedSizeBinary(10), true), // TODO: support fixed size binary
     ];
 
-    /*    let data_list_fields = data_fields
-            .iter()
-            .map(|field| {
-                let inner = Field::new("item", field.data_type.clone(), field.is_nullable);
-                Field::new(
-                    format!("list_{}", field.name),
-                    DataType::List(Box::new(inner)),
-                    true,
-                )
-            })
-            .collect::<Vec<_>>();
-        let data_fields = [data_fields, data_list_fields].concat();*/
+    //    let data_list_fields = data_fields
+    // .iter()
+    // .map(|field| {
+    // let inner = Field::new("item", field.data_type.clone(), field.is_nullable);
+    // Field::new(
+    // format!("list_{}", field.name),
+    // DataType::List(Box::new(inner)),
+    // true,
+    // )
+    // })
+    // .collect::<Vec<_>>();
+    // let data_fields = [data_fields, data_list_fields].concat();
 
     let cases = vec![
         TestCase {
@@ -560,10 +549,13 @@ fn test_profile_merge() {
         },
     ];
 
-    profile(cases[1].clone(), 1, ProfileStep::Merge);
-    /*for (idx, case) in cases.into_iter().enumerate() {
-        profile(case, idx, ProfileStep::Merge);
-    }*/
+    for (idx, case) in cases.iter().enumerate() {
+        profile(case.to_owned(), idx, ProfileStep::Generate);
+    }
+
+    for (idx, case) in cases.iter().enumerate() {
+        profile(case.to_owned(), idx, ProfileStep::Merge);
+    }
 }
 
 // #[traced_test]
@@ -583,7 +575,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
         .map(|f| f.name.to_string())
         .collect::<Vec<_>>();
 
-    let chunks = (0..streams)
+    let stream_chunks = (0..streams)
         .into_iter()
         .map(|stream_id| {
             let arrs = (0..cols)
@@ -600,7 +592,6 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
                             }
                         })
                         .collect::<Vec<_>>();
-
                     PrimitiveArray::<i64>::from_slice(vec.as_slice()).boxed()
                 })
                 .collect::<Vec<_>>();
@@ -609,7 +600,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    let readers = chunks
+    let readers = stream_chunks
         .into_iter()
         .enumerate()
         .map(|(stream_id, chunk)| {
@@ -656,7 +647,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
 
 // #[traced_test]
 #[test]
-fn test_missing_columns() -> anyhow::Result<()> {
+fn test_merge_with_missing_columns() -> anyhow::Result<()> {
     let cols = vec![
         vec![
             PrimitiveArray::<i64>::from_slice(&[1, 4, 7]).boxed(),
@@ -707,11 +698,6 @@ fn test_missing_columns() -> anyhow::Result<()> {
     merger.merge()?;
     let final_chunk = read_parquet_as_one_chunk(&mut out);
 
-    trace!(
-        "final merged\n{}",
-        print::write(&[final_chunk.clone()], &names)
-    );
-
     let exp = vec![
         PrimitiveArray::<i64>::from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9]).boxed(),
         PrimitiveArray::<i64>::from(vec![
@@ -745,5 +731,55 @@ fn test_missing_columns() -> anyhow::Result<()> {
     trace!("expected\n{}", print::write(&[exp.clone()], &names));
     debug_assert_eq!(exp, final_chunk);
 
+    Ok(())
+}
+
+#[traced_test]
+#[test]
+fn test_pick_with_null_columns() -> anyhow::Result<()> {
+    let cols = vec![
+        vec![
+            PrimitiveArray::<i64>::from_slice(&[1, 2, 3]).boxed(),
+            PrimitiveArray::<i64>::from_slice(&[1, 2, 3]).boxed(),
+        ],
+        vec![
+            PrimitiveArray::<i64>::from_slice(&[4, 5, 6]).boxed(),
+        ],
+    ];
+
+    let fields = vec![
+        vec![
+            Field::new("f1", DataType::Int64, false),
+            Field::new("f2", DataType::Int64, true),
+        ],
+        vec![
+            Field::new("f1", DataType::Int64, false),
+        ],
+    ];
+
+    let names = vec!["f1", "f2"];
+    let readers = cols
+        .into_iter()
+        .zip(fields.iter())
+        .map(|(cols, fields)| {
+            let chunk = Chunk::new(cols);
+            let mut w = Cursor::new(vec![]);
+            create_parquet_from_chunk(chunk, fields.to_owned(), &mut w, None, 100).unwrap();
+
+            w
+        })
+        .collect::<Vec<_>>();
+
+    let mut out = Cursor::new(vec![]);
+    let mut merger = Merger::try_new(readers, &mut out, 1, None, 100, 100)?;
+    merger.merge()?;
+    let final_chunk = read_parquet_as_one_chunk(&mut out);
+
+    let exp = Chunk::new(vec![
+        PrimitiveArray::<i64>::from_slice(&[1, 2, 3, 4, 5, 6]).boxed(),
+        PrimitiveArray::<i64>::from(vec![Some(1), Some(2), Some(3), None, None, None]).boxed(),
+    ]);
+
+    debug_assert_eq!(exp, final_chunk);
     Ok(())
 }
