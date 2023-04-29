@@ -4,21 +4,29 @@
             v-if="editMode"
             class="properties-management-line__inputs pf-u-display-flex pf-u-w-100"
         >
-            <div class="properties-management-line__input pf-u-w-100">
+            <div
+                class="properties-management-line__input pf-u-w-100"
+                @click="onClickInput"
+            >
                 <UiInput
                     v-model="editKey"
                     class="pf-u-px-lg pf-u-py-md"
                     :required="true"
-                    :name="'key'"
+                    :name="KEY"
+                    :mount-focus="editClickInputType === KEY"
                     @blur="onEdit"
                 />
             </div>
-            <div class="properties-management-line__input pf-u-w-100">
+            <div
+                class="properties-management-line__input pf-u-w-100"
+                @click="onClickInput"
+            >
                 <UiInput
                     v-model="editValue"
                     class="pf-u-px-lg pf-u-py-md"
                     :required="true"
-                    :name="'key'"
+                    :name="VALUE"
+                    :mount-focus="editClickInputType === VALUE"
                     @blur="onEdit"
                 />
             </div>
@@ -26,13 +34,13 @@
         <div
             v-else
             class="properties-management-line__values pf-u-display-flex pf-u-w-100"
-            @click="onEdit"
         >
             <div
                 class="properties-management-line__item pf-u-align-items-center pf-u-display-flex pf-u-w-100 pf-u-px-lg"
                 :class="{
                     'pf-u-font-weight-bold': props.boldText,
                 }"
+                @click="openEditInputs(KEY)"
             >
                 {{ props.valueKey }}
             </div>
@@ -41,6 +49,7 @@
                 :class="{
                     'pf-u-font-weight-bold': props.boldText,
                 }"
+                @click="openEditInputs(VALUE)"
             >
                 {{ props.value }}
             </div>
@@ -97,6 +106,9 @@ type Props = {
     startEdit?: boolean
 };
 
+const VALUE = 'value';
+const KEY = 'key';
+
 const props = withDefaults(defineProps<Props>(), {
     boldText: false,
     hideControls: false,
@@ -106,28 +118,47 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     (e: 'apply', payload: ApplyPayload): void
     (e: 'delete', index: number): void
+    (e: 'close-new-line'): void
 }>();
 
 const i18n = inject('i18n') as I18N;
 const editKey = ref('');
 const editValue = ref('');
 const editMode = ref(false);
+const error = ref('');
+const editClickInputType = ref('');
+const activeInput = ref(false);
 
 const editIcon = computed(() => editMode.value ? 'fas fa-plus-circle' : 'fas fa-pencil-alt');
 const editTooltip = computed(() => editMode.value ? i18n.$t('users.saveProperty') : i18n.$t('users.editProperty'));
 
+const openEditInputs = (typeInput: string) => {
+    editClickInputType.value = typeInput;
+    editMode.value = true;
+}
+
+const onClickInput = () => {
+    activeInput.value = true;
+}
+
 const onEdit = () => {
-    if (editMode.value) {
+    activeInput.value = false;
+    if (editKey.value && (editKey.value !== props.valueKey || editValue.value !== props.value)) {
         emit('apply', {
             valueKey: editKey.value,
             value: editValue.value,
-            index: props.index || 0,
+            index: props.index,
         });
     } else {
-        editKey.value = props.valueKey;
-        editValue.value = String(props.value);
+        if (!editValue.value && !props.index) {
+            emit('close-new-line');
+        }
     }
-    editMode.value = !editMode.value;
+    setTimeout(() => {
+        if (editKey.value && !activeInput.value) {
+            editMode.value = false;
+        }
+    }, 200);
 };
 
 const onDelete = () => {

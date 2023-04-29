@@ -41,6 +41,11 @@ For run with MOCKS
 VITE_MOCK_API=true yarn start:dev
 ```
 
+For Build
+```
+yarn build
+```
+
 For run with API
 ```
 docker run -it -p 8089:8080 optiprismio/demo:v0.1.9

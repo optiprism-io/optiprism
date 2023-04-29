@@ -37,8 +37,10 @@
                 :value="''"
                 :value-key="''"
                 :start-edit="true"
+                :index="-1"
                 @apply="onApplyChangePropery"
                 @delete="onDeleteNewLine"
+                @close-new-line="onDeleteNewLine"
             />
             <UiButton
                 v-else
@@ -83,15 +85,17 @@ const activeTab = ref('userProperties');
 const createNewLine = ref(false);
 
 const title = computed(() => `${i18n.$t('users.user')}: ${props.item?.id}`);
+const activeItem = computed(() => groupStore.items.find(item => item.id === props.item?.id));
+const activeItemProperties = computed(() => activeItem.value?.properties || {});
 
 const itemsProperties = computed(() => {
-    return props?.item?.properties ? Object.keys(props.item.properties).map((key, i) => {
+    return Object.keys(activeItemProperties.value).map((key, i) => {
         return {
             key,
-            value: props.item?.properties[key] || '' as Value,
+            value: activeItemProperties.value[key] || '' as Value,
             index: i,
         };
-    }) : [];
+    });
 });
 
 const itemsTabs = computed(() => {
@@ -104,12 +108,14 @@ const itemsTabs = computed(() => {
     })
 });
 
-const onApplyChangePropery = (payload: ApplyPayload) => {
+const onApplyChangePropery = async (payload: ApplyPayload) => {
     if (props.item?.id) {
         let properties: Properties = {};
-        if (payload.index === 0) {
+        const activeItemPropertiesLength = Object.keys(activeItemProperties.value).length;
+
+        if (payload.index === -1) {
             properties = {
-                ...props.item.properties,
+                ...activeItemProperties.value,
                 [payload.valueKey]: payload.value,
             };
         } else {
@@ -120,12 +126,16 @@ const onApplyChangePropery = (payload: ApplyPayload) => {
                 properties[item.key] = item.value;
             });
         }
-        groupStore.update({
+        const propertiesLength = Object.keys(properties).length;
+
+        await groupStore.update({
             id: props.item.id,
             properties,
             noLoading: true,
         });
-        createNewLine.value = false;
+        if (propertiesLength > activeItemPropertiesLength || (!payload.valueKey && !payload.value)) {
+            createNewLine.value = false;
+        }
     }
 };
 
@@ -147,6 +157,7 @@ const onDeleteLine = (index: number) => {
                 }
                 return acc;
             }, {}),
+            noLoading: true,
         });
     }
 };
