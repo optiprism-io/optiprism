@@ -285,10 +285,7 @@ export default function ({ environment = 'development' } = {}) {
             }, { timing: 110 });
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/group-records/:id`, (schema, request) => {
-                const body = JSON.parse(request.requestBody);
-                console.log(body, request.params.id, 'body');
-
-                return schema.db.groupRecords.update(request.params.id, body)
+                return schema.db.groupRecords.update(request.params.id, JSON.parse(request.requestBody));
             }, { timing: 220 });
             /**
              * end Group-records

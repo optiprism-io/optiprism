@@ -1,7 +1,12 @@
 <template>
-    <div class="properties-management-line pf-u-display-flex pf-u-w-100">
+    <div
+        class="properties-management-line pf-u-display-flex pf-u-w-100"
+        :class="{
+            'properties-management-line_no-edit': props.noEdit,
+        }"
+    >
         <div
-            v-if="editMode"
+            v-if="editMode && !props.noEdit"
             class="properties-management-line__inputs pf-u-display-flex pf-u-w-100"
         >
             <div
@@ -55,6 +60,7 @@
             </div>
         </div>
         <div
+            v-show="!props.hideControls"
             class="properties-management-line__controls pf-u-display-flex"
             :class="{
                 'properties-management-line__controls_hide': props.hideControls,
@@ -104,6 +110,7 @@ type Props = {
     hideControls?: boolean
     boldText?: boolean
     startEdit?: boolean
+    noEdit?: boolean
 };
 
 const VALUE = 'value';
@@ -113,7 +120,7 @@ const props = withDefaults(defineProps<Props>(), {
     boldText: false,
     hideControls: false,
     startEdit: false,
-    index: 0,
+    index: -1,
 });
 const emit = defineEmits<{
     (e: 'apply', payload: ApplyPayload): void
@@ -131,6 +138,9 @@ const activeInput = ref(false);
 
 const editIcon = computed(() => editMode.value ? 'fas fa-plus-circle' : 'fas fa-pencil-alt');
 const editTooltip = computed(() => editMode.value ? i18n.$t('users.saveProperty') : i18n.$t('users.editProperty'));
+const isNewLine = computed(() => props.index === -1);
+const isHasEditKey = computed(() => Boolean(editKey.value.trim()));
+const isHasEditValue = computed(() => Boolean(editValue.value.trim()));
 
 const openEditInputs = (typeInput: string) => {
     editClickInputType.value = typeInput;
@@ -143,22 +153,24 @@ const onClickInput = () => {
 
 const onEdit = () => {
     activeInput.value = false;
-    if (editKey.value && (editKey.value !== props.valueKey || editValue.value !== props.value)) {
-        emit('apply', {
-            valueKey: editKey.value,
-            value: editValue.value,
-            index: props.index,
-        });
-    } else {
-        if (!editValue.value && !props.index) {
-            emit('close-new-line');
-        }
-    }
     setTimeout(() => {
-        if (editKey.value && !activeInput.value) {
-            editMode.value = false;
+        if (!(activeInput.value && isNewLine.value && (isHasEditKey.value || isHasEditValue.value))) {
+            if (editKey.value && (editKey.value !== props.valueKey || editValue.value !== props.value)) {
+                emit('apply', {
+                    valueKey: editKey.value,
+                    value: editValue.value,
+                    index: props.index,
+                });
+            } else {
+                if (!editValue.value && !isNewLine.value) {
+                    emit('close-new-line');
+                }
+            }
+            if (editKey.value && !activeInput.value) {
+                editMode.value = false;
+            }
         }
-    }, 200);
+    }, 300);
 };
 
 const onDelete = () => {
@@ -180,12 +192,20 @@ onBeforeMount(() => {
             opacity: 1;
         }
     }
+    &_no-edit {
+        cursor: initial;
+        pointer-events: none;
+        .properties-management-line__controls {
+            opacity: 0;
+        }
+    }
     &__table {
         margin-left: 80px;
     }
     &__controls {
         opacity: 0;
         &_hide {
+            cursor: initial;
             pointer-events: none;
             opacity: 0;
         }

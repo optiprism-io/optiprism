@@ -8,6 +8,12 @@
         @cancel="close"
     >
         <div class="properties-panagement-popup__content">
+            <div
+                v-show="isLodingSavePropetries"
+                class="properties-panagement-popup__loading"
+            >
+                <UiSpinner :size="'xl'" />
+            </div>
             <UiTabs
                 class="pf-u-mb-md"
                 :items="itemsTabs"
@@ -16,6 +22,7 @@
                 class="properties-panagement-popup__line"
                 :hide-controls="true"
                 :bold-text="true"
+                :no-edit="true"
                 :value="$t('users.columns.value')"
                 :value-key="$t('users.columns.key')"
             />
@@ -55,12 +62,11 @@
 
 <script lang="ts" setup>
 import { computed, inject, ref } from 'vue';
-import PropertiesManagementLine, { ApplyPayload } from './PropertiesManagementLine.vue';
-import { Value } from '@/api';
 import { I18N } from '@/utils/i18n';
-import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue';
+import { Value, GroupRecord } from '@/api';
 import { useGroupStore } from '@/stores/group/group';
-import { GroupRecord } from '@/api';
+import UiPopupWindow from '@/components/uikit/UiPopupWindow.vue';
+import PropertiesManagementLine, { ApplyPayload } from './PropertiesManagementLine.vue';
 
 export type Properties = {
     [key: string]: Value,
@@ -83,6 +89,7 @@ const emit = defineEmits<{
 
 const activeTab = ref('userProperties');
 const createNewLine = ref(false);
+const isLodingSavePropetries = ref(false);
 
 const title = computed(() => `${i18n.$t('users.user')}: ${props.item?.id}`);
 const activeItem = computed(() => groupStore.items.find(item => item.id === props.item?.id));
@@ -110,6 +117,7 @@ const itemsTabs = computed(() => {
 
 const onApplyChangePropery = async (payload: ApplyPayload) => {
     if (props.item?.id) {
+        isLodingSavePropetries.value = true;
         let properties: Properties = {};
         const activeItemPropertiesLength = Object.keys(activeItemProperties.value).length;
 
@@ -136,6 +144,7 @@ const onApplyChangePropery = async (payload: ApplyPayload) => {
         if (propertiesLength > activeItemPropertiesLength || (!payload.valueKey && !payload.value)) {
             createNewLine.value = false;
         }
+        isLodingSavePropetries.value = false;
     }
 };
 
@@ -147,9 +156,10 @@ const onDeleteNewLine = () => {
     createNewLine.value = false;
 };
 
-const onDeleteLine = (index: number) => {
+const onDeleteLine = async (index: number) => {
     if (props.item?.id) {
-        groupStore.update({
+        isLodingSavePropetries.value = true;
+        await groupStore.update({
             id: props.item.id,
             properties: itemsProperties.value.reduce((acc: Properties, item, i) => {
                 if (i !== index) {
@@ -159,6 +169,7 @@ const onDeleteLine = (index: number) => {
             }, {}),
             noLoading: true,
         });
+        isLodingSavePropetries.value = false;
     }
 };
 
@@ -176,6 +187,21 @@ const apply = () => {
 .properties-panagement-popup {
     .pf-c-table {
         margin-right: 80px;
+    }
+    &__content {
+        position: relative;
+    }
+    &__loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(#fff, .6);
+        z-index: 2;
     }
     &__line {
         border-bottom: 1px solid var(--pf-global--BorderColor--dark-100);

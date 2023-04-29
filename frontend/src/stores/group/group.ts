@@ -65,11 +65,8 @@ export const useGroupStore = defineStore('group', {
                 this.loading = true;
             }
             try {
-                const res = await groupRecordsService.updated(commonStore.organizationId, commonStore.projectId, payload.id, { properties: payload.properties });
+                await groupRecordsService.updated(commonStore.organizationId, commonStore.projectId, payload.id, { properties: payload.properties });
                 await this.getList(payload.noLoading || true);
-
-                console.log(res.data, 'res');
-
             } catch (e) {
                 if (!payload.noLoading) {
                     this.loading = false;
