@@ -44,7 +44,6 @@ use datafusion::physical_plan::Accumulator;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use datafusion_expr::AggregateFunction;
-use datafusion_expr::AggregateState;
 
 use crate::error::QueryError;
 use crate::error::Result;
@@ -55,7 +54,7 @@ use crate::physical_plan::expressions::partitioned_sum::PartitionedSumAccumulato
 pub trait PartitionedAccumulator: Debug + Send + Sync {
     fn update_batch(&mut self, spans: &[bool], values: &[ArrayRef]) -> Result<()>;
     fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()>;
-    fn state(&self) -> Result<Vec<AggregateState>>;
+    fn state(&self) -> Result<Vec<ScalarValue>>;
     fn evaluate(&self) -> Result<ScalarValue>;
 }
 
@@ -141,7 +140,7 @@ impl Buffer {
         self.buffer.is_empty()
     }
 
-    pub fn state(&self) -> DFResult<Vec<AggregateState>> {
+    pub fn state(&self) -> DFResult<Vec<ScalarValue>> {
         self.acc.lock().unwrap().state()
     }
 
@@ -379,7 +378,7 @@ macro_rules! make_spans {
     }};
 }
 impl Accumulator for PartitionedAggregateAccumulator {
-    fn state(&self) -> DFResult<Vec<AggregateState>> {
+    fn state(&self) -> DFResult<Vec<ScalarValue>> {
         self.acc
             .state()
             .map_err(QueryError::into_datafusion_execution_error)

@@ -2,10 +2,12 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::hash::Hasher;
 use std::sync::Arc;
+use std::hash::Hash;
 
 use arrow::datatypes::DataType;
-use datafusion_common::Column;
+use datafusion_common::{Column, TableReference};
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
@@ -16,6 +18,7 @@ use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 
 use crate::Result;
 
+#[derive(Hash)]
 pub struct DictionaryDecodeNode {
     pub input: LogicalPlan,
     pub decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>,
@@ -37,7 +40,7 @@ impl DictionaryDecodeNode {
                     .find(|(col, _)| *field.name() == col.name)
                 {
                     Some(_) => DFField::new(
-                        field.qualifier().map(|q| q.as_str()),
+                        field.qualifier(),
                         field.name().as_str(),
                         DataType::Utf8,
                         field.is_nullable(),
@@ -68,6 +71,10 @@ impl UserDefinedLogicalNode for DictionaryDecodeNode {
         self
     }
 
+    fn name(&self) -> &str {
+        "DictionaryDecode"
+    }
+
     fn inputs(&self) -> Vec<&LogicalPlan> {
         vec![&self.input]
     }
@@ -92,5 +99,18 @@ impl UserDefinedLogicalNode for DictionaryDecodeNode {
         Arc::new(
             DictionaryDecodeNode::try_new(inputs[0].clone(), self.decode_cols.clone()).unwrap(),
         )
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        let mut s = state;
+        self.hash(&mut s);
+    }
+
+    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            Some(o) => self == o,
+
+            None => false,
+        }
     }
 }

@@ -331,9 +331,9 @@ impl PivotStream {
 
 #[async_trait]
 impl Stream for PivotStream {
-    type Item = ArrowResult<RecordBatch>;
+    type Item = DFResult<RecordBatch>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.finished {
             return Poll::Ready(None);
         }

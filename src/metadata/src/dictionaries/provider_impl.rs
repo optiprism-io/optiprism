@@ -135,6 +135,7 @@ impl Provider for ProviderImpl {
     }
 }
 
+#[derive(Hash)]
 pub struct SingleDictionaryProvider {
     organization_id: u64,
     project_id: u64,

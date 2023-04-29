@@ -2,6 +2,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
@@ -74,6 +75,10 @@ impl UserDefinedLogicalNode for UnpivotNode {
         self
     }
 
+    fn name(&self) -> &str {
+        "Unpivot"
+    }
+
     fn inputs(&self) -> Vec<&LogicalPlan> {
         vec![&self.input]
     }
@@ -101,5 +106,18 @@ impl UserDefinedLogicalNode for UnpivotNode {
             .map_err(QueryError::into_datafusion_plan_error)
             .unwrap(),
         )
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        let mut s = state;
+        self.hash(&mut s);
+    }
+
+    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            Some(o) => self == o,
+
+            None => false,
+        }
     }
 }

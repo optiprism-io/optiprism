@@ -76,10 +76,6 @@ impl ExecutionPlan for MergeExec {
         None
     }
 
-    fn relies_on_input_order(&self) -> bool {
-        false
-    }
-
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
         self.inputs.clone()
     }
@@ -184,9 +180,9 @@ impl RecordBatchStream for MergeStream {
 
 #[async_trait]
 impl Stream for MergeStream {
-    type Item = ArrowResult<RecordBatch>;
+    type Item = DFResult<RecordBatch>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let poll = self.poll_next_inner(cx);
         self.baseline_metrics.record_poll(poll)
     }

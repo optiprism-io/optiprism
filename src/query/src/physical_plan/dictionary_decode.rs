@@ -213,9 +213,9 @@ impl RecordBatchStream for DictionaryDecodeStream {
 
 #[async_trait]
 impl Stream for DictionaryDecodeStream {
-    type Item = ArrowResult<RecordBatch>;
+    type Item = DFResult<RecordBatch>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let poll = self.poll_next_inner(cx);
 
         self.baseline_metrics.record_poll(poll)
