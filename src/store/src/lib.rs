@@ -20,6 +20,7 @@ pub mod test_util {
     use std::io::Seek;
     use std::io::Write;
     use std::path::Path;
+    use std::time::Instant;
 
     use anyhow::anyhow;
     use arrow::ipc::FixedSizeBinary;
@@ -626,7 +627,7 @@ pub mod test_util {
             }
             _ => unimplemented!("{:?}", pt),
         }
-        .boxed()
+            .boxed()
     }
 
     pub fn gen_utf8_data_list_array<O: Offset, O2: Offset>(
@@ -1117,7 +1118,11 @@ pub mod test_util {
                     let out = chunk
                         .arrays()
                         .iter()
-                        .map(|arr| arr.sliced(idx, end - idx))
+                        .map(|arr| {
+                            let take_idx = PrimitiveArray::from_vec((idx..end).into_iter().map(|v| v as i64).collect());
+                            take(arr.as_ref(), &take_idx).unwrap()
+                            // arr.sliced(idx, end - idx) // TODO slice is not working, producing enormous pages amount while writing to parquet
+                        })
                         .collect::<Vec<_>>();
                     // round robin stream assignment
                     let stream_id = cur_row_group % out_count;
@@ -1150,7 +1155,6 @@ pub mod test_util {
 
                         res[stream_id].push(Chunk::new(out));
                     }
-
                     idx += to_take;
                 }
             }
@@ -1293,7 +1297,7 @@ pub mod test_util {
 
         let options = WriteOptions {
             write_statistics: true,
-            compression: CompressionOptions::Snappy,
+            compression: CompressionOptions::Uncompressed,
             version: Version::V2,
             data_pagesize_limit,
         };

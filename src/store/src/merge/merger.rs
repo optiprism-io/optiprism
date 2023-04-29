@@ -12,6 +12,7 @@ use std::ops::Range;
 use std::ops::RangeBounds;
 use std::ops::SubAssign;
 use std::rc::Rc;
+use tracing::trace;
 
 use arrow2::array::new_null_array;
 use arrow2::array::Array;
@@ -479,9 +480,9 @@ macro_rules! merge_list_primitive_arrays {
 }
 
 pub struct Merger<R, W>
-where
-    R: Read,
-    W: Write,
+    where
+        R: Read,
+        W: Write,
 {
     index_cols: Vec<ColumnDescriptor>,
     parquet_schema: SchemaDescriptor,
@@ -507,9 +508,9 @@ pub enum MergeReorder {
 }
 
 impl<R, W> Merger<R, W>
-where
-    R: Read + Seek,
-    W: Write,
+    where
+        R: Read + Seek,
+        W: Write,
 {
     pub fn try_new(
         mut readers: Vec<R>,
