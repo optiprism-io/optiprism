@@ -201,7 +201,7 @@ impl PivotStream {
     fn poll_next_inner(
         self: &mut Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Option<ArrowResult<RecordBatch>>> {
+    ) -> Poll<Option<DFResult<RecordBatch>>> {
         let elapsed_compute = self.baseline_metrics.elapsed_compute().clone();
         let _timer = elapsed_compute.timer();
 
@@ -216,7 +216,7 @@ impl PivotStream {
                         return Poll::Ready(None);
                     }
 
-                    return Poll::Ready(Some(self.finish()));
+                    return Poll::Ready(Some(Ok(self.finish()?)));
                 }
                 other => return other,
             }
@@ -236,7 +236,6 @@ impl PivotStream {
         let mut batch_hashes = vec![0; batch.num_rows()];
 
         let c = arrow::compute::cast(batch.column(self.name_col.index()), &DataType::Utf8)?;
-
         let name_arr = c
             .as_any()
             .downcast_ref::<StringArray>()
@@ -333,7 +332,7 @@ impl PivotStream {
 impl Stream for PivotStream {
     type Item = DFResult<RecordBatch>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.finished {
             return Poll::Ready(None);
         }

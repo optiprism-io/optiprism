@@ -5,14 +5,15 @@ use crate::error::Result;
 
 pub fn make_password_hash(password: &str) -> Result<String> {
     let salt = password_hash::SaltString::generate(rand::thread_rng());
-    let hash = password_hash::PasswordHash::generate(
-        argon2::Argon2::new(
-            argon2::Algorithm::Argon2d,
-            argon2::Version::V0x10,
-            argon2::Params::default(),
-        ),
+    let phf = Argon2::new(
+        argon2::Algorithm::Argon2d,
+        argon2::Version::V0x10,
+        argon2::Params::default(),
+    );
+    let hash = PasswordHash::generate(
+        phf,
         password,
-        salt.as_str(),
+        &salt,
     )?;
 
     Ok(hash.to_string())

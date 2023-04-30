@@ -18,6 +18,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::error::QueryError;
 use crate::Result;
 
+#[derive(Hash, Eq, PartialEq)]
 pub struct UnpivotNode {
     input: LogicalPlan,
     schema: DFSchemaRef,
@@ -46,9 +47,9 @@ impl UnpivotNode {
                 })
                 .collect();
 
-            let name_field = DFField::new(None, name_col.as_str(), DataType::Utf8, false);
+            let name_field = DFField::new_unqualified( name_col.as_str(), DataType::Utf8, false);
             fields.push(name_field);
-            let value_field = DFField::new(None, value_col.as_str(), value_type, false);
+            let value_field = DFField::new_unqualified( value_col.as_str(), value_type, false);
             fields.push(value_field);
 
             Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?)
@@ -109,6 +110,7 @@ impl UserDefinedLogicalNode for UnpivotNode {
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {
+        use std::hash::Hash;
         let mut s = state;
         self.hash(&mut s);
     }

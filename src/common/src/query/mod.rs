@@ -458,7 +458,9 @@ pub fn time_columns(
     };
 
     rule.with_end(to + granularity.relative_duration(1))
-        .map(|dt| dt.naive_utc().to_string())
+        .map(|dt| {
+            dt.naive_utc().format("%Y-%m-%dT%H:%M:%S").to_string()
+        })
         .collect()
 }
 

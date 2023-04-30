@@ -167,9 +167,9 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
 
 impl Accumulator for SortedDistinctCountAccumulator {
     fn state(&self) -> Result<Vec<ScalarValue>> {
-        Ok(vec![AggregateState::Scalar(ScalarValue::UInt64(Some(
+        Ok(vec![ScalarValue::UInt64(Some(
             self.count,
-        )))])
+        ))])
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {

@@ -16,6 +16,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::error::QueryError;
 use crate::Result;
 
+#[derive(Hash, Eq, PartialEq)]
 pub struct PivotNode {
     pub input: LogicalPlan,
     pub schema: DFSchemaRef,
@@ -39,7 +40,7 @@ impl PivotNode {
                 .filter_map(|f| {
                     match f.name().clone() == name_col.name || f.name().clone() == value_col.name {
                         true => None,
-                        false => Some(DFField::new(None, f.name(), f.data_type().clone(), true)),
+                        false => Some(f.to_owned()),
                     }
                 })
                 .collect();
@@ -52,7 +53,7 @@ impl PivotNode {
 
             let result_fields: Vec<DFField> = result_cols
                 .iter()
-                .map(|col| DFField::new(None, col, value_type.clone(), true))
+                .map(|col| DFField::new_unqualified( col, value_type.clone(), true))
                 .collect();
 
             fields.extend_from_slice(&result_fields);
@@ -115,6 +116,7 @@ impl UserDefinedLogicalNode for PivotNode {
     }
 
     fn dyn_hash(&self, state: &mut dyn Hasher) {
+        use std::hash::Hash;
         let mut s = state;
         self.hash(&mut s);
     }

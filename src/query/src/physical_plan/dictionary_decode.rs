@@ -175,7 +175,7 @@ impl DictionaryDecodeStream {
     fn poll_next_inner(
         self: &mut Pin<&mut Self>,
         cx: &mut Context<'_>,
-    ) -> Poll<Option<ArrowResult<RecordBatch>>> {
+    ) -> Poll<Option<DFResult<RecordBatch>>> {
         let cloned_time = self.baseline_metrics.elapsed_compute().clone();
         let _timer = cloned_time.timer();
 
@@ -198,7 +198,7 @@ impl DictionaryDecodeStream {
                         }
                     })
                     .collect();
-                Poll::Ready(Some(RecordBatch::try_new(self.schema.clone(), columns)))
+                Poll::Ready(Some(Ok(RecordBatch::try_new(self.schema.clone(), columns)?)))
             }
             other => other,
         }
@@ -215,7 +215,7 @@ impl RecordBatchStream for DictionaryDecodeStream {
 impl Stream for DictionaryDecodeStream {
     type Item = DFResult<RecordBatch>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let poll = self.poll_next_inner(cx);
 
         self.baseline_metrics.record_poll(poll)

@@ -213,13 +213,13 @@ impl RecordBatchStream for UnpivotStream {
 impl Stream for UnpivotStream {
     type Item = DFResult<RecordBatch>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let elapsed_compute = self.baseline_metrics.elapsed_compute().clone();
         let _timer = elapsed_compute.timer();
 
         let poll = match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => {
-                Poll::Ready(Some(unpivot(&batch, self.schema.clone(), &self.cols)))
+                Poll::Ready(Some(Ok(unpivot(&batch, self.schema.clone(), &self.cols)?)))
             }
             other => other,
         };

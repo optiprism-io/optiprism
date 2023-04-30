@@ -18,7 +18,6 @@ use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 
 use crate::Result;
 
-#[derive(Hash)]
 pub struct DictionaryDecodeNode {
     pub input: LogicalPlan,
     pub decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>,
@@ -40,7 +39,7 @@ impl DictionaryDecodeNode {
                     .find(|(col, _)| *field.name() == col.name)
                 {
                     Some(_) => DFField::new(
-                        field.qualifier(),
+                        field.qualifier().cloned(),
                         field.name().as_str(),
                         DataType::Utf8,
                         field.is_nullable(),
@@ -48,7 +47,7 @@ impl DictionaryDecodeNode {
                     None => field.to_owned(),
                 }
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         let schema = Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?);
 
@@ -59,6 +58,22 @@ impl DictionaryDecodeNode {
         })
     }
 }
+
+impl Hash for DictionaryDecodeNode {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.input.hash(state);
+        self.decode_cols.hash(state);
+        self.schema.hash(state);
+    }
+}
+
+impl PartialEq for DictionaryDecodeNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.dyn_eq(other)
+    }
+}
+
+impl Eq for DictionaryDecodeNode {}
 
 impl Debug for DictionaryDecodeNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
