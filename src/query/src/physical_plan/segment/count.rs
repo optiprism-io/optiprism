@@ -79,7 +79,6 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::record_batch::RecordBatch;
     use datafusion::error::Result;
-    use datafusion::logical_plan::Operator;
     use datafusion::physical_plan::expressions::{BinaryExpr, Column, Literal};
     use datafusion_common::ScalarValue;
     use std::sync::Arc;

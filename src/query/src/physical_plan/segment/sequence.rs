@@ -480,7 +480,6 @@ mod tests {
     use arrow::record_batch::RecordBatch;
     use chrono::Duration;
     use datafusion::error::Result;
-    use datafusion::logical_plan::Operator;
     use datafusion::physical_plan::expressions::{BinaryExpr, Column, Literal};
     use datafusion::physical_plan::PhysicalExpr;
     use datafusion_common::ScalarValue;
