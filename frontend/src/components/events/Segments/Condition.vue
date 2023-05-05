@@ -143,6 +143,7 @@
                 </VTooltip>
             </div>
             <div
+                v-if="!props.isOne"
                 class="pf-c-action-list__item condition__control"
                 @click="onRemove"
             >
@@ -212,6 +213,7 @@ interface Props {
     condition: ConditionType
     updateOpen?: boolean
     autoHideEvent?: boolean
+    isOne?: boolean
 }
 
 const lexiconStore = useLexiconStore()

@@ -153,24 +153,28 @@ const onClickInput = () => {
 
 const onEdit = () => {
     activeInput.value = false;
-    setTimeout(() => {
-        if (!(activeInput.value && isNewLine.value && (isHasEditKey.value || isHasEditValue.value))) {
-            if (editKey.value && (editKey.value !== props.valueKey || editValue.value !== props.value)) {
-                emit('apply', {
-                    valueKey: editKey.value,
-                    value: editValue.value,
-                    index: props.index,
-                });
-            } else {
-                if (!editValue.value && !isNewLine.value) {
-                    emit('close-new-line');
+    if (editMode.value) {
+        setTimeout(() => {
+            if (!(activeInput.value && isNewLine.value && (isHasEditKey.value || isHasEditValue.value))) {
+                if (editKey.value && (editKey.value !== props.valueKey || editValue.value !== props.value)) {
+                    emit('apply', {
+                        valueKey: editKey.value,
+                        value: editValue.value,
+                        index: props.index,
+                    });
+                } else {
+                    if (!editValue.value && !isNewLine.value) {
+                        emit('close-new-line');
+                    }
+                }
+                if (editKey.value && !activeInput.value) {
+                    editMode.value = false;
                 }
             }
-            if (editKey.value && !activeInput.value) {
-                editMode.value = false;
-            }
-        }
-    }, 300);
+        }, 300);
+    } else {
+        openEditInputs(KEY);
+    }
 };
 
 const onDelete = () => {

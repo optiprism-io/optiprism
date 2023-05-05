@@ -7,6 +7,7 @@
             :name="item.name"
             :conditions="item.conditions || []"
             :auto-hide-event="!commonStore.showCreateCustomEvent"
+            :is-one="props.isOne"
             @on-remove="deleteSegment"
             @on-rename="onRenameSegment"
             @add-condition="addCondition"
@@ -28,7 +29,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, inject, provide, watch } from 'vue'
+import { computed, inject, provide } from 'vue'
 import { OperationId, Value } from '@/types'
 import {
     ChangeEventCondition,
@@ -68,7 +69,7 @@ const props = defineProps<{
 }>();
 
 const isShowAddSegment =  computed(() => {
-    return !(props?.isOne && segmentsStore.segments.length);
+    return !props?.isOne;
 });
 
 const conditionAggregateItems = computed(() => {

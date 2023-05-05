@@ -3,7 +3,9 @@
         :title="title"
         :apply-loading="props.loading"
         class="properties-panagement-popup"
-        :apply-button="$t('common.close')"
+        :apply-button="$t('common.save')"
+        :cancel-button="$t('common.close')"
+        :apply-disabled="applyDisabled"
         @apply="apply"
         @cancel="close"
     >
@@ -61,7 +63,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, inject, ref } from 'vue';
+import { computed, inject, ref, onMounted, onUnmounted } from 'vue';
 import { I18N } from '@/utils/i18n';
 import { Value, GroupRecord } from '@/api';
 import { useGroupStore } from '@/stores/group/group';
@@ -90,16 +92,16 @@ const emit = defineEmits<{
 const activeTab = ref('userProperties');
 const createNewLine = ref(false);
 const isLodingSavePropetries = ref(false);
+const propertiesEdit = ref<Properties>({});
 
 const title = computed(() => `${i18n.$t('users.user')}: ${props.item?.id}`);
-const activeItem = computed(() => groupStore.items.find(item => item.id === props.item?.id));
-const activeItemProperties = computed(() => activeItem.value?.properties || {});
+const applyDisabled = computed(() => JSON.stringify(propertiesEdit.value) === JSON.stringify(props.item?.properties));
 
 const itemsProperties = computed(() => {
-    return Object.keys(activeItemProperties.value).map((key, i) => {
+    return Object.keys(propertiesEdit.value).map((key, i) => {
         return {
             key,
-            value: activeItemProperties.value[key] || '' as Value,
+            value: propertiesEdit.value[key] || '' as Value,
             index: i,
         };
     });
@@ -117,13 +119,12 @@ const itemsTabs = computed(() => {
 
 const onApplyChangePropery = async (payload: ApplyPayload) => {
     if (props.item?.id) {
-        isLodingSavePropetries.value = true;
         let properties: Properties = {};
-        const activeItemPropertiesLength = Object.keys(activeItemProperties.value).length;
+        const activeItemPropertiesLength = Object.keys(propertiesEdit.value).length;
 
         if (payload.index === -1) {
             properties = {
-                ...activeItemProperties.value,
+                ...propertiesEdit.value,
                 [payload.valueKey]: payload.value,
             };
         } else {
@@ -135,18 +136,20 @@ const onApplyChangePropery = async (payload: ApplyPayload) => {
             });
         }
         const propertiesLength = Object.keys(properties).length;
-
-        await groupStore.update({
-            id: props.item.id,
-            properties,
-            noLoading: true,
-        });
+        propertiesEdit.value = properties;
         if (propertiesLength > activeItemPropertiesLength || (!payload.valueKey && !payload.value)) {
             createNewLine.value = false;
         }
-        isLodingSavePropetries.value = false;
     }
 };
+
+onMounted(() => {
+    propertiesEdit.value = props.item?.properties || {};
+});
+
+onUnmounted(() => {
+    isLodingSavePropetries.value = false;
+});
 
 const onAddProperty = () => {
     createNewLine.value = true;
@@ -158,18 +161,12 @@ const onDeleteNewLine = () => {
 
 const onDeleteLine = async (index: number) => {
     if (props.item?.id) {
-        isLodingSavePropetries.value = true;
-        await groupStore.update({
-            id: props.item.id,
-            properties: itemsProperties.value.reduce((acc: Properties, item, i) => {
-                if (i !== index) {
-                    acc[item.key] = item.value;
-                }
-                return acc;
-            }, {}),
-            noLoading: true,
-        });
-        isLodingSavePropetries.value = false;
+        propertiesEdit.value = itemsProperties.value.reduce((acc: Properties, item, i) => {
+            if (i !== index) {
+                acc[item.key] = item.value;
+            }
+            return acc;
+        }, {});
     }
 };
 
@@ -177,7 +174,15 @@ const close = () => {
     apply();
 };
 
-const apply = () => {
+const apply = async () => {
+    isLodingSavePropetries.value = true;
+    if (props.item?.id) {
+        await groupStore.update({
+            id: props.item.id,
+            properties: propertiesEdit.value,
+            noLoading: true,
+        });
+    }
     emit('apply');
     groupStore.propertyPopup = false;
 };

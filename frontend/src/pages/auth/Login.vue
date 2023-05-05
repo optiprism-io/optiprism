@@ -109,7 +109,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth/auth'
 import { pagesMap } from '@/router'
@@ -118,7 +118,6 @@ import UiInput from '@/components/uikit/UiInput.vue'
 import UiCheckbox from '@/components/uikit/UiCheckbox.vue'
 import UiForm from '@/components/uikit/UiForm.vue'
 import UiFormGroup from '@/components/uikit/UiFormGroup.vue'
-import { AlertTypeEnum } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,15 +130,6 @@ const keepLogged = ref(true)
 const errorFields = ref<{ [key: string]: string }>({})
 const errorMain = ref('');
 const loading = ref(false);
-
-const errorMainItem = computed(() => {
-    return {
-        id: '0',
-        type: AlertTypeEnum.Danger,
-        text: errorMain.value,
-        noClose: true,
-    };
-});
 
 const nextPath = computed(() => {
     const next = route.query.next

@@ -186,6 +186,12 @@ const onSelectData = (payload: DataPickerPeriod, controlsPeriod: string) => {
 
 onMounted(() => {
     segmentsStore.$reset();
+    segmentsStore.segments.push({
+        name: '',
+        conditions: [{
+            filters: []
+        }],
+    });
     updateData();
 });
 

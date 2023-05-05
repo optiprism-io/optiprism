@@ -1,6 +1,9 @@
 <template>
     <div class="segment pf-l-flex pf-m-column">
-        <div class="pf-l-flex">
+        <div
+            v-if="!props.isOne"
+            class="pf-l-flex"
+        >
             <AlphabetIdentifier
                 class="pf-l-flex__item"
                 :index="props.index"
@@ -38,7 +41,12 @@
                 </div>
             </div>
         </div>
-        <div class="pf-l-flex pf-m-column pf-u-pl-xl">
+        <div
+            class="pf-l-flex pf-m-column"
+            :class="{
+                'pf-u-pl-xl': !props.isOne,
+            }"
+        >
             <Condition
                 v-for="(condition, i) in props.conditions"
                 :key="i"
@@ -47,6 +55,7 @@
                 :update-open="updateOpenCondition"
                 :index-parent="props.index"
                 :auto-hide-event="props.autoHideEvent"
+                :is-one="props.isOne"
             />
         </div>
     </div>
@@ -64,6 +73,7 @@ interface Props {
     name: string
     conditions: ConditionType[]
     autoHideEvent?: boolean
+    isOne?: boolean
 }
 
 const props = defineProps<Props>()

@@ -51,7 +51,9 @@ export default function ({ environment = 'development' } = {}) {
             }, { timing: 160 })
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events`, (schema) => {
-                return schema.db.customEvents.map(item => ({...item, id: Number(item.id)}))
+                return {
+                    data: schema.db.customEvents.map(item => ({...item, id: Number(item.id)})),
+                };
             })
 
             this.delete(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/custom-events/:event_id`, (schema, request) => {
@@ -72,7 +74,9 @@ export default function ({ environment = 'development' } = {}) {
             })
 
             this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/event-records/search`, (schema, request) => {
-                return liveStreamMocks
+                return {
+                    events: liveStreamMocks,
+                };
             })
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/schema/event-properties`, (schema) => {
