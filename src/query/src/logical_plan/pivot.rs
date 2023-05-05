@@ -2,6 +2,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use datafusion_common::Column;
@@ -15,6 +16,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::error::QueryError;
 use crate::Result;
 
+#[derive(Hash, Eq, PartialEq)]
 pub struct PivotNode {
     pub input: LogicalPlan,
     pub schema: DFSchemaRef,
@@ -38,7 +40,7 @@ impl PivotNode {
                 .filter_map(|f| {
                     match f.name().clone() == name_col.name || f.name().clone() == value_col.name {
                         true => None,
-                        false => Some(DFField::new(None, f.name(), f.data_type().clone(), true)),
+                        false => Some(f.to_owned()),
                     }
                 })
                 .collect();
@@ -51,7 +53,7 @@ impl PivotNode {
 
             let result_fields: Vec<DFField> = result_cols
                 .iter()
-                .map(|col| DFField::new(None, col, value_type.clone(), true))
+                .map(|col| DFField::new_unqualified( col, value_type.clone(), true))
                 .collect();
 
             fields.extend_from_slice(&result_fields);
@@ -78,6 +80,10 @@ impl Debug for PivotNode {
 impl UserDefinedLogicalNode for PivotNode {
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn name(&self) -> &str {
+        "Pivot"
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
@@ -107,5 +113,19 @@ impl UserDefinedLogicalNode for PivotNode {
             .map_err(QueryError::into_datafusion_plan_error)
             .unwrap(),
         )
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        use std::hash::Hash;
+        let mut s = state;
+        self.hash(&mut s);
+    }
+
+    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            Some(o) => self == o,
+
+            None => false,
+        }
     }
 }

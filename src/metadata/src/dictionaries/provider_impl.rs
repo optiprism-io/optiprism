@@ -1,3 +1,4 @@
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -13,6 +14,7 @@ use crate::error::Result;
 use crate::store::path_helpers::make_id_seq_key;
 use crate::store::path_helpers::org_proj_ns;
 use crate::store::Store;
+
 const NAMESPACE: &[u8] = b"dictinaries";
 
 fn dict_ns(dict: &str) -> Vec<u8> {
@@ -25,7 +27,7 @@ fn make_key_key(organization_id: u64, project_id: u64, dict: &str, key: u64) -> 
         b"keys/",
         key.to_le_bytes().as_ref(),
     ]
-    .concat()
+        .concat()
 }
 
 fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str) -> Vec<u8> {
@@ -34,7 +36,7 @@ fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str
         b"values/",
         value.as_bytes(),
     ]
-    .concat()
+        .concat()
 }
 
 pub struct ProviderImpl {
@@ -109,7 +111,7 @@ impl Provider for ProviderImpl {
                 dict.to_string(),
                 key,
             ))
-            .into()),
+                .into()),
             Some(value) => Ok(String::from_utf8(value)?),
         }
     }
@@ -129,7 +131,7 @@ impl Provider for ProviderImpl {
                 dict.to_string(),
                 value.to_string(),
             ))
-            .into()),
+                .into()),
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
         }
     }
@@ -140,6 +142,14 @@ pub struct SingleDictionaryProvider {
     project_id: u64,
     dict: String,
     provider: Arc<dyn Provider>,
+}
+
+impl Hash for SingleDictionaryProvider {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.organization_id.hash(state);
+        self.project_id.hash(state);
+        self.dict.hash(state);
+    }
 }
 
 impl SingleDictionaryProvider {

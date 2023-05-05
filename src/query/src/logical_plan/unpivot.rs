@@ -2,6 +2,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
@@ -17,6 +18,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::error::QueryError;
 use crate::Result;
 
+#[derive(Hash, Eq, PartialEq)]
 pub struct UnpivotNode {
     input: LogicalPlan,
     schema: DFSchemaRef,
@@ -45,9 +47,9 @@ impl UnpivotNode {
                 })
                 .collect();
 
-            let name_field = DFField::new(None, name_col.as_str(), DataType::Utf8, false);
+            let name_field = DFField::new_unqualified( name_col.as_str(), DataType::Utf8, false);
             fields.push(name_field);
-            let value_field = DFField::new(None, value_col.as_str(), value_type, false);
+            let value_field = DFField::new_unqualified( value_col.as_str(), value_type, false);
             fields.push(value_field);
 
             Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?)
@@ -72,6 +74,10 @@ impl Debug for UnpivotNode {
 impl UserDefinedLogicalNode for UnpivotNode {
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn name(&self) -> &str {
+        "Unpivot"
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
@@ -101,5 +107,19 @@ impl UserDefinedLogicalNode for UnpivotNode {
             .map_err(QueryError::into_datafusion_plan_error)
             .unwrap(),
         )
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        use std::hash::Hash;
+        let mut s = state;
+        self.hash(&mut s);
+    }
+
+    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            Some(o) => self == o,
+
+            None => false,
+        }
     }
 }

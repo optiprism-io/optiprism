@@ -299,24 +299,25 @@ impl LogicalPlanBuilder {
             .enumerate()
             .map(|(id, query)| {
                 let q = match &query.agg {
-                    Query::CountEvents => Expr::AggregateFunction {
-                        fun: AggregateFunction::Count,
-                        args: vec![col(event_fields::EVENT)],
-                        distinct: false,
-                        filter: None,
-                    },
-                    Query::CountUniqueGroups | Query::DailyActiveGroups => {
-                        let _a = col(self.es.group.as_ref());
-                        sorted_distinct_count(input.schema(), col(self.es.group.as_ref()))?
+                    Query::CountEvents => {
+                        let agg_fn = datafusion_expr::expr::AggregateFunction::new(
+                            AggregateFunction::Count,
+                            vec![col(event_fields::EVENT)],
+                            false,
+                            None,
+                        );
+                        Expr::AggregateFunction(agg_fn)
                     }
+                    Query::CountUniqueGroups | Query::DailyActiveGroups =>
+                        sorted_distinct_count(input.schema(), col(Column::from_name(self.es.group.clone())))?,
                     Query::WeeklyActiveGroups => unimplemented!(),
                     Query::MonthlyActiveGroups => unimplemented!(),
                     Query::CountPerGroup { aggregate } => aggregate_partitioned(
                         input.schema(),
-                        col(self.es.group.as_ref()),
+                        col(Column::from_name(self.es.group.clone())),
                         PartitionedAggregateFunction::Count,
                         aggregate.to_owned().into(),
-                        vec![col(self.es.group.as_ref())],
+                        vec![col(Column::from_name(self.es.group.clone()))],
                     )?,
                     Query::AggregatePropertyPerGroup {
                         property,
@@ -324,7 +325,7 @@ impl LogicalPlanBuilder {
                         aggregate,
                     } => aggregate_partitioned(
                         input.schema(),
-                        col(self.es.group.as_ref()),
+                        col(Column::from_name(self.es.group.clone())),
                         aggregate_per_group.clone(),
                         aggregate.to_owned().into(),
                         vec![executor::block_on(property_col(
@@ -333,19 +334,20 @@ impl LogicalPlanBuilder {
                             property,
                         ))?],
                     )?,
-                    Query::AggregateProperty {
-                        property,
-                        aggregate,
-                    } => Expr::AggregateFunction {
-                        fun: aggregate.to_owned().into(),
-                        args: vec![executor::block_on(property_col(
-                            &self.ctx,
-                            &self.metadata,
-                            property,
-                        ))?],
-                        distinct: false,
-                        filter: None,
-                    },
+                    Query::AggregateProperty { property, aggregate } => {
+                        let agg_fn = datafusion_expr::expr::AggregateFunction::new(
+                            aggregate.to_owned().into(),
+                            vec![executor::block_on(property_col(
+                                &self.ctx,
+                                &self.metadata,
+                                property,
+                            ))?],
+                            false,
+                            None,
+                        );
+
+                        Expr::AggregateFunction(agg_fn)
+                    }
                     Query::QueryFormula { .. } => unimplemented!(),
                 };
 
@@ -362,12 +364,13 @@ impl LogicalPlanBuilder {
         let aggr_schema =
             DFSchema::new_with_metadata(exprlist_to_fields(all_expr, &input)?, HashMap::new())?;
 
-        let expr = LogicalPlan::Aggregate(Aggregate {
-            input: Arc::new(input),
-            group_expr,
-            aggr_expr,
-            schema: Arc::new(aggr_schema),
-        });
+
+        let expr = LogicalPlan::Aggregate(
+            Aggregate::try_new(
+                Arc::new(input),
+                group_expr,
+                aggr_expr,
+            )?);
 
         Ok(expr)
     }

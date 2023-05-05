@@ -8,6 +8,7 @@ pub use error::Result;
 pub use provider_impl::ProviderImpl;
 
 use crate::queries::property_values::PropertyValues;
+
 pub mod context;
 pub mod error;
 pub mod expr;
@@ -68,7 +69,8 @@ pub mod test_util {
     use datafusion::datasource::listing::ListingTableConfig;
     use datafusion::datasource::listing::ListingTableUrl;
     use datafusion::datasource::provider_as_source;
-    use datafusion::prelude::CsvReadOptions;
+    use datafusion::execution::options::ReadOptions;
+    use datafusion::prelude::{CsvReadOptions, SessionConfig};
     use datafusion_expr::logical_plan::builder::UNNAMED_TABLE;
     use datafusion_expr::LogicalPlan;
     use datafusion_expr::LogicalPlanBuilder;
@@ -104,7 +106,8 @@ pub mod test_util {
                 .unwrap(),
         )?;
         let target_partitions = 1;
-        let listing_options = options.to_listing_options(target_partitions);
+        let session_config = SessionConfig::new().with_target_partitions(target_partitions);
+        let listing_options = options.to_listing_options(&session_config);
 
         let config = ListingTableConfig::new(table_path)
             .with_listing_options(listing_options)
@@ -215,7 +218,7 @@ pub mod test_util {
                 dictionary_type: Some(DataType::UInt8),
             },
         )
-        .await?;
+            .await?;
 
         md.dictionaries
             .get_key_or_create(
@@ -253,7 +256,7 @@ pub mod test_util {
                 is_system: false,
             },
         )
-        .await?;
+            .await?;
 
         create_property(
             &md,
@@ -275,7 +278,7 @@ pub mod test_util {
                 dictionary_type: None,
             },
         )
-        .await?;
+            .await?;
 
         // create events
         md.events
@@ -327,7 +330,7 @@ pub mod test_util {
                 is_system: false,
             },
         )
-        .await?;
+            .await?;
 
         create_property(
             &md,
@@ -349,7 +352,7 @@ pub mod test_util {
                 is_system: false,
             },
         )
-        .await?;
+            .await?;
 
         Ok(())
     }

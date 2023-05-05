@@ -7,7 +7,7 @@ use common::query::PropertyRef;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
-use datafusion_expr::col;
+use datafusion_expr::{col, expr};
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Aggregate;
 use datafusion_expr::Expr;
@@ -38,12 +38,8 @@ macro_rules! property_col {
 
         let aggr_schema =
             DFSchema::new_with_metadata(exprlist_to_fields(vec![&expr], &$input)?, HashMap::new())?;
-        let expr = LogicalPlan::Aggregate(Aggregate {
-            input: Arc::new($input.clone()),
-            group_expr: vec![expr],
-            aggr_expr: vec![],
-            schema: Arc::new(aggr_schema),
-        });
+        let agg_fn = Aggregate::try_new(Arc::new($input.clone()),vec![expr],vec![])?;
+        let expr = LogicalPlan::Aggregate(agg_fn);
 
         match prop.dictionary_type {
             Some(_) => {
@@ -116,18 +112,17 @@ impl LogicalPlanBuilder {
                     &filter.operation,
                     filter.value.clone(),
                 )
-                .await?,
+                    .await?,
                 Arc::new(input),
             )?),
             None => input,
         };
-
         let input = LogicalPlan::Sort(Sort {
-            expr: vec![Expr::Sort {
+            expr: vec![Expr::Sort(expr::Sort {
                 expr: Box::new(expr_col),
                 asc: true,
                 nulls_first: false,
-            }],
+            })],
             input: Arc::new(input),
             fetch: None,
         });

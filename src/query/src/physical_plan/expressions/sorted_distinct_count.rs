@@ -25,7 +25,6 @@ use datafusion_common::DataFusionError;
 use datafusion_common::Result;
 use datafusion_common::ScalarValue;
 use datafusion_expr::AccumulatorFunctionImplementation;
-use datafusion_expr::AggregateState;
 use datafusion_expr::ReturnTypeFunction;
 use datafusion_expr::Signature;
 use datafusion_expr::StateTypeFunction;
@@ -167,10 +166,10 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
 }
 
 impl Accumulator for SortedDistinctCountAccumulator {
-    fn state(&self) -> Result<Vec<AggregateState>> {
-        Ok(vec![AggregateState::Scalar(ScalarValue::UInt64(Some(
+    fn state(&self) -> Result<Vec<ScalarValue>> {
+        Ok(vec![ScalarValue::UInt64(Some(
             self.count,
-        )))])
+        ))])
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {

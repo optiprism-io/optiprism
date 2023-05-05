@@ -6,15 +6,15 @@ authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
 ahash = { version = "0.8", default-features = false }
-arrow = { version = "28.0.0", features = ["prettyprint"] }
+arrow = { version = "36.0.0", features = ["prettyprint"] }
 async-trait = "0.1.59"
 axum = { version = "0.6.1", features = ["headers"] }
 chrono = "0.4.23"
 chronoutil = "0.2.3"
 common = { path = "../common" }
-datafusion = "15.0.0"
-datafusion-common = "15.0.0"
-datafusion-expr = "15.0.0"
+datafusion = "22.0.0"
+datafusion-common = "22.0.0"
+datafusion-expr = "22.0.0"
 fnv = "1.0.7"
 futures = "0.3.25"
 metadata = { path = "../metadata" }

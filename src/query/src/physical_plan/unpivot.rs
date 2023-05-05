@@ -149,10 +149,6 @@ impl ExecutionPlan for UnpivotExec {
         None
     }
 
-    fn relies_on_input_order(&self) -> bool {
-        false
-    }
-
     fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
         vec![self.input.clone()]
     }
@@ -215,7 +211,7 @@ impl RecordBatchStream for UnpivotStream {
 
 #[async_trait]
 impl Stream for UnpivotStream {
-    type Item = ArrowResult<RecordBatch>;
+    type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let elapsed_compute = self.baseline_metrics.elapsed_compute().clone();
@@ -223,7 +219,7 @@ impl Stream for UnpivotStream {
 
         let poll = match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => {
-                Poll::Ready(Some(unpivot(&batch, self.schema.clone(), &self.cols)))
+                Poll::Ready(Some(Ok(unpivot(&batch, self.schema.clone(), &self.cols)?)))
             }
             other => other,
         };

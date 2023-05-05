@@ -15,7 +15,6 @@ use arrow::array::UInt8Array;
 use arrow::datatypes::DataType;
 use datafusion::physical_plan::Accumulator;
 use datafusion_common::ScalarValue;
-use datafusion_expr::AggregateState;
 
 use crate::error::Result;
 use crate::physical_plan::expressions::partitioned_aggregate::Buffer;
@@ -110,7 +109,7 @@ impl PartitionedAccumulator for PartitionedSumAccumulator {
         Ok(self.buffer.merge_batch(states)?)
     }
 
-    fn state(&self) -> Result<Vec<AggregateState>> {
+    fn state(&self) -> Result<Vec<ScalarValue>> {
         self.buffer.flush_with_value(self.sum)?;
         Ok(self.buffer.state()?)
     }

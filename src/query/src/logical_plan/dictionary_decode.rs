@@ -2,10 +2,12 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::hash::Hasher;
 use std::sync::Arc;
+use std::hash::Hash;
 
 use arrow::datatypes::DataType;
-use datafusion_common::Column;
+use datafusion_common::{Column, TableReference};
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
@@ -37,7 +39,7 @@ impl DictionaryDecodeNode {
                     .find(|(col, _)| *field.name() == col.name)
                 {
                     Some(_) => DFField::new(
-                        field.qualifier().map(|q| q.as_str()),
+                        field.qualifier().cloned(),
                         field.name().as_str(),
                         DataType::Utf8,
                         field.is_nullable(),
@@ -45,7 +47,7 @@ impl DictionaryDecodeNode {
                     None => field.to_owned(),
                 }
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         let schema = Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?);
 
@@ -57,6 +59,22 @@ impl DictionaryDecodeNode {
     }
 }
 
+impl Hash for DictionaryDecodeNode {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.input.hash(state);
+        self.decode_cols.hash(state);
+        self.schema.hash(state);
+    }
+}
+
+impl PartialEq for DictionaryDecodeNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.dyn_eq(other)
+    }
+}
+
+impl Eq for DictionaryDecodeNode {}
+
 impl Debug for DictionaryDecodeNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.fmt_for_explain(f)
@@ -66,6 +84,10 @@ impl Debug for DictionaryDecodeNode {
 impl UserDefinedLogicalNode for DictionaryDecodeNode {
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn name(&self) -> &str {
+        "DictionaryDecode"
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
@@ -92,5 +114,18 @@ impl UserDefinedLogicalNode for DictionaryDecodeNode {
         Arc::new(
             DictionaryDecodeNode::try_new(inputs[0].clone(), self.decode_cols.clone()).unwrap(),
         )
+    }
+
+    fn dyn_hash(&self, state: &mut dyn Hasher) {
+        let mut s = state;
+        self.hash(&mut s);
+    }
+
+    fn dyn_eq(&self, other: &dyn UserDefinedLogicalNode) -> bool {
+        match other.as_any().downcast_ref::<Self>() {
+            Some(o) => self == o,
+
+            None => false,
+        }
     }
 }

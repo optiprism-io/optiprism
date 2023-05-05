@@ -204,8 +204,6 @@ impl From<DFOperator> for Operator {
             DFOperator::Modulo => Operator::Modulo,
             DFOperator::And => Operator::And,
             DFOperator::Or => Operator::Or,
-            DFOperator::Like => Operator::Like,
-            DFOperator::NotLike => Operator::NotLike,
             DFOperator::IsDistinctFrom => Operator::IsDistinctFrom,
             DFOperator::IsNotDistinctFrom => Operator::IsNotDistinctFrom,
             DFOperator::RegexMatch => Operator::RegexMatch,
@@ -218,6 +216,7 @@ impl From<DFOperator> for Operator {
             DFOperator::BitwiseShiftRight => Operator::BitwiseShiftRight,
             DFOperator::BitwiseShiftLeft => Operator::BitwiseShiftLeft,
             DFOperator::StringConcat => Operator::StringConcat,
+            _ => unreachable!("Operator {:?} not supported", o)
         }
     }
 }
@@ -238,8 +237,6 @@ impl From<Operator> for DFOperator {
             Operator::Modulo => DFOperator::Modulo,
             Operator::And => DFOperator::And,
             Operator::Or => DFOperator::Or,
-            Operator::Like => DFOperator::Like,
-            Operator::NotLike => DFOperator::NotLike,
             Operator::IsDistinctFrom => DFOperator::IsDistinctFrom,
             Operator::IsNotDistinctFrom => DFOperator::IsNotDistinctFrom,
             Operator::RegexMatch => DFOperator::RegexMatch,
@@ -252,6 +249,7 @@ impl From<Operator> for DFOperator {
             Operator::BitwiseShiftRight => DFOperator::BitwiseShiftRight,
             Operator::BitwiseShiftLeft => DFOperator::BitwiseShiftLeft,
             Operator::StringConcat => DFOperator::StringConcat,
+            _ => unreachable!("Operator {:?} not supported", o)
         }
     }
 }
@@ -365,7 +363,7 @@ impl TryInto<DFOperator> for PropValueOperation {
         Ok(match self {
             PropValueOperation::Eq => DFOperator::Eq,
             PropValueOperation::Neq => DFOperator::NotEq,
-            PropValueOperation::Like => DFOperator::Like,
+            // PropValueOperation::Like => DFOperator::Like,
             _ => unimplemented!(),
         })
     }
@@ -460,7 +458,9 @@ pub fn time_columns(
     };
 
     rule.with_end(to + granularity.relative_duration(1))
-        .map(|dt| dt.naive_utc().to_string())
+        .map(|dt| {
+            dt.naive_utc().format("%Y-%m-%dT%H:%M:%S").to_string()
+        })
         .collect()
 }
 

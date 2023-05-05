@@ -1,4 +1,7 @@
 use std::mem;
+use arrow::ffi::{ArrowArray, ArrowArrayRef};
+use arrow_array::make_array;
+use arrow_data::ArrayData;
 
 use crate::error::Result;
 
@@ -12,7 +15,7 @@ pub fn arrow2_to_arrow1(
     let arr1_ffi = unsafe { mem::transmute(arr2_ffi) }; // todo get rid of transmute?
     let schema1_ffi = unsafe { mem::transmute(schema2_ffi) };
 
-    Ok(arrow_array::make_array(
+    Ok(make_array(
         arrow::ffi::ArrowArray::new(arr1_ffi, schema1_ffi).try_into()?,
     ))
 }
