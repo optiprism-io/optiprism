@@ -1,12 +1,13 @@
-use arrow::array::ArrayRef;
+use arrow::array::{Array, ArrayRef};
 use arrow::datatypes::DataType;
 use arrow::datatypes::SchemaRef;
 use async_trait::async_trait;
+use datafusion_common::ScalarValue;
 use common::query::event_segmentation::EventSegmentation;
 pub use context::Context;
 pub use error::Result;
 pub use provider_impl::ProviderImpl;
-
+pub use std::cmp::Ordering;
 use crate::queries::property_values::PropertyValues;
 
 pub mod context;
@@ -56,6 +57,97 @@ pub struct DataTable {
 impl DataTable {
     pub fn new(schema: SchemaRef, columns: Vec<Column>) -> Self {
         Self { schema, columns }
+    }
+}
+
+
+macro_rules! make_one_col_spans {
+    ($spans_state:expr, $arr:expr,$_type:ident, $scalar_type:ident, $ARRAYTYPE:ident) => {{
+        $spans_state.spans.clear();
+
+        let arr = $arr.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
+        let mut last_value: Option<$_type> = if $spans_state.first {
+            $spans_state.first = false;
+            match arr.is_null(0) {
+                true => None,
+                false => Some(arr.value(0)),
+            }
+        } else {
+            match $spans_state.last_partition_value {
+                ScalarValue::$scalar_type(v) => v,
+                _ => unreachable!(),
+            }
+        };
+
+        for v in arr.iter() {
+            match last_value.partial_cmp(&v) {
+                Some(ord) => match ord {
+                    Ordering::Less | Ordering::Greater => {
+                        $spans_state.spans.push(true);
+                        last_value = v.clone();
+                    }
+                    Ordering::Equal => $spans_state.spans.push(false),
+                },
+                _ => unreachable!(),
+            };
+        }
+
+        $spans_state.last_partition_value = ScalarValue::$scalar_type(last_value);
+    }};
+}
+
+pub struct OneColSpansState {
+    pub first: bool,
+    pub last_partition_value: ScalarValue,
+    pub spans: Vec<bool>,
+}
+
+impl OneColSpansState {
+    pub fn new(len: usize) -> Self {
+        Self {
+            first: true,
+            last_partition_value: ScalarValue::Null,
+            spans: Vec::with_capacity(len),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow::array::{Array, ArrayRef, Int64Array, PrimitiveArray};
+    use crate::OneColSpansState;
+    use datafusion_common::ScalarValue;
+    pub use std::cmp::Ordering;
+    use std::sync::Arc;
+    use arrow::datatypes::Int64Type;
+
+    #[test]
+    fn test_make_one_col_spans() {
+        let arr = Arc::new(Int64Array::from(vec![1, 1, 1, 1, 2, 2])) as ArrayRef;
+        let mut state = OneColSpansState::new(arr.len());
+
+        make_one_col_spans!(state, arr, i64,Int64,Int64Array);
+
+        assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(2)));
+        assert_eq!(state.spans, vec![false, false, false, false, true, false]);
+
+        let arr = Arc::new(Int64Array::from(vec![2, 2, 2, 2, 3])) as ArrayRef;
+        make_one_col_spans!(state, arr, i64,Int64,Int64Array);
+
+        assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(3)));
+        assert_eq!(state.spans, vec![false, false, false, false, true]);
+
+        let arr = Arc::new(Int64Array::from(vec![4, 4])) as ArrayRef;
+        make_one_col_spans!(state, arr, i64,Int64,Int64Array);
+
+        assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(4)));
+        assert_eq!(state.spans, vec![true, false]);
+
+        let arr = Arc::new(Int64Array::from(vec![5])) as ArrayRef;
+        make_one_col_spans!(state, arr, i64,Int64,Int64Array);
+
+        assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(5)));
+        assert_eq!(state.spans, vec![true]);
     }
 }
 

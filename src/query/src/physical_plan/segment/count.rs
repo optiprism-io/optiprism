@@ -1,19 +1,18 @@
-use crate::exprtree::error::Result;
-use crate::exprtree::segment::expressions::boolean_op::BooleanOp;
-use crate::exprtree::segment::expressions::multibatch::expr::Expr;
-use crate::exprtree::segment::expressions::utils::into_array;
-use crate::exprtree::segment::expressions::utils::{break_on_false, break_on_true};
 use arrow::array::{ArrayRef, BooleanArray};
 use arrow::compute::kernels::arithmetic::{add, divide, divide_scalar, multiply, subtract};
 use arrow::datatypes::{DataType, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
-use datafusion::error::{DataFusionError, Result as DatafusionResult};
 use datafusion::physical_plan::{ColumnarValue, PhysicalExpr};
 use std::marker::PhantomData;
 use std::sync::Arc;
+use datafusion_expr::Literal;
+use crate::physical_plan::segment::boolean_op::BooleanOp;
+use crate::physical_plan::segment::{Comparable, Expr};
+use crate::error::{Result, QueryError};
 
 #[derive(Debug)]
 pub struct Count<Op> {
+    key: Arc<dyn PhysicalExpr>,
     predicate: Arc<dyn PhysicalExpr>,
     op: PhantomData<Op>,
     right: i64,
@@ -24,14 +23,14 @@ impl<Op> Count<Op> {
         schema: &Schema,
         predicate: Arc<dyn PhysicalExpr>,
         right: i64,
-    ) -> DatafusionResult<Self> {
+    ) -> Result<Self> {
         match predicate.data_type(schema)? {
             DataType::Boolean => Ok(Count {
                 predicate,
                 op: PhantomData,
                 right,
             }),
-            other => Err(DataFusionError::Plan(format!(
+            other => Err(QueryError::Plan(format!(
                 "Count predicate must return boolean values, not {:?}",
                 other,
             ))),
@@ -39,25 +38,21 @@ impl<Op> Count<Op> {
     }
 }
 
-impl<Op> Expr for Count<Op>
-where
-    Op: BooleanOp<i64>,
+impl<T, Op> Expr for Count<Op>
+    where
+        Op: BooleanOp<T>, T: Comparable,
 {
-    fn evaluate(&self, batches: &[RecordBatch]) -> DatafusionResult<bool> {
+    fn evaluate(&self, batch: &RecordBatch) -> Result<bool> {
         let mut acc: i64 = 0;
 
-        for batch in batches.iter() {
-            let ar = into_array(self.predicate.evaluate(batch)?);
-            let b = ar.as_any().downcast_ref::<BooleanArray>().ok_or_else(|| {
-                DataFusionError::Internal("failed to downcast to BooleanArray".to_string())
-            })?;
-            acc += b.iter().filter(|x| x.is_some() && x.unwrap()).count() as i64;
-            let res = Op::perform(acc, self.right);
-            if res && break_on_true(Op::op()) {
-                return Ok(true);
-            } else if !res && break_on_false(Op::op()) {
-                return Ok(false);
-            }
+        let arr = self.predicate.evaluate(batch)?.into_array(0);
+        let bool_arr = arr.as_any().downcast_ref::<BooleanArray>().unwrap();
+        acc += bool_arr.iter().filter(|x| x.is_some() && x.unwrap()).count() as i64;
+        let res = Op::perform(acc, self.right);
+        if res && break_on_true(Op::op()) {
+            return Ok(true);
+        } else if !res && break_on_false(Op::op()) {
+            return Ok(false);
         }
 
         Ok(Op::perform(acc, self.right))
@@ -72,9 +67,6 @@ impl<Op: BooleanOp<i64>> std::fmt::Display for Count<Op> {
 
 #[cfg(test)]
 mod tests {
-    use crate::exprtree::segment::expressions::boolean_op::{Eq, Gt, Lt};
-    use crate::exprtree::segment::expressions::multibatch::count::Count;
-    use crate::exprtree::segment::expressions::multibatch::expr::Expr;
     use arrow::array::{ArrayRef, BooleanArray, Int8Array};
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::record_batch::RecordBatch;

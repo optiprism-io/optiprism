@@ -378,6 +378,7 @@ macro_rules! make_spans {
             .map_err(QueryError::into_datafusion_execution_error)?
     }};
 }
+
 impl Accumulator for PartitionedAggregateAccumulator {
     fn state(&self) -> DFResult<Vec<ScalarValue>> {
         self.acc
