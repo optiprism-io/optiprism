@@ -8,6 +8,7 @@
             'pf-c-table__sort': props.sorted,
             'pf-c-table__action': props.type === 'action',
             'pf-u-text-nowrap': props.noWrap,
+            'pf-m-fit-content': props.fitContent,
         }"
         :colspan="colspan"
         :style="{
@@ -29,6 +30,7 @@ type Props = {
    colspan?: number
    noWrap?: boolean
    type?: string
+   fitContent?: boolean
 }
 
 const props = defineProps<Props>()

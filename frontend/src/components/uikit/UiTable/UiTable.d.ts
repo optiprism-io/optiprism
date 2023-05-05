@@ -43,6 +43,7 @@ export type Column = {
     default?: boolean
     type?: string
     notActiveStart?: boolean
+    fitContent?: boolean
 }
 
 export type Cell = {

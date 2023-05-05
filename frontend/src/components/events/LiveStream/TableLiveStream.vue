@@ -149,6 +149,8 @@ const tableColumnsValues = computed(() => {
             return {
                 value: key,
                 title: key.charAt(0).toUpperCase() + key.slice(1),
+                fitContent: true,
+                noWrap: true,
             }
         }),
         {
@@ -213,7 +215,8 @@ const tableData = computed(() => {
 
                 return {
                     key: column.value,
-                    title: value || '-'
+                    title: value || '-',
+                    nowrap: true,
                 }
             }
         })

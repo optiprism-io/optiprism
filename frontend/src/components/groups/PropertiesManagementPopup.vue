@@ -121,7 +121,6 @@ const onApplyChangePropery = async (payload: ApplyPayload) => {
     if (props.item?.id) {
         let properties: Properties = {};
         const activeItemPropertiesLength = Object.keys(propertiesEdit.value).length;
-
         if (payload.index === -1) {
             properties = {
                 ...propertiesEdit.value,
@@ -171,7 +170,7 @@ const onDeleteLine = async (index: number) => {
 };
 
 const close = () => {
-    apply();
+    groupStore.propertyPopup = false;
 };
 
 const apply = async () => {

@@ -107,6 +107,7 @@ const columns = computed(() => {
             title: isAction ? '' : key === 'id' ? i18n.$t(`groups.columns.${key}`) : key,
             default: isAction,
             type: isAction? 'action' : '',
+            fitContent: key === 'id',
         };
     });
 });

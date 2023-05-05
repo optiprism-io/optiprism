@@ -60,6 +60,7 @@
                             :sorted="column.sorted"
                             :truncate="column.truncate"
                             :last-fixed="column.lastFixed"
+                            :fit-content="column.fitContent"
                             :type="column.type"
                         >
                             <UiTableHeadCell
@@ -178,10 +179,4 @@ const toggleColumns = (payload: string) => {
 }
 </script>
 
-<style lang="scss">
-.pf-c-table {
-    tr > * {
-        --pf-c-table--cell--MinWidth: 140px;
-    }
-}
-</style>
+<style lang="scss"></style>
