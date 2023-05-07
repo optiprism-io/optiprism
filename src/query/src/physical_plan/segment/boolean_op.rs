@@ -10,9 +10,9 @@ pub trait BooleanOp<T>: Send + Sync + Display + Debug {
 #[derive(Debug)]
 pub struct BooleanAnd;
 
-impl<T> BooleanOp<T> for BooleanAnd
+impl BooleanOp<bool> for BooleanAnd
 {
-    fn perform(left: T, right: T) -> bool {
+    fn perform(left: bool, right: bool) -> bool {
         return left && right;
     }
 
@@ -30,9 +30,9 @@ impl Display for BooleanAnd {
 #[derive(Debug)]
 pub struct BooleanOr;
 
-impl<T> BooleanOp<T> for BooleanOr
+impl BooleanOp<bool> for BooleanOr
 {
-    fn perform(left: T, right: T) -> bool {
+    fn perform(left: bool, right: bool) -> bool {
         return left || right;
     }
 
@@ -68,6 +68,29 @@ impl Display for BooleanEq {
         write!(f, "Eq")
     }
 }
+
+#[derive(Debug)]
+pub struct BooleanNotEq;
+
+impl<T> BooleanOp<T> for BooleanNotEq
+    where
+        T: PartialEq,
+{
+    fn perform(left: T, right: T) -> bool {
+        return left != right;
+    }
+
+    fn op() -> Operator {
+        Operator::NotEq
+    }
+}
+
+impl Display for BooleanNotEq {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "NotEq")
+    }
+}
+
 
 #[derive(Debug)]
 pub struct BooleanGt;

@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 use arrow::array::{Array, ArrayRef};
 use arrow::datatypes::DataType;
 use arrow::datatypes::SchemaRef;
@@ -62,10 +64,10 @@ impl DataTable {
 
 
 macro_rules! make_one_col_spans {
-    ($spans_state:expr, $arr:expr,$_type:ident, $scalar_type:ident, $ARRAYTYPE:ident) => {{
+    ($spans_state:expr, $arr:expr,$arr_type:ident,$_type:ident, $scalar_type:ident) => {{
         $spans_state.spans.clear();
 
-        let arr = $arr.as_any().downcast_ref::<$ARRAYTYPE>().unwrap();
+        let arr = $arr.as_any().downcast_ref::<$arr_type>().unwrap();
         let mut last_value: Option<$_type> = if $spans_state.first {
             $spans_state.first = false;
             match arr.is_null(0) {
@@ -126,25 +128,25 @@ mod tests {
         let arr = Arc::new(Int64Array::from(vec![1, 1, 1, 1, 2, 2])) as ArrayRef;
         let mut state = OneColSpansState::new(arr.len());
 
-        make_one_col_spans!(state, arr, i64,Int64,Int64Array);
+        make_one_col_spans!(state, arr, Int64Array,i64,Int64);
 
         assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(2)));
         assert_eq!(state.spans, vec![false, false, false, false, true, false]);
 
         let arr = Arc::new(Int64Array::from(vec![2, 2, 2, 2, 3])) as ArrayRef;
-        make_one_col_spans!(state, arr, i64,Int64,Int64Array);
+        make_one_col_spans!(state, arr, Int64Array,i64,Int64);
 
         assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(3)));
         assert_eq!(state.spans, vec![false, false, false, false, true]);
 
         let arr = Arc::new(Int64Array::from(vec![4, 4])) as ArrayRef;
-        make_one_col_spans!(state, arr, i64,Int64,Int64Array);
+        make_one_col_spans!(state, arr, Int64Array,i64,Int64);
 
         assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(4)));
         assert_eq!(state.spans, vec![true, false]);
 
         let arr = Arc::new(Int64Array::from(vec![5])) as ArrayRef;
-        make_one_col_spans!(state, arr, i64,Int64,Int64Array);
+        make_one_col_spans!(state, arr, Int64Array,i64,Int64);
 
         assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(5)));
         assert_eq!(state.spans, vec![true]);

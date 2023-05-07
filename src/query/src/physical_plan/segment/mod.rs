@@ -4,18 +4,18 @@ use arrow::record_batch::RecordBatch;
 use datafusion_expr::{ColumnarValue, Operator};
 use crate::error::Result;
 
-pub mod binary_op;
-// pub mod count;
+// pub mod binary_op;
+pub mod count;
 mod boolean_op;
 // pub mod sequence;
 // pub mod sum;
 // mod test_value;
 // mod boolean_op;
 
-trait Comparable: Eq + PartialEq + Gt + Gte+Lt {}
+trait Comparable: Eq + PartialEq + PartialOrd {}
 
 pub trait Expr: Send + Sync + Display + Debug {
-    fn evaluate(&self, batch: &RecordBatch) -> Result<bool>;
+    fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<Option<Vec<i64>>>;
 }
 
 pub fn break_on_false(op: Operator) -> bool {
