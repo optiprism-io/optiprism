@@ -72,7 +72,7 @@
         </div>
         <div
             v-show="!props.hideControls"
-            class="properties-management-line__controls pf-u-display-flex"
+            class="properties-management-line__controls"
             :class="{
                 'properties-management-line__controls_hide': props.hideControls,
             }"
