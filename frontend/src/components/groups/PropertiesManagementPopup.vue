@@ -31,28 +31,16 @@
             <PropertiesManagementLine
                 v-for="(property, i) in itemsProperties"
                 :key="i"
-                class="properties-panagement-popup__line"
+                class="properties-panagement-popup__line pf-u-mb-md"
                 :hide-controls="false"
                 :index="i"
                 :value="property.value"
                 :value-key="property.key"
+                :error-key="property.error"
                 @apply="onApplyChangePropery"
                 @delete="onDeleteLine"
             />
-            <PropertiesManagementLine
-                v-if="createNewLine"
-                class="properties-panagement-popup__line"
-                :bold-text="false"
-                :value="''"
-                :value-key="''"
-                :start-edit="true"
-                :index="-1"
-                @apply="onApplyChangePropery"
-                @delete="onDeleteNewLine"
-                @close-new-line="onDeleteNewLine"
-            />
             <UiButton
-                v-else
                 class="pf-m-primary pf-u-mt-md"
                 @click="onAddProperty"
             >
@@ -74,6 +62,12 @@ export type Properties = {
     [key: string]: Value,
 };
 
+type PropertiesEdit = {
+    value: Value,
+    key: string,
+    error?: boolean,
+};
+
 const i18n = inject('i18n') as I18N;
 const groupStore = useGroupStore();
 const mapTabs = ['userProperties'];
@@ -90,23 +84,10 @@ const emit = defineEmits<{
 }>();
 
 const activeTab = ref('userProperties');
-const createNewLine = ref(false);
 const isLodingSavePropetries = ref(false);
-const propertiesEdit = ref<Properties>({});
+const propertiesEdit = ref<PropertiesEdit[]>([]);
 
 const title = computed(() => `${i18n.$t('users.user')}: ${props.item?.id}`);
-const applyDisabled = computed(() => JSON.stringify(propertiesEdit.value) === JSON.stringify(props.item?.properties));
-
-const itemsProperties = computed(() => {
-    return Object.keys(propertiesEdit.value).map((key, i) => {
-        return {
-            key,
-            value: propertiesEdit.value[key] || '' as Value,
-            index: i,
-        };
-    });
-});
-
 const itemsTabs = computed(() => {
     return mapTabs.map(key => {
         return {
@@ -117,33 +98,46 @@ const itemsTabs = computed(() => {
     })
 });
 
+const itemsProperties = computed(() => {
+    return propertiesEdit.value.map((item, i) => {
+        return {
+            key: item.key,
+            value: item.value || '' as Value,
+            error: item.error,
+            index: i,
+        };
+    });
+});
+
+const properties = computed(() => {
+    return itemsProperties.value.reduce((acc: Properties, item) => {
+        acc[item.key] = item.value;
+        return acc;
+    }, {});
+});
+
+const applyDisabled = computed(() => {
+    return JSON.stringify(properties.value) === JSON.stringify(props.item?.properties);
+});
+
 const onApplyChangePropery = async (payload: ApplyPayload) => {
     if (props.item?.id) {
-        let properties: Properties = {};
-        const activeItemPropertiesLength = Object.keys(propertiesEdit.value).length;
-        if (payload.index === -1) {
-            properties = {
-                ...propertiesEdit.value,
-                [payload.valueKey]: payload.value,
-            };
-        } else {
-            const items = [...itemsProperties.value];
-            items[payload.index].key = payload.valueKey;
-            items[payload.index].value = payload.value;
-            items.forEach(item => {
-                properties[item.key] = item.value;
-            });
-        }
-        const propertiesLength = Object.keys(properties).length;
-        propertiesEdit.value = properties;
-        if (propertiesLength > activeItemPropertiesLength || (!payload.valueKey && !payload.value)) {
-            createNewLine.value = false;
-        }
+        propertiesEdit.value[payload.index] = {
+            key: payload.valueKey,
+            value: payload.value,
+            error: false,
+        };
     }
 };
 
 onMounted(() => {
-    propertiesEdit.value = props.item?.properties || {};
+    propertiesEdit.value = props.item?.properties ?
+        Object.keys(props.item.properties).map(key => {
+            return {
+                value: props.item?.properties[key] || '',
+                key: key || '',
+            }
+        }) : [];
 });
 
 onUnmounted(() => {
@@ -151,21 +145,15 @@ onUnmounted(() => {
 });
 
 const onAddProperty = () => {
-    createNewLine.value = true;
-};
-
-const onDeleteNewLine = () => {
-    createNewLine.value = false;
+    propertiesEdit.value.push({
+        key: '',
+        value: '',
+    });
 };
 
 const onDeleteLine = async (index: number) => {
     if (props.item?.id) {
-        propertiesEdit.value = itemsProperties.value.reduce((acc: Properties, item, i) => {
-            if (i !== index) {
-                acc[item.key] = item.value;
-            }
-            return acc;
-        }, {});
+        propertiesEdit.value.splice(index, 1);
     }
 };
 
@@ -174,16 +162,29 @@ const close = () => {
 };
 
 const apply = async () => {
-    isLodingSavePropetries.value = true;
     if (props.item?.id) {
-        await groupStore.update({
-            id: props.item.id,
-            properties: propertiesEdit.value,
-            noLoading: true,
-        });
+        const error = propertiesEdit.value.findIndex(item => !item.key.trim());
+        if (error === -1) {
+            isLodingSavePropetries.value = true;
+            await groupStore.update({
+                id: props.item.id,
+                properties: propertiesEdit.value.reduce((acc: Properties, item) => {
+                    acc[item.key] = item.value;
+                    return acc;
+                }, {}),
+                noLoading: true,
+            });
+            emit('apply');
+            groupStore.propertyPopup = false;
+        } else {
+            propertiesEdit.value = propertiesEdit.value.map(item => {
+                return {
+                    ...item,
+                    error: !item.key.trim(),
+                };
+            });
+        }
     }
-    emit('apply');
-    groupStore.propertyPopup = false;
 };
 </script>
 
@@ -206,9 +207,6 @@ const apply = async () => {
         justify-content: center;
         background-color: rgba(#fff, .6);
         z-index: 2;
-    }
-    &__line {
-        border-bottom: 1px solid var(--pf-global--BorderColor--dark-100);
     }
 }
 

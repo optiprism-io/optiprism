@@ -42,6 +42,7 @@
     "list_of": "List of :types",
     "columns": "columns",
     "no_data": "No data",
+    "fillField": "Please fill in this field",
     "calendar": {
       "last": "Last",
       "since": "Since",

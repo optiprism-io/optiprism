@@ -1,8 +1,9 @@
 <template>
     <div
-        class="ui-form-group pf-c-form__group pf-u-mb-md"
+        class="ui-form-group pf-c-form__group"
         :class="{
-            'pf-m-action': props.action
+            'pf-m-action': props.action,
+            'pf-u-mb-md': props.indent,
         }"
     >
         <label
@@ -45,11 +46,13 @@ interface Props {
     for?: string
     required?: boolean
     action?: boolean
+    indent?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     error: '',
     required: false,
     action: false,
+    indent: true,
 });
 </script>
