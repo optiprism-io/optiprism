@@ -1,11 +1,23 @@
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::BitAnd;
-use datafusion_expr::Operator;
 
-pub trait BooleanOp<T>: Send + Sync + Display + Debug {
+#[derive(Debug, Clone)]
+pub enum Operator {
+    And,
+    Or,
+    Eq,
+    NotEq,
+    Lt,
+    LtEq,
+    Gt,
+    GtEq,
+}
+
+pub trait BooleanOp<T>: Send + Sync + Debug {
     fn perform(left: T, right: T) -> bool;
     fn op() -> Operator;
 }
+/*
 
 #[derive(Debug)]
 pub struct BooleanAnd;
@@ -46,7 +58,7 @@ impl Display for BooleanOr {
         write!(f, "Or")
     }
 }
-
+*/
 #[derive(Debug)]
 pub struct BooleanEq;
 

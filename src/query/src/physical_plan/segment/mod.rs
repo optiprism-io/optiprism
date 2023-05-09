@@ -9,6 +9,7 @@ pub mod count;
 mod boolean_op;
 // pub mod sequence;
 // pub mod sum;
+pub mod aggregate;
 // mod test_value;
 // mod boolean_op;
 

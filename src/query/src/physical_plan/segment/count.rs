@@ -120,7 +120,6 @@ mod tests {
     use datafusion::physical_plan::expressions::Column;
     use datafusion::physical_plan::expressions::Literal;
     use datafusion_common::ScalarValue;
-    use datafusion_expr::Operator;
 
     use crate::physical_plan::segment::boolean_op::{BooleanEq, BooleanGt, BooleanNotEq};
     use crate::physical_plan::segment::count::Count;

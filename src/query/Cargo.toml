@@ -5,6 +5,8 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
+num-traits = "0.2.15"
+num = "0.4.0"
 anyhow = "1.0.66"
 ahash = { version = "0.8", default-features = false }
 arrow = { version = "38.0.0", features = ["prettyprint"] }

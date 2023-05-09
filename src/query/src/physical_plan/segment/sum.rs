@@ -1,13 +1,9 @@
-use crate::exprtree::error::Result;
-use crate::exprtree::segment::expressions::boolean_op::BooleanOp;
-use crate::exprtree::segment::expressions::multibatch::expr::Expr;
 use crate::exprtree::segment::expressions::utils::{break_on_false, break_on_true, into_array};
 use arrow::array::{Array, ArrayRef, BooleanArray, Int8Array};
 use arrow::compute::kernels::arithmetic::{add, divide, divide_scalar, multiply, subtract};
 use arrow::datatypes::{DataType, Schema};
 use arrow::record_batch::RecordBatch;
 use datafusion::error::{DataFusionError, Result as DatafusionResult};
-use datafusion::logical_plan::ToDFSchema;
 use datafusion::physical_plan::expressions::Column;
 use datafusion::physical_plan::{ColumnarValue, PhysicalExpr};
 use std::marker::PhantomData;
