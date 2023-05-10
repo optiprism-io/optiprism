@@ -29,7 +29,6 @@ use num_traits::{AsPrimitive, Bounded, FromPrimitive, Num, NumAssign, NumCast, P
 
 #[derive(Debug)]
 enum AggregateFunction {
-    Count,
     Sum,
     Min,
     Max,
@@ -65,7 +64,6 @@ pub struct Aggregate<T, Arr, Op, Acc> where T: Debug {
     left_col: Column,
     right: T,
     left: T,
-    is_prev_valid: Option<bool>,
     result: Vec<i64>,
 }
 
@@ -77,7 +75,6 @@ impl<T, Arr, Op, Acc> Aggregate<T, Arr, Op, Acc> where Acc: Accumulator<T>, T: D
         }
 
         match Acc::fn_name() {
-            AggregateFunction::Count => {}
             AggregateFunction::Sum => {
                 if !left.data_type(&schema)?.is_numeric() {
                     return Err(QueryError::Plan("Column should be numeric".to_string()));
@@ -94,7 +91,6 @@ impl<T, Arr, Op, Acc> Aggregate<T, Arr, Op, Acc> where Acc: Accumulator<T>, T: D
             left_col: left,
             right,
             left: T::default(),
-            is_prev_valid: None,
             result: Vec::with_capacity(100),
         })
     }

@@ -29,7 +29,6 @@ pub struct Count<Op> {
     op: PhantomData<Op>,
     right: i64,
     acc: i64,
-    is_prev_valid: Option<bool>,
     result: Vec<i64>,
 }
 
@@ -41,7 +40,6 @@ impl<Op> Count<Op> {
                 op: PhantomData,
                 right,
                 acc: 0,
-                is_prev_valid: None,
                 result: Vec::with_capacity(100),
             }),
             other => Err(QueryError::Plan(format!(
