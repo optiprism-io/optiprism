@@ -4,6 +4,6 @@ pub mod merge;
 mod pivot;
 pub mod planner;
 mod unpivot;
-mod segment;
+mod segmentation;
 // pub mod merge;
 // pub mod planner;

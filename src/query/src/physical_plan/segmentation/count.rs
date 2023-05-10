@@ -20,11 +20,8 @@ use datafusion_expr::Literal;
 
 use crate::error::QueryError;
 use crate::error::Result;
-use crate::physical_plan::segment::boolean_op::BooleanOp;
-use crate::physical_plan::segment::{break_on_false};
-use crate::physical_plan::segment::break_on_true;
-use crate::physical_plan::segment::Comparable;
-use crate::physical_plan::segment::Expr;
+use crate::physical_plan::segmentation::boolean_op::BooleanOp;
+use crate::physical_plan::segmentation::Expr;
 
 #[derive(Debug)]
 pub struct Count<Op> {
@@ -121,9 +118,9 @@ mod tests {
     use datafusion::physical_plan::expressions::Literal;
     use datafusion_common::ScalarValue;
 
-    use crate::physical_plan::segment::boolean_op::{BooleanEq, BooleanGt, BooleanNotEq};
-    use crate::physical_plan::segment::count::Count;
-    use crate::physical_plan::segment::Expr;
+    use crate::physical_plan::segmentation::boolean_op::{BooleanEq, BooleanGt, BooleanNotEq};
+    use crate::physical_plan::segmentation::count::Count;
+    use crate::physical_plan::segmentation::Expr;
 
     #[test]
     fn one_batch() -> anyhow::Result<()> {
