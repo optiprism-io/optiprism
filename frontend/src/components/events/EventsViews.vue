@@ -108,26 +108,18 @@
         v-if="!isNoData && !props.onlyView"
         class="pf-c-card"
     >
-        <div class="pf-c-toolbar">
-            <div class="pf-c-toolbar__content">
-                <div class="pf-u-font-size-lg">
-                    Breakdown Table
-                </div>
-            </div>
-        </div>
         <div class="pf-c-scroll-inner-wrapper">
-            <div
-                v-if="props.loading"
-                class="pf-u-min-height pf-u-display-flex pf-u-justify-content-center pf-u-align-items-center"
-                style="--pf-u-min-height--MinHeight: 24ch;"
-            >
-                <UiSpinner :size="'xl'" />
-            </div>
             <UiTable
-                v-else
+                :is-loading="props.loading"
                 :items="dataTable.tableData"
                 :columns="dataTable.tableColumnsValues"
-            />
+            >
+                <template #before>
+                    <div class="pf-u-font-size-lg">
+                        Breakdown Table
+                    </div>
+                </template>
+            </UiTable>
         </div>
     </div>
 </template>

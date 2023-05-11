@@ -286,7 +286,7 @@ export default function ({ environment = 'development' } = {}) {
                 return {
                     data: schema.db.groupRecords,
                 };
-            }, { timing: 110 });
+            }, { timing: 1500 });
 
             this.put(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/group-records/:id`, (schema, request) => {
                 return schema.db.groupRecords.update(request.params.id, JSON.parse(request.requestBody));

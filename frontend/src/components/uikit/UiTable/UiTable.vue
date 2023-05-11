@@ -4,7 +4,20 @@
             <div class="pf-c-toolbar__content">
                 <div class="pf-c-toolbar__content-section pf-m-nowrap">
                     <div class="pf-c-toolbar__item">
-                        <slot name="before" />
+                        <div class="pf-l-flex pf-u-align-items-center">
+                            <slot name="before" />
+                            <UiSpinner
+                                v-show="props.isLoading"
+                                class="pf-u-ml-md"
+                                :size="'md'"
+                            />
+                        </div>
+                    </div>
+                    <div
+                        v-if="slots.after"
+                        class="pf-c-toolbar__item pf-u-ml-auto"
+                    >
+                        <slot name="after" />
                     </div>
                     <div
                         v-if="props.showSelectColumns"
@@ -21,7 +34,6 @@
                 </div>
             </div>
         </div>
-
         <table
             class="pf-c-table"
             :class="{
@@ -105,13 +117,15 @@
 
 <script lang="ts" setup>
 import {Row, Column, Action, ColumnGroup} from '@/components/uikit/UiTable/UiTable'
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, useSlots, ref } from 'vue'
 import UiTableHeadCell from '@/components/uikit/UiTable/UiTableHeadCell.vue'
 import UiTableCell from '@/components/uikit/UiTable/UiTableCell.vue'
 import UiTableCellWrapper from '@/components/uikit/UiTable/UiTableCellWrapper.vue'
 import UiSelect, { UiSelectItem } from '@/components/uikit/UiSelect.vue'
+import UiSpinner from '@/components/uikit/UiSpinner.vue'
 
 const i18n = inject<any>('i18n')
+const slots = useSlots();
 
 type Props = {
     showSelectColumns?: boolean,
@@ -119,6 +133,7 @@ type Props = {
     items?: Row[]
     columns: Column[]
     groups?: ColumnGroup[]
+    isLoading?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -179,4 +194,10 @@ const toggleColumns = (payload: string) => {
 }
 </script>
 
-<style lang="scss"></style>
+<style lang="scss">
+.ui-table {
+    .pf-c-toolbar__content {
+        min-height: 34px;
+    }
+}
+</style>

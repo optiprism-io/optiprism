@@ -10,43 +10,36 @@
             >
                 <Segments
                     :is-one="true"
-                    @get-event-segmentation="updateData"
+                    @get-event-segmentation="getEventSegmentationDebounce"
                 />
             </UiCard>
             <template #main>
                 <UiCardContainer class="pf-u-h-100">
-                    <div
-                        v-if="groupStore.loading"
-                        class="pf-u-h-50vh pf-u-display-flex pf-u-align-items-center pf-u-justify-content-center"
+                    <UiTable
+                        :items="items"
+                        :columns="columns"
+                        :show-select-columns="true"
+                        :is-loading="groupStore.loading"
+                        @on-action="onAction"
                     >
-                        <UiSpinner :size="'xl'" />
-                    </div>
-                    <template v-else>
-                        <UiTable
-                            :items="items"
-                            :columns="columns"
-                            :show-select-columns="true"
-                            @on-action="onAction"
-                        >
-                            <template #before>
-                                <UiToggleGroup
-                                    :items="itemsPeriod"
-                                    @select="onSelectPerion"
-                                >
-                                    <template #after>
-                                        <UiDatePickerWrappet
-                                            :is-period-active="groupStore.isPeriodActive"
-                                            :from="groupStore.period.from"
-                                            :to="groupStore.period.to"
-                                            :last="groupStore.period.last"
-                                            :type="groupStore.period.type"
-                                            @on-apply="onSelectData"
-                                        />
-                                    </template>
-                                </UiToggleGroup>
-                            </template>
-                        </UiTable>
-                    </template>
+                        <template #before>
+                            <UiToggleGroup
+                                :items="itemsPeriod"
+                                @select="onSelectPerion"
+                            >
+                                <template #after>
+                                    <UiDatePickerWrappet
+                                        :is-period-active="groupStore.isPeriodActive"
+                                        :from="groupStore.period.from"
+                                        :to="groupStore.period.to"
+                                        :last="groupStore.period.last"
+                                        :type="groupStore.period.type"
+                                        @on-apply="onSelectData"
+                                    />
+                                </template>
+                            </UiToggleGroup>
+                        </template>
+                    </UiTable>
                 </UiCardContainer>
             </template>
         </ToolsLayout>
@@ -76,7 +69,7 @@ import UiDatePickerWrappet, { DataPickerPeriod } from '@/components/uikit/UiDate
 import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue';
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue';
 import PropertiesManagementPopup from '@/components/groups/PropertiesManagementPopup.vue';
-import UiSpinner from '@/components/uikit/UiSpinner.vue'
+import { debounce } from 'lodash';
 
 const i18n = inject('i18n') as I18N;
 const groupStore = useGroupStore();
@@ -100,7 +93,7 @@ const columnsPropertiesKeys = computed(() => {
 });
 
 const columns = computed(() => {
-    return ['id', ...columnsPropertiesKeys.value, 'action'].map(key => {
+    return groupStore.items.length ? ['id', ...columnsPropertiesKeys.value, 'action'].map(key => {
         const isAction = key === 'action';
         return {
             value: key,
@@ -109,7 +102,7 @@ const columns = computed(() => {
             type: isAction? 'action' : '',
             fitContent: key === 'id',
         };
-    });
+    }) : [];
 });
 
 const items = computed(() => {
@@ -150,6 +143,10 @@ const items = computed(() => {
         ]
     })
 });
+
+const getEventSegmentationDebounce = debounce(() => {
+    updateData()
+}, 1500);
 
 const onAction = (payload: Action) => {
     const item = groupStore.items.find(item => item.id === payload.type);

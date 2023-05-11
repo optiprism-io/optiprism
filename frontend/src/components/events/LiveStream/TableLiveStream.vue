@@ -1,38 +1,49 @@
 <template>
-    <div class="pf-c-toolbar">
-        <div class="pf-c-toolbar__content">
-            <div class="pf-c-toolbar__content-section pf-m-nowrap">
-                <div class="pf-c-toolbar__item">
-                    <UiToggleGroup
-                        :items="itemsPeriod"
-                        @select="onSelectPerion"
-                    >
-                        <template #after>
-                            <UiDatePicker
-                                :value="calendarValue"
-                                :last-count="liveStreamStore.period.last"
-                                :active-tab-controls="liveStreamStore.period.type"
-                                @on-apply="onApplyPeriod"
-                            >
-                                <template #action>
-                                    <button
-                                        class="pf-c-toggle-group__button"
-                                        :class="{
-                                            'pf-m-selected': liveStreamStore.isPeriodActive,
-                                        }"
-                                        type="button"
-                                    >
-                                        <div class="pf-u-display-flex pf-u-align-items-center">
-                                            <UiIcon :icon="'far fa-calendar-alt'" />
-                                            &nbsp;
-                                            {{ calendarValueString }}
-                                        </div>
-                                    </button>
-                                </template>
-                            </UiDatePicker>
-                        </template>
-                    </UiToggleGroup>
-                </div>
+    <div
+        class="pf-u-min-height"
+        style="--pf-u-min-height--MinHeight: 24ch;"
+    >
+        <DataEmptyPlaceholder v-if="liveStreamStore.isNoData">
+            {{ $t('events.select_to_start') }}
+        </DataEmptyPlaceholder>
+        <UiTable
+            :is-loading="liveStreamStore.loading"
+            :items="tableData"
+            :columns="tableColumnsValues"
+            @on-action="onAction"
+        >
+            <template #before>
+                <UiToggleGroup
+                    :items="itemsPeriod"
+                    @select="onSelectPerion"
+                >
+                    <template #after>
+                        <UiDatePicker
+                            :value="calendarValue"
+                            :last-count="liveStreamStore.period.last"
+                            :active-tab-controls="liveStreamStore.period.type"
+                            @on-apply="onApplyPeriod"
+                        >
+                            <template #action>
+                                <button
+                                    class="pf-c-toggle-group__button"
+                                    :class="{
+                                        'pf-m-selected': liveStreamStore.isPeriodActive,
+                                    }"
+                                    type="button"
+                                >
+                                    <div class="pf-u-display-flex pf-u-align-items-center">
+                                        <UiIcon :icon="'far fa-calendar-alt'" />
+                                        &nbsp;
+                                        {{ calendarValueString }}
+                                    </div>
+                                </button>
+                            </template>
+                        </UiDatePicker>
+                    </template>
+                </UiToggleGroup>
+            </template>
+            <template #after>
                 <div
                     v-if="liveStreamStore.columnsMap.length"
                     class="pf-c-toolbar__item pf-u-ml-auto"
@@ -62,29 +73,12 @@
                         </UiButton>
                     </Select>
                 </div>
-            </div>
-        </div>
-    </div>
-    <div class="pf-c-scroll-inner-wrapper">
-        <div
-            class="pf-u-min-height"
-            style="--pf-u-min-height--MinHeight: 24ch;"
-        >
-            <DataEmptyPlaceholder v-if="liveStreamStore.isNoData">
-                {{ $t('events.select_to_start') }}
-            </DataEmptyPlaceholder>
-            <DataLoader v-else-if="liveStreamStore.loading" />
-            <UiTable
-                v-else
-                :items="tableData"
-                :columns="tableColumnsValues"
-                @on-action="onAction"
-            />
-            <LiveStreamEventPopup
-                v-if="liveStreamStore.eventPopup"
-                :name="eventPopupName"
-            />
-        </div>
+            </template>
+        </UiTable>
+        <LiveStreamEventPopup
+            v-if="liveStreamStore.eventPopup"
+            :name="eventPopupName"
+        />
     </div>
 </template>
 
@@ -104,7 +98,6 @@ import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGro
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
 import UiTable from '@/components/uikit/UiTable/UiTable.vue'
 import DataEmptyPlaceholder from '@/components/common/data/DataEmptyPlaceholder.vue';
-import DataLoader from '@/components/common/data/DataLoader.vue';
 import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue'
 import LiveStreamEventPopup from '@/components/events/LiveStreamEventPopup.vue'
 import Select from '@/components/Select/Select.vue'
