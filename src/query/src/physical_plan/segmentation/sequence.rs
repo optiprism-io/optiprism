@@ -13,18 +13,13 @@ use std::borrow::{Borrow, BorrowMut};
 use std::ops::{Deref, Neg};
 use std::rc::Rc;
 use std::sync::Arc;
+use crate::physical_plan::segmentation::Expr;
 
 #[derive(Debug, Clone)]
 pub enum Filter {
     DropOffOnAnyStep,
     DropOffOnStep(usize),
     TimeToConvert(Duration, Duration),
-}
-
-#[derive(Clone)]
-struct Row {
-    batch_id: usize,
-    row_id: usize,
 }
 
 #[derive(Debug)]
@@ -35,7 +30,7 @@ pub struct Sequence {
     steps: Vec<Arc<dyn PhysicalExpr>>,
     exclude: Option<Vec<(Arc<dyn PhysicalExpr>, Vec<usize>)>>,
     // expr and vec of step ids
-    constants: Option<Vec<usize>>,
+    constants: Option<Vec<Column>>,
     // vec of col ids
     filter: Option<Filter>,
 }
@@ -54,7 +49,7 @@ impl Sequence {
                 return Err(DataFusionError::Plan(format!(
                     "Timestamp column must be Timestamp, not {:?}",
                     other,
-                )))
+                )));
             }
         };
 
@@ -75,7 +70,7 @@ impl Sequence {
                     return Err(DataFusionError::Plan(format!(
                         "Step expression must return boolean values, not {:?}",
                         other,
-                    )))
+                    )));
                 }
             }
         }
@@ -110,7 +105,7 @@ impl Sequence {
                         return Err(DataFusionError::Plan(format!(
                             "Exclude expression must return boolean values, not {:?}",
                             other,
-                        )))
+                        )));
                     }
                 },
                 Err(e) => return Err(e),
@@ -128,7 +123,7 @@ impl Sequence {
                     return Err(DataFusionError::Plan(format!(
                         "Exclude expression must return boolean values, not {:?}",
                         other,
-                    )))
+                    )));
                 }
             }
             if steps.is_empty() {
@@ -151,27 +146,17 @@ impl Sequence {
         })
     }
 
-    pub fn with_constants(self, constants: Vec<&str>) -> DatafusionResult<Self> {
+    pub fn with_constants(self, constants: Vec<Column>) -> DatafusionResult<Self> {
         if constants.is_empty() {
             return Err(DataFusionError::Plan("Empty constants".to_string()));
         }
-        let c: Vec<usize> = constants
-            .iter()
-            .map(|x| {
-                return match self.schema.column_with_name(*x) {
-                    None => Err(DataFusionError::Plan(format!("Column {} not found", *x))),
-                    Some((i, f)) => Ok(i),
-                };
-            })
-            .collect::<DatafusionResult<Vec<usize>>>()?;
-
         Ok(Sequence {
             schema: self.schema,
             ts_col: self.ts_col,
             window: self.window,
             steps: self.steps,
             exclude: self.exclude,
-            constants: Some(c),
+            constants: Some(constants),
             filter: None,
         })
     }
@@ -217,57 +202,59 @@ impl Sequence {
             filter: Some(Filter::TimeToConvert(from, to)),
         })
     }
+
+    fn check_constants(
+        &mut self,
+        batch: &RecordBatch,
+        constants:Vec<Column>,
+        row: usize,
+        const_row: usize,
+    ) -> DatafusionResult<bool> {
+        for col in constants {
+            constant
+            let col = batch.columns()[*col_id];
+            // current col and const col are the same, but they can be in different batches
+            let const_col = &batches[const_row.batch_id].columns()[*col_id];
+
+            match (col.is_null(row.row_id), const_col.is_null(const_row.row_id)) {
+                (true, true) => continue,
+                (true, false) | (false, true) => return Ok(false),
+                _ => {}
+            }
+
+            match col.data_type() {
+                DataType::Int8 => {
+                    let left = const_col
+                        .as_any()
+                        .downcast_ref::<Int8Array>()
+                        .unwrap()
+                        .value(const_row.row_id);
+                    let right = col
+                        .as_any()
+                        .downcast_ref::<Int8Array>()
+                        .unwrap()
+                        .value(row.row_id);
+                    if left != right {
+                        return Ok(false);
+                    }
+                }
+                other => {
+                    return Err(DataFusionError::Internal(format!(
+                        "Unsupported format {:?}",
+                        other
+                    )));
+                }
+            }
+        }
+
+        Ok(true)
+    }
 }
 
 impl std::fmt::Display for Sequence {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", "Sequence")
     }
-}
-
-fn check_constants(
-    batches: &[RecordBatch],
-    row: &Row,
-    constants: &Vec<usize>,
-    const_row: &Row,
-) -> DatafusionResult<bool> {
-    for col_id in constants {
-        let col = &batches[row.batch_id].columns()[*col_id];
-        // current col and const col are the same, but they can be in different batches
-        let const_col = &batches[const_row.batch_id].columns()[*col_id];
-
-        match (col.is_null(row.row_id), const_col.is_null(const_row.row_id)) {
-            (true, true) => continue,
-            (true, false) | (false, true) => return Ok(false),
-            _ => {}
-        }
-
-        match col.data_type() {
-            DataType::Int8 => {
-                let left = const_col
-                    .as_any()
-                    .downcast_ref::<Int8Array>()
-                    .unwrap()
-                    .value(const_row.row_id);
-                let right = col
-                    .as_any()
-                    .downcast_ref::<Int8Array>()
-                    .unwrap()
-                    .value(row.row_id);
-                if left != right {
-                    return Ok(false);
-                }
-            }
-            other => {
-                return Err(DataFusionError::Internal(format!(
-                    "Unsupported format {:?}",
-                    other
-                )))
-            }
-        }
-    }
-
-    Ok(true)
 }
 
 fn inc_row(row: &mut Row, batches: &[RecordBatch]) -> bool {
@@ -283,6 +270,7 @@ fn inc_row(row: &mut Row, batches: &[RecordBatch]) -> bool {
 
     true
 }
+
 
 impl Expr for Sequence {
     fn evaluate(&self, batches: &[RecordBatch]) -> DatafusionResult<bool> {
@@ -355,9 +343,9 @@ impl Expr for Sequence {
         let mut step_row: Vec<Row> = vec![
             Row {
                 batch_id: 0,
-                row_id: 0
+                row_id: 0,
             };
-            steps.len()
+            steps.len(),
         ];
         // timestamp of first step
         let mut window_start_ts: i64 = 0;
@@ -509,7 +497,7 @@ mod tests {
                     Arc::new(TimestampSecondArray::from(ts.1.clone())),
                 ],
             )
-            .unwrap(),
+                .unwrap(),
         )
     }
 
@@ -596,7 +584,7 @@ mod tests {
                 Duration::seconds(100),
                 vec![step1.clone(), step2.clone(), step3.clone()],
             )?
-            .with_exclude(exclude)?;
+                .with_exclude(exclude)?;
             assert_eq!(true, op.evaluate(vec![batch.clone()].as_slice())?);
         }
 
@@ -623,7 +611,7 @@ mod tests {
                 Duration::seconds(100),
                 vec![step1.clone(), step2.clone(), step3.clone()],
             )?
-            .with_exclude(exclude)?;
+                .with_exclude(exclude)?;
             assert_eq!(false, op.evaluate(vec![batch.clone()].as_slice())?);
         }
         Ok(())
@@ -654,7 +642,7 @@ mod tests {
                 Duration::seconds(100),
                 vec![step1.clone(), step2.clone(), step3.clone()],
             )?
-            .with_constants(constants)?;
+                .with_constants(constants)?;
             assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
@@ -672,7 +660,7 @@ mod tests {
                 Duration::seconds(100),
                 vec![step1.clone(), step2.clone(), step3.clone()],
             )?
-            .with_constants(constants)?;
+                .with_constants(constants)?;
             assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         }
 
@@ -690,7 +678,7 @@ mod tests {
                 Duration::seconds(100),
                 vec![step1.clone(), step2.clone(), step3.clone()],
             )?
-            .with_constants(constants)?;
+                .with_constants(constants)?;
             assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         }
 
@@ -708,7 +696,7 @@ mod tests {
                 Duration::seconds(100),
                 vec![step1.clone(), step2.clone(), step3.clone()],
             )?
-            .with_constants(constants)?;
+                .with_constants(constants)?;
             assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
@@ -726,7 +714,7 @@ mod tests {
                 Duration::seconds(100),
                 vec![step1.clone(), step2.clone(), step3.clone()],
             )?
-            .with_constants(constants)?;
+                .with_constants(constants)?;
             assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
@@ -744,7 +732,7 @@ mod tests {
                 Duration::seconds(100),
                 vec![step1.clone(), step2.clone(), step3.clone()],
             )?
-            .with_constants(constants)?;
+                .with_constants(constants)?;
             assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         }
 
@@ -762,7 +750,7 @@ mod tests {
                 Duration::seconds(100),
                 vec![step1.clone(), step2.clone(), step3.clone()],
             )?
-            .with_constants(constants)?;
+                .with_constants(constants)?;
             assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         }
 
@@ -834,7 +822,7 @@ mod tests {
             Duration::seconds(1),
             vec![step1.clone(), step2.clone(), step3.clone()],
         )?
-        .with_drop_off_on_step(2)?;
+            .with_drop_off_on_step(2)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -858,7 +846,7 @@ mod tests {
             Duration::seconds(100),
             vec![step1.clone(), step2.clone(), step3.clone()],
         )?
-        .with_drop_off_on_step(2)?;
+            .with_drop_off_on_step(2)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -882,7 +870,7 @@ mod tests {
             Duration::seconds(100),
             vec![step1.clone(), step2.clone(), step3.clone()],
         )?
-        .with_drop_off_on_step(1)?;
+            .with_drop_off_on_step(1)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -906,7 +894,7 @@ mod tests {
             Duration::seconds(100),
             vec![step1.clone(), step2.clone(), step3.clone()],
         )?
-        .with_drop_off_on_step(0)?;
+            .with_drop_off_on_step(0)?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -930,7 +918,7 @@ mod tests {
             Duration::seconds(100),
             vec![step1.clone(), step2.clone(), step3.clone()],
         )?
-        .with_drop_off_on_any_step();
+            .with_drop_off_on_any_step();
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -954,7 +942,7 @@ mod tests {
             Duration::seconds(100),
             vec![step1.clone(), step2.clone(), step3.clone()],
         )?
-        .with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
+            .with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
         assert_eq!(true, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }
@@ -978,7 +966,7 @@ mod tests {
             Duration::seconds(100),
             vec![step1.clone(), step2.clone(), step3.clone()],
         )?
-        .with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
+            .with_time_to_convert(Duration::seconds(1), Duration::seconds(2))?;
         assert_eq!(false, op.evaluate(vec![batch].as_slice())?);
         Ok(())
     }

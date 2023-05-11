@@ -7,9 +7,10 @@ use crate::error::Result;
 // pub mod binary_op;
 pub mod count;
 mod boolean_op;
-// pub mod sequence;
+pub mod sequence;
 // pub mod sum;
 pub mod aggregate;
+pub mod sequence_new;
 // mod test_value;
 // mod boolean_op;
 
