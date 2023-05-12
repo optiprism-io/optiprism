@@ -146,7 +146,7 @@ const items = computed(() => {
 
 const getEventSegmentationDebounce = debounce(() => {
     updateData()
-}, 1500);
+}, 2000);
 
 const onAction = (payload: Action) => {
     const item = groupStore.items.find(item => item.id === payload.type);

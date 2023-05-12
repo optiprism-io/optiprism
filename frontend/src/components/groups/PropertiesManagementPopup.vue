@@ -120,16 +120,6 @@ const applyDisabled = computed(() => {
     return JSON.stringify(properties.value) === JSON.stringify(props.item?.properties);
 });
 
-const onApplyChangePropery = async (payload: ApplyPayload) => {
-    if (props.item?.id) {
-        propertiesEdit.value[payload.index] = {
-            key: payload.valueKey,
-            value: payload.value,
-            error: false,
-        };
-    }
-};
-
 onMounted(() => {
     propertiesEdit.value = props.item?.properties ?
         Object.keys(props.item.properties).map(key => {
@@ -143,6 +133,17 @@ onMounted(() => {
 onUnmounted(() => {
     isLodingSavePropetries.value = false;
 });
+
+const onApplyChangePropery = async (payload: ApplyPayload) => {
+    if (props.item?.id) {
+        propertiesEdit.value[payload.index] = {
+            key: payload.valueKey,
+            value: payload.value,
+            error: !payload.valueKey.trim(),
+        };
+    }
+};
+
 
 const onAddProperty = () => {
     propertiesEdit.value.push({
@@ -161,6 +162,15 @@ const close = () => {
     groupStore.propertyPopup = false;
 };
 
+const checkError = () => {
+    propertiesEdit.value = propertiesEdit.value.map(item => {
+        return {
+            ...item,
+            error: !item.key.trim(),
+        };
+    });
+};
+
 const apply = async () => {
     if (props.item?.id) {
         const error = propertiesEdit.value.findIndex(item => !item.key.trim());
@@ -177,12 +187,7 @@ const apply = async () => {
             emit('apply');
             groupStore.propertyPopup = false;
         } else {
-            propertiesEdit.value = propertiesEdit.value.map(item => {
-                return {
-                    ...item,
-                    error: !item.key.trim(),
-                };
-            });
+            checkError();
         }
     }
 };

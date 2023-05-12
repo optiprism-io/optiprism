@@ -56,13 +56,14 @@
                 :index-parent="props.index"
                 :auto-hide-event="props.autoHideEvent"
                 :is-one="props.isOne"
+                :show-remove="showRemove && (i !== props.conditions.length - 1)"
             />
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import AlphabetIdentifier from '@/components/common/identifier/AlphabetIdentifier.vue'
 import UiEditableText from '@/components/uikit/UiEditableText.vue'
 import Condition from '@/components/events/Segments/Condition.vue'
@@ -85,6 +86,7 @@ const emit = defineEmits<{
 }>()
 
 const updateOpenCondition = ref(false)
+const showRemove = computed(() => !(props.isOne && props.conditions.length === 1));
 
 const onRename = (name: string): void => emit('on-rename', name, props.index)
 const addCondition = (): void => {

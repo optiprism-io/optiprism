@@ -106,7 +106,15 @@ const addSegment = () => segmentsStore.addSegment(`${i18n.$t('events.segments.se
 const deleteSegment = (idx: number) => segmentsStore.deleteSegment(idx)
 const onRenameSegment = (name: string, idx: number) => segmentsStore.renameSegment(name, idx)
 const addCondition = (idx: number) => segmentsStore.addConditionSegment(idx)
-const changeActionCondition = (idx: number, idxSegment: number, ref: { id: string, name: string }) => segmentsStore.changeActionCondition(idx, idxSegment, ref)
+const changeActionCondition = (idx: number, idxSegment: number, ref: { id: string, name: string }) => {
+    const segment = segmentsStore.segments[idxSegment];
+    const conditions = segment?.conditions;
+    const isNonSelectAction = !(conditions && conditions[idx].action?.id);
+    segmentsStore.changeActionCondition(idx, idxSegment, ref);
+    if (props.isOne && isNonSelectAction) {
+        addCondition(0)
+    }
+}
 const changePropertyCondition = (idx: number, idxSegment: number, ref: PropertyRef) => segmentsStore.changePropertyCondition(idx, idxSegment, ref)
 const changeOperationCondition = (idx: number, idxSegment: number, opId: OperationId) => segmentsStore.changeOperationCondition(idx, idxSegment, opId)
 const addValueCondition = (idx: number, idxSegment: number, value: Value) => segmentsStore.addValueCondition(idx, idxSegment, value)

@@ -89,12 +89,11 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, inject, onBeforeMount } from 'vue';
+import { ref, onBeforeMount } from 'vue';
 import { Value } from '@/api';
 import UiInput from '@/components/uikit/UiInput.vue';
 import UiFormGroup from '@/components/uikit/UiFormGroup.vue';
 import UiForm from '@/components/uikit/UiForm.vue';
-import { I18N } from '@/utils/i18n';
 
 export type ApplyPayload = {
     value: Value,
@@ -129,18 +128,11 @@ const emit = defineEmits<{
     (e: 'close-new-line'): void
 }>();
 
-const i18n = inject('i18n') as I18N;
 const editKey = ref('');
 const editValue = ref('');
 const editMode = ref(false);
 const editClickInputType = ref('');
 const activeInput = ref(false);
-
-const editIcon = computed(() => editMode.value ? 'fas fa-plus-circle' : 'fas fa-pencil-alt');
-const editTooltip = computed(() => editMode.value ? i18n.$t('users.saveProperty') : i18n.$t('users.editProperty'));
-const isNewLine = computed(() => props.index === -1);
-const isHasEditKey = computed(() => Boolean(editKey.value.trim()));
-const isHasEditValue = computed(() => Boolean(editValue.value.trim()));
 
 const openEditInputs = (typeInput: string) => {
     editClickInputType.value = typeInput;

@@ -143,7 +143,7 @@
                 </VTooltip>
             </div>
             <div
-                v-if="!props.isOne"
+                v-if="props.showRemove"
                 class="pf-c-action-list__item condition__control"
                 @click="onRemove"
             >
@@ -214,10 +214,13 @@ interface Props {
     updateOpen?: boolean
     autoHideEvent?: boolean
     isOne?: boolean
+    showRemove?: boolean
 }
 
 const lexiconStore = useLexiconStore()
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+    showRemove: true,
+});
 
 const conditionItems = inject<[]>('conditionItems')
 const updateOpenFilter = ref(false);
@@ -289,7 +292,7 @@ const conditionConfig = computed(() => {
 
 const isSelectedAction = computed(() => Boolean(props.condition.action))
 
-const displayNameAction = computed(() => props.condition?.action?.name || i18n.$t('events.segments.select_condition'))
+const displayNameAction = computed(() => props.condition?.action?.name || (props.isOne ? i18n.$t('events.segments.add_condition') : i18n.$t('events.segments.select_condition')))
 
 const isSelectedProp = computed(() =>  Boolean(props.condition.propRef))
 
