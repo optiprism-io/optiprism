@@ -24,6 +24,8 @@ const refreshToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3O
 const csrfToken = 'CIwNZNlR4XbisJF39I8yWnWX9wX4WFoz'
 
 export default function ({ environment = 'development' } = {}) {
+    let usersCount = 0;
+
     return createServer({
         seeds(server) {
             server.db.loadData({
@@ -33,7 +35,7 @@ export default function ({ environment = 'development' } = {}) {
                 userProperties: userPropertiesMocks,
                 reports: reportsMocks,
                 dashboards: dashboardsMocks,
-                groupRecords: groupRecordsMocks,
+                groupRecords: groupRecordsMocks.map(item => ({...item, id: nanoid()})),
             });
         },
 
@@ -283,6 +285,14 @@ export default function ({ environment = 'development' } = {}) {
              * put
              */
             this.post(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/group-records/search`, (schema) => {
+                if (usersCount) {
+                    schema.db.groupRecords.insert({
+                        ...schema.db.groupRecords[schema.db.groupRecords.length - 1],
+                        id: nanoid(),
+                    });
+                } else {
+                    usersCount = ++usersCount;
+                }
                 return {
                     data: schema.db.groupRecords,
                 };
