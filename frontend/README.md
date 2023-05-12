@@ -58,7 +58,7 @@ VITE_API_BASE_PATH=http://localhost:8089/api yarn start:dev
 - [Install Doc](https://openapi-generator.tech/docs/installation/) `(min version 6.0.1)`
 
 ```
-openapi-generator generate -i ../api/openapi.yaml -g typescript-axios -o ./src/api
+openapi-generator generate -i ./api/openapi.yaml -g typescript-axios -o ./frontend/src/api
 ```
 
 Run command before push
