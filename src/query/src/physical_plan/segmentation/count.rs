@@ -21,7 +21,7 @@ use datafusion_expr::Literal;
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::segmentation::boolean_op::BooleanOp;
-use crate::physical_plan::segmentation::Expr;
+use crate::physical_plan::segmentation::{Expr, RowResult, Spans};
 
 #[derive(Debug)]
 pub struct Count<Op> {
@@ -29,7 +29,7 @@ pub struct Count<Op> {
     op: PhantomData<Op>,
     right: i64,
     acc: i64,
-    result: Vec<i64>,
+    spans: Spans,
 }
 
 impl<Op> Count<Op> {
@@ -40,7 +40,7 @@ impl<Op> Count<Op> {
                 op: PhantomData,
                 right,
                 acc: 0,
-                result: Vec::with_capacity(100),
+                spans: Spans::new(100),
             }),
             other => Err(QueryError::Plan(format!(
                 "Count predicate must return boolean values, not {:?}",
@@ -59,36 +59,74 @@ impl<Op> Expr for Count<Op>
         batch: &RecordBatch,
         is_last: bool,
     ) -> Result<Option<Vec<i64>>> {
-        self.result.clear();
+        println!("\n");
+        self.spans.reset(spans.to_vec(), batch.columns()[0].len());
         let arr = self.predicate.evaluate(batch)?.into_array(0);
         let arr = arr.as_any().downcast_ref::<BooleanArray>().unwrap();
 
-        let mut idx: i64 = 0;
-        let mut cur_span = 0;
-        while idx < arr.len() as i64 {
-            if cur_span < spans.len() && spans[cur_span] == idx as usize {
-                if Op::perform(self.acc, self.right) {
-                    self.result.push(idx - 1);
+
+        while self.spans.next_span() {
+            while let Some(row) = self.spans.next_row() {
+                match row {
+                    RowResult::NextPartition(row_id) => {
+                        if Op::perform(self.acc, self.right) || self.spans.cur_span() == 0 {
+                            self.spans.push_result();
+                        }
+
+                        self.acc = 0;
+
+                        if arr.value(row_id) {
+                            self.acc += 1;
+                        }
+
+                        println!("acc {}", self.acc);
+
+                        break;
+                    }
+                    RowResult::NextRow(row_id) => {
+                        if arr.value(row_id as usize) {
+                            self.acc += 1;
+                        }
+                        println!("acc {}", self.acc);
+                    }
                 }
-                self.acc = 0;
-                cur_span += 1;
             }
 
-            if arr.value(idx as usize) {
-                self.acc += 1;
+
+            /*let mut idx: i64 = 0;
+            let mut cur_span = 0;
+            while idx < arr.len() as i64 {
+                if cur_span < spans.len() && spans[cur_span] == idx as usize {
+                    if Op::perform(self.acc, self.right) {
+                        self.result.push(idx - 1);
+                    }
+                    self.acc = 0;
+                    cur_span += 1;
+                }
+
+                if arr.value(idx as usize) {
+                    self.acc += 1;
+                }
+
+                idx += 1;
             }
 
-            idx += 1;
+
+            if is_last && self.result.last().cloned() != Some(idx - 1) && Op::perform(self.acc, self.right) {
+                self.result.push(idx - 1)
+            }
+            if self.result.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(self.result.drain(..).collect()))
+            }*/
         }
 
-        if is_last && self.result.last().cloned() != Some(idx - 1) && Op::perform(self.acc, self.right) {
-            self.result.push(idx - 1)
+
+        if is_last && self.spans.check_last_span() && Op::perform(self.acc, self.right) {
+            self.spans.push_final_result()
         }
-        if self.result.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(self.result.drain(..).collect()))
-        }
+        Ok(self.spans.result())
     }
 }
 
@@ -133,19 +171,20 @@ mod tests {
             ],
         )?;
         let mut op = Count::<BooleanEq>::try_new(&schema, col.clone(), 1)?;
-        assert_eq!(op.evaluate(&[1, 3], &batch, true)?, Some(vec![0]));
+        // 0, 1., 2, 0., 1
+        assert_eq!(op.evaluate(&[1, 3], &batch, true)?, Some(vec![0, 3]));
 
         let mut op = Count::<BooleanNotEq>::try_new(&schema, col.clone(), 1)?;
         assert_eq!(op.evaluate(&[1, 3], &batch, false)?, Some(vec![2]));
 
         let mut op = Count::<BooleanNotEq>::try_new(&schema, col.clone(), 1)?;
-        assert_eq!(op.evaluate(&[1, 3], &batch, true)?, Some(vec![2, 4]));
+        assert_eq!(op.evaluate(&[1, 3], &batch, true)?, Some(vec![2]));
 
         let mut op = Count::<BooleanGt>::try_new(&schema, col.clone(), 1)?;
         assert_eq!(op.evaluate(&[1, 3], &batch, false)?, Some(vec![2]));
 
         let mut op = Count::<BooleanGt>::try_new(&schema, col.clone(), 1)?;
-        assert_eq!(op.evaluate(&[1, 3], &batch, true)?, Some(vec![2, 4]));
+        assert_eq!(op.evaluate(&[1, 3], &batch, true)?, Some(vec![2]));
 
         Ok(())
     }

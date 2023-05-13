@@ -17,6 +17,26 @@ pub enum Filter {
     TimeToConvert(Duration, Duration),
 }
 
+struct State {
+    step_id: usize,
+    row_id: usize,
+    step_row: Vec<usize>,
+    window_start_ts: i64,
+    is_completed: bool,
+}
+
+impl State {
+    pub fn new(steps: usize) -> Self {
+        Self {
+            step_id: 0,
+            row_id: 0,
+            step_row: vec![0; steps],
+            window_start_ts: 0,
+            is_completed: false,
+        }
+    }
+}
+
 pub struct Sequence {
     schema: SchemaRef,
     ts_col: Column,
@@ -27,6 +47,8 @@ pub struct Sequence {
     constants: Option<Vec<Column>>,
     // vec of col ids
     filter: Option<Filter>,
+    state: State,
+    result:
 }
 
 impl Expr for Sequence {
@@ -42,33 +64,38 @@ impl Expr for Sequence {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let exclude = self
-            .exclude
-            .map(|v| {
-                let mut res = HashMap::<usize, Vec<ArrayRef>>::new();
+        let mut exclude = vec![Vec::new(); steps.len()];
 
-                for (expr, steps) in v.into_iter() {
-                    let expr_res = expr.evaluate(batch)?.into_array(0);
-                    let matched_steps = match steps {
-                        None => (0..self.steps.len()).collect::<Vec<_>>(),
-                        Some(steps) => steps,
-                    };
-                    for step_id in matched_steps {
-                        res
-                            .entry(step_id)
-                            .and_modify(|e| e.push(expr_res.clone()))
-                            .or_insert(vec![expr_res.clone()]);
+        if let Some(e) = self.exclude.as_ref() {
+            for (expr, s) in e.iter() {
+                let arr = expr
+                    .evaluate(batch)?
+                    .into_array(0)
+                    .as_any()
+                    .downcast_ref::<BooleanArray>()
+                    .unwrap();
+                match s {
+                    None => {
+                        for step_id in 0..steps.len() {
+                            exclude[step_id].push(arr.clone());
+                        }
+                    }
+                    Some(steps) => {
+                        for step_id in steps {
+                            exclude[*step_id].push(arr.clone());
+                        }
                     }
                 }
+            }
+        }
 
-                res
-            }).map(|v| {
-            (0..self.steps.len()).into_iter().map(|step_id| {
-                v.get(&step_id).cloned()
-            }).collect::<Vec<_>>()
-        });
-
-        let ts_col = self.ts_col.evaluate(batch)?.into_array(0).as_any().downcast_ref::<TimestampSecondArray>().unwrap();
+        let ts_col = self
+            .ts_col
+            .evaluate(batch)?
+            .into_array(0)
+            .as_any()
+            .downcast_ref::<TimestampSecondArray>()
+            .unwrap();
 
         Ok(())
     }

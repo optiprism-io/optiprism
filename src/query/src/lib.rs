@@ -1,5 +1,7 @@
 #![feature(let_chains)]
 
+extern crate core;
+
 use arrow::array::{Array, ArrayRef};
 use arrow::datatypes::DataType;
 use arrow::datatypes::SchemaRef;
