@@ -91,6 +91,7 @@ import { useCommonStore } from '@/stores/common'
 import { useLexiconStore } from '@/stores/lexicon'
 import { useEventsStore } from '@/stores/eventSegmentation/events'
 
+import { shortPeriodDays } from '@/components/uikit/UiCalendar/UiCalendar.config';
 import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 import { Column, Cell, Action,  } from '@/components/uikit/UiTable/UiTable'
 import { EventCell as EventCellType } from '@/components/events/EventCell.vue'
@@ -119,9 +120,9 @@ const userProperties = 'userProperties'
 const eventPopupName = ref('')
 
 const itemsPeriod = computed(() => {
-    return ['7', '30', '90'].map((key, i): UiToggleGroupItem => ({
+    return shortPeriodDays.map((key): UiToggleGroupItem => ({
         key,
-        nameDisplay: key + i18n.$t('common.calendar.day_short'),
+        nameDisplay: key + i18n.$t('common.calendar.dayShort'),
         value: key,
         selected: liveStreamStore.controlsPeriod === key,
     }))

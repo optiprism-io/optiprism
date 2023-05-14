@@ -62,7 +62,7 @@
                     </div>
                     <div class="pf-c-toolbar__item pf-u-ml-auto">
                         <UiLabelGroup
-                            :label="'Chart type:'"
+                            :label="chartTypeLabel"
                         >
                             <template #content>
                                 <UiToggleGroup
@@ -98,14 +98,12 @@
                 :is="chartEventsOptions.component"
                 v-else
                 :options="chartEventsOptions"
-                :type="chartTypeActive"
                 :loading="props.loading"
             />
         </div>
     </div>
-
     <div
-        v-if="!isNoData && !props.onlyView"
+        v-if="isShowTable"
         class="pf-c-card"
     >
         <div class="pf-c-scroll-inner-wrapper">
@@ -116,7 +114,7 @@
             >
                 <template #before>
                     <div class="pf-u-font-size-lg">
-                        Breakdown Table
+                        {{ $t('events.breakdownTable') }}
                     </div>
                 </template>
             </UiTable>
@@ -133,6 +131,7 @@ import { ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 import { getStringDateByFormat } from '@/helpers/getStringDates';
 import { DataTableResponse, TimeUnit } from '@/api'
 import useDataTable from '@/hooks/useDataTable'
+import usei18n from '@/hooks/useI18n';
 
 import UiSelect from '@/components/uikit/UiSelect.vue';
 import UiToggleGroup, { UiToggleGroupItem } from '@/components/uikit/UiToggleGroup.vue';
@@ -162,6 +161,7 @@ const chartTypeMap = [
 ];
 
 const eventsStore = useEventsStore();
+const { t } = usei18n()
 
 type Props = {
     eventSegmentation: DataTableResponse | undefined
@@ -185,7 +185,8 @@ const emit = defineEmits<{
 
 const isNoData = computed(() => !props.loading && !dataTable.value.hasData)
 const chartTypeActive = computed(() => props.chartType ?? eventsStore.chartType)
-
+const chartTypeLabel = computed(() => `${t('common.chartType')}:`);
+const isShowTable = computed(() => (!isNoData.value && !props.onlyView));
 
 const chartEventsOptions = computed(() => {
     switch(chartTypeActive.value) {

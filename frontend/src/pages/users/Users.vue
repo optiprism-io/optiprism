@@ -69,6 +69,7 @@ import UiDatePickerWrappet, { DataPickerPeriod } from '@/components/uikit/UiDate
 import UiCellToolMenu from '@/components/uikit/cells/UiCellToolMenu.vue';
 import UiTablePressedCell from '@/components/uikit/UiTable/UiTablePressedCell.vue';
 import PropertiesManagementPopup from '@/components/groups/PropertiesManagementPopup.vue';
+import { shortPeriodDays } from '@/components/uikit/UiCalendar/UiCalendar.config';
 import { debounce } from 'lodash';
 
 const i18n = inject('i18n') as I18N;
@@ -77,9 +78,9 @@ const segmentsStore = useSegmentsStore();
 const selectedItes = ref<GroupRecord | null>(null);
 
 const itemsPeriod = computed(() => {
-    return ['7', '30', '90'].map((key): UiToggleGroupItem => ({
+    return shortPeriodDays.map((key): UiToggleGroupItem => ({
         key,
-        nameDisplay: key + i18n.$t('common.calendar.day_short'),
+        nameDisplay: key + i18n.$t('common.calendar.dayShort'),
         value: key,
         selected: groupStore.controlsPeriod === key,
     }));

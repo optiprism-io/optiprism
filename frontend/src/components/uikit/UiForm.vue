@@ -24,7 +24,7 @@ import UiAlert from '@/components/uikit/UiAlert.vue'
 import { AlertTypeEnum } from '@/types'
 
 interface Props {
-    errorMain: string
+    errorMain?: string
 }
 
 const emit = defineEmits<{

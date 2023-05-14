@@ -7,3 +7,5 @@ export const eachMap: Each[] = [
     'hour',
     'minute'
 ]
+
+export const shortPeriodDays = ['7', '30', '90'];

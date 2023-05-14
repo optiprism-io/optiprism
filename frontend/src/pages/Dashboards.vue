@@ -124,7 +124,6 @@ import dashboardService from '@/api/services/dashboards.service'
 import { DashboardPanel as DashboardPanelType, DashboardPanelTypeEnum } from '@/api'
 import { useDashboardsStore } from '@/stores/dashboards'
 import { useCommonStore } from '@/stores/common'
-import { useLexiconStore } from '@/stores/lexicon'
 import { useReportsStore } from '@/stores/reports/reports'
 import usei18n from '@/hooks/useI18n'
 
@@ -140,7 +139,6 @@ const { t } = usei18n()
 const route = useRoute()
 const router = useRouter()
 const commonStore = useCommonStore()
-const lexiconStore = useLexiconStore()
 const dashboardsStore = useDashboardsStore()
 const reportsStore = useReportsStore()
 
@@ -371,10 +369,6 @@ const initDashboardPage = () => {
         setNew()
     }
 };
-
-const reportSelectAction = (payload: any) => {
-    // TODO
-}
 
 const onEditNameDashboard = (payload: boolean) => {
     editableNameDashboard.value = payload;

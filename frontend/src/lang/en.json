@@ -59,7 +59,7 @@
       },
       "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
       "week_days": ["mo", "tu", "we", "th", "fr", "sa", "su"],
-      "day_short": "d"
+      "dayShort": "d"
     },
     "timeUnits": {
       "second": "seconds",
@@ -69,7 +69,8 @@
       "week": "weeks",
       "month": "months",
       "year": "years"
-    }
+    },
+    "chartType": "Chart type"
   },
 
   "users": {
@@ -98,6 +99,7 @@
   },
 
   "events": {
+    "breakdownTable": "Breakdown Table",
     "event_management": {
       "event": "Event",
       "columns": {
