@@ -177,7 +177,7 @@ export default function ({ environment = 'development' } = {}) {
 
             this.get(`${BASE_PATH}/v1/organizations/:organization_id/projects/:project_id/reports`, (schema) => {
                 return {
-                    dashboards: schema.db.reports,
+                    data: schema.db.reports,
                     meta: {}
                 }
             })

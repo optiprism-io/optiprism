@@ -15,13 +15,9 @@ import { useAuthStore } from '@/stores/auth/auth'
 import { useAlertsStore } from '@/stores/alerts'
 import { ErrorResponse } from '@/api'
 import { I18N } from '@/utils/i18n'
-import { useRoute, useRouter } from 'vue-router'
-import { pagesMap } from '@/router'
 import UiAlertGroup from './components/uikit/UiAlertGroup.vue'
 
 const { $t } = inject('i18n') as I18N
-const route = useRoute()
-const router = useRouter()
 const authStore = useAuthStore()
 const alertsStore = useAlertsStore()
 

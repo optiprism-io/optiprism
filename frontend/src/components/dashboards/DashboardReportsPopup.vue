@@ -9,6 +9,7 @@
         />
         <UiTable
             v-else
+            :show-toolbar="false"
             :items="itemsReport"
             :columns="[]"
             @on-action="onActionReport"

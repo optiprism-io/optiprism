@@ -1,6 +1,9 @@
 <template>
     <div class="ui-table">
-        <div class="pf-c-toolbar">
+        <div
+            v-if="props.showToolbar"
+            class="pf-c-toolbar"
+        >
             <div class="pf-c-toolbar__content">
                 <div class="pf-c-toolbar__content-section pf-m-nowrap">
                     <div class="pf-c-toolbar__item">
@@ -123,6 +126,7 @@ import UiTableCell from '@/components/uikit/UiTable/UiTableCell.vue'
 import UiTableCellWrapper from '@/components/uikit/UiTable/UiTableCellWrapper.vue'
 import UiSelect, { UiSelectItem } from '@/components/uikit/UiSelect.vue'
 import UiSpinner from '@/components/uikit/UiSpinner.vue'
+import UiToolbar from '@/components/uikit/UiToolbar.vue';
 
 const i18n = inject<any>('i18n')
 const slots = useSlots();
@@ -134,6 +138,7 @@ type Props = {
     columns: Column[]
     groups?: ColumnGroup[]
     isLoading?: boolean
+    showToolbar?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -141,6 +146,7 @@ const props = withDefaults(defineProps<Props>(), {
     groups: () => [],
     compact: true,
     showSelectColumns: false,
+    showToolbar: true,
 })
 
 const emit = defineEmits<{
