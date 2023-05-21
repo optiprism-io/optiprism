@@ -59,7 +59,6 @@ impl<Op> Expr for Count<Op>
         batch: &RecordBatch,
         is_last: bool,
     ) -> Result<Option<Vec<i64>>> {
-        println!("\n");
         self.spans.reset(spans.to_vec(), batch.columns()[0].len());
         let arr = self.predicate.evaluate(batch)?.into_array(0);
         let arr = arr.as_any().downcast_ref::<BooleanArray>().unwrap();
@@ -91,35 +90,6 @@ impl<Op> Expr for Count<Op>
                     }
                 }
             }
-
-
-            /*let mut idx: i64 = 0;
-            let mut cur_span = 0;
-            while idx < arr.len() as i64 {
-                if cur_span < spans.len() && spans[cur_span] == idx as usize {
-                    if Op::perform(self.acc, self.right) {
-                        self.result.push(idx - 1);
-                    }
-                    self.acc = 0;
-                    cur_span += 1;
-                }
-
-                if arr.value(idx as usize) {
-                    self.acc += 1;
-                }
-
-                idx += 1;
-            }
-
-
-            if is_last && self.result.last().cloned() != Some(idx - 1) && Op::perform(self.acc, self.right) {
-                self.result.push(idx - 1)
-            }
-            if self.result.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(self.result.drain(..).collect()))
-            }*/
         }
 
 

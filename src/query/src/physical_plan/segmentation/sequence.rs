@@ -211,7 +211,6 @@ impl Sequence {
         const_row: usize,
     ) -> DatafusionResult<bool> {
         for col in constants {
-            constant
             let col = batch.columns()[*col_id];
             // current col and const col are the same, but they can be in different batches
             let const_col = &batches[const_row.batch_id].columns()[*col_id];

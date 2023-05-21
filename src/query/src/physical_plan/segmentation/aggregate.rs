@@ -24,7 +24,8 @@ use datafusion_expr::Literal;
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::segmentation::boolean_op::BooleanOp;
-use crate::physical_plan::segmentation::Expr;
+use super::RowResult;
+use crate::physical_plan::segmentation::{Expr, Spans};
 use num_traits::{AsPrimitive, Bounded, FromPrimitive, Num, NumAssign, NumCast, PrimInt};
 
 #[derive(Debug)]
@@ -64,7 +65,7 @@ pub struct Aggregate<T, Arr, Op, Acc> where T: Debug {
     left_col: Column,
     right: T,
     left: T,
-    result: Vec<i64>,
+    spans: Spans,
 }
 
 
@@ -91,7 +92,7 @@ impl<T, Arr, Op, Acc> Aggregate<T, Arr, Op, Acc> where Acc: Accumulator<T>, T: D
             left_col: left,
             right,
             left: T::default(),
-            result: Vec::with_capacity(100),
+            spans: Spans::new(100),
         })
     }
 }
@@ -107,37 +108,40 @@ macro_rules! gen_evaluate_int {
     ($acc_ty:ty,$array_type:ident) => {
         impl<Op, Acc> Expr for Aggregate<$acc_ty, $array_type,Op, Acc> where Op: BooleanOp<$acc_ty>, Acc: Accumulator<$acc_ty> + Debug {
             fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<Option<Vec<i64>>> {
-                self.result.clear();
+                self.spans.reset(spans.to_vec(), batch.columns()[0].len());
                 let predicate_arr = self.predicate.evaluate(batch)?.into_array(0);
                 let predicate_arr = predicate_arr.as_any().downcast_ref::<BooleanArray>().unwrap();
                 let left_arr = self.left_col.evaluate(batch)?.into_array(0);
                 let left_arr = left_arr.as_any().downcast_ref::<$array_type>().unwrap();
-                let mut idx: i64 = 0;
-                let mut cur_span = 0;
-                while idx < predicate_arr.len() as i64 {
-                    if cur_span < spans.len() && spans[cur_span] == idx as usize {
-                        if Op::perform(self.left, self.right) {
-                            self.result.push(idx - 1);
+
+                while self.spans.next_span() {
+                    while let Some(row) = self.spans.next_row() {
+                        match row {
+                            RowResult::NextPartition(row_id) => {
+                                if Op::perform(self.left, self.right) || self.spans.cur_span() == 0 {
+                                    self.spans.push_result();
+                                }
+
+                                self.left = 0;
+
+                                println!("left {}", self.left);
+
+                                break;
+                            }
+                            RowResult::NextRow(row_id) => {
+                                if predicate_arr.value(row_id as usize) {
+                                    self.left = Acc::perform(self.left, left_arr.value(row_id as usize) as $acc_ty);
+                                }
+                                println!("left {}", self.left);
+                            }
                         }
-                        self.left = 0;
-                        cur_span += 1;
                     }
-
-                    if predicate_arr.value(idx as usize) {
-                        self.left = Acc::perform(self.left, left_arr.value(idx as usize) as $acc_ty);
-                    }
-
-                    idx += 1;
                 }
 
-                if is_last && self.result.last().cloned() != Some(idx - 1) && Op::perform(self.left, self.right) {
-                    self.result.push(idx - 1)
+                if is_last && self.spans.check_last_span() && Op::perform(self.left, self.right) {
+                    self.spans.push_final_result()
                 }
-                if self.result.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some(self.result.drain(..).collect()))
-                }
+                Ok(self.spans.result())
             }
         }
     }
@@ -147,37 +151,40 @@ macro_rules! gen_evaluate_float {
     ($acc_ty:ty,$array_type:ident) => {
         impl<Op, Acc> Expr for Aggregate<$acc_ty, $array_type,Op, Acc> where Op: BooleanOp<$acc_ty>, Acc: Accumulator<$acc_ty> + Debug {
             fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<Option<Vec<i64>>> {
-                self.result.clear();
+                self.spans.reset(spans.to_vec(), batch.columns()[0].len());
                 let predicate_arr = self.predicate.evaluate(batch)?.into_array(0);
                 let predicate_arr = predicate_arr.as_any().downcast_ref::<BooleanArray>().unwrap();
                 let left_arr = self.left_col.evaluate(batch)?.into_array(0);
                 let left_arr = left_arr.as_any().downcast_ref::<$array_type>().unwrap();
-                let mut idx: i64 = 0;
-                let mut cur_span = 0;
-                while idx < predicate_arr.len() as i64 {
-                    if cur_span < spans.len() && spans[cur_span] == idx as usize {
-                        if Op::perform(self.left, self.right) {
-                            self.result.push(idx - 1);
+
+                while self.spans.next_span() {
+                    while let Some(row) = self.spans.next_row() {
+                        match row {
+                            RowResult::NextPartition(row_id) => {
+                                if Op::perform(self.left, self.right) || self.spans.cur_span() == 0 {
+                                    self.spans.push_result();
+                                }
+
+                                self.left = 0.0;
+
+                                println!("left {}", self.left);
+
+                                break;
+                            }
+                            RowResult::NextRow(row_id) => {
+                                if predicate_arr.value(row_id as usize) {
+                                    self.left = Acc::perform(self.left, left_arr.value(row_id as usize) as $acc_ty);
+                                }
+                                println!("left {}", self.left);
+                            }
                         }
-                        self.left = 0.0;
-                        cur_span += 1;
                     }
-
-                    if predicate_arr.value(idx as usize) {
-                        self.left = Acc::perform(self.left, left_arr.value(idx as usize) as $acc_ty);
-                    }
-
-                    idx += 1;
                 }
 
-                if is_last && self.result.last().cloned() != Some(idx - 1) && Op::perform(self.left, self.right) {
-                    self.result.push(idx - 1)
+                if is_last && self.spans.check_last_span() && Op::perform(self.left, self.right) {
+                    self.spans.push_final_result()
                 }
-                if self.result.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some(self.result.drain(..).collect()))
-                }
+                Ok(self.spans.result())
             }
         }
     }
@@ -234,6 +241,7 @@ mod tests {
                 Arc::new(BooleanArray::from(vec![
                     true, true, true, true, true,
                 ])),
+                //                                         1     5  9
                 Arc::new(Int8Array::from(vec![1, 2, 3, 4, 5])),
             ],
         )?;

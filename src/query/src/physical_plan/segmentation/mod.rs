@@ -10,9 +10,15 @@ mod boolean_op;
 // pub mod sequence;
 // pub mod sum;
 pub mod aggregate;
-// pub mod sequence_new;
+mod funnel;
+// mod sequence;
 // mod test_value;
 // mod boolean_op;
+
+pub trait EvaluationResult {
+    fn spans(&self) -> Option<Vec<i64>>;
+    fn as_any(&self) -> &dyn std::any::Any;
+}
 
 pub trait Expr: Send + Sync + Display + Debug {
     fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<Option<Vec<i64>>>;
@@ -44,6 +50,7 @@ impl Spans {
     }
 
     pub fn reset(&mut self, spans: Vec<usize>, batch_len: usize) {
+        println!("\n");
         self.span_idx = -1;
         self.row_idx = 0;
         self.batch_len = batch_len;
