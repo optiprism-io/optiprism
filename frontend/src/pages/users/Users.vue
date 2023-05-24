@@ -6,10 +6,10 @@
             </template>
             <UiCard
                 class="pf-c-card pf-m-compact pf-u-h-100"
-                :title="$t('events.segments.segment')"
+                :title="$t('events.segments.label')"
             >
                 <Segments
-                    :is-one="true"
+                    :and-or-select="true"
                     @get-event-segmentation="getEventSegmentationDebounce"
                 />
             </UiCard>
@@ -56,7 +56,7 @@ import { computed, inject, onMounted, onUnmounted, ref } from 'vue';
 import { Row, Action } from '@/components/uikit/UiTable/UiTable';
 import { useGroupStore } from '@/stores/group/group';
 import { useSegmentsStore } from '@/stores/reports/segments';
-import { GroupRecord } from '@/api';
+import { GroupRecord, EventSegmentationSegmentFiltersConditionEnum } from '@/api';
 import { I18N } from '@/utils/i18n';
 
 import Segments from '@/components/events/Segments/Segments.vue';
@@ -187,6 +187,7 @@ onMounted(() => {
     segmentsStore.$reset();
     segmentsStore.segments.push({
         name: '',
+        filterConditions: EventSegmentationSegmentFiltersConditionEnum.And,
         conditions: [{
             filters: []
         }],

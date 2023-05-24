@@ -8,9 +8,14 @@
             :conditions="item.conditions || []"
             :auto-hide-event="!commonStore.showCreateCustomEvent"
             :is-one="props.isOne"
+            :is-active-and-or-filter="props.andOrSelect"
+            :and-or-select="props.andOrSelect && segmentsStore.segments[index + 1] ? item.filterConditions || EventSegmentationSegmentFiltersConditionEnum.And : null"
+            :is-last="(segmentsStore.segments.length - 1) === index"
+            :segments-length="segmentsStore.segments.length"
             @on-remove="deleteSegment"
             @on-rename="onRenameSegment"
             @add-condition="addCondition"
+            @on-change-and-or="onChangeAndOr"
         />
         <div
             v-if="isShowAddSegment"
@@ -52,7 +57,7 @@ import Segment from '@/components/events/Segments/Segment.vue'
 import { conditions } from '@/configs/events/segmentCondition'
 import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
 import { PropertyRef } from '@/types/events'
-import { DidEventCountTypeEnum } from '@/api'
+import { DidEventCountTypeEnum, EventSegmentationSegmentFiltersConditionEnum } from '@/api'
 
 const i18n = inject<any>('i18n')
 const segmentsStore = useSegmentsStore()
@@ -66,10 +71,17 @@ const emit = defineEmits<{
 
 const props = defineProps<{
     isOne?: boolean,
+    andOrSelect?: boolean
 }>();
 
+const isFirstSegmentSelectAction = computed(() => {
+    const lastSegment = segmentsStore.segments[0];
+    const conditions = lastSegment?.conditions || [];
+    return conditions[0]?.action;
+});
+
 const isShowAddSegment =  computed(() => {
-    return !props?.isOne;
+    return (!props?.isOne && !props.andOrSelect) || (props.andOrSelect && isFirstSegmentSelectAction.value);
 });
 
 const conditionAggregateItems = computed(() => {
@@ -102,16 +114,28 @@ const conditionItems = computed(() => {
     })
 })
 
-const addSegment = () => segmentsStore.addSegment(`${i18n.$t('events.segments.segment')} ${segmentsStore.segments.length + 1}`)
+const addSegment = () => {
+    if (props.andOrSelect) {
+        segmentsStore.segments.push({
+            name: '',
+            conditions: [{
+                filters: []
+            }],
+        });
+    } else {
+        segmentsStore.addSegment(`${i18n.$t('events.segments.segment')} ${segmentsStore.segments.length + 1}`)
+    }
+}
 const deleteSegment = (idx: number) => segmentsStore.deleteSegment(idx)
 const onRenameSegment = (name: string, idx: number) => segmentsStore.renameSegment(name, idx)
 const addCondition = (idx: number) => segmentsStore.addConditionSegment(idx)
+const onChangeAndOr = (idx: number) => segmentsStore.onChangeAndOr(idx)
 const changeActionCondition = (idx: number, idxSegment: number, ref: { id: string, name: string }) => {
     const segment = segmentsStore.segments[idxSegment];
     const conditions = segment?.conditions;
     const isNonSelectAction = !(conditions && conditions[idx].action?.id);
     segmentsStore.changeActionCondition(idx, idxSegment, ref);
-    if (props.isOne && isNonSelectAction) {
+    if ((props.isOne || props.andOrSelect) && isNonSelectAction) {
         addCondition(0)
     }
 }

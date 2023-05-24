@@ -42,15 +42,15 @@ import {
     DidEventCountTypeEnum,
     DidEventRelativeCountTypeEnum,
     DidEventAggregatePropertyTypeEnum,
-    QueryAggregatePropertyTypeEnum,
     QueryAggregate,
     EventFilterByProperty,
     EventFilterByPropertyTypeEnum,
-    DataTableResponseColumnsInnerData
+    EventSegmentationSegmentFiltersConditionEnum,
 } from '@/api'
 
 export interface Segment {
     name: string
+    filterConditions?: EventSegmentationSegmentFiltersConditionEnum,
     conditions?: Condition[]
 }
 
@@ -133,6 +133,7 @@ export const useSegmentsStore = defineStore('segments', {
             return this.segments.map(segment => {
                 return {
                     name: segment.name,
+                    filtersCondition: segment.filterConditions,
                     conditions: segment.conditions ? segment.conditions.reduce((items: EventSegmentationSegmentConditionsInner[], item) => {
                         if (item.action?.id === SegmentConditionDidEventTypeEnum.DidEvent && item.event) {
                             if (item?.aggregate?.id === DidEventRelativeCountTypeEnum.RelativeCount && !item.compareEvent) {
@@ -489,9 +490,15 @@ export const useSegmentsStore = defineStore('segments', {
                 segment.conditions.splice(payload.idx, 1);
 
                 if (!segment.conditions.length) {
-                    delete segment.conditions
+                    this.deleteSegment(payload.idxParent);
                 }
             }
+        },
+        onChangeAndOr(idx: number) {
+            const segment = this.segments[idx];
+            const or = EventSegmentationSegmentFiltersConditionEnum.Or;
+            const and = EventSegmentationSegmentFiltersConditionEnum.And;
+            segment.filterConditions = segment.filterConditions === and ? or : and;
         },
         addConditionSegment(idx: number) {
             const segment = this.segments[idx];

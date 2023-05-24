@@ -18,6 +18,8 @@
   },
 
   "common": {
+    "and": "And",
+    "or": "Or",
     "addPropery": "Add property",
     "ok": "Ok",
     "types": {

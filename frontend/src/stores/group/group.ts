@@ -47,7 +47,7 @@ export const useGroupStore = defineStore('group', {
                 const res = await groupRecordsService.getList(commonStore.organizationId, commonStore.projectId, {
                     time: this.timeRequest,
                     group: 'users', // TODO any group to use
-                    segment: segmentsStore.segmentationItems[0],
+                    segments: segmentsStore.segmentationItems,
                 });
                 if (res?.data?.data) {
                     this.items = res.data.data

@@ -1970,12 +1970,26 @@ export interface EventSegmentationSegment {
      */
     'name'?: string;
     /**
+     * 
+     * @type {string}
+     * @memberof EventSegmentationSegment
+     */
+    'filtersCondition'?: EventSegmentationSegmentFiltersConditionEnum;
+    /**
      * array of conditions
      * @type {Array<EventSegmentationSegmentConditionsInner>}
      * @memberof EventSegmentationSegment
      */
     'conditions': Array<EventSegmentationSegmentConditionsInner>;
 }
+
+export const EventSegmentationSegmentFiltersConditionEnum = {
+    And: 'and',
+    Or: 'or'
+} as const;
+
+export type EventSegmentationSegmentFiltersConditionEnum = typeof EventSegmentationSegmentFiltersConditionEnum[keyof typeof EventSegmentationSegmentFiltersConditionEnum];
+
 /**
  * @type EventSegmentationSegmentConditionsInner
  * @export
@@ -2668,11 +2682,11 @@ export interface GroupRecordsListRequest {
      */
     'searchTerm'?: string;
     /**
-     * 
-     * @type {EventSegmentationSegment}
+     * array of segments
+     * @type {Array<EventSegmentationSegment>}
      * @memberof GroupRecordsListRequest
      */
-    'segment'?: EventSegmentationSegment;
+    'segments'?: Array<EventSegmentationSegment>;
     /**
      * 
      * @type {EventGroupedFilters}

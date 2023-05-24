@@ -2360,8 +2360,11 @@ components:
           example: user
         searchTerm:
           type: string
-        segment:
-          $ref: '#/components/schemas/EventSegmentationSegment'
+        segments:
+          description: array of segments
+          type: array
+          items:
+            $ref: '#/components/schemas/EventSegmentationSegment'
         filters:
           $ref: '#/components/schemas/EventGroupedFilters'
     FunnelQuery:
@@ -2932,6 +2935,11 @@ components:
           type: string
           description: name of segment
           example: iphone users
+        filtersCondition:
+          type: string
+          enum:
+            - and
+            - or
         conditions:
           type: array
           description: array of conditions

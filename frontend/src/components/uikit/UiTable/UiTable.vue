@@ -126,7 +126,6 @@ import UiTableCell from '@/components/uikit/UiTable/UiTableCell.vue'
 import UiTableCellWrapper from '@/components/uikit/UiTable/UiTableCellWrapper.vue'
 import UiSelect, { UiSelectItem } from '@/components/uikit/UiSelect.vue'
 import UiSpinner from '@/components/uikit/UiSpinner.vue'
-import UiToolbar from '@/components/uikit/UiToolbar.vue';
 
 const i18n = inject<any>('i18n')
 const slots = useSlots();
