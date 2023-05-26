@@ -7,7 +7,7 @@ use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::{PhysicalExpr, PhysicalExprRef};
 use futures::SinkExt;
-use tracing::{info, log,instrument};
+use tracing::{info, log, instrument};
 use tracing::log::{debug, trace};
 use crate::error::QueryError;
 use crate::error::Result;
@@ -34,8 +34,8 @@ pub enum Filter {
 
 #[derive(Debug, Clone)]
 struct State {
-    step_id: i16,
-    row_id: usize,
+    step_id: usize,
+    // row_id: usize,
     step_row: Vec<usize>,
     window_start_ts: i64,
     is_completed: bool,
@@ -45,8 +45,8 @@ struct State {
 impl State {
     pub fn new(steps: usize) -> Self {
         Self {
-            step_id: -1,
-            row_id: 0,
+            step_id: 0,
+            // row_id: 0,
             step_row: vec![0; steps],
             window_start_ts: 0,
             is_completed: false,
@@ -96,6 +96,15 @@ pub struct Funnel {
 
 }
 
+#[derive(Debug, Clone)]
+enum LoopResult {
+    ContinueFunnel,
+    NextFunnel,
+    NextStep,
+    // PrevStep,
+    NextRow,
+}
+
 pub struct Options {
     schema: SchemaRef,
     ts_col: Column,
@@ -132,12 +141,11 @@ impl Funnel {
     }
 
     fn is_out_of_window(&self, steps: &[per_partition::Step], ts: &TimestampMillisecondArray, row_id: usize) -> bool {
-        ts.value(row_id) - steps[0].ts < self.window.num_milliseconds()
+        ts.value(row_id) - steps[0].ts > self.window.num_milliseconds()
     }
 
 
     pub fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<bool> {
-        trace!("!");
         let batch_len = batch.columns()[0].len();
         let mut steps = self
             .steps
@@ -165,7 +173,6 @@ impl Funnel {
             .collect::<Result<Vec<_>>>()?;
 
 
-        log::info!("init: steps: {:?}", steps);
         let exclude = self.exclude.clone().map(|e| {
             e.
                 iter().
@@ -181,7 +188,6 @@ impl Funnel {
                 collect::<Result<Vec<_>>>().unwrap()
         });
 
-        log::info!("init: exclude: {:?}", exclude);
         let mut constants = self.constants.as_ref().map(|constants| {
             let v = constants
                 .iter()
@@ -195,7 +201,6 @@ impl Funnel {
             (v, vec![0; constants.len()])
         });
 
-        log::info!("[init] constants: {:?}", constants);
         let ts_col = self
             .ts_col
             .evaluate(batch)?
@@ -204,107 +209,81 @@ impl Funnel {
             .downcast_ref::<TimestampMillisecondArray>()
             .unwrap().clone();
 
-        log::info!("[init] ts_col: {:?}", ts_col);
         let State {
             mut step_id,
-            mut row_id,
+            // mut row_id,
             mut step_row,
             mut window_start_ts,
             mut is_completed,
         } = self.state.clone();
 
-        log::info!("[init] state: {:?}", self.state);
 
         // main loop
-        'outer: while row_id < batch_len && step_id < steps.len() as i16 {
-            log::info!("[main] row_id: {}, step_id: {}", row_id, step_id);
-            log::info!("[main] steps: {:?}", steps);
-            if step_id == -1 {
-                info!("[begin] step_id == -1");
-                step_id += 1;
-                steps[step_id as usize].ts = ts_col.value(row_id);
-                steps[step_id as usize].row_id = row_id;
-                info!("[begin] steps: {:?}",steps);
-                if let Some((constants, rows)) = &mut constants {
-                    for (const_idx, constant) in constants.iter().enumerate() {
-                        rows[const_idx] = row_id;
+        'outer: while step_id < steps.len() && steps[step_id].row_id < batch_len {
+            let mut res = LoopResult::NextRow;
+            if step_id > 0 && self.is_out_of_window(&steps, &ts_col, steps[step_id].row_id) {
+                res = LoopResult::ContinueFunnel;
+            } else if steps[step_id].exists.value(steps[step_id].row_id) {
+                res = LoopResult::NextStep;
+                if let Some((constants, const_rows)) = &mut constants {
+                    if step_id == 0 {
+                        for (const_idx, constant) in constants.iter().enumerate() {
+                            const_rows[const_idx] = steps[step_id].row_id;
+                        }
+                    } else {
+                        for (const_idx, constant) in constants.iter().enumerate() {
+                            // todo make static
+                            let constant = constant.as_any().downcast_ref::<Int64Array>().unwrap();
+                            if constant.value(const_rows[const_idx]) != constant.value(steps[step_id].row_id) {
+                                res = LoopResult::NextRow;
+                            }
+                        }
                     }
-                    info!("[begin] constraint rows: {:?}", rows);
                 }
             }
-            info!("[main] entering second loop");
-            while row_id < batch_len - 1 {
-                info!("[second loop] row_id: {}, step_id: {}", row_id, step_id);
-                if step_id > 0 && self.is_out_of_window(&steps, &ts_col, row_id) {
-                    info!("[second loop] out of window");
-                    step_id = -1;
 
-                    break;
+
+            if let Some(exclude) = &exclude {
+                for excl in exclude.iter() {
+                    if excl.value(steps[step_id].row_id) {
+                        res = LoopResult::NextFunnel;
+                    }
                 }
+            }
 
-                if steps[step_id as usize].exists.value(row_id) {
-                    info!("step {} exists",step_id);
+            println!("{:?} {} {}", res, step_id, steps[step_id].row_id);
+            match res {
+                LoopResult::ContinueFunnel => {
+                    step_id = 0;
+                    steps[step_id].row_id += 1;
+                }
+                LoopResult::NextStep => {
                     step_id += 1;
-                    steps[step_id as usize].ts = ts_col.value(row_id);
-                    steps[step_id as usize].row_id = row_id;
-
-                    info!("[second loop] current step: {:?}. Break loop",steps[step_id as usize]);
-
-                    break;
-                }
-
-                row_id += 1;
-                info!("[main] incremented row_id: {}", row_id);
-            }
-
-            if step_id > 0 {
-                info!("step_id > 0");
-                if let Some(exclude) = &exclude {
-                    for excl in exclude.iter() {
-                        if excl.value(row_id) {
-                            info!("[step_id > 0] value {} by row id {} excluded",excl.value(row_id),row_id);
-                            step_id -= 1;
-                            row_id = steps[step_id as usize].row_id;
-                            info!("[step_id > 0] new step_id: {}, row_id: {}", step_id, row_id);
-                        }
+                    if step_id > steps.len() - 1 {
+                        break;
                     }
+                    steps[step_id].row_id = steps[step_id - 1].row_id + 1;
                 }
-
-                if let Some((constants, rows)) = &constants {
-                    // todo zip
-                    info!("checking constraints");
-                    for (idx, constant) in constants.iter().enumerate() {
-                        // todo make static
-                        let constant = constant.as_any().downcast_ref::<Int64Array>().unwrap();
-                        if constant.value(rows[idx]) != constant.value(row_id) {
-                            info!(
-                                "[constraints] constant with value {} by row id {} doesn't match original value {} by row id {}",
-                                constant.value(row_id),row_id,
-                                constant.value(rows[idx]),
-                                rows[idx]
-                            );
-                            step_id -= 1;
-                            row_id = steps[step_id as usize].row_id;
-                            info!("[constraints] new step_id: {}, row_id: {}", step_id, row_id);
-                        }
-                    }
+                LoopResult::NextRow => {
+                    steps[step_id].row_id += 1;
+                }
+                LoopResult::NextFunnel => {
+                    steps[0].row_id = steps[step_id].row_id + 1;
+                    step_id = 0;
                 }
             }
-
-            row_id += 1;
-            info!("[main] incremented row_id: {}", row_id);
+            steps[step_id].ts = ts_col.value(steps[step_id].row_id);
         }
 
-        info!("[final] filter: {:?}",self.filter);
         let is_completed = match &self.filter {
             None => true,
             Some(filter) => match filter {
-                Filter::DropOffOnAnyStep => step_id != steps.len() as i16,
+                Filter::DropOffOnAnyStep => step_id != steps.len(),
                 Filter::DropOffOnStep(drop_off_step_id) => {
-                    step_id == *drop_off_step_id as i16
+                    step_id == *drop_off_step_id
                 }
                 Filter::TimeToConvert(from, to) => {
-                    if step_id != steps.len() as i16 {
+                    if step_id != steps.len() {
                         false
                     } else {
                         steps[0].ts >= from.num_milliseconds() && steps[0].ts <= to.num_milliseconds()
@@ -314,6 +293,9 @@ impl Funnel {
         };
 
         info!("is_completed: {}", is_completed);
+        for (idx, step) in steps.iter().enumerate() {
+            println!("step {}: {:?}", idx, step);
+        }
         Ok(is_completed)
     }
 }
@@ -335,6 +317,8 @@ mod prepare_array {
 |----|---------|-------|-------|
 | 1  | 1       | e1    | 1     |
 | 2  | 1       | e2    | 1     |
+| 2  | 1       | e2    | 1     |
+| 2  | 1       | e1    | 1     |
 | 4  | 1       | e3    | 2     |
 | 5  | 1       | e1    | 1     |
 | 6  | 1       | e2    | 1     |
@@ -414,7 +398,7 @@ mod tests {
         let opts = Options {
             schema: schema.clone(),
             ts_col: Column::new("ts", 0),
-            window: Duration::minutes(10),
+            window: Duration::milliseconds(1),
             steps: vec![
                 Step {
                     expr: event_eq("e1", schema.as_ref()),
