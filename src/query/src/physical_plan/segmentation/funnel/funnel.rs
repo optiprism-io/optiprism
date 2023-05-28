@@ -13,11 +13,25 @@ use tracing::log::{debug, trace};
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::segmentation::{Expr, Spans};
-use crate::physical_plan::segmentation::funnel::{funnel, per_partition};
+use crate::physical_plan::segmentation::funnel::{funnel};
 use crate::physical_plan::segmentation::funnel::per_partition::FunnelResult;
 use tracing_core::Level;
 use crate::StaticArray;
 // use crate::StaticArray;
+
+#[derive(Debug, Clone)]
+pub struct Step {
+    pub ts: i64,
+    pub row_id: usize,
+    pub exists: BooleanArray,
+    pub is_completed: bool,
+}
+
+pub struct FunnelResult {
+    pub steps: Vec<Step>,
+    pub last_step: usize,
+    pub is_completed: bool,
+}
 
 enum Report {
     Steps,
@@ -58,13 +72,13 @@ impl State {
 }
 
 #[derive(Clone)]
-pub struct Exclude {
+pub struct ExcludeExpr {
     expr: PhysicalExprRef,
     steps: Option<Vec<usize>>,
 }
 
 #[derive(Clone)]
-pub struct Step {
+pub struct StepExpr {
     expr: PhysicalExprRef,
     comparison: Option<Vec<Box<Step>>>,
 }
@@ -85,9 +99,9 @@ pub struct Funnel {
     schema: SchemaRef,
     ts_col: Column,
     window: Duration,
-    steps: Vec<Step>,
+    steps: Vec<StepExpr>,
     in_any_order: bool,
-    exclude: Option<Vec<Exclude>>,
+    exclude: Option<Vec<ExcludeExpr>>,
     // expr and vec of step ids
     constants: Option<Vec<Column>>,
     count: Count,
@@ -112,9 +126,9 @@ pub struct Options {
     schema: SchemaRef,
     ts_col: Column,
     window: Duration,
-    steps: Vec<Step>,
+    steps: Vec<StepExpr>,
     any_order: bool,
-    exclude: Option<Vec<Exclude>>,
+    exclude: Option<Vec<ExcludeExpr>>,
     constants: Option<Vec<Column>>,
     count: Count,
     filter: Option<Filter>,
@@ -164,7 +178,7 @@ impl Funnel {
                             downcast_ref::<BooleanArray>().
                             unwrap().
                             clone();
-                        per_partition::Step { // initial state of each step
+                        Step { // initial state of each step
                             ts: 0,
                             row_id: 0,
                             exists: arr, // array of bools indicating if the step exists
@@ -388,7 +402,7 @@ mod tests {
     use tracing_core::Level;
     use tracing_test::traced_test;
     use store::test_util::parse_markdown_table;
-    use crate::physical_plan::segmentation::funnel::funnel::{Count, Exclude, Filter, Funnel, Options, Step, Touch};
+    use crate::physical_plan::segmentation::funnel::funnel::{Count, ExcludeExpr, Filter, Funnel, Options, Step, StepExpr, Touch};
     use crate::physical_plan::segmentation::funnel::funnel::prepare_array::get_sample_events;
 
     fn event_eq(event: &str, schema: &Schema) -> PhysicalExprRef {
@@ -439,21 +453,21 @@ mod tests {
             ts_col: Column::new("ts", 0),
             window: Duration::seconds(100),
             steps: vec![
-                Step {
+                StepExpr {
                     expr: event_eq("e1", schema.as_ref()),
                     comparison: None,
                 },
-                Step {
+                StepExpr {
                     expr: event_eq("e2", schema.as_ref()),
                     comparison: None,
                 },
-                Step {
+                StepExpr {
                     expr: event_eq("e3", schema.as_ref()),
                     comparison: None,
                 },
             ],
             any_order: false,
-            exclude: Some(vec![Exclude {
+            exclude: Some(vec![ExcludeExpr {
                 expr: event_eq("e4", schema.as_ref()),
                 steps: None,
             }]),
