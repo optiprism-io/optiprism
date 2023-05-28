@@ -12,4 +12,7 @@ pub struct Step {
 
 pub struct FunnelResult {
     pub steps: Vec<Step>,
+    pub last_step: usize,
+    pub is_completed: bool,
 }
+

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use arrow::array::{Array, ArrayRef, BooleanArray, Int64Array, TimestampMicrosecondArray, TimestampMillisecondArray, TimestampSecondArray};
+use arrow::array::{Array, ArrayAccessor, ArrayRef, BooleanArray, Int64Array, TimestampMicrosecondArray, TimestampMillisecondArray, TimestampSecondArray};
+use arrow::compute::kernels;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use chrono::Duration;
@@ -15,6 +16,8 @@ use crate::physical_plan::segmentation::{Expr, Spans};
 use crate::physical_plan::segmentation::funnel::{funnel, per_partition};
 use crate::physical_plan::segmentation::funnel::per_partition::FunnelResult;
 use tracing_core::Level;
+use crate::StaticArray;
+// use crate::StaticArray;
 
 enum Report {
     Steps,
@@ -145,8 +148,9 @@ impl Funnel {
     }
 
 
-    pub fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<bool> {
+    pub fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<FunnelResult> {
         let batch_len = batch.columns()[0].len();
+        // evaluate steps
         let mut steps = self
             .steps
             .iter()
@@ -160,10 +164,10 @@ impl Funnel {
                             downcast_ref::<BooleanArray>().
                             unwrap().
                             clone();
-                        per_partition::Step {
+                        per_partition::Step { // initial state of each step
                             ts: 0,
                             row_id: 0,
-                            exists: arr,
+                            exists: arr, // array of bools indicating if the step exists
                             is_completed: false,
                         }
                     }
@@ -173,6 +177,7 @@ impl Funnel {
             .collect::<Result<Vec<_>>>()?;
 
 
+        // evaluate exclude
         let exclude = self.exclude.clone().map(|e| {
             e.
                 iter().
@@ -188,19 +193,23 @@ impl Funnel {
                 collect::<Result<Vec<_>>>().unwrap()
         });
 
+        // prepare constants
+        // each constant is a static array (for fast dispatching) and vector of steps between which it is valid
         let mut constants = self.constants.as_ref().map(|constants| {
             let v = constants
                 .iter()
                 .map(|constant| {
                     constant
                         .evaluate(batch)
-                        .map(|v| v.into_array(0).clone())
+                        .map(|v| StaticArray::from(v.into_array(0))) // convert to dyn to static
                         .map_err(|e| e.into())
                 })
                 .collect::<Result<Vec<_>>>().unwrap();
             (v, vec![0; constants.len()])
         });
 
+        // timestamp column
+        // Optiprism uses millisecond precision
         let ts_col = self
             .ts_col
             .evaluate(batch)?
@@ -209,6 +218,7 @@ impl Funnel {
             .downcast_ref::<TimestampMillisecondArray>()
             .unwrap().clone();
 
+        // deconstruct state
         let State {
             mut step_id,
             // mut row_id,
@@ -218,23 +228,34 @@ impl Funnel {
         } = self.state.clone();
 
 
-        // main loop
+        // main loop Until all steps are completed or we run out of rows
+        // Main algorithm is:
+        // 1. Find the first step to process
+        // 2. optionally fix the constants
+        // 3.a loop over rows until we find a row that matches the next step
+        // 3.b check out of window
+        // 4 break if we run out of rows or steps
+        // 5. if we found a row that matches the next step, update the state
         'outer: while step_id < steps.len() && steps[step_id].row_id < batch_len {
+            // default result is next row. If we find a match, we will update it
             let mut res = LoopResult::NextRow;
+            // if we are out of window, we can skip to the next funnel
             if step_id > 0 && self.is_out_of_window(&steps, &ts_col, steps[step_id].row_id) {
                 res = LoopResult::ContinueFunnel;
-            } else if steps[step_id].exists.value(steps[step_id].row_id) {
-                res = LoopResult::NextStep;
+            } else if steps[step_id].exists.value(steps[step_id].row_id) { // if the step exists
+                res = LoopResult::NextStep; // next step
                 if let Some((constants, const_rows)) = &mut constants {
+                    // initialize constants if it is first step
                     if step_id == 0 {
-                        for (const_idx, constant) in constants.iter().enumerate() {
+                        for (const_idx, _) in constants.iter().enumerate() {
+                            // assign current row_id to each constant as initial
                             const_rows[const_idx] = steps[step_id].row_id;
                         }
                     } else {
+                        // for step >0 iterate over constants and check value equality
                         for (const_idx, constant) in constants.iter().enumerate() {
-                            // todo make static
-                            let constant = constant.as_any().downcast_ref::<Int64Array>().unwrap();
-                            if constant.value(const_rows[const_idx]) != constant.value(steps[step_id].row_id) {
+                            // check if current value equals to initial value
+                            if !constant.eq_values(const_rows[const_idx], steps[step_id].row_id) {
                                 res = LoopResult::NextRow;
                             }
                         }
@@ -242,7 +263,7 @@ impl Funnel {
                 }
             }
 
-
+            // check exclude between steps
             if let Some(exclude) = &exclude {
                 for excl in exclude.iter() {
                     if excl.value(steps[step_id].row_id) {
@@ -251,52 +272,70 @@ impl Funnel {
                 }
             }
 
-            println!("{:?} {} {}", res, step_id, steps[step_id].row_id);
+            // match result
             match res {
+                // continue funnel is usually out of window
                 LoopResult::ContinueFunnel => {
                     step_id = 0;
+                    // go back to step 0 and pick next row id
                     steps[step_id].row_id += 1;
                 }
+                // increase step with checking
                 LoopResult::NextStep => {
                     step_id += 1;
                     if step_id > steps.len() - 1 {
                         break;
                     }
+                    // assign row id of step as row id of previous step + 1
                     steps[step_id].row_id = steps[step_id - 1].row_id + 1;
                 }
+                // just go no the next row
                 LoopResult::NextRow => {
                     steps[step_id].row_id += 1;
                 }
+                // next funnel
                 LoopResult::NextFunnel => {
+                    // greedy variant. Treat next row of first step as a new funnel
                     steps[0].row_id = steps[step_id].row_id + 1;
                     step_id = 0;
                 }
             }
+            // double check limits
+            if step_id >= steps.len() || steps[step_id].row_id >= batch_len {
+                break;
+            }
+
+            // assign timestamp on each iteration
             steps[step_id].ts = ts_col.value(steps[step_id].row_id);
         }
 
+        // final step of success decision - check filters
         let is_completed = match &self.filter {
-            None => true,
+            // if no filter, then funnel is completed id all steps are completed
+            None => step_id == steps.len() - 1,
             Some(filter) => match filter {
                 Filter::DropOffOnAnyStep => step_id != steps.len(),
+                // drop off on defined step
                 Filter::DropOffOnStep(drop_off_step_id) => {
                     step_id == *drop_off_step_id
                 }
+                // drop off if time to convert is out of range
                 Filter::TimeToConvert(from, to) => {
-                    if step_id != steps.len() {
+                    if step_id != steps.len() - 1 {
                         false
                     } else {
-                        steps[0].ts >= from.num_milliseconds() && steps[0].ts <= to.num_milliseconds()
+                        steps[0].ts >= from.num_milliseconds() && steps[step_id].ts <= to.num_milliseconds()
                     }
                 }
             }
         };
 
-        info!("is_completed: {}", is_completed);
-        for (idx, step) in steps.iter().enumerate() {
-            println!("step {}: {:?}", idx, step);
-        }
-        Ok(is_completed)
+        let res = FunnelResult {
+            steps,
+            last_step: step_id,
+            is_completed,
+        };
+        Ok(res)
     }
 }
 
@@ -311,23 +350,7 @@ mod prepare_array {
     use store::arrow_conversion::arrow2_to_arrow1;
     use store::test_util::parse_markdown_table;
 
-    pub fn get_sample_events() -> (Vec<ArrayRef>, SchemaRef) {
-        let data = r#"
-| ts | user_id | event | const |
-|----|---------|-------|-------|
-| 1  | 1       | e1    | 1     |
-| 2  | 1       | e2    | 1     |
-| 2  | 1       | e2    | 1     |
-| 2  | 1       | e1    | 1     |
-| 4  | 1       | e3    | 2     |
-| 5  | 1       | e1    | 1     |
-| 6  | 1       | e2    | 1     |
-| 6  | 1       | e4    | 1     |
-| 7  | 1       | e3    | 1     |
-| 8  | 1       | e1    | 1     |
-| 9  | 1       | e2    | 1     |
-| 10 | 1       | e3    | 1     |
-"#;
+    pub fn get_sample_events(data: &str) -> (Vec<ArrayRef>, SchemaRef) {
         let fields = vec![
             Field::new("ts", DataType::Timestamp(TimeUnit::Millisecond, None), false),
             Field::new("user_id", DataType::Int64, false),
@@ -393,12 +416,28 @@ mod tests {
             // Build the subscriber
             .finish();
 
-        let (cols, schema) = get_sample_events();
+        let data = r#"
+| ts | user_id | event | const |
+|----|---------|-------|-------|
+| 1  | 1       | e1    | 1     |
+| 2  | 1       | e2    | 1     |
+| 2  | 1       | e2    | 1     |
+| 2  | 1       | e1    | 1     |
+| 4  | 1       | e3    | 2     |
+| 5  | 1       | e1    | 1     |
+| 6  | 1       | e2    | 1     |
+| 6  | 1       | e4    | 1     |
+| 7  | 1       | e3    | 1     |
+| 8  | 1       | e1    | 1     |
+| 9  | 1       | e2    | 1     |
+| 10 | 1       | e3    | 1     |
+"#;
+        let (cols, schema) = get_sample_events(data);
 
         let opts = Options {
             schema: schema.clone(),
             ts_col: Column::new("ts", 0),
-            window: Duration::milliseconds(1),
+            window: Duration::seconds(100),
             steps: vec![
                 Step {
                     expr: event_eq("e1", schema.as_ref()),
