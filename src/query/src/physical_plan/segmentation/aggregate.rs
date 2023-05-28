@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::ops::Add;
 use std::sync::Arc;
 
-use arrow::array::{Array, Float16Array, Int64Array, Int8Array, Int16Array, Int32Array, UInt8Array, UInt16Array, UInt32Array, UInt64Array, Float32Array, Float64Array};
+use arrow::array::{Array, Float16Array, Int64Array, Int8Array, Int16Array, Int32Array, UInt8Array, UInt16Array, UInt32Array, UInt64Array, Float32Array, Float64Array,Decimal128Array};
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::compute::kernels;
@@ -198,6 +198,8 @@ gen_evaluate_int!(u64,UInt8Array);
 gen_evaluate_int!(u64,UInt16Array);
 gen_evaluate_int!(u64,UInt32Array);
 gen_evaluate_int!(u128,UInt64Array);
+// todo add decimal 256
+gen_evaluate_int!(i128,Decimal128Array);
 gen_evaluate_float!(f64,Float32Array);
 gen_evaluate_float!(f64,Float64Array);
 

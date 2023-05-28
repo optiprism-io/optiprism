@@ -1,8 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use arrow::array::{Array, ArrayAccessor, ArrayRef, BooleanArray, Int64Array, TimestampMicrosecondArray, TimestampMillisecondArray, TimestampSecondArray};
-use arrow::compute::kernels;
-use arrow::datatypes::SchemaRef;
+use arrow2::array::{Array, ArrayAccessor, ArrayRef, BooleanArray, Int64Array, Time, TimestampMillisecondArray, TimestampSecondArray};
+use arrow2::chunk::Chunk;
+use arrow2::datatypes::{Field, SchemaRef};
+use arrow2::record_batch::RecordBatch;
+use arrow::array::{Array, TimestampMillisecondArray};
+use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
@@ -12,10 +15,11 @@ use tracing::{info, log, instrument};
 use tracing::log::{debug, trace};
 use crate::error::QueryError;
 use crate::error::Result;
-use crate::physical_plan::segmentation::{Expr, Spans};
+use crate::physical_plan::segmentation::{Expr, RowResult, Spans};
 use crate::physical_plan::segmentation::funnel::{funnel};
 use crate::physical_plan::segmentation::funnel::per_partition::FunnelResult;
 use tracing_core::Level;
+use store::arrow_conversion::{arrow1_to_arrow2, arrow2_to_arrow1};
 use crate::StaticArray;
 // use crate::StaticArray;
 
@@ -23,7 +27,7 @@ use crate::StaticArray;
 pub struct Step {
     pub ts: i64,
     pub row_id: usize,
-    pub exists: BooleanArray,
+    pub exists: Vec<BooleanArray>,
     pub is_completed: bool,
 }
 
@@ -49,24 +53,36 @@ pub enum Filter {
     TimeToConvert(Duration, Duration),
 }
 
+#[derive(Debug, Clone, Default)]
+struct Batch {
+    pub steps: Vec<BooleanArray>,
+    pub exclude: Option<Vec<(BooleanArray, Option<Vec<usize>>)>>,
+    pub constants: Option<Vec<StaticArray>>,
+    pub ts: TimestampMillisecondArray,
+}
+
 #[derive(Debug, Clone)]
 struct State {
+    exclude: Option<Vec<Vec<BooleanArray>>>,
+    batches: Vec<Batch>,
+    steps: Vec<Step>,
     step_id: usize,
-    // row_id: usize,
-    step_row: Vec<usize>,
-    window_start_ts: i64,
-    is_completed: bool,
-    // result: FunnelResult,
+    row_id: usize,
 }
 
 impl State {
     pub fn new(steps: usize) -> Self {
-        Self {
-            step_id: 0,
-            // row_id: 0,
-            step_row: vec![0; steps],
-            window_start_ts: 0,
+        let step = Step {
+            ts: 0,
+            row_id: 0,
+            exists: vec![BooleanArray::from(vec![false; 0])],
             is_completed: false,
+        };
+        Self {
+            exclude: vec![],
+            step_id: 0,
+            steps: vec![step; steps],
+            row_id: 0,
         }
     }
 }
@@ -80,7 +96,6 @@ pub struct ExcludeExpr {
 #[derive(Clone)]
 pub struct StepExpr {
     expr: PhysicalExprRef,
-    comparison: Option<Vec<Box<Step>>>,
 }
 
 enum Touch {
@@ -99,9 +114,9 @@ pub struct Funnel {
     schema: SchemaRef,
     ts_col: Column,
     window: Duration,
-    steps: Vec<StepExpr>,
+    steps_expr: Vec<StepExpr>,
     in_any_order: bool,
-    exclude: Option<Vec<ExcludeExpr>>,
+    exclude_expr: Option<Vec<ExcludeExpr>>,
     // expr and vec of step ids
     constants: Option<Vec<Column>>,
     count: Count,
@@ -109,8 +124,7 @@ pub struct Funnel {
     filter: Option<Filter>,
     touch: Touch,
     state: State,
-    spans: Spans,
-
+    batches: VecDeque<Batch>,
 }
 
 #[derive(Debug, Clone)]
@@ -145,15 +159,14 @@ impl Funnel {
             schema: opts.schema,
             ts_col: opts.ts_col,
             window: opts.window,
-            steps: opts.steps.clone(),
+            steps_expr: opts.steps.clone(),
             in_any_order: opts.any_order,
-            exclude: opts.exclude,
+            exclude_expr: opts.exclude,
             constants: opts.constants,
             count: opts.count,
             filter: opts.filter,
             touch: opts.touch,
             state: State::new(opts.steps.len()),
-            spans: Spans::new(100),
         }
     }
 
@@ -162,69 +175,84 @@ impl Funnel {
     }
 
 
-    pub fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<FunnelResult> {
-        let batch_len = batch.columns()[0].len();
-        // evaluate steps
-        let mut steps = self
-            .steps
-            .iter()
-            .map(|step| {
-                step.expr
-                    .evaluate(batch)
-                    .map(|v| {
-                        let arr = v.
-                            into_array(0).
-                            as_any().
-                            downcast_ref::<BooleanArray>().
-                            unwrap().
-                            clone();
-                        Step { // initial state of each step
-                            ts: 0,
-                            row_id: 0,
-                            exists: arr, // array of bools indicating if the step exists
-                            is_completed: false,
-                        }
-                    }
-                    )
-                    .map_err(|e| e.into())
-            })
-            .collect::<Result<Vec<_>>>()?;
+    pub fn pop_front_batch(&mut self) -> Option<Batch> {
+        self.batches.pop_front()
+    }
 
+    pub fn evaluate_batch(&mut self, batch: &RecordBatch,schema:SchemaRef) -> Result<()> {
+        // prepare steps
+        for (step_id, expr) in self.steps_expr.iter().enumerate() {
+            let arr = expr.expr.evaluate(batch)?.into_array(0);
+            let field = match arr.data_type() {
+                DataType::Null => {}
+                DataType::Boolean => arrow::datatypes::Field::new()
+                DataType::Int8 => {}
+                DataType::Int16 => {}
+                DataType::Int32 => {}
+                DataType::Int64 => {}
+                DataType::UInt8 => {}
+                DataType::UInt16 => {}
+                DataType::UInt32 => {}
+                DataType::UInt64 => {}
+                DataType::Float16 => {}
+                DataType::Float32 => {}
+                DataType::Float64 => {}
+                DataType::Timestamp(_, _) => {}
+                DataType::Date32 => {}
+                DataType::Date64 => {}
+                DataType::Time32(_) => {}
+                DataType::Time64(_) => {}
+                DataType::Duration(_) => {}
+                DataType::Interval(_) => {}
+                DataType::Binary => {}
+                DataType::FixedSizeBinary(_) => {}
+                DataType::LargeBinary => {}
+                DataType::Utf8 => {}
+                DataType::LargeUtf8 => {}
+                DataType::List(_) => {}
+                DataType::FixedSizeList(_, _) => {}
+                DataType::LargeList(_) => {}
+                DataType::Struct(_) => {}
+                DataType::Union(_, _, _) => {}
+                DataType::Dictionary(_, _) => {}
+                DataType::Decimal128(_, _) => {}
+                DataType::Decimal256(_, _) => {}
+                DataType::Map(_, _) => {}
+                DataType::RunEndEncoded(_, _) => {}
+            }
+            let arr = arrow1_to_arrow2(arr,arr,schema.get_field)
+            self.state.steps[step_id].exists.push(arrow1_to_arrow2(arr,));
+        }
+arrow2_to_arrow1()
+        let mut state_batch = Batch::default();
 
         // evaluate exclude
-        let exclude = self.exclude.clone().map(|e| {
-            e.
-                iter().
-                map(|f| f.expr
-                    .evaluate(batch)
-                    .map(|d| d.
-                        into_array(0).
-                        as_any().
-                        downcast_ref::<BooleanArray>().
-                        unwrap().
-                        clone()).
-                    map_err(|e| e.into())).
-                collect::<Result<Vec<_>>>().unwrap()
-        });
+        if let Some(exprs) = &self.exclude_expr {
+            for expr in exprs.iter() {
+                let arr = expr.expr.evaluate(batch)?.into_array(0).as_any().downcast_ref::<BooleanArray>().unwrap().clone();
+                if let Some(ex) = &mut state_batch.exclude {
+                    ex.push((arr, expr.steps.clone()))
+                } else {
+                    state_batch.exclude = Some(vec![(arr, expr.steps.clone())])
+                }
+            }
+        }
 
         // prepare constants
-        // each constant is a static array (for fast dispatching) and vector of steps between which it is valid
-        let mut constants = self.constants.as_ref().map(|constants| {
-            let v = constants
-                .iter()
-                .map(|constant| {
-                    constant
-                        .evaluate(batch)
-                        .map(|v| StaticArray::from(v.into_array(0))) // convert to dyn to static
-                        .map_err(|e| e.into())
-                })
-                .collect::<Result<Vec<_>>>().unwrap();
-            (v, vec![0; constants.len()])
-        });
-
+        if let Some(constants) = &self.constants {
+            for constant in constants.iter() {
+                let arr = constant.evaluate(batch)?.into_array(0);
+                let arr = StaticArray::from(arr);
+                if let Some(c) = &mut state_batch.constants {
+                    c.push(arr)
+                } else {
+                    state_batch.constants = Some(vec![arr])
+                }
+            }
+        }
         // timestamp column
         // Optiprism uses millisecond precision
-        let ts_col = self
+        state_batch.ts = self
             .ts_col
             .evaluate(batch)?
             .into_array(0)
@@ -232,16 +260,12 @@ impl Funnel {
             .downcast_ref::<TimestampMillisecondArray>()
             .unwrap().clone();
 
-        // deconstruct state
-        let State {
-            mut step_id,
-            // mut row_id,
-            mut step_row,
-            mut window_start_ts,
-            mut is_completed,
-        } = self.state.clone();
+        self.batches.push_back(state_batch);
 
-
+        Ok(())
+    }
+    pub fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<FunnelResult> {
+        let batch_len = batch.num_rows();
         // main loop Until all steps are completed or we run out of rows
         // Main algorithm is:
         // 1. Find the first step to process
@@ -250,11 +274,11 @@ impl Funnel {
         // 3.b check out of window
         // 4 break if we run out of rows or steps
         // 5. if we found a row that matches the next step, update the state
-        'outer: while step_id < steps.len() && steps[step_id].row_id < batch_len {
+        'outer: while step_id < steps.len() & &steps[step_id].row_id < batch_len {
             // default result is next row. If we find a match, we will update it
             let mut res = LoopResult::NextRow;
             // if we are out of window, we can skip to the next funnel
-            if step_id > 0 && self.is_out_of_window(&steps, &ts_col, steps[step_id].row_id) {
+            if step_id > 0 & &self.is_out_of_window(&steps, &ts_col, steps[step_id].row_id) {
                 res = LoopResult::ContinueFunnel;
             } else if steps[step_id].exists.value(steps[step_id].row_id) { // if the step exists
                 res = LoopResult::NextStep; // next step
@@ -315,7 +339,7 @@ impl Funnel {
                 }
             }
             // double check limits
-            if step_id >= steps.len() || steps[step_id].row_id >= batch_len {
+            if step_id > = steps.len() || steps[step_id].row_id > = batch_len {
                 break;
             }
 
@@ -338,19 +362,20 @@ impl Funnel {
                     if step_id != steps.len() - 1 {
                         false
                     } else {
-                        steps[0].ts >= from.num_milliseconds() && steps[step_id].ts <= to.num_milliseconds()
+                        steps[0].ts > = from.num_milliseconds() & &steps[step_id].ts < = to.num_milliseconds()
                     }
                 }
             }
         };
+    };
 
-        let res = FunnelResult {
-            steps,
-            last_step: step_id,
-            is_completed,
-        };
-        Ok(res)
-    }
+    let res = FunnelResult {
+    steps,
+    last_step: step_id,
+    is_completed,
+};
+Ok(res)
+}
 }
 
 mod prepare_array {
