@@ -2,11 +2,9 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use arrow2::array::{Array, ArrayAccessor, ArrayRef, BooleanArray, Int64Array, Time, TimestampMillisecondArray, TimestampSecondArray};
 use arrow2::chunk::Chunk;
+use arrow2::compute::concatenate::concatenate;
 use arrow2::datatypes::{Field, SchemaRef};
 use arrow2::record_batch::RecordBatch;
-use arrow::array::{Array, TimestampMillisecondArray};
-use arrow::datatypes::DataType;
-use arrow::record_batch::RecordBatch;
 use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::{PhysicalExpr, PhysicalExprRef};
@@ -20,7 +18,8 @@ use crate::physical_plan::segmentation::funnel::{funnel};
 use crate::physical_plan::segmentation::funnel::per_partition::FunnelResult;
 use tracing_core::Level;
 use store::arrow_conversion::{arrow1_to_arrow2, arrow2_to_arrow1};
-use crate::StaticArray;
+use crate::static_array::StaticArray;
+use crate::{static_array, StaticArray};
 // use crate::StaticArray;
 
 #[derive(Debug, Clone)]
@@ -53,12 +52,54 @@ pub enum Filter {
     TimeToConvert(Duration, Duration),
 }
 
+struct Exclude {
+    exists: BooleanArray,
+    steps: Option<Vec<usize>>,
+}
+
 #[derive(Debug, Clone, Default)]
 struct Batch {
     pub steps: Vec<BooleanArray>,
-    pub exclude: Option<Vec<(BooleanArray, Option<Vec<usize>>)>>,
+    pub exclude: Option<Vec<Exclude>>,
     pub constants: Option<Vec<StaticArray>>,
-    pub ts: TimestampMillisecondArray,
+    pub ts: Int64Array,
+}
+
+impl Batch {
+    pub fn append(&mut self, other: &Batch) -> Result<()> {
+        let mut steps = vec![];
+        for (lstep, rstep) in self.steps.iter().zip(other.steps.iter()) {
+            let res = concatenate(&[lstep.boxed().as_ref(), rstep.boxed().as_ref()])?.as_any().downcast_ref::<BooleanArray>().unwrap().clone();
+            steps.push(res);
+        }
+        self.steps = steps;
+
+        if let Some(e) = &self.exclude {
+            let mut exclude = vec![];
+            for (l, r) in e.iter().zip(other.exclude.unwrap().iter()) {
+                let res = concatenate(&[l.exists.boxed().as_ref(), r.exists.boxed().as_ref()])?.as_any().downcast_ref::<BooleanArray>().unwrap().clone();
+
+                let res = Exclude { exists: res, steps: l.steps.clone() };
+                exclude.push(res);
+            }
+            self.exclude = Some(exclude);
+        }
+
+        if let Some(c) = &self.constants {
+            let mut constants = vec![];
+            for (l, r) in c.iter().zip(other.constants.unwrap().iter()) {
+                let res = static_array::concatenate(l, r)?;
+
+                constants.push(res);
+            }
+            self.constants = Some(constants);
+        }
+
+        let res = concatenate(&[self.ts.boxed().as_ref(), other.ts.boxed().as_ref()])?.as_any().downcast_ref::<Int64Array>().unwrap().clone();
+        self.ts = res;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -114,7 +155,7 @@ pub struct Funnel {
     schema: SchemaRef,
     ts_col: Column,
     window: Duration,
-    steps_expr: Vec<StepExpr>,
+    steps_expr: Vec<PhysicalExprRef>,
     in_any_order: bool,
     exclude_expr: Option<Vec<ExcludeExpr>>,
     // expr and vec of step ids
@@ -124,7 +165,7 @@ pub struct Funnel {
     filter: Option<Filter>,
     touch: Touch,
     state: State,
-    batches: VecDeque<Batch>,
+    batche: Batch,
 }
 
 #[derive(Debug, Clone)]
@@ -179,61 +220,26 @@ impl Funnel {
         self.batches.pop_front()
     }
 
-    pub fn evaluate_batch(&mut self, batch: &RecordBatch,schema:SchemaRef) -> Result<()> {
+    pub fn evaluate_batch(&mut self, batch: &RecordBatch, schema: SchemaRef) -> Result<()> {
         // prepare steps
+        let mut current_batch = Batch::default();
         for (step_id, expr) in self.steps_expr.iter().enumerate() {
-            let arr = expr.expr.evaluate(batch)?.into_array(0);
-            let field = match arr.data_type() {
-                DataType::Null => {}
-                DataType::Boolean => arrow::datatypes::Field::new()
-                DataType::Int8 => {}
-                DataType::Int16 => {}
-                DataType::Int32 => {}
-                DataType::Int64 => {}
-                DataType::UInt8 => {}
-                DataType::UInt16 => {}
-                DataType::UInt32 => {}
-                DataType::UInt64 => {}
-                DataType::Float16 => {}
-                DataType::Float32 => {}
-                DataType::Float64 => {}
-                DataType::Timestamp(_, _) => {}
-                DataType::Date32 => {}
-                DataType::Date64 => {}
-                DataType::Time32(_) => {}
-                DataType::Time64(_) => {}
-                DataType::Duration(_) => {}
-                DataType::Interval(_) => {}
-                DataType::Binary => {}
-                DataType::FixedSizeBinary(_) => {}
-                DataType::LargeBinary => {}
-                DataType::Utf8 => {}
-                DataType::LargeUtf8 => {}
-                DataType::List(_) => {}
-                DataType::FixedSizeList(_, _) => {}
-                DataType::LargeList(_) => {}
-                DataType::Struct(_) => {}
-                DataType::Union(_, _, _) => {}
-                DataType::Dictionary(_, _) => {}
-                DataType::Decimal128(_, _) => {}
-                DataType::Decimal256(_, _) => {}
-                DataType::Map(_, _) => {}
-                DataType::RunEndEncoded(_, _) => {}
-            }
-            let arr = arrow1_to_arrow2(arr,arr,schema.get_field)
-            self.state.steps[step_id].exists.push(arrow1_to_arrow2(arr,));
+            // evaluate expr to bool result
+            let arr = expr.evaluate(batch)?.into_array(0);
+            // convert arrow 1 to arrow 2. Because arrow 2 is faster
+            let arr = arrow1_to_arrow2::convert(arr)?.as_any().downcast_ref::<BooleanArray>().unwrap().clone();
+            // add steps to state
+            current_batch.steps.push(arr);
         }
-arrow2_to_arrow1()
-        let mut state_batch = Batch::default();
 
         // evaluate exclude
         if let Some(exprs) = &self.exclude_expr {
             for expr in exprs.iter() {
                 let arr = expr.expr.evaluate(batch)?.into_array(0).as_any().downcast_ref::<BooleanArray>().unwrap().clone();
-                if let Some(ex) = &mut state_batch.exclude {
+                if let Some(ex) = &mut current_batch.exclude {
                     ex.push((arr, expr.steps.clone()))
                 } else {
-                    state_batch.exclude = Some(vec![(arr, expr.steps.clone())])
+                    current_batch.exclude = Some(vec![(arr, expr.steps.clone())])
                 }
             }
         }
@@ -243,16 +249,16 @@ arrow2_to_arrow1()
             for constant in constants.iter() {
                 let arr = constant.evaluate(batch)?.into_array(0);
                 let arr = StaticArray::from(arr);
-                if let Some(c) = &mut state_batch.constants {
+                if let Some(c) = &mut current_batch.constants {
                     c.push(arr)
                 } else {
-                    state_batch.constants = Some(vec![arr])
+                    current_batch.constants = Some(vec![arr])
                 }
             }
         }
         // timestamp column
         // Optiprism uses millisecond precision
-        state_batch.ts = self
+        current_batch.ts = self
             .ts_col
             .evaluate(batch)?
             .into_array(0)
@@ -260,11 +266,15 @@ arrow2_to_arrow1()
             .downcast_ref::<TimestampMillisecondArray>()
             .unwrap().clone();
 
-        self.batches.push_back(state_batch);
+        // add batch
+        self.batches.push_back(current_batch);
 
         Ok(())
     }
-    pub fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<FunnelResult> {
+
+    // evaluate single partition. Partition may be spread across multiple chunks
+    pub fn evaluate_partition(&mut self, chunks: &[Chunk<Box<dyn Array>>]) -> Result<FunnelResult> {
+        chunks[0].chunks()
         let batch_len = batch.num_rows();
         // main loop Until all steps are completed or we run out of rows
         // Main algorithm is:
@@ -506,7 +516,7 @@ mod tests {
 
 
         let batch = RecordBatch::try_new(schema, cols)?;
-        funnel.evaluate(vec![1, 2, 3].as_slice(), &batch, true)?;
+        funnel.evaluate_partition(vec![1, 2, 3].as_slice(), &batch, true)?;
 
         Ok(())
     }

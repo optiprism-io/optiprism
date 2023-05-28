@@ -12,7 +12,7 @@ macro_rules! static_array_enum_variant {
 macro_rules! static_array_enum {
     ($($ident:ident)+) => {
         #[derive(Debug,Clone)]
-        enum StaticArray {
+        pub enum StaticArray {
             $($ident(concat_idents!($ident,Array)),)+
         }
     }
@@ -137,4 +137,8 @@ impl From<ArrayRef> for StaticArray {
             _ => unimplemented!(),
         }
     }
+}
+
+pub fn concatenate(l:&StaticArray,r:&StaticArray) -> Result<StaticArray> {
+
 }

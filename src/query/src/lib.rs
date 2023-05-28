@@ -5,6 +5,7 @@ extern crate core;
 use static_array::array::{Array, BooleanArray, PrimitiveArray, FixedSizeBinaryArray, Float16Array, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
 use static_array::datatypes::{IntervalUnit, TimeUnit};
 use static_array::datatypes::SchemaRef;
+use static_array::concatenate;
 use async_trait::async_trait;
 use datafusion_common::ScalarValue;
 use common::query::event_segmentation::EventSegmentation;
