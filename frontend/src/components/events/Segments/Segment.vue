@@ -64,25 +64,6 @@
                 :show-remove="showRemove"
             />
         </div>
-        <hr
-            v-if="props.andOrSelect === EventSegmentationSegmentFiltersConditionEnum.Or"
-            class="pf-c-divider pf-u-my-md"
-        />
-        <div
-            v-if="props.andOrSelect && props.segmentsLength > 1"
-            class="pf-l-flex"
-        >
-            <UiButton
-                class="pf-m-main"
-                @click="changeAndOr"
-            >
-                {{ $t(`common.${props.andOrSelect}`) }}
-            </UiButton>
-        </div>
-        <hr
-            v-if="props.andOrSelect === EventSegmentationSegmentFiltersConditionEnum.Or"
-            class="pf-c-divider pf-u-mb-md"
-        />
     </div>
 </template>
 
@@ -92,7 +73,6 @@ import AlphabetIdentifier from '@/components/common/identifier/AlphabetIdentifie
 import UiEditableText from '@/components/uikit/UiEditableText.vue'
 import Condition from '@/components/events/Segments/Condition.vue'
 import { Condition as ConditionType } from '@/types/events'
-import { EventSegmentationSegmentFiltersConditionEnum } from '@/api';
 
 interface Props {
     index: number
@@ -100,10 +80,10 @@ interface Props {
     conditions: ConditionType[]
     autoHideEvent?: boolean
     isOne?: boolean
-    andOrSelect?: EventSegmentationSegmentFiltersConditionEnum | null,
     isLast?: boolean
     isActiveAndOrFilter?: boolean
     segmentsLength: number
+    andOrSelectCondition?: boolean
 }
 
 const props = defineProps<Props>()
@@ -112,7 +92,6 @@ const emit = defineEmits<{
     (e: 'on-remove', inx: number): void
     (e: 'on-rename', name: string, idx: number): void
     (e: 'add-condition', idx: number): void
-    (e: 'on-change-and-or', idx: number): void
 }>()
 
 const updateOpenCondition = ref(false)
@@ -128,7 +107,6 @@ const addCondition = (): void => {
     })
 }
 
-const changeAndOr = (): void => emit('on-change-and-or', props.index);
 const onRemove = (): void => emit('on-remove', props.index)
 </script>
 

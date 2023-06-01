@@ -8,14 +8,11 @@
             :conditions="item.conditions || []"
             :auto-hide-event="!commonStore.showCreateCustomEvent"
             :is-one="props.isOne"
-            :is-active-and-or-filter="props.andOrSelect"
-            :and-or-select="props.andOrSelect && segmentsStore.segments[index + 1] ? item.filterConditions || EventSegmentationSegmentFiltersConditionEnum.And : null"
             :is-last="(segmentsStore.segments.length - 1) === index"
             :segments-length="segmentsStore.segments.length"
             @on-remove="deleteSegment"
             @on-rename="onRenameSegment"
             @add-condition="addCondition"
-            @on-change-and-or="onChangeAndOr"
         />
         <div
             v-if="isShowAddSegment"
@@ -57,7 +54,7 @@ import Segment from '@/components/events/Segments/Segment.vue'
 import { conditions } from '@/configs/events/segmentCondition'
 import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
 import { PropertyRef } from '@/types/events'
-import { DidEventCountTypeEnum, EventSegmentationSegmentFiltersConditionEnum } from '@/api'
+import { DidEventCountTypeEnum } from '@/api'
 
 const i18n = inject<any>('i18n')
 const segmentsStore = useSegmentsStore()
@@ -71,7 +68,6 @@ const emit = defineEmits<{
 
 const props = defineProps<{
     isOne?: boolean,
-    andOrSelect?: boolean
 }>();
 
 const isFirstSegmentSelectAction = computed(() => {
@@ -81,7 +77,7 @@ const isFirstSegmentSelectAction = computed(() => {
 });
 
 const isShowAddSegment =  computed(() => {
-    return (!props?.isOne && !props.andOrSelect) || (props.andOrSelect && isFirstSegmentSelectAction.value);
+    return (!props?.isOne &&  isFirstSegmentSelectAction.value);
 });
 
 const conditionAggregateItems = computed(() => {
@@ -115,27 +111,17 @@ const conditionItems = computed(() => {
 })
 
 const addSegment = () => {
-    if (props.andOrSelect) {
-        segmentsStore.segments.push({
-            name: '',
-            conditions: [{
-                filters: []
-            }],
-        });
-    } else {
-        segmentsStore.addSegment(`${i18n.$t('events.segments.segment')} ${segmentsStore.segments.length + 1}`)
-    }
+    segmentsStore.addSegment(`${i18n.$t('events.segments.segment')} ${segmentsStore.segments.length + 1}`)
 }
 const deleteSegment = (idx: number) => segmentsStore.deleteSegment(idx)
 const onRenameSegment = (name: string, idx: number) => segmentsStore.renameSegment(name, idx)
 const addCondition = (idx: number) => segmentsStore.addConditionSegment(idx)
-const onChangeAndOr = (idx: number) => segmentsStore.onChangeAndOr(idx)
 const changeActionCondition = (idx: number, idxSegment: number, ref: { id: string, name: string }) => {
     const segment = segmentsStore.segments[idxSegment];
     const conditions = segment?.conditions;
     const isNonSelectAction = !(conditions && conditions[idx].action?.id);
     segmentsStore.changeActionCondition(idx, idxSegment, ref);
-    if ((props.isOne || props.andOrSelect) && isNonSelectAction) {
+    if (props.isOne && isNonSelectAction) {
         addCondition(0)
     }
 }

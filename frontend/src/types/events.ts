@@ -15,6 +15,8 @@ import {
     QueryFormulaTypeEnum,
     QueryAggregatePerGroup,
     QueryAggregate,
+    SegmentConditionAnd,
+    SegmentConditionOr,
 } from '@/api'
 
 export type QueryType = QuerySimpleTypeEnum | QueryCountPerGroupTypeEnum | DidEventAggregatePropertyTypeEnum | QueryAggregatePropertyPerGroupTypeEnum | QueryFormulaTypeEnum;
@@ -239,7 +241,7 @@ export interface ConditionFilter {
 export interface Condition {
     action?: {
         name?: string
-        id: string
+        id: string | SegmentConditionAnd | SegmentConditionOr
     }
     propRef?: PropertyRef
     opId?: OperationId

@@ -51,6 +51,8 @@ import {
     QueryAggregate,
     QueryAggregatePerGroup,
     EventFilterByPropertyTypeEnum,
+    SegmentConditionAnd,
+    SegmentConditionOr
 } from '@/api'
 
 type Queries = QuerySimple | QueryCountPerGroup | QueryAggregatePropertyPerGroup | QueryAggregateProperty | QueryFormula
@@ -238,98 +240,108 @@ const mapReportToSegments = async (items: EventSegmentationSegment[]): Promise<S
             conditions: await Promise.all(item.conditions.map(async (row): Promise<Condition> => {
                 const condition = row
 
-                const res: Condition = {
-                    action: {
-                        name: i18n.t(`events.condition.${condition.type}`),
-                        id: condition.type || '',
-                    },
-                    filters: []
-                }
+                if (condition === SegmentConditionAnd.And || condition === SegmentConditionOr.Or) {
+                    return {
+                        action: {
+                            name: i18n.t(`events.condition.${row}`),
+                            id: condition,
+                        },
+                        filters: []
+                    }
+                } else {
+                    const res: Condition = {
+                        action: {
+                            name: i18n.t(`events.condition.${condition.type}`),
+                            id: condition.type || '',
+                        },
+                        filters: []
+                    }
 
-                switch (condition.type) {
-                    case SegmentConditionDidEventTypeEnum.DidEvent:
-                        if (condition.eventName || condition.eventId) {
-                            res.event = {
-                                name: condition.eventName || '',
-                                ref: {
-                                    type: condition.eventType || EventType.Regular,
-                                    id: condition.eventId || 0,
+                    switch (condition.type) {
+                        case SegmentConditionDidEventTypeEnum.DidEvent:
+                            if (condition.eventName || condition.eventId) {
+                                res.event = {
                                     name: condition.eventName || '',
-                                }
-                            }
-                        }
-
-                        if (condition.filters) {
-                            res.filters = await computedFilter(condition.eventName, condition.eventType, condition.filters)
-                        }
-
-                        if (condition.aggregate) {
-                            res.opId = condition.aggregate.operation
-
-                            if (condition.aggregate.type !== DidEventRelativeCountTypeEnum.RelativeCount && condition.aggregate?.value) {
-                                res.valueItem = condition.aggregate.value
-                            }
-
-                            if (condition.aggregate.time) {
-                                const { each, period } = getTime({ time: condition.aggregate.time });
-                                res.period = period
-                                res.each = each as Each
-                            }
-
-                            if (condition.aggregate.type === DidEventRelativeCountTypeEnum.RelativeCount && condition.aggregate.eventType) {
-                                let event: EventItem | null = null
-
-                                switch (condition.aggregate.eventType) {
-                                    case EventType.Regular:
-                                        event = lexiconStore.findEventByName(condition.aggregate.eventName || '')
-                                        break
-                                    case EventType.Custom:
-                                        event = lexiconStore.findCustomEventById(condition.aggregate.eventId || 0)
-                                        break
-                                }
-
-                                if (event) {
-                                    res.compareEvent = {
-                                        name: event.name,
-                                        ref: {
-                                            type: condition.aggregate.eventType as EventType,
-                                            id: event.id,
-                                        }
+                                    ref: {
+                                        type: condition.eventType || EventType.Regular,
+                                        id: condition.eventId || 0,
+                                        name: condition.eventName || '',
                                     }
                                 }
                             }
-                            res.aggregate = {
-                                name: i18n.t(`events.aggregates.${condition.aggregate.type}`),
-                                id: condition.aggregate.type,
-                            }
-                        }
-                        break;
-                    case SegmentConditionHadPropertyValueTypeEnum.HadPropertyValue:
-                        if (condition.time) {
-                            const { each, period } = getTime({ time: condition.time });
-                            res.period = period
-                            res.each = each as Each
-                        }
-                    case SegmentConditionHadPropertyValueTypeEnum.HadPropertyValue:
-                    case SegmentConditionHasPropertyValueTypeEnum.HasPropertyValue:
-                        if (condition.propertyName) {
-                            const property: Property = lexiconStore.findEventPropertyByName(condition.propertyName) || lexiconStore.findUserPropertyByName(condition.propertyName)
-                            res.propRef = {
-                                type: PropertyType.User,
-                                id: property?.id,
-                                name: property.name || property.displayName,
-                            }
-                            res.valuesList = await getValues({
-                                propertyName: property.name,
-                                propertyType: PropertyType.User,
-                            })
-                        }
 
-                        res.opId = condition.operation
-                        res.values = condition.value
+                            if (condition.filters) {
+                                res.filters = await computedFilter(condition.eventName, condition.eventType, condition.filters)
+                            }
+
+                            if (condition.aggregate) {
+                                res.opId = condition.aggregate.operation
+
+                                if (condition.aggregate.type !== DidEventRelativeCountTypeEnum.RelativeCount && condition.aggregate?.value) {
+                                    res.valueItem = condition.aggregate.value
+                                }
+
+                                if (condition.aggregate.time) {
+                                    const { each, period } = getTime({ time: condition.aggregate.time });
+                                    res.period = period
+                                    res.each = each as Each
+                                }
+
+                                if (condition.aggregate.type === DidEventRelativeCountTypeEnum.RelativeCount && condition.aggregate.eventType) {
+                                    let event: EventItem | null = null
+
+                                    switch (condition.aggregate.eventType) {
+                                        case EventType.Regular:
+                                            event = lexiconStore.findEventByName(condition.aggregate.eventName || '')
+                                            break
+                                        case EventType.Custom:
+                                            event = lexiconStore.findCustomEventById(condition.aggregate.eventId || 0)
+                                            break
+                                    }
+
+                                    if (event) {
+                                        res.compareEvent = {
+                                            name: event.name,
+                                            ref: {
+                                                type: condition.aggregate.eventType as EventType,
+                                                id: event.id,
+                                            }
+                                        }
+                                    }
+                                }
+                                res.aggregate = {
+                                    name: i18n.t(`events.aggregates.${condition.aggregate.type}`),
+                                    id: condition.aggregate.type,
+                                }
+                            }
+                            break;
+                        case SegmentConditionHadPropertyValueTypeEnum.HadPropertyValue:
+                            if (condition.time) {
+                                const { each, period } = getTime({ time: condition.time });
+                                res.period = period
+                                res.each = each as Each
+                            }
+                        case SegmentConditionHadPropertyValueTypeEnum.HadPropertyValue:
+                        case SegmentConditionHasPropertyValueTypeEnum.HasPropertyValue:
+                            if (condition.propertyName) {
+                                const property: Property = lexiconStore.findEventPropertyByName(condition.propertyName) || lexiconStore.findUserPropertyByName(condition.propertyName)
+                                res.propRef = {
+                                    type: PropertyType.User,
+                                    id: property?.id,
+                                    name: property.name || property.displayName,
+                                }
+                                res.valuesList = await getValues({
+                                    propertyName: property.name,
+                                    propertyType: PropertyType.User,
+                                })
+                            }
+
+                            res.opId = condition.operation
+                            res.values = condition.value
+                    }
+
+                    return res;
                 }
-
-                return res;
             }))
         }
     }))

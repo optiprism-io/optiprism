@@ -45,12 +45,12 @@ import {
     QueryAggregate,
     EventFilterByProperty,
     EventFilterByPropertyTypeEnum,
-    EventSegmentationSegmentFiltersConditionEnum,
+    SegmentConditionAnd,
+    SegmentConditionOr,
 } from '@/api'
 
 export interface Segment {
     name: string
-    filterConditions?: EventSegmentationSegmentFiltersConditionEnum,
     conditions?: Condition[]
 }
 
@@ -133,7 +133,6 @@ export const useSegmentsStore = defineStore('segments', {
             return this.segments.map(segment => {
                 return {
                     name: segment.name,
-                    filtersCondition: segment.filterConditions,
                     conditions: segment.conditions ? segment.conditions.reduce((items: EventSegmentationSegmentConditionsInner[], item) => {
                         if (item.action?.id === SegmentConditionDidEventTypeEnum.DidEvent && item.event) {
                             if (item?.aggregate?.id === DidEventRelativeCountTypeEnum.RelativeCount && !item.compareEvent) {
@@ -171,6 +170,10 @@ export const useSegmentsStore = defineStore('segments', {
                             }
 
                             items.push(condition)
+                        }
+
+                        if (SegmentConditionAnd.And === item.action?.id || SegmentConditionOr.Or === item.action?.id) {
+                            items.push(item.action?.id)
                         }
 
                         if (item.propRef && item.action?.id) {
@@ -493,12 +496,6 @@ export const useSegmentsStore = defineStore('segments', {
                     this.deleteSegment(payload.idxParent);
                 }
             }
-        },
-        onChangeAndOr(idx: number) {
-            const segment = this.segments[idx];
-            const or = EventSegmentationSegmentFiltersConditionEnum.Or;
-            const and = EventSegmentationSegmentFiltersConditionEnum.And;
-            segment.filterConditions = segment.filterConditions === and ? or : and;
         },
         addConditionSegment(idx: number) {
             const segment = this.segments[idx];

@@ -2935,11 +2935,6 @@ components:
           type: string
           description: name of segment
           example: iphone users
-        filtersCondition:
-          type: string
-          enum:
-            - and
-            - or
         conditions:
           type: array
           description: array of conditions
@@ -2950,6 +2945,8 @@ components:
               - $ref: '#/components/schemas/SegmentConditionHadPropertyValue'
               - $ref: '#/components/schemas/SegmentConditionDidEvent'
               - $ref: '#/components/schemas/SegmentConditionFunnel'
+              - $ref: '#/components/schemas/SegmentConditionAnd'
+              - $ref: '#/components/schemas/SegmentConditionOr'
     TimeBetween:
       type: object
       description: time range between fixed values
@@ -3271,6 +3268,14 @@ components:
           type: integer
         bucket:
           $ref: '#/components/schemas/TimeUnit'
+    SegmentConditionAnd:
+      type: string
+      enum:
+        - and
+    SegmentConditionOr:
+      type: string
+      enum:
+        - or
     QuerySimple:
       type: object
       description: simple query without any additional arguments
