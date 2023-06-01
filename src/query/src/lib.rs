@@ -52,18 +52,6 @@ static_array_enum! {
     TimestampSecond FixedSizeBinary Binary LargeBinary String LargeString Decimal128 Decimal256
 }
 
-
-macro_rules! static_array_variant_from_array {
-    ($typ:ident) => {
-        DataType::$typ=>StaticArray::$typ(arr.as_any().downcast_ref::<$typArray>().unwrap().clone()),
-    }
-}
-
-macro_rules! impl_into_static_array_simple {
-    ($($ident:ident)+) => {
-     $(DataType::$ident=>StaticArray::$ident(arr.as_any().downcast_ref::<concat_idents!($ident,Array)>().unwrap().clone())),+
-    }
-}
 /*
 macro_rules! impl_into_static_array {
     ($($ident:ident)+) => {
