@@ -18,15 +18,25 @@ use crate::{StaticArray};
 use std::sync::mpsc::{Sender, Receiver};
 // use crate::StaticArray;
 
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum StepOrder {
+    Sequential,
+    Any(Vec<usize>),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Step {
     pub ts: i64,
     pub row_id: usize,
+    pub order: StepOrder,
 }
 
 impl Step {
-    pub fn new(ts: i64, row_id: usize) -> Self {
-        Self { ts, row_id }
+    pub fn new(ts: i64, row_id: usize, order: StepOrder) -> Self {
+        Self { ts, row_id, order }
+    }
+    pub fn new_sequential(ts: i64, row_id: usize) -> Self {
+        Self { ts, row_id, order: StepOrder::Sequential }
     }
 }
 
@@ -61,6 +71,7 @@ struct Exclude {
 #[derive(Debug, Clone)]
 struct Batch<'a> {
     pub steps: Vec<BooleanArray>,
+    // pointer to step_results
     pub exclude: Option<Vec<Exclude>>,
     pub constants: Option<Vec<StaticArray>>,
     pub ts: TimestampMillisecondArray,
@@ -69,8 +80,6 @@ struct Batch<'a> {
 
 struct Batches<'a> {
     batches: Vec<Batch<'a>>,
-    spans: Vec<usize>,
-    cur_span: usize,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -94,8 +103,7 @@ struct Span<'a> {
 }
 
 impl<'a> Span<'a> {
-    pub fn new(id: usize, offset: usize, len: usize, batches: &'a [Batch]) -> Self {
-        let steps = batches[0].steps.len();
+    pub fn new(id: usize, offset: usize, len: usize, steps: &[StepOrder], batches: &'a [Batch]) -> Self {
         let const_row = if batches[0].constants.is_some() {
             Some(Row::default())
         } else {
@@ -108,7 +116,7 @@ impl<'a> Span<'a> {
             len,
             batches,
             const_row,
-            steps: vec![Step::default(); steps],
+            steps: steps.iter().map(|step| Step::new(0, 0, step.to_owned())).collect(),
             step_id: 0,
             row_id: 0,
             first_step: true,
@@ -230,12 +238,40 @@ impl<'a> Span<'a> {
         true
     }
 
-    // check if value by row id is true, so current row is a step
+    // check if value by row id is true, thus current row is a step
     // this is usually called before calling next_step
+    //  1
+    // *2
+    // *3
+    //  4
+    // *5
+    //  6
     #[inline]
-    pub fn validate_cur_step(&self) -> bool {
+    pub fn validate_cur_step(&mut self) -> bool {
         let (batch_id, idx) = self.abs_row_id();
-        self.batches[batch_id].steps[self.step_id].value(idx)
+        let mut del_step = None;
+        match &mut self.steps[self.step_id].order {
+            StepOrder::Sequential => {
+                return if del_step.is_none() {
+                    self.batches[batch_id].steps[self.step_id].value(idx)
+                } else {
+                    true
+                };
+            }
+            StepOrder::Any(steps) => {
+                if let Some(step_id) = del_step {
+                    steps.retain(|&x| x != step_id);
+                }
+                for step_id in steps {
+                    if self.batches[batch_id].steps[*step_id].value(idx) {
+                        del_step = Some(*step_id);
+                        break;
+                    }
+                }
+            }
+        }
+
+        del_step.is_some()
     }
 
     #[inline]
@@ -286,30 +322,14 @@ impl<'a> Span<'a> {
 }
 
 impl<'a> Batches<'a> {
-    pub fn new(batches: Vec<Batch<'a>>, spans: Vec<usize>) -> Self {
+    pub fn new(batches: Vec<Batch<'a>>) -> Self {
         Batches {
             batches,
-            spans,
-            cur_span: 0,
         }
     }
 
     pub fn len(&self) -> usize {
         self.batches.iter().map(|b| b.len()).sum()
-    }
-    pub fn next_span(&mut self) -> Option<Span> {
-        if self.cur_span == self.spans.len() {
-            return None;
-        }
-
-        let span_len = self.spans[self.cur_span];
-        let offset = (0..self.cur_span).into_iter().map(|i| self.spans[i]).sum();
-        if offset + span_len > self.len() {
-            (" offset {offset}, span len: {span_len} > rows count: {}", self.len());
-            return None;
-        }
-        self.cur_span += 1;
-        Some(Span::new(self.cur_span - 1, offset, span_len, &self.batches))
     }
 }
 
@@ -365,10 +385,11 @@ pub struct Funnel {
     ts_col: Column,
     window: Duration,
     steps_expr: Vec<PhysicalExprRef>,
-    in_any_order: bool,
+    steps: Vec<StepOrder>,
     exclude_expr: Option<Vec<ExcludeExpr>>,
     // expr and vec of step ids
     constants: Option<Vec<Column>>,
+    cur_span: usize,
     count: Count,
     // vec of col ids
     filter: Option<Filter>,
@@ -395,8 +416,7 @@ enum LoopResult {
 pub struct Options {
     ts_col: Column,
     window: Duration,
-    steps: Vec<PhysicalExprRef>,
-    any_order: bool,
+    steps: Vec<(PhysicalExprRef, StepOrder)>,
     exclude: Option<Vec<ExcludeExpr>>,
     constants: Option<Vec<Column>>,
     count: Count,
@@ -423,10 +443,11 @@ impl Funnel {
         Self {
             ts_col: opts.ts_col,
             window: opts.window,
-            steps_expr: opts.steps,
-            in_any_order: opts.any_order,
+            steps_expr: opts.steps.iter().map(|(expr, _)| expr.clone()).collect::<Vec<_>>(),
+            steps: opts.steps.iter().map(|(_, order)| order.clone()).collect::<Vec<_>>(),
             exclude_expr: opts.exclude,
             constants: opts.constants,
+            cur_span: 0,
             count: opts.count,
             filter: opts.filter,
             touch: opts.touch,
@@ -436,7 +457,7 @@ impl Funnel {
 
     pub fn evaluate_batch<'a>(&mut self, batch: &'a RecordBatch) -> Result<Batch<'a>> {
         let mut steps = vec![];
-        for (step_id, expr) in self.steps_expr.iter().enumerate() {
+        for expr in self.steps_expr.iter() {
             // evaluate expr to bool result
             let arr = expr.evaluate(&batch)?.into_array(0).as_any().downcast_ref::<BooleanArray>().unwrap().clone();
             // add steps to state
@@ -492,10 +513,12 @@ impl Funnel {
         Ok(res)
     }
 
-    pub fn evaluate(&mut self, batches: &mut Batches) -> Result<Option<Vec<FunnelResult>>> {
+    pub fn evaluate(&mut self, batches: &[Batch], spans: Vec<usize>) -> Result<Option<Vec<FunnelResult>>> {
         let mut results = vec![];
+        let (window, filter) = (self.window.clone(), self.filter.clone());
+        let mut dbg: Vec<DebugInfo> = vec![];
         // iterate over spans. For simplicity all ids are tied to span and start at 0
-        'span: while let Some(mut span) = batches.next_span() {
+        'span: while let Some(mut span) = self.next_span(batches, &spans) {
             // destructuring for to quick access to the fields
 
             // main loop Until all steps are completed or we run out of rows
@@ -513,7 +536,7 @@ impl Funnel {
                 // check exclude between steps
                 if !span.is_first_step() && !span.validate_excludes() {
                     next = LoopResult::ExcludeViolation;
-                } else if !span.is_first_step() && span.time_window() > self.window.num_milliseconds() {
+                } else if !span.is_first_step() && span.time_window() > window.num_milliseconds() {
                     // if step is not 0 and we have a window between steps and we are out of window - skip to the next funnel
                     next = LoopResult::OutOfWindow;
                 } else if span.validate_cur_step() { // if current
@@ -530,7 +553,7 @@ impl Funnel {
                     row_id: span.row_id,
                     ts: span.ts_value(),
                 };
-                self.dbg.push(dbinfo);
+                dbg.push(dbinfo);
 
                 // match result
                 match next {
@@ -559,7 +582,7 @@ impl Funnel {
             }
 
             // final step of success decision - check filters
-            let is_completed = match &self.filter {
+            let is_completed = match &filter {
                 // if no filter, then funnel is completed id all steps are completed
                 None => span.is_completed(),
                 Some(filter) => match filter {
@@ -588,11 +611,28 @@ impl Funnel {
             results.push(fr);
         }
 
+        self.dbg = dbg;
         if results.len() > 0 {
             Ok(Some(results))
         } else {
             Ok(None)
         }
+    }
+
+    pub fn next_span<'a>(&'a mut self, batches: &'a [Batch], spans: &[usize]) -> Option<Span> {
+        if self.cur_span == spans.len() {
+            return None;
+        }
+
+        let span_len = spans[self.cur_span];
+        let offset = (0..self.cur_span).into_iter().map(|i| spans[i]).sum();
+        let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
+        if offset + span_len > rows_count {
+            (" offset {offset}, span len: {span_len} > rows count: {}", rows_count);
+            return None;
+        }
+        self.cur_span += 1;
+        Some(Span::new(self.cur_span - 1, offset, span_len, &self.steps, batches))
     }
 }
 
@@ -647,15 +687,16 @@ mod tests {
     use tracing_core::Level;
     use tracing_test::traced_test;
     use store::test_util::parse_markdown_table;
-    use crate::physical_plan::segmentation::funnel::funnel::{Batch, Batches, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, Funnel, FunnelResult, LoopResult, Options, Step, StepExpr, Touch};
+    use crate::physical_plan::segmentation::funnel::funnel::{Batch, Batches, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, Funnel, FunnelResult, LoopResult, Options, Step, StepExpr, StepOrder, Touch};
     use crate::physical_plan::segmentation::funnel::funnel::prepare_array::get_sample_events;
     use crate::error::Result;
+    use crate::physical_plan::segmentation::funnel::funnel::StepOrder::*;
 
-    fn event_eq(event: &str, schema: &Schema) -> PhysicalExprRef {
+    fn event_eq(schema: &Schema, event: &str, order: StepOrder) -> (PhysicalExprRef, StepOrder) {
         let l = Column::new_with_schema("event", schema).unwrap();
         let r = Literal::new(ScalarValue::Utf8(Some(event.to_string())));
         let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-        Arc::new(expr) as PhysicalExprRef
+        (Arc::new(expr) as PhysicalExprRef, order)
     }
 
     fn evaluate_funnel(opts: Options, batch: RecordBatch, spans: Vec<usize>, exp: Vec<DebugInfo>, full_debug: bool, split_by: usize) -> Result<Option<Vec<FunnelResult>>> {
@@ -677,9 +718,7 @@ mod tests {
         for batch in batches.iter() {
             fbatches.push(funnel.evaluate_batch(batch)?);
         }
-        let mut batches = Batches::new(fbatches, spans);
-
-        let res = funnel.evaluate(&mut batches)?;
+        let res = funnel.evaluate(&fbatches, spans)?;
         let i = 0;
         let exp_len = exp.len();
         assert_eq!(exp_len, funnel.dbg.len());
@@ -736,9 +775,9 @@ mod tests {
     }
 }
     macro_rules! event_eq {
-    ($schema:expr, $($name:literal)+) => {
+    ($schema:expr, $($name:literal $order:expr),+) => {
         vec![
-            $(event_eq($name, $schema.as_ref()),)+
+            $(event_eq($schema.as_ref(),$name,$order),)+
         ]
     }
 }
@@ -764,8 +803,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -773,7 +812,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextStep),
-                exp: Some(vec![FunnelResult::Completed(vec![Step::new(0, 0), Step::new(1, 1), Step::new(2, 2)])]),
+                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)])]),
                 spans: vec![3],
                 full_debug: false,
             },
@@ -789,8 +828,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -798,7 +837,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep),
-                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new(0, 0), Step::new(1, 1)], 1)]),
+                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1)], 1)]),
                 spans: vec![2],
                 full_debug: false,
             },
@@ -816,8 +855,8 @@ mod tests {
                 Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -826,7 +865,7 @@ mod tests {
                 },
                 spans: vec![4],
                 exp_debug: expected_debug!(NextRow NextStep NextStep NextStep),
-                exp: Some(vec![FunnelResult::Completed(vec![Step::new(1, 1), Step::new(2, 2), Step::new(3, 3)])]),
+                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(1, 1), Step::new_sequential(2, 2), Step::new_sequential(3, 3)])]),
                 full_debug: false,
             },
             TestCase {
@@ -844,8 +883,8 @@ mod tests {
                 Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -855,7 +894,7 @@ mod tests {
                 spans: vec![5],
                 exp_debug: expected_debug!(NextStep NextStep NextRow NextRow NextStep),
                 // exp: Some(vec![FunnelResult { ts: vec![0, 1, 4], is_completed: true }]),
-                exp: Some(vec![FunnelResult::Completed(vec![Step::new(0, 0), Step::new(1, 1), Step::new(4, 4)])]),
+                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(4, 4)])]),
                 full_debug: false,
             },
             TestCase {
@@ -875,10 +914,10 @@ mod tests {
                 Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: Some(vec![
-                        ExcludeExpr { expr: event_eq("ex", schema.as_ref()), steps: None }
+                        ExcludeExpr { expr: event_eq(schema.as_ref(), "ex", StepOrder::Sequential).0, steps: None }
                     ]),
                     constants: None,
                     count: Count::Unique,
@@ -888,7 +927,7 @@ mod tests {
                 spans: vec![7],
                 exp_debug: expected_debug!(NextStep NextStep ExcludeViolation NextRow NextStep NextStep NextStep),
                 //exp: Some(vec![FunnelResult { ts: vec![4, 5, 6], is_completed: true }]),
-                exp: Some(vec![FunnelResult::Completed(vec![Step::new(4, 4), Step::new(5, 5), Step::new(6, 6)])]),
+                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(4, 4), Step::new_sequential(5, 5), Step::new_sequential(6, 6)])]),
 
                 full_debug: false,
             },
@@ -908,10 +947,10 @@ mod tests {
                 Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: Some(vec![
-                        ExcludeExpr { expr: event_eq("e1", schema.as_ref()), steps: Some(vec![ExcludeSteps::new(1, 2)]) }
+                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e1", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) }
                     ]),
                     constants: None,
                     count: Count::Unique,
@@ -921,7 +960,7 @@ mod tests {
                 spans: vec![6],
                 exp_debug: expected_debug!(NextStep NextStep ExcludeViolation NextStep NextStep NextStep),
                 //exp: Some(vec![FunnelResult { ts: vec![4, 5, 6], is_completed: true }]),
-                exp: Some(vec![FunnelResult::Completed(vec![Step::new(4, 3), Step::new(5, 4), Step::new(6, 5)])]),
+                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(4, 3), Step::new_sequential(5, 4), Step::new_sequential(6, 5)])]),
                 full_debug: false,
             },
             TestCase {
@@ -943,12 +982,12 @@ mod tests {
                 Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: Some(vec![
-                        ExcludeExpr { expr: event_eq("e1", schema.as_ref()), steps: Some(vec![ExcludeSteps::new(1, 2)]) },
-                        ExcludeExpr { expr: event_eq("e2", schema.as_ref()), steps: Some(vec![ExcludeSteps::new(0, 1)]) },
-                        ExcludeExpr { expr: event_eq("e3", schema.as_ref()), steps: Some(vec![ExcludeSteps::new(1, 2)]) },
+                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e1", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
+                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e2", Sequential).0, steps: Some(vec![ExcludeSteps::new(0, 1)]) },
+                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e3", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
                     ]),
                     constants: None,
                     count: Count::Unique,
@@ -958,7 +997,7 @@ mod tests {
                 spans: vec![9],
                 exp_debug: expected_debug!(NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow),
                 // exp: None,
-                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new(7, 6)], 0)]),
+                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new_sequential(7, 6)], 0)]),
                 full_debug: false,
             },
             TestCase {
@@ -973,8 +1012,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: Some(vec![Column::new("const", 2)]),
                     count: Count::Unique,
@@ -982,7 +1021,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep ConstantViolation NextRow NextRow),
-                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new(0, 0)], 0)]),
+                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0)], 0)]),
                 spans: vec![3],
                 full_debug: false,
             },
@@ -998,8 +1037,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: Some(vec![Column::new("const", 2)]),
                     count: Count::Unique,
@@ -1008,7 +1047,7 @@ mod tests {
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextStep),
                 // exp: Some(vec![FunnelResult { ts: vec![0, 1, 2], is_completed: true }]),
-                exp: Some(vec![FunnelResult::Completed(vec![Step::new(0, 0), Step::new(1, 1), Step::new(2, 2)])]),
+                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)])]),
                 spans: vec![3],
                 full_debug: false,
             },
@@ -1024,8 +1063,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1033,7 +1072,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextStep),
-                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new(0, 0), Step::new(1, 1), Step::new(2, 2)], 2)]),
+                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)], 2)]),
                 spans: vec![3],
                 full_debug: false,
             },
@@ -1049,8 +1088,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1058,7 +1097,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextRow),
-                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new(0, 0), Step::new(1, 1)], 1)]),
+                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1)], 1)]),
                 spans: vec![3],
                 full_debug: false,
             },
@@ -1074,8 +1113,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1083,7 +1122,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextStep),
-                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new(0, 0), Step::new(1, 1), Step::new(2, 2)], 2)]),
+                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)], 2)]),
                 spans: vec![3],
                 full_debug: false,
             },
@@ -1099,8 +1138,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1108,7 +1147,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextRow),
-                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new(0, 0), Step::new(1, 1)], 1)]),
+                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1)], 1)]),
                 spans: vec![3],
                 full_debug: false,
             },
@@ -1128,8 +1167,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::milliseconds(3),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1137,7 +1176,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep OutOfWindow NextRow NextRow NextStep NextStep NextRow NextStep),
-                exp: Some(vec![FunnelResult::Completed(vec![Step::new(6, 3), Step::new(7, 4), Step::new(9, 6)])]),
+                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(6, 3), Step::new_sequential(7, 4), Step::new_sequential(9, 6)])]),
                 spans: vec![7],
                 full_debug: false,
             },
@@ -1153,8 +1192,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::milliseconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1162,7 +1201,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextStep),
-                exp: Some(vec![FunnelResult::Completed(vec![Step::new(0, 0), Step::new(3, 1), Step::new(5, 2)])]),
+                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(3, 1), Step::new_sequential(5, 2)])]),
                 spans: vec![3],
                 full_debug: false,
             },
@@ -1178,8 +1217,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::milliseconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1187,7 +1226,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextStep),
-                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new(0, 0), Step::new(1, 1), Step::new(2, 2)], 2)]),
+                exp: Some(vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)], 2)]),
                 spans: vec![3],
                 full_debug: false,
             },
@@ -1206,8 +1245,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1216,8 +1255,8 @@ mod tests {
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextStep NextStep NextStep NextStep),
                 exp: Some(vec![
-                    FunnelResult::Completed(vec![Step::new(0, 0), Step::new(1, 1), Step::new(2, 2)]),
-                    FunnelResult::Completed(vec![Step::new(3, 0), Step::new(4, 1), Step::new(5, 2)]),
+                    FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)]),
+                    FunnelResult::Completed(vec![Step::new_sequential(3, 0), Step::new_sequential(4, 1), Step::new_sequential(5, 2)]),
                 ]),
                 spans: vec![3, 3],
                 full_debug: false,
@@ -1237,8 +1276,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1247,8 +1286,8 @@ mod tests {
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextRow NextStep NextStep NextStep),
                 exp: Some(vec![
-                    FunnelResult::Incomplete(vec![Step::new(0, 0), Step::new(1, 1)], 1),
-                    FunnelResult::Completed(vec![Step::new(3, 0), Step::new(4, 1), Step::new(5, 2)]),
+                    FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1)], 1),
+                    FunnelResult::Completed(vec![Step::new_sequential(3, 0), Step::new_sequential(4, 1), Step::new_sequential(5, 2)]),
                 ]),
                 spans: vec![3, 3],
                 full_debug: false,
@@ -1281,12 +1320,12 @@ mod tests {
                 Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: Some(vec![
-                        ExcludeExpr { expr: event_eq("e1", schema.as_ref()), steps: Some(vec![ExcludeSteps::new(1, 2)]) },
-                        ExcludeExpr { expr: event_eq("e2", schema.as_ref()), steps: Some(vec![ExcludeSteps::new(0, 1)]) },
-                        ExcludeExpr { expr: event_eq("e3", schema.as_ref()), steps: Some(vec![ExcludeSteps::new(1, 2)]) },
+                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e1", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
+                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e2", Sequential).0, steps: Some(vec![ExcludeSteps::new(0, 1)]) },
+                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e3", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
                     ]),
                     constants: None,
                     count: Count::Unique,
@@ -1296,7 +1335,7 @@ mod tests {
                 spans: vec![18],
                 exp_debug: expected_debug!(NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow),
                 exp: Some(vec![
-                    FunnelResult::Incomplete(vec![Step::new(4, 15)], 0),
+                    FunnelResult::Incomplete(vec![Step::new_sequential(4, 15)], 0),
                 ]),
                 full_debug: false,
             },
@@ -1315,8 +1354,8 @@ mod tests {
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" "e2" "e3"),
-                    any_order: false,
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
+
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
@@ -1324,10 +1363,38 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextStep),
-                exp: Some(vec![FunnelResult::Completed(vec![Step::new(0, 0), Step::new(1, 1), Step::new(2, 2)])]),
+                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)])]),
                 spans: vec![3, 4],
                 full_debug: false,
             },
+            /*TestCase {
+                name: "3 steps in a row, two spans, second exceeds limits".to_string(),
+                data: r#"
+| ts  | event | const  |
+|-----|-------|--------|
+| 0   | e1    | 1      |
+| 1   | e2    | 1      |
+| 2   | e3    | 1      |
+| 3   | e4    | 1      |
+| 4   | e5    | 1      |
+| 5   | e6    | 1      |
+"#,
+                opts: Options {
+                    ts_col: Column::new("ts", 0),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential,"e4" Sequential,"e5" Sequential,"e6" Sequential),
+
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                },
+                exp_debug: expected_debug!(NextStep NextStep NextStep),
+                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)])]),
+                spans: vec![3, 4],
+                full_debug: false,
+            },*/
         ];
 
 
