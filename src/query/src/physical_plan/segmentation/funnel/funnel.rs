@@ -38,6 +38,10 @@ impl Step {
     pub fn new_sequential(ts: i64, row_id: usize) -> Self {
         Self { ts, row_id, order: StepOrder::Sequential }
     }
+
+    pub fn new_any(ts: i64, row_id: usize, any: Vec<usize>) -> Self {
+        Self { ts, row_id, order: StepOrder::Any(any) }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -690,7 +694,7 @@ mod tests {
     use crate::physical_plan::segmentation::funnel::funnel::{Batch, Batches, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, Funnel, FunnelResult, LoopResult, Options, Step, StepExpr, StepOrder, Touch};
     use crate::physical_plan::segmentation::funnel::funnel::prepare_array::get_sample_events;
     use crate::error::Result;
-    use crate::physical_plan::segmentation::funnel::funnel::StepOrder::*;
+    use crate::physical_plan::segmentation::funnel::funnel::StepOrder::{Sequential, Any};
 
     fn event_eq(schema: &Schema, event: &str, order: StepOrder) -> (PhysicalExprRef, StepOrder) {
         let l = Column::new_with_schema("event", schema).unwrap();
@@ -721,7 +725,8 @@ mod tests {
         let res = funnel.evaluate(&fbatches, spans)?;
         let i = 0;
         let exp_len = exp.len();
-        assert_eq!(exp_len, funnel.dbg.len());
+        println!("result: {:?}", res);
+        assert_eq!(funnel.dbg.len(), exp_len);
         for (idx, info) in exp.into_iter().enumerate() {
             if full_debug {
                 assert_eq!(funnel.dbg[idx], info);
@@ -1367,40 +1372,67 @@ mod tests {
                 spans: vec![3, 4],
                 full_debug: false,
             },
-            /*TestCase {
-                name: "3 steps in a row, two spans, second exceeds limits".to_string(),
+            TestCase {
+                name: "any ordering".to_string(),
                 data: r#"
 | ts  | event | const  |
 |-----|-------|--------|
 | 0   | e1    | 1      |
-| 1   | e2    | 1      |
-| 2   | e3    | 1      |
+| 1   | e3    | 1      |
+| 2   | e2    | 1      |
 | 3   | e4    | 1      |
-| 4   | e5    | 1      |
-| 5   | e6    | 1      |
+| 4   | e6    | 1      |
+| 5   | e5    | 1      |
+| 6   | e7    | 1      |
+| 7   | e8    | 1      |
 "#,
                 opts: Options {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
-                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential,"e4" Sequential,"e5" Sequential,"e6" Sequential),
-
+                    steps: vec![
+                        event_eq(&schema, "e1", Sequential),
+                        event_eq(&schema, "e2", Any(vec![1, 2])),
+                        event_eq(&schema, "e3", Any(vec![1, 2])),
+                        event_eq(&schema, "e4", Sequential),
+                        event_eq(&schema, "e5", Any(vec![4, 5])),
+                        event_eq(&schema, "e6", Any(vec![4, 5])),
+                        event_eq(&schema, "e7", Sequential),
+                        event_eq(&schema, "e8", Any(vec![7])),
+                    ],
                     exclude: None,
                     constants: None,
                     count: Count::Unique,
                     filter: None,
                     touch: Touch::First,
                 },
-                exp_debug: expected_debug!(NextStep NextStep NextStep),
-                exp: Some(vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)])]),
-                spans: vec![3, 4],
+                exp_debug: expected_debug!(NextStep NextStep NextStep NextStep NextStep NextStep NextStep NextStep),
+                exp: Some(vec![
+                    FunnelResult::Completed(vec![
+                        Step::new_sequential(0, 0),
+                        Step::new_any(1, 1, vec![1, 2]),
+                        Step::new_any(2, 2, vec![1, 2]),
+                        Step::new_sequential(3, 3),
+                        Step::new_any(4, 4, vec![4, 5]),
+                        Step::new_any(5, 5, vec![4, 5]),
+                        Step::new_sequential(6, 6),
+                        Step::new_any(7, 7, vec![7]),
+                    ]),
+                ]),
+                spans: vec![8],
                 full_debug: false,
-            },*/
+            },
         ];
 
 
+        let run_only: Option<&str> = None;
         for split_by in 1..3 {
             println!("split batches by {split_by}");
             for case in cases.iter().cloned() {
+                if let Some(name) = run_only {
+                    if case.name != name {
+                        continue;
+                    }
+                }
                 println!("\ntest case : {}", case.name);
                 println!("============================================================");
                 let (cols, schema) = get_sample_events(case.data);
