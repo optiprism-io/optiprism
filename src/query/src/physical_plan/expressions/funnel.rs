@@ -12,11 +12,10 @@ use tracing::log::{debug, trace};
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::segmentation::{Expr, RowResult, Spans};
-use crate::physical_plan::segmentation::funnel::{funnel};
+use super::*;
 use tracing_core::Level;
 use crate::{StaticArray};
 use std::sync::mpsc::{Sender, Receiver};
-// use crate::StaticArray;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum StepOrder {
@@ -45,12 +44,12 @@ impl Step {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-enum FunnelResult {
+pub enum FunnelResult {
     Completed(Vec<Step>),
     Incomplete(Vec<Step>, usize),
 }
 
-enum Report {
+pub enum Report {
     Steps,
     Trends,
     TimeToConvert,
@@ -67,13 +66,13 @@ pub enum Filter {
 }
 
 #[derive(Debug, Clone)]
-struct Exclude {
+pub struct Exclude {
     exists: BooleanArray,
     steps: Option<Vec<ExcludeSteps>>,
 }
 
 #[derive(Debug, Clone)]
-struct Batch<'a> {
+pub struct Batch<'a> {
     pub steps: Vec<BooleanArray>,
     // pointer to step_results
     pub exclude: Option<Vec<Exclude>>,
@@ -82,9 +81,6 @@ struct Batch<'a> {
     pub batch: &'a RecordBatch,
 }
 
-struct Batches<'a> {
-    batches: Vec<Batch<'a>>,
-}
 
 #[derive(Debug, Clone, Default)]
 struct Row {
@@ -93,7 +89,7 @@ struct Row {
 }
 
 #[derive(Debug, Clone)]
-struct Span<'a> {
+pub struct Span<'a> {
     id: usize,
     offset: usize,
     len: usize,
@@ -325,18 +321,6 @@ impl<'a> Span<'a> {
     }
 }
 
-impl<'a> Batches<'a> {
-    pub fn new(batches: Vec<Batch<'a>>) -> Self {
-        Batches {
-            batches,
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.batches.iter().map(|b| b.len()).sum()
-    }
-}
-
 impl<'a> Batch<'a> {
     pub fn len(&self) -> usize {
         self.batch.num_rows()
@@ -384,8 +368,8 @@ enum Count {
     Session,
 }
 
-
-pub struct Funnel {
+#[derive(Clone, Debug)]
+pub struct FunnelExpr {
     ts_col: Column,
     window: Duration,
     steps_expr: Vec<PhysicalExprRef>,
@@ -442,7 +426,7 @@ struct DebugInfo {
     ts: i64,
 }
 
-impl Funnel {
+impl FunnelExpr {
     pub fn new(opts: Options) -> Self {
         Self {
             ts_col: opts.ts_col,
@@ -459,7 +443,7 @@ impl Funnel {
         }
     }
 
-    pub fn evaluate_batch<'a>(&mut self, batch: &'a RecordBatch) -> Result<Batch<'a>> {
+    fn evaluate_batch<'a>(&mut self, batch: &'a RecordBatch) -> Result<Batch<'a>> {
         let mut steps = vec![];
         for expr in self.steps_expr.iter() {
             // evaluate expr to bool result
@@ -517,12 +501,13 @@ impl Funnel {
         Ok(res)
     }
 
-    pub fn evaluate(&mut self, batches: &[Batch], spans: Vec<usize>) -> Result<Option<Vec<FunnelResult>>> {
+    pub fn evaluate(&mut self, record_batches: &[RecordBatch], spans: Vec<usize>) -> Result<Option<Vec<FunnelResult>>> {
+        let batches = record_batches.iter().map(|b| self.evaluate_batch(b)).collect::<Result<Vec<_>>>()?;
         let mut results = vec![];
         let (window, filter) = (self.window.clone(), self.filter.clone());
         let mut dbg: Vec<DebugInfo> = vec![];
         // iterate over spans. For simplicity all ids are tied to span and start at 0
-        'span: while let Some(mut span) = self.next_span(batches, &spans) {
+        'span: while let Some(mut span) = self.next_span(&batches, &spans) {
             // destructuring for to quick access to the fields
 
             // main loop Until all steps are completed or we run out of rows
@@ -623,7 +608,7 @@ impl Funnel {
         }
     }
 
-    pub fn next_span<'a>(&'a mut self, batches: &'a [Batch], spans: &[usize]) -> Option<Span> {
+    fn next_span<'a>(&'a mut self, batches: &'a [Batch], spans: &[usize]) -> Option<Span> {
         if self.cur_span == spans.len() {
             return None;
         }
@@ -691,10 +676,10 @@ mod tests {
     use tracing_core::Level;
     use tracing_test::traced_test;
     use store::test_util::parse_markdown_table;
-    use crate::physical_plan::segmentation::funnel::funnel::{Batch, Batches, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, Funnel, FunnelResult, LoopResult, Options, Step, StepExpr, StepOrder, Touch};
-    use crate::physical_plan::segmentation::funnel::funnel::prepare_array::get_sample_events;
+    use super::{Batch, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, FunnelExpr, FunnelResult, LoopResult, Options, Step, StepExpr, StepOrder, Touch};
+    use super::prepare_array::get_sample_events;
     use crate::error::Result;
-    use crate::physical_plan::segmentation::funnel::funnel::StepOrder::{Sequential, Any};
+    use super::StepOrder::{Sequential, Any};
 
     fn event_eq(schema: &Schema, event: &str, order: StepOrder) -> (PhysicalExprRef, StepOrder) {
         let l = Column::new_with_schema("event", schema).unwrap();
@@ -704,7 +689,7 @@ mod tests {
     }
 
     fn evaluate_funnel(opts: Options, batch: RecordBatch, spans: Vec<usize>, exp: Vec<DebugInfo>, full_debug: bool, split_by: usize) -> Result<Option<Vec<FunnelResult>>> {
-        let mut funnel = Funnel::new(opts);
+        let mut funnel = FunnelExpr::new(opts);
 
 
         let step = batch.num_rows() / split_by;
@@ -718,11 +703,7 @@ mod tests {
         }).collect::<Vec<_>>();
 
 
-        let mut fbatches = vec![];
-        for batch in batches.iter() {
-            fbatches.push(funnel.evaluate_batch(batch)?);
-        }
-        let res = funnel.evaluate(&fbatches, spans)?;
+        let res = funnel.evaluate(&batches, spans)?;
         let i = 0;
         let exp_len = exp.len();
         println!("result: {:?}", res);

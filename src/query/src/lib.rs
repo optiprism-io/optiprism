@@ -40,7 +40,7 @@ macro_rules! static_array_enum_variant {
 macro_rules! static_array_enum {
     ($($ident:ident)+) => {
         #[derive(Debug,Clone)]
-        enum StaticArray {
+        pub enum StaticArray {
             $($ident(concat_idents!($ident,Array)),)+
         }
     }
@@ -52,19 +52,6 @@ static_array_enum! {
     TimestampSecond FixedSizeBinary Binary LargeBinary String LargeString Decimal128 Decimal256
 }
 
-/*
-macro_rules! impl_into_static_array {
-    ($($ident:ident)+) => {
-    impl From<ArrayRef> for StaticArray {
-        fn from(arr: ArrayRef) -> Self {
-            match arr.data_type() {
-                 $(DataType::$ident=>StaticArray::$ident(arr.as_any().downcast_ref::<concat_idents!($ident,Array)>().unwrap().clone())),+
-            }
-        }
-        }
-    }
-}
-*/
 macro_rules! impl_into_static_array {
     ($($ident:ident)+) => {
         impl StaticArray {

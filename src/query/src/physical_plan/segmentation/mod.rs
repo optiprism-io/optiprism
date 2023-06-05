@@ -11,7 +11,6 @@ mod boolean_op;
 // pub mod sequence;
 // pub mod sum;
 pub mod aggregate;
-mod funnel;
 // mod sequence;
 // mod test_value;
 // mod boolean_op;
