@@ -6,7 +6,7 @@
         }"
     >
         <div
-            v-if="!props.isOne && !props.isActiveAndOrFilter"
+            v-if="!props.isOneSegment"
             class="pf-l-flex"
         >
             <AlphabetIdentifier
@@ -49,7 +49,7 @@
         <div
             class="pf-l-flex pf-m-column"
             :class="{
-                'pf-u-pl-xl': !props.isOne,
+                'pf-u-pl-xl': !props.isOneSegment,
             }"
         >
             <Condition
@@ -60,15 +60,16 @@
                 :update-open="updateOpenCondition"
                 :index-parent="props.index"
                 :auto-hide-event="props.autoHideEvent"
-                :is-one="props.isOne"
-                :show-remove="showRemove"
+                :is-one="props.isOneSegment"
+                :allow-and-or="props.isOneSegment && i > 0 ? !['and', 'or'].includes(props.conditions[i - 1]?.action?.id || '') : false"
+                :show-remove="props.isOneSegment ? props.conditions.length > 0 : true"
             />
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import AlphabetIdentifier from '@/components/common/identifier/AlphabetIdentifier.vue'
 import UiEditableText from '@/components/uikit/UiEditableText.vue'
 import Condition from '@/components/events/Segments/Condition.vue'
@@ -79,11 +80,10 @@ interface Props {
     name: string
     conditions: ConditionType[]
     autoHideEvent?: boolean
-    isOne?: boolean
+    isOneSegment?: boolean
     isLast?: boolean
     isActiveAndOrFilter?: boolean
     segmentsLength: number
-    andOrSelectCondition?: boolean
 }
 
 const props = defineProps<Props>()
@@ -95,7 +95,6 @@ const emit = defineEmits<{
 }>()
 
 const updateOpenCondition = ref(false)
-const showRemove = computed(() => props.segmentsLength > 1 || !((props.isOne || props.isActiveAndOrFilter) && props.conditions.length === 1));
 
 const onRename = (name: string): void => emit('on-rename', name, props.index)
 const addCondition = (): void => {

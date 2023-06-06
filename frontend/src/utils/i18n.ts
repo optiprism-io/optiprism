@@ -1,7 +1,11 @@
 type Dictionary = { [key: string]: string }
 type Placements = { [index: string]: any }
 export type $T = (key: string, placements?: Placements) => string
-export type I18N = { $t: $T }
+export type $TKeyExists = (key: string) => boolean
+export type I18N = {
+    $t: $T,
+    $tkeyExists: $TKeyExists
+}
 
 const validateKey = (key?: string) => {
     if (typeof key !== 'string') {
@@ -70,7 +74,7 @@ const i18n = {
         const error = validateKey(key)
         if (error) {
             logError(error)
-            return
+            return false;
         }
 
         for (const currentDictionary of this.currentDictionaries) {

@@ -185,7 +185,8 @@
       "didEvent": "Did event",
       "funnel": "Funnel",
       "retained": "Retained",
-
+      "and": "And",
+      "or": "Or",
       "hasPropertyValue_hint": "Has property value description",
       "hadPropertyValue_hint": "Had property value description",
       "didEvent_hint": "Did event description",

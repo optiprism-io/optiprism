@@ -7,7 +7,7 @@
             :name="item.name"
             :conditions="item.conditions || []"
             :auto-hide-event="!commonStore.showCreateCustomEvent"
-            :is-one="props.isOne"
+            :is-one-segment="props.isOne"
             :is-last="(segmentsStore.segments.length - 1) === index"
             :segments-length="segmentsStore.segments.length"
             @on-remove="deleteSegment"
@@ -15,7 +15,7 @@
             @add-condition="addCondition"
         />
         <div
-            v-if="isShowAddSegment"
+            v-if="!props.hideAddSegmentButton"
             class="pf-l-flex"
         >
             <UiButton
@@ -51,7 +51,6 @@ import { useLexiconStore } from '@/stores/lexicon'
 import { useCommonStore } from '@/stores/common'
 
 import Segment from '@/components/events/Segments/Segment.vue'
-import { conditions } from '@/configs/events/segmentCondition'
 import { aggregates } from '@/configs/events/segmentConditionDidEventAggregate'
 import { PropertyRef } from '@/types/events'
 import { DidEventCountTypeEnum } from '@/api'
@@ -66,18 +65,17 @@ const emit = defineEmits<{
     (e: 'get-event-segmentation'): void
 }>()
 
-const props = defineProps<{
+type Props = {
     isOne?: boolean,
-}>();
+    hideAddSegmentButton?: boolean,
+}
+
+const props = defineProps<Props>();
 
 const isFirstSegmentSelectAction = computed(() => {
     const lastSegment = segmentsStore.segments[0];
     const conditions = lastSegment?.conditions || [];
     return conditions[0]?.action;
-});
-
-const isShowAddSegment =  computed(() => {
-    return (!props?.isOne &&  isFirstSegmentSelectAction.value);
 });
 
 const conditionAggregateItems = computed(() => {
@@ -91,21 +89,6 @@ const conditionAggregateItems = computed(() => {
             },
             name,
             items: item.hasProperty ? lexiconStore.eventsQueryAggregates : null
-        }
-    })
-})
-
-const conditionItems = computed(() => {
-    return conditions.map(item => {
-        const name = i18n.$t(`events.condition.${item.key}`)
-
-        return {
-            item: {
-                id: item.key,
-                name,
-            },
-            name,
-            description: i18n.$t(`events.condition.${item.key}_hint`)
         }
     })
 })
@@ -130,7 +113,6 @@ const changeOperationCondition = (idx: number, idxSegment: number, opId: Operati
 const addValueCondition = (idx: number, idxSegment: number, value: Value) => segmentsStore.addValueCondition(idx, idxSegment, value)
 const removeValueCondition = (idx: number, idxSegment: number, value: Value) => segmentsStore.removeValueCondition(idx, idxSegment, value)
 
-provide('conditionItems', conditionItems.value)
 provide('conditionAggregateItems', conditionAggregateItems.value)
 provide('changeOperationCondition', changeOperationCondition)
 provide('changePropertyCondition', changePropertyCondition)

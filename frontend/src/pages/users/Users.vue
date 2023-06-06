@@ -10,7 +10,7 @@
             >
                 <Segments
                     :is-one="true"
-                    :and-or-select-condition="true"
+                    :hide-add-segment-button="true"
                     @get-event-segmentation="getEventSegmentationDebounce"
                 />
             </UiCard>

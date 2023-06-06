@@ -193,7 +193,8 @@ import {
 import { conditions } from '@/configs/events/segmentCondition'
 import { useLexiconStore } from '@/stores/lexicon'
 import { getStringDateByFormat } from '@/helpers/getStringDates'
-
+import { conditions as conditionsMap } from '@/configs/events/segmentCondition'
+import usei18n from '@/hooks/useI18n';
 import { Each, ApplyPayload } from '@/components/uikit/UiCalendar/UiCalendar'
 
 import Select from '@/components/Select/Select.vue'
@@ -204,8 +205,19 @@ import ValueSelect from '@/components/events/ValueSelect.vue'
 import Filter from '@/components/events/Filter.vue'
 import UiDatePicker from '@/components/uikit/UiDatePicker.vue'
 const ConditionDidEvent = defineAsyncComponent(() => import('./ConditionDidEvent.vue'))
+const i18n = usei18n();
 
-const i18n = inject<any>('i18n')
+type Item = {
+    id: string,
+    name: string,
+}
+
+interface ItemConditionType {
+    item: Item,
+    items?: ItemConditionType[],
+    name: string,
+    description: string,
+}
 
 interface Props {
     index: number
@@ -215,6 +227,7 @@ interface Props {
     autoHideEvent?: boolean
     isOne?: boolean
     showRemove?: boolean
+    allowAndOr?: boolean
 }
 
 const lexiconStore = useLexiconStore()
@@ -222,7 +235,38 @@ const props = withDefaults(defineProps<Props>(), {
     showRemove: true,
 });
 
-const conditionItems = inject<[]>('conditionItems')
+const getConditionItem = (key: string): ItemConditionType => {
+    const name = i18n.t(`events.condition.${key}`) as string;
+    const hintKey = `events.condition.${key}_hint`;
+
+    return {
+        item: {
+            id: key,
+            name,
+        },
+        name,
+        description: i18n.keyExists(hintKey) ? i18n.t(hintKey) : '',
+    }
+}
+
+const conditionItems = computed(() => {
+    const items = conditionsMap.map(item => getConditionItem(item.key));
+
+    if (props.allowAndOr) {
+        items.push({
+            item: {
+                id: 'andOr',
+                name: '',
+            },
+            items: ['and', 'or'].map(key => getConditionItem(key)),
+            name: '',
+            description: '',
+        });
+    }
+
+    return items;
+});
+
 const updateOpenFilter = ref(false);
 
 const lastCount = computed(() => {
@@ -263,25 +307,25 @@ const calendarValueString = computed(() => {
     if (props.condition.period) {
         switch(props.condition.period.type) {
             case 'last':
-                return `${i18n.$t('common.calendar.last')} ${props.condition.period.last} ${props.condition.period.last === 1 ? i18n.$t('common.calendar.day') : i18n.$t('common.calendar.days')}`
+                return `${i18n.t('common.calendar.last')} ${props.condition.period.last} ${props.condition.period.last === 1 ? i18n.t('common.calendar.day') : i18n.t('common.calendar.days')}`
             case 'since':
-                return props.condition.period.from ? `${i18n.$t('common.calendar.since')} ${getStringDateByFormat(props.condition.period.from, '%d %b, %Y')}` : ''
+                return props.condition.period.from ? `${i18n.t('common.calendar.since')} ${getStringDateByFormat(props.condition.period.from, '%d %b, %Y')}` : ''
             case 'between':
                 return props.condition.period.from && props.condition.period.to ? `${getStringDateByFormat(props.condition.period.from, '%d %b, %Y')} - ${getStringDateByFormat(props.condition.period.to, '%d %b, %Y')}` : ''
             case 'each':
-                return `${i18n.$t('common.calendar.each')} ${i18n.$t(`common.calendar.each_select.${props.condition.each}`).toLowerCase()}`
+                return `${i18n.t('common.calendar.each')} ${i18n.t(`common.calendar.each_select.${props.condition.each}`).toLowerCase()}`
             default:
-                return i18n.$t('common.select_period')
+                return i18n.t('common.select_period')
         }
     } else {
-        return i18n.$t('common.select_period')
+        return i18n.t('common.select_period')
     }
 })
 
 const conditionConfig = computed(() => {
     const id = props.condition?.action?.id
 
-    if (id && conditionItems) {
+    if (id) {
         const conditionItem = conditions.find(condition => condition.key === id)
 
         return conditionItem || null
@@ -292,16 +336,16 @@ const conditionConfig = computed(() => {
 
 const isSelectedAction = computed(() => Boolean(props.condition.action))
 
-const displayNameAction = computed(() => props.condition?.action?.name || (props.isOne ? i18n.$t('events.segments.add_condition') : i18n.$t('events.segments.select_condition')))
+const displayNameAction = computed(() => props.condition?.action?.name || (props.isOne ? i18n.t('events.segments.add_condition') : i18n.t('events.segments.select_condition')))
 
 const isSelectedProp = computed(() =>  Boolean(props.condition.propRef))
 
-const displayNameProp = computed(() => props.condition.propRef ? lexiconStore.propertyName(props.condition.propRef) : i18n.$t('events.select_property'))
+const displayNameProp = computed(() => props.condition.propRef ? lexiconStore.propertyName(props.condition.propRef) : i18n.t('events.select_property'))
 
 const isShowSelectProp = computed(() => {
     const id = props.condition?.action?.id
 
-    if (id && conditionItems) {
+    if (id) {
         const conditionItem = conditions.find(condition => condition.key === id)
 
         return conditionItem?.hasProp;
