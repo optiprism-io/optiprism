@@ -31,7 +31,7 @@ use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
-use datafusion_common::Result as DFResult;
+use datafusion_common::{DataFusionError, Result as DFResult};
 use datafusion_common::ScalarValue;
 use futures::Stream;
 use futures::StreamExt;
@@ -152,17 +152,19 @@ impl Stream for FunnelExecStream {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut state = PartitionState::new(self.partition_key.clone());
         let mut converted_steps = UInt64Builder::with_capacity(DEFAULT_BATCH_SIZE);
-        let mut steps_ts = vec![TimestampMillisecondBuilder::with_capacity(DEFAULT_BATCH_SIZE); self.predicate.steps_count()];
+        let mut steps_ts = (0..self.predicate.steps_count()).into_iter().map(|_| TimestampMillisecondBuilder::with_capacity(DEFAULT_BATCH_SIZE)).collect::<Vec<_>>();
         let mut to_filter = BooleanBuilder::with_capacity(DEFAULT_BATCH_SIZE);
         let num_cols = self.schema.fields().len() - 1 - self.predicate.steps_count();
+        let mut pre_batch_res: Vec<Vec<ArrayRef>> = vec![vec![]; num_cols];
+
         let mut is_ended = false;
 
         while !is_ended {
-            let timer = self.baseline_metrics.elapsed_compute().timer();
+            // let timer = self.baseline_metrics.elapsed_compute().timer();
             let res = match self.input.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
                     if let Some((batches, spans)) = state.push(batch)? {
-                        let ev_res = self.predicate.evaluate(&batches, spans.clone())?;
+                        let ev_res = self.predicate.evaluate(&batches, spans.clone()).map_err(|e| e.into_datafusion_execution_error())?;
                         Some((batches, spans, ev_res))
                     } else {
                         None
@@ -171,7 +173,7 @@ impl Stream for FunnelExecStream {
                 Poll::Ready(None) => {
                     is_ended = true;
                     if let Some((batches, spans)) = state.finalize()? {
-                        let ev_res = self.predicate.evaluate(&batches, spans.clone())?;
+                        let ev_res = self.predicate.evaluate(&batches, spans.clone()).map_err(|e| e.into_datafusion_execution_error())?;
                         Some((batches, spans, ev_res))
                     } else {
                         None
@@ -180,7 +182,6 @@ impl Stream for FunnelExecStream {
                 other => return other,
             };
 
-            let mut pre_batch_res: Vec<Vec<ArrayRef>> = vec![vec![]; num_cols];
             if let Some((batches, spans, res)) = res {
                 let mut offset = 0;
                 let mut batch_iter = batches.into_iter().peekable();
@@ -195,7 +196,7 @@ impl Stream for FunnelExecStream {
                         }
                         FunnelResult::Incomplete(steps, stepn) => {
                             converted_steps.append_value(0);
-                            for step_id in self.predicate.steps_count() {
+                            for step_id in 0..self.predicate.steps_count() {
                                 if step_id < stepn {
                                     steps_ts[step_id].append_value(steps[step_id].ts as i64);
                                 } else {
@@ -225,8 +226,20 @@ impl Stream for FunnelExecStream {
                     if converted_steps.len() >= DEFAULT_BATCH_SIZE {
                         let converted_col = converted_steps.finish();
                         let step_ts_cols = steps_ts.iter_mut().map(|v| v.finish()).collect::<Vec<_>>();
-                        let cols = pre_batch_res.into_iter().map(|cols| concat(&cols)).collect::<ArrowResult<Vec<_>>>()?;
-                        let batch = RecordBatch::try_new(self.schema.clone(), vec![converted_col, step_ts_cols, cols].concat())?;
+                        let cols = pre_batch_res.iter().map(|cols| {
+                            let to_concat = cols.into_iter().map(|v| v.as_ref()).collect::<Vec<_>>();
+                            concat(to_concat.as_slice())
+                        }).collect::<ArrowResult<Vec<_>>>()?;
+                        let mut res_cols = vec![];
+                        res_cols.push(Arc::new(converted_col) as ArrayRef);
+                        for col in step_ts_cols.into_iter() {
+                            res_cols.push(Arc::new(col) as ArrayRef)
+                        }
+                        for col in cols.into_iter() {
+                            res_cols.push(col)
+                        }
+
+                        let batch = RecordBatch::try_new(self.schema.clone(), res_cols)?;
 
                         let poll = Poll::Ready(Some(Ok(batch)));
                         return self.baseline_metrics.record_poll(poll);
@@ -234,18 +247,30 @@ impl Stream for FunnelExecStream {
                 }
             }
 
-            timer.done();
+            // timer.done();
         }
 
         let poll = if !converted_steps.is_empty() {
             let converted_col = converted_steps.finish();
             let step_ts_cols = steps_ts.iter_mut().map(|v| v.finish()).collect::<Vec<_>>();
-            let cols = pre_batch_res.into_iter().map(|cols| concat(&cols)).collect::<ArrowResult<Vec<_>>>()?;
-            let batch = RecordBatch::try_new(self.schema.clone(), vec![converted_col, step_ts_cols, cols].concat())?;
+            let cols = pre_batch_res.iter().map(|cols| {
+                let to_concat = cols.into_iter().map(|v| v.as_ref()).collect::<Vec<_>>();
+                concat(to_concat.as_slice())
+            }).collect::<ArrowResult<Vec<_>>>()?;
+            let mut res_cols = vec![];
+            res_cols.push(Arc::new(converted_col) as ArrayRef);
+            for col in step_ts_cols.into_iter() {
+                res_cols.push(Arc::new(col) as ArrayRef)
+            }
+            for col in cols.into_iter() {
+                res_cols.push(col)
+            }
+
+            let batch = RecordBatch::try_new(self.schema.clone(), res_cols)?;
 
             Poll::Ready(Some(Ok(batch)))
         } else {
-            Poll::Ready(None);
+            Poll::Ready(None)
         };
 
         self.baseline_metrics.record_poll(poll)
@@ -271,7 +296,6 @@ mod tests {
     use arrow::record_batch::RecordBatch;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
-    use crate::physical_plan::funnel::PartitionState;
     use crate::physical_plan::PartitionState;
 
     #[test]

@@ -1273,7 +1273,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextRow NextStep NextStep NextStep),
-                exp: vec![,
+                exp: vec![
                     FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1)], 1),
                     FunnelResult::Completed(vec![Step::new_sequential(3, 0), Step::new_sequential(4, 1), Step::new_sequential(5, 2)]),
                 ],
@@ -1322,7 +1322,7 @@ mod tests {
                 },
                 spans: vec![18],
                 exp_debug: expected_debug!(NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow NextStep ExcludeViolation NextRow),
-                exp: vec![,
+                exp: vec![
                     FunnelResult::Incomplete(vec![Step::new_sequential(4, 15)], 0),
                 ],
                 full_debug: false,
@@ -1389,7 +1389,7 @@ mod tests {
                     touch: Touch::First,
                 },
                 exp_debug: expected_debug!(NextStep NextStep NextStep NextStep NextStep NextStep NextStep NextStep),
-                exp: vec![,
+                exp: vec![
                     FunnelResult::Completed(vec![
                         Step::new_sequential(0, 0),
                         Step::new_any(1, 1, vec![1, 2]),
