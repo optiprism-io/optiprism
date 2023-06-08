@@ -88,3 +88,80 @@ impl PartitionState {
         Ok(None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use arrow::array::{ArrayRef, Int32Array, Int64Array};
+    use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+    use arrow::record_batch::RecordBatch;
+    use chrono::Duration;
+    use datafusion::physical_expr::expressions::Column;
+    use datafusion::physical_expr::{expressions, PhysicalExprRef};
+    use store::arrow_conversion::arrow2_to_arrow1;
+    use store::test_util::parse_markdown_table;
+    use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, Options, Touch};
+    use crate::physical_plan::expressions::get_sample_events;
+    use crate::physical_plan::funnel::FunnelExec;
+    use crate::physical_plan::PartitionState;
+
+    #[test]
+    fn test_batches_state() -> anyhow::Result<()> {
+        let schema = Schema::new(vec![
+            Field::new("a", DataType::Int64, false),
+        ]);
+
+        let batches = {
+            let v = vec![
+                vec![0, 0, 0, 0],
+                vec![1, 1, 1, 1, 2, 2, 2, 2, 2],
+                vec![2, 3, 3, 3, 4, 4, 4, 5, 5],
+                vec![6],
+                vec![6],
+                vec![6],
+                vec![7, 7, 7],
+                vec![8, 8, 8],
+            ];
+            v.into_iter()
+                .map(|v| {
+                    let arrays = vec![
+                        Arc::new(Int64Array::from(v)) as ArrayRef,
+                    ];
+                    RecordBatch::try_new(Arc::new(schema.clone()), arrays.clone()).unwrap()
+                })
+                .collect::<Vec<_>>()
+        };
+
+
+        let col = Arc::new(Column::new_with_schema("a", &schema)?) as PhysicalExprRef;
+        let mut state = PartitionState::new(vec![col]);
+
+        let mut spans = vec![];
+        for (idx, batch) in batches.into_iter().enumerate() {
+            let res = state.push(batch)?;
+            match res {
+                None => {}
+                Some((rb, s)) => spans.push(s)
+            }
+        }
+
+        let res = state.finalize()?;
+        match res {
+            None => println!("none"),
+            Some((rb, s)) => spans.push(s)
+        }
+
+        assert_eq!(spans,
+                   vec![
+                       vec![4, 4],
+                       vec![6, 3, 3],
+                       vec![2],
+                       vec![3],
+                       vec![3],
+                       vec![3],
+                   ],
+        );
+
+        Ok(())
+    }
+}

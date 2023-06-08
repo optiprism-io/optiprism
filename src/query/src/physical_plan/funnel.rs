@@ -292,68 +292,125 @@ impl RecordBatchStream for FunnelExecStream {
 mod tests {
     use std::sync::Arc;
     use arrow::array::{ArrayRef, Int32Array, Int64Array};
-    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
     use arrow::record_batch::RecordBatch;
+    use chrono::Duration;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
+    use datafusion::physical_plan::common::collect;
+    use datafusion::physical_plan::memory::MemoryExec;
+    use datafusion::prelude::SessionContext;
+    use store::arrow_conversion::arrow2_to_arrow1;
+    use store::test_util::parse_markdown_table;
+    use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, Options, Touch};
+    use crate::physical_plan::funnel::FunnelExec;
+    use crate::physical_plan::merge::MergeExec;
     use crate::physical_plan::PartitionState;
+    use crate::error::Result;
+use crate::physical_plan::expressions::funnel::test_utils::result_completed;
+    #[tokio::test]
+    async fn test_funnel() -> anyhow::Result<()> {
+        let data = r#"
+| user_id | ts | event | const  |
+|---------|----|-------|--------|
+| 0       | 1  | e1    | 1      |
+| 0       | 2  | e2    | 1      |
+| 0       | 3  | e3    | 1      |
+| 0       | 4  | e1    | 1      |
+| 1       | 1  | e1    | 1      |
+| 1       | 2  | e2    | 1      |
+| 1       | 3  | e3    | 1      |
+| 1       | 4  | e3    | 1      |
+| 2       | 1  | e1    | 1      |
+| 2       | 2  | e2    | 1      |
+| 2       | 3  | e3    | 1      |
+| 2       | 4  | e3    | 1      |
+| 2       | 5  | e3    | 1      |
+| 2       | 6  | e3    | 1      |
+| 3       | 1  | e1    | 1      |
+| 3       | 2  | e2    | 1      |
+| 3       | 3  | e3    | 1      |
+| 4       | 1  | e1    | 1      |
+| 4       | 2  | e2    | 1      |
+| 4       | 3  | e3    | 1      |
+| 5       | 1  | e1    | 1      |
+| 5       | 2  | e2    | 1      |
+| 6       | 1  | e1    | 1      |
+| 6       | 2  | e3    | 1      |
+| 6       | 3  | e3    | 1      |
+| 7       | 1  | e1    | 1      |
+| 7       | 2  | e2    | 1      |
+| 7       | 3  | e3    | 1      |
+| 8       | 1  | e1    | 1      |
+| 8       | 2  | e2    | 1      |
+| 8       | 3  | e3    | 1      |
+"#;
+        let (arrs, schema) = {
+            // todo change to arrow1
+            let fields = vec![
+                arrow2::datatypes::Field::new("user_id", arrow2::datatypes::DataType::Int64, false),
+                arrow2::datatypes::Field::new("ts", arrow2::datatypes::DataType::Timestamp(arrow2::datatypes::TimeUnit::Millisecond, None), false),
+                arrow2::datatypes::Field::new("event", arrow2::datatypes::DataType::Utf8, true),
+                arrow2::datatypes::Field::new("const", arrow2::datatypes::DataType::Int64, true),
+            ];
+            let res = parse_markdown_table(data, &fields).unwrap();
 
-    #[test]
-    fn test_batches_state() -> anyhow::Result<()> {
-        let schema = Schema::new(vec![
-            Field::new("a", DataType::Int64, false),
-        ]);
+            let (arrs, fields) = res.
+                into_iter().
+                zip(fields).
+                map(|(arr, field)| arrow2_to_arrow1(arr, field).unwrap()).
+                unzip();
+
+            let schema = Arc::new(Schema::new(fields)) as SchemaRef;
+
+            (arrs, schema)
+        };
+
+        let opts = Options {
+            ts_col: Column::new("ts", 0),
+            window: Duration::seconds(15),
+            steps: super::physical_plan::expressions::funnel::event_eq!(schema, "e1" Sequential, "e2" Sequential),
+            exclude: None,
+            constants: None,
+            count: Count::Unique,
+            filter: None,
+            touch: Touch::First,
+        };
 
         let batches = {
-            let v = vec![
-                vec![0, 0, 0, 0],
-                vec![1, 1, 1, 1, 2, 2, 2, 2, 2],
-                vec![2, 3, 3, 3, 4, 4, 4, 5, 5],
-                vec![6],
-                vec![6],
-                vec![6],
-                vec![7, 7, 7],
-                vec![8, 8, 8],
-            ];
-            v.into_iter()
+            let batch = RecordBatch::try_new(schema.clone(), arrs)?;
+            let to_take = vec![4, 9, 9, 1, 1, 1, 3, 3];
+            (0..to_take)
+                .into_iter()
                 .map(|v| {
-                    let arrays = vec![
-                        Arc::new(Int64Array::from(v)) as ArrayRef,
-                    ];
-                    RecordBatch::try_new(Arc::new(schema.clone()), arrays.clone()).unwrap()
+                    let mut offset = 0;
+                    let arrs = batch
+                        .columns()
+                        .iter()
+                        .map(|c| c.slice(offset, v).to_owned())
+                        .collect::<Vec<_>>();
+                    offset += v;
+                    arrs
                 })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|v| RecordBatch::try_new(schema.clone(), v).unwrap())
                 .collect::<Vec<_>>()
         };
 
+        let input = MemoryExec::try_new(vec![batch].as_slice(), schema.clone(), None)?;
 
-        let col = Arc::new(Column::new_with_schema("a", &schema)?) as PhysicalExprRef;
-        let mut state = PartitionState::new(vec![col]);
+        let funnel = FunnelExec::try_new(
+            FunnelExpr::new(opts),
+            vec![Arc::new(Column::new("ts", 0))],
+            Arc::new(input),
+        )?;
 
-        let mut spans = vec![];
-        for (idx, batch) in batches.into_iter().enumerate() {
-            let res = state.push(batch)?;
-            match res {
-                None => {}
-                Some((rb, s)) => spans.push(s)
-            }
-        }
-
-        let res = state.finalize()?;
-        match res {
-            None => println!("none"),
-            Some((rb, s)) => spans.push(s)
-        }
-
-        assert_eq!(spans,
-                   vec![
-                       vec![4, 4],
-                       vec![6, 3, 3],
-                       vec![2],
-                       vec![3],
-                       vec![3],
-                       vec![3],
-                   ],
-        );
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = funnel.execute(0, task_ctx)?;
+        let result = collect(stream).await?;
+        print!("{}", arrow::util::pretty::pretty_format_batches(&result)?);
 
         Ok(())
     }

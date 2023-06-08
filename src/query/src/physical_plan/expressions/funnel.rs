@@ -355,14 +355,14 @@ pub struct StepExpr {
 }
 
 #[derive(Clone, Debug)]
-enum Touch {
+pub enum Touch {
     First,
     Last,
     Step(usize),
 }
 
 #[derive(Clone, Debug)]
-enum Count {
+pub enum Count {
     Unique,
     NonUnique,
     Session,
@@ -385,13 +385,13 @@ pub struct FunnelExpr {
     dbg: Vec<DebugInfo>,
 }
 
-enum Order {
+pub enum Order {
     Any,
     Asc,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-enum LoopResult {
+pub enum LoopResult {
     OutOfWindow,
     ConstantViolation,
     ExcludeViolation,
@@ -402,17 +402,17 @@ enum LoopResult {
 
 #[derive(Debug, Clone)]
 pub struct Options {
-    ts_col: Column,
-    window: Duration,
-    steps: Vec<(PhysicalExprRef, StepOrder)>,
-    exclude: Option<Vec<ExcludeExpr>>,
-    constants: Option<Vec<Column>>,
-    count: Count,
-    filter: Option<Filter>,
-    touch: Touch,
+    pub ts_col: Column,
+    pub window: Duration,
+    pub steps: Vec<(PhysicalExprRef, StepOrder)>,
+    pub exclude: Option<Vec<ExcludeExpr>>,
+    pub constants: Option<Vec<Column>>,
+    pub count: Count,
+    pub filter: Option<Filter>,
+    pub touch: Touch,
 }
 
-enum Error {
+pub enum Error {
     OutOfWindow
 }
 
@@ -627,39 +627,9 @@ impl FunnelExpr {
     }
 }
 
-mod prepare_array {
-    use std::sync::Arc;
+pub mod test_utils {
     use arrow2::array::Utf8Array;
-    use arrow2::datatypes::{DataType, Field, TimeUnit};
     use arrow::array;
-    use arrow::array::ArrayRef;
-    use arrow::datatypes::{Schema, SchemaRef};
-    use datafusion::physical_expr::expressions::Literal;
-    use store::arrow_conversion::arrow2_to_arrow1;
-    use store::test_util::parse_markdown_table;
-
-    pub fn get_sample_events(data: &str) -> (Vec<ArrayRef>, SchemaRef) {
-        let fields = vec![
-            Field::new("ts", DataType::Timestamp(TimeUnit::Millisecond, None), false),
-            Field::new("event", DataType::Utf8, true),
-            Field::new("const", DataType::Int64, true),
-        ];
-        let res = parse_markdown_table(data, &fields).unwrap();
-
-        let (arrs, fields) = res.
-            into_iter().
-            zip(fields).
-            map(|(arr, field)| arrow2_to_arrow1(arr, field).unwrap()).
-            unzip();
-
-        let schema = Arc::new(Schema::new(fields)) as SchemaRef;
-
-        (arrs, schema)
-    }
-}
-
-#[cfg(test)]
-mod tests {
     use std::cmp::{max, min};
     use std::sync::Arc;
     use anyhow::bail;
@@ -677,20 +647,40 @@ mod tests {
     use super::LoopResult::*;
     use tracing_core::Level;
     use tracing_test::traced_test;
+    use store::arrow_conversion::arrow2_to_arrow1;
     use store::test_util::parse_markdown_table;
     use super::{Batch, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, FunnelExpr, FunnelResult, LoopResult, Options, Step, StepExpr, StepOrder, Touch};
-    use super::prepare_array::get_sample_events;
     use crate::error::Result;
     use super::StepOrder::{Sequential, Any};
 
-    fn event_eq(schema: &Schema, event: &str, order: StepOrder) -> (PhysicalExprRef, StepOrder) {
+    pub fn get_sample_events(data: &str) -> (Vec<ArrayRef>, SchemaRef) {
+        // todo change to arrow1
+        let fields = vec![
+            arrow2::datatypes::Field::new("ts", arrow2::datatypes::DataType::Timestamp(arrow2::datatypes::TimeUnit::Millisecond, None), false),
+            arrow2::datatypes::Field::new("event", arrow2::datatypes::DataType::Utf8, true),
+            arrow2::datatypes::Field::new("const", arrow2::datatypes::DataType::Int64, true),
+        ];
+        let res = parse_markdown_table(data, &fields).unwrap();
+
+        let (arrs, fields) = res.
+            into_iter().
+            zip(fields).
+            map(|(arr, field)| arrow2_to_arrow1(arr, field).unwrap()).
+            unzip();
+
+        let schema = Arc::new(Schema::new(fields)) as SchemaRef;
+
+        (arrs, schema)
+    }
+
+    pub fn event_eq(schema: &Schema, event: &str, order: StepOrder) -> (PhysicalExprRef, StepOrder) {
         let l = Column::new_with_schema("event", schema).unwrap();
         let r = Literal::new(ScalarValue::Utf8(Some(event.to_string())));
         let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
         (Arc::new(expr) as PhysicalExprRef, order)
     }
 
-    fn evaluate_funnel(opts: Options, batch: RecordBatch, spans: Vec<usize>, exp: Vec<DebugInfo>, full_debug: bool, split_by: usize) -> Result<Vec<FunnelResult>> {
+    pub fn evaluate_funnel(opts: Options, batch: RecordBatch, spans: Vec<usize>, exp: Vec<DebugInfo>, full_debug: bool, split_by: usize) -> Result<Vec<FunnelResult>> {
         let mut funnel = FunnelExpr::new(opts);
 
 
@@ -720,6 +710,73 @@ mod tests {
         Ok(res)
     }
 
+    macro_rules! expected_debug {
+    ($($ident:ident)+) => {
+        Some(vec![
+            $(DebugInfo {
+                loop_result: LoopResult::$ident,
+                cur_span: 0,
+                step_id: 0,
+                row_id: 0,
+                ts: 0,
+            },)+
+            ])
+        }
+    }
+
+    macro_rules! steps {
+    ($($ts:ident $row_id:ident)+) => {
+        vec![
+            $(Step::new($ts,$row_id),)+
+            ]
+        }
+    }
+
+    macro_rules! result_completed {
+    ($($ts:ident, $row_id:ident),+) => {
+        FunnelResult::Completed(
+        vec![
+            $(Step::new($ts,$row_id),)+
+            ])
+        }
+    }
+    macro_rules! event_eq {
+    ($schema:expr, $($name:literal $order:expr),+) => {
+        vec![
+            $(event_eq($schema.as_ref(),$name,$order),)+
+            ]
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use std::cmp::{max, min};
+    use std::sync::Arc;
+    use anyhow::bail;
+    use arrow::array::{Array, ArrayRef, Int64Array, StringArray, TimestampMillisecondArray};
+    use arrow::compute::take;
+    use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
+    use arrow::record_batch::RecordBatch;
+    use chrono::Duration;
+    use datafusion::physical_expr::expressions::{BinaryExpr, Column, Literal};
+    use datafusion::physical_expr::{PhysicalExpr, PhysicalExprRef};
+    use datafusion::physical_expr::unicode_expressions::right;
+    use datafusion_common::ScalarValue;
+    use datafusion_expr::{binary_expr, ColumnarValue, Expr, Operator};
+    use tracing::{debug, info};
+    use tracing::log::Level::Debug;
+    use super::LoopResult::*;
+    use tracing_core::Level;
+    use tracing_test::traced_test;
+    use store::test_util::parse_markdown_table;
+    use super::{Batch, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, FunnelExpr, FunnelResult, LoopResult, Options, Step, StepExpr, StepOrder, Touch};
+    use crate::error::Result;
+    use crate::physical_plan::expressions::funnel::test_utils::{evaluate_funnel, event_eq};
+    use crate::physical_plan::expressions::get_sample_events;
+    use super::StepOrder::{Sequential, Any};
+
+
     #[derive(Debug, Clone)]
     struct TestCase {
         name: String,
@@ -731,44 +788,7 @@ mod tests {
         full_debug: bool,
     }
 
-    macro_rules! expected_debug {
-    ($($ident:ident)+) => {
-        Some(vec![
-            $(DebugInfo {
-                loop_result: LoopResult::$ident,
-                cur_span: 0,
-                step_id: 0,
-                row_id: 0,
-                ts: 0,
-            },)+
-        ])
-    }
-}
 
-    macro_rules! steps {
-    ($($ts:ident $row_id:ident)+) => {
-        vec![
-            $(Step::new($ts,$row_id),)+
-        ]
-    }
-}
-
-    macro_rules! result_completed {
-    ($($ts:ident, $row_id:ident),+) => {
-        FunnelResult::Completed(
-        vec![
-            $(Step::new($ts,$row_id),)+
-        ]
-        )
-    }
-}
-    macro_rules! event_eq {
-    ($schema:expr, $($name:literal $order:expr),+) => {
-        vec![
-            $(event_eq($schema.as_ref(),$name,$order),)+
-        ]
-    }
-}
     #[traced_test]
     #[test]
     fn test_cases() -> anyhow::Result<()> {
