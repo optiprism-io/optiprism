@@ -1,11 +1,16 @@
 <template>
-    <div class="condition pf-l-flex pf-m-column">
+    <div
+        class="condition pf-l-flex pf-m-column"
+        :class="{
+            'condition_is-one': props.isOne,
+        }"
+    >
         <div class="pf-c-action-list">
             <div class="pf-c-action-list__item">
                 <Select
-                    :items="conditionItems"
+                    :items="allowAndOr ? conditionItemsAll : conditionItems"
                     :width-auto="true"
-                    :is-open-mount="updateOpen"
+                    :is-open-mount="updateOpen || (!!nextCondition?.action && !!condition?.action)"
                     :update-open="!isSelectedAction ? updateOpen : false"
                     @select="changeConditionAction"
                 >
@@ -173,6 +178,27 @@
                 @remove-filter-value="removeFilterValue"
             />
         </div>
+        <div
+            v-if="isAllowBetweenAdd"
+            class="condition__between-add"
+        >
+            <Select
+                :items="conditionItemsAll"
+                :width-auto="true"
+                :is-open-mount="updateOpenBetweenCondition"
+                :update-open="updateOpenBetweenCondition"
+                @select="changeBetweenAdd"
+            >
+                <UiButton
+                    :before-icon="'fas fa-plus-circle'"
+                    @click="betweenAdd"
+                />
+            </Select>
+        </div>
+        <i
+            v-if="isAllowBetweenAdd"
+            class="condition__between-add-after"
+        />
     </div>
 </template>
 
@@ -180,7 +206,9 @@
 import { inject, computed, ref, defineAsyncComponent } from 'vue'
 import { operationById, OperationId, Value } from '@/types'
 import { PropertyRef, Condition as ConditionType } from '@/types/events'
-import { DidEventRelativeCountTypeEnum } from '@/api'
+import {
+    DidEventRelativeCountTypeEnum,
+} from '@/api';
 import {
     ChangeFilterPropertyCondition,
     RemoveFilterCondition,
@@ -223,6 +251,7 @@ interface Props {
     index: number
     indexParent: number
     condition: ConditionType
+    nextCondition: ConditionType | null,
     updateOpen?: boolean
     autoHideEvent?: boolean
     isOne?: boolean
@@ -249,25 +278,30 @@ const getConditionItem = (key: string): ItemConditionType => {
     }
 }
 
+const isAllowBetweenAdd = computed(() => {
+    return props.isOne && props.condition?.action?.id && props.nextCondition?.action?.id;
+});
+
 const conditionItems = computed(() => {
-    const items = conditionsMap.map(item => getConditionItem(item.key));
+    return conditionsMap.map(item => getConditionItem(item.key));
+});
 
-    if (props.allowAndOr) {
-        items.push({
-            item: {
-                id: 'andOr',
-                name: '',
-            },
-            items: ['and', 'or'].map(key => getConditionItem(key)),
+const conditionItemsAll = computed(() => {
+    const items = [...conditionItems.value];
+    items.push({
+        item: {
+            id: 'andOr',
             name: '',
-            description: '',
-        });
-    }
-
+        },
+        items: ['and', 'or'].map(key => getConditionItem(key)),
+        name: i18n.t('common.groupBy'),
+        description: '',
+    });
     return items;
 });
 
 const updateOpenFilter = ref(false);
+const updateOpenBetweenCondition = ref(false);
 
 const lastCount = computed(() => {
     return props.condition?.period?.last
@@ -391,6 +425,7 @@ const removeFilterValueCondition = inject<(payload: FilterValueCondition) => voi
 const changePeriodCondition = inject<(payload: PeriodConditionPayload) => void>('changePeriodCondition')
 const onRemoveCondition = inject<(payload: Ids) => void>('onRemoveCondition')
 const changeEachCondition = inject<(payload: PayloadChangeEach) => void>('changeEachCondition')
+const betweenAddCondition = inject<(idx: number, indexParent: number, ref: {id: string, name: string}) => void>('betweenAddCondition');
 
 const changeConditionAction = (payload: { id: string, name: string }) => changeActionCondition && changeActionCondition(props.index, props.indexParent, payload)
 const changeProperty = (propRef: PropertyRef) => changePropertyCondition && changePropertyCondition(props.index, props.indexParent, propRef)
@@ -476,10 +511,19 @@ const onChangeEach = (payload: Each) => {
         value: payload,
     })
 }
+
+const betweenAdd = () => {
+    updateOpenBetweenCondition.value = true
+};
+
+const changeBetweenAdd = (payload: {id: string, name: string}) => {
+    betweenAddCondition && betweenAddCondition(props.index, props.indexParent, payload);
+};
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .condition {
+    position: relative;
     &__control {
         padding: 5px;
         opacity: 0;
@@ -494,6 +538,36 @@ const onChangeEach = (payload: Each) => {
     &:hover {
         .condition {
             &__control {
+                opacity: 1;
+            }
+        }
+    }
+
+    &_is-one {
+        padding-left: 40px;
+    }
+
+    &__between-add-after {
+        position: absolute;
+        left: 40px;
+        bottom: 0;
+        height: 1px;
+        width: calc(100% - 50px);
+        background-color: #000;
+        opacity: 0;
+    }
+
+    &__between-add {
+        position: absolute;
+        bottom: -28px;
+        left: 0;
+        opacity: 0;
+        .pf-c-button {
+            padding-top: 34px;
+        }
+        &:hover {
+            opacity: 1;
+            + .condition__between-add-after {
                 opacity: 1;
             }
         }

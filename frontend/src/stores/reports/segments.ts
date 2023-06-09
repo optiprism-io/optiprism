@@ -525,5 +525,15 @@ export const useSegmentsStore = defineStore('segments', {
         addSegment(name: string) {
             this.segments.push({name})
         },
-    }
+        betweenAddCondition(idx: number, indexParent: number, ref: {id: string, name: string}) {
+            const segment = this.segments[indexParent]
+            if (segment && segment.conditions) {
+                segment.conditions.splice(idx + 1, 0, {
+                    filters: [],
+                    period: {},
+                    action: ref
+                });
+            }
+        },
+    },
 });

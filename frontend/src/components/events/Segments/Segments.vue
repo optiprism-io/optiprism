@@ -119,7 +119,7 @@ provide('changePropertyCondition', changePropertyCondition)
 provide('changeActionCondition', changeActionCondition)
 provide('addValueCondition', addValueCondition)
 provide('removeValueCondition', removeValueCondition)
-
+provide('betweenAddCondition', (idx: number, indexParent: number, ref: {id: string, name: string}) => segmentsStore.betweenAddCondition(idx, indexParent, ref));
 provide('changeAgregateCondition', (payload: PayloadChangeAgregateCondition) => segmentsStore.changeAgregateCondition(payload))
 provide('onRemoveCondition', (payload: Ids) => segmentsStore.removeCondition(payload))
 provide('addFilterCondition', (payload: Ids) => segmentsStore.addFilterCondition(payload))
@@ -129,6 +129,7 @@ provide('changeFilterOperation', (payload: ChangeFilterOperation) => segmentsSto
 provide('addFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.addFilterValueCondition(payload))
 provide('removeFilterValueCondition', (payload: FilterValueCondition) => segmentsStore.removeFilterValueCondition(payload))
 provide('inputValueCondition', (payload: PayloadChangeValueItem) => segmentsStore.inputValue(payload))
+
 
 /**
  * Period Calendar

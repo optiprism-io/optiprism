@@ -72,7 +72,8 @@
       "month": "months",
       "year": "years"
     },
-    "chartType": "Chart type"
+    "chartType": "Chart type",
+    "groupBy": "Group by"
   },
 
   "users": {

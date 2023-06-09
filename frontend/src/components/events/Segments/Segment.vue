@@ -47,7 +47,7 @@
             </div>
         </div>
         <div
-            class="pf-l-flex pf-m-column"
+            class="segment__condition-list pf-l-flex pf-m-column"
             :class="{
                 'pf-u-pl-xl': !props.isOneSegment,
             }"
@@ -57,19 +57,20 @@
                 :key="i"
                 :index="i"
                 :condition="condition"
+                :next-condition="props.conditions[i + 1] || null"
                 :update-open="updateOpenCondition"
                 :index-parent="props.index"
                 :auto-hide-event="props.autoHideEvent"
                 :is-one="props.isOneSegment"
                 :allow-and-or="props.isOneSegment && i > 0 ? !['and', 'or'].includes(props.conditions[i - 1]?.action?.id || '') : false"
-                :show-remove="props.isOneSegment ? props.conditions.length > 0 : true"
+                :show-remove="props.isOneSegment ? conditionsLength > 1 && (conditionsLength !== i + 1) && (showRemoveCondition.length > 1 ? true : !!condition?.action) : true"
             />
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import AlphabetIdentifier from '@/components/common/identifier/AlphabetIdentifier.vue'
 import UiEditableText from '@/components/uikit/UiEditableText.vue'
 import Condition from '@/components/events/Segments/Condition.vue'
@@ -95,6 +96,14 @@ const emit = defineEmits<{
 }>()
 
 const updateOpenCondition = ref(false)
+
+const showRemoveCondition = computed(() => {
+    return props.conditions.filter(item => !item?.action?.id);
+});
+
+const conditionsLength = computed(() => {
+    return props.conditions.length;
+});
 
 const onRename = (name: string): void => emit('on-rename', name, props.index)
 const addCondition = (): void => {
