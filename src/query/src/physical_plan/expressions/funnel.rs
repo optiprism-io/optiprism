@@ -504,11 +504,12 @@ impl FunnelExpr {
         Ok(res)
     }
 
-    pub fn evaluate(&mut self, record_batches: &[RecordBatch], spans: Vec<usize>) -> Result<Vec<FunnelResult>> {
+    pub fn evaluate(&mut self, record_batches: &[RecordBatch], spans: Vec<usize>, skip: usize) -> Result<Vec<FunnelResult>> {
         let batches = record_batches.iter().map(|b| self.evaluate_batch(b)).collect::<Result<Vec<_>>>()?;
         let mut results = vec![];
         let (window, filter) = (self.window.clone(), self.filter.clone());
         let mut dbg: Vec<DebugInfo> = vec![];
+        self.cur_span = skip;
         // iterate over spans. For simplicity all ids are tied to span and start at 0
         'span: while let Some(mut span) = self.next_span(&batches, &spans) {
             // destructuring for to quick access to the fields
@@ -652,6 +653,7 @@ pub mod test_utils {
     use super::{Batch, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, FunnelExpr, FunnelResult, LoopResult, Options, Step, StepExpr, StepOrder, Touch};
     use crate::error::Result;
     use super::StepOrder::{Sequential, Any};
+
     pub fn get_sample_events(data: &str) -> (Vec<ArrayRef>, SchemaRef) {
         // todo change to arrow1
         let fields = vec![
@@ -694,8 +696,7 @@ pub mod test_utils {
         }).collect::<Vec<_>>();
 
 
-        let res = funnel.evaluate(&batches, spans)?;
-        let i = 0;
+        let res = funnel.evaluate(&batches, spans,0)?;
         let exp_len = exp.len();
         println!("result: {:?}", res);
         assert_eq!(funnel.dbg.len(), exp_len);
@@ -774,7 +775,7 @@ pub mod tests {
     use super::{Batch, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, FunnelExpr, FunnelResult, LoopResult, Options, Step, StepExpr, StepOrder, Touch};
     use crate::error::Result;
     use crate::physical_plan::expressions::funnel::test_utils::{evaluate_funnel, event_eq_};
-    use crate::{event_eq,expected_debug};
+    use crate::{event_eq, expected_debug};
     use crate::physical_plan::expressions::get_sample_events;
     use super::StepOrder::{Sequential, Any};
 

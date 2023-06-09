@@ -9,8 +9,8 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
-use arrow::array::{ArrayBuilder, ArrayRef, BooleanBuilder, Int64Array, TimestampMillisecondBuilder, UInt64Builder, UInt8Builder};
-use arrow::compute::{concat, filter};
+use arrow::array::{Array, ArrayBuilder, ArrayRef, BooleanBuilder, Int64Array, TimestampMillisecondBuilder, UInt32Builder, UInt64Builder, UInt8Builder};
+use arrow::compute::{concat, filter, take};
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::datatypes::SchemaRef;
 use arrow::error::Result as ArrowResult;
@@ -145,6 +145,20 @@ struct FunnelExecStream {
     baseline_metrics: BaselineMetrics,
 }
 
+#[inline]
+pub fn abs_id(offset: usize, batches: &[RecordBatch]) -> (usize, usize) {
+    let mut batch_id = 0;
+    let mut idx = offset;
+    for batch in batches {
+        if idx < batch.num_rows() {
+            break;
+        }
+        idx -= batch.num_rows();
+        batch_id += 1;
+    }
+    (batch_id, idx)
+}
+
 #[async_trait]
 impl Stream for FunnelExecStream {
     type Item = DFResult<RecordBatch>;
@@ -153,29 +167,41 @@ impl Stream for FunnelExecStream {
         let mut state = PartitionState::new(self.partition_key.clone());
         let mut converted_steps = UInt64Builder::with_capacity(DEFAULT_BATCH_SIZE);
         let mut steps_ts = (0..self.predicate.steps_count()).into_iter().map(|_| TimestampMillisecondBuilder::with_capacity(DEFAULT_BATCH_SIZE)).collect::<Vec<_>>();
-        let mut to_filter = BooleanBuilder::with_capacity(DEFAULT_BATCH_SIZE);
+        let mut to_take_builder = UInt32Builder::with_capacity(DEFAULT_BATCH_SIZE);
         let num_cols = self.schema.fields().len() - 1 - self.predicate.steps_count();
         let mut pre_batch_res: Vec<Vec<ArrayRef>> = vec![vec![]; num_cols];
 
         let mut is_ended = false;
 
         while !is_ended {
+            println!("loop");
             // let timer = self.baseline_metrics.elapsed_compute().timer();
             let res = match self.input.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
-                    if let Some((batches, spans)) = state.push(batch)? {
-                        let ev_res = self.predicate.evaluate(&batches, spans.clone()).map_err(|e| e.into_datafusion_execution_error())?;
+                    println!("pulled batch {:?}", batch);
+                    if let Some((batches, spans, offset)) = state.push(batch)? {
+                        println!("state: spans batches {:?} {:?}", spans, batches.iter().map(|v| v.columns()[0].clone()).collect::<Vec<_>>());
+                        let ev_res = self.predicate
+                            .evaluate(&batches, spans.clone(), offset)
+                            .map_err(|e| e.into_datafusion_execution_error())?;
+                        println!("ev result: {:?}", ev_res);
                         Some((batches, spans, ev_res))
                     } else {
+                        println!("possible more to push");
                         None
                     }
                 }
                 Poll::Ready(None) => {
+                    println!("last");
                     is_ended = true;
-                    if let Some((batches, spans)) = state.finalize()? {
-                        let ev_res = self.predicate.evaluate(&batches, spans.clone()).map_err(|e| e.into_datafusion_execution_error())?;
+                    if let Some((batches, spans, offset)) = state.finalize()? {
+                        println!("final state: batches spans {:?} {:?}", batches, spans);
+                        let ev_res = self.predicate
+                            .evaluate(&batches, spans.clone(),offset)
+                            .map_err(|e| e.into_datafusion_execution_error())?;
                         Some((batches, spans, ev_res))
                     } else {
+                        println!("no final");
                         None
                     }
                 }
@@ -184,44 +210,59 @@ impl Stream for FunnelExecStream {
 
             if let Some((batches, spans, res)) = res {
                 let mut offset = 0;
-                let mut batch_iter = batches.into_iter().peekable();
+                let mut last_batch = 0;
+                // println!("batches len: {}", batches.len());
+                // let total_rows = batches.iter().map(|b| b.num_rows()).sum::<usize>();
+
+                // let mut batch_iter = batches.into_iter().peekable();
+                println!("go through the results");
                 for (span, funnel_result) in spans.into_iter().zip(res.into_iter()) {
                     match funnel_result {
                         FunnelResult::Completed(steps) => {
+                            println!("completed result. Add converted steps len: {:?}", steps);
                             converted_steps.append_value(steps.len() as u64);
 
                             for (step_id, step) in steps.into_iter().enumerate() {
+                                println!("append ts value {}", step.ts);
                                 steps_ts[step_id].append_value(step.ts as i64);
                             }
                         }
                         FunnelResult::Incomplete(steps, stepn) => {
+                            println!("completed result. steps: {:?}, number: {stepn}", steps);
+                            println!("Add zero to converted steps");
                             converted_steps.append_value(0);
                             for step_id in 0..self.predicate.steps_count() {
                                 if step_id < stepn {
+                                    println!("append steps_ts with value {}", steps[step_id].ts);
                                     steps_ts[step_id].append_value(steps[step_id].ts as i64);
                                 } else {
+                                    println!("append null to steps_ts");
                                     steps_ts[step_id].append_null();
                                 }
                             }
                         }
                     }
-                    to_filter.append_value(true);
-                    for _ in 0..span {
-                        to_filter.append_value(false);
-                    }
-                    offset += span;
-                    if offset > batch_iter.peek().unwrap().num_rows() {
-                        let fb = to_filter.finish();
-                        let batch = batch_iter.next().unwrap();
-                        let cols = batch.columns().iter().map(|col| filter(col, &fb)).collect::<ArrowResult<Vec<_>>>()?;
+                    to_take_builder.append_value(offset);
+                    println!("to take: {:?}", to_take_builder.slices_mut().0);
+
+                    offset += span as u32;
+                    // println!("peek {}", batch_iter.peek().unwrap().num_rows());
+                    if offset >= batches[last_batch].num_rows() as u32 {
+                        println!("reset");
+                        offset = 0;
+                        let to_take = to_take_builder.finish();
+                        println!("to take: {:?}", to_take);
+                        let batch = &batches[last_batch];
+                        let cols = batch
+                            .columns()
+                            .iter()
+                            .map(|col| take(col, &to_take, None))
+                            .collect::<ArrowResult<Vec<_>>>()?;
                         for (col_id, col) in cols.into_iter().enumerate() {
                             pre_batch_res[col_id].push(col);
                         }
-
-                        if batch_iter.next().is_none() {
-                            break;
-                        }
                     }
+
 
                     if converted_steps.len() >= DEFAULT_BATCH_SIZE {
                         let converted_col = converted_steps.finish();
@@ -371,7 +412,7 @@ mod tests {
         };
 
         let opts = Options {
-            ts_col: Column::new("ts", 0),
+            ts_col: Column::new_with_schema("ts", &schema)?,
             window: Duration::seconds(15),
             steps: event_eq!(schema, "e1" Sequential, "e2" Sequential),
             exclude: None,
@@ -384,10 +425,10 @@ mod tests {
         let batches = {
             let batch = RecordBatch::try_new(schema.clone(), arrs)?;
             let to_take = vec![4, 9, 9, 1, 1, 1, 3, 3];
+            let mut offset = 0;
             to_take
                 .into_iter()
                 .map(|v| {
-                    let mut offset = 0;
                     let arrs = batch
                         .columns()
                         .iter()
@@ -406,7 +447,7 @@ mod tests {
 
         let funnel = FunnelExec::try_new(
             FunnelExpr::new(opts),
-            vec![Arc::new(Column::new("ts", 0))],
+            vec![Arc::new(Column::new_with_schema("user_id", &schema)?)],
             Arc::new(input),
         )?;
 
