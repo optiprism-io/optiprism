@@ -306,8 +306,12 @@ mod tests {
     use crate::physical_plan::funnel::FunnelExec;
     use crate::physical_plan::merge::MergeExec;
     use crate::physical_plan::PartitionState;
+    use crate::physical_plan::expressions::funnel::test_utils::event_eq_;
     use crate::error::Result;
-use crate::physical_plan::expressions::funnel::test_utils::result_completed;
+    use crate::event_eq;
+    use crate::physical_plan::expressions::funnel::StepOrder::Sequential;
+    use datafusion::physical_plan::ExecutionPlan;
+
     #[tokio::test]
     async fn test_funnel() -> anyhow::Result<()> {
         let data = r#"
@@ -369,7 +373,7 @@ use crate::physical_plan::expressions::funnel::test_utils::result_completed;
         let opts = Options {
             ts_col: Column::new("ts", 0),
             window: Duration::seconds(15),
-            steps: super::physical_plan::expressions::funnel::event_eq!(schema, "e1" Sequential, "e2" Sequential),
+            steps: event_eq!(schema, "e1" Sequential, "e2" Sequential),
             exclude: None,
             constants: None,
             count: Count::Unique,
@@ -380,7 +384,7 @@ use crate::physical_plan::expressions::funnel::test_utils::result_completed;
         let batches = {
             let batch = RecordBatch::try_new(schema.clone(), arrs)?;
             let to_take = vec![4, 9, 9, 1, 1, 1, 3, 3];
-            (0..to_take)
+            to_take
                 .into_iter()
                 .map(|v| {
                     let mut offset = 0;
@@ -398,7 +402,7 @@ use crate::physical_plan::expressions::funnel::test_utils::result_completed;
                 .collect::<Vec<_>>()
         };
 
-        let input = MemoryExec::try_new(vec![batch].as_slice(), schema.clone(), None)?;
+        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
         let funnel = FunnelExec::try_new(
             FunnelExpr::new(opts),

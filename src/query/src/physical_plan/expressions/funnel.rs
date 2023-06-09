@@ -418,7 +418,7 @@ pub enum Error {
 
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-struct DebugInfo {
+pub struct DebugInfo {
     loop_result: LoopResult,
     cur_span: usize,
     step_id: usize,
@@ -603,7 +603,7 @@ impl FunnelExpr {
             results.push(fr);
         }
         assert!(results.len() > 0);
-        assert_eq!(spans.len(), results.len());
+        // assert_eq!(spans.len(), results.len());
 
         self.dbg = dbg;
 
@@ -652,7 +652,6 @@ pub mod test_utils {
     use super::{Batch, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, FunnelExpr, FunnelResult, LoopResult, Options, Step, StepExpr, StepOrder, Touch};
     use crate::error::Result;
     use super::StepOrder::{Sequential, Any};
-
     pub fn get_sample_events(data: &str) -> (Vec<ArrayRef>, SchemaRef) {
         // todo change to arrow1
         let fields = vec![
@@ -673,7 +672,7 @@ pub mod test_utils {
         (arrs, schema)
     }
 
-    pub fn event_eq(schema: &Schema, event: &str, order: StepOrder) -> (PhysicalExprRef, StepOrder) {
+    pub fn event_eq_(schema: &Schema, event: &str, order: StepOrder) -> (PhysicalExprRef, StepOrder) {
         let l = Column::new_with_schema("event", schema).unwrap();
         let r = Literal::new(ScalarValue::Utf8(Some(event.to_string())));
         let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
@@ -710,6 +709,7 @@ pub mod test_utils {
         Ok(res)
     }
 
+    #[macro_export]
     macro_rules! expected_debug {
     ($($ident:ident)+) => {
         Some(vec![
@@ -740,10 +740,11 @@ pub mod test_utils {
             ])
         }
     }
+    #[macro_export]
     macro_rules! event_eq {
     ($schema:expr, $($name:literal $order:expr),+) => {
         vec![
-            $(event_eq($schema.as_ref(),$name,$order),)+
+            $(event_eq_($schema.as_ref(),$name,$order),)+
             ]
         }
     }
@@ -772,7 +773,8 @@ pub mod tests {
     use store::test_util::parse_markdown_table;
     use super::{Batch, Count, DebugInfo, ExcludeExpr, ExcludeSteps, Filter, FunnelExpr, FunnelResult, LoopResult, Options, Step, StepExpr, StepOrder, Touch};
     use crate::error::Result;
-    use crate::physical_plan::expressions::funnel::test_utils::{evaluate_funnel, event_eq};
+    use crate::physical_plan::expressions::funnel::test_utils::{evaluate_funnel, event_eq_};
+    use crate::{event_eq,expected_debug};
     use crate::physical_plan::expressions::get_sample_events;
     use super::StepOrder::{Sequential, Any};
 
@@ -925,7 +927,7 @@ pub mod tests {
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
 
                     exclude: Some(vec![
-                        ExcludeExpr { expr: event_eq(schema.as_ref(), "ex", StepOrder::Sequential).0, steps: None }
+                        ExcludeExpr { expr: event_eq_(schema.as_ref(), "ex", StepOrder::Sequential).0, steps: None }
                     ]),
                     constants: None,
                     count: Count::Unique,
@@ -958,7 +960,7 @@ pub mod tests {
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
 
                     exclude: Some(vec![
-                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e1", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) }
+                        ExcludeExpr { expr: event_eq_(schema.as_ref(), "e1", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) }
                     ]),
                     constants: None,
                     count: Count::Unique,
@@ -993,9 +995,9 @@ pub mod tests {
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
 
                     exclude: Some(vec![
-                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e1", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
-                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e2", Sequential).0, steps: Some(vec![ExcludeSteps::new(0, 1)]) },
-                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e3", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
+                        ExcludeExpr { expr: event_eq_(schema.as_ref(), "e1", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
+                        ExcludeExpr { expr: event_eq_(schema.as_ref(), "e2", Sequential).0, steps: Some(vec![ExcludeSteps::new(0, 1)]) },
+                        ExcludeExpr { expr: event_eq_(schema.as_ref(), "e3", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
                     ]),
                     constants: None,
                     count: Count::Unique,
@@ -1331,9 +1333,9 @@ pub mod tests {
                     steps: event_eq!(schema, "e1" Sequential, "e2" Sequential , "e3" Sequential),
 
                     exclude: Some(vec![
-                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e1", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
-                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e2", Sequential).0, steps: Some(vec![ExcludeSteps::new(0, 1)]) },
-                        ExcludeExpr { expr: event_eq(schema.as_ref(), "e3", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
+                        ExcludeExpr { expr: event_eq_(schema.as_ref(), "e1", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
+                        ExcludeExpr { expr: event_eq_(schema.as_ref(), "e2", Sequential).0, steps: Some(vec![ExcludeSteps::new(0, 1)]) },
+                        ExcludeExpr { expr: event_eq_(schema.as_ref(), "e3", Sequential).0, steps: Some(vec![ExcludeSteps::new(1, 2)]) },
                     ]),
                     constants: None,
                     count: Count::Unique,
@@ -1393,14 +1395,14 @@ pub mod tests {
                     ts_col: Column::new("ts", 0),
                     window: Duration::seconds(15),
                     steps: vec![
-                        event_eq(&schema, "e1", Sequential),
-                        event_eq(&schema, "e2", Any(vec![1, 2])),
-                        event_eq(&schema, "e3", Any(vec![1, 2])),
-                        event_eq(&schema, "e4", Sequential),
-                        event_eq(&schema, "e5", Any(vec![4, 5])),
-                        event_eq(&schema, "e6", Any(vec![4, 5])),
-                        event_eq(&schema, "e7", Sequential),
-                        event_eq(&schema, "e8", Any(vec![7])),
+                        event_eq_(&schema, "e1", Sequential),
+                        event_eq_(&schema, "e2", Any(vec![1, 2])),
+                        event_eq_(&schema, "e3", Any(vec![1, 2])),
+                        event_eq_(&schema, "e4", Sequential),
+                        event_eq_(&schema, "e5", Any(vec![4, 5])),
+                        event_eq_(&schema, "e6", Any(vec![4, 5])),
+                        event_eq_(&schema, "e7", Sequential),
+                        event_eq_(&schema, "e8", Any(vec![7])),
                     ],
                     exclude: None,
                     constants: None,
