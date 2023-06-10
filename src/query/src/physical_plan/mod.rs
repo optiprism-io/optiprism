@@ -36,7 +36,7 @@ impl PartitionState {
         }
     }
 
-    pub fn push(&mut self, batch: RecordBatch) -> DFResult<Option<(Vec<RecordBatch>, Vec<usize>,usize)>> {
+    pub fn push(&mut self, batch: RecordBatch) -> DFResult<Option<(Vec<RecordBatch>, Vec<usize>, usize)>> {
         self.buf.push(batch.clone());
         let arrays = self.partition_key
             .iter()
@@ -72,17 +72,17 @@ impl PartitionState {
             take_batches.push(self.buf.last().unwrap().to_owned());
             let take_spans = self.spans.drain(..self.spans.len() - 1).collect::<Vec<usize>>();
 
-            return Ok(Some((take_batches, take_spans)));
+            return Ok(Some((take_batches, take_spans,0)));
         }
         Ok(None)
     }
 
-    pub fn finalize(&mut self) -> DFResult<Option<(Vec<RecordBatch>, Vec<usize>,offset)>> {
+    pub fn finalize(&mut self) -> DFResult<Option<(Vec<RecordBatch>, Vec<usize>, usize)>> {
         if self.spans.len() > 0 {
             let batches = self.buf.drain(0..).collect();
             let spans = self.spans.drain(0..).collect();
 
-            return Ok(Some((batches, spans)));
+            return Ok(Some((batches, spans, 0)));
         }
 
         Ok(None)
@@ -141,7 +141,7 @@ mod tests {
             let res = state.push(batch)?;
             match res {
                 None => {}
-                Some((rb, s)) => {
+                Some((rb, s,skip)) => {
                     println!("{:?} {:?}", s, rb.iter().map(|v| v.columns()[0].clone()).collect::<Vec<_>>());
                     spans.push(s)
                 }
@@ -151,7 +151,7 @@ mod tests {
         let res = state.finalize()?;
         match res {
             None => println!("none"),
-            Some((rb, s)) => {
+            Some((rb, s,skip)) => {
                 println!("{:?} {:?}", s, rb.iter().map(|v| v.columns()[0].clone()).collect::<Vec<_>>());
                 spans.push(s)
             }

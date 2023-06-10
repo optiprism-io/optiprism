@@ -509,7 +509,15 @@ impl FunnelExpr {
         let mut results = vec![];
         let (window, filter) = (self.window.clone(), self.filter.clone());
         let mut dbg: Vec<DebugInfo> = vec![];
-        self.cur_span = skip;
+
+        let spans = if skip>0 {
+            let spans = [vec![skip],spans].concat();
+            self.next_span(&batches, &spans);
+            spans
+        } else {
+            spans
+        };
+
         // iterate over spans. For simplicity all ids are tied to span and start at 0
         'span: while let Some(mut span) = self.next_span(&batches, &spans) {
             // destructuring for to quick access to the fields
@@ -603,8 +611,6 @@ impl FunnelExpr {
 
             results.push(fr);
         }
-        assert!(results.len() > 0);
-        // assert_eq!(spans.len(), results.len());
 
         self.dbg = dbg;
 
@@ -620,7 +626,6 @@ impl FunnelExpr {
         let offset = (0..self.cur_span).into_iter().map(|i| spans[i]).sum();
         let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
         if offset + span_len > rows_count {
-            (" offset {offset}, span len: {span_len} > rows count: {}", rows_count);
             return None;
         }
         self.cur_span += 1;
@@ -681,7 +686,7 @@ pub mod test_utils {
         (Arc::new(expr) as PhysicalExprRef, order)
     }
 
-    pub fn evaluate_funnel(opts: Options, batch: RecordBatch, spans: Vec<usize>, exp: Vec<DebugInfo>, full_debug: bool, split_by: usize) -> Result<Vec<FunnelResult>> {
+    pub fn evaluate_funnel(opts: Options, batch: RecordBatch, spans: Vec<usize>, skip: usize, exp: Vec<DebugInfo>, full_debug: bool, split_by: usize) -> Result<Vec<FunnelResult>> {
         let mut funnel = FunnelExpr::new(opts);
 
 
@@ -696,7 +701,7 @@ pub mod test_utils {
         }).collect::<Vec<_>>();
 
 
-        let res = funnel.evaluate(&batches, spans,0)?;
+        let res = funnel.evaluate(&batches, spans, skip)?;
         let exp_len = exp.len();
         println!("result: {:?}", res);
         assert_eq!(funnel.dbg.len(), exp_len);
@@ -786,6 +791,7 @@ pub mod tests {
         data: &'static str,
         opts: Options,
         spans: Vec<usize>,
+        skip: usize,
         exp: Vec<FunnelResult>,
         exp_debug: Option<Vec<DebugInfo>>,
         full_debug: bool,
@@ -826,6 +832,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)])],
                 spans: vec![3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "3 steps in a row, but span is only 2 should fail".to_string(),
@@ -851,6 +858,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1)], 1)],
                 spans: vec![2],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "three steps in a row, starting from second row should pass".to_string(),
@@ -878,6 +886,7 @@ pub mod tests {
                 exp_debug: expected_debug!(NextRow NextStep NextStep NextStep),
                 exp: vec![FunnelResult::Completed(vec![Step::new_sequential(1, 1), Step::new_sequential(2, 2), Step::new_sequential(3, 3)])],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "steps 1-3 with step 1 between should pass".to_string(),
@@ -907,6 +916,7 @@ pub mod tests {
                 // exp:  vec![FunnelResult { ts: vec![0, 1, 4], is_completed: true }],
                 exp: vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(4, 4)])],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "steps 1-3 with step exclude between should pass".to_string(),
@@ -941,6 +951,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Completed(vec![Step::new_sequential(4, 4), Step::new_sequential(5, 5), Step::new_sequential(6, 6)])],
 
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "steps 1-3 with step exclude e1 (1-2) should pass".to_string(),
@@ -973,6 +984,7 @@ pub mod tests {
                 //exp:  vec![FunnelResult { ts: vec![4, 5, 6], is_completed: true }],
                 exp: vec![FunnelResult::Completed(vec![Step::new_sequential(4, 3), Step::new_sequential(5, 4), Step::new_sequential(6, 5)])],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "steps 1-3 with multiple exclude should fail".to_string(),
@@ -1010,6 +1022,7 @@ pub mod tests {
                 // exp:  None,,
                 exp: vec![FunnelResult::Incomplete(vec![Step::new_sequential(7, 6)], 0)],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "3 steps in a row with different const should fail".to_string(),
@@ -1035,6 +1048,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0)], 0)],
                 spans: vec![3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "3 steps in a row with same const should pass".to_string(),
@@ -1061,6 +1075,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)])],
                 spans: vec![3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "successful funnel with drop of on any step filter should fail".to_string(),
@@ -1086,6 +1101,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)], 2)],
                 spans: vec![3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "failed funnel with drop of on any step filter should fail".to_string(),
@@ -1111,6 +1127,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1)], 1)],
                 spans: vec![3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "successful funnel with drop of on step 1 filter should fail ".to_string(),
@@ -1136,6 +1153,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)], 2)],
                 spans: vec![3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "failed funnel on drop on step 1 with drop of on step 1 filter should success".to_string(),
@@ -1161,6 +1179,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1)], 1)],
                 spans: vec![3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "test fit in window".to_string(),
@@ -1190,6 +1209,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Completed(vec![Step::new_sequential(6, 3), Step::new_sequential(7, 4), Step::new_sequential(9, 6)])],
                 spans: vec![7],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "test fit window 2".to_string(),
@@ -1215,6 +1235,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(3, 1), Step::new_sequential(5, 2)])],
                 spans: vec![3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "test window".to_string(),
@@ -1240,6 +1261,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Incomplete(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)], 2)],
                 spans: vec![3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "3 steps in a row, two spans".to_string(),
@@ -1271,6 +1293,7 @@ pub mod tests {
                 ],
                 spans: vec![3, 3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "3 steps in a row, two spans, first fails".to_string(),
@@ -1302,6 +1325,7 @@ pub mod tests {
                 ],
                 spans: vec![3, 3],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "steps 1-3 with multiple exclude, 2 spans".to_string(),
@@ -1349,6 +1373,7 @@ pub mod tests {
                     FunnelResult::Incomplete(vec![Step::new_sequential(4, 15)], 0),
                 ],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "3 steps in a row, two spans, second exceeds limits".to_string(),
@@ -1377,6 +1402,7 @@ pub mod tests {
                 exp: vec![FunnelResult::Completed(vec![Step::new_sequential(0, 0), Step::new_sequential(1, 1), Step::new_sequential(2, 2)])],
                 spans: vec![3, 4],
                 full_debug: false,
+                skip: 0,
             },
             TestCase {
                 name: "any ordering".to_string(),
@@ -1426,6 +1452,36 @@ pub mod tests {
                 ],
                 spans: vec![8],
                 full_debug: false,
+                skip: 0,
+            },
+            TestCase {
+                name: "3 steps in a row should pass, skip first 3".to_string(),
+                data: r#"
+| ts  | event | const  |
+|-----|-------|--------|
+| 0   | e1    | 1      |
+| 1   | e2    | 1      |
+| 2   | e3    | 1      |
+| 3   | e1    | 1      |
+| 4   | e2    | 1      |
+| 5   | e3    | 1      |
+"#,
+                opts: Options {
+                    ts_col: Column::new("ts", 0),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                },
+                exp_debug: expected_debug!(NextStep NextStep NextStep),
+                exp: vec![FunnelResult::Completed(vec![Step::new_sequential(3, 0), Step::new_sequential(4, 1), Step::new_sequential(5, 2)])],
+                spans: vec![3],
+                full_debug: false,
+                skip: 3,
             },
         ];
 
@@ -1446,6 +1502,7 @@ pub mod tests {
                     case.opts,
                     RecordBatch::try_new(schema, cols)?,
                     case.spans,
+                    case.skip,
                     case.exp_debug.unwrap(),
                     case.full_debug,
                     split_by,
