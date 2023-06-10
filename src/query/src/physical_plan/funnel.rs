@@ -36,10 +36,8 @@ use datafusion_common::ScalarValue;
 use futures::Stream;
 use futures::StreamExt;
 use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
-use super::expressions::funnel::FunnelExpr;
 use crate::error::QueryError;
 use crate::physical_plan::expressions::funnel::FunnelResult;
-use crate::physical_plan::PartitionState;
 use crate::{DEFAULT_BATCH_SIZE, Result};
 
 pub struct FunnelExec {
@@ -180,7 +178,7 @@ impl Stream for FunnelExecStream {
                 Poll::Ready(Some(Ok(batch))) => {
                     println!("pulled batch {:?}", batch);
                     if let Some((batches, spans, offset)) = state.push(batch)? {
-                        println!("state: spans batches {:?} {:?}", spans, batches.iter().map(|v| v.columns()[0].clone()).collect::<Vec<_>>());
+                        println!("state: spans batches {:?} {:?} offset: {offset}", spans, batches.iter().map(|v| v.columns()[0].clone()).collect::<Vec<_>>());
                         let ev_res = self.predicate
                             .evaluate(&batches, spans.clone(), offset)
                             .map_err(|e| e.into_datafusion_execution_error())?;
@@ -194,10 +192,10 @@ impl Stream for FunnelExecStream {
                 Poll::Ready(None) => {
                     println!("last");
                     is_ended = true;
-                    if let Some((batches, spans, offset)) = state.finalize()? {
+                    if let Some((batches, spans, skip)) = state.finalize()? {
                         println!("final state: batches spans {:?} {:?}", batches, spans);
                         let ev_res = self.predicate
-                            .evaluate(&batches, spans.clone(),offset)
+                            .evaluate(&batches, spans.clone(),skip)
                             .map_err(|e| e.into_datafusion_execution_error())?;
                         Some((batches, spans, ev_res))
                     } else {

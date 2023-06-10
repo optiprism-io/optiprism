@@ -510,13 +510,16 @@ impl FunnelExpr {
         let (window, filter) = (self.window.clone(), self.filter.clone());
         let mut dbg: Vec<DebugInfo> = vec![];
 
-        let spans = if skip>0 {
+        if skip>0 {
+            self.next_span(&batches, &spans);
+        }
+        /*let spans = if skip>0 {
             let spans = [vec![skip],spans].concat();
             self.next_span(&batches, &spans);
             spans
         } else {
             spans
-        };
+        };*/
 
         // iterate over spans. For simplicity all ids are tied to span and start at 0
         'span: while let Some(mut span) = self.next_span(&batches, &spans) {
@@ -622,6 +625,7 @@ impl FunnelExpr {
             return None;
         }
 
+        println!("next_span spans {:?}",spans);
         let span_len = spans[self.cur_span];
         let offset = (0..self.cur_span).into_iter().map(|i| spans[i]).sum();
         let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
