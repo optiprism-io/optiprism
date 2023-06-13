@@ -83,7 +83,6 @@ pub struct Batch {
     pub batch: RecordBatch,
 }
 
-
 #[derive(Debug, Clone, Default)]
 struct Row {
     batch_id: usize,
@@ -92,10 +91,9 @@ struct Row {
 
 #[derive(Debug, Clone)]
 pub struct Span {
-    id: usize,
     offset: usize,
     len: usize,
-    batches: Vec<Batch>,
+    batches: VecDeque<Batch>,
     const_row: Option<Row>,
     steps: Vec<Step>,
     step_id: usize,
@@ -105,7 +103,7 @@ pub struct Span {
 }
 
 impl Span {
-    pub fn new(id: usize, offset: usize, len: usize, steps: &[StepOrder], batches: Vec<Batch>) -> Self {
+    pub fn new(offset: usize, len: usize, steps: &[StepOrder], batches: VecDeque<Batch>) -> Self {
         let const_row = if batches[0].constants.is_some() {
             Some(Row::default())
         } else {
@@ -113,7 +111,6 @@ impl Span {
         };
 
         Self {
-            id,
             offset,
             len,
             batches,
@@ -373,19 +370,20 @@ pub enum Count {
 #[derive(Clone, Debug)]
 pub struct FunnelExpr {
     partition_expr: Vec<PhysicalExprRef>,
-    buf: Vec<Batch>,
+    buf: VecDeque<Batch>,
     hash_buffer: Vec<u64>,
     random_state: ahash::RandomState,
     ts_col: Column,
     window: Duration,
     steps_expr: Vec<PhysicalExprRef>,
     steps: Vec<StepOrder>,
+    span_offset: usize,
+    span_len: usize,
     exclude_expr: Option<Vec<ExcludeExpr>>,
     // expr and vec of step ids
     constants: Option<Vec<Column>>,
     last_value: Option<u64>,
     last_span: usize,
-    span: usize,
     pub results: Vec<FunnelResult>,
     count: Count,
     // vec of col ids
@@ -429,7 +427,6 @@ pub enum Error {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DebugInfo {
     loop_result: LoopResult,
-    cur_span: usize,
     step_id: usize,
     row_id: usize,
     ts: i64,
@@ -439,18 +436,19 @@ impl FunnelExpr {
     pub fn new(opts: Options) -> Self {
         Self {
             partition_expr: opts.partition_expr,
-            buf: vec![],
+            buf: VecDeque::new(),
             hash_buffer: vec![],
             random_state: Default::default(),
             ts_col: opts.ts_col,
             window: opts.window,
             steps_expr: opts.steps.iter().map(|(expr, _)| expr.clone()).collect::<Vec<_>>(),
             steps: opts.steps.iter().map(|(_, order)| order.clone()).collect::<Vec<_>>(),
+            span_offset: 0,
+            span_len: 0,
             exclude_expr: opts.exclude,
             constants: opts.constants,
             last_value: None,
             last_span: 0,
-            span: 0,
             count: opts.count,
             filter: opts.filter,
             touch: opts.touch,
@@ -462,7 +460,7 @@ impl FunnelExpr {
     pub fn steps_count(&self) -> usize {
         self.steps.len()
     }
-    pub fn evaluate(&mut self, batch: RecordBatch) -> Result<()> {
+    fn evaluate_batch<'a>(&mut self, batch: RecordBatch) -> Result<Batch> {
         let mut steps = vec![];
         for expr in self.steps_expr.iter() {
             // evaluate expr to bool result
@@ -507,8 +505,117 @@ impl FunnelExpr {
             .into_array(0)
             .as_any()
             .downcast_ref::<TimestampMillisecondArray>()
-            .unwrap().clone();
+            .unwrap()
+            .clone();
 
+        let res = Batch {
+            steps,
+            exclude,
+            constants,
+            ts,
+            batch,
+        };
+
+        Ok(res)
+    }
+
+    fn evaluate_partition(&mut self, len: usize) -> Result<FunnelResult> {
+        println!("offset: {}, len: {}", self.span_offset, self.span_len);
+        let mut span = Span::new(self.span_offset - len, len, &self.steps, self.buf.clone());
+
+        // iterate over spans. For simplicity all ids are tied to span and start at 0
+        // destructuring for to quick access to the fields
+
+        // main loop Until all steps are completed or we run out of rows
+        // Main algorithm is:
+        // 1. Find the first step to process
+        // 2. optionally fix the constants
+        // 3.a loop over rows until we find a row that matches the next step
+        // 3.b check out of window
+        // 4 break if we run out of rows or steps
+        // 5. if we found a row that matches the next step, update the state
+        loop {
+            // default result is next row. If we find a match, we will update it
+            let mut next = LoopResult::NextRow;
+
+            // check exclude between steps
+            if !span.is_first_step() && !span.validate_excludes() {
+                next = LoopResult::ExcludeViolation;
+            } else if !span.is_first_step() && span.time_window() > self.window.num_milliseconds() {
+                // if step is not 0 and we have a window between steps and we are out of window - skip to the next funnel
+                next = LoopResult::OutOfWindow;
+            } else if span.validate_cur_step() { // if current
+                next = LoopResult::NextStep; // next step
+                if !span.validate_constants() {
+                    next = LoopResult::ConstantViolation;
+                }
+            }
+
+            let dbinfo = DebugInfo {
+                loop_result: next.clone(),
+                step_id: span.step_id,
+                row_id: span.row_id,
+                ts: span.ts_value(),
+            };
+            self.dbg.push(dbinfo);
+
+            // match result
+            match next {
+                LoopResult::ExcludeViolation => {
+                    span.continue_from_last_step();
+                    // span.next_row();
+                }
+                LoopResult::NextRow => {
+                    if !span.next_row() {
+                        break;
+                    }
+                }
+                // continue funnel is usually out of window
+                LoopResult::OutOfWindow | LoopResult::ConstantViolation => {
+                    if !span.continue_from_first_step() {
+                        break;
+                    }
+                }
+                // increase step with checking
+                LoopResult::NextStep => {
+                    if !span.next_step() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // final step of success decision - check filters
+        let is_completed = match &self.filter {
+            // if no filter, then funnel is completed id all steps are completed
+            None => span.is_completed(),
+            Some(filter) => match filter {
+                Filter::DropOffOnAnyStep => !span.is_last_step(),
+                // drop off on defined step
+                Filter::DropOffOnStep(drop_off_step_id) => {
+                    span.step_id == *drop_off_step_id
+                }
+                // drop off if time to convert is out of range
+                Filter::TimeToConvert(from, to) => {
+                    if !span.is_completed() {
+                        false
+                    } else {
+                        let diff = span.cur_step().ts - span.first_step().ts;
+                        from.num_milliseconds() <= diff && diff <= to.num_milliseconds()
+                    }
+                }
+            }
+        };
+
+        let fr = match is_completed {
+            true => FunnelResult::Completed(span.steps.clone()),
+            false => FunnelResult::Incomplete(span.steps[0..=span.stepn].to_vec(), span.stepn),
+        };
+
+        Ok(fr)
+    }
+
+    pub fn evaluate(&mut self, batch: RecordBatch) -> Result<()> {
         // calculate partition key hashes
         let arrays = self.partition_expr
             .iter()
@@ -517,131 +624,47 @@ impl FunnelExpr {
             })
             .collect::<DFResult<Vec<_>>>()?;
 
-        self.hash_buffer.resize(batch.num_rows(), 0);
-        create_hashes(&arrays, &self.random_state, &mut self.hash_buffer)?;
-        let (window, filter) = (self.window.clone(), self.filter.clone());
+        // perf: pre-allocate hash buffer
+        let mut hash_buffer = vec![0; batch.num_rows()];
+        create_hashes(&arrays, &self.random_state, &mut hash_buffer)?;
+        let our_batch = self.evaluate_batch(batch.clone())?;
+        self.buf.push_back(our_batch.clone());
 
-        let our_batch = Batch {
-            steps,
-            exclude,
-            constants,
-            ts,
-            batch: batch.clone(),
-        };
-
-        self.buf.push(our_batch.clone());
-        let mut dbg: Vec<DebugInfo> = vec![];
-
-        for (idx, v) in self.hash_buffer.iter().enumerate() {
+        println!("ev");
+        for (idx, v) in hash_buffer.iter().enumerate() {
             if self.last_value.is_none() {
                 self.last_value = Some(*v);
             }
 
-            println!("{:?}", batch.column(0).as_any().downcast_ref::<UInt64Array>().unwrap().value(idx));
-
             if self.last_value != Some(*v) {
-                println!("!");
-                let mut span = Span::new(0, 0, self.span, &self.steps, self.buf.clone());
-                // iterate over spans. For simplicity all ids are tied to span and start at 0
-                // destructuring for to quick access to the fields
-
-                // main loop Until all steps are completed or we run out of rows
-                // Main algorithm is:
-                // 1. Find the first step to process
-                // 2. optionally fix the constants
-                // 3.a loop over rows until we find a row that matches the next step
-                // 3.b check out of window
-                // 4 break if we run out of rows or steps
-                // 5. if we found a row that matches the next step, update the state
-                loop {
-                    // default result is next row. If we find a match, we will update it
-                    let mut next = LoopResult::NextRow;
-
-                    // check exclude between steps
-                    if !span.is_first_step() && !span.validate_excludes() {
-                        next = LoopResult::ExcludeViolation;
-                    } else if !span.is_first_step() && span.time_window() > window.num_milliseconds() {
-                        // if step is not 0 and we have a window between steps and we are out of window - skip to the next funnel
-                        next = LoopResult::OutOfWindow;
-                    } else if span.validate_cur_step() { // if current
-                        next = LoopResult::NextStep; // next step
-                        if !span.validate_constants() {
-                            next = LoopResult::ConstantViolation;
-                        }
-                    }
-
-                    let dbinfo = DebugInfo {
-                        loop_result: next.clone(),
-                        cur_span: span.id,
-                        step_id: span.step_id,
-                        row_id: span.row_id,
-                        ts: span.ts_value(),
-                    };
-                    dbg.push(dbinfo);
-
-                    // match result
-                    match next {
-                        LoopResult::ExcludeViolation => {
-                            span.continue_from_last_step();
-                            // span.next_row();
-                        }
-                        LoopResult::NextRow => {
-                            if !span.next_row() {
-                                break;
-                            }
-                        }
-                        // continue funnel is usually out of window
-                        LoopResult::OutOfWindow | LoopResult::ConstantViolation => {
-                            if !span.continue_from_first_step() {
-                                break;
-                            }
-                        }
-                        // increase step with checking
-                        LoopResult::NextStep => {
-                            if !span.next_step() {
-                                break;
-                            }
-                        }
-                    }
+                if idx==0 && self.buf.len()>1 {
+                    // let v = self.buf.pop_front().unwrap();
+                    // println!("{:?}",v);
+                    println!("offset:{}",self.span_offset);
+                    // self.span_offset-=v.len()-1;
+                    println!("{}",self.span_offset);
                 }
-
-                // final step of success decision - check filters
-                let is_completed = match &filter {
-                    // if no filter, then funnel is completed id all steps are completed
-                    None => span.is_completed(),
-                    Some(filter) => match filter {
-                        Filter::DropOffOnAnyStep => !span.is_last_step(),
-                        // drop off on defined step
-                        Filter::DropOffOnStep(drop_off_step_id) => {
-                            span.step_id == *drop_off_step_id
-                        }
-                        // drop off if time to convert is out of range
-                        Filter::TimeToConvert(from, to) => {
-                            if !span.is_completed() {
-                                false
-                            } else {
-                                let diff = span.cur_step().ts - span.first_step().ts;
-                                from.num_milliseconds() <= diff && diff <= to.num_milliseconds()
-                            }
-                        }
-                    }
-                };
-
-                let fr = match is_completed {
-                    true => FunnelResult::Completed(span.steps.clone()),
-                    false => FunnelResult::Incomplete(span.steps[0..=span.stepn].to_vec(), span.stepn),
-                };
-
-                self.results.push(fr);
+                println!("idx:{}",idx);
+                let res = self.evaluate_partition(self.span_len)?;
+                println!("res: {:?}", res);
+                self.span_len = 0;
+                self.last_value = Some(*v);
+                self.results.push(res);
             }
-            self.span += 1;
+            self.span_len += 1;
+            self.span_offset += 1;
             self.last_value = Some(*v);
         };
 
-
-        self.dbg = dbg;
-
         Ok(())
+    }
+
+    pub fn finalize(&mut self) -> Result<Option<FunnelResult>> {
+        if self.span_len > 0 {
+            let res = self.evaluate_partition(self.span_len)?;
+            println!("res: {:?}", res);
+            Ok(Some(res))
+        } else { Ok(None) }
     }
 }
 
@@ -732,22 +755,32 @@ pub mod tests {
         let input2 = r#"
 | user_id | ts | event | const |
 |---------|----|-------|-------|
-| 2       | 0  | e1    | 1     |
-| 2       | 1  | e2    | 1     |
-| 2       | 2  | e3    | 1     |
-| 3       | 0  | e1    | 1     |
-| 3       | 1  | e2    | 1     |
-| 3       | 2  | e3    | 1     |
+| 2       | 4  | e1    | 1     |
+| 2       | 5  | e2    | 1     |
+| 2       | 6  | e3    | 1     |
+| 3       | 7  | e1    | 1     |
+| 3       | 8  | e2    | 1     |
+"#;
+
+        let input3 = r#"
+| user_id | ts | event | const |
+|---------|----|-------|-------|
+| 3       | 9  | e3    | 1     |
+| 4       | 10 | e1    | 1     |
+| 4       | 11 | e2    | 1     |
+| 4       | 12 | e3    | 1     |
 "#;
         let (arrs, schema) = get_sample_events(input1);
         let batch1 = RecordBatch::try_new(schema, arrs).unwrap();
         let (arrs, schema) = get_sample_events(input2);
         let batch2 = RecordBatch::try_new(schema, arrs).unwrap();
+        let (arrs, schema) = get_sample_events(input3);
+        let batch3 = RecordBatch::try_new(schema, arrs).unwrap();
 
         let mut funnel = FunnelExpr::new(opts);
         funnel.evaluate(batch1).unwrap();
         funnel.evaluate(batch2).unwrap();
-
-        println!("{:?}", funnel.results);
+        funnel.evaluate(batch3).unwrap();
+        funnel.finalize().unwrap();
     }
 }
