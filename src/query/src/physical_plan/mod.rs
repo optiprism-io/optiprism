@@ -111,22 +111,38 @@ impl PartitionState {
         Ok(None)
     }
 }
-/*
+
+#[inline]
+pub fn abs_row_id(row_id: usize, batches: &[RecordBatch]) -> (usize, usize) {
+    let mut batch_id = 0;
+    let mut idx = row_id;
+    for batch in batches.iter() {
+        if idx < batch.num_rows() {
+            break;
+        }
+        idx -= batch.num_rows();
+        batch_id += 1;
+    }
+    (batch_id, idx)
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
     use arrow::array::{Array, ArrayRef, Int32Array, Int64Array};
-    use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+    use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
     use arrow::record_batch::RecordBatch;
     use chrono::Duration;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::{expressions, PhysicalExprRef};
     use store::arrow_conversion::arrow2_to_arrow1;
     use store::test_util::parse_markdown_table;
+    use crate::event_eq;
+    use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, Options, Touch};
+    use crate::physical_plan::expressions::funnel::StepOrder::*;
+    use crate::physical_plan::expressions::funnel::test_utils::event_eq_;
     // use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, Options, Touch};
-    use crate::physical_plan::expressions::get_sample_events;
-    use crate::physical_plan::funnel::FunnelExec;
-    use crate::physical_plan::PartitionState;
+    use crate::physical_plan::{abs_row_id, PartitionState};
 
     #[test]
     fn test_batches_state() -> anyhow::Result<()> {
@@ -260,4 +276,143 @@ mod tests {
         assert_eq!(skip_res, exp_skips);
         Ok(())
     }
-}*/
+
+    #[test]
+    fn test_funnel() {
+        let fields = vec![
+            Field::new("user_id", DataType::UInt64, false),
+            Field::new("ts", DataType::Timestamp(TimeUnit::Millisecond, None), false),
+            Field::new("event", DataType::Utf8, true),
+            Field::new("const", DataType::Int64, true),
+        ];
+        let schema = Arc::new(Schema::new(fields.clone())) as SchemaRef;
+
+        let pre_batches = vec![
+            r#"
+| user_id | ts | event | const |
+|---------|----|-------|-------|
+| 0       | 0  | e1    | 1     |
+| 0       | 1  | e2    | 1     |
+| 0       | 2  | e3    | 1     |
+| 0       | 3  | e3    | 1     |
+"#,
+            r#"
+| user_id | ts | event | const |
+|---------|----|-------|-------|
+| 1       | 4  | e1    | 1     |
+| 1       | 5  | e2    | 1     |
+| 1       | 6  | e3    | 1     |
+| 1       | 6  | e3    | 1     |
+| 2       | 7  | e2    | 1     |
+| 2       | 8  | e2    | 1     |
+| 2       | 10  | e2    | 1     |
+| 2       | 11  | e2    | 1     |
+| 2       | 12  | e1    | 1     |
+"#,
+            r#"
+| user_id | ts | event | const |
+|---------|----|-------|-------|
+| 2       | 13  | e2    | 1     |
+| 3       | 14  | e2    | 1     |
+| 3       | 15  | e1    | 1     |
+| 3       | 16  | e2    | 1     |
+| 4       | 17  | e1    | 1     |
+| 4       | 18  | e2    | 1     |
+| 4       | 19  | e3    | 1     |
+| 5       | 20  | e1    | 1     |
+| 5       | 21  | e2    | 1     |
+"#,
+            r#"
+| user_id | ts | event | const |
+|---------|----|-------|-------|
+| 6       | 22  | e1    | 1     |
+"#,
+            r#"
+| user_id | ts | event | const |
+|---------|----|-------|-------|
+| 6       | 23  | e2    | 1     |
+"#,
+            r#"
+| user_id | ts | event | const |
+|---------|----|-------|-------|
+| 6       | 24  | e3    | 1     |
+"#,
+            r#"
+| user_id | ts | event | const |
+|---------|----|-------|-------|
+| 7       | 25  | e1    | 1     |
+| 7       | 26  | e2    | 1     |
+| 7       | 27  | e3    | 1     |
+"#,
+            r#"
+| user_id | ts | event | const |
+|---------|----|-------|-------|
+| 8       | 28  | e1    | 1     |
+| 8       | 29  | e2    | 1     |
+| 8       | 30  | e3    | 1     |
+"#,
+        ];
+
+        let fields2 = vec![
+            arrow2::datatypes::Field::new("user_id", arrow2::datatypes::DataType::UInt64, false),
+            arrow2::datatypes::Field::new("ts", arrow2::datatypes::DataType::Timestamp(arrow2::datatypes::TimeUnit::Millisecond, None), false),
+            arrow2::datatypes::Field::new("event", arrow2::datatypes::DataType::Utf8, true),
+            arrow2::datatypes::Field::new("const", arrow2::datatypes::DataType::Int64, true),
+        ];
+
+        let batches = pre_batches.into_iter().map(|pb| {
+            let res = parse_markdown_table(pb, &fields2).unwrap();
+            let (arrs, fields) = res.
+                into_iter().
+                zip(fields2.clone()).
+                map(|(arr, field)| arrow2_to_arrow1(arr, field).unwrap()).
+                unzip();
+
+            let schema = Arc::new(Schema::new(fields)) as SchemaRef;
+
+            RecordBatch::try_new(schema, arrs).unwrap()
+        }).collect::<Vec<_>>();
+
+        let col = Arc::new(Column::new_with_schema("user_id", &schema).unwrap()) as PhysicalExprRef;
+        let mut state = PartitionState::new(vec![col]);
+
+
+        let opts = Options {
+            ts_col: Column::new_with_schema("ts", schema.as_ref()).unwrap(),
+            window: Duration::seconds(15),
+            steps: event_eq!(schema, "e1" Sequential, "e2" Sequential),
+
+            exclude: None,
+            constants: None,
+            count: Count::Unique,
+            filter: None,
+            touch: Touch::First,
+        };
+        let mut funnel = FunnelExpr::new(opts);
+
+        for batch in batches {
+            if let Some((batches, spans, skip)) = state.push(batch).unwrap() {
+                let res = funnel.evaluate(&batches, spans.clone(), skip).unwrap();
+                println!("{:?}", res);
+
+                let mut offset = skip;
+                for (span, fr) in spans.into_iter().zip(res.into_iter()) {
+                    let (a, b) = abs_row_id(offset, &batches);
+                    println!("batch_id:{a}, row_id:{b}");
+                    offset += span;
+                }
+            }
+        }
+
+        if let Some((batches, spans, skip)) = state.finalize().unwrap() {
+            let res = funnel.evaluate(&batches, spans.clone(), skip).unwrap();
+            println!("{:?}", res);
+
+            let mut offset = skip;
+            for (span, fr) in spans.into_iter().zip(res.into_iter()) {
+                let (a, b) = abs_row_id(span + offset, &batches);
+                println!("batch_id:{a}, row_id:{b}");
+            }
+        }
+    }
+}

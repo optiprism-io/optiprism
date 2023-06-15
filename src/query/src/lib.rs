@@ -1,5 +1,6 @@
 #![feature(let_chains, concat_idents)]
 #![feature(exclusive_range_pattern)]
+#![feature(slice_group_by)]
 
 extern crate core;
 

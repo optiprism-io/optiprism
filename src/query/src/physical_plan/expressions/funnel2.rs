@@ -1,6 +1,7 @@
 use std::collections::{HashMap, VecDeque};
+use std::mem;
 use std::sync::{Arc, mpsc};
-use arrow::array::{Array, BooleanArray, Int64Array, TimestampMillisecondArray, UInt64Array};
+use arrow::array::{Array, ArrayRef, BooleanArray, BooleanBuilder, Int64Array, TimestampMillisecondArray, UInt32Array, UInt64Array};
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use chrono::Duration;
@@ -16,6 +17,8 @@ use super::*;
 use tracing_core::Level;
 use crate::{StaticArray};
 use std::sync::mpsc::{Sender, Receiver};
+use arrow::compute::take;
+use arrow::error::ArrowError;
 use datafusion::physical_expr::hash_utils::create_hashes;
 use datafusion_common::Result as DFResult;
 
@@ -367,7 +370,7 @@ pub enum Count {
     Session,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct FunnelExpr {
     partition_expr: Vec<PhysicalExprRef>,
     buf: VecDeque<Batch>,
@@ -379,6 +382,10 @@ pub struct FunnelExpr {
     steps: Vec<StepOrder>,
     span_offset: usize,
     span_len: usize,
+    take_offsets: Vec<usize>,
+    take_per_batch: Vec<(usize, usize)>,
+    take: BooleanBuilder,
+    res_buffer: Vec<Vec<ArrayRef>>,
     exclude_expr: Option<Vec<ExcludeExpr>>,
     // expr and vec of step ids
     constants: Option<Vec<Column>>,
@@ -389,6 +396,7 @@ pub struct FunnelExpr {
     // vec of col ids
     filter: Option<Filter>,
     touch: Touch,
+    schema: SchemaRef,
     dbg: Vec<DebugInfo>,
 }
 
@@ -417,6 +425,7 @@ pub struct Options {
     pub count: Count,
     pub filter: Option<Filter>,
     pub touch: Touch,
+    pub schema: SchemaRef,
 }
 
 pub enum Error {
@@ -434,6 +443,7 @@ pub struct DebugInfo {
 
 impl FunnelExpr {
     pub fn new(opts: Options) -> Self {
+        // perf: preallocate all buffers
         Self {
             partition_expr: opts.partition_expr,
             buf: VecDeque::new(),
@@ -445,6 +455,10 @@ impl FunnelExpr {
             steps: opts.steps.iter().map(|(_, order)| order.clone()).collect::<Vec<_>>(),
             span_offset: 0,
             span_len: 0,
+            take_offsets: vec![],
+            take_per_batch: vec![],
+            take: BooleanBuilder::new(),
+            res_buffer: vec![],
             exclude_expr: opts.exclude,
             constants: opts.constants,
             last_value: None,
@@ -452,6 +466,7 @@ impl FunnelExpr {
             count: opts.count,
             filter: opts.filter,
             touch: opts.touch,
+            schema: opts.schema,
             dbg: vec![],
             results: vec![],
         }
@@ -615,7 +630,7 @@ impl FunnelExpr {
         Ok(fr)
     }
 
-    pub fn evaluate(&mut self, batch: RecordBatch) -> Result<()> {
+    pub fn evaluate(&mut self, batch: RecordBatch) -> Result<Option<RecordBatch>> {
         // calculate partition key hashes
         let arrays = self.partition_expr
             .iter()
@@ -629,41 +644,73 @@ impl FunnelExpr {
         create_hashes(&arrays, &self.random_state, &mut hash_buffer)?;
         let our_batch = self.evaluate_batch(batch.clone())?;
         self.buf.push_back(our_batch.clone());
-
         println!("ev");
+        let mut tke = false;
         for (idx, v) in hash_buffer.iter().enumerate() {
             if self.last_value.is_none() {
                 self.last_value = Some(*v);
             }
 
             if self.last_value != Some(*v) {
-                if idx==0 && self.buf.len()>1 {
-                    // let v = self.buf.pop_front().unwrap();
-                    // println!("{:?}",v);
-                    println!("offset:{}",self.span_offset);
-                    // self.span_offset-=v.len()-1;
-                    println!("{}",self.span_offset);
-                }
-                println!("idx:{}",idx);
+                println!("idx:{}", idx);
+                // self.span_offset += self.span_len;
                 let res = self.evaluate_partition(self.span_len)?;
-                println!("res: {:?}", res);
+                let last_buf_id = self.buf.len() - 1;
+                if idx == 0 {
+                    self.take_per_batch.push((last_buf_id - 1, idx));
+                } else {
+                    self.take_per_batch.push((last_buf_id, idx));
+                }
+                tke = true;
                 self.span_len = 0;
+                println!("res: {:?}", res);
                 self.last_value = Some(*v);
                 self.results.push(res);
+                /*if idx == 0 && self.buf.len() > 1 {
+                    let v = self.buf.pop_front().unwrap();
+                    // println!("{:?}", v);
+                    println!("offset:{}", self.span_offset);
+                    self.span_offset -= v.len();
+                    println!("offset2:{}", self.span_offset);
+                    println!("{}", self.span_offset);
+                }*/
             }
             self.span_len += 1;
             self.span_offset += 1;
             self.last_value = Some(*v);
         };
 
-        Ok(())
+
+        if tke && self.buf.len() > 1 {
+            let mut take_batches = self.buf.drain(..self.buf.len() - 1).collect::<Vec<_>>();
+            // take_batches.push(self.buf.last().unwrap().to_owned());
+            self.span_offset = 1;
+        }
+        /*println!("{:?}", self.take_per_batch);
+        self.take_per_batch.sort_by(|(a, _), (b, _)| a.cmp(b));
+        println!("{:?}", self.take_per_batch);
+        let groups = self.take_per_batch.group_by(|(a,_),(b,_)|a==b);
+
+        for group in groups {
+            let batch_id=group[0].0;
+            let offsets=group.iter().map(|(_,offset)|*offset as u32).collect::<Vec<_>>();
+            let indices = UInt32Array::from(offsets.iter().map(|v| Some(*v)).collect::<Vec<_>>());
+            let res = self.buf[batch_id].batch.columns().iter().map(|c| take(c, &indices, None)).collect::<std::result::Result<Vec<_>, ArrowError>>()?;
+            println!("rrr {:?}", res);
+        }*/
+        /*for (batch_id, offsets) in self.take_per_batch.drain(..).enumerate() {
+            let indices = UInt32Array::from(offsets.iter().map(|v| Some(*v as u32)).collect::<Vec<_>>());
+            let res = self.buf[batch_id].batch.columns().iter().map(|c| take(c, &indices, None)).collect::<std::result::Result<Vec<_>, ArrowError>>()?;
+            println!("{:?}", res);
+        }*/
+        Ok(None)
     }
 
-    pub fn finalize(&mut self) -> Result<Option<FunnelResult>> {
+    pub fn finalize(&mut self) -> Result<Option<RecordBatch>> {
         if self.span_len > 0 {
             let res = self.evaluate_partition(self.span_len)?;
             println!("res: {:?}", res);
-            Ok(Some(res))
+            Ok(None)
         } else { Ok(None) }
     }
 }
@@ -742,6 +789,7 @@ pub mod tests {
             count: Count::Unique,
             filter: None,
             touch: Touch::First,
+            schema,
         };
 
         let input1 = r#"
