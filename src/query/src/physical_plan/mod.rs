@@ -11,7 +11,7 @@ mod pivot;
 pub mod planner;
 mod unpivot;
 mod segmentation;
-// mod funnel;
+mod funnel;
 // pub mod merge;
 // pub mod planner;
 

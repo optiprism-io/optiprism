@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fmt;
 use std::fmt::Debug;
@@ -9,15 +10,32 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
-use arrow::array::{Array, ArrayBuilder, ArrayRef, BooleanBuilder, Int64Array, TimestampMillisecondBuilder, UInt32Builder, UInt64Builder, UInt8Builder};
-use arrow::compute::{concat, filter, take};
-use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+use arrow::array::Array;
+use arrow::array::ArrayBuilder;
+use arrow::array::ArrayRef;
+use arrow::array::BooleanBuilder;
+use arrow::array::Int64Array;
+use arrow::array::TimestampMillisecondBuilder;
+use arrow::array::UInt32Array;
+use arrow::array::UInt32Builder;
+use arrow::array::UInt64Builder;
+use arrow::array::UInt8Builder;
+use arrow::compute::concat;
+use arrow::compute::filter;
+use arrow::compute::take;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
+use arrow::datatypes::TimeUnit;
+use arrow::error::ArrowError;
 use arrow::error::Result as ArrowResult;
 use arrow::ipc::TimestampBuilder;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use axum::extract::State;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::hash_utils::create_hashes;
 use datafusion::physical_expr::PhysicalExpr;
@@ -31,14 +49,19 @@ use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
-use datafusion_common::{DataFusionError, Result as DFResult};
+use datafusion_common::DataFusionError;
+use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::Stream;
 use futures::StreamExt;
-use common::{DECIMAL_PRECISION, DECIMAL_SCALE};
+
 use crate::error::QueryError;
+use crate::physical_plan::abs_row_id;
+use crate::physical_plan::expressions::funnel::FunnelExpr;
 use crate::physical_plan::expressions::funnel::FunnelResult;
-use crate::{DEFAULT_BATCH_SIZE, Result};
+use crate::physical_plan::PartitionState;
+use crate::Result;
+use crate::DEFAULT_BATCH_SIZE;
 
 pub struct FunnelExec {
     predicate: FunnelExpr,
@@ -49,16 +72,26 @@ pub struct FunnelExec {
 }
 
 impl FunnelExec {
-    pub fn try_new(predicate: FunnelExpr, partition_key: Vec<Arc<dyn PhysicalExpr>>, input: Arc<dyn ExecutionPlan>) -> Result<Self> {
+    pub fn try_new(
+        predicate: FunnelExpr,
+        partition_key: Vec<Arc<dyn PhysicalExpr>>,
+        input: Arc<dyn ExecutionPlan>,
+    ) -> Result<Self> {
         let schema = {
             let mut fields = vec![];
             fields.push(Field::new("is_converted", DataType::Boolean, true));
             fields.push(Field::new("converted_steps", DataType::UInt8, true));
             for step_id in 0..=predicate.steps_count() {
-                fields.push(Field::new(format!("step_{step_id}_ts"), DataType::Timestamp(TimeUnit::Millisecond, None), true));
+                fields.push(Field::new(
+                    format!("step_{step_id}_ts"),
+                    DataType::Timestamp(TimeUnit::Millisecond, None),
+                    true,
+                ));
             }
 
-            Arc::new(Schema::new([fields, input.schema().fields.clone()].concat()))
+            Arc::new(Schema::new(
+                [fields, input.schema().fields.clone()].concat(),
+            ))
         };
 
         Ok(Self {
@@ -104,7 +137,12 @@ impl ExecutionPlan for FunnelExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
-            FunnelExec::try_new(self.predicate.clone(), self.partition_key.clone(), children[0].clone()).map_err(QueryError::into_datafusion_execution_error)?,
+            FunnelExec::try_new(
+                self.predicate.clone(),
+                self.partition_key.clone(),
+                children[0].clone(),
+            )
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -118,7 +156,13 @@ impl ExecutionPlan for FunnelExec {
             input: self.input.execute(partition, context.clone())?,
             schema: self.schema.clone(),
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
+            out_buf: Default::default(),
+            state: PartitionState::new(self.partition_key.clone()),
             partition_key: self.partition_key.clone(),
+            is_completed_col: HashMap::new(),
+            converted_steps_col: HashMap::new(),
+            converted_by_step_col: HashMap::new(),
+            to_take: HashMap::default(),
         }))
     }
 
@@ -141,6 +185,12 @@ struct FunnelExecStream {
     input: SendableRecordBatchStream,
     partition_key: Vec<Arc<dyn PhysicalExpr>>,
     baseline_metrics: BaselineMetrics,
+    out_buf: VecDeque<RecordBatch>,
+    state: PartitionState,
+    is_completed_col: HashMap<usize, BooleanBuilder>,
+    converted_steps_col: HashMap<usize, UInt32Builder>,
+    converted_by_step_col: HashMap<usize, Vec<TimestampMillisecondBuilder>>,
+    to_take: HashMap<usize, Vec<usize>>,
 }
 
 #[inline]
@@ -162,152 +212,192 @@ impl Stream for FunnelExecStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut state = PartitionState::new(self.partition_key.clone());
-        let mut converted_steps = UInt64Builder::with_capacity(DEFAULT_BATCH_SIZE);
-        let mut steps_ts = (0..self.predicate.steps_count()).into_iter().map(|_| TimestampMillisecondBuilder::with_capacity(DEFAULT_BATCH_SIZE)).collect::<Vec<_>>();
-        let mut to_take_builder = UInt32Builder::with_capacity(DEFAULT_BATCH_SIZE);
-        let num_cols = self.schema.fields().len() - 1 - self.predicate.steps_count();
-        let mut pre_batch_res: Vec<Vec<ArrayRef>> = vec![vec![]; num_cols];
-
         let mut is_ended = false;
-
-        while !is_ended {
-            println!("loop");
-            // let timer = self.baseline_metrics.elapsed_compute().timer();
-            let res = match self.input.poll_next_unpin(cx) {
-                Poll::Ready(Some(Ok(batch))) => {
-                    println!("pulled batch {:?}", batch);
-                    if let Some((batches, spans, offset)) = state.push(batch)? {
-                        println!("state: spans batches {:?} {:?} offset: {offset}", spans, batches.iter().map(|v| v.columns()[0].clone()).collect::<Vec<_>>());
-                        let ev_res = self.predicate
-                            .evaluate(&batches, spans.clone(), offset)
-                            .map_err(|e| e.into_datafusion_execution_error())?;
-                        println!("ev result: {:?}", ev_res);
-                        Some((batches, spans, ev_res))
-                    } else {
-                        println!("possible more to push");
-                        None
-                    }
-                }
-                Poll::Ready(None) => {
-                    println!("last");
-                    is_ended = true;
-                    if let Some((batches, spans, skip)) = state.finalize()? {
-                        println!("final state: batches spans {:?} {:?}", batches, spans);
-                        let ev_res = self.predicate
-                            .evaluate(&batches, spans.clone(),skip)
-                            .map_err(|e| e.into_datafusion_execution_error())?;
-                        Some((batches, spans, ev_res))
-                    } else {
-                        println!("no final");
-                        None
-                    }
-                }
-                other => return other,
-            };
-
-            if let Some((batches, spans, res)) = res {
-                let mut offset = 0;
-                let mut last_batch = 0;
-                // println!("batches len: {}", batches.len());
-                // let total_rows = batches.iter().map(|b| b.num_rows()).sum::<usize>();
-
-                // let mut batch_iter = batches.into_iter().peekable();
-                println!("go through the results");
-                for (span, funnel_result) in spans.into_iter().zip(res.into_iter()) {
-                    match funnel_result {
-                        FunnelResult::Completed(steps) => {
-                            println!("completed result. Add converted steps len: {:?}", steps);
-                            converted_steps.append_value(steps.len() as u64);
-
-                            for (step_id, step) in steps.into_iter().enumerate() {
-                                println!("append ts value {}", step.ts);
-                                steps_ts[step_id].append_value(step.ts as i64);
-                            }
-                        }
-                        FunnelResult::Incomplete(steps, stepn) => {
-                            println!("completed result. steps: {:?}, number: {stepn}", steps);
-                            println!("Add zero to converted steps");
-                            converted_steps.append_value(0);
-                            for step_id in 0..self.predicate.steps_count() {
-                                if step_id < stepn {
-                                    println!("append steps_ts with value {}", steps[step_id].ts);
-                                    steps_ts[step_id].append_value(steps[step_id].ts as i64);
-                                } else {
-                                    println!("append null to steps_ts");
-                                    steps_ts[step_id].append_null();
-                                }
-                            }
-                        }
-                    }
-                    to_take_builder.append_value(offset);
-                    println!("to take: {:?}", to_take_builder.slices_mut().0);
-
-                    offset += span as u32;
-                    // println!("peek {}", batch_iter.peek().unwrap().num_rows());
-                    if offset >= batches[last_batch].num_rows() as u32 {
-                        println!("reset");
-                        offset = 0;
-                        let to_take = to_take_builder.finish();
-                        println!("to take: {:?}", to_take);
-                        let batch = &batches[last_batch];
-                        let cols = batch
-                            .columns()
+        println!("loop");
+        let mut offset = 0;
+        // let timer = self.baseline_metrics.elapsed_compute().timer();
+        let res = match self.input.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok(batch))) => {
+                println!("pulled batch {:?}", batch);
+                if let Some((batches, spans, skip)) = self.state.push(batch)? {
+                    offset = skip;
+                    println!(
+                        "state: spans batches {:?} {:?} offset: {skip}",
+                        spans,
+                        batches
                             .iter()
-                            .map(|col| take(col, &to_take, None))
-                            .collect::<ArrowResult<Vec<_>>>()?;
-                        for (col_id, col) in cols.into_iter().enumerate() {
-                            pre_batch_res[col_id].push(col);
-                        }
-                    }
-
-
-                    if converted_steps.len() >= DEFAULT_BATCH_SIZE {
-                        let converted_col = converted_steps.finish();
-                        let step_ts_cols = steps_ts.iter_mut().map(|v| v.finish()).collect::<Vec<_>>();
-                        let cols = pre_batch_res.iter().map(|cols| {
-                            let to_concat = cols.into_iter().map(|v| v.as_ref()).collect::<Vec<_>>();
-                            concat(to_concat.as_slice())
-                        }).collect::<ArrowResult<Vec<_>>>()?;
-                        let mut res_cols = vec![];
-                        res_cols.push(Arc::new(converted_col) as ArrayRef);
-                        for col in step_ts_cols.into_iter() {
-                            res_cols.push(Arc::new(col) as ArrayRef)
-                        }
-                        for col in cols.into_iter() {
-                            res_cols.push(col)
-                        }
-
-                        let batch = RecordBatch::try_new(self.schema.clone(), res_cols)?;
-
-                        let poll = Poll::Ready(Some(Ok(batch)));
-                        return self.baseline_metrics.record_poll(poll);
-                    }
+                            .map(|v| v.columns()[0].clone())
+                            .collect::<Vec<_>>()
+                    );
+                    let ev_res = self
+                        .predicate
+                        .evaluate(&batches, spans.clone(), skip)
+                        .map_err(|e| e.into_datafusion_execution_error())?;
+                    println!("ev result: {:?}", ev_res);
+                    Some((batches, spans, ev_res))
+                } else {
+                    println!("possible more to push");
+                    None
                 }
             }
+            Poll::Ready(None) => {
+                println!("last");
+                is_ended = true;
+                if let Some((batches, spans, skip)) = self.state.finalize()? {
+                    offset = skip;
+                    println!("final state: batches spans {:?} {:?}", batches, spans);
+                    let ev_res = self
+                        .predicate
+                        .evaluate(&batches, spans.clone(), skip)
+                        .map_err(|e| e.into_datafusion_execution_error())?;
+                    Some((batches, spans, ev_res))
+                } else {
+                    println!("no final");
+                    None
+                }
+            }
+            other => return other,
+        };
 
-            // timer.done();
+        if let Some((batches, spans, ev_res)) = res {
+            for (span, fr) in spans.into_iter().zip(ev_res.into_iter()) {
+                let (batch_id, row_id) = abs_row_id(offset, &batches);
+                self.to_take.entry(batch_id).or_default().push(row_id);
+                match fr {
+                    FunnelResult::Completed(steps) => {
+                        self.is_completed_col
+                            .entry(batch_id)
+                            .or_default()
+                            .append_value(true);
+                        self.converted_steps_col
+                            .entry(batch_id)
+                            .or_default()
+                            .append_value(steps.len() as u32);
+                        let steps_len = self.predicate.steps_count();
+                        for (id, step) in steps.iter().enumerate() {
+                            let d =
+                                self.converted_by_step_col
+                                    .entry(batch_id)
+                                    .or_insert_with(|| {
+                                        (0..self.predicate.steps_count())
+                                            .into_iter()
+                                            .map(|_| TimestampMillisecondBuilder::new())
+                                            .collect::<Vec<_>>()
+                                    })[id]
+                                    .append_value(step.ts);
+                        }
+                    }
+                    FunnelResult::Incomplete(steps, stepn) => {
+                        self.is_completed_col
+                            .entry(batch_id)
+                            .or_default()
+                            .append_value(false);
+                        self.converted_steps_col
+                            .entry(batch_id)
+                            .or_default()
+                            .append_value(stepn as u32);
+                        let steps_len = self.predicate.steps_count();
+                        for step in 0..steps_len {
+                            if step < steps_len {
+                                self.converted_by_step_col
+                                    .entry(batch_id)
+                                    .or_insert_with(|| {
+                                        (0..self.predicate.steps_count())
+                                            .into_iter()
+                                            .map(|_| TimestampMillisecondBuilder::new())
+                                            .collect::<Vec<_>>()
+                                    })[step]
+                                    .append_value(steps[step].ts);
+                            } else {
+                                self.converted_by_step_col
+                                    .entry(batch_id)
+                                    .or_insert_with(|| {
+                                        (0..self.predicate.steps_count())
+                                            .into_iter()
+                                            .map(|_| TimestampMillisecondBuilder::new())
+                                            .collect::<Vec<_>>()
+                                    })[step]
+                                    .append_null();
+                            }
+                        }
+                    }
+                }
+                offset += span;
+            }
+
+            let mut batches = self
+                .to_take
+                .into_iter()
+                .map(|(batch_id, rows)| {
+                    let take_arr = rows.iter().map(|b| Some(*b as u32)).collect::<Vec<_>>();
+                    let take_arr = UInt32Array::from(take_arr);
+                    let cols = batches[batch_id]
+                        .columns()
+                        .iter()
+                        .map(|arr| take(arr, &take_arr, None))
+                        .collect::<std::result::Result<Vec<_>, _>>()?;
+
+                    let is_completed = self.is_completed_col.remove(&batch_id).unwrap().finish();
+                    let is_completed = Arc::new(is_completed) as ArrayRef;
+                    let converted_steps =
+                        self.converted_steps_col.remove(&batch_id).unwrap().finish();
+                    let converted_steps = Arc::new(converted_steps) as ArrayRef;
+                    let converted_by_step = self
+                        .converted_by_step_col
+                        .remove(&batch_id)
+                        .unwrap()
+                        .iter_mut()
+                        .map(|v| v.finish())
+                        .collect::<Vec<_>>();
+                    let converted_by_step = converted_by_step
+                        .into_iter()
+                        .map(|v| Arc::new(v) as ArrayRef)
+                        .collect::<Vec<_>>();
+                    RecordBatch::try_new(
+                        self.schema.clone(),
+                        vec![
+                            vec![is_completed],
+                            vec![converted_steps],
+                            converted_by_step,
+                            cols,
+                        ]
+                        .concat(),
+                    )
+                })
+                .collect::<Vec<std::result::Result<_, _>>>()
+                .into_iter()
+                .collect::<std::result::Result<Vec<RecordBatch>, _>>()?;
+
+            self.out_buf.append(&mut batches.into());
+            // for batch in batches.into_iter() {
+            // print!("{}", arrow::util::pretty::pretty_format_batches(&[batch]).unwrap());
+            // }
         }
 
-        let poll = if !converted_steps.is_empty() {
-            let converted_col = converted_steps.finish();
-            let step_ts_cols = steps_ts.iter_mut().map(|v| v.finish()).collect::<Vec<_>>();
-            let cols = pre_batch_res.iter().map(|cols| {
-                let to_concat = cols.into_iter().map(|v| v.as_ref()).collect::<Vec<_>>();
-                concat(to_concat.as_slice())
-            }).collect::<ArrowResult<Vec<_>>>()?;
-            let mut res_cols = vec![];
-            res_cols.push(Arc::new(converted_col) as ArrayRef);
-            for col in step_ts_cols.into_iter() {
-                res_cols.push(Arc::new(col) as ArrayRef)
-            }
-            for col in cols.into_iter() {
-                res_cols.push(col)
-            }
+        // timer.done();
 
-            let batch = RecordBatch::try_new(self.schema.clone(), res_cols)?;
+        let rows = self.out_buf.iter().map(|b| b.num_rows()).sum();
+        let poll = if rows > 3 || is_ended {
+            let arrs = self
+                .schema
+                .fields
+                .iter()
+                .enumerate()
+                .map(|(idx, _)| {
+                    let to_concat = self
+                        .out_buf
+                        .iter()
+                        .map(|b| b.column(idx).clone().as_ref())
+                        .collect::<Vec<_>>();
+                    concat(&to_concat)
+                })
+                .collect::<std::result::Result<Vec<_>, ArrowError>>()?;
 
-            Poll::Ready(Some(Ok(batch)))
+            let rb = RecordBatch::try_new(self.schema.clone(), arrs)
+                .map_err(|err| DataFusionError::from(err));
+            Poll::Ready(Some(Ok(rb)))
+        } else if !is_ended {
+            Poll::Pending
         } else {
             Poll::Ready(None)
         };
@@ -330,26 +420,36 @@ impl RecordBatchStream for FunnelExecStream {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use arrow::array::{ArrayRef, Int32Array, Int64Array};
-    use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+
+    use arrow::array::ArrayRef;
+    use arrow::array::Int32Array;
+    use arrow::array::Int64Array;
+    use arrow::datatypes::DataType;
+    use arrow::datatypes::Field;
+    use arrow::datatypes::Schema;
+    use arrow::datatypes::SchemaRef;
     use arrow::record_batch::RecordBatch;
     use chrono::Duration;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
+    use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
     use store::arrow_conversion::arrow2_to_arrow1;
     use store::test_util::parse_markdown_table;
-    use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, Options, Touch};
+
+    use crate::error::Result;
+    use crate::event_eq;
+    use crate::physical_plan::expressions::funnel::test_utils::event_eq_;
+    use crate::physical_plan::expressions::funnel::Count;
+    use crate::physical_plan::expressions::funnel::FunnelExpr;
+    use crate::physical_plan::expressions::funnel::Options;
+    use crate::physical_plan::expressions::funnel::StepOrder::Sequential;
+    use crate::physical_plan::expressions::funnel::Touch;
     use crate::physical_plan::funnel::FunnelExec;
     use crate::physical_plan::merge::MergeExec;
     use crate::physical_plan::PartitionState;
-    use crate::physical_plan::expressions::funnel::test_utils::event_eq_;
-    use crate::error::Result;
-    use crate::event_eq;
-    use crate::physical_plan::expressions::funnel::StepOrder::Sequential;
-    use datafusion::physical_plan::ExecutionPlan;
 
     #[tokio::test]
     async fn test_funnel() -> anyhow::Result<()> {
@@ -392,17 +492,24 @@ mod tests {
             // todo change to arrow1
             let fields = vec![
                 arrow2::datatypes::Field::new("user_id", arrow2::datatypes::DataType::Int64, false),
-                arrow2::datatypes::Field::new("ts", arrow2::datatypes::DataType::Timestamp(arrow2::datatypes::TimeUnit::Millisecond, None), false),
+                arrow2::datatypes::Field::new(
+                    "ts",
+                    arrow2::datatypes::DataType::Timestamp(
+                        arrow2::datatypes::TimeUnit::Millisecond,
+                        None,
+                    ),
+                    false,
+                ),
                 arrow2::datatypes::Field::new("event", arrow2::datatypes::DataType::Utf8, true),
                 arrow2::datatypes::Field::new("const", arrow2::datatypes::DataType::Int64, true),
             ];
             let res = parse_markdown_table(data, &fields).unwrap();
 
-            let (arrs, fields) = res.
-                into_iter().
-                zip(fields).
-                map(|(arr, field)| arrow2_to_arrow1(arr, field).unwrap()).
-                unzip();
+            let (arrs, fields) = res
+                .into_iter()
+                .zip(fields)
+                .map(|(arr, field)| arrow2_to_arrow1(arr, field).unwrap())
+                .unzip();
 
             let schema = Arc::new(Schema::new(fields)) as SchemaRef;
 
