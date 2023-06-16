@@ -128,9 +128,13 @@ pub fn abs_row_id(row_id: usize, batches: &[RecordBatch]) -> (usize, usize) {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::sync::Arc;
-    use arrow::array::{Array, ArrayRef, Int32Array, Int64Array};
+    use arrow::array::{Array, ArrayRef, BooleanBuilder, Int32Array, Int64Array, TimestampMillisecondBuilder, UInt32Array, UInt32Builder};
+    use arrow::compute::take;
     use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
+    use arrow::error::ArrowError;
+    use arrow::ipc::BoolBuilder;
     use arrow::record_batch::RecordBatch;
     use chrono::Duration;
     use datafusion::physical_expr::expressions::Column;
@@ -138,7 +142,7 @@ mod tests {
     use store::arrow_conversion::arrow2_to_arrow1;
     use store::test_util::parse_markdown_table;
     use crate::event_eq;
-    use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, Options, Touch};
+    use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, FunnelResult, Options, Touch};
     use crate::physical_plan::expressions::funnel::StepOrder::*;
     use crate::physical_plan::expressions::funnel::test_utils::event_eq_;
     // use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, Options, Touch};
@@ -373,6 +377,17 @@ mod tests {
             RecordBatch::try_new(schema, arrs).unwrap()
         }).collect::<Vec<_>>();
 
+        let out_schema = Schema::new(
+            vec![
+                Field::new("is_completed", DataType::Boolean, false),
+                Field::new("converted_steps", DataType::UInt32, false),
+                Field::new("user_id", DataType::UInt64, false),
+                Field::new("ts", DataType::Timestamp(TimeUnit::Millisecond, None), false),
+                Field::new("event", DataType::Utf8, true),
+                Field::new("const", DataType::Int64, true),
+            ]);
+
+        let out_schema = Arc::new(out_schema) as SchemaRef;
         let col = Arc::new(Column::new_with_schema("user_id", &schema).unwrap()) as PhysicalExprRef;
         let mut state = PartitionState::new(vec![col]);
 
@@ -392,14 +407,51 @@ mod tests {
 
         for batch in batches {
             if let Some((batches, spans, skip)) = state.push(batch).unwrap() {
+                let mut is_completed_col: HashMap<usize, BooleanBuilder> = HashMap::new();
+                let mut converted_steps_col: HashMap<usize, UInt32Builder> = HashMap::new();
+                let mut to_take: HashMap<usize, Vec<usize>> = HashMap::new();
+
                 let res = funnel.evaluate(&batches, spans.clone(), skip).unwrap();
                 println!("{:?}", res);
 
                 let mut offset = skip;
                 for (span, fr) in spans.into_iter().zip(res.into_iter()) {
-                    let (a, b) = abs_row_id(offset, &batches);
-                    println!("batch_id:{a}, row_id:{b}");
+                    let (batch_id, row_id) = abs_row_id(offset, &batches);
+                    to_take.entry(batch_id).or_default().push(row_id);
+                    match fr {
+                        FunnelResult::Completed(steps) => {
+                            is_completed_col.entry(batch_id).or_default().append_value(true);
+                            converted_steps_col.entry(batch_id).or_default().append_value(steps.len() as u32)
+                        }
+                        FunnelResult::Incomplete(steps, stepn) => {
+                            is_completed_col.entry(batch_id).or_default().append_value(false);
+                            converted_steps_col.entry(batch_id).or_default().append_value(stepn as u32);
+                        }
+                    }
                     offset += span;
+                }
+
+                let batches = to_take.into_iter().map(|(batch_id, rows)| {
+                    let take_arr = rows
+                        .iter()
+                        .map(|b| Some(*b as u32))
+                        .collect::<Vec<_>>();
+                    let take_arr = UInt32Array::from(take_arr);
+                    let cols = batches[batch_id]
+                        .columns()
+                        .iter()
+                        .map(|arr| take(arr, &take_arr, None))
+                        .collect::<Result<Vec<_>, _>>().unwrap();
+
+                    let is_completed = is_completed_col.remove(&batch_id).unwrap().finish();
+                    let is_completed = Arc::new(is_completed) as ArrayRef;
+                    let converted_steps = converted_steps_col.remove(&batch_id).unwrap().finish();
+                    let converted_steps = Arc::new(converted_steps) as ArrayRef;
+                    RecordBatch::try_new(out_schema.clone(), vec![vec![is_completed], vec![converted_steps], cols].concat())
+                }).collect::<Vec<Result<_, _>>>().into_iter().collect::<Result<Vec<RecordBatch>, _>>().unwrap();
+
+                for batch in batches.into_iter() {
+                    print!("{}", arrow::util::pretty::pretty_format_batches(&[batch]).unwrap());
                 }
             }
         }
