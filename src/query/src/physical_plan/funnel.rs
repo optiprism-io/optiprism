@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::mem;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -80,8 +81,8 @@ impl FunnelExec {
         let schema = {
             let mut fields = vec![];
             fields.push(Field::new("is_converted", DataType::Boolean, true));
-            fields.push(Field::new("converted_steps", DataType::UInt8, true));
-            for step_id in 0..=predicate.steps_count() {
+            fields.push(Field::new("converted_steps", DataType::UInt32, true));
+            for step_id in 0..predicate.steps_count() {
                 fields.push(Field::new(
                     format!("step_{step_id}_ts"),
                     DataType::Timestamp(TimeUnit::Millisecond, None),
@@ -241,7 +242,7 @@ impl Stream for FunnelExecStream {
                             .predicate
                             .evaluate(&batches, spans.clone(), skip)
                             .map_err(|e| e.into_datafusion_execution_error())?;
-                        println!("ev result: {:?}", ev_res);
+                        // println!("ev result: {:?}", ev_res);
                         Some((batches, spans, ev_res))
                     } else {
                         println!("possible more to push");
@@ -249,18 +250,19 @@ impl Stream for FunnelExecStream {
                     }
                 }
                 Poll::Ready(None) => {
-                    println!("last");
+                    println!("!@#!@#");
+                    // println!("last");
                     is_ended = true;
                     if let Some((batches, spans, skip)) = self.state.finalize()? {
                         offset = skip;
-                        println!("final state: batches spans {:?} {:?}", batches, spans);
+                        // println!("final state: batches spans {:?} {:?}", batches, spans);
                         let ev_res = self
                             .predicate
                             .evaluate(&batches, spans.clone(), skip)
                             .map_err(|e| e.into_datafusion_execution_error())?;
                         Some((batches, spans, ev_res))
                     } else {
-                        println!("no final");
+                        // println!("no final");
                         None
                     }
                 }
@@ -270,9 +272,11 @@ impl Stream for FunnelExecStream {
             if let Some((batches, spans, ev_res)) = res {
                 for (span, fr) in spans.into_iter().zip(ev_res.into_iter()) {
                     let (batch_id, row_id) = abs_row_id(offset, &batches);
+                    println!("tb");
                     to_take.entry(batch_id).or_default().push(row_id);
                     match fr {
                         FunnelResult::Completed(steps) => {
+                            println!("tc");
                             is_completed_col
                                 .entry(batch_id)
                                 .or_default()
@@ -293,6 +297,7 @@ impl Stream for FunnelExecStream {
                             }
                         }
                         FunnelResult::Incomplete(steps, stepn) => {
+                            println!("{:?} {}", steps, stepn);
                             is_completed_col
                                 .entry(batch_id)
                                 .or_default()
@@ -303,7 +308,7 @@ impl Stream for FunnelExecStream {
                                 .append_value(stepn as u32);
                             let steps_len = self.predicate.steps_count();
                             for step in 0..steps_len {
-                                if step < steps_len {
+                                if step < steps.len() {
                                     converted_by_step_col.entry(batch_id).or_insert_with(|| {
                                         (0..steps_len)
                                             .into_iter()
@@ -323,20 +328,24 @@ impl Stream for FunnelExecStream {
                             }
                         }
                     }
+                    println!("tt {:?}", to_take);
+                    println!("icc {:?}", is_completed_col);
                     offset += span;
                 }
-
-                let mut batches = to_take
+                let mut batches = mem::replace(&mut to_take, Default::default())
                     .iter()
                     .map(|(batch_id, rows)| {
+                        println!("rrr {}", rows.len());
                         let take_arr = rows.iter().map(|b| Some(*b as u32)).collect::<Vec<_>>();
                         let take_arr = UInt32Array::from(take_arr);
+                        println!("bb {:?}", batches[*batch_id].columns());
                         let cols = batches[*batch_id]
                             .columns()
                             .iter()
                             .map(|arr| take(arr, &take_arr, None))
                             .collect::<std::result::Result<Vec<_>, _>>()?;
 
+                        println!("cols {:?}\n!", cols);
                         let is_completed = is_completed_col.remove(&batch_id).unwrap().finish();
                         let is_completed = Arc::new(is_completed) as ArrayRef;
                         let converted_steps =
@@ -352,9 +361,9 @@ impl Stream for FunnelExecStream {
                             .into_iter()
                             .map(|v| Arc::new(v) as ArrayRef)
                             .collect::<Vec<_>>();
-                        println!("final");
-                        println!("schema {:?}", self.schema.clone());
-                        println!(" {}", self.schema.fields().len());
+                        // println!("final");
+                        // println!("schema {:?}", self.schema.clone());
+                        // println!(" {}", self.schema.fields().len());
                         let arrs = vec![
                             vec![is_completed],
                             vec![converted_steps],
@@ -363,7 +372,11 @@ impl Stream for FunnelExecStream {
                         ]
                         .concat();
                         println!("{:?}", arrs);
-                        println!("len {}", arrs.len());
+                        // println!("len {}", arrs.len());
+                        for arr in arrs.iter() {
+                            println!("arr len{}", arr.len());
+                        }
+
                         RecordBatch::try_new(self.schema.clone(), arrs)
                     })
                     .collect::<Vec<std::result::Result<_, _>>>()
@@ -462,33 +475,33 @@ mod tests {
 | 0       | 2  | e2    | 1      |
 | 0       | 3  | e3    | 1      |
 | 0       | 4  | e1    | 1      |
-| 1       | 1  | e1    | 1      |
-| 1       | 2  | e2    | 1      |
-| 1       | 3  | e3    | 1      |
-| 1       | 4  | e3    | 1      |
-| 2       | 1  | e1    | 1      |
-| 2       | 2  | e2    | 1      |
-| 2       | 3  | e3    | 1      |
-| 2       | 4  | e3    | 1      |
-| 2       | 5  | e3    | 1      |
-| 2       | 6  | e3    | 1      |
-| 3       | 1  | e1    | 1      |
-| 3       | 2  | e2    | 1      |
-| 3       | 3  | e3    | 1      |
-| 4       | 1  | e1    | 1      |
-| 4       | 2  | e2    | 1      |
-| 4       | 3  | e3    | 1      |
-| 5       | 1  | e1    | 1      |
-| 5       | 2  | e2    | 1      |
-| 6       | 1  | e1    | 1      |
-| 6       | 2  | e3    | 1      |
-| 6       | 3  | e3    | 1      |
-| 7       | 1  | e1    | 1      |
-| 7       | 2  | e2    | 1      |
-| 7       | 3  | e3    | 1      |
-| 8       | 1  | e1    | 1      |
-| 8       | 2  | e2    | 1      |
-| 8       | 3  | e3    | 1      |
+| 1       | 5  | e1    | 1      |
+| 1       | 6  | e2    | 1      |
+| 1       | 7  | e3    | 1      |
+| 1       | 8  | e3    | 1      |
+| 2       | 9  | e1    | 1      |
+| 2       | 10  | e2    | 1      |
+| 2       | 11  | e3    | 1      |
+| 2       | 12  | e3    | 1      |
+| 2       | 13  | e3    | 1      |
+| 2       | 14  | e3    | 1      |
+| 3       | 15  | e1    | 1      |
+| 3       | 16  | e2    | 1      |
+| 3       | 17  | e3    | 1      |
+| 4       | 18  | e1    | 1      |
+| 4       | 19  | e2    | 1      |
+| 4       | 20  | e3    | 1      |
+| 5       | 21  | e1    | 1      |
+| 5       | 22  | e2    | 1      |
+| 6       | 23  | e1    | 1      |
+| 6       | 24  | e3    | 1      |
+| 6       | 25  | e3    | 1      |
+| 7       | 26  | e1    | 1      |
+| 7       | 27  | e2    | 1      |
+| 7       | 28  | e3    | 1      |
+| 8       | 29  | e1    | 1      |
+| 8       | 30  | e2    | 1      |
+| 8       | 31  | e3    | 1      |
 "#;
         let (arrs, schema) = {
             // todo change to arrow1
@@ -532,6 +545,7 @@ mod tests {
         let batches = {
             let batch = RecordBatch::try_new(schema.clone(), arrs)?;
             let to_take = vec![4, 9, 9, 1, 1, 1, 3, 3];
+            // let to_take = vec![10];
             let mut offset = 0;
             to_take
                 .into_iter()
