@@ -164,6 +164,7 @@ impl ExecutionPlan for FunnelExec {
             // converted_steps_col: HashMap::new(),
             // converted_by_step_col: HashMap::new(),
             // to_take: HashMap::default(),
+            is_ended: false,
         }))
     }
 
@@ -187,6 +188,7 @@ struct FunnelExecStream {
     partition_key: Vec<Arc<dyn PhysicalExpr>>,
     baseline_metrics: BaselineMetrics,
     state: PartitionState,
+    is_ended: bool,
     // out_buf: VecDeque<RecordBatch>,
     // is_completed_col: HashMap<usize, BooleanBuilder>,
     // converted_steps_col: HashMap<usize, UInt32Builder>,
@@ -213,6 +215,10 @@ impl Stream for FunnelExecStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.is_ended {
+            return Poll::Ready(None);
+        }
+
         let mut out_buf: VecDeque<RecordBatch> = Default::default();
         let mut is_completed_col: HashMap<usize, BooleanBuilder> = Default::default();
         let mut converted_steps_col: HashMap<usize, UInt32Builder> = Default::default();
@@ -220,24 +226,23 @@ impl Stream for FunnelExecStream {
             Default::default();
         let mut to_take: HashMap<usize, Vec<usize>> = Default::default();
 
-        let mut is_ended = false;
-        println!("loop");
+        // println!("loop");
         loop {
             let mut offset = 0;
             // let timer = self.baseline_metrics.elapsed_compute().timer();
             let res = match self.input.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
-                    println!("pulled batch {:?}", batch);
+                    // println!("pulled batch {:?}", batch);
                     if let Some((batches, spans, skip)) = self.state.push(batch)? {
                         offset = skip;
-                        println!(
-                            "state: spans batches {:?} {:?} offset: {skip}",
-                            spans,
-                            batches
-                                .iter()
-                                .map(|v| v.columns()[0].clone())
-                                .collect::<Vec<_>>()
-                        );
+                        // println!(
+                        //     "state: spans batches {:?} {:?} offset: {skip}",
+                        //     spans,
+                        //     batches
+                        //         .iter()
+                        //         .map(|v| v.columns()[0].clone())
+                        //         .collect::<Vec<_>>()
+                        // );
                         let ev_res = self
                             .predicate
                             .evaluate(&batches, spans.clone(), skip)
@@ -245,14 +250,14 @@ impl Stream for FunnelExecStream {
                         // println!("ev result: {:?}", ev_res);
                         Some((batches, spans, ev_res))
                     } else {
-                        println!("possible more to push");
+                        // println!("possible more to push");
                         None
                     }
                 }
                 Poll::Ready(None) => {
                     println!("!@#!@#");
                     // println!("last");
-                    is_ended = true;
+                    self.is_ended = true;
                     if let Some((batches, spans, skip)) = self.state.finalize()? {
                         offset = skip;
                         // println!("final state: batches spans {:?} {:?}", batches, spans);
@@ -272,11 +277,11 @@ impl Stream for FunnelExecStream {
             if let Some((batches, spans, ev_res)) = res {
                 for (span, fr) in spans.into_iter().zip(ev_res.into_iter()) {
                     let (batch_id, row_id) = abs_row_id(offset, &batches);
-                    println!("tb");
+                    // println!("tb");
                     to_take.entry(batch_id).or_default().push(row_id);
                     match fr {
                         FunnelResult::Completed(steps) => {
-                            println!("tc");
+                            // println!("tc");
                             is_completed_col
                                 .entry(batch_id)
                                 .or_default()
@@ -297,7 +302,7 @@ impl Stream for FunnelExecStream {
                             }
                         }
                         FunnelResult::Incomplete(steps, stepn) => {
-                            println!("{:?} {}", steps, stepn);
+                            // println!("{:?} {}", steps, stepn);
                             is_completed_col
                                 .entry(batch_id)
                                 .or_default()
@@ -328,24 +333,24 @@ impl Stream for FunnelExecStream {
                             }
                         }
                     }
-                    println!("tt {:?}", to_take);
-                    println!("icc {:?}", is_completed_col);
+                    // println!("tt {:?}", to_take);
+                    // println!("icc {:?}", is_completed_col);
                     offset += span;
                 }
                 let mut batches = mem::replace(&mut to_take, Default::default())
                     .iter()
                     .map(|(batch_id, rows)| {
-                        println!("rrr {}", rows.len());
+                        // println!("rrr {}", rows.len());
                         let take_arr = rows.iter().map(|b| Some(*b as u32)).collect::<Vec<_>>();
                         let take_arr = UInt32Array::from(take_arr);
-                        println!("bb {:?}", batches[*batch_id].columns());
+                        // println!("bb {:?}", batches[*batch_id].columns());
                         let cols = batches[*batch_id]
                             .columns()
                             .iter()
                             .map(|arr| take(arr, &take_arr, None))
                             .collect::<std::result::Result<Vec<_>, _>>()?;
 
-                        println!("cols {:?}\n!", cols);
+                        // println!("cols {:?}\n!", cols);
                         let is_completed = is_completed_col.remove(&batch_id).unwrap().finish();
                         let is_completed = Arc::new(is_completed) as ArrayRef;
                         let converted_steps =
@@ -371,11 +376,8 @@ impl Stream for FunnelExecStream {
                             cols,
                         ]
                         .concat();
-                        println!("{:?}", arrs);
+                        // println!("{:?}", arrs);
                         // println!("len {}", arrs.len());
-                        for arr in arrs.iter() {
-                            println!("arr len{}", arr.len());
-                        }
 
                         RecordBatch::try_new(self.schema.clone(), arrs)
                     })
@@ -390,7 +392,7 @@ impl Stream for FunnelExecStream {
             }
 
             let rows = out_buf.iter().map(|b| b.num_rows()).sum::<usize>();
-            if rows > 3 || is_ended {
+            if rows > 3 || self.is_ended {
                 let arrs = self
                     .schema
                     .fields
