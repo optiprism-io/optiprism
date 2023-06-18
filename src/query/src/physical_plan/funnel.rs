@@ -70,6 +70,7 @@ pub struct FunnelExec {
     schema: SchemaRef,
     metrics: ExecutionPlanMetricsSet,
     partition_key: Vec<Arc<dyn PhysicalExpr>>,
+    out_batch_size: usize,
 }
 
 impl FunnelExec {
@@ -77,6 +78,7 @@ impl FunnelExec {
         predicate: FunnelExpr,
         partition_key: Vec<Arc<dyn PhysicalExpr>>,
         input: Arc<dyn ExecutionPlan>,
+        out_batch_size: usize,
     ) -> Result<Self> {
         let schema = {
             let mut fields = vec![];
@@ -101,6 +103,7 @@ impl FunnelExec {
             schema,
             metrics: ExecutionPlanMetricsSet::new(),
             partition_key,
+            out_batch_size,
         })
     }
 }
@@ -142,6 +145,7 @@ impl ExecutionPlan for FunnelExec {
                 self.predicate.clone(),
                 self.partition_key.clone(),
                 children[0].clone(),
+                self.out_batch_size,
             )
             .map_err(QueryError::into_datafusion_execution_error)?,
         ))
@@ -157,14 +161,10 @@ impl ExecutionPlan for FunnelExec {
             input: self.input.execute(partition, context.clone())?,
             schema: self.schema.clone(),
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
-            // out_buf: Default::default(),
             state: PartitionState::new(self.partition_key.clone()),
             partition_key: self.partition_key.clone(),
-            // is_completed_col: HashMap::new(),
-            // converted_steps_col: HashMap::new(),
-            // converted_by_step_col: HashMap::new(),
-            // to_take: HashMap::default(),
             is_ended: false,
+            out_batch_size: self.out_batch_size,
         }))
     }
 
@@ -189,11 +189,7 @@ struct FunnelExecStream {
     baseline_metrics: BaselineMetrics,
     state: PartitionState,
     is_ended: bool,
-    // out_buf: VecDeque<RecordBatch>,
-    // is_completed_col: HashMap<usize, BooleanBuilder>,
-    // converted_steps_col: HashMap<usize, UInt32Builder>,
-    // converted_by_step_col: HashMap<usize, Vec<TimestampMillisecondBuilder>>,
-    // to_take: HashMap<usize, Vec<usize>>,
+    out_batch_size: usize,
 }
 
 #[inline]
@@ -255,7 +251,6 @@ impl Stream for FunnelExecStream {
                     }
                 }
                 Poll::Ready(None) => {
-                    println!("!@#!@#");
                     // println!("last");
                     self.is_ended = true;
                     if let Some((batches, spans, skip)) = self.state.finalize()? {
@@ -392,7 +387,8 @@ impl Stream for FunnelExecStream {
             }
 
             let rows = out_buf.iter().map(|b| b.num_rows()).sum::<usize>();
-            if rows > 3 || self.is_ended {
+            if rows > self.out_batch_size || self.is_ended {
+                println!("{}", rows);
                 let arrs = self
                     .schema
                     .fields
@@ -471,17 +467,20 @@ mod tests {
     #[tokio::test]
     async fn test_funnel() -> anyhow::Result<()> {
         let data = r#"
-| user_id | ts | event | const  |
-|---------|----|-------|--------|
-| 0       | 1  | e1    | 1      |
-| 0       | 2  | e2    | 1      |
-| 0       | 3  | e3    | 1      |
-| 0       | 4  | e1    | 1      |
-| 1       | 5  | e1    | 1      |
-| 1       | 6  | e2    | 1      |
-| 1       | 7  | e3    | 1      |
-| 1       | 8  | e3    | 1      |
-| 2       | 9  | e1    | 1      |
+| user_id | ts  | event | const  |
+|---------|-----|-------|--------|
+| 0       | 1   | e1    | 1      |
+| 0       | 2   | e2    | 1      |
+| 0       | 3   | e3    | 1      |
+| 0       | 4   | e1    | 1      |
+| 0       | 1   | e1    | 1      |
+| 0       | 2   | e2    | 1      |
+| 0       | 3   | e3    | 1      |
+| 1       | 5   | e1    | 1      |
+| 1       | 6   | e3    | 1      |
+| 1       | 7   | e1    | 1      |
+| 1       | 8   | e2    | 1      |
+| 2       | 9   | e1    | 1      |
 | 2       | 10  | e2    | 1      |
 | 2       | 11  | e3    | 1      |
 | 2       | 12  | e3    | 1      |
@@ -547,7 +546,7 @@ mod tests {
         let batches = {
             let batch = RecordBatch::try_new(schema.clone(), arrs)?;
             let to_take = vec![4, 9, 9, 1, 1, 1, 3, 3];
-            // let to_take = vec![10];
+            // let to_take = vec![10, 10, 10, 3];
             let mut offset = 0;
             to_take
                 .into_iter()
@@ -572,12 +571,29 @@ mod tests {
             FunnelExpr::new(opts),
             vec![Arc::new(Column::new_with_schema("user_id", &schema)?)],
             Arc::new(input),
+            100,
         )?;
 
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
         let stream = funnel.execute(0, task_ctx)?;
         let result = collect(stream).await?;
+
+        let expected = r#"
++--------------+-----------------+-------------------------+-------------------------+---------+-------------------------+-------+-------+
+| is_converted | converted_steps | step_0_ts               | step_1_ts               | user_id | ts                      | event | const |
++--------------+-----------------+-------------------------+-------------------------+---------+-------------------------+-------+-------+
+| true         | 2               | 1970-01-01T00:00:00.001 | 1970-01-01T00:00:00.002 | 0       | 1970-01-01T00:00:00.001 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.005 | 1970-01-01T00:00:00.006 | 1       | 1970-01-01T00:00:00.005 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.009 | 1970-01-01T00:00:00.010 | 2       | 1970-01-01T00:00:00.009 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.015 | 1970-01-01T00:00:00.016 | 3       | 1970-01-01T00:00:00.015 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.018 | 1970-01-01T00:00:00.019 | 4       | 1970-01-01T00:00:00.018 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.021 | 1970-01-01T00:00:00.022 | 5       | 1970-01-01T00:00:00.021 | e1    | 1     |
+| false        | 0               | 1970-01-01T00:00:00.023 |                         | 6       | 1970-01-01T00:00:00.023 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.026 | 1970-01-01T00:00:00.027 | 7       | 1970-01-01T00:00:00.026 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.029 | 1970-01-01T00:00:00.030 | 8       | 1970-01-01T00:00:00.029 | e1    | 1     |
++--------------+-----------------+-------------------------+-------------------------+---------+-------------------------+-------+-------+
+"#;
         print!("{}", arrow::util::pretty::pretty_format_batches(&result)?);
 
         Ok(())

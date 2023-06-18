@@ -566,9 +566,6 @@ impl FunnelExpr {
         spans: Vec<usize>,
         skip: usize,
     ) -> Result<Vec<FunnelResult>> {
-        // println!("{:?}",record_batches);
-        // println!("spans {:?}", spans);
-        // println!("skip {:?}", skip);
         let batches = record_batches
             .iter()
             .map(|b| self.evaluate_batch(b))
@@ -677,11 +674,8 @@ impl FunnelExpr {
                 false => FunnelResult::Incomplete(span.steps[0..=span.stepn].to_vec(), span.stepn),
             };
 
-            // println!("{:?}",fr);
             results.push(fr);
         }
-        // assert!(results.len() > 0);
-        // assert_eq!(spans.len(), results.len());
 
         self.dbg = dbg;
 
@@ -694,7 +688,6 @@ impl FunnelExpr {
         }
 
         let span_len = spans[self.cur_span];
-        // println!("span_len {:?}", span_len);
         let offset = (0..self.cur_span).into_iter().map(|i| spans[i]).sum();
         let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
         if offset + span_len > rows_count {
@@ -842,7 +835,6 @@ pub mod test_utils {
         let res = funnel.evaluate(&batches, spans, 0)?;
         let i = 0;
         let exp_len = exp.len();
-        // println!("result: {:?}", res);
         assert_eq!(funnel.dbg.len(), exp_len);
         for (idx, info) in exp.into_iter().enumerate() {
             if full_debug {
