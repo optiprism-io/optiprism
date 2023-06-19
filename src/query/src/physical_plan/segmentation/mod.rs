@@ -1,16 +1,21 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
+use std::fmt::Display;
+
 use arrow::array::ArrayRef;
 use arrow::record_batch::RecordBatch;
-use datafusion_expr::{ColumnarValue, Operator};
+use datafusion_expr::ColumnarValue;
+use datafusion_expr::Operator;
 use tracing::debug;
+
 use crate::error::Result;
 
 // pub mod binary_op;
-pub mod count;
 mod boolean_op;
+pub mod count;
 // pub mod sequence;
 // pub mod sum;
 pub mod aggregate;
+pub mod sum;
 // mod sequence;
 // mod test_value;
 // mod boolean_op;
@@ -21,7 +26,12 @@ pub trait EvaluationResult {
 }
 
 pub trait Expr: Send + Sync + Display + Debug {
-    fn evaluate(&mut self, spans: &[usize], batch: &RecordBatch, is_last: bool) -> Result<Option<Vec<i64>>>;
+    fn evaluate(
+        &mut self,
+        spans: &[usize],
+        batch: &RecordBatch,
+        is_last: bool,
+    ) -> Result<Option<Vec<i64>>>;
 }
 
 #[derive(Debug)]
@@ -60,7 +70,11 @@ impl Spans {
 
     pub fn next_span(&mut self) -> bool {
         if self.span_idx >= 0 {
-            debug!("[next partition] span idx: {} spans len: {}", self.span_idx, self.spans.len());
+            debug!(
+                "[next partition] span idx: {} spans len: {}",
+                self.span_idx,
+                self.spans.len()
+            );
         }
         if self.span_idx == self.spans.len() as i64 - 1 {
             debug!("[next partition] no next span");
@@ -76,13 +90,20 @@ impl Spans {
         self.spans[self.span_idx as usize]
     }
     pub fn next_row(&mut self) -> Option<RowResult> {
-        debug!("[next row] idx {}, batch len {}", self.row_idx, self.batch_len as i64);
+        debug!(
+            "[next row] idx {}, batch len {}",
+            self.row_idx, self.batch_len as i64
+        );
         if self.row_idx == self.batch_len as i64 {
             return None;
         }
 
         let res = if self.cur_span() == self.row_idx as usize {
-            debug!("[next row] next partition: cur span {}, row idx {}", self.cur_span(), self.row_idx);
+            debug!(
+                "[next row] next partition: cur span {}, row idx {}",
+                self.cur_span(),
+                self.row_idx
+            );
             Some(RowResult::NextPartition(self.row_idx as usize))
         } else {
             Some(RowResult::NextRow(self.row_idx as usize))
@@ -102,7 +123,6 @@ impl Spans {
         debug!("[push result]: row idx {}", self.row_idx as i64 - 1);
         self.result.push(self.row_idx as i64 - 1);
     }
-
 
     pub fn check_last_span(&self) -> bool {
         debug!("{:?}", self.result.last().cloned());

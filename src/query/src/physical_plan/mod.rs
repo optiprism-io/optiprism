@@ -36,6 +36,7 @@ use arrow::array::Array;
 use arrow::array::Int64Array;
 use lazy_static::lazy_static;
 
+// partition state makes spans from batches. Span is a partition length
 impl PartitionState {
     pub fn new(partition_key: Vec<Arc<dyn PhysicalExpr>>) -> Self {
         Self {
@@ -52,11 +53,15 @@ impl PartitionState {
         }
     }
 
+    // Push batch and get back array of batches, spans and offset
+    // Result will remain empty until we have enough batches to make a partition
     pub fn push(
         &mut self,
         batch: RecordBatch,
     ) -> DFResult<Option<(Vec<RecordBatch>, Vec<usize>, usize)>> {
+        // push batch to buffer
         self.buf.push(batch.clone());
+        // evaluate partition
         let arrays = self
             .partition_key
             .iter()
@@ -64,49 +69,71 @@ impl PartitionState {
             .collect::<DFResult<Vec<_>>>()?;
         let num_rows = batch.num_rows();
 
+        // calculate offset
         let mut offset = 0;
+        // calculate only if there is more than one batch, e.g. not on first iteration
         if self.last_value_count > 0 && self.buf.len() > 1 {
+            // offset is the number of rows in the last batch minus the number of rows in the last value
+            // eg we have batch [1,1,1,2,2,2,3,3] then offset will be 8-2=6 2 is a last span/partition
             offset = self.buf[self.buf.len() - 2].num_rows() - self.last_value_count;
+            // push offset to corresponding batch
             self.offsets.push(offset);
+            // reset offset
             self.last_value_count = 0;
         }
+        // create hash of partition
         self.hash_buffer.clear();
         self.hash_buffer.resize(num_rows, 0);
         create_hashes(&arrays, &mut self.random_state, &mut self.hash_buffer)?;
 
         let mut take = false;
-        for (idx, v) in self.hash_buffer.iter().enumerate() {
+
+        // iterate over hashes
+        for v in self.hash_buffer.iter() {
+            // initialize first value
             if self.last_value.is_none() {
                 self.last_value = Some(*v);
             }
 
+            // new partition
             if self.last_value != Some(*v) {
+                // create new span with length of 0
                 self.spans.push(0);
+                // set take flag to true
                 take = true;
                 self.last_value_count = 0;
             }
             let i = self.spans.len() - 1;
+            // increment current span
             self.spans[i] += 1;
+            // increment last value count for offset calculation
             self.last_value_count += 1;
 
+            // set the last value
             self.last_value = Some(*v);
         }
 
+        // take batches we have enough batches and enough spans to take
         if self.buf.len() > 1 && take {
+            // drain the buffer except the last batch
             let mut take_batches = self.buf.drain(..self.buf.len() - 1).collect::<Vec<_>>();
             take_batches.push(self.buf.last().unwrap().to_owned());
+            // take the spans
             let take_spans = self
                 .spans
                 .drain(..self.spans.len() - 1)
                 .collect::<Vec<usize>>();
 
+            // set offset of first batch
             let offset = self.offsets[0];
+            // reset offsets
             self.offsets = vec![];
             return Ok(Some((take_batches, take_spans, offset)));
         }
         Ok(None)
     }
 
+    // finalize state and return remaining batches, spans and offset
     pub fn finalize(&mut self) -> DFResult<Option<(Vec<RecordBatch>, Vec<usize>, usize)>> {
         if self.spans.len() > 0 {
             let batches = self.buf.drain(0..).collect();

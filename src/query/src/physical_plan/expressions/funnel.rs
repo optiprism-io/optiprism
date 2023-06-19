@@ -33,14 +33,15 @@ use crate::StaticArray;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum StepOrder {
     Sequential,
-    Any(Vec<usize>),
+    Any(Vec<usize>), // any of the steps
 }
 
+// step that was fixed
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Step {
-    pub ts: i64,
-    pub row_id: usize,
-    pub order: StepOrder,
+    pub ts: i64,          // timestamp at the time of fix
+    pub row_id: usize,    // row id
+    pub order: StepOrder, // order of the step. Steps may be in different order
 }
 
 impl Step {
@@ -64,61 +65,62 @@ impl Step {
     }
 }
 
+// Result of the funnel
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum FunnelResult {
-    Completed(Vec<Step>),
-    Incomplete(Vec<Step>, usize),
+    Completed(Vec<Step>),         // completed result with all the steps
+    Incomplete(Vec<Step>, usize), /* incompleted result with completed steps and count of completed steps */
 }
 
-pub enum Report {
-    Steps,
-    Trends,
-    TimeToConvert,
-    Frequency,
-    TopPaths,
-}
-
+// Additional filter to complete
 #[derive(Debug, Clone)]
 pub enum Filter {
-    DropOffOnAnyStep,
-    DropOffOnStep(usize),
-    TimeToConvert(Duration, Duration),
+    DropOffOnAnyStep,                  // funnel should fail on any step
+    DropOffOnStep(usize),              // funnel should fail on certain step
+    TimeToConvert(Duration, Duration), // conversion should be within certain window
 }
 
+// exclude steps
 #[derive(Debug, Clone)]
 pub struct Exclude {
-    exists: BooleanArray,
+    exists: BooleanArray, // array of booleans that indicate if the step exists
+    // optional array of steps to apply exclude only between them. Otherwise include
+    // will be applied on each step
     steps: Option<Vec<ExcludeSteps>>,
 }
 
+// Batch for state
 #[derive(Debug, Clone)]
 pub struct Batch<'a> {
-    pub steps: Vec<BooleanArray>,
+    pub steps: Vec<BooleanArray>, // boolean Exists array for each step
     // pointer to step_results
-    pub exclude: Option<Vec<Exclude>>,
-    pub constants: Option<Vec<StaticArray>>,
-    pub ts: TimestampMillisecondArray,
-    pub batch: &'a RecordBatch,
+    pub exclude: Option<Vec<Exclude>>, // optional exclude with Exists array
+    pub constants: Option<Vec<StaticArray>>, // optional constants
+    pub ts: TimestampMillisecondArray, // timestamp
+    pub batch: &'a RecordBatch,        // ref to actual record batch
 }
 
+// Relative row with batch id and row id. Used mostly for constants
 #[derive(Debug, Clone, Default)]
 struct Row {
     batch_id: usize,
     row_id: usize,
 }
 
+// Span is a span of rows that are in the same partition
 #[derive(Debug, Clone)]
 pub struct Span<'a> {
-    id: usize,
-    offset: usize,
-    len: usize,
-    batches: &'a [Batch<'a>],
+    id: usize,                // # of span
+    offset: usize, // offset of the span. Used to skip rows from record batch. See PartitionedState
+    len: usize,    // length of the span
+    batches: &'a [Batch<'a>], // one or more batches with span
+    // fixed const row. This will be filled with fiest occurrence if constants are enabled and
     const_row: Option<Row>,
-    steps: Vec<Step>,
-    step_id: usize,
-    row_id: usize,
-    first_step: bool,
-    stepn: usize,
+    steps: Vec<Step>, // state of steps
+    step_id: usize,   // current step
+    row_id: usize,    // current row id
+    first_step: bool, // is this first step
+    stepn: usize,     // supplement counter for completed steps
 }
 
 impl<'a> Span<'a> {
@@ -152,10 +154,13 @@ impl<'a> Span<'a> {
         }
     }
 
+    // Calculates absolute row for span row id and offset
+    // Absolute row refers to batch id and row id in the batch
     #[inline]
     pub fn abs_row_id(&self) -> (usize, usize) {
         let mut batch_id = 0;
         let mut idx = self.row_id + self.offset;
+        // go over the batches and find the batch that contains the row
         for batch in self.batches {
             if idx < batch.batch.num_rows() {
                 break;
@@ -166,8 +171,10 @@ impl<'a> Span<'a> {
         (batch_id, idx)
     }
 
+    // get ts value of current row
     #[inline]
     pub fn ts_value(&self) -> i64 {
+        // calculate batch id and row id
         let (batch_id, idx) = self.abs_row_id();
         self.batches[batch_id].ts.value(idx)
     }
@@ -190,7 +197,6 @@ impl<'a> Span<'a> {
     #[inline]
     pub fn time_window(&self) -> i64 {
         self.ts_value() - self.first_step().ts
-        // self.first_step().ts - self.cur_step().ts-self.first_step()
     }
 
     #[inline]
@@ -203,16 +209,7 @@ impl<'a> Span<'a> {
         &self.steps[self.step_id]
     }
 
-    #[inline]
-    pub fn cur_step_mut(&mut self) -> &mut Step {
-        &mut self.steps[self.step_id]
-    }
-
-    #[inline]
-    pub fn prev_step(&mut self) -> &mut Step {
-        &mut self.steps[self.step_id - 1]
-    }
-
+    // go to next row
     #[inline]
     pub fn next_row(&mut self) -> bool {
         if self.row_id == self.len - 1 {
@@ -223,6 +220,7 @@ impl<'a> Span<'a> {
         true
     }
 
+    // go to next step
     #[inline]
     pub fn next_step(&mut self) -> bool {
         if self.first_step {
@@ -230,34 +228,44 @@ impl<'a> Span<'a> {
         } else {
             self.stepn += 1;
         }
+        // 1. assign ts value and row id to current step. To not to assign it each time
+        // 2. increment row
+        // 3. increment step
         self.steps[self.step_id].ts = self.ts_value();
         self.steps[self.step_id].row_id = self.row_id;
         if self.step_id == self.steps.len() - 1 {
             return false;
         }
 
+        // increment row
         if !self.next_row() {
             return false;
         }
 
+        // increment step for
         self.step_id += 1;
 
         true
     }
 
+    #[inline]
     pub fn continue_from_first_step(&mut self) -> bool {
+        // reset everything
         self.step_id = 0;
         self.first_step = true;
         self.stepn = 0;
         self.row_id = self.cur_step().row_id;
+        // make next row
         self.next_row()
     }
 
     #[inline]
     pub fn continue_from_last_step(&mut self) -> bool {
+        // move caret to the next tow
         if !self.next_row() {
             return false;
         }
+        // make this row as first step
         self.step_id = 0;
         self.first_step = true;
         self.stepn = 0;
@@ -275,11 +283,14 @@ impl<'a> Span<'a> {
     //  6
     #[inline]
     pub fn validate_cur_step(&mut self) -> bool {
+        // get abs row
         let (batch_id, idx) = self.abs_row_id();
-        let mut del_step = None;
+        let mut del_step = None; // todo what is this?
+        // choose order strategy
         match &mut self.steps[self.step_id].order {
             StepOrder::Sequential => {
                 return if del_step.is_none() {
+                    // just return current Exists value
                     self.batches[batch_id].steps[self.step_id].value(idx)
                 } else {
                     true
@@ -304,10 +315,15 @@ impl<'a> Span<'a> {
     #[inline]
     pub fn validate_constants(&mut self) -> bool {
         let (batch_id, row_id) = self.abs_row_id();
+        // fix the constant if this is the first step
         if self.const_row.is_some() {
             if self.is_first_step() {
+                // save constant row info
                 self.const_row = Some(Row { row_id, batch_id });
+                return true;
             } else {
+                // compare current value with constant
+                // get constant row
                 let const_row = self.const_row.as_ref().unwrap();
                 for (const_idx, first_const) in self.batches[const_row.batch_id]
                     .constants
@@ -316,6 +332,7 @@ impl<'a> Span<'a> {
                     .iter()
                     .enumerate()
                 {
+                    // compare the const values of current row and first row
                     let cur_const = &self.batches[batch_id].constants.as_ref().unwrap()[const_idx];
                     if !first_const.eq_values(const_row.row_id, cur_const, row_id) {
                         return false;
@@ -327,18 +344,22 @@ impl<'a> Span<'a> {
         true
     }
 
+    // check if there is no excludes between the steps
     pub fn validate_excludes(&self) -> bool {
         let (batch_id, row_id) = self.abs_row_id();
         if let Some(exclude) = &self.batches[batch_id].exclude {
             for excl in exclude.iter() {
                 let mut to_check = false;
+                // check if this exclude is relevant to current step
                 if let Some(steps) = &excl.steps {
                     for pair in steps {
                         if pair.from <= self.step_id && pair.to >= self.step_id {
                             to_check = true;
+                            break;
                         }
                     }
                 } else {
+                    // check anyway
                     to_check = true;
                 }
 
@@ -482,8 +503,10 @@ impl FunnelExpr {
     pub fn steps_count(&self) -> usize {
         self.steps.len()
     }
+    // calculate expressions
     fn evaluate_batch<'a>(&mut self, batch: &'a RecordBatch) -> Result<Batch<'a>> {
         let mut steps = vec![];
+        // evaluate steps
         for expr in self.steps_expr.iter() {
             // evaluate expr to bool result
             let arr = expr
@@ -560,12 +583,14 @@ impl FunnelExpr {
         Ok(res)
     }
 
+    // entry point
     pub fn evaluate(
         &mut self,
         record_batches: &[RecordBatch],
         spans: Vec<usize>,
         skip: usize,
     ) -> Result<Vec<FunnelResult>> {
+        // evaluate each batch, e.g. create batch state
         let batches = record_batches
             .iter()
             .map(|b| self.evaluate_batch(b))
@@ -573,6 +598,7 @@ impl FunnelExpr {
 
         self.cur_span = 0;
 
+        // if skip is set, we need to skip the first span
         let spans = if skip > 0 {
             let spans = [vec![skip], spans].concat();
             self.next_span(&batches, &spans);
@@ -682,12 +708,14 @@ impl FunnelExpr {
         Ok(results)
     }
 
+    // take next span if exist
     fn next_span<'a>(&'a mut self, batches: &'a [Batch], spans: &[usize]) -> Option<Span> {
         if self.cur_span == spans.len() {
             return None;
         }
 
         let span_len = spans[self.cur_span];
+        // offset is a sum of prev spans
         let offset = (0..self.cur_span).into_iter().map(|i| spans[i]).sum();
         let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
         if offset + span_len > rows_count {
