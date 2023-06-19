@@ -33,6 +33,7 @@ where T: Debug
     right: T,
     left_col: Column,
     time_window: Box<dyn TimeWindow>,
+    cur_span: usize,
 }
 
 impl<T, Acc, Op> Aggregate<T, Acc, Op>
@@ -50,9 +51,31 @@ where
             right: T::default(),
             time_window: Default::default(),
             left_col,
+            cur_span: 0,
         };
 
         Ok(res)
+    }
+
+    // take next span if exist
+    fn next_span<'a>(&'a mut self, batches: &'a [Batch], spans: &[usize]) -> Option<Span> {
+        if self.cur_span == spans.len() {
+            return None;
+        }
+
+        let span_len = spans[self.cur_span];
+        // offset is a sum of prev spans
+        let offset = (0..self.cur_span).into_iter().map(|i| spans[i]).sum();
+        let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
+        if offset + span_len > rows_count {
+            (
+                " offset {offset}, span len: {span_len} > rows count: {}",
+                rows_count,
+            );
+            return None;
+        }
+        self.cur_span += 1;
+        Some(Span::new(self.cur_span - 1, offset, span_len, batches))
     }
 }
 
@@ -108,6 +131,11 @@ impl<'a> Span<'a> {
         self.batches[batch_id].ts.value(idx)
     }
 
+    #[inline]
+    pub fn predicate_value(&self) -> bool {
+        self.batches[batch_id].predicate.value(idx)
+    }
+
     // go to next row
     #[inline]
     pub fn next_row(&mut self) -> bool {
@@ -126,13 +154,13 @@ impl<'a> Batch<'a> {
     }
 }
 
-impl<T, Op, Acc> Expr for Aggregate<T, Op, Acc> {
+impl<Op, Acc> Expr for Aggregate<i128, Op, Acc> {
     fn evaluate(
         &mut self,
         record_batches: &[RecordBatch],
         spans: Vec<usize>,
         skip: usize,
-    ) -> Result<Vec<usize>> {
+    ) -> Result<Option<Vec<usize>>> {
         // evaluate each batch, e.g. create batch state
         let batches = record_batches
             .iter()
@@ -151,6 +179,52 @@ impl<T, Op, Acc> Expr for Aggregate<T, Op, Acc> {
         };
 
         let mut results = vec![];
+
+        while let Some(mut span) = self.next_span(&batches, &spans) {
+            loop {
+                let (batch_id, idx) = span.abs_row_id();
+                if !self.time_window.perform(span.ts_value()) {
+                    if !span.next_row() {
+                        break;
+                    }
+                }
+                if !span.predicate_value() {
+                    if !span.next_row() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        results.push(fr);
+        Ok(None)
+    }
+
+    // take next span if exist
+    fn next_span<'a>(&'a mut self, batches: &'a [Batch], spans: &[usize]) -> Option<Span> {
+        if self.cur_span == spans.len() {
+            return None;
+        }
+
+        let span_len = spans[self.cur_span];
+        // offset is a sum of prev spans
+        let offset = (0..self.cur_span).into_iter().map(|i| spans[i]).sum();
+        let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
+        if offset + span_len > rows_count {
+            (
+                " offset {offset}, span len: {span_len} > rows count: {}",
+                rows_count,
+            );
+            return None;
+        }
+        self.cur_span += 1;
+        Some(Span::new(
+            self.cur_span - 1,
+            offset,
+            span_len,
+            &self.steps,
+            batches,
+        ))
     }
 
     fn finalize(&mut self) -> Result<Vec<usize>> {
