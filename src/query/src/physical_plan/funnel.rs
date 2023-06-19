@@ -437,11 +437,13 @@ mod tests {
     use arrow::array::ArrayRef;
     use arrow::array::Int32Array;
     use arrow::array::Int64Array;
+    use arrow::compute::concat_batches;
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::datatypes::SchemaRef;
     use arrow::record_batch::RecordBatch;
+    use arrow::util::pretty::pretty_format_batches;
     use chrono::Duration;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
@@ -473,9 +475,152 @@ mod tests {
 | 0       | 2   | e2    | 1      |
 | 0       | 3   | e3    | 1      |
 | 0       | 4   | e1    | 1      |
+
 | 0       | 1   | e1    | 1      |
 | 0       | 2   | e2    | 1      |
 | 0       | 3   | e3    | 1      |
+| 1       | 5   | e1    | 1      |
+| 1       | 6   | e3    | 1      |
+| 1       | 7   | e1    | 1      |
+| 1       | 8   | e2    | 1      |
+| 2       | 9   | e1    | 1      |
+| 2       | 10  | e2    | 1      |
+
+| 2       | 11  | e3    | 1      |
+| 2       | 12  | e3    | 1      |
+| 2       | 13  | e3    | 1      |
+| 2       | 14  | e3    | 1      |
+| 3       | 15  | e1    | 1      |
+| 3       | 16  | e2    | 1      |
+| 3       | 17  | e3    | 1      |
+| 4       | 18  | e1    | 1      |
+| 4       | 19  | e2    | 1      |
+
+| 4       | 20  | e3    | 1      |
+
+| 5       | 21  | e1    | 1      |
+
+| 5       | 22  | e2    | 1      |
+
+| 6       | 23  | e1    | 1      |
+| 6       | 24  | e3    | 1      |
+| 6       | 25  | e3    | 1      |
+
+| 7       | 26  | e1    | 1      |
+| 7       | 27  | e2    | 1      |
+| 7       | 28  | e3    | 1      |
+
+| 8       | 29  | e1    | 1      |
+| 8       | 30  | e2    | 1      |
+| 8       | 31  | e3    | 1      |
+"#;
+        let fields = vec![
+            arrow2::datatypes::Field::new("user_id", arrow2::datatypes::DataType::Int64, false),
+            arrow2::datatypes::Field::new(
+                "ts",
+                arrow2::datatypes::DataType::Timestamp(
+                    arrow2::datatypes::TimeUnit::Millisecond,
+                    None,
+                ),
+                false,
+            ),
+            arrow2::datatypes::Field::new("event", arrow2::datatypes::DataType::Utf8, true),
+            arrow2::datatypes::Field::new("const", arrow2::datatypes::DataType::Int64, true),
+        ];
+
+        let (arrs, schema) = {
+            // todo change to arrow1
+
+            let res = parse_markdown_table(data, &fields).unwrap();
+
+            let (arrs, fields) = res
+                .into_iter()
+                .zip(fields.clone())
+                .map(|(arr, field)| arrow2_to_arrow1(arr, field).unwrap())
+                .unzip();
+
+            let schema = Arc::new(Schema::new(fields)) as SchemaRef;
+
+            (arrs, schema)
+        };
+
+        let opts = Options {
+            ts_col: Column::new_with_schema("ts", &schema)?,
+            window: Duration::seconds(15),
+            steps: event_eq!(schema, "e1" Sequential, "e2" Sequential),
+            exclude: None,
+            constants: None,
+            count: Count::Unique,
+            filter: None,
+            touch: Touch::First,
+        };
+
+        let batches = {
+            let batch = RecordBatch::try_new(schema.clone(), arrs)?;
+            let to_take = vec![4, 9, 9, 1, 1, 1, 3, 3, 3];
+            // let to_take = vec![10, 10, 10, 3];
+            let mut offset = 0;
+            to_take
+                .into_iter()
+                .map(|v| {
+                    let arrs = batch
+                        .columns()
+                        .iter()
+                        .map(|c| c.slice(offset, v).to_owned())
+                        .collect::<Vec<_>>();
+                    offset += v;
+                    arrs
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|v| RecordBatch::try_new(schema.clone(), v).unwrap())
+                .collect::<Vec<_>>()
+        };
+
+        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+
+        let funnel = FunnelExec::try_new(
+            FunnelExpr::new(opts),
+            vec![Arc::new(Column::new_with_schema("user_id", &schema)?)],
+            Arc::new(input),
+            1,
+        )?;
+
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = funnel.execute(0, task_ctx)?;
+        let result = collect(stream).await?;
+
+        let expected = r#"
++--------------+-----------------+-------------------------+-------------------------+---------+-------------------------+-------+-------+
+| is_converted | converted_steps | step_0_ts               | step_1_ts               | user_id | ts                      | event | const |
++--------------+-----------------+-------------------------+-------------------------+---------+-------------------------+-------+-------+
+| true         | 2               | 1970-01-01T00:00:00.001 | 1970-01-01T00:00:00.002 | 0       | 1970-01-01T00:00:00.001 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.005 | 1970-01-01T00:00:00.006 | 1       | 1970-01-01T00:00:00.005 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.009 | 1970-01-01T00:00:00.010 | 2       | 1970-01-01T00:00:00.009 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.015 | 1970-01-01T00:00:00.016 | 3       | 1970-01-01T00:00:00.015 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.018 | 1970-01-01T00:00:00.019 | 4       | 1970-01-01T00:00:00.018 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.021 | 1970-01-01T00:00:00.022 | 5       | 1970-01-01T00:00:00.021 | e1    | 1     |
+| false        | 0               | 1970-01-01T00:00:00.023 |                         | 6       | 1970-01-01T00:00:00.023 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.026 | 1970-01-01T00:00:00.027 | 7       | 1970-01-01T00:00:00.026 | e1    | 1     |
+| true         | 2               | 1970-01-01T00:00:00.029 | 1970-01-01T00:00:00.030 | 8       | 1970-01-01T00:00:00.029 | e1    | 1     |
++--------------+-----------------+-------------------------+-------------------------+---------+-------------------------+-------+-------+
+"#;
+
+        println!("{}", pretty_format_batches(&result)?);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_funnel2() -> anyhow::Result<()> {
+        let data = r#"
+| user_id | ts  | event | const  |
+|---------|-----|-------|--------|
+| 0       | 1   | e1    | 1      |
+| 0       | 2   | e2    | 1      |
+| 0       | 3   | e3    | 1      |
+| 0       | 4   | e1    | 1      |
 | 1       | 5   | e1    | 1      |
 | 1       | 6   | e3    | 1      |
 | 1       | 7   | e1    | 1      |
@@ -486,7 +631,7 @@ mod tests {
 | 2       | 12  | e3    | 1      |
 | 2       | 13  | e3    | 1      |
 | 2       | 14  | e3    | 1      |
-| 3       | 15  | e1    | 1      |
+| 2       | 15  | e1    | 1      |
 | 3       | 16  | e2    | 1      |
 | 3       | 17  | e3    | 1      |
 | 4       | 18  | e1    | 1      |
@@ -497,7 +642,7 @@ mod tests {
 | 6       | 23  | e1    | 1      |
 | 6       | 24  | e3    | 1      |
 | 6       | 25  | e3    | 1      |
-| 7       | 26  | e1    | 1      |
+| 6       | 26  | e1    | 1      |
 | 7       | 27  | e2    | 1      |
 | 7       | 28  | e3    | 1      |
 | 8       | 29  | e1    | 1      |
@@ -523,7 +668,7 @@ mod tests {
 
             let (arrs, fields) = res
                 .into_iter()
-                .zip(fields)
+                .zip(fields.clone())
                 .map(|(arr, field)| arrow2_to_arrow1(arr, field).unwrap())
                 .unzip();
 
@@ -545,7 +690,7 @@ mod tests {
 
         let batches = {
             let batch = RecordBatch::try_new(schema.clone(), arrs)?;
-            let to_take = vec![4, 9, 9, 1, 1, 1, 3, 3];
+            let to_take = vec![4, 9, 9, 1, 1, 1, 3, 3, 3];
             // let to_take = vec![10, 10, 10, 3];
             let mut offset = 0;
             to_take

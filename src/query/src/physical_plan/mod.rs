@@ -20,10 +20,9 @@ struct PartitionState {
     random_state: ahash::RandomState,
     hash_buffer: Vec<u64>,
     buf: Vec<RecordBatch>,
-    last_value: Option<u64>,
-    offset: usize,
-    offset_idx: usize,
     offsets: Vec<usize>,
+    last_value: Option<u64>,
+    last_value_count: usize,
     last_span: usize,
     spans: Vec<usize>,
     c: usize,
@@ -33,11 +32,9 @@ struct PartitionState {
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
+use arrow::array::Array;
+use arrow::array::Int64Array;
 use lazy_static::lazy_static;
-
-lazy_static! {
-    static ref ARRAY: Mutex<VecDeque<usize>> = Mutex::new(VecDeque::from(vec![0, 4, 7, 0, 0, 0]));
-}
 
 impl PartitionState {
     pub fn new(partition_key: Vec<Arc<dyn PhysicalExpr>>) -> Self {
@@ -45,10 +42,9 @@ impl PartitionState {
             random_state: ahash::RandomState::with_seeds(0, 0, 0, 0),
             hash_buffer: vec![],
             buf: Vec::with_capacity(10),
-            last_value: None,
-            offset: 0,
-            offset_idx: 0,
             offsets: vec![],
+            last_value: None,
+            last_value_count: 0,
             last_span: 0,
             spans: vec![0],
             c: 0,
@@ -68,7 +64,12 @@ impl PartitionState {
             .collect::<DFResult<Vec<_>>>()?;
         let num_rows = batch.num_rows();
 
-        self.offsets.push(0);
+        let mut offset = 0;
+        if self.last_value_count > 0 && self.buf.len() > 1 {
+            offset = self.buf[self.buf.len() - 2].num_rows() - self.last_value_count;
+            self.offsets.push(offset);
+            self.last_value_count = 0;
+        }
         self.hash_buffer.clear();
         self.hash_buffer.resize(num_rows, 0);
         create_hashes(&arrays, &mut self.random_state, &mut self.hash_buffer)?;
@@ -82,16 +83,11 @@ impl PartitionState {
             if self.last_value != Some(*v) {
                 self.spans.push(0);
                 take = true;
-                // println!("{} {}", self.offset, self.offset_idx);
-                self.offset = 0;
-                self.offset_idx = idx;
-            } else if idx == 0 {
-                // todo if value of prev batch == cur first value - diff value count in prev batch from total values. This will be offset
-                println!("!{}", *v);
+                self.last_value_count = 0;
             }
             let i = self.spans.len() - 1;
             self.spans[i] += 1;
-            self.offset += 1;
+            self.last_value_count += 1;
 
             self.last_value = Some(*v);
         }
@@ -104,17 +100,9 @@ impl PartitionState {
                 .drain(..self.spans.len() - 1)
                 .collect::<Vec<usize>>();
 
-            // println!(
-            // "buf {:?}",
-            // take_batches
-            // .iter()
-            // .map(|v| v.columns()[0].clone())
-            // .collect::<Vec<_>>()
-            // );
-            println!("spans {:?}", take_spans);
-            let mut offset = ARRAY.lock().unwrap(); // TODO fix
-            let o = offset.drain(..1).collect::<Vec<_>>()[0];
-            return Ok(Some((take_batches, take_spans, o)));
+            let offset = self.offsets[0];
+            self.offsets = vec![];
+            return Ok(Some((take_batches, take_spans, offset)));
         }
         Ok(None)
     }
@@ -124,9 +112,13 @@ impl PartitionState {
             let batches = self.buf.drain(0..).collect();
             let spans = self.spans.drain(0..).collect();
 
-            let mut offset = ARRAY.lock().unwrap();
-            let o = offset.drain(..1).collect::<Vec<_>>()[0];
-            return Ok(Some((batches, spans, o)));
+            let offset = if self.offsets.len() > 0 {
+                self.offsets[0]
+            } else {
+                0
+            };
+
+            return Ok(Some((batches, spans, offset)));
         }
 
         Ok(None)
@@ -209,8 +201,8 @@ mod tests {
                 vec![6],                         // 1 0
                 vec![6],                         // 1 0
                 vec![6],                         // 1 0
-                vec![6, 7, 7],                   // 3-2 = 1
-                vec![8, 8, 8],                   // 3 0
+                vec![6, 7, 8],                   // 3-2 = 0
+                vec![8, 8, 8],                   // 3 0 = 2
             ];
 
             v.into_iter()
@@ -267,7 +259,7 @@ mod tests {
                     2, 2, 2, 2, 2, // 6
                 ],
                 vec![
-                    2, 3, 3, 3, // 3
+                    2, 2, 3, 3, // 3
                     4, 4, 4, // 3
                     5, 5,
                 ],
@@ -275,7 +267,7 @@ mod tests {
             vec![
                 // i3
                 vec![
-                    2, 3, 3, 3, 4, 4, 4, // skip 7
+                    2, 2, 3, 3, 4, 4, 4, // skip 7
                     5, 5, // 2
                 ],
                 vec![6],
@@ -285,11 +277,11 @@ mod tests {
                 vec![6],
                 vec![6],
                 vec![6], // 3
-                vec![7, 7, 7],
+                vec![6, 7, 8],
             ],
             vec![
                 // i5
-                vec![7, 7, 7], // 3
+                vec![6, 7, 8], // 3
                 vec![8, 8, 8],
             ],
             vec![
@@ -309,135 +301,10 @@ mod tests {
                 assert_eq!(l, r);
             }
         }
-        let exp_spans = vec![vec![4, 4], vec![6, 3, 3], vec![2], vec![3], vec![3], vec![
-            3,
-        ]];
+        let exp_spans = vec![vec![4, 4], vec![7, 2, 3], vec![2], vec![4, 1], vec![4]];
         assert_eq!(spans_res, exp_spans);
 
-        let exp_skips = vec![0, 4, 7, 0, 0, 0];
-        assert_eq!(skip_res, exp_skips);
-        Ok(())
-    }
-
-    #[test]
-    fn test_batches_state2() -> anyhow::Result<()> {
-        let schema = Schema::new(vec![Field::new("a", DataType::Int64, false)]);
-
-        let batches = {
-            let v = vec![
-                vec![0, 0, 0, 0],                // 4  0
-                vec![0, 0, 0, 1, 1, 1, 1, 2],    // 12
-                vec![2, 2, 2, 2, 3, 3, 3, 4, 4], // 21
-                vec![4],                         // 22
-                vec![5],                         // 23
-                vec![5],                         // 24
-                vec![6, 6, 6],                   // 27
-                vec![7, 7, 7],                   // 30
-                vec![8, 8, 8],                   // 33
-            ];
-
-            v.into_iter()
-                .map(|v| {
-                    let arrays = vec![Arc::new(Int64Array::from(v)) as ArrayRef];
-                    RecordBatch::try_new(Arc::new(schema.clone()), arrays.clone()).unwrap()
-                })
-                .collect::<Vec<_>>()
-        };
-
-        let col = Arc::new(Column::new_with_schema("a", &schema)?) as PhysicalExprRef;
-        let mut state = PartitionState::new(vec![col]);
-
-        let mut batches_res = vec![];
-        let mut spans_res = vec![];
-        let mut skip_res = vec![];
-        for (idx, batch) in batches.into_iter().enumerate() {
-            let res = state.push(batch)?;
-            match res {
-                None => {}
-                Some((batches, spans, skip)) => {
-                    batches_res.push(batches);
-                    spans_res.push(spans);
-                    skip_res.push(skip);
-                }
-            }
-        }
-
-        let res = state.finalize()?;
-        match res {
-            None => println!("none"),
-            Some((batches, spans, skip)) => {
-                batches_res.push(batches);
-                spans_res.push(spans);
-                skip_res.push(skip);
-            }
-        }
-
-        let exp_batches = vec![
-            vec![
-                // i1
-                vec![
-                    0, 0, 0, 0, // 4
-                ],
-                vec![
-                    1, 1, 1, 1, // 4
-                    2, 2, 2, 2, 2,
-                ],
-            ],
-            vec![
-                // i2
-                vec![
-                    1, 1, 1, 1, // skip 4
-                    2, 2, 2, 2, 2, // 6
-                ],
-                vec![
-                    2, 3, 3, 3, // 3
-                    4, 4, 4, // 3
-                    5, 5,
-                ],
-            ],
-            vec![
-                // i3
-                vec![
-                    2, 3, 3, 3, 4, 4, 4, // skip 7
-                    5, 5, // 2
-                ],
-                vec![6],
-            ],
-            vec![
-                // i4
-                vec![6],
-                vec![6],
-                vec![6], // 3
-                vec![7, 7, 7],
-            ],
-            vec![
-                // i5
-                vec![7, 7, 7], // 3
-                vec![8, 8, 8],
-            ],
-            vec![
-                // i6
-                vec![8, 8, 8], // 3
-            ],
-        ];
-
-        for (res_id, batches) in batches_res.iter().enumerate() {
-            for (batch_id, vals) in batches.into_iter().enumerate() {
-                let l = vals.columns()[0]
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .clone();
-                let r = Int64Array::from(exp_batches[res_id][batch_id].clone());
-                assert_eq!(l, r);
-            }
-        }
-        let exp_spans = vec![vec![4, 4], vec![6, 3, 3], vec![2], vec![3], vec![3], vec![
-            3,
-        ]];
-        assert_eq!(spans_res, exp_spans);
-
-        let exp_skips = vec![0, 4, 7, 0, 0, 0];
+        let exp_skips = vec![0, 4, 7, 0, 2];
         assert_eq!(skip_res, exp_skips);
         Ok(())
     }
@@ -458,67 +325,74 @@ mod tests {
 
         let pre_batches = vec![
             r#"
-| user_id | ts | event | const |
-|---------|----|-------|-------|
-| 0       | 0  | e1    | 1     |
-| 0       | 1  | e2    | 1     |
-| 0       | 2  | e3    | 1     |
-| 0       | 3  | e3    | 1     |
+| user_id | ts  | event | const  |
+|---------|-----|-------|--------|
+| 0       | 1   | e1    | 1      |
+| 0       | 2   | e2    | 1      |
+| 0       | 3   | e3    | 1      |
+| 0       | 4   | e1    | 1      |
 "#,
             r#"
 | user_id | ts | event | const |
 |---------|----|-------|-------|
-| 1       | 4  | e1    | 1     |
-| 1       | 5  | e2    | 1     |
-| 1       | 6  | e3    | 1     |
-| 1       | 6  | e3    | 1     |
-| 2       | 7  | e2    | 1     |
-| 2       | 8  | e2    | 1     |
-| 2       | 10  | e2    | 1     |
-| 2       | 11  | e2    | 1     |
-| 2       | 12  | e1    | 1     |
+| 0       | 1   | e1    | 1      |
+| 0       | 2   | e2    | 1      |
+| 0       | 3   | e3    | 1      |
+| 1       | 5   | e1    | 1      |
+| 1       | 6   | e3    | 1      |
+| 1       | 7   | e1    | 1      |
+| 1       | 8   | e2    | 1      |
+| 2       | 9   | e1    | 1      |
+| 2       | 10  | e2    | 1      |
 "#,
             r#"
 | user_id | ts | event | const |
 |---------|----|-------|-------|
-| 2       | 13  | e2    | 1     |
-| 3       | 14  | e2    | 1     |
-| 3       | 15  | e1    | 1     |
-| 3       | 16  | e2    | 1     |
-| 4       | 17  | e1    | 1     |
-| 4       | 18  | e2    | 1     |
-| 4       | 19  | e3    | 1     |
-| 5       | 20  | e1    | 1     |
-| 5       | 21  | e2    | 1     |
+| 2       | 11  | e3    | 1      |
+| 2       | 12  | e3    | 1      |
+| 2       | 13  | e3    | 1      |
+| 2       | 14  | e3    | 1      |
+| 3       | 15  | e1    | 1      |
+| 3       | 16  | e2    | 1      |
+| 3       | 17  | e3    | 1      |
+| 4       | 18  | e1    | 1      |
+| 4       | 19  | e2    | 1      |
 "#,
             r#"
 | user_id | ts | event | const |
 |---------|----|-------|-------|
-| 6       | 22  | e1    | 1     |
+| 4       | 20  | e3    | 1      |
 "#,
             r#"
 | user_id | ts | event | const |
 |---------|----|-------|-------|
-| 6       | 23  | e2    | 1     |
+| 5       | 21  | e1    | 1      |
 "#,
             r#"
 | user_id | ts | event | const |
 |---------|----|-------|-------|
-| 6       | 24  | e3    | 1     |
+| 5       | 22  | e2    | 1      |
 "#,
             r#"
 | user_id | ts | event | const |
 |---------|----|-------|-------|
-| 7       | 25  | e1    | 1     |
-| 7       | 26  | e2    | 1     |
-| 7       | 27  | e3    | 1     |
+| 6       | 23  | e1    | 1      |
+| 6       | 24  | e3    | 1      |
+| 6       | 25  | e3    | 1      |
 "#,
             r#"
 | user_id | ts | event | const |
 |---------|----|-------|-------|
-| 8       | 28  | e1    | 1     |
-| 8       | 29  | e2    | 1     |
-| 8       | 30  | e3    | 1     |
+| 7       | 26  | e1    | 1      |
+| 7       | 27  | e2    | 1      |
+| 7       | 28  | e3    | 1      |
+"#,
+            r#"
+| user_id | ts | event | const |
+|---------|----|-------|-------|
+| 8       | 29  | e1    | 1      |
+| 8       | 30  | e2    | 1      |
+| 8       | 31  | e3    | 1      |
 "#,
         ];
 
@@ -589,7 +463,6 @@ mod tests {
                 let mut to_take: HashMap<usize, Vec<usize>> = HashMap::new();
 
                 let res = funnel.evaluate(&batches, spans.clone(), skip).unwrap();
-                println!("{:?}", res);
 
                 let mut offset = skip;
                 for (span, fr) in spans.into_iter().zip(res.into_iter()) {
@@ -648,7 +521,7 @@ mod tests {
                     .unwrap();
 
                 for batch in batches.into_iter() {
-                    print!(
+                    println!(
                         "{}",
                         arrow::util::pretty::pretty_format_batches(&[batch]).unwrap()
                     );
@@ -657,8 +530,8 @@ mod tests {
         }
 
         if let Some((batches, spans, skip)) = state.finalize().unwrap() {
+            println!("skip {skip}");
             let res = funnel.evaluate(&batches, spans.clone(), skip).unwrap();
-            println!("{:?}", res);
 
             let mut offset = skip;
             for (span, fr) in spans.into_iter().zip(res.into_iter()) {
