@@ -10,6 +10,8 @@ use arrow::array::TimestampMillisecondArray;
 use arrow::record_batch::RecordBatch;
 use arrow2::array::Int128Array;
 use arrow2::types::PrimitiveType::Int128;
+use chrono::DateTime;
+use chrono::Duration;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_plan::expressions::Column;
 use datafusion_common::ScalarValue;
@@ -20,7 +22,7 @@ use crate::physical_plan::abs_row_id_refs;
 use crate::physical_plan::segmentation::accumulator::Accumulator;
 use crate::physical_plan::segmentation::boolean_op::BooleanOp;
 use crate::physical_plan::segmentation::boolean_op::Operator;
-use crate::physical_plan::segmentation::time_window::TimeWindow;
+use crate::physical_plan::segmentation::time_range::TimeRange;
 
 pub trait Expr {
     fn evaluate(
@@ -41,7 +43,8 @@ where T: Debug
     op: PhantomData<Op>,
     left_col: PhysicalExprRef,
     right: T,
-    time_window: Box<dyn TimeWindow>,
+    time_range: Box<dyn TimeRange>,
+    time_window: i64,
     cur_span: usize,
 }
 
@@ -56,17 +59,22 @@ where
         predicate: PhysicalExprRef,
         left_col: Column,
         right: T,
-        time_window: Box<dyn TimeWindow>,
+        time_range: Box<dyn TimeRange>,
+        time_window: Option<Duration>,
     ) -> Result<Self> {
         let res = Self {
             ts_col: Arc::new(ts_col) as PhysicalExprRef,
             predicate,
             acc: Default::default(),
             op: Default::default(),
-            time_window,
+            time_range,
             left_col: Arc::new(left_col) as PhysicalExprRef,
             right,
             cur_span: 0,
+            time_window: time_window
+                .map(|v| v.num_milliseconds())
+                .or(Some(Duration::days(365 * 10).num_milliseconds()))
+                .unwrap(),
         };
 
         Ok(res)
@@ -243,70 +251,82 @@ where
         };
 
         let mut results = vec![];
-
-        let mut tw = dyn_clone::clone_box(&*self.time_window);
+        let mut time_range = dyn_clone::clone_box(&*self.time_range);
+        let time_window = self.time_window;
         'main: while let Some(mut span) = self.next_span(&batches, &spans) {
-            tw.reset();
-            let mut acc: i128 = 0;
-
             println!("new span");
-            let res = loop {
-                println!("iteration");
-                if !tw.check_bounds(span.ts_value()) {
-                    println!("{} out of bounds", span.ts_value());
-
-                    if !span.next_row() {
-                        println!("no next row");
-
+            let cur_time = span.ts_value();
+            let mut max_time = cur_time + time_window;
+            let res = 'time_window: loop {
+                println!("max time: {max_time}");
+                let mut acc: i128 = 0;
+                let res = loop {
+                    println!("iteration");
+                    if span.ts_value() >= max_time {
+                        println!("out of time window");
                         break true;
                     }
-                    continue;
-                }
-                if !span.check_predicate() {
-                    println!("no predicate");
-                    if !span.next_row() {
-                        println!("no next row");
 
-                        break true;
-                    }
-                    continue;
-                }
+                    if !time_range.check_bounds(span.ts_value()) {
+                        println!("{} out of bounds", span.ts_value());
 
-                let (batch_id, row_id) = abs_row_id(span.row_id, record_batches);
-                acc = Acc::perform(acc, left_values[batch_id].value(row_id) as i128);
-                println!("acc after perform {acc}");
-                match Op::op() {
-                    (Operator::Gt | Operator::GtEq) => {
-                        if Op::perform(acc, right_value) {
-                            break false;
+                        if !span.next_row() {
+                            println!("no next row");
+
+                            break 'time_window true;
                         }
+                        continue;
                     }
-                    _ => {}
-                }
+                    if !span.check_predicate() {
+                        println!("no predicate");
+                        if !span.next_row() {
+                            println!("no next row");
 
-                if !span.next_row() {
-                    println!("no next rows");
-                    break true;
-                }
-            };
+                            break 'time_window true;
+                        }
+                        continue;
+                    }
 
-            if !res {
-                println!("not pass");
-                results.push(false);
-                continue;
-            }
-            println!("pass with acc {acc}");
-            let res = match Op::op() {
-                Operator::Eq => {
-                    println!("{} == {}", acc, right_value);
-                    acc == right_value
+                    let (batch_id, row_id) = abs_row_id(span.row_id, record_batches);
+                    acc = Acc::perform(acc, left_values[batch_id].value(row_id) as i128);
+                    println!("acc after perform {acc}");
+                    match Op::op() {
+                        (Operator::Gt | Operator::GtEq) => {
+                            if Op::perform(acc, right_value) {
+                                break 'time_window false;
+                            }
+                        }
+                        _ => {}
+                    }
+
+                    if !span.next_row() {
+                        println!("no next rows");
+                        break 'time_window true;
+                    }
+                };
+
+                if !res {
+                    println!("not pass");
+                    break false;
                 }
-                Operator::NotEq => acc != right_value,
-                Operator::Lt => acc < right_value,
-                Operator::LtEq => acc <= right_value,
-                Operator::Gt => true,
-                Operator::GtEq => true,
-                _ => unreachable!("{:?}", Op::op()),
+                println!("pass with acc {acc}");
+                let res = match Op::op() {
+                    Operator::Eq => {
+                        println!("{} == {}", acc, right_value);
+                        acc == right_value
+                    }
+                    Operator::NotEq => acc != right_value,
+                    Operator::Lt => acc < right_value,
+                    Operator::LtEq => acc <= right_value,
+                    Operator::Gt => true,
+                    Operator::GtEq => true,
+                    _ => unreachable!("{:?}", Op::op()),
+                };
+
+                if !res {
+                    break 'time_window false;
+                }
+                max_time += time_window
             };
 
             results.push(res == true);
@@ -323,6 +343,7 @@ mod tests {
     use arrow::datatypes::Schema;
     use arrow::datatypes::SchemaRef;
     use arrow::record_batch::RecordBatch;
+    use chrono::Duration;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;
@@ -338,8 +359,9 @@ mod tests {
     use crate::physical_plan::segmentation::boolean_op::BooleanGt;
     use crate::physical_plan::segmentation::boolean_op::BooleanLt;
     use crate::physical_plan::segmentation::boolean_op::Operator;
-    use crate::physical_plan::segmentation::time_window::Between;
-    use crate::physical_plan::segmentation::time_window::TimeWindow;
+    use crate::physical_plan::segmentation::time_range::Between;
+    use crate::physical_plan::segmentation::time_range::TimeRange;
+    use crate::physical_plan::segmentation::time_range::TimeRangeNone;
     use crate::physical_plan::PartitionState;
 
     fn test_batches(batches: Vec<RecordBatch>, mut agg: Box<dyn Expr>) -> bool {
@@ -375,7 +397,7 @@ mod tests {
 | user_id | ts  | event | v  |
 |---------|-----|-------|--------| 
 | 0       | 1   | e1    | 1      |
-| 0       | 2   | e2    | 2      |
+| 0       | 2   | e1    | 2      |
 | 0       | 3   | e3    | 3      |
 | 0       | 4   | e1    | 4      |
 
@@ -481,19 +503,20 @@ mod tests {
 
         // todo add assertions
         {
-            println!("sum<100, between 1-20");
+            println!("sum=1, window 1ms");
             let pk = vec![
                 Arc::new(Column::new_with_schema("user_id", &schema).unwrap()) as PhysicalExprRef,
             ];
             let mut state = PartitionState::new(pk);
 
-            let tw = Box::new(Between { from: 1, to: 20 }) as Box<dyn TimeWindow>;
+            let tw = Box::new(Between { from: 1, to: 20 }) as Box<dyn TimeRange>;
             let mut agg = Aggregate::<i128, BooleanLt, Sum>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
                 100,
                 tw,
+                None,
             )
             .unwrap();
 
@@ -506,13 +529,14 @@ mod tests {
                 Arc::new(Column::new_with_schema("user_id", &schema).unwrap()) as PhysicalExprRef,
             ];
 
-            let tw = Box::new(Between { from: 5, to: 30 }) as Box<dyn TimeWindow>;
+            let tw = Box::new(Between { from: 5, to: 30 }) as Box<dyn TimeRange>;
             let mut agg = Aggregate::<i128, BooleanGt, Sum>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
                 100,
                 tw,
+                None,
             )
             .unwrap();
 
@@ -521,13 +545,14 @@ mod tests {
 
         {
             println!("sum=1, between 5-100");
-            let tw = Box::new(Between { from: 5, to: 100 }) as Box<dyn TimeWindow>;
+            let tw = Box::new(Between { from: 5, to: 100 }) as Box<dyn TimeRange>;
             let mut agg = Aggregate::<i128, BooleanEq, Sum>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
                 1,
                 tw,
+                None,
             )
             .unwrap();
 
@@ -536,5 +561,82 @@ mod tests {
     }
 
     #[test]
-    fn it_works() {}
+    fn test_time_window() {
+        let data = r#"
+| user_id | ts   | event | v  |
+|---------|------|-------|----| 
+| 0       | 1    | e1    | 1  |
+| 0       | 2    | e1    | 1  |
+| 0       | 3    | e1    | 1  |
+| 0       | 4    | e1    | 1  |
+| 0       | 5    | e1    | 1  |
+| 0       | 6    | e1    | 1  |
+| 0       | 7    | e1    | 1  |
+| 0       | 8    | e1    | 1  |
+| 0       | 9    | e1    | 1  |
+| 0       | 10   | e1    | 1  |
+"#;
+
+        let fields = vec![
+            arrow2::datatypes::Field::new("user_id", arrow2::datatypes::DataType::Int64, false),
+            arrow2::datatypes::Field::new(
+                "ts",
+                arrow2::datatypes::DataType::Timestamp(
+                    arrow2::datatypes::TimeUnit::Millisecond,
+                    None,
+                ),
+                false,
+            ),
+            arrow2::datatypes::Field::new("event", arrow2::datatypes::DataType::Utf8, true),
+            arrow2::datatypes::Field::new("v", arrow2::datatypes::DataType::Int64, true),
+        ];
+
+        let (arrs, schema) = {
+            // todo change to arrow1
+
+            let res = parse_markdown_table(data, &fields).unwrap();
+
+            let (arrs, fields) = res
+                .into_iter()
+                .zip(fields.clone())
+                .map(|(arr, field)| arrow2_to_arrow1(arr, field).unwrap())
+                .unzip();
+
+            let schema = Arc::new(Schema::new(fields)) as SchemaRef;
+
+            (arrs, schema)
+        };
+
+        let batch = RecordBatch::try_new(schema.clone(), arrs).unwrap();
+        let predicate = {
+            let l = Column::new_with_schema("event", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Utf8(Some("e1".to_string())));
+            let expr = BinaryExpr::new(Arc::new(l), datafusion_expr::Operator::Eq, Arc::new(r));
+            Arc::new(expr) as PhysicalExprRef
+        };
+        let ts_col = Column::new_with_schema("ts", &schema).unwrap();
+        let left_col = Column::new_with_schema("v", &schema).unwrap();
+
+        // todo add assertions
+        {
+            println!("sum<100, between 1-20");
+            let pk = vec![
+                Arc::new(Column::new_with_schema("user_id", &schema).unwrap()) as PhysicalExprRef,
+            ];
+            let mut state = PartitionState::new(pk);
+
+            let tw = Box::new(TimeRangeNone {}) as Box<dyn TimeRange>;
+            let mut agg = Aggregate::<i128, BooleanLt, Sum>::try_new(
+                ts_col.clone(),
+                predicate.clone(),
+                left_col.clone(),
+                3,
+                tw,
+                Some(Duration::milliseconds(2)),
+            )
+            .unwrap();
+
+            test_batches(vec![batch.clone()], Box::new(agg) as Box<dyn Expr>);
+        }
+    }
 }
