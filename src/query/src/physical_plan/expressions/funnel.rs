@@ -25,9 +25,8 @@ use tracing_core::Level;
 use super::*;
 use crate::error::QueryError;
 use crate::error::Result;
-use crate::physical_plan::segmentation::Expr;
-use crate::physical_plan::segmentation::RowResult;
-use crate::physical_plan::segmentation::Spans;
+use crate::physical_plan::abs_row_id;
+use crate::physical_plan::abs_row_id_refs;
 use crate::StaticArray;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -158,17 +157,10 @@ impl<'a> Span<'a> {
     // Absolute row refers to batch id and row id in the batch
     #[inline]
     pub fn abs_row_id(&self) -> (usize, usize) {
-        let mut batch_id = 0;
-        let mut idx = self.row_id + self.offset;
-        // go over the batches and find the batch that contains the row
-        for batch in self.batches {
-            if idx < batch.batch.num_rows() {
-                break;
-            }
-            idx -= batch.batch.num_rows();
-            batch_id += 1;
-        }
-        (batch_id, idx)
+        abs_row_id_refs(
+            self.row_id,
+            self.batches.iter().map(|b| b.batch).collect::<Vec<_>>(),
+        )
     }
 
     // get ts value of current row

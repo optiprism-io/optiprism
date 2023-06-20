@@ -7,6 +7,7 @@ authors = ["Optiprism <dev@optiprism.io>"]
 [dependencies]
 num-traits = "0.2.15"
 num = "0.4.0"
+dyn-clone = "1.0.11"
 lazy_static = "1.4.0"
 anyhow = "1.0.66"
 ahash = { version = "0.8", default-features = false }

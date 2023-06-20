@@ -163,7 +163,6 @@ impl ExecutionPlan for FunnelExec {
             schema: self.schema.clone(),
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
             state: PartitionState::new(self.partition_key.clone()),
-            partition_key: self.partition_key.clone(),
             is_ended: false,
             out_batch_size: self.out_batch_size,
         }))
@@ -186,7 +185,6 @@ struct FunnelExecStream {
     predicate: FunnelExpr,
     schema: SchemaRef,
     input: SendableRecordBatchStream,
-    partition_key: Vec<Arc<dyn PhysicalExpr>>,
     baseline_metrics: BaselineMetrics,
     state: PartitionState,
     is_ended: bool,

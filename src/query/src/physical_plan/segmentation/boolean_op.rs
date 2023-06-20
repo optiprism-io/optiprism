@@ -1,4 +1,6 @@
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::Debug;
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::ops::BitAnd;
 
 #[derive(Debug, Clone)]
@@ -13,58 +15,54 @@ pub enum Operator {
     GtEq,
 }
 
-pub trait BooleanOp<T>: Send + Sync + Debug {
+pub trait BooleanOp<T>: Send + Sync {
     fn perform(left: T, right: T) -> bool;
     fn op() -> Operator;
 }
-/*
-
-#[derive(Debug)]
-pub struct BooleanAnd;
-
-impl BooleanOp<bool> for BooleanAnd
-{
-    fn perform(left: bool, right: bool) -> bool {
-        return left && right;
-    }
-
-    fn op() -> Operator {
-        Operator::And
-    }
-}
-
-impl Display for BooleanAnd {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "And")
-    }
-}
-
-#[derive(Debug)]
-pub struct BooleanOr;
-
-impl BooleanOp<bool> for BooleanOr
-{
-    fn perform(left: bool, right: bool) -> bool {
-        return left || right;
-    }
-
-    fn op() -> Operator {
-        Operator::Or
-    }
-}
-
-impl Display for BooleanOr {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Or")
-    }
-}
-*/
+// #[derive(Debug)]
+// pub struct BooleanAnd;
+//
+// impl BooleanOp<bool> for BooleanAnd
+// {
+// fn perform(left: bool, right: bool) -> bool {
+// return left && right;
+// }
+//
+// fn op() -> Operator {
+// Operator::And
+// }
+// }
+//
+// impl Display for BooleanAnd {
+// fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+// write!(f, "And")
+// }
+// }
+//
+// #[derive(Debug)]
+// pub struct BooleanOr;
+//
+// impl BooleanOp<bool> for BooleanOr
+// {
+// fn perform(left: bool, right: bool) -> bool {
+// return left || right;
+// }
+//
+// fn op() -> Operator {
+// Operator::Or
+// }
+// }
+//
+// impl Display for BooleanOr {
+// fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+// write!(f, "Or")
+// }
+// }
 #[derive(Debug)]
 pub struct BooleanEq;
 
 impl<T> BooleanOp<T> for BooleanEq
-    where
-        T: PartialEq,
+where T: PartialEq
 {
     fn perform(left: T, right: T) -> bool {
         return left == right;
@@ -85,8 +83,7 @@ impl Display for BooleanEq {
 pub struct BooleanNotEq;
 
 impl<T> BooleanOp<T> for BooleanNotEq
-    where
-        T: PartialEq,
+where T: PartialEq
 {
     fn perform(left: T, right: T) -> bool {
         return left != right;
@@ -103,13 +100,11 @@ impl Display for BooleanNotEq {
     }
 }
 
-
 #[derive(Debug)]
 pub struct BooleanGt;
 
 impl<T> BooleanOp<T> for BooleanGt
-    where
-        T: Ord,
+where T: Ord
 {
     fn perform(left: T, right: T) -> bool {
         return left > right;
@@ -130,8 +125,7 @@ impl Display for BooleanGt {
 pub struct BooleanLt;
 
 impl<T> BooleanOp<T> for BooleanLt
-    where
-        T: Ord,
+where T: Ord
 {
     fn perform(left: T, right: T) -> bool {
         return left < right;

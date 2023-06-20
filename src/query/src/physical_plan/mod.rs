@@ -3,6 +3,7 @@ use std::sync::Arc;
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_expr::hash_utils::create_hashes;
 use datafusion::physical_expr::PhysicalExpr;
+use datafusion::physical_expr::PhysicalExprRef;
 use datafusion_common::Result as DFResult;
 
 mod dictionary_decode;
@@ -38,7 +39,7 @@ use lazy_static::lazy_static;
 
 // partition state makes spans from batches. Span is a partition length
 impl PartitionState {
-    pub fn new(partition_key: Vec<Arc<dyn PhysicalExpr>>) -> Self {
+    pub fn new(partition_key: Vec<PhysicalExprRef>) -> Self {
         Self {
             random_state: ahash::RandomState::with_seeds(0, 0, 0, 0),
             hash_buffer: vec![],
@@ -154,6 +155,20 @@ impl PartitionState {
 
 #[inline]
 pub fn abs_row_id(row_id: usize, batches: &[RecordBatch]) -> (usize, usize) {
+    let mut batch_id = 0;
+    let mut idx = row_id;
+    for batch in batches.iter() {
+        if idx < batch.num_rows() {
+            break;
+        }
+        idx -= batch.num_rows();
+        batch_id += 1;
+    }
+    (batch_id, idx)
+}
+
+#[inline]
+pub fn abs_row_id_refs(row_id: usize, batches: Vec<&RecordBatch>) -> (usize, usize) {
     let mut batch_id = 0;
     let mut idx = row_id;
     for batch in batches.iter() {

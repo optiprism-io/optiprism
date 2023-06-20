@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -21,7 +22,6 @@ use datafusion_expr::Literal;
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::segmentation::boolean_op::BooleanOp;
-use crate::physical_plan::segmentation::{Expr, RowResult, Spans};
 
 #[derive(Debug)]
 pub struct Count<Op> {
@@ -51,7 +51,7 @@ impl<Op> Count<Op> {
 }
 
 impl<Op> Expr for Count<Op>
-    where Op: BooleanOp<i64>
+where Op: BooleanOp<i64> + Debug
 {
     fn evaluate(
         &mut self,
@@ -62,7 +62,6 @@ impl<Op> Expr for Count<Op>
         self.spans.reset(spans.to_vec(), batch.columns()[0].len());
         let arr = self.predicate.evaluate(batch)?.into_array(0);
         let arr = arr.as_any().downcast_ref::<BooleanArray>().unwrap();
-
 
         while self.spans.next_span() {
             while let Some(row) = self.spans.next_row() {
@@ -91,7 +90,6 @@ impl<Op> Expr for Count<Op>
                 }
             }
         }
-
 
         if is_last && self.spans.check_last_span() && Op::perform(self.acc, self.right) {
             self.spans.push_final_result()
@@ -124,22 +122,18 @@ mod tests {
     use datafusion::physical_plan::expressions::Literal;
     use datafusion_common::ScalarValue;
 
-    use crate::physical_plan::segmentation::boolean_op::{BooleanEq, BooleanGt, BooleanNotEq};
-    use crate::physical_plan::segmentation::count::Count;
-    use crate::physical_plan::segmentation::Expr;
+    use crate::physical_plan::segmentation::_count::Count;
+    use crate::physical_plan::segmentation::boolean_op::BooleanEq;
+    use crate::physical_plan::segmentation::boolean_op::BooleanGt;
+    use crate::physical_plan::segmentation::boolean_op::BooleanNotEq;
 
     #[test]
     fn one_batch() -> anyhow::Result<()> {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, true)]));
         let col = Arc::new(Column::new_with_schema("a", &schema)?) as Arc<dyn PhysicalExpr>;
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(BooleanArray::from(vec![
-                    true, true, true, true, true,
-                ])) as ArrayRef
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(BooleanArray::from(vec![
+            true, true, true, true, true,
+        ])) as ArrayRef])?;
         let mut op = Count::<BooleanEq>::try_new(&schema, col.clone(), 1)?;
         // 0, 1., 2, 0., 1
         assert_eq!(op.evaluate(&[1, 3], &batch, true)?, Some(vec![0, 3]));
@@ -164,56 +158,31 @@ mod tests {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, true)]));
         let col = Arc::new(Column::new_with_schema("a", &schema)?) as Arc<dyn PhysicalExpr>;
 
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(BooleanArray::from(vec![
-                    true, true,
-                ])) as ArrayRef
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(BooleanArray::from(vec![
+            true, true,
+        ])) as ArrayRef])?;
         let mut op = Count::<BooleanNotEq>::try_new(&schema, col.clone(), 1)?;
         assert_eq!(op.evaluate(&[1], &batch, false)?, None);
 
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(BooleanArray::from(vec![
-                    true, true,
-                ])) as ArrayRef
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(BooleanArray::from(vec![
+            true, true,
+        ])) as ArrayRef])?;
         assert_eq!(op.evaluate(&[], &batch, false)?, None);
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(BooleanArray::from(vec![
-                    true, true,
-                ])) as ArrayRef
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(BooleanArray::from(vec![
+            true, true,
+        ])) as ArrayRef])?;
         assert_eq!(op.evaluate(&[0], &batch, false)?, Some(vec![-1]));
 
         assert_eq!(op.evaluate(&[], &batch, false)?, None);
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(BooleanArray::from(vec![
-                    true, true,
-                ])) as ArrayRef
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(BooleanArray::from(vec![
+            true, true,
+        ])) as ArrayRef])?;
         assert_eq!(op.evaluate(&[1], &batch, false)?, Some(vec![0]));
 
         assert_eq!(op.evaluate(&[], &batch, false)?, None);
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(BooleanArray::from(vec![
-                    true,
-                ])) as ArrayRef
-            ],
-        )?;
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(BooleanArray::from(vec![
+            true,
+        ])) as ArrayRef])?;
         assert_eq!(op.evaluate(&[0], &batch, false)?, Some(vec![-1]));
 
         Ok(())

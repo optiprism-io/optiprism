@@ -1,4 +1,8 @@
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::marker::PhantomData;
+
+use dyn_clone::DynClone;
 
 #[derive(Debug)]
 enum TimeWindowName {
@@ -7,22 +11,32 @@ enum TimeWindowName {
     Last,
 }
 
-pub trait TimeWindow: Send + Sync {
-    fn perform(&self, v: i64) -> bool;
-    fn fn_name() -> TimeWindowName;
+pub trait TimeWindow: Send + Sync + Debug + DynClone {
+    fn check_bounds(&self, v: i64) -> bool;
+    fn reset(&mut self);
+    fn fn_name(&self) -> TimeWindowName;
 }
 
+#[derive(Clone)]
 pub struct Between {
-    from: i64,
-    to: i64,
+    pub from: i64,
+    pub to: i64,
 }
 
 impl TimeWindow for Between {
-    fn perform(&self, v: i64) -> bool {
-        v >= self.from && v <= self.from
+    fn check_bounds(&self, v: i64) -> bool {
+        v >= self.from && v <= self.to
     }
 
-    fn fn_name() -> TimeWindowName {
+    fn reset(&mut self) {}
+
+    fn fn_name(&self) -> TimeWindowName {
         TimeWindowName::Between
+    }
+}
+
+impl Debug for Between {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Between")
     }
 }
