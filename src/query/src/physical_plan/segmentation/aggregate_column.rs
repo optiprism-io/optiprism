@@ -36,12 +36,10 @@ use num_traits::PrimInt;
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::abs_row_id_refs;
-use crate::physical_plan::segmentation::aggregate_function::AggregateFunction;
-use crate::physical_plan::segmentation::aggregate_function::Primitive;
 use crate::physical_plan::segmentation::boolean_op::BooleanOp;
 use crate::physical_plan::segmentation::boolean_op::Operator;
 use crate::physical_plan::segmentation::time_range::TimeRange;
-use crate::physical_plan::segmentation::Expr;
+use crate::physical_plan::segmentation::{AggregateFunction, SegmentationExpr};
 use crate::span;
 
 span!(Batch);
@@ -62,7 +60,7 @@ impl<'a> Batch<'a> {
 }
 
 #[derive(Debug)]
-pub struct RelativeAggregate<T, Arr, Op>
+pub struct AggregateColumn<T, Arr, Op>
 where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 {
     ts_col: PhysicalExprRef,
@@ -77,7 +75,7 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
     cur_span: usize,
 }
 
-impl<T, Arr, Op> RelativeAggregate<T, Arr, Op>
+impl<T, Arr, Op> AggregateColumn<T, Arr, Op>
 where
     T: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
     Op: BooleanOp<T>,
@@ -113,7 +111,7 @@ where
 
 macro_rules! gen_evaluate_int {
     ($acc_ty:ty,$array_type:ident) => {
-        impl<Op> RelativeAggregate<$acc_ty, $array_type, Op>
+        impl<Op> AggregateColumn<$acc_ty, $array_type, Op>
         where Op: BooleanOp<$acc_ty> /* ,
          * T: Copy + Num + Bounded + NumCast + PartialOrd + Clone, */
         {
@@ -173,7 +171,7 @@ macro_rules! gen_evaluate_int {
             }
         }
 
-        impl<Op> Expr for RelativeAggregate<$acc_ty, $array_type, Op>
+        impl<Op> SegmentationExpr for AggregateColumn<$acc_ty, $array_type, Op>
         where Op: BooleanOp<$acc_ty>
         {
             fn evaluate(
@@ -309,20 +307,19 @@ mod tests {
     use store::arrow_conversion::arrow2_to_arrow1;
     use store::test_util::parse_markdown_table;
 
-    use crate::physical_plan::segmentation::aggregate_function::AggregateFunction;
     use crate::physical_plan::segmentation::boolean_op::BooleanEq;
     use crate::physical_plan::segmentation::boolean_op::BooleanGt;
     use crate::physical_plan::segmentation::boolean_op::BooleanLt;
     use crate::physical_plan::segmentation::boolean_op::Operator;
     // use crate::physical_plan::segmentation::boolean_op::Operator;
-    use crate::physical_plan::segmentation::relative_aggregate::RelativeAggregate;
-    use crate::physical_plan::segmentation::time_range;
+    use crate::physical_plan::segmentation::aggregate_column::AggregateColumn;
+    use crate::physical_plan::segmentation::{AggregateFunction, time_range};
     use crate::physical_plan::segmentation::time_range::from_milli;
     use crate::physical_plan::segmentation::time_range::TimeRange;
-    use crate::physical_plan::segmentation::Expr;
+    use crate::physical_plan::segmentation::SegmentationExpr;
     use crate::physical_plan::PartitionState;
 
-    fn test_batches(batches: Vec<RecordBatch>, mut agg: Box<dyn Expr>) -> bool {
+    fn test_batches(batches: Vec<RecordBatch>, mut agg: Box<dyn SegmentationExpr>) -> bool {
         let pk = vec![
             Arc::new(Column::new_with_schema("user_id", &batches[0].schema()).unwrap())
                 as PhysicalExprRef,
@@ -467,7 +464,7 @@ mod tests {
             ];
             let mut state = PartitionState::new(pk);
 
-            let mut agg = RelativeAggregate::<i128, Int64Array, BooleanLt>::try_new(
+            let mut agg = AggregateColumn::<i128, Int64Array, BooleanLt>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
@@ -478,7 +475,7 @@ mod tests {
             )
             .unwrap();
 
-            test_batches(batches.clone(), Box::new(agg) as Box<dyn Expr>);
+            test_batches(batches.clone(), Box::new(agg) as Box<dyn SegmentationExpr>);
         }
 
         {
@@ -487,7 +484,7 @@ mod tests {
                 Arc::new(Column::new_with_schema("user_id", &schema).unwrap()) as PhysicalExprRef,
             ];
 
-            let mut agg = RelativeAggregate::<i128, Int64Array, BooleanGt>::try_new(
+            let mut agg = AggregateColumn::<i128, Int64Array, BooleanGt>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
@@ -498,12 +495,12 @@ mod tests {
             )
             .unwrap();
 
-            test_batches(batches.clone(), Box::new(agg) as Box<dyn Expr>);
+            test_batches(batches.clone(), Box::new(agg) as Box<dyn SegmentationExpr>);
         }
 
         {
             println!("sum=1, between 5-100");
-            let mut agg = RelativeAggregate::<i128, Int64Array, BooleanEq>::try_new(
+            let mut agg = AggregateColumn::<i128, Int64Array, BooleanEq>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
@@ -514,7 +511,7 @@ mod tests {
             )
             .unwrap();
 
-            test_batches(batches.clone(), Box::new(agg) as Box<dyn Expr>);
+            test_batches(batches.clone(), Box::new(agg) as Box<dyn SegmentationExpr>);
         }
     }
 
@@ -583,7 +580,7 @@ mod tests {
             ];
             let mut state = PartitionState::new(pk);
 
-            let mut agg = RelativeAggregate::<i128, Int64Array, BooleanLt>::try_new(
+            let mut agg = AggregateColumn::<i128, Int64Array, BooleanLt>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
@@ -594,7 +591,7 @@ mod tests {
             )
             .unwrap();
 
-            test_batches(vec![batch.clone()], Box::new(agg) as Box<dyn Expr>);
+            test_batches(vec![batch.clone()], Box::new(agg) as Box<dyn SegmentationExpr>);
         }
     }
 }

@@ -5,8 +5,6 @@ use std::ops::BitAnd;
 
 #[derive(Debug, Clone)]
 pub enum Operator {
-    And,
-    Or,
     Eq,
     NotEq,
     Lt,
@@ -19,45 +17,7 @@ pub trait BooleanOp<T>: Send + Sync {
     fn perform(left: T, right: T) -> bool;
     fn op() -> Operator;
 }
-// #[derive(Debug)]
-// pub struct BooleanAnd;
-//
-// impl BooleanOp<bool> for BooleanAnd
-// {
-// fn perform(left: bool, right: bool) -> bool {
-// return left && right;
-// }
-//
-// fn op() -> Operator {
-// Operator::And
-// }
-// }
-//
-// impl Display for BooleanAnd {
-// fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-// write!(f, "And")
-// }
-// }
-//
-// #[derive(Debug)]
-// pub struct BooleanOr;
-//
-// impl BooleanOp<bool> for BooleanOr
-// {
-// fn perform(left: bool, right: bool) -> bool {
-// return left || right;
-// }
-//
-// fn op() -> Operator {
-// Operator::Or
-// }
-// }
-//
-// impl Display for BooleanOr {
-// fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-// write!(f, "Or")
-// }
-// }
+
 #[derive(Debug)]
 pub struct BooleanEq;
 
