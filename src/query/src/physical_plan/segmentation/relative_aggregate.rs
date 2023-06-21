@@ -5,8 +5,19 @@ use std::sync::Arc;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
+use arrow::array::Decimal128Array;
+use arrow::array::Float16Array;
+use arrow::array::Float32Array;
+use arrow::array::Float64Array;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
 use arrow::array::Int64Array;
+use arrow::array::Int8Array;
 use arrow::array::TimestampMillisecondArray;
+use arrow::array::UInt16Array;
+use arrow::array::UInt32Array;
+use arrow::array::UInt64Array;
+use arrow::array::UInt8Array;
 use arrow::record_batch::RecordBatch;
 use arrow2::array::Int128Array;
 use arrow2::types::PrimitiveType::Int128;
@@ -30,24 +41,35 @@ use crate::physical_plan::segmentation::aggregate_function::Primitive;
 use crate::physical_plan::segmentation::boolean_op::BooleanOp;
 use crate::physical_plan::segmentation::boolean_op::Operator;
 use crate::physical_plan::segmentation::time_range::TimeRange;
+use crate::physical_plan::segmentation::Expr;
+use crate::span;
 
-pub trait Expr {
-    fn evaluate(
-        &mut self,
-        record_batches: &[RecordBatch],
-        spans: Vec<usize>,
-        skip: usize,
-    ) -> Result<Vec<bool>>;
+span!(Batch);
+
+// Batch for state
+#[derive(Debug, Clone)]
+pub struct Batch<'a> {
+    pub ts: TimestampMillisecondArray,
+    pub predicate: BooleanArray,
+    pub left_values: ArrayRef,
+    pub batch: &'a RecordBatch,
+}
+
+impl<'a> Batch<'a> {
+    pub fn len(&self) -> usize {
+        self.batch.num_rows()
+    }
 }
 
 #[derive(Debug)]
-pub struct Aggregate<T, Op>
+pub struct RelativeAggregate<T, Arr, Op>
 where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 {
     ts_col: PhysicalExprRef,
     predicate: PhysicalExprRef,
     aggregator: AggregateFunction<T>,
     op: PhantomData<Op>,
+    arr: PhantomData<Arr>,
     left_col: PhysicalExprRef,
     right: T,
     time_range: TimeRange,
@@ -55,7 +77,7 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
     cur_span: usize,
 }
 
-impl<T, Op> Aggregate<T, Op>
+impl<T, Arr, Op> RelativeAggregate<T, Arr, Op>
 where
     T: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
     Op: BooleanOp<T>,
@@ -82,252 +104,196 @@ where
                 .map(|v| v.num_milliseconds())
                 .or(Some(Duration::days(365 * 10).num_milliseconds()))
                 .unwrap(),
+            arr: Default::default(),
         };
 
         Ok(res)
     }
 }
 
-// Batch for state
-#[derive(Debug, Clone)]
-pub struct Batch<'a> {
-    pub ts: TimestampMillisecondArray,
-    pub predicate: BooleanArray,
-    pub left_values: ArrayRef,
-    pub batch: &'a RecordBatch,
-}
+macro_rules! gen_evaluate_int {
+    ($acc_ty:ty,$array_type:ident) => {
+        impl<Op> RelativeAggregate<$acc_ty, $array_type, Op>
+        where Op: BooleanOp<$acc_ty> /* ,
+         * T: Copy + Num + Bounded + NumCast + PartialOrd + Clone, */
+        {
+            // calculate expressions
+            fn evaluate_batch<'a>(&mut self, batch: &'a RecordBatch) -> Result<Batch<'a>> {
+                // timestamp column
+                // Optiprism uses millisecond precision
+                let ts = self
+                    .ts_col
+                    .evaluate(&batch)?
+                    .into_array(0)
+                    .as_any()
+                    .downcast_ref::<TimestampMillisecondArray>()
+                    .unwrap()
+                    .clone();
 
-// Span is a span of rows that are in the same partition
-#[derive(Debug, Clone)]
-pub struct Span<'a> {
-    id: usize,                // # of span
-    offset: usize, // offset of the span. Used to skip rows from record batch. See PartitionedState
-    len: usize,    // length of the span
-    batches: &'a [Batch<'a>], // one or more batches with span
-    row_id: usize, // current row id
-}
+                let predicate = self
+                    .predicate
+                    .evaluate(&batch)?
+                    .into_array(0)
+                    .as_any()
+                    .downcast_ref::<BooleanArray>()
+                    .unwrap()
+                    .clone();
 
-impl<'a> Span<'a> {
-    pub fn new(id: usize, offset: usize, len: usize, batches: &'a [Batch]) -> Self {
-        Self {
-            id,
-            offset,
-            len,
-            batches,
-            row_id: 0,
-        }
-    }
+                let left_values = self.left_col.evaluate(&batch)?.into_array(0);
+                // add steps to state
+                let res = Batch {
+                    ts,
+                    predicate,
+                    batch,
+                    left_values,
+                };
 
-    #[inline]
-    pub fn abs_row_id(&self) -> (usize, usize) {
-        abs_row_id_refs(
-            self.row_id,
-            self.batches.iter().map(|b| b.batch).collect::<Vec<_>>(),
-        )
-    }
+                Ok(res)
+            }
 
-    // get ts value of current row
-    #[inline]
-    pub fn ts_value(&self) -> i64 {
-        // calculate batch id and row id
-        let (batch_id, idx) = self.abs_row_id();
-        self.batches[batch_id].ts.value(idx)
-    }
+            // take next span if exist
+            fn next_span<'a>(&'a mut self, batches: &'a [Batch], spans: &[usize]) -> Option<Span> {
+                if self.cur_span == spans.len() {
+                    return None;
+                }
 
-    #[inline]
-    pub fn check_predicate(&self) -> bool {
-        let (batch_id, idx) = self.abs_row_id();
-        self.batches[batch_id].predicate.value(idx)
-    }
-
-    // go to next row
-    #[inline]
-    pub fn next_row(&mut self) -> bool {
-        if self.row_id == self.len - 1 {
-            return false;
-        }
-        self.row_id += 1;
-
-        true
-    }
-
-    pub fn values(&self) -> &ArrayRef {
-        let (batch_id, idx) = self.abs_row_id();
-        &self.batches[batch_id].left_values
-    }
-}
-
-impl<'a> Batch<'a> {
-    pub fn len(&self) -> usize {
-        self.batch.num_rows()
-    }
-}
-
-impl<Op> Aggregate<i128, Op>
-where Op: BooleanOp<i128>
-{
-    // calculate expressions
-    fn evaluate_batch<'a>(&mut self, batch: &'a RecordBatch) -> Result<Batch<'a>> {
-        // timestamp column
-        // Optiprism uses millisecond precision
-        let ts = self
-            .ts_col
-            .evaluate(&batch)?
-            .into_array(0)
-            .as_any()
-            .downcast_ref::<TimestampMillisecondArray>()
-            .unwrap()
-            .clone();
-
-        let predicate = self
-            .predicate
-            .evaluate(&batch)?
-            .into_array(0)
-            .as_any()
-            .downcast_ref::<BooleanArray>()
-            .unwrap()
-            .clone();
-
-        let left_values = self.left_col.evaluate(&batch)?.into_array(0);
-        // add steps to state
-        let res = Batch {
-            ts,
-            predicate,
-            batch,
-            left_values,
-        };
-
-        Ok(res)
-    }
-
-    // take next span if exist
-    fn next_span<'a>(&'a mut self, batches: &'a [Batch], spans: &[usize]) -> Option<Span> {
-        if self.cur_span == spans.len() {
-            return None;
+                let span_len = spans[self.cur_span];
+                // offset is a sum of prev spans
+                let offset = (0..self.cur_span).into_iter().map(|i| spans[i]).sum();
+                let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
+                if offset + span_len > rows_count {
+                    (
+                        " offset {offset}, span len: {span_len} > rows count: {}",
+                        rows_count,
+                    );
+                    return None;
+                }
+                self.cur_span += 1;
+                Some(Span::new(self.cur_span - 1, offset, span_len, batches))
+            }
         }
 
-        let span_len = spans[self.cur_span];
-        // offset is a sum of prev spans
-        let offset = (0..self.cur_span).into_iter().map(|i| spans[i]).sum();
-        let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
-        if offset + span_len > rows_count {
-            (
-                " offset {offset}, span len: {span_len} > rows count: {}",
-                rows_count,
-            );
-            return None;
-        }
-        self.cur_span += 1;
-        Some(Span::new(self.cur_span - 1, offset, span_len, batches))
-    }
-}
-impl<Op> Expr for Aggregate<i128, Op>
-where Op: BooleanOp<i128>
-{
-    fn evaluate(
-        &mut self,
-        record_batches: &[RecordBatch],
-        spans: Vec<usize>,
-        skip: usize,
-    ) -> Result<Vec<bool>> {
-        // evaluate each batch, e.g. create batch state
-        let batches = record_batches
-            .iter()
-            .map(|b| self.evaluate_batch(b))
-            .collect::<Result<Vec<_>>>()?;
+        impl<Op> Expr for RelativeAggregate<$acc_ty, $array_type, Op>
+        where Op: BooleanOp<$acc_ty>
+        {
+            fn evaluate(
+                &mut self,
+                record_batches: &[RecordBatch],
+                spans: Vec<usize>,
+                skip: usize,
+            ) -> Result<Vec<bool>> {
+                // evaluate each batch, e.g. create batch state
+                let batches = record_batches
+                    .iter()
+                    .map(|b| self.evaluate_batch(b))
+                    .collect::<Result<Vec<_>>>()?;
 
-        let left_values = batches
-            .iter()
-            .map(|b| b.left_values.as_any().downcast_ref::<Int64Array>().unwrap())
-            .collect::<Vec<_>>();
+                let left_values = batches
+                    .iter()
+                    .map(|b| {
+                        b.left_values
+                            .as_any()
+                            .downcast_ref::<$array_type>()
+                            .unwrap()
+                    })
+                    .collect::<Vec<_>>();
 
-        let right_value: i128 = self.right.into();
-        self.cur_span = 0;
+                let right_value: $acc_ty = self.right.into();
+                self.cur_span = 0;
 
-        // if skip is set, we need to skip the first span
-        let spans = if skip > 0 {
-            let spans = [vec![skip], spans].concat();
-            self.next_span(&batches, &spans);
-            spans
-        } else {
-            spans
-        };
+                // if skip is set, we need to skip the first span
+                let spans = if skip > 0 {
+                    let spans = [vec![skip], spans].concat();
+                    self.next_span(&batches, &spans);
+                    spans
+                } else {
+                    spans
+                };
 
-        let mut results = vec![];
-        let mut time_range = self.time_range.clone();
-        let mut agg = self.aggregator.clone();
-        let time_window = self.time_window;
-        'main: while let Some(mut span) = self.next_span(&batches, &spans) {
-            let cur_time = span.ts_value();
-            let mut max_time = cur_time + time_window;
-            let res = 'time_window: loop {
-                agg.reset();
-                let res = loop {
-                    if span.ts_value() >= max_time {
-                        break true;
-                    }
+                let mut results = vec![];
+                let mut time_range = self.time_range.clone();
+                let mut agg = self.aggregator.clone();
+                let time_window = self.time_window;
+                'main: while let Some(mut span) = self.next_span(&batches, &spans) {
+                    let cur_time = span.ts_value();
+                    let mut max_time = cur_time + time_window;
+                    let res = loop {
+                        agg.reset();
+                        loop {
+                            if span.ts_value() >= max_time {
+                                break;
+                            }
 
-                    if !time_range.check_bounds(span.ts_value()) {
-                        if !span.next_row() {
-                            break 'time_window true;
-                        }
-                        continue;
-                    }
-                    if !span.check_predicate() {
-                        if !span.next_row() {
-                            break 'time_window true;
-                        }
-                        continue;
-                    }
+                            if !time_range.check_bounds(span.ts_value()) {
+                                if !span.next_row() {
+                                    break;
+                                }
+                                continue;
+                            }
+                            if !span.check_predicate() {
+                                if !span.next_row() {
+                                    break;
+                                }
+                                continue;
+                            }
 
-                    let (batch_id, row_id) = abs_row_id(span.row_id, record_batches);
-                    let agg_res = agg.accumulate(left_values[batch_id].value(row_id) as i128);
-                    match Op::op() {
-                        (Operator::Gt | Operator::GtEq) => {
-                            if Op::perform(agg_res, right_value) {
-                                break 'time_window false;
+                            let (batch_id, row_id) = abs_row_id(span.row_id, record_batches);
+                            agg.accumulate(left_values[batch_id].value(row_id) as $acc_ty);
+
+                            if !span.next_row() {
+                                break;
                             }
                         }
-                        _ => {}
-                    }
 
-                    if !span.next_row() {
-                        break 'time_window true;
-                    }
-                };
+                        let acc = agg.result();
 
-                if !res {
-                    break false;
+                        let res = match Op::op() {
+                            Operator::Lt => acc < right_value,
+                            Operator::LtEq => acc <= right_value,
+                            Operator::Eq => acc == right_value,
+                            Operator::NotEq => acc != right_value,
+                            Operator::Gt => true,
+                            Operator::GtEq => true,
+                            _ => unreachable!("{:?}", Op::op()),
+                        };
+
+                        if !res {
+                            break false;
+                        }
+
+                        if !span.is_next_row() {
+                            break true;
+                        }
+                        max_time += time_window
+                    };
+
+                    results.push(res == true);
                 }
-                let acc = agg.result();
 
-                let res = match Op::op() {
-                    Operator::Eq => acc == right_value,
-                    Operator::NotEq => acc != right_value,
-                    Operator::Lt => acc < right_value,
-                    Operator::LtEq => acc <= right_value,
-                    Operator::Gt => true,
-                    Operator::GtEq => true,
-                    _ => unreachable!("{:?}", Op::op()),
-                };
-
-                if !res {
-                    break 'time_window false;
-                }
-                max_time += time_window
-            };
-
-            results.push(res == true);
+                Ok(results)
+            }
         }
-
-        Ok(results)
-    }
+    };
 }
+
+gen_evaluate_int!(i64, Int8Array);
+gen_evaluate_int!(i64, Int16Array);
+gen_evaluate_int!(i64, Int32Array);
+gen_evaluate_int!(i128, Int64Array);
+gen_evaluate_int!(u64, UInt8Array);
+gen_evaluate_int!(u64, UInt16Array);
+gen_evaluate_int!(u64, UInt32Array);
+gen_evaluate_int!(u128, UInt64Array);
+// todo add decimal 256
+gen_evaluate_int!(i128, Decimal128Array);
+gen_evaluate_int!(f64, Float32Array);
+gen_evaluate_int!(f64, Float64Array);
 
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
+    use arrow::array::Int64Array;
     use arrow::datatypes::Schema;
     use arrow::datatypes::SchemaRef;
     use arrow::record_batch::RecordBatch;
@@ -343,16 +309,17 @@ mod tests {
     use store::arrow_conversion::arrow2_to_arrow1;
     use store::test_util::parse_markdown_table;
 
-    // use crate::physical_plan::segmentation::boolean_op::Operator;
-    use crate::physical_plan::segmentation::aggregate::{Aggregate, Expr};
     use crate::physical_plan::segmentation::aggregate_function::AggregateFunction;
     use crate::physical_plan::segmentation::boolean_op::BooleanEq;
     use crate::physical_plan::segmentation::boolean_op::BooleanGt;
     use crate::physical_plan::segmentation::boolean_op::BooleanLt;
     use crate::physical_plan::segmentation::boolean_op::Operator;
+    // use crate::physical_plan::segmentation::boolean_op::Operator;
+    use crate::physical_plan::segmentation::relative_aggregate::RelativeAggregate;
     use crate::physical_plan::segmentation::time_range;
     use crate::physical_plan::segmentation::time_range::from_milli;
     use crate::physical_plan::segmentation::time_range::TimeRange;
+    use crate::physical_plan::segmentation::Expr;
     use crate::physical_plan::PartitionState;
 
     fn test_batches(batches: Vec<RecordBatch>, mut agg: Box<dyn Expr>) -> bool {
@@ -365,7 +332,7 @@ mod tests {
             match state.push(batch) {
                 Ok(Some((batches, spans, skip))) => {
                     let res = agg.evaluate(&batches, spans, skip).unwrap();
-                    // println!("res: {:?}", res);
+                    println!("res: {:?}", res);
                 }
                 _ => {}
                 Err(err) => panic!("{:?}", err),
@@ -500,7 +467,7 @@ mod tests {
             ];
             let mut state = PartitionState::new(pk);
 
-            let mut agg = Aggregate::<i128, BooleanLt>::try_new(
+            let mut agg = RelativeAggregate::<i128, Int64Array, BooleanLt>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
@@ -520,7 +487,7 @@ mod tests {
                 Arc::new(Column::new_with_schema("user_id", &schema).unwrap()) as PhysicalExprRef,
             ];
 
-            let mut agg = Aggregate::<i128, BooleanGt>::try_new(
+            let mut agg = RelativeAggregate::<i128, Int64Array, BooleanGt>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
@@ -536,7 +503,7 @@ mod tests {
 
         {
             println!("sum=1, between 5-100");
-            let mut agg = Aggregate::<i128, BooleanEq>::try_new(
+            let mut agg = RelativeAggregate::<i128, Int64Array, BooleanEq>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
@@ -616,7 +583,7 @@ mod tests {
             ];
             let mut state = PartitionState::new(pk);
 
-            let mut agg = Aggregate::<i128, BooleanLt>::try_new(
+            let mut agg = RelativeAggregate::<i128, Int64Array, BooleanLt>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
