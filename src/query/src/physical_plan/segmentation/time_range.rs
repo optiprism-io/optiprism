@@ -8,131 +8,51 @@ use chrono::Utc;
 use common::query::TimeUnit;
 use dyn_clone::DynClone;
 
-#[derive(Debug)]
-enum TimeRangeName {
-    Between,
-    From,
-    Last,
+#[derive(Debug, Clone)]
+pub enum TimeRange {
+    Between(i64, i64),
+    From(i64),
+    Last(i64, i64),
     None,
 }
 
-pub trait TimeRange: Send + Sync + Debug + DynClone {
-    fn check_bounds(&self, v: i64) -> bool;
-    fn fn_name(&self) -> TimeRangeName;
+pub fn from_milli(m: i64) -> DateTime<Utc> {
+    DateTime::<Utc>::from_utc(
+        chrono::NaiveDateTime::from_timestamp_millis(m).unwrap(),
+        Utc,
+    )
 }
 
-#[derive(Clone)]
-pub struct Between {
-    pub from: i64,
-    pub to: i64,
-}
+impl TimeRange {
+    pub fn new_between(from: DateTime<Utc>, to: DateTime<Utc>) -> Self {
+        TimeRange::Between(from.timestamp_millis(), to.timestamp_millis())
+    }
+    pub fn new_between_milli(from: i64, to: i64) -> Self {
+        TimeRange::Between(from, to)
+    }
 
-impl Between {
-    pub fn new(from: DateTime<Utc>, to: DateTime<Utc>) -> Self {
-        Self {
-            from: from.timestamp_millis(),
-            to: to.timestamp_millis(),
+    pub fn new_from(from: DateTime<Utc>) -> Self {
+        TimeRange::From(from.timestamp_millis())
+    }
+
+    pub fn new_from_milli(from: i64) -> Self {
+        TimeRange::From(from)
+    }
+
+    pub fn new_last(since: Duration, ts: DateTime<Utc>) -> Self {
+        TimeRange::Last(since.num_milliseconds(), ts.timestamp_millis())
+    }
+
+    pub fn new_last_milli(since: i64, ts: i64) -> Self {
+        TimeRange::Last(since, ts)
+    }
+
+    pub fn check_bounds(&self, ts: i64) -> bool {
+        match self {
+            TimeRange::Between(from, to) => ts >= *from && ts <= *to,
+            TimeRange::From(from) => ts >= *from,
+            TimeRange::Last(since, start_ts) => ts >= *start_ts - *since,
+            TimeRange::None => true,
         }
-    }
-}
-
-impl TimeRange for Between {
-    fn check_bounds(&self, v: i64) -> bool {
-        v >= self.from && v <= self.to
-    }
-
-    fn fn_name(&self) -> TimeRangeName {
-        TimeRangeName::Between
-    }
-}
-
-impl Debug for Between {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", TimeRangeName::Between)
-    }
-}
-
-#[derive(Clone)]
-pub struct From {
-    pub from: i64,
-}
-
-impl From {
-    pub fn new(from: DateTime<Utc>) -> Self {
-        Self {
-            from: from.timestamp_millis(),
-        }
-    }
-}
-
-impl TimeRange for From {
-    fn check_bounds(&self, v: i64) -> bool {
-        v >= self.from
-    }
-
-    fn fn_name(&self) -> TimeRangeName {
-        TimeRangeName::From
-    }
-}
-
-impl Debug for From {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", TimeRangeName::From)
-    }
-}
-
-#[derive(Clone)]
-pub struct Last {
-    pub since: i64,
-    pub ts: i64,
-}
-
-impl Last {
-    pub fn new(since: Duration, ts: DateTime<Utc>) -> Self {
-        Self {
-            since: since.num_milliseconds(),
-            ts: ts.timestamp_millis(),
-        }
-    }
-}
-
-impl TimeRange for Last {
-    fn check_bounds(&self, v: i64) -> bool {
-        v >= self.ts - self.since
-    }
-
-    fn fn_name(&self) -> TimeRangeName {
-        TimeRangeName::Last
-    }
-}
-
-impl Debug for Last {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", TimeRangeName::Last)
-    }
-}
-
-#[derive(Clone)]
-pub struct TimeRangeNone {}
-
-impl TimeRangeNone {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl TimeRange for TimeRangeNone {
-    fn check_bounds(&self, v: i64) -> bool {
-        true
-    }
-
-    fn fn_name(&self) -> TimeRangeName {
-        TimeRangeName::None
-    }
-}
-
-impl Debug for TimeRangeNone {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", TimeRangeName::None)
     }
 }

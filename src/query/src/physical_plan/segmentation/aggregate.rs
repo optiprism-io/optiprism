@@ -15,11 +15,18 @@ use chrono::Duration;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_plan::expressions::Column;
 use datafusion_common::ScalarValue;
+use datafusion_expr::Accumulator;
+use num::Integer;
+use num_traits::Bounded;
+use num_traits::Num;
+use num_traits::NumCast;
+use num_traits::PrimInt;
 
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::abs_row_id_refs;
-use crate::physical_plan::segmentation::accumulator::Accumulator;
+use crate::physical_plan::segmentation::aggregate_function::AggregateFunction;
+use crate::physical_plan::segmentation::aggregate_function::Primitive;
 use crate::physical_plan::segmentation::boolean_op::BooleanOp;
 use crate::physical_plan::segmentation::boolean_op::Operator;
 use crate::physical_plan::segmentation::time_range::TimeRange;
@@ -34,24 +41,23 @@ pub trait Expr {
 }
 
 #[derive(Debug)]
-pub struct Aggregate<T, Op, Acc>
-where T: Debug
+pub struct Aggregate<T, Op>
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 {
     ts_col: PhysicalExprRef,
     predicate: PhysicalExprRef,
-    acc: PhantomData<Acc>,
+    aggregator: AggregateFunction<T>,
     op: PhantomData<Op>,
     left_col: PhysicalExprRef,
     right: T,
-    time_range: Box<dyn TimeRange>,
+    time_range: TimeRange,
     time_window: i64,
     cur_span: usize,
 }
 
-impl<T, Op, Acc> Aggregate<T, Op, Acc>
+impl<T, Op> Aggregate<T, Op>
 where
-    T: Debug,
-    Acc: Accumulator<T>,
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
     Op: BooleanOp<T>,
 {
     pub fn try_new(
@@ -59,13 +65,14 @@ where
         predicate: PhysicalExprRef,
         left_col: Column,
         right: T,
-        time_range: Box<dyn TimeRange>,
+        aggregate: AggregateFunction<T>,
+        time_range: TimeRange,
         time_window: Option<Duration>,
     ) -> Result<Self> {
         let res = Self {
             ts_col: Arc::new(ts_col) as PhysicalExprRef,
             predicate,
-            acc: Default::default(),
+            aggregator: aggregate,
             op: Default::default(),
             time_range,
             left_col: Arc::new(left_col) as PhysicalExprRef,
@@ -156,10 +163,8 @@ impl<'a> Batch<'a> {
     }
 }
 
-impl<Op, Acc> Aggregate<i128, Op, Acc>
-where
-    Op: BooleanOp<i128>,
-    Acc: Accumulator<i128> + Debug,
+impl<Op> Aggregate<i128, Op>
+where Op: BooleanOp<i128>
 {
     // calculate expressions
     fn evaluate_batch<'a>(&mut self, batch: &'a RecordBatch) -> Result<Batch<'a>> {
@@ -216,10 +221,8 @@ where
         Some(Span::new(self.cur_span - 1, offset, span_len, batches))
     }
 }
-impl<Op, Acc> Expr for Aggregate<i128, Op, Acc>
-where
-    Op: BooleanOp<i128>,
-    Acc: Accumulator<i128> + Debug,
+impl<Op> Expr for Aggregate<i128, Op>
+where Op: BooleanOp<i128>
 {
     fn evaluate(
         &mut self,
@@ -251,48 +254,37 @@ where
         };
 
         let mut results = vec![];
-        let mut time_range = dyn_clone::clone_box(&*self.time_range);
+        let mut time_range = self.time_range.clone();
+        let mut agg = self.aggregator.clone();
         let time_window = self.time_window;
         'main: while let Some(mut span) = self.next_span(&batches, &spans) {
-            println!("new span");
             let cur_time = span.ts_value();
             let mut max_time = cur_time + time_window;
             let res = 'time_window: loop {
-                println!("max time: {max_time}");
-                let mut acc: i128 = 0;
+                agg.reset();
                 let res = loop {
-                    println!("iteration");
                     if span.ts_value() >= max_time {
-                        println!("out of time window");
                         break true;
                     }
 
                     if !time_range.check_bounds(span.ts_value()) {
-                        println!("{} out of bounds", span.ts_value());
-
                         if !span.next_row() {
-                            println!("no next row");
-
                             break 'time_window true;
                         }
                         continue;
                     }
                     if !span.check_predicate() {
-                        println!("no predicate");
                         if !span.next_row() {
-                            println!("no next row");
-
                             break 'time_window true;
                         }
                         continue;
                     }
 
                     let (batch_id, row_id) = abs_row_id(span.row_id, record_batches);
-                    acc = Acc::perform(acc, left_values[batch_id].value(row_id) as i128);
-                    println!("acc after perform {acc}");
+                    let agg_res = agg.accumulate(left_values[batch_id].value(row_id) as i128);
                     match Op::op() {
                         (Operator::Gt | Operator::GtEq) => {
-                            if Op::perform(acc, right_value) {
+                            if Op::perform(agg_res, right_value) {
                                 break 'time_window false;
                             }
                         }
@@ -300,21 +292,17 @@ where
                     }
 
                     if !span.next_row() {
-                        println!("no next rows");
                         break 'time_window true;
                     }
                 };
 
                 if !res {
-                    println!("not pass");
                     break false;
                 }
-                println!("pass with acc {acc}");
+                let acc = agg.result();
+
                 let res = match Op::op() {
-                    Operator::Eq => {
-                        println!("{} == {}", acc, right_value);
-                        acc == right_value
-                    }
+                    Operator::Eq => acc == right_value,
                     Operator::NotEq => acc != right_value,
                     Operator::Lt => acc < right_value,
                     Operator::LtEq => acc <= right_value,
@@ -343,7 +331,10 @@ mod tests {
     use arrow::datatypes::Schema;
     use arrow::datatypes::SchemaRef;
     use arrow::record_batch::RecordBatch;
+    use arrow2::compute::arithmetics::time;
+    use chrono::DateTime;
     use chrono::Duration;
+    use chrono::NaiveTime;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;
@@ -352,16 +343,16 @@ mod tests {
     use store::arrow_conversion::arrow2_to_arrow1;
     use store::test_util::parse_markdown_table;
 
-    use crate::physical_plan::segmentation::accumulator::Sum;
     // use crate::physical_plan::segmentation::boolean_op::Operator;
     use crate::physical_plan::segmentation::aggregate::{Aggregate, Expr};
+    use crate::physical_plan::segmentation::aggregate_function::AggregateFunction;
     use crate::physical_plan::segmentation::boolean_op::BooleanEq;
     use crate::physical_plan::segmentation::boolean_op::BooleanGt;
     use crate::physical_plan::segmentation::boolean_op::BooleanLt;
     use crate::physical_plan::segmentation::boolean_op::Operator;
-    use crate::physical_plan::segmentation::time_range::Between;
+    use crate::physical_plan::segmentation::time_range;
+    use crate::physical_plan::segmentation::time_range::from_milli;
     use crate::physical_plan::segmentation::time_range::TimeRange;
-    use crate::physical_plan::segmentation::time_range::TimeRangeNone;
     use crate::physical_plan::PartitionState;
 
     fn test_batches(batches: Vec<RecordBatch>, mut agg: Box<dyn Expr>) -> bool {
@@ -374,7 +365,7 @@ mod tests {
             match state.push(batch) {
                 Ok(Some((batches, spans, skip))) => {
                     let res = agg.evaluate(&batches, spans, skip).unwrap();
-                    println!("res: {:?}", res);
+                    // println!("res: {:?}", res);
                 }
                 _ => {}
                 Err(err) => panic!("{:?}", err),
@@ -384,7 +375,7 @@ mod tests {
         match state.finalize() {
             Ok(Some((batches, spans, skip))) => {
                 let res = agg.evaluate(&batches, spans, skip).unwrap();
-                println!("res: {:?}", res);
+                // println!("res: {:?}", res);
             }
             _ => {}
         }
@@ -509,13 +500,13 @@ mod tests {
             ];
             let mut state = PartitionState::new(pk);
 
-            let tw = Box::new(Between { from: 1, to: 20 }) as Box<dyn TimeRange>;
-            let mut agg = Aggregate::<i128, BooleanLt, Sum>::try_new(
+            let mut agg = Aggregate::<i128, BooleanLt>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
                 100,
-                tw,
+                AggregateFunction::new_sum(),
+                TimeRange::new_between_milli(1, 20),
                 None,
             )
             .unwrap();
@@ -529,13 +520,13 @@ mod tests {
                 Arc::new(Column::new_with_schema("user_id", &schema).unwrap()) as PhysicalExprRef,
             ];
 
-            let tw = Box::new(Between { from: 5, to: 30 }) as Box<dyn TimeRange>;
-            let mut agg = Aggregate::<i128, BooleanGt, Sum>::try_new(
+            let mut agg = Aggregate::<i128, BooleanGt>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
                 100,
-                tw,
+                AggregateFunction::new_sum(),
+                TimeRange::new_between_milli(5, 30),
                 None,
             )
             .unwrap();
@@ -545,13 +536,13 @@ mod tests {
 
         {
             println!("sum=1, between 5-100");
-            let tw = Box::new(Between { from: 5, to: 100 }) as Box<dyn TimeRange>;
-            let mut agg = Aggregate::<i128, BooleanEq, Sum>::try_new(
+            let mut agg = Aggregate::<i128, BooleanEq>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
                 1,
-                tw,
+                AggregateFunction::new_sum(),
+                TimeRange::new_between_milli(5, 100),
                 None,
             )
             .unwrap();
@@ -625,13 +616,13 @@ mod tests {
             ];
             let mut state = PartitionState::new(pk);
 
-            let tw = Box::new(TimeRangeNone {}) as Box<dyn TimeRange>;
-            let mut agg = Aggregate::<i128, BooleanLt, Sum>::try_new(
+            let mut agg = Aggregate::<i128, BooleanLt>::try_new(
                 ts_col.clone(),
                 predicate.clone(),
                 left_col.clone(),
                 3,
-                tw,
+                AggregateFunction::new_sum(),
+                TimeRange::None,
                 Some(Duration::milliseconds(2)),
             )
             .unwrap();

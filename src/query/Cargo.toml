@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
-num-traits = "0.2.15"
+num-traits = {version="0.2.15",features=["i128"]}
 num = "0.4.0"
 dyn-clone = "1.0.11"
 lazy_static = "1.4.0"
