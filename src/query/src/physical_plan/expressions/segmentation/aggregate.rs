@@ -31,15 +31,14 @@ use num_traits::Num;
 use num_traits::NumCast;
 
 use crate::error::Result;
-use crate::physical_plan::segmentation::AggregateFunction;
-use crate::physical_plan::segmentation::SegmentationExpr;
+use crate::physical_plan::expressions::segmentation::AggregateFunction;
+use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
-struct Aggregate<T, OT, OB>
+pub struct Aggregate<T, OT, OB>
 where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 {
     last_hash: u64,
     out: OB,
-    max_out_len: usize,
     agg: AggregateFunction<OT>,
     predicate: Column,
     arr: PhantomData<OB>,
@@ -51,16 +50,10 @@ where
     OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
     T: Copy,
 {
-    pub fn try_new(
-        max_out_len: usize,
-        predicate: Column,
-        agg: AggregateFunction<OT>,
-        out: OB,
-    ) -> Result<Self> {
+    pub fn try_new(predicate: Column, agg: AggregateFunction<OT>, out: OB) -> Result<Self> {
         Ok(Self {
             last_hash: 0,
             out,
-            max_out_len,
             agg,
             predicate,
             arr: PhantomData,
@@ -70,13 +63,9 @@ where
 }
 
 macro_rules! gen_agg_int {
-    ($ty:ty,$array_ty:ident,$acc_ty:ty,$acc_builder:ty ) => {
+    ($ty:ty,$array_ty:ident,$acc_ty:ty,$acc_builder:ty) => {
         impl SegmentationExpr for Aggregate<$ty, $acc_ty, $acc_builder> {
-            fn evaluate(
-                &mut self,
-                record_batch: &RecordBatch,
-                hashes: &[u64],
-            ) -> Result<Option<ArrayRef>> {
+            fn evaluate(&mut self, record_batch: &RecordBatch, hashes: &[u64]) -> Result<ArrayRef> {
                 let arr = self
                     .predicate
                     .evaluate(record_batch)?
@@ -98,22 +87,12 @@ macro_rules! gen_agg_int {
                     self.agg.accumulate(arr.value(idx).into());
                 }
 
-                let res = if self.out.len() >= self.max_out_len {
-                    Some(Arc::new(self.out.finish()) as ArrayRef)
-                } else {
-                    None
-                };
-
-                Ok(res)
+                Ok(Arc::new(self.out.finish()) as ArrayRef)
             }
 
-            fn finalize(&mut self) -> Result<Option<ArrayRef>> {
+            fn finalize(&mut self) -> Result<ArrayRef> {
                 self.out.append_value(self.agg.result() as $acc_ty);
-                if self.out.len() > 0 {
-                    Ok(Some(Arc::new(self.out.finish()) as ArrayRef))
-                } else {
-                    Ok(None)
-                }
+                Ok(Arc::new(self.out.finish()) as ArrayRef)
             }
         }
     };
@@ -158,10 +137,9 @@ mod tests {
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::hash_utils::create_hashes;
 
-    use crate::physical_plan::segmentation::aggregate::Aggregate;
-    use crate::physical_plan::segmentation::count::Count;
-    use crate::physical_plan::segmentation::AggregateFunction;
-    use crate::physical_plan::segmentation::SegmentationExpr;
+    use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
+    use crate::physical_plan::expressions::segmentation::AggregateFunction;
+    use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
     #[test]
     fn test_sum() {
@@ -180,15 +158,14 @@ mod tests {
         hash_buf.resize(col1.len(), 0);
         create_hashes(&vec![col1], &mut random_state, &mut hash_buf).unwrap();
         let mut agg = Aggregate::<i16, i64, _>::try_new(
-            3,
             Column::new_with_schema("col2", &schema).unwrap(),
             AggregateFunction::new_sum(),
             Int64Builder::with_capacity(10_000),
         )
         .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
-        assert_eq!(res, None);
-
+        let right = Arc::new(Int64Array::from(vec![6, 6])) as ArrayRef;
+        assert_eq!(&*res, &*right);
         let col1: ArrayRef = Arc::new(Int64Array::from(vec![3, 3, 3, 4]));
         let col2: ArrayRef = Arc::new(Int16Array::from(vec![4, 5, 6, 1]));
         hash_buf.clear();
@@ -197,12 +174,11 @@ mod tests {
         let batch =
             RecordBatch::try_new(Arc::new(schema), vec![col1.clone(), col2.clone()]).unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
-        assert_eq!(
-            res,
-            Some(Arc::new(Int64Array::from(vec![6, 6, 21])) as ArrayRef)
-        );
+        let right = Arc::new(Int64Array::from(vec![21])) as ArrayRef;
+        assert_eq!(&*res, &*right);
         let res = agg.finalize().unwrap();
-        assert_eq!(res, Some(Arc::new(Int64Array::from(vec![1])) as ArrayRef));
+        let right = Arc::new(Int64Array::from(vec![1])) as ArrayRef;
+        assert_eq!(&*res, &*right);
     }
     #[test]
     fn test_sum_float() {
@@ -222,14 +198,14 @@ mod tests {
         hash_buf.resize(col1.len(), 0);
         create_hashes(&vec![col1], &mut random_state, &mut hash_buf).unwrap();
         let mut agg = Aggregate::<f32, f64, _>::try_new(
-            3,
             Column::new_with_schema("col2", &schema).unwrap(),
             AggregateFunction::new_sum(),
             Float64Builder::with_capacity(10_000),
         )
         .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
-        assert_eq!(res, None);
+        let right = Arc::new(Float64Array::from(vec![6., 6.])) as ArrayRef;
+        assert_eq!(&*res, &*right);
 
         let col1: ArrayRef = Arc::new(Int64Array::from(vec![3, 3, 3, 4]));
         let col2: ArrayRef = Arc::new(Float32Array::from(vec![4., 5., 6., 1.]));
@@ -239,14 +215,10 @@ mod tests {
         let batch =
             RecordBatch::try_new(Arc::new(schema), vec![col1.clone(), col2.clone()]).unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
-        assert_eq!(
-            res,
-            Some(Arc::new(Float64Array::from(vec![6., 6., 21.])) as ArrayRef)
-        );
+        let right = Arc::new(Float64Array::from(vec![21.])) as ArrayRef;
+        assert_eq!(&*res, &*right);
         let res = agg.finalize().unwrap();
-        assert_eq!(
-            res,
-            Some(Arc::new(Float64Array::from(vec![1.])) as ArrayRef)
-        );
+        let right = Arc::new(Float64Array::from(vec![1.])) as ArrayRef;
+        assert_eq!(&*res, &*right);
     }
 }

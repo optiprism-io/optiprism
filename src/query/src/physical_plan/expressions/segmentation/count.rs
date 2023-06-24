@@ -7,32 +7,26 @@ use arrow::array::PrimitiveArray;
 use arrow::record_batch::RecordBatch;
 
 use crate::error::Result;
-use crate::physical_plan::segmentation::SegmentationExpr;
+use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
 pub struct Count {
     last_hash: u64,
     out: Int64Builder,
-    max_out_len: usize,
     count: i64,
 }
 
 impl Count {
-    pub fn new(max_out_len: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             last_hash: 0,
             out: Int64Builder::with_capacity(10_000),
-            max_out_len,
             count: 0,
         }
     }
 }
 
 impl SegmentationExpr for Count {
-    fn evaluate(
-        &mut self,
-        _record_batch: &RecordBatch,
-        hashes: &[u64],
-    ) -> Result<Option<ArrayRef>> {
+    fn evaluate(&mut self, _record_batch: &RecordBatch, hashes: &[u64]) -> Result<ArrayRef> {
         for hash in hashes {
             if self.last_hash == 0 {
                 self.last_hash = *hash;
@@ -46,22 +40,12 @@ impl SegmentationExpr for Count {
             self.count += 1;
         }
 
-        let res = if self.out.len() >= self.max_out_len {
-            Some(Arc::new(self.out.finish()) as ArrayRef)
-        } else {
-            None
-        };
-
-        Ok(res)
+        Ok(Arc::new(self.out.finish()) as ArrayRef)
     }
 
-    fn finalize(&mut self) -> Result<Option<ArrayRef>> {
+    fn finalize(&mut self) -> Result<ArrayRef> {
         self.out.append_value(self.count);
-        if self.out.len() > 0 {
-            Ok(Some(Arc::new(self.out.finish()) as ArrayRef))
-        } else {
-            Ok(None)
-        }
+        Ok(Arc::new(self.out.finish()) as ArrayRef)
     }
 }
 
@@ -79,8 +63,8 @@ mod tests {
     use arrow::record_batch::RecordBatch;
     use datafusion::physical_expr::hash_utils::create_hashes;
 
-    use crate::physical_plan::segmentation::count::Count;
-    use crate::physical_plan::segmentation::SegmentationExpr;
+    use crate::physical_plan::expressions::segmentation::count::Count;
+    use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
     #[test]
     fn it_works() {
@@ -92,9 +76,10 @@ mod tests {
         let mut hash_buf = vec![];
         hash_buf.resize(col.len(), 0);
         create_hashes(&vec![col], &mut random_state, &mut hash_buf).unwrap();
-        let mut count = Count::new(3);
+        let mut count = Count::new();
         let res = count.evaluate(&batch, &hash_buf).unwrap();
-        assert_eq!(res, None);
+        let right = Arc::new(Int64Array::from(vec![3, 3])) as ArrayRef;
+        assert_eq!(&*res, &*right);
 
         let col: ArrayRef = Arc::new(Int64Array::from(vec![3, 3, 3, 4]));
         hash_buf.clear();
@@ -103,11 +88,10 @@ mod tests {
         let batch = RecordBatch::try_new(Arc::new(schema), vec![col.clone()]).unwrap();
         let res = count.evaluate(&batch, &hash_buf).unwrap();
 
-        assert_eq!(
-            res,
-            Some(Arc::new(Int64Array::from(vec![3, 3, 6])) as ArrayRef)
-        );
+        let right = Arc::new(Int64Array::from(vec![6])) as ArrayRef;
+        assert_eq!(&*res, &*right);
         let res = count.finalize().unwrap();
-        assert_eq!(res, Some(Arc::new(Int64Array::from(vec![1])) as ArrayRef));
+        let right = Arc::new(Int64Array::from(vec![1])) as ArrayRef;
+        assert_eq!(&*res, &*right);
     }
 }
