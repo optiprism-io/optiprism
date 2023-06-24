@@ -157,7 +157,7 @@ impl ExecutionPlan for FunnelExec {
         partition: usize,
         context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
-        Ok(Box::pin(FunnelExecStream {
+        Ok(Box::pin(FunnelStream {
             predicate: self.predicate.clone(),
             input: self.input.execute(partition, context.clone())?,
             schema: self.schema.clone(),
@@ -181,7 +181,7 @@ impl ExecutionPlan for FunnelExec {
     }
 }
 
-struct FunnelExecStream {
+struct FunnelStream {
     predicate: FunnelExpr,
     schema: SchemaRef,
     input: SendableRecordBatchStream,
@@ -206,7 +206,7 @@ pub fn abs_id(offset: usize, batches: &[RecordBatch]) -> (usize, usize) {
 }
 
 #[async_trait]
-impl Stream for FunnelExecStream {
+impl Stream for FunnelStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -392,7 +392,7 @@ impl Stream for FunnelExecStream {
     }
 }
 
-impl RecordBatchStream for FunnelExecStream {
+impl RecordBatchStream for FunnelStream {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }

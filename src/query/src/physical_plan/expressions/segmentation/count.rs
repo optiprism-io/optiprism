@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
@@ -9,43 +10,55 @@ use arrow::record_batch::RecordBatch;
 use crate::error::Result;
 use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
-pub struct Count {
+#[derive(Debug)]
+struct CountInner {
     last_hash: u64,
     out: Int64Builder,
     count: i64,
 }
+#[derive(Debug)]
+pub struct Count {
+    inner: Arc<Mutex<CountInner>>,
+}
 
 impl Count {
     pub fn new() -> Self {
-        Self {
+        let inner = CountInner {
             last_hash: 0,
             out: Int64Builder::with_capacity(10_000),
             count: 0,
+        };
+        Self {
+            inner: Arc::new(Mutex::new(inner)),
         }
     }
 }
 
 impl SegmentationExpr for Count {
-    fn evaluate(&mut self, _record_batch: &RecordBatch, hashes: &[u64]) -> Result<ArrayRef> {
+    fn evaluate(&self, _record_batch: &RecordBatch, hashes: &[u64]) -> Result<ArrayRef> {
+        let mut inner = self.inner.lock().unwrap();
         for hash in hashes {
-            if self.last_hash == 0 {
-                self.last_hash = *hash;
+            if inner.last_hash == 0 {
+                inner.last_hash = *hash;
             }
-            if *hash != self.last_hash {
-                self.last_hash = *hash;
-                self.out.append_value(self.count);
-                self.count = 0;
+            if *hash != inner.last_hash {
+                inner.last_hash = *hash;
+                let res = inner.count;
+                inner.out.append_value(res);
+                inner.count = 0;
             }
 
-            self.count += 1;
+            inner.count += 1;
         }
 
-        Ok(Arc::new(self.out.finish()) as ArrayRef)
+        Ok(Arc::new(inner.out.finish()) as ArrayRef)
     }
 
-    fn finalize(&mut self) -> Result<ArrayRef> {
-        self.out.append_value(self.count);
-        Ok(Arc::new(self.out.finish()) as ArrayRef)
+    fn finalize(&self) -> Result<ArrayRef> {
+        let mut inner = self.inner.lock().unwrap();
+        let res = inner.count;
+        inner.out.append_value(res);
+        Ok(Arc::new(inner.out.finish()) as ArrayRef)
     }
 }
 

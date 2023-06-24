@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use arrow::array::Array;
 use arrow::array::ArrayBuilder;
@@ -34,12 +35,19 @@ use crate::error::Result;
 use crate::physical_plan::expressions::segmentation::AggregateFunction;
 use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
-pub struct Aggregate<T, OT, OB>
+#[derive(Debug)]
+struct AggregateInner<OT, OB>
 where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 {
     last_hash: u64,
     out: OB,
     agg: AggregateFunction<OT>,
+}
+#[derive(Debug)]
+pub struct Aggregate<T, OT, OB>
+where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+{
+    inner: Arc<Mutex<AggregateInner<OT, OB>>>,
     predicate: Column,
     arr: PhantomData<OB>,
     typ: PhantomData<T>,
@@ -51,10 +59,14 @@ where
     T: Copy,
 {
     pub fn try_new(predicate: Column, agg: AggregateFunction<OT>, out: OB) -> Result<Self> {
-        Ok(Self {
+        let inner = AggregateInner {
             last_hash: 0,
             out,
             agg,
+        };
+
+        Ok(Self {
+            inner: Arc::new(Mutex::new(inner)),
             predicate,
             arr: PhantomData,
             typ: Default::default(),
@@ -65,7 +77,8 @@ where
 macro_rules! gen_agg_int {
     ($ty:ty,$array_ty:ident,$acc_ty:ty,$acc_builder:ty) => {
         impl SegmentationExpr for Aggregate<$ty, $acc_ty, $acc_builder> {
-            fn evaluate(&mut self, record_batch: &RecordBatch, hashes: &[u64]) -> Result<ArrayRef> {
+            fn evaluate(&self, record_batch: &RecordBatch, hashes: &[u64]) -> Result<ArrayRef> {
+                let mut inner = self.inner.lock().unwrap();
                 let arr = self
                     .predicate
                     .evaluate(record_batch)?
@@ -75,24 +88,27 @@ macro_rules! gen_agg_int {
                     .unwrap()
                     .clone();
                 for (idx, hash) in hashes.iter().enumerate() {
-                    if self.last_hash == 0 {
-                        self.last_hash = *hash;
+                    if inner.last_hash == 0 {
+                        inner.last_hash = *hash;
                     }
-                    if *hash != self.last_hash {
-                        self.last_hash = *hash;
-                        self.out.append_value(self.agg.result());
-                        self.agg.reset();
+                    if *hash != inner.last_hash {
+                        inner.last_hash = *hash;
+                        let res = inner.agg.result();
+                        inner.out.append_value(res);
+                        inner.agg.reset();
                     }
 
-                    self.agg.accumulate(arr.value(idx).into());
+                    inner.agg.accumulate(arr.value(idx).into());
                 }
 
-                Ok(Arc::new(self.out.finish()) as ArrayRef)
+                Ok(Arc::new(inner.out.finish()) as ArrayRef)
             }
 
-            fn finalize(&mut self) -> Result<ArrayRef> {
-                self.out.append_value(self.agg.result() as $acc_ty);
-                Ok(Arc::new(self.out.finish()) as ArrayRef)
+            fn finalize(&self) -> Result<ArrayRef> {
+                let mut inner = self.inner.lock().unwrap();
+                let res = inner.agg.result() as $acc_ty;
+                inner.out.append_value(res);
+                Ok(Arc::new(inner.out.finish()) as ArrayRef)
             }
         }
     };
@@ -179,6 +195,43 @@ mod tests {
         let res = agg.finalize().unwrap();
         let right = Arc::new(Int64Array::from(vec![1])) as ArrayRef;
         assert_eq!(&*res, &*right);
+    }
+
+    #[test]
+    fn test_sum2() {
+        let schema = Schema::new(vec![
+            Field::new("col1", DataType::Int64, false),
+            Field::new("col2", DataType::Int16, false),
+        ]);
+        let col1: ArrayRef = Arc::new(Int64Array::from(vec![1, 1, 1]));
+        let col2: ArrayRef = Arc::new(Int16Array::from(vec![1, 2, 3]));
+        let batch =
+            RecordBatch::try_new(Arc::new(schema.clone()), vec![col1.clone(), col2.clone()])
+                .unwrap();
+
+        let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
+        let mut hash_buf = vec![];
+        hash_buf.resize(col1.len(), 0);
+        create_hashes(&vec![col1], &mut random_state, &mut hash_buf).unwrap();
+        let mut agg = Aggregate::<i16, i64, _>::try_new(
+            Column::new_with_schema("col2", &schema).unwrap(),
+            AggregateFunction::new_sum(),
+            Int64Builder::with_capacity(10_000),
+        )
+        .unwrap();
+        let res = agg.evaluate(&batch, &hash_buf).unwrap();
+        println!("{:?}", res);
+        let col1: ArrayRef = Arc::new(Int64Array::from(vec![1, 1]));
+        let col2: ArrayRef = Arc::new(Int16Array::from(vec![4, 5]));
+        hash_buf.clear();
+        hash_buf.resize(col1.len(), 0);
+        create_hashes(&vec![col1.clone()], &mut random_state, &mut hash_buf).unwrap();
+        let batch =
+            RecordBatch::try_new(Arc::new(schema), vec![col1.clone(), col2.clone()]).unwrap();
+        let res = agg.evaluate(&batch, &hash_buf).unwrap();
+        println!("{:?}", res);
+        let res = agg.finalize().unwrap();
+        println!("{:?}", res);
     }
     #[test]
     fn test_sum_float() {

@@ -20,6 +20,7 @@ use crate::Column;
 
 pub mod aggregate;
 mod aggregator;
+// pub mod comparison;
 pub mod count;
 pub mod time_range;
 
@@ -30,9 +31,9 @@ use num_traits::NumCast;
 use num_traits::PrimInt;
 use num_traits::Zero;
 
-pub trait SegmentationExpr {
-    fn evaluate(&mut self, record_batch: &RecordBatch, hashes: &[u64]) -> Result<ArrayRef>;
-    fn finalize(&mut self) -> Result<ArrayRef>;
+pub trait SegmentationExpr: Debug + Send + Sync {
+    fn evaluate(&self, record_batch: &RecordBatch, hashes: &[u64]) -> Result<ArrayRef>;
+    fn finalize(&self) -> Result<ArrayRef>;
 }
 
 #[derive(Debug, Clone)]
