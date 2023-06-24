@@ -160,18 +160,29 @@ impl Stream for SegmentationStream {
                         .collect::<Vec<ArrayRef>>();
                     create_hashes(&pk_arrs, &mut random_state, &mut hash_buf).unwrap();
 
-                    self.predicate
+                    let res = self
+                        .predicate
                         .evaluate(&batch, &hash_buf)
-                        .map_err(|e| e.into_datafusion_execution_error())?
+                        .map_err(|e| e.into_datafusion_execution_error())?;
+                    res
                 }
-                Poll::Ready(None) => self
-                    .predicate
-                    .finalize()
-                    .map_err(|e| e.into_datafusion_execution_error())?,
+                Poll::Ready(None) => {
+                    let res = self
+                        .predicate
+                        .finalize()
+                        .map_err(|e| e.into_datafusion_execution_error())?;
+
+                    Some(res)
+                }
                 other => return other,
             };
 
-            let res = res.as_any().downcast_ref::<BooleanArray>().unwrap();
+            // match res {
+            // None => {}
+            // Some(res) => {
+            // res.as_any().downcast_ref::<BooleanArray>().unwrap();
+            // }
+            // }
         }
     }
 }
@@ -242,7 +253,7 @@ mod tests {
 
         let segmentation = SegmentationExec::try_new(
             Arc::new(agg),
-            vec![Arc::new(Column::new_with_schema("user_id", &schema)?)],
+            vec![Arc::new(Column::new_with_schema("col1", &schema)?)],
             Arc::new(input),
             1,
         )?;

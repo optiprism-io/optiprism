@@ -77,7 +77,11 @@ where
 macro_rules! gen_agg_int {
     ($ty:ty,$array_ty:ident,$acc_ty:ty,$acc_builder:ty) => {
         impl SegmentationExpr for Aggregate<$ty, $acc_ty, $acc_builder> {
-            fn evaluate(&self, record_batch: &RecordBatch, hashes: &[u64]) -> Result<ArrayRef> {
+            fn evaluate(
+                &self,
+                record_batch: &RecordBatch,
+                hashes: &[u64],
+            ) -> Result<Option<ArrayRef>> {
                 let mut inner = self.inner.lock().unwrap();
                 let arr = self
                     .predicate
@@ -101,7 +105,11 @@ macro_rules! gen_agg_int {
                     inner.agg.accumulate(arr.value(idx).into());
                 }
 
-                Ok(Arc::new(inner.out.finish()) as ArrayRef)
+                if inner.out.len() > 0 {
+                    Ok(Some(Arc::new(inner.out.finish()) as ArrayRef))
+                } else {
+                    Ok(None)
+                }
             }
 
             fn finalize(&self) -> Result<ArrayRef> {
@@ -181,7 +189,7 @@ mod tests {
         .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Int64Array::from(vec![6, 6])) as ArrayRef;
-        assert_eq!(&*res, &*right);
+        assert_eq!(res, Some(right));
         let col1: ArrayRef = Arc::new(Int64Array::from(vec![3, 3, 3, 4]));
         let col2: ArrayRef = Arc::new(Int16Array::from(vec![4, 5, 6, 1]));
         hash_buf.clear();
@@ -191,48 +199,12 @@ mod tests {
             RecordBatch::try_new(Arc::new(schema), vec![col1.clone(), col2.clone()]).unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Int64Array::from(vec![21])) as ArrayRef;
-        assert_eq!(&*res, &*right);
+        assert_eq!(res, Some(right));
         let res = agg.finalize().unwrap();
         let right = Arc::new(Int64Array::from(vec![1])) as ArrayRef;
         assert_eq!(&*res, &*right);
     }
 
-    #[test]
-    fn test_sum2() {
-        let schema = Schema::new(vec![
-            Field::new("col1", DataType::Int64, false),
-            Field::new("col2", DataType::Int16, false),
-        ]);
-        let col1: ArrayRef = Arc::new(Int64Array::from(vec![1, 1, 1]));
-        let col2: ArrayRef = Arc::new(Int16Array::from(vec![1, 2, 3]));
-        let batch =
-            RecordBatch::try_new(Arc::new(schema.clone()), vec![col1.clone(), col2.clone()])
-                .unwrap();
-
-        let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
-        let mut hash_buf = vec![];
-        hash_buf.resize(col1.len(), 0);
-        create_hashes(&vec![col1], &mut random_state, &mut hash_buf).unwrap();
-        let mut agg = Aggregate::<i16, i64, _>::try_new(
-            Column::new_with_schema("col2", &schema).unwrap(),
-            AggregateFunction::new_sum(),
-            Int64Builder::with_capacity(10_000),
-        )
-        .unwrap();
-        let res = agg.evaluate(&batch, &hash_buf).unwrap();
-        println!("{:?}", res);
-        let col1: ArrayRef = Arc::new(Int64Array::from(vec![1, 1]));
-        let col2: ArrayRef = Arc::new(Int16Array::from(vec![4, 5]));
-        hash_buf.clear();
-        hash_buf.resize(col1.len(), 0);
-        create_hashes(&vec![col1.clone()], &mut random_state, &mut hash_buf).unwrap();
-        let batch =
-            RecordBatch::try_new(Arc::new(schema), vec![col1.clone(), col2.clone()]).unwrap();
-        let res = agg.evaluate(&batch, &hash_buf).unwrap();
-        println!("{:?}", res);
-        let res = agg.finalize().unwrap();
-        println!("{:?}", res);
-    }
     #[test]
     fn test_sum_float() {
         let schema = Schema::new(vec![
@@ -258,7 +230,7 @@ mod tests {
         .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Float64Array::from(vec![6., 6.])) as ArrayRef;
-        assert_eq!(&*res, &*right);
+        assert_eq!(res, Some(right));
 
         let col1: ArrayRef = Arc::new(Int64Array::from(vec![3, 3, 3, 4]));
         let col2: ArrayRef = Arc::new(Float32Array::from(vec![4., 5., 6., 1.]));
@@ -269,7 +241,7 @@ mod tests {
             RecordBatch::try_new(Arc::new(schema), vec![col1.clone(), col2.clone()]).unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Float64Array::from(vec![21.])) as ArrayRef;
-        assert_eq!(&*res, &*right);
+        assert_eq!(res, Some(right));
         let res = agg.finalize().unwrap();
         let right = Arc::new(Float64Array::from(vec![1.])) as ArrayRef;
         assert_eq!(&*res, &*right);

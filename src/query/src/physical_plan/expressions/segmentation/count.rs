@@ -35,7 +35,7 @@ impl Count {
 }
 
 impl SegmentationExpr for Count {
-    fn evaluate(&self, _record_batch: &RecordBatch, hashes: &[u64]) -> Result<ArrayRef> {
+    fn evaluate(&self, _record_batch: &RecordBatch, hashes: &[u64]) -> Result<Option<ArrayRef>> {
         let mut inner = self.inner.lock().unwrap();
         for hash in hashes {
             if inner.last_hash == 0 {
@@ -51,7 +51,11 @@ impl SegmentationExpr for Count {
             inner.count += 1;
         }
 
-        Ok(Arc::new(inner.out.finish()) as ArrayRef)
+        if inner.out.len() > 0 {
+            Ok(Some(Arc::new(inner.out.finish()) as ArrayRef))
+        } else {
+            Ok(None)
+        }
     }
 
     fn finalize(&self) -> Result<ArrayRef> {
@@ -92,7 +96,7 @@ mod tests {
         let mut count = Count::new();
         let res = count.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Int64Array::from(vec![3, 3])) as ArrayRef;
-        assert_eq!(&*res, &*right);
+        assert_eq!(res, Some(right));
 
         let col: ArrayRef = Arc::new(Int64Array::from(vec![3, 3, 3, 4]));
         hash_buf.clear();
@@ -102,7 +106,7 @@ mod tests {
         let res = count.evaluate(&batch, &hash_buf).unwrap();
 
         let right = Arc::new(Int64Array::from(vec![6])) as ArrayRef;
-        assert_eq!(&*res, &*right);
+        assert_eq!(res, Some(right));
         let res = count.finalize().unwrap();
         let right = Arc::new(Int64Array::from(vec![1])) as ArrayRef;
         assert_eq!(&*res, &*right);
