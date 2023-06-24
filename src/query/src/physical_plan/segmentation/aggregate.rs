@@ -31,8 +31,8 @@ use num_traits::Num;
 use num_traits::NumCast;
 
 use crate::error::Result;
-use crate::physical_plan::segmentation2::AggregateFunction;
-use crate::physical_plan::segmentation2::SegmentationExpr;
+use crate::physical_plan::segmentation::AggregateFunction;
+use crate::physical_plan::segmentation::SegmentationExpr;
 
 struct Aggregate<T, OT, OB>
 where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
@@ -158,10 +158,10 @@ mod tests {
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::hash_utils::create_hashes;
 
-    use crate::physical_plan::segmentation2::aggregate::Aggregate;
-    use crate::physical_plan::segmentation2::count::Count;
-    use crate::physical_plan::segmentation2::AggregateFunction;
-    use crate::physical_plan::segmentation2::SegmentationExpr;
+    use crate::physical_plan::segmentation::aggregate::Aggregate;
+    use crate::physical_plan::segmentation::count::Count;
+    use crate::physical_plan::segmentation::AggregateFunction;
+    use crate::physical_plan::segmentation::SegmentationExpr;
 
     #[test]
     fn test_sum() {
