@@ -145,10 +145,14 @@ impl Stream for SegmentationStream {
 
         let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
         let mut hash_buf = vec![];
+        let mut batch_buf: VecDeque<RecordBatch> = Default::default();
+        let mut span_buf: VecDeque<Vec<usize>> = Default::default();
 
+        let mut i = 0;
         loop {
             let res = match self.input.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
+                    println!("?");
                     hash_buf.resize(batch.num_rows(), 0);
                     let pk_arrs = self
                         .partition_key
@@ -159,30 +163,54 @@ impl Stream for SegmentationStream {
                         .map(|v| v.clone().into_array(batch.num_rows()).clone())
                         .collect::<Vec<ArrayRef>>();
                     create_hashes(&pk_arrs, &mut random_state, &mut hash_buf).unwrap();
-
                     let res = self
                         .predicate
                         .evaluate(&batch, &hash_buf)
                         .map_err(|e| e.into_datafusion_execution_error())?;
+                    batch_buf.push_back(batch);
+
+                    let mut last_hash = 0;
+                    let mut sb = vec![];
+                    for (idx, p) in hash_buf.iter().enumerate() {
+                        if last_hash != *p {
+                            last_hash = *p;
+                            sb.push(idx);
+                        }
+                    }
+                    span_buf.push_back(sb);
+                    println!("res {:?}", res);
+                    if res.is_some() {
+                        println!("span buf {:?}", span_buf);
+                        println!("batch buf{:?}", batch_buf);
+                    }
+
                     res
                 }
                 Poll::Ready(None) => {
+                    println!("??");
                     let res = self
                         .predicate
                         .finalize()
                         .map_err(|e| e.into_datafusion_execution_error())?;
+                    println!("res {:?}", res);
+                    println!("span buf {:?}", span_buf);
+                    println!("batch buf{:?}", batch_buf);
 
                     Some(res)
                 }
                 other => return other,
             };
 
-            // match res {
-            // None => {}
-            // Some(res) => {
-            // res.as_any().downcast_ref::<BooleanArray>().unwrap();
-            // }
-            // }
+            match res {
+                None => {}
+                Some(res) => {
+                    res.as_any().downcast_ref::<BooleanArray>().unwrap();
+                }
+            }
+            i += 1;
+            if i > 2 {
+                return Poll::Ready(None);
+            }
         }
     }
 }
@@ -211,12 +239,15 @@ mod tests {
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
+    use datafusion_common::ScalarValue;
     use segmentation::SegmentationExpr;
 
     use crate::physical_plan::expressions::segmentation;
     use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
+    use crate::physical_plan::expressions::segmentation::comparison;
     use crate::physical_plan::expressions::segmentation::AggregateFunction;
     use crate::physical_plan::segmentation::SegmentationExec;
+
     #[tokio::test]
     async fn it_works() -> anyhow::Result<()> {
         let schema = Arc::new(Schema::new(vec![
@@ -251,6 +282,7 @@ mod tests {
         )
         .unwrap();
 
+        let agg = comparison::Eq::new(Arc::new(agg), ScalarValue::Int64(Some(1)));
         let segmentation = SegmentationExec::try_new(
             Arc::new(agg),
             vec![Arc::new(Column::new_with_schema("col1", &schema)?)],
