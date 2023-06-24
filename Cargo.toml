@@ -7,7 +7,7 @@
 members = [
     "src/common",
     "src/contract-test-server",
-    "src/demo",
+#    "src/demo",
     "src/events-gen",
     "src/metadata",
     "src/platform",

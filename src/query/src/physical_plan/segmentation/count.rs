@@ -6,6 +6,7 @@ use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::Int64Array;
+use arrow::array::Int64Builder;
 use arrow::array::TimestampMillisecondArray;
 use arrow::record_batch::RecordBatch;
 use arrow2::array::Int128Array;
@@ -33,37 +34,32 @@ use crate::span;
 
 span!(Batch);
 #[derive(Debug)]
-pub struct CountPredicate<Op> {
+pub struct CountPredicate {
     ts_col: PhysicalExprRef,
     predicate: PhysicalExprRef,
-    op: PhantomData<Op>,
-    right: i64,
     time_range: TimeRange,
     time_window: i64,
     cur_span: usize,
+    out_buffer: Int64Builder,
 }
 
-impl<Op> CountPredicate<Op>
-where Op: BooleanOp<i64>
-{
+impl CountPredicate {
     pub fn try_new(
         ts_col: Column,
         predicate: PhysicalExprRef,
-        right: i64,
         time_range: TimeRange,
         time_window: Option<Duration>,
     ) -> Result<Self> {
         let res = Self {
             ts_col: Arc::new(ts_col) as PhysicalExprRef,
             predicate,
-            op: Default::default(),
             time_range,
-            right,
             cur_span: 0,
             time_window: time_window
                 .map(|v| v.num_milliseconds())
                 .or(Some(Duration::days(365 * 10).num_milliseconds()))
                 .unwrap(),
+            out_buffer: Int64Builder::with_capacity(10000),
         };
 
         Ok(res)
@@ -84,9 +80,7 @@ impl<'a> Batch<'a> {
     }
 }
 
-impl<Op> CountPredicate<Op>
-where Op: BooleanOp<i64>
-{
+impl CountPredicate {
     // calculate expressions
     fn evaluate_batch<'a>(&mut self, batch: &'a RecordBatch) -> Result<Batch<'a>> {
         // timestamp column
@@ -141,9 +135,7 @@ where Op: BooleanOp<i64>
     }
 }
 
-impl<Op> SegmentationExpr for CountPredicate<Op>
-where Op: BooleanOp<i64>
-{
+impl SegmentationExpr for CountPredicate {
     fn evaluate(
         &mut self,
         record_batches: &[RecordBatch],
@@ -167,15 +159,13 @@ where Op: BooleanOp<i64>
             spans
         };
 
-        let mut results = vec![];
         let mut time_range = self.time_range.clone();
-        let mut count = 0;
-        let mut right = self.right;
+        let mut count: i64 = 0;
         let time_window = self.time_window;
         'main: while let Some(mut span) = self.next_span(&batches, &spans) {
             let cur_time = span.ts_value();
             let mut max_time = cur_time + time_window;
-            let res = loop {
+            loop {
                 count = 0;
                 loop {
                     if span.ts_value() >= max_time {
@@ -203,28 +193,14 @@ where Op: BooleanOp<i64>
                     }
                 }
 
-                let res = match Op::op() {
-                    Operator::Lt => count < right,
-                    Operator::LtEq => count <= right,
-                    Operator::NotEq => count != right,
-                    Operator::Eq => count == right,
-                    Operator::Gt => count > right,
-                    Operator::GtEq => count >= right,
-                    _ => unreachable!(),
-                };
-
-                if !res {
-                    break false;
-                }
-
                 if !span.is_next_row() {
-                    break true;
+                    break;
                 }
 
                 max_time += time_window
-            };
+            }
 
-            results.push(res == true);
+            self.out_buffer.append_value(count)?;
         }
 
         Ok(results)
@@ -250,12 +226,7 @@ mod tests {
     use store::arrow_conversion::arrow2_to_arrow1;
     use store::test_util::parse_markdown_table;
 
-    use crate::physical_plan::segmentation::boolean_op::BooleanEq;
-    use crate::physical_plan::segmentation::boolean_op::BooleanGt;
-    use crate::physical_plan::segmentation::boolean_op::BooleanLt;
     use crate::physical_plan::segmentation::boolean_op::Operator;
-    // use crate::physical_plan::segmentation::boolean_op::Operator;
-    use crate::physical_plan::segmentation::count_predicate::CountPredicate;
     use crate::physical_plan::segmentation::time_range;
     use crate::physical_plan::segmentation::time_range::from_milli;
     use crate::physical_plan::segmentation::time_range::TimeRange;
@@ -290,7 +261,7 @@ mod tests {
         true
     }
     #[test]
-    fn test_sum() {
+    fn test_count() {
         let data = r#"
 | user_id | ts  | event |
 |---------|-----|-------|
