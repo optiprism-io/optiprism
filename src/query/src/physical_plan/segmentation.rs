@@ -142,6 +142,7 @@ impl Stream for SegmentationStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.is_ended {
+            println!("nothing to poll");
             return Poll::Ready(None);
         }
 
@@ -150,12 +151,15 @@ impl Stream for SegmentationStream {
         let mut batch_buf: VecDeque<RecordBatch> = VecDeque::with_capacity(2);
         // let mut span_buf: VecDeque<Vec<usize>> = Default::default();
 
-        let mut i = 0;
         let mut last_hash = 0;
+        let mut is_ended = false;
         // let mut offset = 0;
         loop {
-            let res = match self.input.poll_next_unpin(cx) {
+            let mut spans = vec![];
+
+            let (res, batch) = match self.input.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
+                    println!("get batch: {:?}", batch);
                     let num_rows = batch.num_rows();
                     hash_buf.resize(num_rows, 0);
                     let pk_arrs = self
@@ -172,7 +176,7 @@ impl Stream for SegmentationStream {
                         .evaluate(&batch, &hash_buf)
                         .map_err(|e| e.into_datafusion_execution_error())?;
 
-                    let mut spans = vec![];
+                    println!("after evaluation: {:?}", res);
                     for (idx, p) in hash_buf.iter().enumerate() {
                         if last_hash == 0 {
                             last_hash = *p;
@@ -182,53 +186,68 @@ impl Stream for SegmentationStream {
                             last_hash = *p;
                         }
                     }
-                    // println!("res {:?}", res);
+                    println!("spans {:?}", spans);
                     batch_buf.push_back(batch.clone());
+                    println!("push back batch: {:?}", batch_buf);
 
-                    match &res {
-                        None => {}
-
-                        Some(arr) => {
-                            println!("{:?}", arr);
-                            let prev_batch = batch_buf.pop_front().unwrap();
-                            let to_take = Int64Array::from(vec![prev_batch.num_rows() as i64 - 1]);
-                            let res1 = take(prev_batch.columns()[0].as_ref(), &to_take, None)?;
-                            // let to_take = Int64Array::from(spans[0..spans.len() - 1].to_vec());
-                            // println!("{:?}", spans);
-                            let to_take = Int64Array::from(spans[0..spans.len() - 1].to_vec());
-                            let res2 = take(batch.columns()[0].as_ref(), &to_take, None)?;
-                            println!("r1 {:?}", res1);
-                            println!("r2 {:?}", res2);
-                            // println!("spans {:?}", spans);
-                            // println!("prev batch {:?}", prev_batch);
-                            // println!("batch {:?}", batch);
-                        }
-                    }
-
-                    res
+                    (res, batch)
                 }
                 Poll::Ready(None) => {
+                    println!("no more batches");
                     let res = self
                         .predicate
                         .finalize()
                         .map_err(|e| e.into_datafusion_execution_error())?;
 
-                    Some(res)
+                    println!("after finalization: {:?}", res);
+
+                    println!("back to pick {:?}", batch_buf.pop_back().unwrap());
+                    is_ended = true;
+                    (Some(res), batch_buf.pop_back().unwrap())
                 }
                 other => return other,
             };
 
+            println!("spans orig: {:?}", spans);
+
             match res {
                 None => {}
-                Some(res) => {
-                    res.as_any().downcast_ref::<BooleanArray>().unwrap();
+
+                Some(arr) => {
+                    let arrb = arr.as_any().downcast_ref::<BooleanArray>().unwrap();
+                    println!("{:?}", arr);
+                    let prev_batch = batch_buf.pop_front().unwrap();
+                    if arrb.value(0) {
+                        let to_take = Int64Array::from(vec![prev_batch.num_rows() as i64 - 1]);
+                        let res1 = take(prev_batch.columns()[0].as_ref(), &to_take, None)?;
+                        println!("r1 {:?}", res1);
+                    }
+
+                    if spans.len() > 0 {
+                        let spans = spans[..spans.len() - 1]
+                            .iter()
+                            .zip(arrb.iter())
+                            .filter_map(|(offset, keep)| match keep {
+                                Some(true) => Some(*offset),
+                                _ => None,
+                            })
+                            .collect::<Vec<_>>();
+                        println!("spans {:?}", spans);
+                        let to_take = Int64Array::from(spans);
+                        let res2 = take(batch.columns()[0].as_ref(), &to_take, None)?;
+                        println!("r2 {:?}", res2);
+                    }
+                    // println!("prev batch {:?}", prev_batch);
+                    // println!("batch {:?}", batch);
                 }
             }
-            i += 1;
-            if i > 10 {
-                return Poll::Ready(None);
+
+            if is_ended {
+                break;
             }
         }
+
+        return Poll::Ready(None);
     }
 }
 impl RecordBatchStream for SegmentationStream {
@@ -260,8 +279,8 @@ mod tests {
     use segmentation::SegmentationExpr;
 
     use crate::physical_plan::expressions::segmentation;
-    use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
     use crate::physical_plan::expressions::segmentation::comparison;
+    use crate::physical_plan::expressions::segmentation::count::Count;
     use crate::physical_plan::expressions::segmentation::AggregateFunction;
     use crate::physical_plan::segmentation::SegmentationExec;
 
@@ -307,12 +326,7 @@ mod tests {
 
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
-        let mut agg = Aggregate::<i16, i64, _>::try_new(
-            Column::new_with_schema("col2", &schema).unwrap(),
-            AggregateFunction::new_sum(),
-            Int64Builder::with_capacity(10_000),
-        )
-        .unwrap();
+        let mut agg = Count::new();
 
         let agg = comparison::Eq::new(Arc::new(agg), ScalarValue::Int64(Some(1)));
         let segmentation = SegmentationExec::try_new(

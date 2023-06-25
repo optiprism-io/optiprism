@@ -190,6 +190,7 @@ impl SegmentationExpr for Eq {
     fn finalize(&self) -> crate::Result<ArrayRef> {
         let mut inner = self.inner.lock().unwrap();
         let arr = inner.left.finalize()?;
+        println!("hmhm {:?}", arr);
         let right = inner.right.to_array_of_size(arr.len());
 
         match arr.data_type() {
