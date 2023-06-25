@@ -14,6 +14,7 @@ mod pivot;
 pub mod planner;
 // mod segmentation;
 mod segmentation;
+mod segmentation2;
 mod unpivot;
 // pub mod merge;
 // pub mod planner;

@@ -59,7 +59,6 @@ impl SegmentationExpr for Count {
     }
 
     fn finalize(&self) -> Result<ArrayRef> {
-        println!("!!");
         let mut inner = self.inner.lock().unwrap();
         let res = inner.count;
         inner.out.append_value(res);

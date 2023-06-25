@@ -149,69 +149,98 @@ impl Stream for SegmentationStream {
 
         let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
         let mut hash_buf = vec![];
-        let mut batch_buf: VecDeque<RecordBatch> = VecDeque::with_capacity(2);
+        let mut batch_buf: VecDeque<RecordBatch> = VecDeque::with_capacity(100);
+        let mut spans_buf: VecDeque<Vec<i64>> = VecDeque::with_capacity(100);
+        let mut res_buf: VecDeque<Option<BooleanArray>> = VecDeque::with_capacity(100);
         let mut out_buf: VecDeque<RecordBatch> = VecDeque::with_capacity(100);
         // let mut span_buf: VecDeque<Vec<usize>> = Default::default();
 
         let mut last_hash = 0;
         // let mut offset = 0;
         loop {
-            let mut spans = vec![];
 
-            let (res, batch) = match self.input.poll_next_unpin(cx) {
-                Poll::Ready(Some(Ok(batch))) => {
-                    // println!("get batch: {:?}", batch);
-                    let num_rows = batch.num_rows();
-                    hash_buf.resize(num_rows, 0);
-                    let pk_arrs = self
-                        .partition_key
-                        .iter()
-                        .map(|v| v.evaluate(&batch))
-                        .collect::<std::result::Result<Vec<ColumnarValue>, _>>()?
-                        .iter()
-                        .map(|v| v.clone().into_array(batch.num_rows()).clone())
-                        .collect::<Vec<ArrayRef>>();
-                    create_hashes(&pk_arrs, &mut random_state, &mut hash_buf).unwrap();
-                    let res = self
-                        .predicate
-                        .evaluate(&batch, &hash_buf)
-                        .map_err(|e| e.into_datafusion_execution_error())?;
+                let mut spans = vec![];
+                let res = match self.input.poll_next_unpin(cx) {
+                    Poll::Ready(Some(Ok(batch))) => {
+                        batch_buf.push_back(batch.clone());
+                        if batch_buf.len()>2 {
+                            batch_buf.pop_front();
+                        }
+                        // println!("get batch: {:?}", batch);
+                        let num_rows = batch.num_rows();
+                        hash_buf.resize(num_rows, 0);
+                        let pk_arrs = self
+                            .partition_key
+                            .iter()
+                            .map(|v| v.evaluate(&batch))
+                            .collect::<std::result::Result<Vec<ColumnarValue>, _>>()?
+                            .iter()
+                            .map(|v| v.clone().into_array(batch.num_rows()).clone())
+                            .collect::<Vec<ArrayRef>>();
+                        create_hashes(&pk_arrs, &mut random_state, &mut hash_buf).unwrap();
+                        let res = self
+                            .predicate
+                            .evaluate(&batch, &hash_buf)
+                            .map_err(|e| e.into_datafusion_execution_error())?;
+                        let res = res.map(|v| v.as_any().downcast_ref::<BooleanArray>().unwrap().clone());
+                        res_buf.push_back(res.clone());
+                        if res_buf.len()>2 {
+                            res_buf.pop_front();
+                        }
+                        for (idx, p) in hash_buf.iter().enumerate() {
+                            if last_hash == 0 {
+                                last_hash = *p;
+                            }
+                            if last_hash != *p {
+                                spans.push(idx as i64);
+                                last_hash = *p;
+                            }
+                        }
 
-                    // println!("after evaluation: {:?}", res);
-                    for (idx, p) in hash_buf.iter().enumerate() {
-                        if last_hash == 0 {
-                            last_hash = *p;
+                        spans_buf.push_back(spans);
+                        if spans_buf.len()>2 {
+                            spans_buf.pop_front();
                         }
-                        if last_hash != *p {
-                            spans.push(idx as i64);
-                            last_hash = *p;
-                        }
+                        res
                     }
-                    // println!("spans {:?}", spans);
-                    batch_buf.push_back(batch.clone());
-                    // println!("push back batch: {:?}", batch_buf);
+                    Poll::Ready(None) => {
+                        // println!("no more batches");
+                        let res = self
+                            .predicate
+                            .finalize()
+                            .map_err(|e| e.into_datafusion_execution_error())?;
+                        let res = res.as_any().downcast_ref::<BooleanArray>().unwrap().clone();
+                        res_buf.push_back(Some(res.clone()));
+                        if res_buf.len()>2 {
+                            res_buf.pop_front();
+                        }
+                        self.is_ended = true;
+                        Some(res)
+                    }
+                    other => return other,
+                };
 
-                    (res, batch)
+                if res.is_some() {
+                    println!("batch buf: {:?}", batch_buf.iter().map(|v|v.columns()[0].clone()).collect::<Vec<_>>());
+                    println!("span buf: {:?}", spans_buf);
+                    println!("res buf: {:?}", res_buf);
+                    let res = res_buf.pop_back().unwrap();
+                    let spans = spans_buf.pop_back().unwrap();
+                    let filtered_spans = spans.into_iter().zip(res.unwrap().iter()).filter_map(|(v,b)|{
+                        match b.unwrap() {
+                            true => Some(v),
+                            false => None
+                        }
+                    }).collect::<Vec<_>>();
+                    println!("filtered spans: {:?}", filtered_spans);
                 }
-                Poll::Ready(None) => {
-                    // println!("no more batches");
-                    let res = self
-                        .predicate
-                        .finalize()
-                        .map_err(|e| e.into_datafusion_execution_error())?;
 
-                    // println!("after finalization: {:?}", res);
-
-                    // println!("back to pick {:?}", batch_buf.pop_back().unwrap());
-                    self.is_ended = true;
-                    (Some(res), batch_buf.pop_back().unwrap())
-                }
-                other => return other,
-            };
-
+            if self.is_ended {
+                break;
+            }
             // println!("spans orig: {:?}", spans);
 
-            match res {
+            /*match res {
                 None => {}
 
                 Some(arr) => {
@@ -262,7 +291,7 @@ impl Stream for SegmentationStream {
                     out_buf.iter().map(|v| v).collect::<Vec<_>>(),
                 )?;
                 return self.baseline_metrics.record_poll(Poll::Ready(Some(Ok(rb))));
-            }
+            }*/
         }
 
         return Poll::Ready(None);
@@ -300,47 +329,30 @@ mod tests {
     use crate::physical_plan::expressions::segmentation::comparison;
     use crate::physical_plan::expressions::segmentation::count::Count;
     use crate::physical_plan::expressions::segmentation::AggregateFunction;
-    use crate::physical_plan::segmentation::SegmentationExec;
+    use crate::physical_plan::segmentation2::SegmentationExec;
 
     #[tokio::test]
     async fn it_works() -> anyhow::Result<()> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("col1", DataType::Int64, false),
-            Field::new("col2", DataType::Int16, false),
-        ]));
-        let batches = {
-            let col1: ArrayRef = Arc::new(Int64Array::from(vec![1, 1, 1]));
-            let col2: ArrayRef = Arc::new(Int16Array::from(vec![1, 2, 3]));
-            let batch1 =
-                RecordBatch::try_new(schema.clone(), vec![col1.clone(), col2.clone()]).unwrap();
+        let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Int64, false)]));
+        let v = vec![
+            vec![1, 1, 1],
+            vec![1, 1, 1],
+            vec![1, 1, 1],
+            vec![1, 3, 4, 5, 5, 5, 6, 6, 7],
+            vec![8, 8, 9, 10],
+            vec![11, 11, 11, 11],
+            vec![11, 11, 11, 11],
+            vec![11, 11],
+            vec![11, 12, 13, 14],
+        ];
 
-            let col1: ArrayRef = Arc::new(Int64Array::from(vec![2, 3, 4, 5, 5, 5, 6, 6, 7]));
-            let col2: ArrayRef = Arc::new(Int16Array::from(vec![4, 1, 2, 1, 2, 3, 1, 2, 1]));
-            let batch2 =
-                RecordBatch::try_new(schema.clone(), vec![col1.clone(), col2.clone()]).unwrap();
-
-            let col1: ArrayRef = Arc::new(Int64Array::from(vec![8, 8, 9, 10]));
-            let col2: ArrayRef = Arc::new(Int16Array::from(vec![1, 2, 1, 1]));
-            let batch3 =
-                RecordBatch::try_new(schema.clone(), vec![col1.clone(), col2.clone()]).unwrap();
-
-            let col1: ArrayRef = Arc::new(Int64Array::from(vec![11, 11, 11, 11]));
-            let col2: ArrayRef = Arc::new(Int16Array::from(vec![1, 2, 1, 1]));
-            let batch4 =
-                RecordBatch::try_new(schema.clone(), vec![col1.clone(), col2.clone()]).unwrap();
-
-            let col1: ArrayRef = Arc::new(Int64Array::from(vec![11, 11]));
-            let col2: ArrayRef = Arc::new(Int16Array::from(vec![1, 2]));
-            let batch5 =
-                RecordBatch::try_new(schema.clone(), vec![col1.clone(), col2.clone()]).unwrap();
-
-            let col1: ArrayRef = Arc::new(Int64Array::from(vec![11, 12, 13, 14]));
-            let col2: ArrayRef = Arc::new(Int16Array::from(vec![1, 2, 1, 1]));
-            let batch6 =
-                RecordBatch::try_new(schema.clone(), vec![col1.clone(), col2.clone()]).unwrap();
-
-            vec![batch1, batch2, batch3, batch4, batch5, batch6]
-        };
+        let batches = v
+            .into_iter()
+            .map(|v| {
+                let col: ArrayRef = Arc::new(Int64Array::from(v));
+                RecordBatch::try_new(schema.clone(), vec![col.clone()]).unwrap()
+            })
+            .collect::<Vec<_>>();
 
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
@@ -349,7 +361,7 @@ mod tests {
         let agg = comparison::Eq::new(Arc::new(agg), ScalarValue::Int64(Some(1)));
         let segmentation = SegmentationExec::try_new(
             Arc::new(agg),
-            vec![Arc::new(Column::new_with_schema("col1", &schema)?)],
+            vec![Arc::new(Column::new_with_schema("col", &schema)?)],
             Arc::new(input),
             111,
         )?;
