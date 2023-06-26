@@ -315,8 +315,8 @@ mod tests {
     async fn it_works() -> anyhow::Result<()> {
         let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Int64, false)]));
         let v = vec![
-            vec![1], // spans [[]], batches [[1]]
-            vec![2], // spans [[],[0]], batches [[1],[2]]
+            vec![1],
+            vec![2],
             vec![1, 1, 1],
             vec![1, 1, 1],
             vec![1, 1, 1],
@@ -357,6 +357,11 @@ mod tests {
         let exp = Arc::new(exp) as ArrayRef;
         let res: ArrayRef = result[0].columns()[0].clone();
         assert_eq!(&*res, &*exp);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn all_variants() -> anyhow::Result<()> {
         Ok(())
     }
 }
