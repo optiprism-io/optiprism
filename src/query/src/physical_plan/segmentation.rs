@@ -1,6 +1,8 @@
 use std::any::Any;
 use std::collections::VecDeque;
 use std::fmt;
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::pin::Pin;
@@ -39,13 +41,18 @@ use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
-#[derive(Debug)]
 pub struct SegmentationExec {
     predicate: Arc<dyn SegmentationExpr>,
     input: Arc<dyn ExecutionPlan>,
     metrics: ExecutionPlanMetricsSet,
     partition_key: Vec<Arc<dyn PhysicalExpr>>,
     out_batch_size: usize,
+}
+
+impl Debug for SegmentationExec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SegmentationExec")
+    }
 }
 
 impl SegmentationExec {
