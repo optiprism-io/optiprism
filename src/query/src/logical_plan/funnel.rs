@@ -22,25 +22,25 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::error::QueryError;
 use crate::Result;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub enum StepOrder {
     Sequential,
     Any(Vec<usize>), // any of the steps
 }
 
-#[derive(Clone, Debug)]
+#[derive(Hash, Clone, Debug, Eq, PartialEq)]
 pub struct ExcludeSteps {
     from: usize,
     to: usize,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Hash, Clone, Debug, Eq, PartialEq)]
 pub struct ExcludeExpr {
     expr: Expr,
     steps: Option<Vec<ExcludeSteps>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum Count {
     Unique,
     NonUnique,
@@ -48,14 +48,14 @@ pub enum Count {
 }
 
 // Additional filter to complete
-#[derive(Debug, Clone)]
+#[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub enum Filter {
     DropOffOnAnyStep,                  // funnel should fail on any step
     DropOffOnStep(usize),              // funnel should fail on certain step
     TimeToConvert(Duration, Duration), // conversion should be within certain window
 }
 
-#[derive(Clone, Debug)]
+#[derive(Hash, Clone, Debug, Eq, PartialEq)]
 pub enum Touch {
     First,
     Last,
@@ -96,7 +96,7 @@ impl FunnelNode {
                 DataType::UInt32,
                 true,
             ));
-            for step_id in 0..predicate.steps_count() {
+            for step_id in 0..opts.steps.len() {
                 fields.push(DFField::new_unqualified(
                     format!("step_{step_id}_ts").as_str(),
                     DataType::Timestamp(TimeUnit::Millisecond, None),

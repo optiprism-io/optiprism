@@ -1,21 +1,24 @@
 use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::NamedQuery;
+use datafusion_common::ScalarValue;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::error::Result;
+use crate::json_value_to_scalar;
 use crate::queries::AggregateFunction;
 use crate::queries::PartitionedAggregateFunction;
 use crate::queries::QueryTime;
 use crate::queries::TimeIntervalUnit;
+use crate::scalar_to_json_value;
 use crate::EventFilter;
 use crate::EventGroupedFilters;
 use crate::EventRef;
 use crate::PlatformError;
 use crate::PropValueOperation;
 use crate::PropertyRef;
-
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum SegmentTime {
@@ -222,6 +225,35 @@ impl TryInto<common::query::event_segmentation::QueryAggregate> for QueryAggrega
             }
             QueryAggregate::Percentile99th => {
                 common::query::event_segmentation::QueryAggregate::Percentile99th
+            }
+        })
+    }
+}
+
+impl TryInto<QueryAggregate> for common::query::event_segmentation::QueryAggregate {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<QueryAggregate, Self::Error> {
+        Ok(match self {
+            common::query::event_segmentation::QueryAggregate::Min => QueryAggregate::Min,
+            common::query::event_segmentation::QueryAggregate::Max => QueryAggregate::Max,
+            common::query::event_segmentation::QueryAggregate::Sum => QueryAggregate::Sum,
+            common::query::event_segmentation::QueryAggregate::Avg => QueryAggregate::Avg,
+            common::query::event_segmentation::QueryAggregate::Median => QueryAggregate::Median,
+            common::query::event_segmentation::QueryAggregate::DistinctCount => {
+                QueryAggregate::DistinctCount
+            }
+            common::query::event_segmentation::QueryAggregate::Percentile25th => {
+                QueryAggregate::Percentile25th
+            }
+            common::query::event_segmentation::QueryAggregate::Percentile75th => {
+                QueryAggregate::Percentile75th
+            }
+            common::query::event_segmentation::QueryAggregate::Percentile90th => {
+                QueryAggregate::Percentile90th
+            }
+            common::query::event_segmentation::QueryAggregate::Percentile99th => {
+                QueryAggregate::Percentile99th
             }
         })
     }
@@ -563,6 +595,61 @@ pub enum DidEventAggregate {
     },
 }
 
+impl TryInto<common::query::event_segmentation::DidEventAggregate> for DidEventAggregate {
+    type Error = PlatformError;
+
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::DidEventAggregate, Self::Error>
+    {
+        Ok(match self {
+            DidEventAggregate::Count {
+                operation,
+                value,
+                time,
+            } => common::query::event_segmentation::DidEventAggregate::Count {
+                operation: operation.try_into()?,
+                value,
+                time: time.try_into()?,
+            },
+            DidEventAggregate::RelativeCount {
+                event,
+                operation,
+                filters,
+                time,
+            } => common::query::event_segmentation::DidEventAggregate::RelativeCount {
+                event: event.into(),
+                operation: operation.try_into()?,
+                filters: filters
+                    .map(|v| v.iter().map(|v| v.try_into()).collect::<Result<Vec<_>>>())
+                    .transpose()?,
+                time: time.try_into()?,
+            },
+            DidEventAggregate::AggregateProperty {
+                property,
+                aggregate,
+                operation,
+                value,
+                time,
+            } => common::query::event_segmentation::DidEventAggregate::AggregateProperty {
+                property: property.try_into()?,
+                aggregate: aggregate.try_into()?,
+                operation: operation.try_into()?,
+                value: value.map(|v| json_value_to_scalar(&v)).transpose()?,
+                time: time.try_into()?,
+            },
+            DidEventAggregate::HistoricalCount {
+                operation,
+                value,
+                time,
+            } => common::query::event_segmentation::DidEventAggregate::HistoricalCount {
+                operation: operation.try_into()?,
+                value,
+                time: time.try_into()?,
+            },
+        })
+    }
+}
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum SegmentCondition {
@@ -616,6 +703,313 @@ pub struct EventSegmentation {
     pub segments: Option<Vec<Segment>>,
 }
 
+impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCondition {
+    type Error = PlatformError;
+
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::SegmentCondition, Self::Error> {
+        Ok(match self {
+            SegmentCondition::HasPropertyValue {
+                property_name,
+                operation,
+                value,
+            } => common::query::event_segmentation::SegmentCondition::HasPropertyValue {
+                property_name,
+                operation: operation.try_into()?,
+                value: value
+                    .map(|v| {
+                        v.iter()
+                            .map(|v| json_value_to_scalar(v))
+                            .collect::<Result<_>>()
+                    })
+                    .transpose()
+                    .unwrap(),
+            },
+            SegmentCondition::HadPropertyValue {
+                property_name,
+                operation,
+                value,
+                time,
+            } => common::query::event_segmentation::SegmentCondition::HadPropertyValue {
+                property_name,
+                operation: operation.try_into()?,
+                value: value
+                    .map(|v| v.iter().map(json_value_to_scalar).collect::<Result<_>>())
+                    .transpose()?,
+                time: time.try_into()?,
+            },
+            SegmentCondition::DidEvent {
+                event,
+                filters,
+                aggregate,
+            } => common::query::event_segmentation::SegmentCondition::DidEvent {
+                event: event.into(),
+                filters: filters
+                    .map(|v| v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                    .transpose()?,
+                aggregate: aggregate.try_into()?,
+            },
+        })
+    }
+}
+impl TryInto<SegmentTime> for common::query::event_segmentation::SegmentTime {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<SegmentTime, Self::Error> {
+        Ok(match self {
+            common::query::event_segmentation::SegmentTime::Between { from, to } => {
+                SegmentTime::Between { from, to }
+            }
+            common::query::event_segmentation::SegmentTime::From(from) => SegmentTime::From(from),
+            common::query::event_segmentation::SegmentTime::Last { n, unit } => SegmentTime::Last {
+                last: n,
+                unit: unit.try_into()?,
+            },
+            common::query::event_segmentation::SegmentTime::AfterFirstUse { within, unit } => {
+                SegmentTime::AfterFirstUse {
+                    within,
+                    unit: unit.try_into()?,
+                }
+            }
+            common::query::event_segmentation::SegmentTime::WindowEach { unit } => {
+                SegmentTime::WindowEach {
+                    unit: unit.try_into()?,
+                }
+            }
+        })
+    }
+}
+
+impl TryInto<DidEventAggregate> for common::query::event_segmentation::DidEventAggregate {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<DidEventAggregate, Self::Error> {
+        Ok(match self {
+            common::query::event_segmentation::DidEventAggregate::Count {
+                operation,
+                value,
+                time,
+            } => DidEventAggregate::Count {
+                operation: operation.try_into()?,
+                value,
+                time: time.try_into()?,
+            },
+            common::query::event_segmentation::DidEventAggregate::RelativeCount {
+                event,
+                operation,
+                filters,
+                time,
+            } => DidEventAggregate::RelativeCount {
+                event: event.try_into()?,
+                operation: operation.try_into()?,
+                filters: filters
+                    .map(|v| v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                    .transpose()?,
+                time: time.try_into()?,
+            },
+            common::query::event_segmentation::DidEventAggregate::AggregateProperty {
+                property,
+                aggregate,
+                operation,
+                value,
+                time,
+            } => DidEventAggregate::AggregateProperty {
+                property: property.try_into()?,
+                aggregate: aggregate.try_into()?,
+                operation: operation.try_into()?,
+                value: value.map(|v| scalar_to_json_value(&v)).transpose()?,
+                time: time.try_into()?,
+            },
+            common::query::event_segmentation::DidEventAggregate::HistoricalCount {
+                operation,
+                value,
+                time,
+            } => DidEventAggregate::HistoricalCount {
+                operation: operation.try_into()?,
+                value,
+                time: time.try_into()?,
+            },
+        })
+    }
+}
+impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCondition {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<SegmentCondition, Self::Error> {
+        Ok(match self {
+            common::query::event_segmentation::SegmentCondition::HasPropertyValue {
+                property_name,
+                operation,
+                value,
+            } => SegmentCondition::HasPropertyValue {
+                property_name,
+                operation: operation.try_into()?,
+                value: value
+                    .map(|v| {
+                        v.into_iter()
+                            .map(|v| scalar_to_json_value(&v))
+                            .collect::<Result<_>>()
+                    })
+                    .transpose()?,
+            },
+            common::query::event_segmentation::SegmentCondition::HadPropertyValue {
+                property_name,
+                operation,
+                value,
+                time,
+            } => SegmentCondition::HadPropertyValue {
+                property_name,
+                operation: operation.try_into()?,
+                value: value
+                    .map(|v| {
+                        v.into_iter()
+                            .map(|v| scalar_to_json_value(&v))
+                            .collect::<Result<_>>()
+                    })
+                    .transpose()?,
+                time: time.try_into()?,
+            },
+            common::query::event_segmentation::SegmentCondition::DidEvent {
+                event,
+                filters,
+                aggregate,
+            } => SegmentCondition::DidEvent {
+                event: event.try_into()?,
+                filters: filters
+                    .map(|v| v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                    .transpose()?,
+                aggregate: aggregate.try_into()?,
+            },
+        })
+    }
+}
+impl TryInto<common::query::event_segmentation::Segment> for Segment {
+    type Error = PlatformError;
+
+    fn try_into(
+        self,
+    ) -> std::result::Result<common::query::event_segmentation::Segment, Self::Error> {
+        Ok(common::query::event_segmentation::Segment {
+            name: self.name.clone(),
+            conditions: self
+                .conditions
+                .iter()
+                .map(|v| v.to_owned().try_into())
+                .collect::<Result<_>>()?,
+        })
+    }
+}
+
+impl TryInto<Segment> for common::query::event_segmentation::Segment {
+    type Error = PlatformError;
+
+    fn try_into(self) -> std::result::Result<Segment, Self::Error> {
+        Ok(Segment {
+            name: self.name.clone(),
+            conditions: self
+                .conditions
+                .iter()
+                .map(|v| v.to_owned().try_into())
+                .collect::<Result<_>>()?,
+        })
+    }
+}
+
+// impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCondition {
+// type Error = PlatformError;
+//
+// fn try_into(self) -> Result<common::query::event_segmentation::SegmentCondition, Self::Error> {
+// match self {
+// SegmentCondition::HasPropertyValue {
+// property_name,
+// operation,
+// value,
+// } => common::query::event_segmentation::SegmentCondition::HasPropertyValue {
+// property_name,
+// operation: operation.try_into()?,
+// value: value
+// .map(|v| v.iter().map(json_value_to_scalar))
+// .collect::<std::result::Result<_, _>>()
+// .transpose()?,
+// },
+// SegmentCondition::HadPropertyValue {
+// property_name,
+// operation,
+// value,
+// time,
+// } => common::query::event_segmentation::SegmentCondition::HadPropertyValue {
+// property_name,
+// operation: operation.try_into()?,
+// value: value
+// .map(|v| v.iter().map(json_value_to_scalar))
+// .collect::<Result<Vec<_>, _>>()
+// .transpose()?,
+// time: time.try_into()?,
+// },
+// SegmentCondition::DidEvent {
+// event,
+// filters,
+// aggregate,
+// } => common::query::event_segmentation::SegmentCondition::DidEvent {
+// event: event.try_into()?,
+// filters: filters
+// .map(|v| v.iter().map(|v| v.try_into()))
+// .collect::<std::result::Result<Vec<_>, _>>()
+// .transpose()?,
+// aggregate: aggregate.try_into()?,
+// },
+// }
+// }
+// }
+//
+// impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCondition {
+// type Error = PlatformError;
+//
+// fn try_into(self) -> Result<SegmentCondition, Self::Error> {
+// match self {
+// common::query::event_segmentation::SegmentCondition::HasPropertyValue {
+// property_name,
+// operation,
+// value,
+// } => SegmentCondition::HasPropertyValue {
+// property_name,
+// operation: operation.try_into()?,
+// value: value
+// .map(|v| v.iter().map(|v| json_value_to_scalar(v)))
+// .collect::<std::result::Result<_, _>>()
+// .transpose()?,
+// },
+// common::query::event_segmentation::SegmentCondition::HadPropertyValue {
+// property_name,
+// operation,
+// value,
+// time,
+// } => SegmentCondition::HadPropertyValue {
+// property_name,
+// operation: operation.try_into()?,
+// value: value
+// .map(|v| v.iter().map(|v| json_value_to_scalar(v)))
+// .collect::<std::result::Result<_, _>>()
+// .transpose()?,
+// time: time.try_into()?,
+// },
+// SegmentCondition::DidEvent {
+// event,
+// filters,
+// aggregate,
+// } => common::query::event_segmentation::SegmentCondition::DidEvent {
+// event: event.try_into()?,
+// filters: filters
+// .map(|v| v.iter().map(|v| scalar_to_json_value(v)))
+// .collect::<std::result::Result<_, _>>()
+// .transpose()?,
+// aggregate: aggregate.try_into()?,
+// },
+// }
+// }
+// }
+
 impl TryInto<common::query::event_segmentation::EventSegmentation> for EventSegmentation {
     type Error = PlatformError;
 
@@ -643,6 +1037,14 @@ impl TryInto<common::query::event_segmentation::EventSegmentation> for EventSegm
                     v.iter()
                         .map(|v| v.try_into())
                         .collect::<std::result::Result<_, _>>()
+                })
+                .transpose()?,
+            segments: self
+                .segments
+                .map(|v| {
+                    v.iter()
+                        .map(|v| v.to_owned().try_into())
+                        .collect::<Result<_>>()
                 })
                 .transpose()?,
         })
@@ -682,7 +1084,14 @@ impl TryInto<EventSegmentation> for common::query::event_segmentation::EventSegm
                         .collect::<std::result::Result<_, _>>()
                 })
                 .transpose()?,
-            segments: None,
+            segments: self
+                .segments
+                .map(|v| {
+                    v.iter()
+                        .map(|v| v.to_owned().try_into())
+                        .collect::<std::result::Result<_, _>>()
+                })
+                .transpose()?,
         })
     }
 }

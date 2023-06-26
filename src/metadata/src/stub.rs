@@ -269,6 +269,7 @@ impl Reports {
                 }],
                 filters: None,
                 breakdowns: None,
+                segments: None,
             }),
         }
     }
