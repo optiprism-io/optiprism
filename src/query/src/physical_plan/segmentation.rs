@@ -1,6 +1,8 @@
 use std::any::Any;
 use std::collections::VecDeque;
 use std::fmt;
+use std::ops::Index;
+use std::ops::IndexMut;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -152,6 +154,54 @@ fn take_from_batch(batch: RecordBatch, to_take: Vec<i64>) -> Result<RecordBatch>
 
     Ok(out)
 }
+
+struct FixedVecDeque<T> {
+    inner: VecDeque<T>,
+    capacity: usize,
+}
+
+impl<T> FixedVecDeque<T> {
+    fn new(capacity: usize) -> Self {
+        Self {
+            inner: VecDeque::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    fn push_back(&mut self, item: T) {
+        if self.inner.len() == self.capacity {
+            self.inner.pop_front();
+        }
+        self.inner.push_back(item);
+    }
+
+    fn pop_front(&mut self) -> Option<T> {
+        self.inner.pop_front()
+    }
+
+    fn pop_back(&mut self) -> Option<T> {
+        self.inner.pop_back()
+    }
+
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
+impl<T> Index<usize> for FixedVecDeque<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.inner[index]
+    }
+}
+
+impl<T> IndexMut<usize> for FixedVecDeque<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.inner[index]
+    }
+}
+
 impl Stream for SegmentationStream {
     type Item = DFResult<RecordBatch>;
 
@@ -162,9 +212,9 @@ impl Stream for SegmentationStream {
 
         let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
         let mut hash_buf = vec![];
-        let mut batch_buf: VecDeque<RecordBatch> = VecDeque::with_capacity(100);
-        let mut spans_buf: VecDeque<Vec<i64>> = VecDeque::with_capacity(100);
-        let mut res_buf: VecDeque<Option<BooleanArray>> = VecDeque::with_capacity(100);
+        let mut batch_buf: FixedVecDeque<RecordBatch> = FixedVecDeque::new(2);
+        let mut spans_buf: FixedVecDeque<Vec<i64>> = FixedVecDeque::new(2);
+        let mut res_buf: FixedVecDeque<Option<BooleanArray>> = FixedVecDeque::new(2);
         let mut out_buf: VecDeque<RecordBatch> = VecDeque::with_capacity(100);
 
         let mut last_hash = 0;
@@ -173,9 +223,6 @@ impl Stream for SegmentationStream {
             let res = match self.input.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
                     batch_buf.push_back(batch.clone());
-                    if batch_buf.len() > 2 {
-                        batch_buf.pop_front();
-                    }
                     let num_rows = batch.num_rows();
                     hash_buf.resize(num_rows, 0);
                     let pk_arrs = self
@@ -194,9 +241,6 @@ impl Stream for SegmentationStream {
                     let res =
                         res.map(|v| v.as_any().downcast_ref::<BooleanArray>().unwrap().clone());
                     res_buf.push_back(res.clone());
-                    if res_buf.len() > 2 {
-                        res_buf.pop_front();
-                    }
                     for (idx, p) in hash_buf.iter().enumerate() {
                         if last_hash == 0 {
                             last_hash = *p;
@@ -208,9 +252,6 @@ impl Stream for SegmentationStream {
                     }
 
                     spans_buf.push_back(spans);
-                    if spans_buf.len() > 2 {
-                        spans_buf.pop_front();
-                    }
                     res
                 }
                 Poll::Ready(None) => {
@@ -220,9 +261,6 @@ impl Stream for SegmentationStream {
                         .map_err(|e| e.into_datafusion_execution_error())?;
                     let res = res.as_any().downcast_ref::<BooleanArray>().unwrap().clone();
                     res_buf.push_back(Some(res.clone()));
-                    if res_buf.len() > 2 {
-                        res_buf.pop_front();
-                    }
                     let n = batch_buf[1].num_rows();
                     spans_buf[0].push(n as i64);
                     self.is_ended = true;
@@ -309,7 +347,7 @@ mod tests {
     use crate::physical_plan::expressions::segmentation::comparison;
     use crate::physical_plan::expressions::segmentation::count::Count;
     use crate::physical_plan::expressions::segmentation::AggregateFunction;
-    use crate::physical_plan::segmentation2::SegmentationExec;
+    use crate::physical_plan::segmentation::SegmentationExec;
 
     #[tokio::test]
     async fn it_works() -> anyhow::Result<()> {
@@ -357,11 +395,6 @@ mod tests {
         let exp = Arc::new(exp) as ArrayRef;
         let res: ArrayRef = result[0].columns()[0].clone();
         assert_eq!(&*res, &*exp);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn all_variants() -> anyhow::Result<()> {
         Ok(())
     }
 }
