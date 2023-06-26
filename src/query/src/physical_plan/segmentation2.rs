@@ -138,12 +138,25 @@ pub struct SegmentationStream {
     out_batch_size: usize,
 }
 
+fn take_from_batch(batch: RecordBatch, to_take: Vec<i64>) -> Result<RecordBatch> {
+    let to_take = Int64Array::from(to_take);
+    let res_arrs = batch
+        .columns()
+        .iter()
+        .map(|c| take(c, &to_take, None))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let out = RecordBatch::try_new(
+        batch.schema().clone(),
+        res_arrs.into_iter().collect::<Vec<_>>(),
+    )?;
+
+    Ok(out)
+}
 impl Stream for SegmentationStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.is_ended {
-            println!("nothing to poll");
             return Poll::Ready(None);
         }
 
@@ -153,150 +166,117 @@ impl Stream for SegmentationStream {
         let mut spans_buf: VecDeque<Vec<i64>> = VecDeque::with_capacity(100);
         let mut res_buf: VecDeque<Option<BooleanArray>> = VecDeque::with_capacity(100);
         let mut out_buf: VecDeque<RecordBatch> = VecDeque::with_capacity(100);
-        // let mut span_buf: VecDeque<Vec<usize>> = Default::default();
 
         let mut last_hash = 0;
-        // let mut offset = 0;
         loop {
-
-                let mut spans = vec![];
-                let res = match self.input.poll_next_unpin(cx) {
-                    Poll::Ready(Some(Ok(batch))) => {
-                        batch_buf.push_back(batch.clone());
-                        if batch_buf.len()>2 {
-                            batch_buf.pop_front();
-                        }
-                        // println!("get batch: {:?}", batch);
-                        let num_rows = batch.num_rows();
-                        hash_buf.resize(num_rows, 0);
-                        let pk_arrs = self
-                            .partition_key
-                            .iter()
-                            .map(|v| v.evaluate(&batch))
-                            .collect::<std::result::Result<Vec<ColumnarValue>, _>>()?
-                            .iter()
-                            .map(|v| v.clone().into_array(batch.num_rows()).clone())
-                            .collect::<Vec<ArrayRef>>();
-                        create_hashes(&pk_arrs, &mut random_state, &mut hash_buf).unwrap();
-                        let res = self
-                            .predicate
-                            .evaluate(&batch, &hash_buf)
-                            .map_err(|e| e.into_datafusion_execution_error())?;
-                        let res = res.map(|v| v.as_any().downcast_ref::<BooleanArray>().unwrap().clone());
-                        res_buf.push_back(res.clone());
-                        if res_buf.len()>2 {
-                            res_buf.pop_front();
-                        }
-                        for (idx, p) in hash_buf.iter().enumerate() {
-                            if last_hash == 0 {
-                                last_hash = *p;
-                            }
-                            if last_hash != *p {
-                                spans.push(idx as i64);
-                                last_hash = *p;
-                            }
-                        }
-
-                        spans_buf.push_back(spans);
-                        if spans_buf.len()>2 {
-                            spans_buf.pop_front();
-                        }
-                        res
+            let mut spans = vec![];
+            let res = match self.input.poll_next_unpin(cx) {
+                Poll::Ready(Some(Ok(batch))) => {
+                    batch_buf.push_back(batch.clone());
+                    if batch_buf.len() > 2 {
+                        batch_buf.pop_front();
                     }
-                    Poll::Ready(None) => {
-                        // println!("no more batches");
-                        let res = self
-                            .predicate
-                            .finalize()
-                            .map_err(|e| e.into_datafusion_execution_error())?;
-                        let res = res.as_any().downcast_ref::<BooleanArray>().unwrap().clone();
-                        res_buf.push_back(Some(res.clone()));
-                        if res_buf.len()>2 {
-                            res_buf.pop_front();
-                        }
-                        self.is_ended = true;
-                        Some(res)
+                    let num_rows = batch.num_rows();
+                    hash_buf.resize(num_rows, 0);
+                    let pk_arrs = self
+                        .partition_key
+                        .iter()
+                        .map(|v| v.evaluate(&batch))
+                        .collect::<std::result::Result<Vec<ColumnarValue>, _>>()?
+                        .iter()
+                        .map(|v| v.clone().into_array(batch.num_rows()).clone())
+                        .collect::<Vec<ArrayRef>>();
+                    create_hashes(&pk_arrs, &mut random_state, &mut hash_buf).unwrap();
+                    let res = self
+                        .predicate
+                        .evaluate(&batch, &hash_buf)
+                        .map_err(|e| e.into_datafusion_execution_error())?;
+                    let res =
+                        res.map(|v| v.as_any().downcast_ref::<BooleanArray>().unwrap().clone());
+                    res_buf.push_back(res.clone());
+                    if res_buf.len() > 2 {
+                        res_buf.pop_front();
                     }
-                    other => return other,
-                };
-
-                if res.is_some() {
-                    println!("batch buf: {:?}", batch_buf.iter().map(|v|v.columns()[0].clone()).collect::<Vec<_>>());
-                    println!("span buf: {:?}", spans_buf);
-                    println!("res buf: {:?}", res_buf);
-                    let res = res_buf.pop_back().unwrap();
-                    let spans = spans_buf.pop_back().unwrap();
-                    let filtered_spans = spans.into_iter().zip(res.unwrap().iter()).filter_map(|(v,b)|{
-                        match b.unwrap() {
-                            true => Some(v),
-                            false => None
+                    for (idx, p) in hash_buf.iter().enumerate() {
+                        if last_hash == 0 {
+                            last_hash = *p;
                         }
-                    }).collect::<Vec<_>>();
-                    println!("filtered spans: {:?}", filtered_spans);
+                        if last_hash != *p {
+                            spans.push(idx as i64);
+                            last_hash = *p;
+                        }
+                    }
+
+                    spans_buf.push_back(spans);
+                    if spans_buf.len() > 2 {
+                        spans_buf.pop_front();
+                    }
+                    res
                 }
-
-            if self.is_ended {
-                break;
-            }
-            // println!("spans orig: {:?}", spans);
-
-            /*match res {
-                None => {}
-
-                Some(arr) => {
-                    let arrb = arr.as_any().downcast_ref::<BooleanArray>().unwrap();
-                    println!("{:?}", arr);
-                    let prev_batch = batch_buf.pop_back().unwrap();
-                    if arrb.value(0) {
-                        let to_take = Int64Array::from(vec![prev_batch.num_rows() as i64 - 1]);
-                        let res1 = take(prev_batch.columns()[0].as_ref(), &to_take, None)?;
-                        // println!("r1 {:?}", res1);
+                Poll::Ready(None) => {
+                    let res = self
+                        .predicate
+                        .finalize()
+                        .map_err(|e| e.into_datafusion_execution_error())?;
+                    let res = res.as_any().downcast_ref::<BooleanArray>().unwrap().clone();
+                    res_buf.push_back(Some(res.clone()));
+                    if res_buf.len() > 2 {
+                        res_buf.pop_front();
                     }
+                    let n = batch_buf[1].num_rows();
+                    spans_buf[0].push(n as i64);
+                    self.is_ended = true;
+                    Some(res)
+                }
+                other => return other,
+            };
 
-                    if spans.len() > 0 {
-                        let spans = spans[..spans.len() - 1]
-                            .iter()
-                            .zip(arrb.iter())
-                            .filter_map(|(offset, keep)| match keep {
-                                Some(true) => Some(*offset),
-                                _ => None,
-                            })
-                            .collect::<Vec<_>>();
-                        // println!("spans {:?}", spans);
-                        let to_take = Int64Array::from(spans);
-                        let res_arrs = batch
-                            .columns()
-                            .iter()
-                            .map(|c| take(c, &to_take, None))
-                            .collect::<std::result::Result<Vec<_>, _>>()?;
-                        let res_batch = RecordBatch::try_new(
-                            self.schema().clone(),
-                            res_arrs.into_iter().collect::<Vec<_>>(),
-                        )?;
-                        out_buf.push_back(res_batch);
-
-                        // println!("r2 {:?}", res2);
+            if res.is_some() {
+                let res = res_buf.pop_back().unwrap();
+                let spans = spans_buf.pop_back().unwrap();
+                let mut filtered_spans = spans
+                    .into_iter()
+                    .zip(res.unwrap().iter())
+                    .filter_map(|(v, b)| match b.unwrap() {
+                        true => Some(v),
+                        false => None,
+                    })
+                    .collect::<VecDeque<_>>();
+                let cur_batch = batch_buf[1].clone();
+                if filtered_spans.len() > 0 {
+                    if filtered_spans[0] == 0 && batch_buf.len() > 0 {
+                        let prev_batch = batch_buf[0].clone();
+                        filtered_spans.pop_front();
+                        let row_id = prev_batch.num_rows() as i64 - 1;
+                        let out = take_from_batch(prev_batch, vec![row_id])
+                            .map_err(|err| err.into_datafusion_execution_error())?;
+                        out_buf.push_back(out);
+                    } else {
+                        let out = take_from_batch(
+                            cur_batch,
+                            filtered_spans
+                                .into_iter()
+                                .map(|v| v - 1)
+                                .collect::<Vec<i64>>(),
+                        )
+                        .map_err(|err| err.into_datafusion_execution_error())?;
+                        out_buf.push_back(out);
                     }
-                    // println!("prev batch {:?}", prev_batch);
-                    // println!("batch {:?}", batch);
                 }
             }
 
             let rows = out_buf.iter().map(|b| b.num_rows()).sum::<usize>();
-            // return buffer only if it's full or we are at the end
             if rows > self.out_batch_size || self.is_ended {
-                println!("eeee");
                 let rb = concat_batches(
                     &self.schema(),
                     out_buf.iter().map(|v| v).collect::<Vec<_>>(),
                 )?;
                 return self.baseline_metrics.record_poll(Poll::Ready(Some(Ok(rb))));
-            }*/
+            }
         }
-
-        return Poll::Ready(None);
     }
 }
+
 impl RecordBatchStream for SegmentationStream {
     fn schema(&self) -> SchemaRef {
         self.input.schema().clone()
@@ -335,6 +315,8 @@ mod tests {
     async fn it_works() -> anyhow::Result<()> {
         let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Int64, false)]));
         let v = vec![
+            vec![1], // spans [[]], batches [[1]]
+            vec![2], // spans [[],[0]], batches [[1],[2]]
             vec![1, 1, 1],
             vec![1, 1, 1],
             vec![1, 1, 1],
@@ -343,7 +325,7 @@ mod tests {
             vec![11, 11, 11, 11],
             vec![11, 11, 11, 11],
             vec![11, 11],
-            vec![11, 12, 13, 14],
+            vec![11, 12, 14, 15],
         ];
 
         let batches = v
@@ -371,7 +353,10 @@ mod tests {
         let stream = segmentation.execute(0, task_ctx)?;
         let result = collect(stream).await?;
 
-        println!("{}", pretty_format_batches(&result)?);
+        let exp = Int64Array::from(vec![1, 2, 3, 4, 7, 10, 12, 14, 15]);
+        let exp = Arc::new(exp) as ArrayRef;
+        let res: ArrayRef = result[0].columns()[0].clone();
+        assert_eq!(&*res, &*exp);
         Ok(())
     }
 }
