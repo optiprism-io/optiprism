@@ -32,6 +32,7 @@ use num_traits::Num;
 use num_traits::NumCast;
 
 use crate::error::Result;
+use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
 use crate::physical_plan::expressions::segmentation::AggregateFunction;
 use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
@@ -49,6 +50,8 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 {
     inner: Arc<Mutex<AggregateInner<OT, OB>>>,
     predicate: Column,
+    ts_col: Column,
+    time_range: TimeRange,
     arr: PhantomData<OB>,
     typ: PhantomData<T>,
 }
@@ -58,7 +61,13 @@ where
     OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
     T: Copy,
 {
-    pub fn try_new(predicate: Column, agg: AggregateFunction<OT>, out: OB) -> Result<Self> {
+    pub fn try_new(
+        predicate: Column,
+        agg: AggregateFunction<OT>,
+        out: OB,
+        ts_col: Column,
+        time_range: TimeRange,
+    ) -> Result<Self> {
         let inner = AggregateInner {
             last_hash: 0,
             out,
@@ -68,6 +77,8 @@ where
         Ok(Self {
             inner: Arc::new(Mutex::new(inner)),
             predicate,
+            ts_col,
+            time_range,
             arr: PhantomData,
             typ: Default::default(),
         })
@@ -82,6 +93,15 @@ macro_rules! gen_agg_int {
                 record_batch: &RecordBatch,
                 hashes: &[u64],
             ) -> Result<Option<ArrayRef>> {
+                let ts = self
+                    .ts_col
+                    .evaluate(record_batch)?
+                    .into_array(record_batch.num_rows())
+                    .as_any()
+                    .downcast_ref::<TimestampMillisecondArray>()
+                    .unwrap()
+                    .clone();
+
                 let mut inner = self.inner.lock().unwrap();
                 let arr = self
                     .predicate
@@ -102,6 +122,9 @@ macro_rules! gen_agg_int {
                         inner.agg.reset();
                     }
 
+                    if !self.time_range.check_bounds(ts.value(idx)) {
+                        continue;
+                    }
                     inner.agg.accumulate(arr.value(idx).into());
                 }
 
@@ -153,15 +176,18 @@ mod tests {
     use arrow::array::Int16Array;
     use arrow::array::Int64Array;
     use arrow::array::Int64Builder;
+    use arrow::array::TimestampMillisecondArray;
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::datatypes::SchemaRef;
+    use arrow::datatypes::TimeUnit;
     use arrow::record_batch::RecordBatch;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::hash_utils::create_hashes;
 
     use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
+    use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
     use crate::physical_plan::expressions::segmentation::AggregateFunction;
     use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
@@ -170,12 +196,23 @@ mod tests {
         let schema = Schema::new(vec![
             Field::new("col1", DataType::Int64, false),
             Field::new("col2", DataType::Int16, false),
+            Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                false,
+            ),
         ]);
         let col1: ArrayRef = Arc::new(Int64Array::from(vec![1, 1, 1, 2, 2, 2, 3, 3, 3]));
         let col2: ArrayRef = Arc::new(Int16Array::from(vec![1, 2, 3, 1, 2, 3, 1, 2, 3]));
-        let batch =
-            RecordBatch::try_new(Arc::new(schema.clone()), vec![col1.clone(), col2.clone()])
-                .unwrap();
+        let tscol: ArrayRef = Arc::new(TimestampMillisecondArray::from(vec![
+            1, 2, 3, 1, 2, 3, 1, 2, 3,
+        ]));
+        let batch = RecordBatch::try_new(Arc::new(schema.clone()), vec![
+            col1.clone(),
+            col2.clone(),
+            tscol.clone(),
+        ])
+        .unwrap();
 
         let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
         let mut hash_buf = vec![];
@@ -185,6 +222,8 @@ mod tests {
             Column::new_with_schema("col2", &schema).unwrap(),
             AggregateFunction::new_sum(),
             Int64Builder::with_capacity(10_000),
+            Column::new_with_schema("ts", &schema).unwrap(),
+            TimeRange::None,
         )
         .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
@@ -192,11 +231,16 @@ mod tests {
         assert_eq!(res, Some(right));
         let col1: ArrayRef = Arc::new(Int64Array::from(vec![3, 3, 3, 4]));
         let col2: ArrayRef = Arc::new(Int16Array::from(vec![4, 5, 6, 1]));
+        let ts: ArrayRef = Arc::new(TimestampMillisecondArray::from(vec![6, 7, 8, 1]));
         hash_buf.clear();
         hash_buf.resize(col1.len(), 0);
         create_hashes(&vec![col1.clone()], &mut random_state, &mut hash_buf).unwrap();
-        let batch =
-            RecordBatch::try_new(Arc::new(schema), vec![col1.clone(), col2.clone()]).unwrap();
+        let batch = RecordBatch::try_new(Arc::new(schema), vec![
+            col1.clone(),
+            col2.clone(),
+            ts.clone(),
+        ])
+        .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Int64Array::from(vec![21])) as ArrayRef;
         assert_eq!(res, Some(right));
@@ -210,13 +254,24 @@ mod tests {
         let schema = Schema::new(vec![
             Field::new("col1", DataType::Int64, false),
             Field::new("col2", DataType::Float32, false),
+            Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                false,
+            ),
         ]);
         let col1: ArrayRef = Arc::new(Int64Array::from(vec![1, 1, 1, 2, 2, 2, 3, 3, 3]));
         let col2: ArrayRef =
             Arc::new(Float32Array::from(vec![1., 2., 3., 1., 2., 3., 1., 2., 3.])) as ArrayRef;
-        let batch =
-            RecordBatch::try_new(Arc::new(schema.clone()), vec![col1.clone(), col2.clone()])
-                .unwrap();
+        let ts: ArrayRef = Arc::new(TimestampMillisecondArray::from(vec![
+            1, 2, 3, 1, 2, 3, 1, 2, 3,
+        ]));
+        let batch = RecordBatch::try_new(Arc::new(schema.clone()), vec![
+            col1.clone(),
+            col2.clone(),
+            ts.clone(),
+        ])
+        .unwrap();
 
         let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
         let mut hash_buf = vec![];
@@ -226,6 +281,8 @@ mod tests {
             Column::new_with_schema("col2", &schema).unwrap(),
             AggregateFunction::new_sum(),
             Float64Builder::with_capacity(10_000),
+            Column::new_with_schema("ts", &schema).unwrap(),
+            TimeRange::None,
         )
         .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
@@ -234,11 +291,16 @@ mod tests {
 
         let col1: ArrayRef = Arc::new(Int64Array::from(vec![3, 3, 3, 4]));
         let col2: ArrayRef = Arc::new(Float32Array::from(vec![4., 5., 6., 1.]));
+        let ts: ArrayRef = Arc::new(TimestampMillisecondArray::from(vec![4, 5, 6, 1]));
         hash_buf.clear();
         hash_buf.resize(col1.len(), 0);
         create_hashes(&vec![col1.clone()], &mut random_state, &mut hash_buf).unwrap();
-        let batch =
-            RecordBatch::try_new(Arc::new(schema), vec![col1.clone(), col2.clone()]).unwrap();
+        let batch = RecordBatch::try_new(Arc::new(schema), vec![
+            col1.clone(),
+            col2.clone(),
+            ts.clone(),
+        ])
+        .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Float64Array::from(vec![21.])) as ArrayRef;
         assert_eq!(res, Some(right));

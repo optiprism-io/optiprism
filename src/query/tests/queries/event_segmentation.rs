@@ -210,22 +210,21 @@ async fn test_query() -> Result<()> {
         events: vec![
             Event::new(
                 EventRef::RegularName("View Product".to_string()),
-                None,
-                // Some(vec![
-                // EventFilter::Property {
-                // property: PropertyRef::User("Is Premium".to_string()),
-                // operation: PropValueOperation::Eq,
-                // value: Some(vec![ScalarValue::Boolean(Some(true))]),
-                // },
-                // EventFilter::Property {
-                // property: PropertyRef::User("Country".to_string()),
-                // operation: PropValueOperation::Eq,
-                // value: Some(vec![
-                // ScalarValue::Utf8(Some("spain".to_string())),
-                // ScalarValue::Utf8(Some("german".to_string())),
-                // ]),
-                // },
-                // ]),
+                Some(vec![
+                    EventFilter::Property {
+                        property: PropertyRef::User("Is Premium".to_string()),
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                    },
+                    EventFilter::Property {
+                        property: PropertyRef::User("Country".to_string()),
+                        operation: PropValueOperation::Eq,
+                        value: Some(vec![
+                            ScalarValue::Utf8(Some("spain".to_string())),
+                            ScalarValue::Utf8(Some("german".to_string())),
+                        ]),
+                    },
+                ]),
                 Some(vec![Breakdown::Property(PropertyRef::User(
                     "Device".to_string(),
                 ))]),
@@ -288,7 +287,7 @@ async fn test_query() -> Result<()> {
     create_entities(md.clone(), org_id, proj_id).await?;
     let input = events_provider(md.database.clone(), org_id, proj_id).await?;
     println!("{:?}", input.schema());
-    let cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
+    let cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:50:00.000000+00:00")
         .unwrap()
         .with_timezone(&Utc);
     let plan = build(&ctx, &md, cur_time, input, &es).await?;

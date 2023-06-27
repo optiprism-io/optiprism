@@ -337,9 +337,11 @@ mod tests {
     use arrow::array::Int16Array;
     use arrow::array::Int64Array;
     use arrow::array::Int64Builder;
+    use arrow::array::TimestampMillisecondArray;
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
+    use arrow::datatypes::TimeUnit;
     use arrow::record_batch::RecordBatch;
     use arrow::util::pretty::pretty_format_batches;
     use datafusion::physical_expr::expressions::Column;
@@ -353,12 +355,22 @@ mod tests {
     use crate::physical_plan::expressions::segmentation;
     use crate::physical_plan::expressions::segmentation::comparison;
     use crate::physical_plan::expressions::segmentation::count::Count;
+    use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
     use crate::physical_plan::expressions::segmentation::AggregateFunction;
     use crate::physical_plan::segmentation::SegmentationExec;
 
     #[tokio::test]
     async fn it_works() -> anyhow::Result<()> {
-        let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Int64, false)]));
+        let schema = Schema::new(vec![
+            Field::new("col", DataType::Int64, false),
+            Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                false,
+            ),
+        ]);
+        let schema = Arc::new(schema);
+
         let v = vec![
             vec![1],
             vec![2],
@@ -373,17 +385,36 @@ mod tests {
             vec![11, 12, 14, 15],
         ];
 
+        let ts = vec![
+            vec![1],
+            vec![1],
+            vec![1, 2, 3],
+            vec![4, 5, 6],
+            vec![7, 8, 9],
+            vec![10, 1, 1, 1, 2, 3, 1, 2, 1],
+            vec![1, 2, 1, 1],
+            vec![1, 2, 3, 4],
+            vec![5, 6, 7, 8],
+            vec![9, 10],
+            vec![11, 1, 1, 1],
+        ];
+
         let batches = v
             .into_iter()
-            .map(|v| {
-                let col: ArrayRef = Arc::new(Int64Array::from(v));
-                RecordBatch::try_new(schema.clone(), vec![col.clone()]).unwrap()
+            .zip(ts.into_iter())
+            .map(|(vals, ts)| {
+                let col: ArrayRef = Arc::new(Int64Array::from(vals));
+                let ts: ArrayRef = Arc::new(TimestampMillisecondArray::from(ts));
+                RecordBatch::try_new(schema.clone(), vec![col.clone(), ts.clone()]).unwrap()
             })
             .collect::<Vec<_>>();
 
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
-        let mut agg = Count::new();
+        let mut agg = Count::new(
+            Column::new_with_schema("ts", &schema).unwrap(),
+            TimeRange::None,
+        );
 
         let agg = comparison::Eq::new(Arc::new(agg), ScalarValue::Int64(Some(1)));
         let segmentation = SegmentationExec::try_new(
