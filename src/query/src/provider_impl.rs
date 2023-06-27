@@ -57,13 +57,7 @@ impl ProviderImpl {
 #[async_trait]
 impl Provider for ProviderImpl {
     async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
-        let plan = property_values::LogicalPlanBuilder::build(
-            ctx,
-            self.metadata.clone(),
-            self.input.clone(),
-            req.clone(),
-        )
-        .await?;
+        let plan = property_values::build(&ctx, &self.metadata, self.input.clone(), &req).await?;
 
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 
@@ -74,12 +68,12 @@ impl Provider for ProviderImpl {
 
     async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable> {
         let cur_time = Utc::now();
-        let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
-            ctx,
+        let plan = event_segmentation::logical_plan_builder::build(
+            &ctx,
+            &self.metadata,
             cur_time,
-            self.metadata.clone(),
             self.input.clone(),
-            es.clone(),
+            &es,
         )
         .await?;
 

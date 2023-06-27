@@ -34,7 +34,7 @@ mod tests {
     use query::error::Result;
     use query::event_fields;
     use query::physical_plan::planner::QueryPlanner;
-    use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
+    use query::queries::event_segmentation::logical_plan_builder::build;
     use query::test_util::create_entities;
     use query::test_util::create_md;
     use query::test_util::events_provider;
@@ -153,6 +153,7 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Device".to_string(),
             ))]),
+            segments: None,
         };
 
         let mut path = temp_dir();
@@ -272,6 +273,7 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Country".to_string(),
             ))]),
+            segments: None,
         };
 
         let md = create_md()?;
@@ -290,7 +292,7 @@ mod tests {
         let cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
+        let plan = build(&ctx, &md, cur_time, input, &es).await?;
         println!("logical plan: {:?}", plan);
 
         let runtime = Arc::new(RuntimeEnv::default());
@@ -384,6 +386,7 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Country".to_string(),
             ))]),
+            segments: None,
         };
 
         let ctx = Context {
@@ -395,7 +398,7 @@ mod tests {
         let cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
+        let plan = build(&ctx, &md, cur_time, input, &es).await?;
         println!("logical plan: {:?}", plan);
 
         let runtime = Arc::new(RuntimeEnv::default());
