@@ -16,10 +16,13 @@ use arrow::array::BooleanArray;
 use arrow::array::Int64Array;
 use arrow::compute::concat_batches;
 use arrow::compute::take;
+use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use arrow2::datatypes::Field;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
+use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::hash_utils::create_hashes;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalSortExpr;
@@ -44,8 +47,9 @@ use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 pub struct SegmentationExec {
     predicate: Arc<dyn SegmentationExpr>,
     input: Arc<dyn ExecutionPlan>,
+    schema: SchemaRef,
     metrics: ExecutionPlanMetricsSet,
-    partition_key: Vec<Arc<dyn PhysicalExpr>>,
+    columns: Vec<Column>,
     out_batch_size: usize,
 }
 
@@ -57,16 +61,24 @@ impl Debug for SegmentationExec {
 
 impl SegmentationExec {
     pub fn try_new(
-        predicate: Arc<dyn SegmentationExpr>,
-        partition_key: Vec<Arc<dyn PhysicalExpr>>,
+        expr: Arc<dyn SegmentationExpr>,
+        columns: Vec<Column>,
         input: Arc<dyn ExecutionPlan>,
         out_batch_size: usize,
     ) -> Result<Self> {
+        let schema = input.schema().project(
+            columns
+                .iter()
+                .map(|c| c.index())
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )?;
         let res = Self {
-            predicate,
+            predicate: expr,
             input,
+            schema: Arc::new(schema),
             metrics: Default::default(),
-            partition_key,
+            columns,
             out_batch_size,
         };
 
@@ -81,7 +93,7 @@ impl ExecutionPlan for SegmentationExec {
     }
 
     fn schema(&self) -> SchemaRef {
-        self.input.schema().clone()
+        self.schema.clone()
     }
 
     fn output_partitioning(&self) -> Partitioning {
@@ -103,7 +115,7 @@ impl ExecutionPlan for SegmentationExec {
         Ok(Arc::new(
             SegmentationExec::try_new(
                 self.predicate.clone(),
-                self.partition_key.clone(),
+                self.columns.clone(),
                 children[0].clone(),
                 self.out_batch_size,
             )
@@ -118,8 +130,9 @@ impl ExecutionPlan for SegmentationExec {
     ) -> DFResult<SendableRecordBatchStream> {
         Ok(Box::pin(SegmentationStream {
             predicate: self.predicate.clone(),
-            partition_key: self.partition_key.clone(),
+            columns: self.columns.clone(),
             input: self.input.execute(partition, context.clone())?,
+            schema: self.schema.clone(),
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
             is_ended: false,
             out_batch_size: self.out_batch_size,
@@ -140,20 +153,32 @@ impl ExecutionPlan for SegmentationExec {
 }
 pub struct SegmentationStream {
     predicate: Arc<dyn SegmentationExpr>,
-    partition_key: Vec<Arc<dyn PhysicalExpr>>,
+    columns: Vec<Column>,
     input: SendableRecordBatchStream,
+    schema: SchemaRef,
     baseline_metrics: BaselineMetrics,
     is_ended: bool,
     out_batch_size: usize,
 }
 
-fn take_from_batch(batch: RecordBatch, to_take: Vec<i64>) -> Result<RecordBatch> {
+fn take_from_batch(
+    batch: RecordBatch,
+    to_take: Vec<i64>,
+    cols: &Vec<Column>,
+) -> Result<RecordBatch> {
     let to_take = Int64Array::from(to_take);
+    let batch = batch.project(
+        cols.iter()
+            .map(|c| c.index())
+            .collect::<Vec<_>>()
+            .as_slice(),
+    )?;
     let res_arrs = batch
         .columns()
         .iter()
         .map(|c| take(c, &to_take, None))
         .collect::<std::result::Result<Vec<_>, _>>()?;
+
     let out = RecordBatch::try_new(
         batch.schema().clone(),
         res_arrs.into_iter().collect::<Vec<_>>(),
@@ -233,7 +258,7 @@ impl Stream for SegmentationStream {
                     let num_rows = batch.num_rows();
                     hash_buf.resize(num_rows, 0);
                     let pk_arrs = self
-                        .partition_key
+                        .columns
                         .iter()
                         .map(|v| v.evaluate(&batch))
                         .collect::<std::result::Result<Vec<ColumnarValue>, _>>()?
@@ -293,7 +318,7 @@ impl Stream for SegmentationStream {
                         let prev_batch = batch_buf[0].clone();
                         filtered_spans.pop_front();
                         let row_id = prev_batch.num_rows() as i64 - 1;
-                        let out = take_from_batch(prev_batch, vec![row_id])
+                        let out = take_from_batch(prev_batch, vec![row_id], &self.columns)
                             .map_err(|err| err.into_datafusion_execution_error())?;
                         out_buf.push_back(out);
                     } else {
@@ -303,6 +328,7 @@ impl Stream for SegmentationStream {
                                 .into_iter()
                                 .map(|v| v - 1)
                                 .collect::<Vec<i64>>(),
+                            &self.columns,
                         )
                         .map_err(|err| err.into_datafusion_execution_error())?;
                         out_buf.push_back(out);
@@ -324,7 +350,7 @@ impl Stream for SegmentationStream {
 
 impl RecordBatchStream for SegmentationStream {
     fn schema(&self) -> SchemaRef {
-        self.input.schema().clone()
+        self.schema.clone()
     }
 }
 
@@ -419,7 +445,7 @@ mod tests {
         let agg = comparison::Eq::new(Arc::new(agg), ScalarValue::Int64(Some(1)));
         let segmentation = SegmentationExec::try_new(
             Arc::new(agg),
-            vec![Arc::new(Column::new_with_schema("col", &schema)?)],
+            vec![Column::new_with_schema("col", &schema)?],
             Arc::new(input),
             111,
         )?;

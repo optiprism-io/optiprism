@@ -5,10 +5,12 @@ use std::fmt::Formatter;
 use std::hash::Hasher;
 use std::sync::Arc;
 
+use arrow::datatypes::DataType;
 use datafusion_common::Column;
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
+use datafusion_common::Result as DFResult;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
@@ -18,30 +20,66 @@ use crate::Result;
 
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub enum AggregateFunction {
-    Sum,
-    Min,
-    Max,
-    Avg,
+    Sum(Column),
+    Min(Column),
+    Max(Column),
+    Avg(Column),
     Count,
+}
+
+#[derive(Hash, Debug, Clone, Eq, PartialEq)]
+pub enum TimeRange {
+    Between(i64, i64),
+    From(i64),
+    Last(i64, i64),
 }
 
 #[derive(Hash, Eq, PartialEq)]
 pub struct SegmentationNode {
     pub input: LogicalPlan,
+    pub ts_col: Column,
+    pub schema: DFSchemaRef,
+    pub partition_cols: Vec<Column>,
+    pub exprs: Vec<SegmentationExpr>,
+}
+
+#[derive(Hash, Debug, Clone, Eq, PartialEq)]
+pub struct SegmentationExpr {
     pub agg_fn: AggregateFunction,
-    pub partition_key: Expr,
+    pub time_range: Option<TimeRange>,
 }
 
 impl SegmentationNode {
     pub fn try_new(
         input: LogicalPlan,
-        agg_fn: AggregateFunction,
-        partition_key: Expr,
+        ts_col: Column,
+        partition_cols: Vec<Column>,
+        exprs: Vec<SegmentationExpr>,
     ) -> Result<Self> {
+        let cols = partition_cols
+            .iter()
+            .map(|c| {
+                input
+                    .schema()
+                    .field_from_column(c)
+                    .and_then(|v| Ok(v.to_owned()))
+            })
+            .collect::<DFResult<Vec<_>>>()?;
+        let schema = DFSchema::new_with_metadata(
+            vec![cols, vec![DFField::new_unqualified(
+                "segment",
+                DataType::UInt8,
+                false,
+            )]]
+            .concat(),
+            HashMap::new(),
+        )?;
         Ok(Self {
             input,
-            agg_fn,
-            partition_key,
+            ts_col,
+            schema: Arc::new(schema),
+            partition_cols,
+            exprs,
         })
     }
 }
@@ -81,8 +119,9 @@ impl UserDefinedLogicalNode for SegmentationNode {
         Arc::new(
             SegmentationNode::try_new(
                 inputs[0].clone(),
-                self.agg_fn.clone(),
-                self.partition_key.clone(),
+                self.ts_col.clone(),
+                self.partition_cols.clone(),
+                self.exprs.clone(),
             )
             .map_err(QueryError::into_datafusion_plan_error)
             .unwrap(),
