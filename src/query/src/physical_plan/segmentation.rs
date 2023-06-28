@@ -144,6 +144,9 @@ impl ExecutionPlan for SegmentationExec {
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
             is_ended: false,
             out_batch_size: self.out_batch_size,
+            random_state: ahash::RandomState::with_seeds(0, 0, 0, 0),
+            batch_buf: FixedVecDeque::new(2),
+            spans_buf: vec![FixedVecDeque::new(2); self.segments.len()],
         }))
     }
 
@@ -167,6 +170,9 @@ pub struct SegmentationStream {
     baseline_metrics: BaselineMetrics,
     is_ended: bool,
     out_batch_size: usize,
+    random_state: ahash::RandomState,
+    batch_buf: FixedVecDeque<RecordBatch>,
+    spans_buf: Vec<FixedVecDeque<Vec<i64>>>,
 }
 
 fn take_from_batch(
@@ -259,21 +265,17 @@ impl Stream for SegmentationStream {
             return Poll::Ready(None);
         }
 
-        let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
         let mut hash_buf = vec![];
-        let mut batch_buf: FixedVecDeque<RecordBatch> = FixedVecDeque::new(2);
-        let mut spans_buf: Vec<FixedVecDeque<Vec<i64>>> =
-            vec![FixedVecDeque::new(2); self.segments.len()];
         let mut res_buf: Vec<FixedVecDeque<Option<BooleanArray>>> =
             vec![FixedVecDeque::new(2); self.segments.len()];
         let mut out_buf: VecDeque<RecordBatch> = VecDeque::with_capacity(100);
-
+        let mut spans_buf = self.spans_buf.clone();
         let mut last_hash = 0;
         loop {
             let mut spans = vec![];
             match self.input.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
-                    batch_buf.push_back(batch.clone());
+                    self.batch_buf.push_back(batch.clone());
                     let num_rows = batch.num_rows();
                     hash_buf.resize(num_rows, 0);
                     let pk_arrs = self
@@ -284,7 +286,7 @@ impl Stream for SegmentationStream {
                         .iter()
                         .map(|v| v.clone().into_array(batch.num_rows()).clone())
                         .collect::<Vec<ArrayRef>>();
-                    create_hashes(&pk_arrs, &mut random_state, &mut hash_buf).unwrap();
+                    create_hashes(&pk_arrs, &mut self.random_state, &mut hash_buf).unwrap();
                     for (idx, segment) in self.segments.iter().enumerate() {
                         let res = segment
                             .evaluate(&batch, &hash_buf)
@@ -318,7 +320,7 @@ impl Stream for SegmentationStream {
                         res_buf[idx].push_back(Some(res.clone()));
                     }
 
-                    let n = batch_buf[1].num_rows();
+                    let n = self.batch_buf[1].num_rows();
                     for (idx, _) in self.segments.iter().enumerate() {
                         spans_buf[idx][0].push(n as i64);
                     }
@@ -342,10 +344,10 @@ impl Stream for SegmentationStream {
                             false => None,
                         })
                         .collect::<VecDeque<_>>();
-                    let cur_batch = batch_buf[1].clone();
+                    let cur_batch = self.batch_buf[1].clone();
                     if filtered_spans.len() > 0 {
-                        if filtered_spans[0] == 0 && batch_buf.len() > 0 {
-                            let prev_batch = batch_buf[0].clone();
+                        if filtered_spans[0] == 0 && self.batch_buf.len() > 0 {
+                            let prev_batch = self.batch_buf[0].clone();
                             filtered_spans.pop_front();
                             let row_id = prev_batch.num_rows() as i64 - 1;
                             let out = take_from_batch(
@@ -377,6 +379,7 @@ impl Stream for SegmentationStream {
 
             let rows = out_buf.iter().map(|b| b.num_rows()).sum::<usize>();
             if rows > self.out_batch_size || self.is_ended {
+                self.spans_buf = spans_buf;
                 let rb = concat_batches(
                     &self.schema(),
                     out_buf.iter().map(|v| v).collect::<Vec<_>>(),
@@ -506,7 +509,7 @@ mod tests {
             vec![agg1, agg2, agg3],
             vec![Column::new_with_schema("col", &schema)?],
             Arc::new(input),
-            111,
+            3,
         )?;
 
         let session_ctx = SessionContext::new();
