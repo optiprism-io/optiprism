@@ -199,7 +199,7 @@ fn take_from_batch(
     Ok(out)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct FixedVecDeque<T> {
     inner: VecDeque<T>,
     capacity: usize,
@@ -218,6 +218,10 @@ impl<T> FixedVecDeque<T> {
             self.inner.pop_front();
         }
         self.inner.push_back(item);
+    }
+
+    fn back(&self) -> Option<&T> {
+        self.inner.back()
     }
 
     fn pop_front(&mut self) -> Option<T> {
@@ -323,8 +327,8 @@ impl Stream for SegmentationStream {
             };
 
             for (idx, _) in self.segments.iter().enumerate() {
-                let res = res_buf[idx].pop_back().unwrap();
-                if res.is_some() {
+                if res_buf[idx].back().unwrap().is_some() {
+                    let res = res_buf[idx].pop_back().unwrap();
                     let spans = spans_buf[idx].pop_back().unwrap();
                     let mut filtered_spans = spans
                         .into_iter()
@@ -334,6 +338,7 @@ impl Stream for SegmentationStream {
                             false => None,
                         })
                         .collect::<VecDeque<_>>();
+                    println!("{:?}", batch_buf);
                     let cur_batch = batch_buf[1].clone();
                     if filtered_spans.len() > 0 {
                         if filtered_spans[0] == 0 && batch_buf.len() > 0 {
@@ -479,10 +484,10 @@ mod tests {
             ScalarValue::Int64(Some(1)),
         ));
         let segmentation = SegmentationExec::try_new(
-            vec![agg.clone(), agg.clone(), agg.clone()],
+            vec![agg.clone() /* , agg.clone()*/ /* , agg.clone() */],
             vec![Column::new_with_schema("col", &schema)?],
             Arc::new(input),
-            111,
+            3,
         )?;
 
         let session_ctx = SessionContext::new();
