@@ -291,6 +291,7 @@ impl Stream for SegmentationStream {
                             .map_err(|e| e.into_datafusion_execution_error())?;
                         let res =
                             res.map(|v| v.as_any().downcast_ref::<BooleanArray>().unwrap().clone());
+
                         res_buf[idx].push_back(res.clone());
                     }
                     for (idx, p) in hash_buf.iter().enumerate() {
@@ -313,6 +314,7 @@ impl Stream for SegmentationStream {
                             .finalize()
                             .map_err(|e| e.into_datafusion_execution_error())?;
                         let res = res.as_any().downcast_ref::<BooleanArray>().unwrap().clone();
+
                         res_buf[idx].push_back(Some(res.clone()));
                     }
 
@@ -330,6 +332,8 @@ impl Stream for SegmentationStream {
                 if res_buf[idx].back().unwrap().is_some() {
                     let res = res_buf[idx].pop_back().unwrap();
                     let spans = spans_buf[idx].pop_back().unwrap();
+                    // println!("{idx} {:?}", spans);
+
                     let mut filtered_spans = spans
                         .into_iter()
                         .zip(res.unwrap().iter())
@@ -338,7 +342,6 @@ impl Stream for SegmentationStream {
                             false => None,
                         })
                         .collect::<VecDeque<_>>();
-                    println!("{:?}", batch_buf);
                     let cur_batch = batch_buf[1].clone();
                     if filtered_spans.len() > 0 {
                         if filtered_spans[0] == 0 && batch_buf.len() > 0 {
@@ -474,20 +477,36 @@ mod tests {
 
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
-        let mut agg = Count::new(
+        let mut agg1 = Count::new(
+            Column::new_with_schema("ts", &schema).unwrap(),
+            TimeRange::None,
+        );
+        let mut agg2 = Count::new(
+            Column::new_with_schema("ts", &schema).unwrap(),
+            TimeRange::None,
+        );
+        let mut agg3 = Count::new(
             Column::new_with_schema("ts", &schema).unwrap(),
             TimeRange::None,
         );
 
-        let agg = Arc::new(comparison::Eq::new(
-            Arc::new(agg),
+        let agg1 = Arc::new(comparison::Eq::new(
+            Arc::new(agg1),
             ScalarValue::Int64(Some(1)),
         ));
+        let agg2 = Arc::new(comparison::Eq::new(
+            Arc::new(agg2),
+            ScalarValue::Int64(Some(2)),
+        ));
+        let agg3 = Arc::new(comparison::Eq::new(
+            Arc::new(agg3),
+            ScalarValue::Int64(Some(3)),
+        ));
         let segmentation = SegmentationExec::try_new(
-            vec![agg.clone() /* , agg.clone()*/ /* , agg.clone() */],
+            vec![agg1, agg2, agg3],
             vec![Column::new_with_schema("col", &schema)?],
             Arc::new(input),
-            3,
+            111,
         )?;
 
         let session_ctx = SessionContext::new();
