@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
+use arrow::array::Decimal128Array;
+use arrow::array::Decimal128Builder;
+use arrow::array::Float32Builder;
 use arrow::array::Float64Builder;
+use arrow::array::Int64Builder;
 use arrow::datatypes::DataType;
 use axum::async_trait;
 use datafusion::execution::context::QueryPlanner as DFQueryPlanner;
@@ -54,6 +58,127 @@ impl DFQueryPlanner for QueryPlanner {
 }
 
 pub struct ExtensionPlanner {}
+
+macro_rules! agg_expr {
+    ($predicate_expr:expr,$ts_col:expr,$time_range:expr,$t:ty,$acc:ty,$agg_fn:ident,$builder:ident) => {
+        Aggregate::<$t, $acc, _>::try_new(
+            $predicate_expr,
+            SegmentAggregateFunction::$agg_fn(),
+            $builder::with_capacity(10_000),
+            $ts_col,
+            $time_range,
+        )?
+    };
+}
+
+macro_rules! agg_segment_expr {
+    ($schema:expr,$predicate:expr,$agg_fn:ident,$ts_col:expr,$time_range:expr) => {{
+        let predicate_expr = expressions::Column::new(
+            $predicate.name.as_str(),
+            $schema.index_of_column(&$predicate)?,
+        );
+        match $schema.data_type($predicate)? {
+            DataType::Int8 => agg_expr!(
+                predicate_expr,
+                $ts_col,
+                $time_range,
+                i8,
+                i64,
+                $agg_fn,
+                Int64Builder
+            ),
+            DataType::Int16 => agg_expr!(
+                predicate_expr,
+                $ts_col,
+                $time_range,
+                i16,
+                i64,
+                $agg_fn,
+                Int64Builder
+            ),
+            DataType::Int32 => agg_expr!(
+                predicate_expr,
+                $ts_col,
+                $time_range,
+                i32,
+                i64,
+                $agg_fn,
+                Int64Builder
+            ),
+            DataType::Int64 => agg_expr!(
+                predicate_expr,
+                $ts_col,
+                $time_range,
+                i32,
+                i128,
+                $agg_fn,
+                Decimal128Builder
+            ),
+            DataType::UInt8 => agg_expr!(
+                predicate_expr,
+                $ts_col,
+                $time_range,
+                u8,
+                i64,
+                $agg_fn,
+                Int64Builder
+            ),
+            DataType::UInt16 => agg_expr!(
+                predicate_expr,
+                $ts_col,
+                $time_range,
+                u16,
+                i64,
+                $agg_fn,
+                Int64Builder
+            ),
+            DataType::UInt32 => agg_expr!(
+                predicate_expr,
+                $ts_col,
+                $time_range,
+                u32,
+                i64,
+                $agg_fn,
+                Int64Builder
+            ),
+            DataType::UInt64 => agg_expr!(
+                predicate_expr,
+                $ts_col,
+                $time_range,
+                u64,
+                i64,
+                $agg_fn,
+                Int64Builder
+            ),
+            DataType::Float32 => agg_expr!(
+                predicate_expr,
+                $ts_col,
+                $time_range,
+                f32,
+                f64,
+                $agg_fn,
+                Float64Builder
+            ),
+            DataType::Float64 => agg_expr!(
+                predicate_expr,
+                $ts_col,
+                $time_range,
+                f64,
+                f64,
+                $agg_fn,
+                Float64Builder
+            ),
+            DataType::Decimal128(p, s) => Aggregate::<Decimal128Array, i128, _>::try_new(
+                predicate_expr,
+                SegmentAggregateFunction::$agg_fn(),
+                Decimal128Builder::with_capacity(10_000),
+                $ts_col,
+                $time_range,
+            )?,
+            _ => unimplemented!(),
+        }
+    }};
+}
 
 #[async_trait]
 impl DFExtensionPlanner for ExtensionPlanner {
@@ -112,7 +237,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .collect();
             let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        /*} else if let Some(node) = any.downcast_ref::<SegmentationNode>() {
+        } else if let Some(node) = any.downcast_ref::<SegmentationNode>() {
             let mut exprs: Vec<Arc<dyn SegmentationExpr>> = Vec::with_capacity(node.exprs.len());
             for expr in node.exprs.iter() {
                 let time_range = match &expr.time_range {
@@ -127,20 +252,27 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 };
                 let ts_col =
                     expressions::Column::new("ts", node.schema.index_of_column(&node.ts_col)?);
+                let schema = node.input.schema();
                 let res = match &expr.agg_fn {
-                    AggregateFunction::Sum(predicate) => {
-                        agg_segment_expr!(node.input.schema(), predicate, new_sum)
+                    AggregateFunction::Sum(predicate) => Arc::new(agg_segment_expr!(
+                        schema, predicate, new_sum, ts_col, time_range
+                    ))
+                        as Arc<dyn SegmentationExpr>,
+                    AggregateFunction::Min(predicate) => Arc::new(agg_segment_expr!(
+                        schema, predicate, new_min, ts_col, time_range
+                    ))
+                        as Arc<dyn SegmentationExpr>,
+                    AggregateFunction::Max(predicate) => Arc::new(agg_segment_expr!(
+                        schema, predicate, new_max, ts_col, time_range
+                    ))
+                        as Arc<dyn SegmentationExpr>,
+                    AggregateFunction::Avg(predicate) => Arc::new(agg_segment_expr!(
+                        schema, predicate, new_avg, ts_col, time_range
+                    ))
+                        as Arc<dyn SegmentationExpr>,
+                    AggregateFunction::Count => {
+                        Arc::new(Count::new(ts_col, time_range)) as Arc<dyn SegmentationExpr>
                     }
-                    AggregateFunction::Min(_) => {
-                        agg_segment_expr!(node.input.schema(), predicate, new_min)
-                    }
-                    AggregateFunction::Max(_) => {
-                        agg_segment_expr!(node.input.schema(), predicate, new_max)
-                    }
-                    AggregateFunction::Avg(_) => {
-                        agg_segment_expr!(node.input.schema(), predicate, new_avg)
-                    }
-                    AggregateFunction::Count => Count::new(ts_col, time_range),
                 };
                 exprs.push(Arc::new(res))
             }
@@ -158,46 +290,10 @@ impl DFExtensionPlanner for ExtensionPlanner {
             let exec = SegmentationExec::try_new(exprs, cols, physical_inputs[0].clone(), 100)
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
 
-            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)*/
+            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else {
             None
         };
         Ok(plan)
     }
 }
-// macro_rules! agg_expr {
-// ($t:typ,$acc:typ,$agg_fn:ident,$builder:ident) => {
-// Aggregate::<$t, $acc, _>::try_new(
-// predicate_expr,
-// SegmentAggregateFunction::$agg_fn(),
-// $builder::with_capacity(10_000),
-// ts_col,
-// time_range,
-// )?
-// };
-// }
-// macro_rules! agg_segment_expr {
-// ($schema:expr,$predicate:expr,$agg_fn:ident) => {
-// let predicate_expr = expressions::Column::new(
-// $predicate.name.as_str(),
-// $schema.index_of_column(&predicate)?,
-// );
-// match $schema.data_type(predicate)? {
-// DataType::Int8 => agg_expr!(i8, i64, $agg_fn, Int64Builder),
-// DataType::Int16 => agg_expr!(i16, i64, $agg_fn, Int64Builder),
-// DataType::Int32 => agg_expr!(i32, i64, $agg_fn, Int64Builder),
-// DataType::Int64 => agg_expr!(i32, i128, $agg_fn, Decimal128Builder),
-// DataType::UInt8 => agg_expr!(u8, i64, $agg_fn, Int64Builder),
-// DataType::UInt16 => agg_expr!(u16, i64, $agg_fn, Int64Builder),
-// DataType::UInt32 => agg_expr!(u32, i64, $agg_fn, Int64Builder),
-// DataType::UInt64 => agg_expr!(u64, i64, $agg_fn, Int64Builder),
-// DataType::Float32 => agg_expr!(f32, f64, $agg_fn, Float64Builder),
-// DataType::Float64 => agg_expr!(f64, f64, $agg_fn, Float64Builder),
-// DataType::Dictionary(p, s) => {}
-// DataType::Decimal128(_, _) => {}
-// DataType::Decimal256(_, _) => {}
-// DataType::Map(_, _) => {}
-// DataType::RunEndEncoded(_, _) => {}
-// }
-// };
-// }
