@@ -16,10 +16,11 @@ use arrow::array::BooleanArray;
 use arrow::array::Int64Array;
 use arrow::compute::concat_batches;
 use arrow::compute::take;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
-use arrow2::datatypes::Field;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::Column;
@@ -35,6 +36,7 @@ use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion_common::Result as DFResult;
+use datafusion_common::ScalarValue;
 use datafusion_common::Statistics;
 use datafusion_expr::ColumnarValue;
 use futures::Stream;
@@ -45,7 +47,7 @@ use crate::error::Result;
 use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
 pub struct SegmentationExec {
-    predicate: Arc<dyn SegmentationExpr>,
+    segments: Vec<Arc<dyn SegmentationExpr>>,
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
     metrics: ExecutionPlanMetricsSet,
@@ -61,20 +63,26 @@ impl Debug for SegmentationExec {
 
 impl SegmentationExec {
     pub fn try_new(
-        expr: Arc<dyn SegmentationExpr>,
+        segments: Vec<Arc<dyn SegmentationExpr>>,
         columns: Vec<Column>,
         input: Arc<dyn ExecutionPlan>,
         out_batch_size: usize,
     ) -> Result<Self> {
-        let schema = input.schema().project(
+        let mut schema = input.schema().project(
             columns
                 .iter()
                 .map(|c| c.index())
                 .collect::<Vec<_>>()
                 .as_slice(),
         )?;
+        schema.fields = vec![
+            vec![Field::new("segment", DataType::Int8, false)],
+            schema.fields,
+        ]
+        .concat();
+
         let res = Self {
-            predicate: expr,
+            segments,
             input,
             schema: Arc::new(schema),
             metrics: Default::default(),
@@ -114,7 +122,7 @@ impl ExecutionPlan for SegmentationExec {
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
             SegmentationExec::try_new(
-                self.predicate.clone(),
+                self.segments.clone(),
                 self.columns.clone(),
                 children[0].clone(),
                 self.out_batch_size,
@@ -129,7 +137,7 @@ impl ExecutionPlan for SegmentationExec {
         context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
         Ok(Box::pin(SegmentationStream {
-            predicate: self.predicate.clone(),
+            segments: self.segments.clone(),
             columns: self.columns.clone(),
             input: self.input.execute(partition, context.clone())?,
             schema: self.schema.clone(),
@@ -152,7 +160,7 @@ impl ExecutionPlan for SegmentationExec {
     }
 }
 pub struct SegmentationStream {
-    predicate: Arc<dyn SegmentationExpr>,
+    segments: Vec<Arc<dyn SegmentationExpr>>,
     columns: Vec<Column>,
     input: SendableRecordBatchStream,
     schema: SchemaRef,
@@ -165,6 +173,8 @@ fn take_from_batch(
     batch: RecordBatch,
     to_take: Vec<i64>,
     cols: &Vec<Column>,
+    schema: SchemaRef,
+    segment_id: i8,
 ) -> Result<RecordBatch> {
     let to_take = Int64Array::from(to_take);
     let batch = batch.project(
@@ -179,14 +189,17 @@ fn take_from_batch(
         .map(|c| take(c, &to_take, None))
         .collect::<std::result::Result<Vec<_>, _>>()?;
 
+    let segment_col = ScalarValue::from(segment_id).to_array_of_size(to_take.len());
+
     let out = RecordBatch::try_new(
-        batch.schema().clone(),
-        res_arrs.into_iter().collect::<Vec<_>>(),
+        schema,
+        vec![vec![segment_col], res_arrs.into_iter().collect::<Vec<_>>()].concat(),
     )?;
 
     Ok(out)
 }
 
+#[derive(Clone)]
 struct FixedVecDeque<T> {
     inner: VecDeque<T>,
     capacity: usize,
@@ -245,14 +258,16 @@ impl Stream for SegmentationStream {
         let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
         let mut hash_buf = vec![];
         let mut batch_buf: FixedVecDeque<RecordBatch> = FixedVecDeque::new(2);
-        let mut spans_buf: FixedVecDeque<Vec<i64>> = FixedVecDeque::new(2);
-        let mut res_buf: FixedVecDeque<Option<BooleanArray>> = FixedVecDeque::new(2);
+        let mut spans_buf: Vec<FixedVecDeque<Vec<i64>>> =
+            vec![FixedVecDeque::new(2); self.segments.len()];
+        let mut res_buf: Vec<FixedVecDeque<Option<BooleanArray>>> =
+            vec![FixedVecDeque::new(2); self.segments.len()];
         let mut out_buf: VecDeque<RecordBatch> = VecDeque::with_capacity(100);
 
         let mut last_hash = 0;
         loop {
             let mut spans = vec![];
-            let res = match self.input.poll_next_unpin(cx) {
+            match self.input.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
                     batch_buf.push_back(batch.clone());
                     let num_rows = batch.num_rows();
@@ -266,13 +281,14 @@ impl Stream for SegmentationStream {
                         .map(|v| v.clone().into_array(batch.num_rows()).clone())
                         .collect::<Vec<ArrayRef>>();
                     create_hashes(&pk_arrs, &mut random_state, &mut hash_buf).unwrap();
-                    let res = self
-                        .predicate
-                        .evaluate(&batch, &hash_buf)
-                        .map_err(|e| e.into_datafusion_execution_error())?;
-                    let res =
-                        res.map(|v| v.as_any().downcast_ref::<BooleanArray>().unwrap().clone());
-                    res_buf.push_back(res.clone());
+                    for (idx, segment) in self.segments.iter().enumerate() {
+                        let res = segment
+                            .evaluate(&batch, &hash_buf)
+                            .map_err(|e| e.into_datafusion_execution_error())?;
+                        let res =
+                            res.map(|v| v.as_any().downcast_ref::<BooleanArray>().unwrap().clone());
+                        res_buf[idx].push_back(res.clone());
+                    }
                     for (idx, p) in hash_buf.iter().enumerate() {
                         if last_hash == 0 {
                             last_hash = *p;
@@ -283,55 +299,70 @@ impl Stream for SegmentationStream {
                         }
                     }
 
-                    spans_buf.push_back(spans);
-                    res
+                    for (idx, _) in self.segments.iter().enumerate() {
+                        spans_buf[idx].push_back(spans.clone());
+                    }
                 }
                 Poll::Ready(None) => {
-                    let res = self
-                        .predicate
-                        .finalize()
-                        .map_err(|e| e.into_datafusion_execution_error())?;
-                    let res = res.as_any().downcast_ref::<BooleanArray>().unwrap().clone();
-                    res_buf.push_back(Some(res.clone()));
+                    for (idx, segment) in self.segments.iter().enumerate() {
+                        let res = segment
+                            .finalize()
+                            .map_err(|e| e.into_datafusion_execution_error())?;
+                        let res = res.as_any().downcast_ref::<BooleanArray>().unwrap().clone();
+                        res_buf[idx].push_back(Some(res.clone()));
+                    }
+
                     let n = batch_buf[1].num_rows();
-                    spans_buf[0].push(n as i64);
+                    for (idx, _) in self.segments.iter().enumerate() {
+                        spans_buf[idx][0].push(n as i64);
+                    }
+
                     self.is_ended = true;
-                    Some(res)
                 }
                 other => return other,
             };
 
-            if res.is_some() {
-                let res = res_buf.pop_back().unwrap();
-                let spans = spans_buf.pop_back().unwrap();
-                let mut filtered_spans = spans
-                    .into_iter()
-                    .zip(res.unwrap().iter())
-                    .filter_map(|(v, b)| match b.unwrap() {
-                        true => Some(v),
-                        false => None,
-                    })
-                    .collect::<VecDeque<_>>();
-                let cur_batch = batch_buf[1].clone();
-                if filtered_spans.len() > 0 {
-                    if filtered_spans[0] == 0 && batch_buf.len() > 0 {
-                        let prev_batch = batch_buf[0].clone();
-                        filtered_spans.pop_front();
-                        let row_id = prev_batch.num_rows() as i64 - 1;
-                        let out = take_from_batch(prev_batch, vec![row_id], &self.columns)
+            for (idx, _) in self.segments.iter().enumerate() {
+                let res = res_buf[idx].pop_back().unwrap();
+                if res.is_some() {
+                    let spans = spans_buf[idx].pop_back().unwrap();
+                    let mut filtered_spans = spans
+                        .into_iter()
+                        .zip(res.unwrap().iter())
+                        .filter_map(|(v, b)| match b.unwrap() {
+                            true => Some(v),
+                            false => None,
+                        })
+                        .collect::<VecDeque<_>>();
+                    let cur_batch = batch_buf[1].clone();
+                    if filtered_spans.len() > 0 {
+                        if filtered_spans[0] == 0 && batch_buf.len() > 0 {
+                            let prev_batch = batch_buf[0].clone();
+                            filtered_spans.pop_front();
+                            let row_id = prev_batch.num_rows() as i64 - 1;
+                            let out = take_from_batch(
+                                prev_batch,
+                                vec![row_id],
+                                &self.columns,
+                                self.schema.clone(),
+                                idx as i8,
+                            )
                             .map_err(|err| err.into_datafusion_execution_error())?;
-                        out_buf.push_back(out);
-                    } else {
-                        let out = take_from_batch(
-                            cur_batch,
-                            filtered_spans
-                                .into_iter()
-                                .map(|v| v - 1)
-                                .collect::<Vec<i64>>(),
-                            &self.columns,
-                        )
-                        .map_err(|err| err.into_datafusion_execution_error())?;
-                        out_buf.push_back(out);
+                            out_buf.push_back(out);
+                        } else {
+                            let out = take_from_batch(
+                                cur_batch,
+                                filtered_spans
+                                    .into_iter()
+                                    .map(|v| v - 1)
+                                    .collect::<Vec<i64>>(),
+                                &self.columns,
+                                self.schema.clone(),
+                                idx as i8,
+                            )
+                            .map_err(|err| err.into_datafusion_execution_error())?;
+                            out_buf.push_back(out);
+                        }
                     }
                 }
             }
@@ -370,6 +401,7 @@ mod tests {
     use arrow::datatypes::TimeUnit;
     use arrow::record_batch::RecordBatch;
     use arrow::util::pretty::pretty_format_batches;
+    use arrow::util::pretty::print_batches;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
@@ -442,9 +474,12 @@ mod tests {
             TimeRange::None,
         );
 
-        let agg = comparison::Eq::new(Arc::new(agg), ScalarValue::Int64(Some(1)));
-        let segmentation = SegmentationExec::try_new(
+        let agg = Arc::new(comparison::Eq::new(
             Arc::new(agg),
+            ScalarValue::Int64(Some(1)),
+        ));
+        let segmentation = SegmentationExec::try_new(
+            vec![agg.clone(), agg.clone(), agg.clone()],
             vec![Column::new_with_schema("col", &schema)?],
             Arc::new(input),
             111,
@@ -457,7 +492,8 @@ mod tests {
 
         let exp = Int64Array::from(vec![1, 2, 3, 4, 7, 10, 12, 14, 15]);
         let exp = Arc::new(exp) as ArrayRef;
-        let res: ArrayRef = result[0].columns()[0].clone();
+        print_batches(&result).unwrap();
+        let res: ArrayRef = result[0].columns()[1].clone();
         assert_eq!(&*res, &*exp);
         Ok(())
     }

@@ -148,9 +148,8 @@ impl DFExtensionPlanner for ExtensionPlanner {
                     )
                 })
                 .collect::<Vec<_>>();
-            let exec =
-                SegmentationExec::try_new(exprs[0].clone(), cols, physical_inputs[0].clone(), 100)
-                    .map_err(|err| DataFusionError::Plan(err.to_string()))?;
+            let exec = SegmentationExec::try_new(exprs, cols, physical_inputs[0].clone(), 100)
+                .map_err(|err| DataFusionError::Plan(err.to_string()))?;
 
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else {
