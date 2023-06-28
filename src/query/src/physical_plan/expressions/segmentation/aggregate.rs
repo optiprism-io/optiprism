@@ -25,6 +25,8 @@ use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::record_batch::RecordBatch;
 use arrow2::types::f16;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use num_traits::Bounded;
@@ -57,9 +59,7 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 }
 
 impl<T, OT, OB> Aggregate<T, OT, OB>
-where
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    T: Copy,
+where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 {
     pub fn try_new(
         predicate: Column,
@@ -145,6 +145,79 @@ macro_rules! gen_agg_int {
     };
 }
 
+macro_rules! gen_agg_decimal {
+    ($ty:ident,$array_ty:ident,$acc_ty:ty,$acc_builder:ty) => {
+        impl SegmentationExpr for Aggregate<$ty, $acc_ty, $acc_builder> {
+            fn evaluate(
+                &self,
+                record_batch: &RecordBatch,
+                hashes: &[u64],
+            ) -> Result<Option<ArrayRef>> {
+                let ts = self
+                    .ts_col
+                    .evaluate(record_batch)?
+                    .into_array(record_batch.num_rows())
+                    .as_any()
+                    .downcast_ref::<TimestampMillisecondArray>()
+                    .unwrap()
+                    .clone();
+
+                let mut inner = self.inner.lock().unwrap();
+                let arr = self
+                    .predicate
+                    .evaluate(record_batch)?
+                    .into_array(record_batch.num_rows())
+                    .as_any()
+                    .downcast_ref::<$array_ty>()
+                    .unwrap()
+                    .clone()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
+                println!("{:?}", arr);
+                for (idx, hash) in hashes.iter().enumerate() {
+                    if inner.last_hash == 0 {
+                        inner.last_hash = *hash;
+                    }
+                    if *hash != inner.last_hash {
+                        inner.last_hash = *hash;
+                        let res = inner.agg.result();
+                        inner.out.append_value(res);
+                        inner.agg.reset();
+                    }
+
+                    if !self.time_range.check_bounds(ts.value(idx)) {
+                        continue;
+                    }
+                    println!("{:?}", arr.value(idx));
+                    inner.agg.accumulate(arr.value(idx).into());
+                }
+
+                if inner.out.len() > 0 {
+                    Ok(Some(Arc::new(
+                        inner
+                            .out
+                            .finish()
+                            .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?,
+                    ) as ArrayRef))
+                } else {
+                    Ok(None)
+                }
+            }
+
+            fn finalize(&self) -> Result<ArrayRef> {
+                let mut inner = self.inner.lock().unwrap();
+                let res = inner.agg.result() as $acc_ty;
+                inner.out.append_value(res);
+                Ok(Arc::new(
+                    inner
+                        .out
+                        .finish()
+                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?,
+                ) as ArrayRef)
+            }
+        }
+    };
+}
+
 gen_agg_int!(i8, Int8Array, i64, Int64Builder);
 gen_agg_int!(i16, Int16Array, i64, Int64Builder);
 gen_agg_int!(i32, Int32Array, i64, Int64Builder);
@@ -157,6 +230,7 @@ gen_agg_int!(u64, Int64Array, i128, Decimal128Builder);
 gen_agg_int!(u128, Decimal128Array, i128, Decimal128Builder);
 gen_agg_int!(f32, Float32Array, f64, Float64Builder);
 gen_agg_int!(f64, Float64Array, f64, Float64Builder);
+gen_agg_decimal!(Decimal128Array, Decimal128Array, i128, Decimal128Builder);
 // todo add decimal 256
 // gen_agg_int!(i128, Decimal128Array);
 // gen_agg_int!(f64, Float32Array);
@@ -168,6 +242,8 @@ mod tests {
 
     use arrow::array::Array;
     use arrow::array::ArrayRef;
+    use arrow::array::Decimal128Array;
+    use arrow::array::Decimal128Builder;
     use arrow::array::Float16Array;
     use arrow::array::Float32Array;
     use arrow::array::Float32Builder;
@@ -183,6 +259,8 @@ mod tests {
     use arrow::datatypes::SchemaRef;
     use arrow::datatypes::TimeUnit;
     use arrow::record_batch::RecordBatch;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::hash_utils::create_hashes;
 
@@ -307,5 +385,77 @@ mod tests {
         let res = agg.finalize().unwrap();
         let right = Arc::new(Float64Array::from(vec![1.])) as ArrayRef;
         assert_eq!(&*res, &*right);
+    }
+
+    #[test]
+    fn test_sum_decimal() {
+        let schema = Schema::new(vec![
+            Field::new("col1", DataType::Int64, false),
+            Field::new(
+                "col2",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            ),
+            Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                false,
+            ),
+        ]);
+
+        let col1: ArrayRef = Arc::new(Int64Array::from(vec![1, 1, 1, 2, 2, 2, 3, 3, 3]));
+        let col2 = {
+            let vals: Vec<i128> = vec![123, 231, 314, 411, 523, 623, 713, 843, 91];
+            let mut builder = Decimal128Builder::with_capacity(9);
+            for val in vals.iter() {
+                builder.append_value(*val);
+            }
+
+            Arc::new(
+                builder
+                    .finish()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                    .unwrap(),
+            )
+        };
+        let ts: ArrayRef = Arc::new(TimestampMillisecondArray::from(vec![
+            1, 2, 3, 1, 2, 3, 1, 2, 3,
+        ]));
+        let batch = RecordBatch::try_new(Arc::new(schema.clone()), vec![
+            col1.clone(),
+            col2.clone(),
+            ts.clone(),
+        ])
+        .unwrap();
+
+        let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
+        let mut hash_buf = vec![];
+        hash_buf.resize(col1.len(), 0);
+        create_hashes(&vec![col1], &mut random_state, &mut hash_buf).unwrap();
+        let mut agg = Aggregate::<Decimal128Array, i128, _>::try_new(
+            Column::new_with_schema("col2", &schema).unwrap(),
+            AggregateFunction::new_sum(),
+            Decimal128Builder::with_capacity(10_000),
+            Column::new_with_schema("ts", &schema).unwrap(),
+            TimeRange::None,
+        )
+        .unwrap();
+
+        let res = agg.evaluate(&batch, &hash_buf).unwrap();
+        let exp = {
+            let vals: Vec<i128> = vec![668, 1557];
+            let mut builder = Decimal128Builder::with_capacity(9);
+            for val in vals.iter() {
+                builder.append_value(*val);
+            }
+
+            Arc::new(
+                builder
+                    .finish()
+                    .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                    .unwrap(),
+            ) as ArrayRef
+        };
+        assert_eq!(res, Some(exp));
     }
 }
