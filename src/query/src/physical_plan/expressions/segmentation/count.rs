@@ -1,15 +1,16 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use arrow::array::Array;
+use arrow::array::{Array, BooleanArray};
 use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
 use arrow::array::Int64Builder;
 use arrow::array::PrimitiveArray;
 use arrow::array::TimestampMillisecondArray;
+use arrow::compute::{filter, filter_record_batch};
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::PhysicalExpr;
+use datafusion::physical_expr::{PhysicalExpr, PhysicalExprRef};
 
 use crate::error::Result;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
@@ -21,15 +22,17 @@ struct CountInner {
     out: Int64Builder,
     count: i64,
 }
+
 #[derive(Debug)]
 pub struct Count {
     inner: Arc<Mutex<CountInner>>,
+    filter: PhysicalExprRef,
     ts_col: Column,
     time_range: TimeRange,
 }
 
 impl Count {
-    pub fn new(ts_col: Column, time_range: TimeRange) -> Self {
+    pub fn new(filter: PhysicalExprRef, ts_col: Column, time_range: TimeRange) -> Self {
         let inner = CountInner {
             last_hash: 0,
             out: Int64Builder::with_capacity(10_000),
@@ -37,10 +40,18 @@ impl Count {
         };
         Self {
             inner: Arc::new(Mutex::new(inner)),
+            filter,
             ts_col,
             time_range,
         }
     }
+}
+
+fn check_filter(filter: &BooleanArray, idx: usize) -> bool {
+    if filter.is_null(idx) {
+        return false;
+    }
+    filter.value(idx)
 }
 
 impl SegmentationExpr for Count {
@@ -54,6 +65,7 @@ impl SegmentationExpr for Count {
             .unwrap()
             .clone();
 
+        let to_filter = self.filter.evaluate(record_batch)?.into_array(record_batch.num_rows()).as_any().downcast_ref::<BooleanArray>().unwrap();
         let mut inner = self.inner.lock().unwrap();
         for (idx, hash) in hashes.iter().enumerate() {
             if inner.last_hash == 0 {
@@ -66,6 +78,9 @@ impl SegmentationExpr for Count {
                 inner.count = 0;
             }
 
+            if check_filter(&to_filter, idx) == false {
+                continue;
+            }
             if !self.time_range.check_bounds(ts.value(idx)) {
                 continue;
             }
