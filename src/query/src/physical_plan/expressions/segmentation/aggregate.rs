@@ -1,13 +1,14 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::Mutex;
-
+use arrow::array::{BooleanArray};
 use arrow::array::Array;
 use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Array;
 use arrow::array::Decimal128Builder;
 use arrow::array::Float16Array;
+use crate::physical_plan::expressions::segmentation::check_filter;
 use arrow::array::Float32Array;
 use arrow::array::Float32Builder;
 use arrow::array::Float64Array;
@@ -28,7 +29,7 @@ use arrow2::types::f16;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::PhysicalExpr;
+use datafusion::physical_expr::{PhysicalExpr, PhysicalExprRef};
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
@@ -40,17 +41,19 @@ use crate::physical_plan::expressions::segmentation::SegmentationExpr;
 
 #[derive(Debug)]
 struct AggregateInner<OT, OB>
-where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+    where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 {
     last_hash: u64,
     out: OB,
     agg: AggregateFunction<OT>,
 }
+
 #[derive(Debug)]
 pub struct Aggregate<T, OT, OB>
-where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+    where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 {
     inner: Arc<Mutex<AggregateInner<OT, OB>>>,
+    filter: PhysicalExprRef,
     predicate: Column,
     ts_col: Column,
     time_range: TimeRange,
@@ -59,9 +62,10 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 }
 
 impl<T, OT, OB> Aggregate<T, OT, OB>
-where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+    where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 {
     pub fn try_new(
+        filter: PhysicalExprRef,
         predicate: Column,
         agg: AggregateFunction<OT>,
         out: OB,
@@ -75,6 +79,7 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
         };
 
         Ok(Self {
+            filter,
             inner: Arc::new(Mutex::new(inner)),
             predicate,
             ts_col,
@@ -111,6 +116,7 @@ macro_rules! gen_agg_int {
                     .downcast_ref::<$array_ty>()
                     .unwrap()
                     .clone();
+                let to_filter = self.filter.evaluate(record_batch)?.into_array(record_batch.num_rows()).as_any().downcast_ref::<BooleanArray>().unwrap().clone();
                 for (idx, hash) in hashes.iter().enumerate() {
                     if inner.last_hash == 0 {
                         inner.last_hash = *hash;
@@ -122,6 +128,9 @@ macro_rules! gen_agg_int {
                         inner.agg.reset();
                     }
 
+                    if check_filter(&to_filter, idx) == false {
+                        continue;
+                    }
                     if !self.time_range.check_bounds(ts.value(idx)) {
                         continue;
                     }
@@ -172,7 +181,7 @@ macro_rules! gen_agg_decimal {
                     .unwrap()
                     .clone()
                     .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
-                println!("{:?}", arr);
+                let to_filter = self.filter.evaluate(record_batch)?.into_array(record_batch.num_rows()).as_any().downcast_ref::<BooleanArray>().unwrap().clone();
                 for (idx, hash) in hashes.iter().enumerate() {
                     if inner.last_hash == 0 {
                         inner.last_hash = *hash;
@@ -184,6 +193,9 @@ macro_rules! gen_agg_decimal {
                         inner.agg.reset();
                     }
 
+                    if check_filter(&to_filter, idx) == false {
+                        continue;
+                    }
                     if !self.time_range.check_bounds(ts.value(idx)) {
                         continue;
                     }
@@ -261,8 +273,10 @@ mod tests {
     use arrow::record_batch::RecordBatch;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
-    use datafusion::physical_expr::expressions::Column;
+    use datafusion::physical_expr::expressions::{BinaryExpr, Column, Literal};
     use datafusion::physical_expr::hash_utils::create_hashes;
+    use datafusion_common::ScalarValue;
+    use datafusion_expr::Operator;
 
     use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
@@ -290,20 +304,24 @@ mod tests {
             col2.clone(),
             tscol.clone(),
         ])
-        .unwrap();
+            .unwrap();
 
         let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
         let mut hash_buf = vec![];
         hash_buf.resize(col1.len(), 0);
+        let left = Arc::new(Column::new_with_schema("col1", &schema).unwrap());
+        let right = Arc::new(Literal::new(ScalarValue::Int64(Some(0))));
+        let f = Arc::new(BinaryExpr::new(left, Operator::GtEq, right));
         create_hashes(&vec![col1], &mut random_state, &mut hash_buf).unwrap();
         let mut agg = Aggregate::<i16, i64, _>::try_new(
+            f,
             Column::new_with_schema("col2", &schema).unwrap(),
             AggregateFunction::new_sum(),
             Int64Builder::with_capacity(10_000),
             Column::new_with_schema("ts", &schema).unwrap(),
             TimeRange::None,
         )
-        .unwrap();
+            .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Int64Array::from(vec![6, 6])) as ArrayRef;
         assert_eq!(res, Some(right));
@@ -318,7 +336,7 @@ mod tests {
             col2.clone(),
             ts.clone(),
         ])
-        .unwrap();
+            .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Int64Array::from(vec![21])) as ArrayRef;
         assert_eq!(res, Some(right));
@@ -349,20 +367,24 @@ mod tests {
             col2.clone(),
             ts.clone(),
         ])
-        .unwrap();
+            .unwrap();
 
         let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
         let mut hash_buf = vec![];
         hash_buf.resize(col1.len(), 0);
         create_hashes(&vec![col1], &mut random_state, &mut hash_buf).unwrap();
+        let left = Arc::new(Column::new_with_schema("col1", &schema).unwrap());
+        let right = Arc::new(Literal::new(ScalarValue::Int64(Some(0))));
+        let f = Arc::new(BinaryExpr::new(left, Operator::GtEq, right));
         let mut agg = Aggregate::<f32, f64, _>::try_new(
+            f,
             Column::new_with_schema("col2", &schema).unwrap(),
             AggregateFunction::new_sum(),
             Float64Builder::with_capacity(10_000),
             Column::new_with_schema("ts", &schema).unwrap(),
             TimeRange::None,
         )
-        .unwrap();
+            .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Float64Array::from(vec![6., 6.])) as ArrayRef;
         assert_eq!(res, Some(right));
@@ -378,7 +400,7 @@ mod tests {
             col2.clone(),
             ts.clone(),
         ])
-        .unwrap();
+            .unwrap();
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let right = Arc::new(Float64Array::from(vec![21.])) as ArrayRef;
         assert_eq!(res, Some(right));
@@ -426,20 +448,24 @@ mod tests {
             col2.clone(),
             ts.clone(),
         ])
-        .unwrap();
+            .unwrap();
 
         let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
         let mut hash_buf = vec![];
         hash_buf.resize(col1.len(), 0);
         create_hashes(&vec![col1], &mut random_state, &mut hash_buf).unwrap();
+        let left = Arc::new(Column::new_with_schema("col1", &schema).unwrap());
+        let right = Arc::new(Literal::new(ScalarValue::Int64(Some(0))));
+        let f = Arc::new(BinaryExpr::new(left, Operator::GtEq, right));
         let mut agg = Aggregate::<Decimal128Array, i128, _>::try_new(
+            f,
             Column::new_with_schema("col2", &schema).unwrap(),
             AggregateFunction::new_sum(),
             Decimal128Builder::with_capacity(10_000),
             Column::new_with_schema("ts", &schema).unwrap(),
             TimeRange::None,
         )
-        .unwrap();
+            .unwrap();
 
         let res = agg.evaluate(&batch, &hash_buf).unwrap();
         let exp = {

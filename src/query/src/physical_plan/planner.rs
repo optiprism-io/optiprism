@@ -61,9 +61,10 @@ impl DFQueryPlanner for QueryPlanner {
 pub struct ExtensionPlanner {}
 
 macro_rules! agg_expr {
-    ($predicate_expr:expr,$ts_col:expr,$time_range:expr,$t:ty,$acc:ty,$agg_fn:ident,$builder:ident) => {
+    ($filter:expr,$predicate_expr:expr,$ts_col:expr,$time_range:expr,$t:ty,$acc:ty,$agg_fn:ident,$builder:ident) => {
         Arc::new(
             Aggregate::<$t, $acc, _>::try_new(
+                $filter,
                 $predicate_expr,
                 SegmentAggregateFunction::$agg_fn(),
                 $builder::with_capacity(10_000),
@@ -76,13 +77,14 @@ macro_rules! agg_expr {
 }
 
 macro_rules! agg_segment_expr {
-    ($schema:expr,$predicate:expr,$agg_fn:ident,$ts_col:expr,$time_range:expr) => {{
+    ($filter:expr,$schema:expr,$predicate:expr,$agg_fn:ident,$ts_col:expr,$time_range:expr) => {{
         let predicate_expr = expressions::Column::new(
             $predicate.name.as_str(),
             $schema.index_of_column(&$predicate)?,
         );
         match $schema.data_type($predicate)? {
             DataType::Int8 => agg_expr!(
+                $filter,
                 predicate_expr,
                 $ts_col,
                 $time_range,
@@ -92,6 +94,7 @@ macro_rules! agg_segment_expr {
                 Int64Builder
             ),
             DataType::Int16 => agg_expr!(
+                $filter,
                 predicate_expr,
                 $ts_col,
                 $time_range,
@@ -101,6 +104,7 @@ macro_rules! agg_segment_expr {
                 Int64Builder
             ),
             DataType::Int32 => agg_expr!(
+                $filter,
                 predicate_expr,
                 $ts_col,
                 $time_range,
@@ -110,6 +114,7 @@ macro_rules! agg_segment_expr {
                 Int64Builder
             ),
             DataType::Int64 => agg_expr!(
+                $filter,
                 predicate_expr,
                 $ts_col,
                 $time_range,
@@ -119,6 +124,7 @@ macro_rules! agg_segment_expr {
                 Decimal128Builder
             ),
             DataType::UInt8 => agg_expr!(
+                $filter,
                 predicate_expr,
                 $ts_col,
                 $time_range,
@@ -128,6 +134,7 @@ macro_rules! agg_segment_expr {
                 Int64Builder
             ),
             DataType::UInt16 => agg_expr!(
+                $filter,
                 predicate_expr,
                 $ts_col,
                 $time_range,
@@ -137,6 +144,7 @@ macro_rules! agg_segment_expr {
                 Int64Builder
             ),
             DataType::UInt32 => agg_expr!(
+                $filter,
                 predicate_expr,
                 $ts_col,
                 $time_range,
@@ -146,6 +154,7 @@ macro_rules! agg_segment_expr {
                 Int64Builder
             ),
             DataType::UInt64 => agg_expr!(
+                $filter,
                 predicate_expr,
                 $ts_col,
                 $time_range,
@@ -155,6 +164,7 @@ macro_rules! agg_segment_expr {
                 Decimal128Builder
             ),
             DataType::Float32 => agg_expr!(
+                $filter,
                 predicate_expr,
                 $ts_col,
                 $time_range,
@@ -164,6 +174,7 @@ macro_rules! agg_segment_expr {
                 Float64Builder
             ),
             DataType::Float64 => agg_expr!(
+                $filter,
                 predicate_expr,
                 $ts_col,
                 $time_range,
@@ -174,6 +185,7 @@ macro_rules! agg_segment_expr {
             ),
             DataType::Decimal128(p, s) => Arc::new(
                 Aggregate::<Decimal128Array, i128, _>::try_new(
+                    $filter,
                     predicate_expr,
                     SegmentAggregateFunction::$agg_fn(),
                     Decimal128Builder::with_capacity(10_000),
@@ -263,16 +275,16 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 let filter = create_physical_expr(&expr.filter, schema.as_ref(), &physical_inputs[0].schema(), ctx_state.execution_props())?;
                 let res = match &expr.agg_fn {
                     AggregateFunction::Sum(predicate) => {
-                        agg_segment_expr!(schema, predicate, new_sum, ts_col, time_range)
+                        agg_segment_expr!(filter,schema, predicate, new_sum, ts_col, time_range)
                     }
                     AggregateFunction::Min(predicate) => {
-                        agg_segment_expr!(schema, predicate, new_min, ts_col, time_range)
+                        agg_segment_expr!(filter,schema, predicate, new_min, ts_col, time_range)
                     }
                     AggregateFunction::Max(predicate) => {
-                        agg_segment_expr!(schema, predicate, new_max, ts_col, time_range)
+                        agg_segment_expr!(filter,schema, predicate, new_max, ts_col, time_range)
                     }
                     AggregateFunction::Avg(predicate) => {
-                        agg_segment_expr!(schema, predicate, new_avg, ts_col, time_range)
+                        agg_segment_expr!(filter,schema, predicate, new_avg, ts_col, time_range)
                     }
                     AggregateFunction::Count => {
                         Arc::new(Count::new(filter, ts_col, time_range)) as Arc<dyn SegmentationExpr>

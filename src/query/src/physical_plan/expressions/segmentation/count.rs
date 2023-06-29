@@ -14,7 +14,7 @@ use datafusion::physical_expr::{PhysicalExpr, PhysicalExprRef};
 
 use crate::error::Result;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-use crate::physical_plan::expressions::segmentation::SegmentationExpr;
+use crate::physical_plan::expressions::segmentation::{check_filter, SegmentationExpr};
 
 #[derive(Debug)]
 struct CountInner {
@@ -45,13 +45,6 @@ impl Count {
             time_range,
         }
     }
-}
-
-fn check_filter(filter: &BooleanArray, idx: usize) -> bool {
-    if filter.is_null(idx) {
-        return false;
-    }
-    filter.value(idx)
 }
 
 impl SegmentationExpr for Count {

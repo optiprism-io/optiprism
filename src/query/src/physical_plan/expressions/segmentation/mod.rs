@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::ops::Add;
 use std::sync::Arc;
 
-use arrow::array::ArrayRef;
+use arrow::array::{Array, ArrayRef};
 use arrow::array::BooleanArray;
 use arrow::array::TimestampMillisecondArray;
 use arrow::record_batch::RecordBatch;
@@ -121,4 +121,11 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
             AggregateFunction::Count(s) => *s = T::zero(),
         }
     }
+}
+
+fn check_filter(filter: &BooleanArray, idx: usize) -> bool {
+    if filter.is_null(idx) {
+        return false;
+    }
+    filter.value(idx)
 }
