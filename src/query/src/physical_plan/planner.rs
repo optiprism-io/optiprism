@@ -61,13 +61,16 @@ pub struct ExtensionPlanner {}
 
 macro_rules! agg_expr {
     ($predicate_expr:expr,$ts_col:expr,$time_range:expr,$t:ty,$acc:ty,$agg_fn:ident,$builder:ident) => {
-        Aggregate::<$t, $acc, _>::try_new(
-            $predicate_expr,
-            SegmentAggregateFunction::$agg_fn(),
-            $builder::with_capacity(10_000),
-            $ts_col,
-            $time_range,
-        )?
+        Arc::new(
+            Aggregate::<$t, $acc, _>::try_new(
+                $predicate_expr,
+                SegmentAggregateFunction::$agg_fn(),
+                $builder::with_capacity(10_000),
+                $ts_col,
+                $time_range,
+            )
+            .map_err(|err| DataFusionError::Plan(err.to_string()))?,
+        ) as Arc<dyn SegmentationExpr>
     };
 }
 
@@ -109,7 +112,7 @@ macro_rules! agg_segment_expr {
                 predicate_expr,
                 $ts_col,
                 $time_range,
-                i32,
+                i64,
                 i128,
                 $agg_fn,
                 Decimal128Builder
@@ -146,9 +149,9 @@ macro_rules! agg_segment_expr {
                 $ts_col,
                 $time_range,
                 u64,
-                i64,
+                i128,
                 $agg_fn,
-                Int64Builder
+                Decimal128Builder
             ),
             DataType::Float32 => agg_expr!(
                 predicate_expr,
@@ -168,13 +171,16 @@ macro_rules! agg_segment_expr {
                 $agg_fn,
                 Float64Builder
             ),
-            DataType::Decimal128(p, s) => Aggregate::<Decimal128Array, i128, _>::try_new(
-                predicate_expr,
-                SegmentAggregateFunction::$agg_fn(),
-                Decimal128Builder::with_capacity(10_000),
-                $ts_col,
-                $time_range,
-            )?,
+            DataType::Decimal128(p, s) => Arc::new(
+                Aggregate::<Decimal128Array, i128, _>::try_new(
+                    predicate_expr,
+                    SegmentAggregateFunction::$agg_fn(),
+                    Decimal128Builder::with_capacity(10_000),
+                    $ts_col,
+                    $time_range,
+                )
+                .map_err(|err| DataFusionError::Plan(err.to_string()))?,
+            ) as Arc<dyn SegmentationExpr>,
             _ => unimplemented!(),
         }
     }};
@@ -254,27 +260,23 @@ impl DFExtensionPlanner for ExtensionPlanner {
                     expressions::Column::new("ts", node.schema.index_of_column(&node.ts_col)?);
                 let schema = node.input.schema();
                 let res = match &expr.agg_fn {
-                    AggregateFunction::Sum(predicate) => Arc::new(agg_segment_expr!(
-                        schema, predicate, new_sum, ts_col, time_range
-                    ))
-                        as Arc<dyn SegmentationExpr>,
-                    AggregateFunction::Min(predicate) => Arc::new(agg_segment_expr!(
-                        schema, predicate, new_min, ts_col, time_range
-                    ))
-                        as Arc<dyn SegmentationExpr>,
-                    AggregateFunction::Max(predicate) => Arc::new(agg_segment_expr!(
-                        schema, predicate, new_max, ts_col, time_range
-                    ))
-                        as Arc<dyn SegmentationExpr>,
-                    AggregateFunction::Avg(predicate) => Arc::new(agg_segment_expr!(
-                        schema, predicate, new_avg, ts_col, time_range
-                    ))
-                        as Arc<dyn SegmentationExpr>,
+                    AggregateFunction::Sum(predicate) => {
+                        agg_segment_expr!(schema, predicate, new_sum, ts_col, time_range)
+                    }
+                    AggregateFunction::Min(predicate) => {
+                        agg_segment_expr!(schema, predicate, new_min, ts_col, time_range)
+                    }
+                    AggregateFunction::Max(predicate) => {
+                        agg_segment_expr!(schema, predicate, new_max, ts_col, time_range)
+                    }
+                    AggregateFunction::Avg(predicate) => {
+                        agg_segment_expr!(schema, predicate, new_avg, ts_col, time_range)
+                    }
                     AggregateFunction::Count => {
                         Arc::new(Count::new(ts_col, time_range)) as Arc<dyn SegmentationExpr>
                     }
                 };
-                exprs.push(Arc::new(res))
+                exprs.push(res)
             }
 
             let cols = node
@@ -297,3 +299,4 @@ impl DFExtensionPlanner for ExtensionPlanner {
         Ok(plan)
     }
 }
+

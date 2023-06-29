@@ -224,7 +224,7 @@ pub enum SegmentCondition {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Segment {
     pub name: String,
-    pub conditions: Vec<SegmentCondition>,
+    pub conditions: Vec<Vec<SegmentCondition>>, // Or<And<SegmentCondition>>
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
