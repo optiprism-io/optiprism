@@ -45,6 +45,7 @@ pub struct SegmentationNode {
 
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub struct SegmentationExpr {
+    pub filter: Expr,
     pub agg_fn: AggregateFunction,
     pub time_range: Option<TimeRange>,
 }
@@ -71,7 +72,7 @@ impl SegmentationNode {
                 DataType::UInt8,
                 false,
             )]]
-            .concat(),
+                .concat(),
             HashMap::new(),
         )?;
         Ok(Self {
@@ -123,8 +124,8 @@ impl UserDefinedLogicalNode for SegmentationNode {
                 self.partition_cols.clone(),
                 self.exprs.clone(),
             )
-            .map_err(QueryError::into_datafusion_plan_error)
-            .unwrap(),
+                .map_err(QueryError::into_datafusion_plan_error)
+                .unwrap(),
         )
     }
 

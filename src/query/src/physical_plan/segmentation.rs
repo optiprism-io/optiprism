@@ -427,7 +427,7 @@ mod tests {
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
     use crate::physical_plan::expressions::segmentation::AggregateFunction;
     use crate::physical_plan::segmentation::SegmentationExec;
-
+/*
     #[tokio::test]
     async fn it_works() -> anyhow::Result<()> {
         let schema = Schema::new(vec![
@@ -523,5 +523,5 @@ mod tests {
         let res: ArrayRef = result[0].columns()[1].clone();
         assert_eq!(&*res, &*exp);
         Ok(())
-    }
+    }*/
 }

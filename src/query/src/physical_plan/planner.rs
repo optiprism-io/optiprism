@@ -9,7 +9,7 @@ use arrow::datatypes::DataType;
 use axum::async_trait;
 use datafusion::execution::context::QueryPlanner as DFQueryPlanner;
 use datafusion::execution::context::SessionState;
-use datafusion::physical_expr::PhysicalExpr;
+use datafusion::physical_expr::{create_physical_expr, PhysicalExpr};
 use datafusion::physical_plan::expressions;
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::planner::ExtensionPlanner as DFExtensionPlanner;
@@ -40,6 +40,7 @@ use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::segmentation;
 use crate::physical_plan::segmentation::SegmentationExec;
 use crate::physical_plan::unpivot::UnpivotExec;
+
 pub struct QueryPlanner {}
 
 #[async_trait]
@@ -192,9 +193,9 @@ impl DFExtensionPlanner for ExtensionPlanner {
         &self,
         _planner: &dyn PhysicalPlanner,
         node: &dyn UserDefinedLogicalNode,
-        _logical_inputs: &[&LogicalPlan],
+        logical_inputs: &[&LogicalPlan],
         physical_inputs: &[Arc<dyn ExecutionPlan>],
-        _ctx_state: &SessionState,
+        ctx_state: &SessionState,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
         let any = node.as_any();
         let plan = if any.downcast_ref::<MergeNode>().is_some() {
@@ -208,7 +209,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 node.name_col.clone(),
                 node.value_col.clone(),
             )
-            .map_err(|err| DataFusionError::Plan(err.to_string()))?;
+                .map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<PivotNode>() {
             let schema = node.input.schema();
@@ -224,7 +225,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 ),
                 node.result_cols.clone(),
             )
-            .map_err(|err| DataFusionError::Plan(err.to_string()))?;
+                .map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<DictionaryDecodeNode>() {
             let schema = node.input.schema();
@@ -259,6 +260,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 let ts_col =
                     expressions::Column::new("ts", node.schema.index_of_column(&node.ts_col)?);
                 let schema = node.input.schema();
+                let filter = create_physical_expr(&expr.filter, schema.as_ref(), &physical_inputs[0].schema(), ctx_state.execution_props())?;
                 let res = match &expr.agg_fn {
                     AggregateFunction::Sum(predicate) => {
                         agg_segment_expr!(schema, predicate, new_sum, ts_col, time_range)
@@ -273,7 +275,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                         agg_segment_expr!(schema, predicate, new_avg, ts_col, time_range)
                     }
                     AggregateFunction::Count => {
-                        Arc::new(Count::new(ts_col, time_range)) as Arc<dyn SegmentationExpr>
+                        Arc::new(Count::new(filter, ts_col, time_range)) as Arc<dyn SegmentationExpr>
                     }
                 };
                 exprs.push(res)

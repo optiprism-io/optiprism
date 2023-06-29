@@ -3,6 +3,7 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
+use datafusion::physical_expr::expressions::BinaryExpr;
 use common::query::EventFilter;
 use common::query::EventRef;
 use common::query::PropValueOperation;
