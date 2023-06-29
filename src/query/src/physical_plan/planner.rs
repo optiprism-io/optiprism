@@ -267,6 +267,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                         TimeRange::Last(since, start_ts) => {
                             SegmentTimeRange::Last(*since, *start_ts)
                         }
+                        TimeRange::Each(_) => unimplemented!()
                     },
                 };
                 let ts_col =

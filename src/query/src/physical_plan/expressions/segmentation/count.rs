@@ -146,7 +146,7 @@ mod tests {
         let mut hash_buf = vec![];
         hash_buf.resize(res.num_rows(), 0);
         create_hashes(&vec![res.columns()[0].clone()], &mut random_state, &mut hash_buf).unwrap();
-        let left = Arc::new(Column::new_with_schema("event",&res.schema()).unwrap());
+        let left = Arc::new(Column::new_with_schema("event", &res.schema()).unwrap());
         let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
         let f = BinaryExpr::new(left, Operator::Eq, right);
         let mut count = Count::new(
@@ -184,7 +184,7 @@ mod tests {
         let mut hash_buf = vec![];
         hash_buf.resize(res.num_rows(), 0);
         create_hashes(&vec![res.columns()[0].clone()], &mut random_state, &mut hash_buf).unwrap();
-        let left = Arc::new(Column::new_with_schema("event",&res.schema()).unwrap());
+        let left = Arc::new(Column::new_with_schema("event", &res.schema()).unwrap());
         let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
         let f = BinaryExpr::new(left, Operator::Eq, right);
         let mut count = Count::new(

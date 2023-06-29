@@ -30,7 +30,8 @@ pub enum SegmentTime {
         within: i64,
         unit: TimeIntervalUnit,
     },
-    WindowEach {
+    Each {
+        n: i64,
         unit: TimeIntervalUnit,
     },
 }

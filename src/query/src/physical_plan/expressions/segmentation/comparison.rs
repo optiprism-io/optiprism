@@ -202,3 +202,5 @@ impl SegmentationExpr for Eq {
         }
     }
 }
+
+// todo make macro for all the ops

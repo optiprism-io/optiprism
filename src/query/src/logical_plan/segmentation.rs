@@ -6,7 +6,7 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
-use datafusion_common::Column;
+use datafusion_common::{Column, ScalarValue};
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
@@ -26,12 +26,13 @@ pub enum AggregateFunction {
     Avg(Column),
     Count,
 }
-
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub enum TimeRange {
     Between(i64, i64),
     From(i64),
     Last(i64, i64),
+    Each(i64),
+    None,
 }
 
 #[derive(Hash, Eq, PartialEq)]
@@ -47,7 +48,7 @@ pub struct SegmentationNode {
 pub struct SegmentationExpr {
     pub filter: Expr,
     pub agg_fn: AggregateFunction,
-    pub time_range: Option<TimeRange>,
+    pub time_range: TimeRange,
 }
 
 impl SegmentationNode {
