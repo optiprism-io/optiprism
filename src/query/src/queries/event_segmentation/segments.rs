@@ -13,7 +13,7 @@ use metadata::MetadataProvider;
 use crate::error::Result;
 use crate::expr::{event_expression, event_filters_expression, property_col};
 use crate::expr::property_expression;
-use crate::logical_plan::segmentation::{AggregateFunction, Comparison, SegmentationExpr, TimeRange};
+use crate::logical_plan::segmentation::{AggregateFunction, SegmentationExpr, TimeRange};
 use crate::logical_plan::segmentation::SegmentationNode;
 use crate::{Context, event_fields};
 use crate::physical_plan::expressions::segmentation::comparison;

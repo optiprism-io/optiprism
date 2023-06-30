@@ -414,15 +414,15 @@ pub enum TimeIntervalUnit {
 }
 
 impl TimeIntervalUnit {
-    pub fn duration(&self,n:i64)->Duration {
+    pub fn duration(&self, n: i64) -> Duration {
         match self {
             TimeIntervalUnit::Second => Duration::seconds(n),
             TimeIntervalUnit::Minute => Duration::minutes(n),
             TimeIntervalUnit::Hour => Duration::hours(n),
             TimeIntervalUnit::Day => Duration::days(n),
             TimeIntervalUnit::Week => Duration::weeks(n),
-            TimeIntervalUnit::Month => Duration::months(n as i32),
-            TimeIntervalUnit::Year => Duration::years(n as i32),
+            TimeIntervalUnit::Month => Duration::days(n  * 31),
+            TimeIntervalUnit::Year => Duration::days(n * 31 * 12),
         }
     }
     pub fn relative_duration(&self, n: i64) -> RelativeDuration {

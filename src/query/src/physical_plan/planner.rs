@@ -256,7 +256,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .collect();
             let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        } else if let Some(node) = any.downcast_ref::<SegmentationNode>() {
+        } /*else if let Some(node) = any.downcast_ref::<SegmentationNode>() {
             let mut exprs: Vec<Arc<dyn SegmentationExpr>> = Vec::with_capacity(node.exprs.len());
             for expr in node.exprs.iter() {
                 let time_range = match &expr.time_range {
@@ -308,7 +308,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
 
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        } else {
+        }*/ else {
             None
         };
         Ok(plan)
