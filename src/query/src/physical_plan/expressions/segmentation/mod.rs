@@ -23,8 +23,10 @@ mod aggregator;
 // pub mod comparison;
 // pub mod count;
 pub mod time_range;
-mod count2;
+mod count;
 mod boolean_op;
+// mod aggregate;
+mod aggregate2;
 
 use num::Integer;
 use num_traits::Bounded;
