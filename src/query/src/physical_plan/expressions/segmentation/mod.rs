@@ -18,10 +18,10 @@ use crate::error::Result;
 use crate::physical_plan::abs_row_id_refs;
 use crate::Column;
 
-pub mod aggregate;
+// pub mod aggregate;
 mod aggregator;
-pub mod comparison;
-pub mod count;
+// pub mod comparison;
+// pub mod count;
 pub mod time_range;
 mod count2;
 mod boolean_op;
@@ -34,8 +34,8 @@ use num_traits::PrimInt;
 use num_traits::Zero;
 
 pub trait SegmentationExpr: Debug + Send + Sync {
-    fn evaluate(&self, record_batch: &RecordBatch, hashes: &[u64]) -> Result<Option<ArrayRef>>;
-    fn finalize(&self) -> Result<ArrayRef>;
+    fn evaluate(&self, record_batch: &RecordBatch, hashes: &[u64]) -> Result<Option<BooleanArray>>;
+    fn finalize(&self) -> Result<BooleanArray>;
 }
 
 #[derive(Debug, Clone)]

@@ -422,8 +422,8 @@ mod tests {
     use segmentation::SegmentationExpr;
 
     use crate::physical_plan::expressions::segmentation;
-    use crate::physical_plan::expressions::segmentation::comparison;
-    use crate::physical_plan::expressions::segmentation::count::Count;
+    // use crate::physical_plan::expressions::segmentation::comparison;
+    // use crate::physical_plan::expressions::segmentation::count::Count;
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
     use crate::physical_plan::expressions::segmentation::AggregateFunction;
     use crate::physical_plan::segmentation::SegmentationExec;

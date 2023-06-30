@@ -35,7 +35,7 @@ impl SegmentationExpr for And {
         &self,
         record_batch: &RecordBatch,
         hashes: &[u64],
-    ) -> crate::Result<Option<ArrayRef>> {
+    ) -> crate::Result<Option<BooleanArray>> {
         let mut inner = self.inner.lock().unwrap();
         let left = inner.left.evaluate(record_batch, hashes)?;
         let right = inner.right.evaluate(record_batch, hashes)?;
@@ -58,7 +58,7 @@ impl SegmentationExpr for And {
         }
     }
 
-    fn finalize(&self) -> crate::Result<ArrayRef> {
+    fn finalize(&self) -> crate::Result<BooleanArray> {
         let mut inner = self.inner.lock().unwrap();
         let left = inner
             .left
