@@ -162,6 +162,7 @@ impl ExecutionPlan for SegmentationExec {
         Statistics::default()
     }
 }
+
 pub struct SegmentationStream {
     segments: Vec<Arc<dyn SegmentationExpr>>,
     columns: Vec<Column>,
@@ -286,7 +287,17 @@ impl Stream for SegmentationStream {
                         .iter()
                         .map(|v| v.clone().into_array(batch.num_rows()).clone())
                         .collect::<Vec<ArrayRef>>();
+
                     create_hashes(&pk_arrs, &mut self.random_state, &mut hash_buf).unwrap();
+
+                    // todo remove
+                    let hash_buf = batch.columns()[0]
+                        .as_any()
+                        .downcast_ref::<Int64Array>()
+                        .unwrap()
+                        .iter()
+                        .map(|v| v.unwrap() as u64)
+                        .collect::<Vec<_>>();
                     for (idx, segment) in self.segments.iter().enumerate() {
                         let res = segment
                             .evaluate(&batch, &hash_buf)
@@ -294,6 +305,8 @@ impl Stream for SegmentationStream {
                         let res =
                             res.map(|v| v.as_any().downcast_ref::<BooleanArray>().unwrap().clone());
 
+                        // println!("{:?}", self.batch_buf);
+                        // println!("{:?}", res);
                         res_buf[idx].push_back(res.clone());
                     }
                     for (idx, p) in hash_buf.iter().enumerate() {
@@ -413,115 +426,136 @@ mod tests {
     use arrow::record_batch::RecordBatch;
     use arrow::util::pretty::pretty_format_batches;
     use arrow::util::pretty::print_batches;
+    use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
+    use datafusion::physical_expr::expressions::Literal;
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
     use datafusion_common::ScalarValue;
+    use datafusion_expr::Operator;
+    use futures::StreamExt;
     use segmentation::SegmentationExpr;
+    use store::test_util::parse_markdown_table_v1;
+    use store::test_util::parse_markdown_tables;
 
     use crate::physical_plan::expressions::segmentation;
+    use crate::physical_plan::expressions::segmentation::boolean_op;
+    use crate::physical_plan::expressions::segmentation::count::Count;
     // use crate::physical_plan::expressions::segmentation::comparison;
     // use crate::physical_plan::expressions::segmentation::count::Count;
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
     use crate::physical_plan::expressions::segmentation::AggregateFunction;
     use crate::physical_plan::segmentation::SegmentationExec;
-/*
+
     #[tokio::test]
     async fn it_works() -> anyhow::Result<()> {
-        let schema = Schema::new(vec![
-            Field::new("col", DataType::Int64, false),
-            Field::new(
-                "ts",
-                DataType::Timestamp(TimeUnit::Millisecond, None),
-                false,
-            ),
-        ]);
-        let schema = Arc::new(schema);
+        let data = r#"
+| user_id(i64) | ts(ts) | event(utf8) |
+|--------------|--------|-------------|
+| 1            | 1      | 1           |
+|              |        |             |
+| 2            | 2      | 1           |
+|              |        |             |
+| 3            | 3      | 1           |
+| 3            | 4      | 1           |
+| 3            | 5      | 1           |
+|              |        |             |
+| 3            | 6      | 1           |
+| 3            | 7      | 1           |
+| 3            | 8      | 1           |
+|              |        |             |
+| 3            | 9      | 1           |
+| 3            | 10     | 1           |
+| 3            | 11     | 1           |
+|              |        |             |
+| 3            | 12     | 1           |
+| 4            | 13     | 1           |
+| 5            | 14     | 1           |
+| 6            | 15     | 1           |
+| 6            | 16     | 1           |
+| 6            | 17     | 1           |
+| 7            | 18     | 1           |
+| 7            | 19     | 1           |
+| 8            | 20     | 1           |
+|              |        |             |
+| 9            | 21     | 1           |
+| 9            | 22     | 1           |
+| 10           | 23     | 1           |
+| 11           | 24     | 1           |
+|              |        |             |
+| 12           | 25     | 1           |
+| 12           | 26     | 1           |
+| 12           | 27     | 1           |
+| 12           | 28     | 1           |
+|              |        |             |
+| 12           | 29     | 1           |
+| 12           | 30     | 1           |
+| 12           | 31     | 1           |
+| 12           | 32     | 1           |
+|              |        |             |
+| 12           | 33     | 1           |
+| 12           | 34     | 1           |
+|              |        |             |
+| 12           | 35     | 1           |
+| 13           | 36     | 1           |
+| 14           | 37     | 1           |
+| 15           | 38     | 1           |
+"#;
 
-        let v = vec![
-            vec![1],
-            vec![2],
-            vec![1, 1, 1],
-            vec![1, 1, 1],
-            vec![1, 1, 1],
-            vec![1, 3, 4, 5, 5, 5, 6, 6, 7],
-            vec![8, 8, 9, 10],
-            vec![11, 11, 11, 11],
-            vec![11, 11, 11, 11],
-            vec![11, 11],
-            vec![11, 12, 14, 15],
-        ];
-
-        let ts = vec![
-            vec![1],
-            vec![1],
-            vec![1, 2, 3],
-            vec![4, 5, 6],
-            vec![7, 8, 9],
-            vec![10, 1, 1, 1, 2, 3, 1, 2, 1],
-            vec![1, 2, 1, 1],
-            vec![1, 2, 3, 4],
-            vec![5, 6, 7, 8],
-            vec![9, 10],
-            vec![11, 1, 1, 1],
-        ];
-
-        let batches = v
-            .into_iter()
-            .zip(ts.into_iter())
-            .map(|(vals, ts)| {
-                let col: ArrayRef = Arc::new(Int64Array::from(vals));
-                let ts: ArrayRef = Arc::new(TimestampMillisecondArray::from(ts));
-                RecordBatch::try_new(schema.clone(), vec![col.clone(), ts.clone()]).unwrap()
-            })
-            .collect::<Vec<_>>();
-
+        let batches = parse_markdown_tables(data).unwrap();
+        let schema = batches[0].schema();
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
-
-        let mut agg1 = Count::new(
+        let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
+        let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
+        let f = Arc::new(BinaryExpr::new(left, Operator::GtEq, right));
+        let mut agg1 = Arc::new(Count::<boolean_op::Eq>::new(
+            f.clone(),
             Column::new_with_schema("ts", &schema).unwrap(),
+            1,
             TimeRange::None,
-        );
-        let mut agg2 = Count::new(
+            None,
+        ));
+        let mut agg2 = Arc::new(Count::<boolean_op::Eq>::new(
+            f.clone(),
             Column::new_with_schema("ts", &schema).unwrap(),
+            2,
             TimeRange::None,
-        );
-        let mut agg3 = Count::new(
+            None,
+        ));
+        let mut agg3 = Arc::new(Count::<boolean_op::Eq>::new(
+            f.clone(),
             Column::new_with_schema("ts", &schema).unwrap(),
-            TimeRange::None,
-        );
-
-        let agg1 = Arc::new(comparison::Eq::new(
-            Arc::new(agg1),
-            ScalarValue::Int64(Some(1)),
-        ));
-        let agg2 = Arc::new(comparison::Eq::new(
-            Arc::new(agg2),
-            ScalarValue::Int64(Some(2)),
-        ));
-        let agg3 = Arc::new(comparison::Eq::new(
-            Arc::new(agg3),
-            ScalarValue::Int64(Some(3)),
-        ));
-        let segmentation = SegmentationExec::try_new(
-            vec![agg1, agg2, agg3],
-            vec![Column::new_with_schema("col", &schema)?],
-            Arc::new(input),
             3,
+            TimeRange::None,
+            None,
+        ));
+
+        let segmentation = SegmentationExec::try_new(
+            vec![agg1 /* , agg2, agg3 */],
+            vec![Column::new_with_schema("user_id", &schema)?],
+            Arc::new(input),
+            0,
         )?;
+
+        fn batch_to_arr(v: &ArrayRef) -> Vec<i64> {
+            let v = v.as_any().downcast_ref::<Int64Array>().unwrap();
+            v.iter().map(|x| x.unwrap()).collect()
+        }
 
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
-        let stream = segmentation.execute(0, task_ctx)?;
+        let mut stream = segmentation.execute(0, task_ctx)?;
         let result = collect(stream).await?;
-
+        // for i in result.iter() {
+        // println!("{:?}", batch_to_arr(&i.columns()[1]));
+        // }
         let exp = Int64Array::from(vec![1, 2, 3, 4, 7, 10, 12, 14, 15]);
         let exp = Arc::new(exp) as ArrayRef;
         print_batches(&result).unwrap();
         let res: ArrayRef = result[0].columns()[1].clone();
         assert_eq!(&*res, &*exp);
         Ok(())
-    }*/
+    }
 }

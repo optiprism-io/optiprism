@@ -23,11 +23,12 @@ use crate::Column;
 mod aggregator;
 // pub mod comparison;
 // pub mod count;
-mod boolean_op;
-mod count;
+pub mod boolean_op;
+pub mod count;
 pub mod time_range;
 // mod aggregate;
-mod aggregate;
+pub mod aggregate;
+mod comparison;
 
 use num::Integer;
 use num_traits::Bounded;

@@ -52,7 +52,7 @@ impl SegmentationExpr for And {
                     .unwrap()
                     .clone();
                 let res = and(&left, &right)?;
-                Ok(Some(Arc::new(res) as ArrayRef))
+                Ok(Some(res))
             }
             _ => unreachable!(),
         }
@@ -75,7 +75,7 @@ impl SegmentationExpr for And {
             .unwrap()
             .clone();
         let res = and(&left, &right)?;
-        Ok(Arc::new(res) as ArrayRef)
+        Ok(res)
     }
 }
 #[derive(Debug)]
@@ -100,7 +100,7 @@ impl SegmentationExpr for Or {
         &self,
         record_batch: &RecordBatch,
         hashes: &[u64],
-    ) -> crate::Result<Option<ArrayRef>> {
+    ) -> crate::Result<Option<BooleanArray>> {
         let mut inner = self.inner.lock().unwrap();
         let left = inner.left.evaluate(record_batch, hashes)?;
         let right = inner.right.evaluate(record_batch, hashes)?;
@@ -118,13 +118,13 @@ impl SegmentationExpr for Or {
                     .unwrap()
                     .clone();
                 let res = or(&left, &right)?;
-                Ok(Some(Arc::new(res) as ArrayRef))
+                Ok(Some(res))
             }
             _ => unreachable!(),
         }
     }
 
-    fn finalize(&self) -> crate::Result<ArrayRef> {
+    fn finalize(&self) -> crate::Result<BooleanArray> {
         let mut inner = self.inner.lock().unwrap();
         let left = inner
             .left
@@ -142,7 +142,7 @@ impl SegmentationExpr for Or {
             .clone();
         let res = or(&left, &right)?;
 
-        Ok(Arc::new(res) as ArrayRef)
+        Ok(res)
     }
 }
 
@@ -168,7 +168,7 @@ impl SegmentationExpr for Eq {
         &self,
         record_batch: &RecordBatch,
         hashes: &[u64],
-    ) -> crate::Result<Option<ArrayRef>> {
+    ) -> crate::Result<Option<BooleanArray>> {
         let mut inner = self.inner.lock().unwrap();
         let left = inner.left.evaluate(record_batch, hashes)?;
         match left {
@@ -179,7 +179,7 @@ impl SegmentationExpr for Eq {
                     DataType::Int64 => {
                         let left = arr.as_any().downcast_ref::<Int64Array>().unwrap();
                         let right = right.as_any().downcast_ref::<Int64Array>().unwrap();
-                        Ok(Some(Arc::new(eq(&left, &right)?) as ArrayRef))
+                        Ok(Some(eq(&left, &right)?))
                     }
                     _ => unreachable!(),
                 }
@@ -187,7 +187,7 @@ impl SegmentationExpr for Eq {
         }
     }
 
-    fn finalize(&self) -> crate::Result<ArrayRef> {
+    fn finalize(&self) -> crate::Result<BooleanArray> {
         let mut inner = self.inner.lock().unwrap();
         let arr = inner.left.finalize()?;
         let right = inner.right.to_array_of_size(arr.len());
@@ -196,7 +196,7 @@ impl SegmentationExpr for Eq {
             DataType::Int64 => {
                 let left = arr.as_any().downcast_ref::<Int64Array>().unwrap();
                 let right = right.as_any().downcast_ref::<Int64Array>().unwrap();
-                Ok(Arc::new(eq(&left, &right)?) as ArrayRef)
+                Ok(eq(&left, &right)?)
             }
             _ => unreachable!(),
         }
