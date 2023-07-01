@@ -6,32 +6,40 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
-use datafusion_common::{Column, ScalarValue};
+use common::query::Operator;
+use datafusion_common::Column;
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_common::Result as DFResult;
+use datafusion_common::ScalarValue;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
 use crate::error::QueryError;
 use crate::Result;
+#[derive(Hash, Debug, Clone, Eq, PartialEq)]
+pub struct Agg {
+    pub left: Column,
+    pub op: Operator,
+    pub right: ScalarValue,
+}
 
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub enum AggregateFunction {
-    Sum(Column),
-    Min(Column),
-    Max(Column),
-    Avg(Column),
-    Count,
+    Sum(Agg),
+    Min(Agg),
+    Max(Agg),
+    Avg(Agg),
+    Count { op: Operator, right: i64 },
 }
+
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub enum TimeRange {
     Between(i64, i64),
     From(i64),
     Last(i64, i64),
-    Each(i64),
     None,
 }
 
@@ -49,6 +57,7 @@ pub struct SegmentationExpr {
     pub filter: Expr,
     pub agg_fn: AggregateFunction,
     pub time_range: TimeRange,
+    pub time_window: Option<i64>,
 }
 
 impl SegmentationNode {
@@ -73,7 +82,7 @@ impl SegmentationNode {
                 DataType::UInt8,
                 false,
             )]]
-                .concat(),
+            .concat(),
             HashMap::new(),
         )?;
         Ok(Self {
@@ -125,8 +134,8 @@ impl UserDefinedLogicalNode for SegmentationNode {
                 self.partition_cols.clone(),
                 self.exprs.clone(),
             )
-                .map_err(QueryError::into_datafusion_plan_error)
-                .unwrap(),
+            .map_err(QueryError::into_datafusion_plan_error)
+            .unwrap(),
         )
     }
 

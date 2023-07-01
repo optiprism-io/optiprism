@@ -28,7 +28,7 @@ pub mod count;
 pub mod time_range;
 // mod aggregate;
 pub mod aggregate;
-mod comparison;
+pub mod comparison;
 
 use num::Integer;
 use num_traits::Bounded;
