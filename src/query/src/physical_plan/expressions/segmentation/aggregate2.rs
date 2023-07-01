@@ -145,26 +145,24 @@ impl<Op> SegmentationExpr for Aggregate<i64, i128, Op> where Op: ComparisonOp<i1
                 inner.val = i128::zero();
                 inner.agg.reset();
                 inner.last_ts = ts.value(idx);
+                let skip =inner.skip;
                 inner.skip = false;
-                println!("reset skip");
-                let res = Op::perform(val, self.right);
-                if !res {
-                    println!("a1");
-                    inner.out.append_value(false);
-                    inner.val = inner.agg.accumulate(arr.value(idx).into());
-                    continue;
+                if !skip {
+                    let res = Op::perform(val, self.right);
+                    if !res {
+                        inner.out.append_value(false);
+                        inner.val = inner.agg.accumulate(arr.value(idx).into());
+                        continue;
+                    }
+                    inner.out.append_value(true);
                 }
-                println!("a2");
-                inner.out.append_value(true);
             } else if !inner.skip && ts.value(idx) - inner.last_ts >= self.time_window {
-                println!("w");
                 let val = inner.val;
                 inner.val = i128::zero();
                 inner.agg.reset();
                 println!("{} {}",val,self.right);
                 let res = Op::perform(val, self.right);
                 if !res {
-                    println!("a3");
                     inner.out.append_value(false);
                     inner.skip = true;
                 } else {
@@ -456,13 +454,16 @@ mod tests {
 | 0            | 1      | e1          | 1      |
 | 0            | 2      | e1          | 1      |
 | 0            | 3      | e1          | 1      |
+
 | 1            | 11     | e1          | 1      |
 | 1            | 12     | e1          | 1      |
 | 1            | 13     | e1          | 1      |
 | 1            | 14     | e1          | 1      |
+
 | 2            | 16     | e1          | 1      |
 | 2            | 17     | e1          | 1      |
 | 2            | 18     | e1          | 1      |
+
 | 3            | 19     | e1          | 1      |
 | 3            | 20     | e1          | 1      |
 | 3            | 22     | e1          | 1      |
@@ -487,19 +488,17 @@ mod tests {
                 Column::new_with_schema("v", &res.schema()).unwrap(),
                 AggregateFunction::new_sum(),
                 Column::new_with_schema("ts", &res.schema()).unwrap(),
-                4,
+                1,
                 TimeRange::None,
                 Some(Duration::nanoseconds(2).num_nanoseconds().unwrap()),
             ).unwrap();
             let res = agg.evaluate(&res, &hash_buf).unwrap();
-            println!("{:?}", res);
-            // let right = BooleanArray::from(vec![true, false]);
-            // assert_eq!(res, Some(right));
+            let right = BooleanArray::from(vec![true, true, false]);
+            assert_eq!(res, Some(right));
 
             let res = agg.finalize().unwrap();
-            println!("{:?}", res);
-            // let right = BooleanArray::from(vec![false]);
-            // assert_eq!(res, right);
+            let right = BooleanArray::from(vec![true]);
+            assert_eq!(res, right);
         }
     }
 }

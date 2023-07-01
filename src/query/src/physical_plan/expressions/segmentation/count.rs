@@ -101,16 +101,13 @@ impl<Op> SegmentationExpr for Count<Op> where Op: ComparisonOp<i64> {
                         Operator::GtEq => count >= self.right,
                     };
                     if !res {
-                        println!("a1");
                         inner.out.append_value(false);
                         inner.count += 1;
                         continue;
                     }
-                    println!("a2");
                     inner.out.append_value(true);
                 }
             } else if !inner.skip && ts.value(idx) - inner.last_ts >= self.time_window {
-                println!("w");
                 let count = inner.count;
                 inner.count = 0;
                 let res = match Op::op() {
@@ -122,7 +119,6 @@ impl<Op> SegmentationExpr for Count<Op> where Op: ComparisonOp<i64> {
                     Operator::GtEq => count >= self.right,
                 };
                 if !res {
-                    println!("a3");
                     inner.out.append_value(false);
                     inner.skip = true;
                 } else {
@@ -144,7 +140,6 @@ impl<Op> SegmentationExpr for Count<Op> where Op: ComparisonOp<i64> {
     fn finalize(&self) -> Result<BooleanArray> {
         let mut inner = self.inner.lock().unwrap();
         if inner.skip {
-            println!("a4");
             inner.out.append_value(false);
             return Ok(inner.out.finish());
         }
@@ -160,10 +155,8 @@ impl<Op> SegmentationExpr for Count<Op> where Op: ComparisonOp<i64> {
         };
 
         if !res {
-            println!("a5");
             inner.out.append_value(false);
         } else {
-            println!("a6");
             inner.out.append_value(true);
         }
         Ok(inner.out.finish())
@@ -312,7 +305,7 @@ mod tests {
         let data = r#"
     | user_id(i64) | ts(ts) | event(utf8) |
     |--------------|--------|-------------|
-   | 0            | 0     | e1          |
+    | 0            | 0     | e1          |
     | 0            | 1     | e1          |
 
     | 0            | 2     | e1          |
@@ -352,14 +345,13 @@ mod tests {
         let mut count = Count::<Gt>::new(
             Arc::new(f) as PhysicalExprRef,
             Column::new_with_schema("ts", &res.schema()).unwrap(),
-            4,
+            1,
             TimeRange::None,
             Some(Duration::nanoseconds(2).num_nanoseconds().unwrap()),
         );
         let res = count.evaluate(&res, &hash_buf).unwrap();
         let right = BooleanArray::from(vec![true, true, false]);
         assert_eq!(res, Some(right));
-        return;
 
         let res = count.finalize().unwrap();
         let right = BooleanArray::from(vec![true]);
