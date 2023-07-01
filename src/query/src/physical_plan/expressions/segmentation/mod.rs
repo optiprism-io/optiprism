@@ -5,7 +5,8 @@ use std::marker::PhantomData;
 use std::ops::Add;
 use std::sync::Arc;
 
-use arrow::array::{Array, ArrayRef};
+use arrow::array::Array;
+use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::TimestampMillisecondArray;
 use arrow::record_batch::RecordBatch;
@@ -22,11 +23,11 @@ use crate::Column;
 mod aggregator;
 // pub mod comparison;
 // pub mod count;
-pub mod time_range;
-mod count;
 mod boolean_op;
+mod count;
+pub mod time_range;
 // mod aggregate;
-mod aggregate2;
+mod aggregate;
 
 use num::Integer;
 use num_traits::Bounded;
