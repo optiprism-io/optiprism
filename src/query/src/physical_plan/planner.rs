@@ -11,7 +11,9 @@ use common::query::Operator;
 use datafusion::execution::context::QueryPlanner as DFQueryPlanner;
 use datafusion::execution::context::SessionState;
 use datafusion::physical_expr::create_physical_expr;
+use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
+use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_plan::expressions;
 use datafusion::physical_plan::planner::DefaultPhysicalPlanner;
 use datafusion::physical_plan::planner::ExtensionPlanner as DFExtensionPlanner;
@@ -22,6 +24,7 @@ use datafusion_common::ExprSchema;
 use datafusion_common::Result;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
+use datafusion_common::ScalarValue::Int8;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
@@ -32,11 +35,13 @@ use crate::logical_plan::segmentation::AggregateFunction;
 use crate::logical_plan::segmentation::SegmentationNode;
 use crate::logical_plan::segmentation::TimeRange;
 use crate::logical_plan::unpivot::UnpivotNode;
+use crate::physical_plan;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
 use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
 use crate::physical_plan::expressions::segmentation::boolean_op;
 use crate::physical_plan::expressions::segmentation::boolean_op::*;
 use crate::physical_plan::expressions::segmentation::count::Count;
+use crate::physical_plan::expressions::segmentation::time_range;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange as SegmentTimeRange;
 use crate::physical_plan::expressions::segmentation::AggregateFunction as SegmentAggregateFunction;
 use crate::physical_plan::expressions::segmentation::SegmentationExpr;
@@ -65,277 +70,24 @@ impl DFQueryPlanner for QueryPlanner {
 
 pub struct ExtensionPlanner {}
 
-macro_rules! agg_expr {
-    ($filter:expr,$left:expr,$ts_col:expr,$agg_fn:ident,$typ:ty,$acc_typ:ty,$scalar_ty:tt,$op:ident,$right:expr,$time_range:expr,$time_window:expr) => {
-        Arc::new(
-            Aggregate::<$typ, $acc_typ, $op>::try_new(
-                $filter,
-                $left,
-                SegmentAggregateFunction::$agg_fn(),
-                $ts_col,
-                scalar_to!($typ, $right),
-                $time_range,
-                $time_window,
-            )
-            .map_err(|err| DataFusionError::Plan(err.to_string()))?,
-        ) as Arc<dyn SegmentationExpr>
-    };
-}
-
-macro_rules! scalar_to {
-    ($typ:tt,$right:expr) => {
-        scalar_to_$typ($right)
-    };
-}
-
-macro_rules! scalar_to_primitive {
-    ($scalar_ty:tt,$typ:tt) => {
-        fn scalar_to_$typ(scalar: ScalarValue) -> $typ {
-            match scalar {
-                ScalarValue::$scalar_ty(Some(v)) => v,
-                _ => panic!("Invalid scalar type"),
-            }
-        }
-    };
-}
-
-scalar_to_primitive!(Int8, i8);
-scalar_to_primitive!(Int16, i16);
-scalar_to_primitive!(Int32, i32);
-scalar_to_primitive!(Int64, i64);
-scalar_to_primitive!(UInt8, i8);
-scalar_to_primitive!(UInt16, i16);
-scalar_to_primitive!(UInt32, i32);
-scalar_to_primitive!(UInt64, i64);
-scalar_to_primitive!(Float16, f16);
-scalar_to_primitive!(Float32, f32);
-scalar_to_primitive!(Float64, f64);
-macro_rules! agg_segment_expr {
-    ($schema:expr, $filter:expr, $ts_col:expr, $agg_fn:ident, $left:expr,$op:ident,$right:expr, $time_range:expr,$time_window:expr) => {{
-        let left_expr =
-            expressions::Column::new($left.name.as_str(), $schema.index_of_column(&$left)?);
-        match $schema.data_type(&$left)? {
-            DataType::Int8 => agg_expr!(
-                $filter,
-                left_expr,
-                $ts_col,
-                $agg_fn,
-                i8,
-                i64,
-                Int8,
-                $op,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Int16 => agg_expr!(
-                $filter,
-                left_expr,
-                $ts_col,
-                $agg_fn,
-                i16,
-                i64,
-                Int16,
-                $op,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Int32 => agg_expr!(
-                $filter,
-                left_expr,
-                $ts_col,
-                $agg_fn,
-                i32,
-                i64,
-                Int32,
-                $op,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Int64 => agg_expr!(
-                $filter,
-                left_expr,
-                $ts_col,
-                $agg_fn,
-                i64,
-                i128,
-                Int64,
-                $op,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::UInt8 => agg_expr!(
-                $filter,
-                left_expr,
-                $ts_col,
-                $agg_fn,
-                u8,
-                i64,
-                UInt8,
-                $op,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::UInt16 => agg_expr!(
-                $filter,
-                left_expr,
-                $ts_col,
-                $agg_fn,
-                u16,
-                i64,
-                UInt16,
-                $op,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::UInt32 => agg_expr!(
-                $filter,
-                left_expr,
-                $ts_col,
-                $agg_fn,
-                u32,
-                i64,
-                UInt32,
-                $op,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::UInt64 => agg_expr!(
-                $filter,
-                left_expr,
-                $ts_col,
-                $agg_fn,
-                u64,
-                i128,
-                UInt64,
-                $op,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Float32 => agg_expr!(
-                $filter,
-                left_expr,
-                $ts_col,
-                $agg_fn,
-                f32,
-                f64,
-                Float32,
-                $op,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Float64 => agg_expr!(
-                $filter,
-                left_expr,
-                $ts_col,
-                $agg_fn,
-                f64,
-                f64,
-                Float64,
-                $op,
-                $right,
-                $time_range,
-                $time_window
-            )/*,
-            DataType::Decimal128(p, s) => Arc::new(
-                agg_expr!(
+macro_rules! aggregate_expr {
+    ($schema:expr,$filter:expr,$left:expr,$agg_fn:ident,$right:expr,$time_range:expr,$time_window:expr) => {
+        match $right {
+            ScalarValue::Int64(Some(v)) => Arc::new(
+                Aggregate::<i8, i64, Gt>::try_new(
                     $filter,
-                    left_expr,
-                    $ts_col,
-                    $agg_fn,
-                    Decimal128Array,
-                    i128,
-                    $op,
-                    $right,
+                    $left,
+                    physical_plan::expressions::segmentation::AggregateFunction::$agg_fn(),
+                    Column::new_with_schema("ts", $schema).unwrap(),
+                    v,
                     $time_range,
-                    $time_window
+                    $time_window,
                 )
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?,
-            ) as Arc<dyn SegmentationExpr>,*/
+            ) as Arc<dyn SegmentationExpr>,
             _ => unimplemented!(),
         }
-    }};
-}
-
-macro_rules! agg_segment_expr_outer {
-    ($schema:expr, $filter:expr, $ts_col:expr, $agg_fn:ident, $left:expr,$op:expr,$right:expr, $time_range:expr,$time_window:expr) => {{
-        match $op {
-            Operator::Eq => agg_segment_expr!(
-                $schema,
-                $filter,
-                $ts_col,
-                $agg_fn,
-                $left,
-                Eq,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            Operator::NotEq => agg_segment_expr!(
-                $schema,
-                $filter,
-                $ts_col,
-                $agg_fn,
-                $left,
-                NotEq,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            Operator::Lt => agg_segment_expr!(
-                $schema,
-                $filter,
-                $ts_col,
-                $agg_fn,
-                $left,
-                Lt,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            Operator::LtEq => agg_segment_expr!(
-                $schema,
-                $filter,
-                $ts_col,
-                $agg_fn,
-                $left,
-                LtEq,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            Operator::Gt => agg_segment_expr!(
-                $schema,
-                $filter,
-                $ts_col,
-                $agg_fn,
-                $left,
-                Gt,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            Operator::GtEq => agg_segment_expr!(
-                $schema,
-                $filter,
-                $ts_col,
-                $agg_fn,
-                $left,
-                GtEq,
-                $right,
-                $time_range,
-                $time_window
-            ),
-        }
-    }};
+    };
 }
 #[async_trait]
 impl DFExtensionPlanner for ExtensionPlanner {
@@ -412,51 +164,57 @@ impl DFExtensionPlanner for ExtensionPlanner {
                     &physical_inputs[0].schema(),
                     ctx_state.execution_props(),
                 )?;
+                let schema = &physical_inputs[0].schema();
                 let res = match &expr.agg_fn {
-                    AggregateFunction::Sum(agg) => agg_segment_expr_outer!(
-                        schema,
-                        filter,
-                        ts_col,
-                        new_sum,
-                        agg.left,
-                        agg.op,
-                        agg.right,
-                        time_range,
-                        expr.time_window
-                    ),
-                    AggregateFunction::Min(agg) => agg_segment_expr_outer!(
-                        schema,
-                        filter,
-                        ts_col,
-                        new_min,
-                        agg.left,
-                        agg.op,
-                        agg.right,
-                        time_range,
-                        expr.time_window
-                    ),
-                    AggregateFunction::Max(agg) => agg_segment_expr_outer!(
-                        schema,
-                        filter,
-                        ts_col,
-                        new_max,
-                        agg.left,
-                        agg.op,
-                        agg.right,
-                        time_range,
-                        expr.time_window
-                    ),
-                    AggregateFunction::Avg(agg) => agg_segment_expr_outer!(
-                        schema,
-                        filter,
-                        ts_col,
-                        new_avg,
-                        agg.left,
-                        agg.op,
-                        agg.right,
-                        time_range,
-                        expr.time_window
-                    ),
+                    AggregateFunction::Sum(agg) => {
+                        let left_col = Column::new_with_schema(agg.left.name.as_str(), schema)?;
+                        aggregate_expr!(
+                            schema,
+                            filter,
+                            left_col,
+                            new_sum,
+                            agg.right,
+                            time_range,
+                            expr.time_window
+                        )
+                    }
+                    AggregateFunction::Min(agg) => {
+                        let left_col = Column::new_with_schema(agg.left.name.as_str(), schema)?;
+                        aggregate_expr!(
+                            schema,
+                            filter,
+                            left_col,
+                            new_min,
+                            agg.right,
+                            time_range,
+                            expr.time_window
+                        )
+                    }
+                    AggregateFunction::Max(agg) => {
+                        let left_col = Column::new_with_schema(agg.left.name.as_str(), schema)?;
+                        aggregate_expr!(
+                            schema,
+                            filter,
+                            left_col,
+                            new_max,
+                            agg.right,
+                            time_range,
+                            expr.time_window
+                        )
+                    }
+                    AggregateFunction::Avg(agg) => {
+                        let left_col = Column::new_with_schema(agg.left.name.as_str(), schema)?;
+                        aggregate_expr!(
+                            schema,
+                            filter,
+                            left_col,
+                            new_avg,
+                            agg.right,
+                            time_range,
+                            expr.time_window
+                        )
+                    }
+
                     AggregateFunction::Count { op, right } => match op {
                         Operator::Eq => Arc::new(Count::<boolean_op::Eq>::new(
                             filter,
@@ -464,42 +222,42 @@ impl DFExtensionPlanner for ExtensionPlanner {
                             *right,
                             time_range,
                             expr.time_window,
-                        )),
+                        )) as Arc<dyn SegmentationExpr>,
                         Operator::NotEq => Arc::new(Count::<boolean_op::NotEq>::new(
                             filter,
                             ts_col,
                             *right,
                             time_range,
                             expr.time_window,
-                        )),
+                        )) as Arc<dyn SegmentationExpr>,
                         Operator::Lt => Arc::new(Count::<boolean_op::Lt>::new(
                             filter,
                             ts_col,
                             *right,
                             time_range,
                             expr.time_window,
-                        )),
+                        )) as Arc<dyn SegmentationExpr>,
                         Operator::LtEq => Arc::new(Count::<boolean_op::LtEq>::new(
                             filter,
                             ts_col,
                             *right,
                             time_range,
                             expr.time_window,
-                        )),
+                        )) as Arc<dyn SegmentationExpr>,
                         Operator::Gt => Arc::new(Count::<boolean_op::Gt>::new(
                             filter,
                             ts_col,
                             *right,
                             time_range,
                             expr.time_window,
-                        )),
+                        )) as Arc<dyn SegmentationExpr>,
                         Operator::GtEq => Arc::new(Count::<boolean_op::GtEq>::new(
                             filter,
                             ts_col,
                             *right,
                             time_range,
                             expr.time_window,
-                        )),
+                        )) as Arc<dyn SegmentationExpr>,
                         _ => unimplemented!(),
                     },
                 };
@@ -541,17 +299,17 @@ macro_rules! impl_scalar {
     };
 }
 
-impl_scalar!(f64, Float64);
-impl_scalar!(f32, Float32);
-impl_scalar!(i8, Int8);
-impl_scalar!(i16, Int16);
-impl_scalar!(i32, Int32);
-impl_scalar!(i64, Int64);
-impl_scalar!(bool, Boolean);
-impl_scalar!(u8, UInt8);
-impl_scalar!(u16, UInt16);
-impl_scalar!(u32, UInt32);
-impl_scalar!(u64, UInt64);
+// impl_scalar!(f64, Float64);
+// impl_scalar!(f32, Float32);
+// impl_scalar!(i8, Int8);
+// impl_scalar!(i16, Int16);
+// impl_scalar!(i32, Int32);
+// impl_scalar!(i64, Int64);
+// impl_scalar!(bool, Boolean);
+// impl_scalar!(u8, UInt8);
+// impl_scalar!(u16, UInt16);
+// impl_scalar!(u32, UInt32);
+// impl_scalar!(u64, UInt64);
 
 #[cfg(test)]
 mod tests {

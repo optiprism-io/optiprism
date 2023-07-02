@@ -20,7 +20,7 @@ use crate::physical_plan::abs_row_id_refs;
 use crate::Column;
 
 // pub mod aggregate;
-mod aggregator;
+// pub mod aggregator;
 // pub mod comparison;
 // pub mod count;
 pub mod boolean_op;
