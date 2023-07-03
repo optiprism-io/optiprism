@@ -285,32 +285,6 @@ impl DFExtensionPlanner for ExtensionPlanner {
     }
 }
 
-macro_rules! impl_scalar {
-    ($ty:ty, $scalar:tt) => {
-        impl From<ScalarValue> for $ty {
-            fn from(value: ScalarValue) -> Self {
-                if let ScalarValue::$scalar(Some(v)) = value {
-                    v
-                } else {
-                    panic!("invalid scalar value")
-                }
-            }
-        }
-    };
-}
-
-// impl_scalar!(f64, Float64);
-// impl_scalar!(f32, Float32);
-// impl_scalar!(i8, Int8);
-// impl_scalar!(i16, Int16);
-// impl_scalar!(i32, Int32);
-// impl_scalar!(i64, Int64);
-// impl_scalar!(bool, Boolean);
-// impl_scalar!(u8, UInt8);
-// impl_scalar!(u16, UInt16);
-// impl_scalar!(u32, UInt32);
-// impl_scalar!(u64, UInt64);
-
 #[cfg(test)]
 mod tests {
     #[test]

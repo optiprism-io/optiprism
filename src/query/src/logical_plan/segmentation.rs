@@ -6,6 +6,9 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
+use chrono::DateTime;
+use chrono::Utc;
+use common::query::event_segmentation::SegmentTime;
 use common::query::Operator;
 use datafusion_common::Column;
 use datafusion_common::DFField;
@@ -19,6 +22,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 
 use crate::error::QueryError;
 use crate::Result;
+
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub struct Agg {
     pub left: Column,
@@ -43,13 +47,35 @@ pub enum TimeRange {
     None,
 }
 
+impl TimeRange {
+    pub fn from_segment_time(t: SegmentTime, cur_time: DateTime<Utc>) -> TimeRange {
+        match t {
+            // todo make common
+            SegmentTime::Between { from, to } => {
+                TimeRange::Between(from.timestamp_millis(), to.timestamp_millis())
+            }
+            SegmentTime::From(from) => TimeRange::From(from.timestamp_millis()),
+            SegmentTime::Last { n, unit } => TimeRange::Last(
+                unit.duration(*n).num_milliseconds(),
+                cur_time.num_milliseconds(),
+            ),
+            SegmentTime::Each { n, unit } => TimeRange::None,
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl From<SegmentTime> for TimeRange {
+    fn from(value: SegmentTime) -> Self {}
+}
+
 #[derive(Hash, Eq, PartialEq)]
 pub struct SegmentationNode {
     pub input: LogicalPlan,
     pub ts_col: Column,
     pub schema: DFSchemaRef,
     pub partition_cols: Vec<Column>,
-    pub exprs: Vec<SegmentationExpr>,
+    pub exprs: Vec<Vec<SegmentationExpr>>,
 }
 
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
@@ -65,7 +91,7 @@ impl SegmentationNode {
         input: LogicalPlan,
         ts_col: Column,
         partition_cols: Vec<Column>,
-        exprs: Vec<SegmentationExpr>,
+        exprs: Vec<Vec<SegmentationExpr>>,
     ) -> Result<Self> {
         let cols = partition_cols
             .iter()
