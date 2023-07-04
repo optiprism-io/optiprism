@@ -30,6 +30,7 @@ use crate::expr::event_expression;
 use crate::expr::event_filters_expression;
 use crate::expr::property_col;
 use crate::expr::property_expression;
+use crate::logical_plan::segmentation;
 use crate::logical_plan::segmentation::Agg;
 use crate::logical_plan::segmentation::AggregateFunction;
 use crate::logical_plan::segmentation::SegmentationExpr;
@@ -48,6 +49,7 @@ pub(crate) fn build_segments_logical_plan(
     partition_columns: Vec<Column>,
     ts_col: Column,
 ) -> Result<LogicalPlan> {
+    let mut out = vec![];
     for segment in segments {
         let mut exprs: Vec<Vec<SegmentationExpr>> = Vec::new();
         for conditions in &segment.conditions {
@@ -170,12 +172,21 @@ pub(crate) fn build_segments_logical_plan(
 
             exprs.push(and_conditions)
         }
+        out.push(segmentation::Segment { expressions: exprs });
     }
 
-    let node = SegmentationNode::try_new(input, ts_col, partition_columns, exprs)?;
+    let node = SegmentationNode::try_new(input, ts_col, partition_columns, out)?;
     let plan = LogicalPlan::Extension(Extension {
         node: Arc::new(node),
     });
 
     Ok(plan)
+}
+
+#[cfg!(test)]
+mod tests {
+    #[test]
+    fn test_plan() {
+        let plan =
+    }
 }

@@ -65,17 +65,13 @@ impl TimeRange {
     }
 }
 
-impl From<SegmentTime> for TimeRange {
-    fn from(value: SegmentTime) -> Self {}
-}
-
 #[derive(Hash, Eq, PartialEq)]
 pub struct SegmentationNode {
     pub input: LogicalPlan,
     pub ts_col: Column,
     pub schema: DFSchemaRef,
     pub partition_cols: Vec<Column>,
-    pub exprs: Vec<Vec<SegmentationExpr>>,
+    pub segments: Vec<Segment>,
 }
 
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
@@ -86,12 +82,16 @@ pub struct SegmentationExpr {
     pub time_window: Option<i64>,
 }
 
+pub struct Segment {
+    pub expressions: Vec<Vec<SegmentationExpr>>,
+}
+
 impl SegmentationNode {
     pub fn try_new(
         input: LogicalPlan,
         ts_col: Column,
         partition_cols: Vec<Column>,
-        exprs: Vec<Vec<SegmentationExpr>>,
+        segments: Vec<Segment>,
     ) -> Result<Self> {
         let cols = partition_cols
             .iter()
@@ -116,7 +116,7 @@ impl SegmentationNode {
             ts_col,
             schema: Arc::new(schema),
             partition_cols,
-            exprs,
+            segments,
         })
     }
 }

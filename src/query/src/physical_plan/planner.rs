@@ -40,6 +40,8 @@ use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
 use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
 use crate::physical_plan::expressions::segmentation::boolean_op;
 use crate::physical_plan::expressions::segmentation::boolean_op::*;
+use crate::physical_plan::expressions::segmentation::comparison::And;
+use crate::physical_plan::expressions::segmentation::comparison::Or;
 use crate::physical_plan::expressions::segmentation::count::Count;
 use crate::physical_plan::expressions::segmentation::time_range;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange as SegmentTimeRange;
@@ -147,134 +149,164 @@ impl DFExtensionPlanner for ExtensionPlanner {
             let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<SegmentationNode>() {
+            let mut segments = vec![];
             let mut exprs: Vec<Arc<dyn SegmentationExpr>> = Vec::with_capacity(node.exprs.len());
-            for expr in node.exprs.iter() {
-                let time_range = match &expr.time_range {
-                    TimeRange::Between(from, to) => SegmentTimeRange::Between(*from, *to),
-                    TimeRange::From(from) => SegmentTimeRange::From(*from),
-                    TimeRange::Last(last, ts) => SegmentTimeRange::Last(*last, *ts),
-                    TimeRange::None => SegmentTimeRange::None,
-                };
-                let ts_col =
-                    expressions::Column::new("ts", node.schema.index_of_column(&node.ts_col)?);
-                let schema = node.input.schema();
-                let filter = create_physical_expr(
-                    &expr.filter,
-                    schema.as_ref(),
-                    &physical_inputs[0].schema(),
-                    ctx_state.execution_props(),
-                )?;
-                let schema = &physical_inputs[0].schema();
-                let res = match &expr.agg_fn {
-                    AggregateFunction::Sum(agg) => {
-                        let left_col = Column::new_with_schema(agg.left.name.as_str(), schema)?;
-                        aggregate_expr!(
-                            schema,
-                            filter,
-                            left_col,
-                            new_sum,
-                            agg.right,
-                            time_range,
-                            expr.time_window
-                        )
-                    }
-                    AggregateFunction::Min(agg) => {
-                        let left_col = Column::new_with_schema(agg.left.name.as_str(), schema)?;
-                        aggregate_expr!(
-                            schema,
-                            filter,
-                            left_col,
-                            new_min,
-                            agg.right,
-                            time_range,
-                            expr.time_window
-                        )
-                    }
-                    AggregateFunction::Max(agg) => {
-                        let left_col = Column::new_with_schema(agg.left.name.as_str(), schema)?;
-                        aggregate_expr!(
-                            schema,
-                            filter,
-                            left_col,
-                            new_max,
-                            agg.right,
-                            time_range,
-                            expr.time_window
-                        )
-                    }
-                    AggregateFunction::Avg(agg) => {
-                        let left_col = Column::new_with_schema(agg.left.name.as_str(), schema)?;
-                        aggregate_expr!(
-                            schema,
-                            filter,
-                            left_col,
-                            new_avg,
-                            agg.right,
-                            time_range,
-                            expr.time_window
-                        )
-                    }
+            for segment in node.segments.iter() {
+                let mut or_expr = vec![];
+                for exprs in segment.expressions.iter() {
+                    let mut and_exprs = vec![];
+                    for expr in exprs.iter() {
+                        let time_range = match &expr.time_range {
+                            TimeRange::Between(from, to) => SegmentTimeRange::Between(*from, *to),
+                            TimeRange::From(from) => SegmentTimeRange::From(*from),
+                            TimeRange::Last(last, ts) => SegmentTimeRange::Last(*last, *ts),
+                            TimeRange::None => SegmentTimeRange::None,
+                        };
+                        let ts_col = expressions::Column::new(
+                            "ts",
+                            node.schema.index_of_column(&node.ts_col)?,
+                        );
+                        let schema = node.input.schema();
+                        let filter = create_physical_expr(
+                            &expr.filter,
+                            schema.as_ref(),
+                            &physical_inputs[0].schema(),
+                            ctx_state.execution_props(),
+                        )?;
+                        let schema = &physical_inputs[0].schema();
+                        let expr = match &expr.agg_fn {
+                            AggregateFunction::Sum(agg) => {
+                                let left_col =
+                                    Column::new_with_schema(agg.left.name.as_str(), schema)?;
+                                aggregate_expr!(
+                                    schema,
+                                    filter,
+                                    left_col,
+                                    new_sum,
+                                    agg.right,
+                                    time_range,
+                                    expr.time_window
+                                )
+                            }
+                            AggregateFunction::Min(agg) => {
+                                let left_col =
+                                    Column::new_with_schema(agg.left.name.as_str(), schema)?;
+                                aggregate_expr!(
+                                    schema,
+                                    filter,
+                                    left_col,
+                                    new_min,
+                                    agg.right,
+                                    time_range,
+                                    expr.time_window
+                                )
+                            }
+                            AggregateFunction::Max(agg) => {
+                                let left_col =
+                                    Column::new_with_schema(agg.left.name.as_str(), schema)?;
+                                aggregate_expr!(
+                                    schema,
+                                    filter,
+                                    left_col,
+                                    new_max,
+                                    agg.right,
+                                    time_range,
+                                    expr.time_window
+                                )
+                            }
+                            AggregateFunction::Avg(agg) => {
+                                let left_col =
+                                    Column::new_with_schema(agg.left.name.as_str(), schema)?;
+                                aggregate_expr!(
+                                    schema,
+                                    filter,
+                                    left_col,
+                                    new_avg,
+                                    agg.right,
+                                    time_range,
+                                    expr.time_window
+                                )
+                            }
 
-                    AggregateFunction::Count { op, right } => match op {
-                        Operator::Eq => Arc::new(Count::<boolean_op::Eq>::new(
-                            filter,
-                            ts_col,
-                            *right,
-                            time_range,
-                            expr.time_window,
-                        )) as Arc<dyn SegmentationExpr>,
-                        Operator::NotEq => Arc::new(Count::<boolean_op::NotEq>::new(
-                            filter,
-                            ts_col,
-                            *right,
-                            time_range,
-                            expr.time_window,
-                        )) as Arc<dyn SegmentationExpr>,
-                        Operator::Lt => Arc::new(Count::<boolean_op::Lt>::new(
-                            filter,
-                            ts_col,
-                            *right,
-                            time_range,
-                            expr.time_window,
-                        )) as Arc<dyn SegmentationExpr>,
-                        Operator::LtEq => Arc::new(Count::<boolean_op::LtEq>::new(
-                            filter,
-                            ts_col,
-                            *right,
-                            time_range,
-                            expr.time_window,
-                        )) as Arc<dyn SegmentationExpr>,
-                        Operator::Gt => Arc::new(Count::<boolean_op::Gt>::new(
-                            filter,
-                            ts_col,
-                            *right,
-                            time_range,
-                            expr.time_window,
-                        )) as Arc<dyn SegmentationExpr>,
-                        Operator::GtEq => Arc::new(Count::<boolean_op::GtEq>::new(
-                            filter,
-                            ts_col,
-                            *right,
-                            time_range,
-                            expr.time_window,
-                        )) as Arc<dyn SegmentationExpr>,
-                        _ => unimplemented!(),
-                    },
-                };
-                exprs.push(res)
+                            AggregateFunction::Count { op, right } => match op {
+                                Operator::Eq => Arc::new(Count::<boolean_op::Eq>::new(
+                                    filter,
+                                    ts_col,
+                                    *right,
+                                    time_range,
+                                    expr.time_window,
+                                ))
+                                    as Arc<dyn SegmentationExpr>,
+                                Operator::NotEq => Arc::new(Count::<boolean_op::NotEq>::new(
+                                    filter,
+                                    ts_col,
+                                    *right,
+                                    time_range,
+                                    expr.time_window,
+                                ))
+                                    as Arc<dyn SegmentationExpr>,
+                                Operator::Lt => Arc::new(Count::<boolean_op::Lt>::new(
+                                    filter,
+                                    ts_col,
+                                    *right,
+                                    time_range,
+                                    expr.time_window,
+                                ))
+                                    as Arc<dyn SegmentationExpr>,
+                                Operator::LtEq => Arc::new(Count::<boolean_op::LtEq>::new(
+                                    filter,
+                                    ts_col,
+                                    *right,
+                                    time_range,
+                                    expr.time_window,
+                                ))
+                                    as Arc<dyn SegmentationExpr>,
+                                Operator::Gt => Arc::new(Count::<boolean_op::Gt>::new(
+                                    filter,
+                                    ts_col,
+                                    *right,
+                                    time_range,
+                                    expr.time_window,
+                                ))
+                                    as Arc<dyn SegmentationExpr>,
+                                Operator::GtEq => Arc::new(Count::<boolean_op::GtEq>::new(
+                                    filter,
+                                    ts_col,
+                                    *right,
+                                    time_range,
+                                    expr.time_window,
+                                ))
+                                    as Arc<dyn SegmentationExpr>,
+                                _ => unimplemented!(),
+                            },
+                        };
+                        and_exprs.push(expr)
+                    }
+                    if and_exprs.len() > 1 {
+                        for idx in (0..and_exprs.len() - 1).into_iter().step_by(2) {
+                            and_exprs[0] = Arc::new(And::new(
+                                and_exprs[idx].clone(),
+                                and_exprs[idx + 1].clone(),
+                            ));
+                        }
+                    }
+                    or_expr.push(and_exprs[0].clone());
+                }
+                if or_expr.len() > 1 {
+                    for idx in (0..or_expr.len() - 1).into_iter().step_by(2) {
+                        or_expr[0] =
+                            Arc::new(Or::new(or_expr[idx].clone(), or_expr[idx + 1].clone()));
+                    }
+                }
+                segments.push(or_expr[0].clone());
             }
 
             let cols = node
                 .partition_cols
                 .iter()
-                .map(|c| {
-                    expressions::Column::new(
-                        c.name.as_str(),
-                        node.schema.index_of_column(c).unwrap(),
-                    )
-                })
+                .map(|c| Column::new(c.name.as_str(), node.schema.index_of_column(c).unwrap()))
                 .collect::<Vec<_>>();
-            let exec = SegmentationExec::try_new(exprs, cols, physical_inputs[0].clone(), 100)
+            let exec = SegmentationExec::try_new(segments, cols, physical_inputs[0].clone(), 100)
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
 
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
@@ -283,10 +315,4 @@ impl DFExtensionPlanner for ExtensionPlanner {
         };
         Ok(plan)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test() {}
 }
