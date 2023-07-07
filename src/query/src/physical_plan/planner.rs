@@ -31,9 +31,9 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
-use crate::logical_plan::segmentation::AggregateFunction;
-use crate::logical_plan::segmentation::SegmentationNode;
-use crate::logical_plan::segmentation::TimeRange;
+// use crate::logical_plan::segmentation::AggregateFunction;
+// use crate::logical_plan::segmentation::SegmentationNode;
+// use crate::logical_plan::segmentation::TimeRange;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
@@ -148,7 +148,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .collect();
             let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        } else if let Some(node) = any.downcast_ref::<SegmentationNode>() {
+        } /*else if let Some(node) = any.downcast_ref::<SegmentationNode>() {
             let mut segments = vec![];
             let mut exprs: Vec<Arc<dyn SegmentationExpr>> = Vec::with_capacity(node.exprs.len());
             for segment in node.segments.iter() {
@@ -310,7 +310,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
 
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        } else {
+        }*/ else {
             None
         };
         Ok(plan)

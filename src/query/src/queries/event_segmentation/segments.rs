@@ -182,11 +182,3 @@ pub(crate) fn build_segments_logical_plan(
 
     Ok(plan)
 }
-
-#[cfg!(test)]
-mod tests {
-    #[test]
-    fn test_plan() {
-        let plan =
-    }
-}
