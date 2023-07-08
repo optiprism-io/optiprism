@@ -95,7 +95,12 @@ where Op: ComparisonOp<i64>
     ) -> Result<Vec<ArrayRef>> {
         let num_rows = batches.iter().map(|b| b.num_rows()).sum::<usize>();
 
-        let offset = if skip > 0 { skip } else { 0 };
+        let mut span_id = 0;
+        let mut offset = 0;
+        if skip > 0 {
+            offset = skip;
+            span_id = 1;
+        }
         let mut out = BooleanBuilder::with_capacity(num_rows);
         let ts = batches
             .iter()
@@ -124,19 +129,19 @@ where Op: ComparisonOp<i64>
             .collect::<std::result::Result<Vec<_>, _>>()?;
 
         let mut count = 0;
-        let mut span_id = 0;
         for idx in offset..num_rows {
-            let (row_id, batch_id) = abs_row_id(idx, batches);
+            let (batch_id, row_id) = abs_row_id(idx, batches);
             if check_filter(&to_filter[batch_id], row_id) == false {
-                // println!("skip1");
+                println!("skip1");
                 continue;
             }
             if !self.time_range.check_bounds(ts[batch_id].value(row_id)) {
-                // println!("skip2");
+                println!("skip2");
                 continue;
             }
             count += 1;
-            if idx - offset == spans[span_id] {
+            if idx - offset == spans[span_id] - 1 {
+                offset += spans[span_id];
                 span_id += 1;
                 let res = match Op::op() {
                     Operator::Lt => count < self.right,
@@ -146,13 +151,12 @@ where Op: ComparisonOp<i64>
                     Operator::Gt => count > self.right,
                     Operator::GtEq => count >= self.right,
                 };
+                count = 0;
                 if !res {
-                    // println!("a1 false {}", last_hash);
                     out.append_value(false);
-                    continue;
+                } else {
+                    out.append_value(true);
                 }
-                // println!("a2 true {}", last_hash);
-                out.append_value(true);
             }
         }
 
@@ -202,52 +206,37 @@ mod tests {
 
     #[test]
     fn test_predicate() {
-        let data = vec![
-            r#"
+        let data = r#"
 | user_id(i64) | ts(ts) | event(utf8) |
 |--------------|--------|-------------|
-| 0            | 1      | e1          |
-| 0            | 2      | e2          |
-| 0            | 3      | e3          |
-| 0            | 4      | e1          |
-| 0            | 5      | e1          |
-| 0            | 6      | e2          |
-| 0            | 7      | e3          |
-"#,
-            r#"
-| 1            | 8      | e1          |
-| 1            | 9      | e3          |
-| 1            | 10      | e1          |
-| 1            | 11      | e2          |
-"#,
-            r#"
-| 2            | 12      | e2          |
-| 2            | 13      | e1          |
-| 2            | 14      | e2          |
-"#,
-        ];
-
-        let res = data
-            .iter()
-            .map(|d| parse_markdown_table_v1(*d).unwrap())
-            .collect::<Vec<_>>();
-        let spans = vec![7, 4, 3];
+| 0            | 1      | 1          |
+| 0            | 2      | 1          |
+|              |        |             |
+| 1            | 8      | 1          |
+|              |        |             |
+| 0            | 1      | 1          |
+| 0            | 2      | 1          |
+|              |        |             |
+| 1            | 8      | 1          |
+"#;
+        let res = parse_markdown_tables(data).unwrap();
 
         {
             let left = Arc::new(Column::new_with_schema("event", &res[0].schema()).unwrap());
-            let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
+            let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
-            let mut count = Count::<Gt>::new(
+            let mut count = Count::<boolean_op::Eq>::new(
                 Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("ts", &res[0].schema()).unwrap(),
-                2,
+                1,
                 TimeRange::None,
                 None,
             );
 
+            let spans = vec![2, 1, 2, 1];
             let res = count.evaluate(&res, &spans, 0).unwrap();
             let right = BooleanArray::from(vec![true, false]);
-            println!("{:?}", right);
+            println!("{:?}", res);
             // assert_eq!(res, Some(right));
             // assert_eq!(res, right);
         }
