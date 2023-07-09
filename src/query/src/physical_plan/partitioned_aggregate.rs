@@ -1,22 +1,27 @@
 use std::any::Any;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::mem;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
+use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::UInt32Array;
 use arrow::compute::concat_batches;
 use arrow::compute::take;
 use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::hash_utils::create_hashes;
@@ -49,12 +54,14 @@ pub trait PartitionedAggregateExpr: Send + Sync {
         skip: usize,
     ) -> Result<Vec<ArrayRef>>;
     fn fields(&self) -> Vec<Field>;
+    fn schema(&self) -> SchemaRef;
 }
 
 pub struct PartitionedAggregateExec {
     group_expr: Vec<Arc<dyn PhysicalExpr>>,
     agg_expr: Vec<Arc<dyn PartitionedAggregateExpr>>,
     schema: SchemaRef,
+    agg_schema: SchemaRef,
     input: Arc<dyn ExecutionPlan>,
     out_batch_size: usize,
     metrics: ExecutionPlanMetricsSet,
@@ -67,10 +74,19 @@ impl PartitionedAggregateExec {
         input: Arc<dyn ExecutionPlan>,
         out_batch_size: usize,
     ) -> Result<Self> {
+        let agg_schemas = agg_expr
+            .iter()
+            .map(|a| (*a.schema()).clone())
+            .collect::<Vec<_>>();
+        let agg_schema = Schema::try_merge(agg_schemas)?;
+        let input_schema = (*input.schema()).clone();
+        let schema =
+            Schema::try_merge(vec![vec![agg_schema.clone()], vec![input_schema]].concat())?;
         let ret = Self {
             group_expr,
             agg_expr,
-            schema: input.schema(),
+            schema: Arc::new(schema),
+            agg_schema: Arc::new(agg_schema),
             input,
             out_batch_size,
             metrics: Default::default(),
@@ -126,6 +142,8 @@ impl ExecutionPlan for PartitionedAggregateExec {
             group_expr: self.group_expr.clone(),
             agg_expr: self.agg_expr.clone(),
             schema: self.schema.clone(),
+            agg_schema: self.agg_schema.clone(),
+            input_schema: self.input.schema(),
             state: PartitionState::new(self.group_expr.clone()),
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
             is_ended: false,
@@ -157,6 +175,8 @@ pub struct PartitionedAggregateStream {
     group_expr: Vec<Arc<dyn PhysicalExpr>>,
     agg_expr: Vec<Arc<dyn PartitionedAggregateExpr>>,
     schema: SchemaRef,
+    agg_schema: SchemaRef,
+    input_schema: SchemaRef,
     state: PartitionState,
     baseline_metrics: BaselineMetrics,
     is_ended: bool,
@@ -174,7 +194,7 @@ impl Stream for PartitionedAggregateStream {
 
         let mut out_buf: VecDeque<RecordBatch> = Default::default();
         let mut out_res_buf: VecDeque<RecordBatch> = Default::default();
-        let mut to_take: HashMap<usize, Vec<usize>> = Default::default();
+        let mut to_take: BTreeMap<usize, Vec<usize>> = Default::default();
 
         loop {
             let mut offset = 0;
@@ -236,33 +256,42 @@ impl Stream for PartitionedAggregateStream {
                             .map(|arr| take(arr, &take_arr, None))
                             .collect::<std::result::Result<Vec<_>, _>>()?;
 
-                        // println!("0 {:?}", cols);
-                        // println!("1 {:?}", ev_res[0]);
-                        let ev_arrs = ev_res.iter().flat_map(|v| v.to_owned()).collect::<Vec<_>>();
-                        // final columns
-                        // let arrs = vec![ev_arrs, cols].concat();
-                        let arrs = cols;
-
                         // final record batch
-                        RecordBatch::try_new(self.schema.clone(), arrs)
+                        RecordBatch::try_new(self.input_schema.clone(), cols)
                     })
                     .collect::<Vec<std::result::Result<_, _>>>()
                     .into_iter()
                     .collect::<std::result::Result<Vec<RecordBatch>, _>>()?;
 
-                let res_batches = ev_res[0].iter().map(|arr| {}).collect::<Vec<_>>();
-                println!("0 {:?}", batches);
-                println!("1 {:?}", ev_res[0]);
+                let ev_cols = ev_res.iter().flat_map(|v| v.clone()).collect::<Vec<_>>();
+                let res_batch = RecordBatch::try_new(self.agg_schema.clone(), ev_cols)?;
+                out_res_buf.push_back(res_batch);
+
                 // push to buffer
                 out_buf.append(&mut batches.into());
             }
 
             let rows = out_buf.iter().map(|b| b.num_rows()).sum::<usize>();
             // return buffer only if it's full or we are at the end
-            if rows > self.out_batch_size || self.is_ended {
-                let rb =
-                    concat_batches(&self.schema, out_buf.iter().map(|v| v).collect::<Vec<_>>())?;
-                return self.baseline_metrics.record_poll(Poll::Ready(Some(Ok(rb))));
+            if rows >= self.out_batch_size || self.is_ended {
+                let rb = concat_batches(
+                    &self.input_schema,
+                    out_buf.iter().map(|v| v).collect::<Vec<_>>(),
+                )?;
+
+                let evb = concat_batches(
+                    &self.agg_schema,
+                    out_res_buf.iter().map(|v| v).collect::<Vec<_>>(),
+                )?;
+
+                let final_batch = RecordBatch::try_new(
+                    self.schema.clone(),
+                    vec![evb.columns(), rb.columns()].concat(),
+                )?;
+
+                return self
+                    .baseline_metrics
+                    .record_poll(Poll::Ready(Some(Ok(final_batch))));
             }
 
             // timer.done();
@@ -359,9 +388,10 @@ mod tests {
         let mut agg1 = Arc::new(Count::<boolean_op::Eq>::new(
             f.clone(),
             Column::new_with_schema("ts", &schema).unwrap(),
-            2,
+            3,
             TimeRange::None,
             None,
+            "a".to_string(),
         ));
 
         let mut agg2 = Arc::new(Count::<boolean_op::Eq>::new(
@@ -370,17 +400,18 @@ mod tests {
             2,
             TimeRange::None,
             None,
+            "b".to_string(),
         ));
         let segmentation = PartitionedAggregateExec::try_new(
             vec![Arc::new(Column::new_with_schema("user_id", &schema)?)],
-            vec![agg1],
+            vec![agg1, agg2],
             Arc::new(input),
-            1,
+            5,
         )?;
 
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
-        let mut stream = segmentation.execute(0, task_ctx)?;
+        let stream = segmentation.execute(0, task_ctx)?;
         let result = collect(stream).await?;
 
         print_batches(&result).unwrap();
@@ -450,6 +481,7 @@ mod tests {
             3,
             TimeRange::None,
             None,
+            "b".to_string(),
         );
 
         for batch in batches {

@@ -14,6 +14,8 @@ use arrow::compute::filter;
 use arrow::compute::filter_record_batch;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
@@ -29,23 +31,14 @@ use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
 use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
 
 #[derive(Debug)]
-struct CountInner {
-    last_hash: u64,
-    last_ts: i64,
-    out: BooleanBuilder,
-    count: i64,
-    skip: bool,
-}
-
-#[derive(Debug)]
 pub struct Count<Op> {
-    inner: Arc<Mutex<CountInner>>,
     filter: PhysicalExprRef,
     ts_col: Column,
     time_range: TimeRange,
     op: PhantomData<Op>,
     right: i64,
     time_window: i64,
+    name: String,
 }
 
 impl<Op> Count<Op> {
@@ -55,16 +48,9 @@ impl<Op> Count<Op> {
         right: i64,
         time_range: TimeRange,
         time_window: Option<i64>,
+        name: String,
     ) -> Self {
-        let inner = CountInner {
-            last_hash: 0,
-            last_ts: 0,
-            out: BooleanBuilder::with_capacity(10_000),
-            count: 0,
-            skip: false,
-        };
         Self {
-            inner: Arc::new(Mutex::new(inner)),
             filter,
             ts_col,
             time_range,
@@ -73,6 +59,7 @@ impl<Op> Count<Op> {
             time_window: time_window
                 .map(|t| t)
                 .unwrap_or(Duration::days(365).num_milliseconds()),
+            name,
         }
     }
 }
@@ -141,7 +128,6 @@ where Op: ComparisonOp<i64>
         spans: Vec<usize>,
         skip: usize,
     ) -> Result<Vec<ArrayRef>> {
-        println!("ev");
         let spans = if skip > 0 {
             vec![vec![skip], spans].concat()
         } else {
@@ -217,7 +203,15 @@ where Op: ComparisonOp<i64>
     }
 
     fn fields(&self) -> Vec<Field> {
-        vec![Field::new("count", DataType::Int64, false)]
+        vec![Field::new(
+            format!("{}_count", self.name),
+            DataType::Boolean,
+            false,
+        )]
+    }
+
+    fn schema(&self) -> SchemaRef {
+        Arc::new(Schema::new(self.fields()))
     }
 }
 
@@ -311,6 +305,7 @@ mod tests {
                 1,
                 TimeRange::None,
                 None,
+                "a".to_string(),
             );
 
             let spans = vec![2, 1, 2, 1];
