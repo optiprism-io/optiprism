@@ -29,7 +29,7 @@ pub mod time_range;
 // mod aggregate;
 pub mod aggregate;
 pub mod comparison;
-pub mod count_span;
+pub mod cond_count;
 
 use num::Integer;
 use num_traits::Bounded;

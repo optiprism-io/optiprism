@@ -12,7 +12,7 @@ use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 use datafusion_common::ScalarValue;
 
-use crate::physical_plan::expressions::segmentation::SegmentationExpr;
+use crate::physical_plan::expressions::partitioned::SegmentationExpr;
 #[derive(Debug)]
 struct AndInner {
     left: Arc<dyn SegmentationExpr>,

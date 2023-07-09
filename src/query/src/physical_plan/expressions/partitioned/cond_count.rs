@@ -24,11 +24,12 @@ use datafusion::physical_expr::PhysicalExprRef;
 
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
-use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
-use crate::physical_plan::expressions::segmentation::boolean_op::Operator;
-use crate::physical_plan::expressions::segmentation::check_filter;
-use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
+use crate::physical_plan::expressions::partitioned::boolean_op::ComparisonOp;
+use crate::physical_plan::expressions::partitioned::boolean_op::Operator;
+use crate::physical_plan::expressions::partitioned::check_filter;
+use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
 use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
+use crate::physical_plan::Spans;
 
 #[derive(Debug)]
 pub struct Count<Op> {
@@ -38,6 +39,7 @@ pub struct Count<Op> {
     op: PhantomData<Op>,
     right: i64,
     time_window: i64,
+    is_window: bool,
     name: String,
 }
 
@@ -59,86 +61,108 @@ impl<Op> Count<Op> {
             time_window: time_window
                 .map(|t| t)
                 .unwrap_or(Duration::days(365).num_milliseconds()),
+            is_window: time_window.is_some(),
             name,
         }
     }
 }
 
-struct Span {
-    spans: Vec<usize>,
-    span_id: i64,
-    row_id: usize,
-    offset: usize,
-    batches: Vec<usize>,
-}
-
-impl Span {
-    pub fn new(spans: Vec<usize>, batches: Vec<usize>) -> Self {
-        Self {
-            spans,
-            span_id: -1,
-            row_id: 0,
-            offset: 0,
-            batches,
-        }
-    }
-
-    // returns next span if exist
-    pub fn next_span(&mut self) -> bool {
-        if self.span_id >= self.spans.len() as i64 - 1 {
-            return false;
-        }
-        self.span_id += 1;
-        self.row_id = 0;
-        if self.span_id == 0 {
-            return true;
-        }
-        self.offset += self.spans[self.span_id as usize];
-
-        true
-    }
-    // return next batch_id and row_id of span if exist
-    pub fn next_row(&mut self) -> Option<(usize, usize)> {
-        if self.span_id >= self.spans.len() as i64 {
-            return None;
-        }
-        if self.row_id >= self.spans[self.span_id as usize] {
-            return None;
-        }
-
-        let mut batch_id = 0;
-        let mut row_id = self.row_id + self.offset;
-        while row_id >= self.batches[batch_id] {
-            row_id -= self.batches[batch_id];
-            batch_id += 1;
-        }
-
-        self.row_id += 1;
-
-        Some((batch_id, row_id))
-    }
-}
-
-impl<Op> PartitionedAggregateExpr for Count<Op>
+impl<Op> Count<Op>
 where Op: ComparisonOp<i64>
 {
-    fn evaluate(
+    fn window(
         &self,
         batches: &[RecordBatch],
         spans: Vec<usize>,
         skip: usize,
     ) -> Result<Vec<ArrayRef>> {
-        let spans = if skip > 0 {
-            vec![vec![skip], spans].concat()
-        } else {
-            spans
-        };
+        let mut spans = Spans::new_from_batches(spans, batches);
+        spans.skip(skip);
 
-        let mut spans = Span::new(spans, batches.iter().map(|b| b.num_rows()).collect());
+        let num_rows = spans.spans.iter().sum::<usize>();
+        let mut out = BooleanBuilder::with_capacity(num_rows);
+        let ts = batches
+            .iter()
+            .map(|b| {
+                self.ts_col.evaluate(b).and_then(|r| {
+                    Ok(r.into_array(b.num_rows())
+                        .as_any()
+                        .downcast_ref::<TimestampMillisecondArray>()
+                        .unwrap()
+                        .clone())
+                })
+            })
+            .collect::<std::result::Result<Vec<_>, _>>()?;
 
-        if skip > 0 {
-            spans.next_span();
+        let to_filter = batches
+            .iter()
+            .map(|b| {
+                self.filter.evaluate(b).and_then(|r| {
+                    Ok(r.into_array(b.num_rows())
+                        .as_any()
+                        .downcast_ref::<BooleanArray>()
+                        .unwrap()
+                        .clone())
+                })
+            })
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        let mut in_bounds = false;
+        let mut window_end = 0;
+        let cur_window = 0;
+        'next_span: while spans.next_span() {
+            let mut count = 0;
+            while let Some((batch_id, row_id)) = spans.next_row() {
+                let cur_ts = ts[batch_id].value(row_id);
+                if !self.time_range.check_bounds(cur_ts) {
+                    if in_bounds {
+                        break;
+                    }
+                    continue;
+                } else {
+                    if !in_bounds {
+                        in_bounds = true;
+                        window_end = cur_ts + self.time_window - 1;
+                    }
+                }
+                if !check_filter(&to_filter[batch_id], row_id) {
+                    continue;
+                }
+                count += 1;
+
+                println!("cur_ts: {}, window_end: {}", cur_ts, window_end);
+                if cur_ts >= window_end {
+                    let res = match Op::op() {
+                        Operator::Lt => count < self.right,
+                        Operator::LtEq => count <= self.right,
+                        Operator::Eq => count == self.right,
+                        Operator::NotEq => count != self.right,
+                        Operator::Gt => count > self.right,
+                        Operator::GtEq => count >= self.right,
+                    };
+                    if !res {
+                        println!("? {}", count);
+                        out.append_value(false);
+                        continue 'next_span;
+                    }
+                    count = 0;
+                    window_end += self.time_window;
+                }
+            }
+            out.append_value(count == 0);
         }
+
+        Ok(vec![Arc::new(out.finish())])
+    }
+
+    pub fn non_window(
+        &self,
+        batches: &[RecordBatch],
+        spans: Vec<usize>,
+        skip: usize,
+    ) -> Result<Vec<ArrayRef>> {
+        let mut spans = Spans::new_from_batches(spans, batches);
+        spans.skip(skip);
 
         let num_rows = spans.spans.iter().sum::<usize>();
         let mut out = BooleanBuilder::with_capacity(num_rows);
@@ -171,18 +195,17 @@ where Op: ComparisonOp<i64>
         while spans.next_span() {
             let mut count = 0;
             while let Some((batch_id, row_id)) = spans.next_row() {
-                count += 1;
+                if !self.time_range.check_bounds(ts[batch_id].value(row_id)) {
+                    continue;
+                }
 
                 if !check_filter(&to_filter[batch_id], row_id) {
                     continue;
                 }
 
-                if !self.time_range.check_bounds(ts[batch_id].value(row_id)) {
-                    continue;
-                }
+                count += 1;
             }
 
-            println!("count: {}", count);
             let res = match Op::op() {
                 Operator::Lt => count < self.right,
                 Operator::LtEq => count <= self.right,
@@ -200,6 +223,23 @@ where Op: ComparisonOp<i64>
         }
 
         Ok(vec![Arc::new(out.finish())])
+    }
+}
+
+impl<Op> PartitionedAggregateExpr for Count<Op>
+where Op: ComparisonOp<i64>
+{
+    fn evaluate(
+        &self,
+        batches: &[RecordBatch],
+        spans: Vec<usize>,
+        skip: usize,
+    ) -> Result<Vec<ArrayRef>> {
+        if !self.is_window {
+            self.non_window(batches, spans, skip)
+        } else {
+            self.window(batches, spans, skip)
+        }
     }
 
     fn fields(&self) -> Vec<Field> {
@@ -225,12 +265,12 @@ mod tests {
     use arrow::array::Int64Array;
     use arrow::array::TimestampMillisecondArray;
     use arrow::datatypes::DataType;
+    use arrow::datatypes::DataType::Duration;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::datatypes::SchemaRef;
     use arrow::datatypes::TimeUnit;
     use arrow::record_batch::RecordBatch;
-    use chrono::Duration;
     use datafusion::physical_expr::expressions;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
@@ -245,16 +285,16 @@ mod tests {
     use store::test_util::parse_markdown_table_v1;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::segmentation::boolean_op;
-    use crate::physical_plan::expressions::segmentation::boolean_op::Gt;
-    use crate::physical_plan::expressions::segmentation::count_span::Count;
-    use crate::physical_plan::expressions::segmentation::count_span::PartitionedAggregateExpr;
-    use crate::physical_plan::expressions::segmentation::count_span::Span;
-    use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
+    use crate::physical_plan::expressions::partitioned::boolean_op;
+    use crate::physical_plan::expressions::partitioned::boolean_op::Gt;
+    use crate::physical_plan::expressions::partitioned::cond_count::Count;
+    use crate::physical_plan::expressions::partitioned::cond_count::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::partitioned::cond_count::Spans;
+    use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
 
     #[test]
     fn test_spans() {
-        let mut span = Span::new(vec![1, 2, 3], vec![1, 2, 6]);
+        let mut span = Spans::new(vec![1, 2, 3], vec![1, 2, 6]);
 
         assert!(span.next_span());
         println!("1 {:?}", span.next_row());
@@ -309,6 +349,47 @@ mod tests {
             );
 
             let spans = vec![2, 1, 2, 1];
+            let res = count.evaluate(&res, spans, 0).unwrap();
+            let right = BooleanArray::from(vec![true, false]);
+
+            let e: Arc<dyn PartitionedAggregateExpr> = Arc::new(count);
+            println!("{:?}", res);
+            // assert_eq!(res, Some(right));
+            // assert_eq!(res, right);
+        }
+    }
+
+    #[test]
+    fn test_window() {
+        let data = r#"
+| user_id(i64) | ts(ts) | event(utf8) |
+|--------------|--------|-------------|
+| 0            | 1      | 1          |
+| 0            | 2      | 1          |
+| 0            | 3      | 1          |
+| 0            | 4      | 1          |
+| 0            | 5      | 1          |
+| 1            | 6      | 1          |
+| 1            | 7      | 1          |
+| 1            | 8      | 1          |
+| 1            | 9      | 1          |
+"#;
+        let res = parse_markdown_tables(data).unwrap();
+
+        {
+            let left = Arc::new(Column::new_with_schema("event", &res[0].schema()).unwrap());
+            let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
+            let f = BinaryExpr::new(left, Operator::Eq, right);
+            let mut count = Count::<boolean_op::Eq>::new(
+                Arc::new(f) as PhysicalExprRef,
+                Column::new_with_schema("ts", &res[0].schema()).unwrap(),
+                1,
+                TimeRange::None,
+                Some(1),
+                "a".to_string(),
+            );
+
+            let spans = vec![5, 4];
             let res = count.evaluate(&res, spans, 0).unwrap();
             let right = BooleanArray::from(vec![true, false]);
 

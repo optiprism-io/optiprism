@@ -19,11 +19,11 @@ use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 
 use crate::error::Result;
-use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
-use crate::physical_plan::expressions::segmentation::boolean_op::Operator;
-use crate::physical_plan::expressions::segmentation::check_filter;
-use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-use crate::physical_plan::expressions::segmentation::SegmentationExpr;
+use crate::physical_plan::expressions::partitioned::boolean_op::ComparisonOp;
+use crate::physical_plan::expressions::partitioned::boolean_op::Operator;
+use crate::physical_plan::expressions::partitioned::check_filter;
+use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
+use crate::physical_plan::expressions::partitioned::SegmentationExpr;
 
 #[derive(Debug)]
 struct CountInner {
@@ -229,11 +229,11 @@ mod tests {
     use store::test_util::parse_markdown_table_v1;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::segmentation::boolean_op;
-    use crate::physical_plan::expressions::segmentation::boolean_op::Gt;
-    use crate::physical_plan::expressions::segmentation::count::Count;
-    use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-    use crate::physical_plan::expressions::segmentation::SegmentationExpr;
+    use crate::physical_plan::expressions::partitioned::boolean_op;
+    use crate::physical_plan::expressions::partitioned::boolean_op::Gt;
+    use crate::physical_plan::expressions::partitioned::count::Count;
+    use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
+    use crate::physical_plan::expressions::partitioned::SegmentationExpr;
 
     #[test]
     fn test_predicate() {

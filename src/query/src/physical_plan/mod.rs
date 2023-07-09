@@ -185,6 +185,83 @@ pub fn abs_row_id_refs(row_id: usize, batches: Vec<&RecordBatch>) -> (usize, usi
     (batch_id, idx)
 }
 
+pub struct Spans {
+    spans: Vec<usize>,
+    span_id: i64,
+    row_id: usize,
+    offset: usize,
+    batches: Vec<usize>,
+}
+
+fn batches_num_rows(batches: &[RecordBatch]) -> Vec<usize> {
+    batches.iter().map(|b| b.num_rows()).collect()
+}
+
+impl Spans {
+    pub fn new(spans: Vec<usize>, batches: Vec<usize>) -> Self {
+        Self {
+            spans,
+            span_id: -1,
+            row_id: 0,
+            offset: 0,
+            batches,
+        }
+    }
+
+    pub fn new_from_batches(spans: Vec<usize>, batches: &[RecordBatch]) -> Self {
+        let rows = batches_num_rows(batches);
+        Self::new(spans, rows)
+    }
+
+    pub fn skip(&mut self, skip: usize) -> bool {
+        if skip == 0 {
+            return false;
+        }
+
+        let spans = vec![vec![skip], self.spans.clone()].concat();
+        self.spans = spans;
+
+        self.next_span()
+    }
+    // returns next span if exist
+    pub fn next_span(&mut self) -> bool {
+        if self.span_id >= self.spans.len() as i64 - 1 {
+            return false;
+        }
+        self.span_id += 1;
+        self.row_id = 0;
+        if self.span_id == 0 {
+            return true;
+        }
+        self.offset += self.spans[self.span_id as usize];
+
+        true
+    }
+    // return next batch_id and row_id of span if exist
+    pub fn next_row(&mut self) -> Option<(usize, usize)> {
+        if self.span_id >= self.spans.len() as i64 {
+            return None;
+        }
+        if self.row_id >= self.spans[self.span_id as usize] {
+            return None;
+        }
+
+        let mut batch_id = 0;
+        let mut row_id = self.row_id + self.offset;
+        if batch_id >= self.batches.len() {
+            return None;
+        }
+        while row_id >= self.batches[batch_id] {
+            row_id -= self.batches[batch_id];
+            batch_id += 1;
+        }
+
+        self.row_id += 1;
+
+        Some((batch_id, row_id))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

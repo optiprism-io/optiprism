@@ -4,11 +4,20 @@ use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
+use std::sync::Mutex;
 
+use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
+use arrow::array::BooleanBuilder;
 use arrow::array::Int64Array;
+use arrow::array::Int64Builder;
 use arrow::array::TimestampMillisecondArray;
+use arrow::array::TimestampMillisecondBuilder;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
+use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
 use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
@@ -27,6 +36,7 @@ use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::abs_row_id_refs;
+use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
 use crate::StaticArray;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -38,8 +48,10 @@ pub enum StepOrder {
 // step that was fixed
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Step {
-    pub ts: i64,          // timestamp at the time of fix
-    pub row_id: usize,    // row id
+    pub ts: i64,
+    // timestamp at the time of fix
+    pub row_id: usize,
+    // row id
     pub order: StepOrder, // order of the step. Steps may be in different order
 }
 
@@ -67,22 +79,27 @@ impl Step {
 // Result of the funnel
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum FunnelResult {
-    Completed(Vec<Step>),         // completed result with all the steps
-    Incomplete(Vec<Step>, usize), /* incompleted result with completed steps and count of completed steps */
+    Completed(Vec<Step>),
+    // completed result with all the steps
+    Incomplete(Vec<Step>, usize),
+    // incompleted result with completed steps and count of completed steps
 }
 
 // Additional filter to complete
 #[derive(Debug, Clone)]
 pub enum Filter {
-    DropOffOnAnyStep,                  // funnel should fail on any step
-    DropOffOnStep(usize),              // funnel should fail on certain step
+    DropOffOnAnyStep,
+    // funnel should fail on any step
+    DropOffOnStep(usize),
+    // funnel should fail on certain step
     TimeToConvert(Duration, Duration), // conversion should be within certain window
 }
 
 // exclude steps
 #[derive(Debug, Clone)]
 pub struct Exclude {
-    exists: BooleanArray, // array of booleans that indicate if the step exists
+    exists: BooleanArray,
+    // array of booleans that indicate if the step exists
     // optional array of steps to apply exclude only between them. Otherwise include
     // will be applied on each step
     steps: Option<Vec<ExcludeSteps>>,
@@ -91,12 +108,16 @@ pub struct Exclude {
 // Batch for state
 #[derive(Debug, Clone)]
 pub struct Batch<'a> {
-    pub steps: Vec<BooleanArray>, // boolean Exists array for each step
+    pub steps: Vec<BooleanArray>,
+    // boolean Exists array for each step
     // pointer to step_results
-    pub exclude: Option<Vec<Exclude>>, // optional exclude with Exists array
-    pub constants: Option<Vec<StaticArray>>, // optional constants
-    pub ts: TimestampMillisecondArray, // timestamp
-    pub batch: &'a RecordBatch,        // ref to actual record batch
+    pub exclude: Option<Vec<Exclude>>,
+    // optional exclude with Exists array
+    pub constants: Option<Vec<StaticArray>>,
+    // optional constants
+    pub ts: TimestampMillisecondArray,
+    // timestamp
+    pub batch: &'a RecordBatch, // ref to actual record batch
 }
 
 // Relative row with batch id and row id. Used mostly for constants
@@ -109,17 +130,25 @@ struct Row {
 // Span is a span of rows that are in the same partition
 #[derive(Debug, Clone)]
 pub struct Span<'a> {
-    id: usize,                // # of span
-    offset: usize, // offset of the span. Used to skip rows from record batch. See PartitionedState
-    len: usize,    // length of the span
-    batches: &'a [Batch<'a>], // one or more batches with span
+    id: usize,
+    // # of span
+    offset: usize,
+    // offset of the span. Used to skip rows from record batch. See PartitionedState
+    len: usize,
+    // length of the span
+    batches: &'a [Batch<'a>],
+    // one or more batches with span
     // fixed const row. This will be filled with fiest occurrence if constants are enabled and
     const_row: Option<Row>,
-    steps: Vec<Step>, // state of steps
-    step_id: usize,   // current step
-    row_id: usize,    // current row id
-    first_step: bool, // is this first step
-    stepn: usize,     // supplement counter for completed steps
+    steps: Vec<Step>,
+    // state of steps
+    step_id: usize,
+    // current step
+    row_id: usize,
+    // current row id
+    first_step: bool,
+    // is this first step
+    stepn: usize, // supplement counter for completed steps
 }
 
 impl<'a> Span<'a> {
@@ -904,6 +933,101 @@ pub mod test_utils {
             $(event_eq_($schema.as_ref(),$name,$order),)+
             ]
         }
+    }
+}
+
+pub struct FunnelExprWrap {
+    funnel: Mutex<FunnelExpr>,
+}
+
+impl FunnelExprWrap {
+    pub fn new(expr: FunnelExpr) -> Self {
+        Self {
+            funnel: Mutex::new(expr),
+        }
+    }
+}
+
+impl PartitionedAggregateExpr for FunnelExprWrap {
+    fn evaluate(
+        &self,
+        batches: &[RecordBatch],
+        spans: Vec<usize>,
+        skip: usize,
+    ) -> Result<Vec<ArrayRef>> {
+        let mut funnel = self.funnel.lock().unwrap();
+
+        let res = funnel.evaluate(batches, spans, skip)?;
+        let mut completed_builder = BooleanBuilder::with_capacity(res.len());
+        let mut steps_builder = Int64Builder::with_capacity(res.len());
+        let mut steps_ts_bulders = (0..funnel.steps.len())
+            .into_iter()
+            .map(|_| TimestampMillisecondBuilder::with_capacity(res.len()))
+            .collect::<Vec<_>>();
+
+        for row in res {
+            match row {
+                FunnelResult::Completed(steps) => {
+                    completed_builder.append_value(true);
+                    steps_builder.append_value(steps.len() as i64);
+                    for (i, step) in steps.into_iter().enumerate() {
+                        steps_ts_bulders[i].append_value(step.ts);
+                    }
+                }
+                FunnelResult::Incomplete(steps, c) => {
+                    completed_builder.append_value(false);
+                    steps_builder.append_value(c as i64);
+                    for i in 0..funnel.steps.len() {
+                        if c > i {
+                            steps_ts_bulders[i].append_value(steps[i].ts);
+                        } else {
+                            steps_ts_bulders[i].append_null();
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut ret = vec![
+            Arc::new(completed_builder.finish()) as ArrayRef,
+            Arc::new(steps_builder.finish()) as ArrayRef,
+        ];
+
+        for b in steps_ts_bulders.iter_mut() {
+            ret.push(Arc::new(b.finish()) as ArrayRef)
+        }
+
+        Ok(ret)
+    }
+
+    fn fields(&self) -> Vec<Field> {
+        let funnel = self.funnel.lock().unwrap();
+        let mut fields = vec![
+            Field::new("completed", DataType::Boolean, false),
+            Field::new("steps", DataType::Int64, false),
+        ];
+
+        let mut steps_ts_fields = funnel
+            .steps
+            .iter()
+            .enumerate()
+            .map(|(idx, _)| {
+                Field::new(
+                    format!("step{idx}_ts"),
+                    DataType::Timestamp(TimeUnit::Millisecond, None),
+                    true,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        fields.append(&mut steps_ts_fields);
+
+        println!("{:?}", fields);
+        fields
+    }
+
+    fn schema(&self) -> SchemaRef {
+        Arc::new(Schema::new(self.fields()))
     }
 }
 

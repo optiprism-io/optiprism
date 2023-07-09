@@ -44,7 +44,7 @@ use futures::StreamExt;
 
 use crate::error::QueryError;
 use crate::error::Result;
-use crate::physical_plan::expressions::segmentation::SegmentationExpr;
+use crate::physical_plan::expressions::partitioned::SegmentationExpr;
 
 pub struct SegmentationExec {
     segments: Vec<Arc<dyn SegmentationExpr>>,
@@ -436,17 +436,17 @@ mod tests {
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
     use futures::StreamExt;
-    use segmentation::SegmentationExpr;
+    use partitioned::SegmentationExpr;
     use store::test_util::parse_markdown_table_v1;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::segmentation;
-    use crate::physical_plan::expressions::segmentation::boolean_op;
-    use crate::physical_plan::expressions::segmentation::count::Count;
+    use crate::physical_plan::expressions::partitioned;
+    use crate::physical_plan::expressions::partitioned::boolean_op;
+    use crate::physical_plan::expressions::partitioned::count::Count;
     // use crate::physical_plan::expressions::segmentation::comparison;
     // use crate::physical_plan::expressions::segmentation::count::Count;
-    use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-    use crate::physical_plan::expressions::segmentation::AggregateFunction;
+    use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
+    use crate::physical_plan::expressions::partitioned::AggregateFunction;
     use crate::physical_plan::segmentation::SegmentationExec;
 
     #[tokio::test]

@@ -311,6 +311,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::util::pretty::print_batches;
+    use chrono::Duration;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;
@@ -323,9 +324,15 @@ mod tests {
     use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::segmentation::boolean_op;
-    use crate::physical_plan::expressions::segmentation::count_span::Count;
-    use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
+    use crate::event_eq;
+    use crate::physical_plan::expressions::funnel;
+    use crate::physical_plan::expressions::funnel::FunnelExpr;
+    use crate::physical_plan::expressions::funnel::FunnelExprWrap;
+    use crate::physical_plan::expressions::funnel::StepOrder;
+    use crate::physical_plan::expressions::funnel::Touch;
+    use crate::physical_plan::expressions::partitioned::boolean_op;
+    use crate::physical_plan::expressions::partitioned::cond_count::Count;
+    use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
     use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExec;
     use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
     use crate::physical_plan::PartitionState;
@@ -335,48 +342,52 @@ mod tests {
         let data = r#"
 | user_id(i64) | ts(ts) | event(utf8) |
 |--------------|--------|-------------|
-| 0       | 1   | e1    | 1      |
-| 0       | 2   | e2    | 1      |
-| 0       | 3   | e3    | 1      |
-| 0       | 4   | e1    | 1      |
-|         |     |       |        |
-| 0       | 5   | e1    | 1      |
-| 0       | 6   | e2    | 1      |
-| 0       | 7   | e3    | 1      |
-| 1       | 5   | e1    | 1      |
-| 1       | 6   | e3    | 1      |
-| 1       | 7   | e1    | 1      |
-| 1       | 8   | e2    | 1      |
-| 2       | 9   | e1    | 1      |
-| 2       | 10  | e2    | 1      |
-|         |     |       |        |
-| 2       | 11  | e3    | 1      |
-| 2       | 12  | e3    | 1      |
-| 2       | 13  | e3    | 1      |
-| 2       | 14  | e3    | 1      |
-| 3       | 15  | e1    | 1      |
-| 3       | 16  | e2    | 1      |
-| 3       | 17  | e3    | 1      |
-| 4       | 18  | e1    | 1      |
-| 4       | 19  | e2    | 1      |
-|         |     |       |        |
-| 4       | 20  | e3    | 1      |
-|         |     |       |        |
-| 5       | 21  | e1    | 1      |
-|         |     |       |        |
-| 5       | 22  | e2    | 1      |
-|         |     |       |        |
-| 6       | 23  | e1    | 1      |
-| 6       | 24  | e3    | 1      |
-| 6       | 25  | e3    | 1      |
-|         |     |       |        |
-| 7       | 26  | e1    | 1      |
-| 7       | 27  | e2    | 1      |
-| 7       | 28  | e3    | 1      |
-|         |     |       |        |
-| 8       | 29  | e1    | 1      |
-| 8       | 30  | e2    | 1      |
-| 8       | 31  | e3    | 1      |
+| 0       | 1   | e1    |
+| 0       | 2   | e2    |
+| 0       | 3   | e3    |
+| 0       | 4   | e1    |
+|         |     |       |
+| 0       | 5   | e1    |
+| 0       | 6   | e2    |
+| 0       | 7   | e3    |
+| 1       | 5   | e1    |
+| 1       | 6   | e3    |
+| 1       | 7   | e1    |
+| 1       | 8   | e2    |
+| 2       | 9   | e1    |
+| 2       | 10  | e2    |
+|         |     |       |
+| 2       | 11  | e3    |
+| 2       | 12  | e3    |
+| 2       | 13  | e3    |
+| 2       | 14  | e3    |
+| 3       | 15  | e1    |
+| 3       | 16  | e2    |
+| 3       | 17  | e3    |
+| 4       | 18  | e1    |
+| 4       | 19  | e2    |
+|         |     |       |
+| 4       | 20  | e3    |
+|         |     |       |
+| 4       | 20  | e3    |
+|         |     |       |
+| 4       | 20  | e3    |
+|         |     |       |
+| 5       | 21  | e1    |
+|         |     |       |
+| 5       | 22  | e2    |
+|         |     |       |
+| 6       | 23  | e1    |
+| 6       | 24  | e3    |
+| 6       | 25  | e3    |
+|         |     |       |
+| 7       | 26  | e1    |
+| 7       | 27  | e2    |
+| 7       | 28  | e3    |
+|         |     |       |
+| 8       | 29  | e1    |
+| 8       | 30  | e2    |
+| 8       | 31  | e3    |
 "#;
 
         let batches = parse_markdown_tables(data).unwrap();
@@ -388,7 +399,7 @@ mod tests {
         let mut agg1 = Arc::new(Count::<boolean_op::Eq>::new(
             f.clone(),
             Column::new_with_schema("ts", &schema).unwrap(),
-            3,
+            5,
             TimeRange::None,
             None,
             "a".to_string(),
@@ -402,9 +413,41 @@ mod tests {
             None,
             "b".to_string(),
         ));
+
+        let e1 = {
+            let l = Column::new_with_schema("event", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Utf8(Some("e1".to_string())));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e2 = {
+            let l = Column::new_with_schema("event", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Utf8(Some("e2".to_string())));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e3 = {
+            let l = Column::new_with_schema("event", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Utf8(Some("e3".to_string())));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let opts = funnel::Options {
+            ts_col: Column::new_with_schema("ts", &schema)?,
+            window: Duration::seconds(15),
+            steps: vec![e1, e2, e3],
+            exclude: None,
+            constants: None,
+            count: funnel::Count::Unique,
+            filter: None,
+            touch: Touch::First,
+        };
+
+        let f = FunnelExpr::new(opts);
+        let agg3 = Arc::new(FunnelExprWrap::new(f));
         let segmentation = PartitionedAggregateExec::try_new(
             vec![Arc::new(Column::new_with_schema("user_id", &schema)?)],
-            vec![agg1, agg2],
+            vec![agg1, agg2, agg3],
             Arc::new(input),
             5,
         )?;
@@ -478,7 +521,7 @@ mod tests {
         let mut count = Count::<boolean_op::Eq>::new(
             Arc::new(f) as PhysicalExprRef,
             Column::new_with_schema("ts", &schema).unwrap(),
-            3,
+            4,
             TimeRange::None,
             None,
             "b".to_string(),
