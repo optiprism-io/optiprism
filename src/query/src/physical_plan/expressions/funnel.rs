@@ -185,11 +185,18 @@ impl<'a> Span<'a> {
     // Calculates absolute row for span row id and offset
     // Absolute row refers to batch id and row id in the batch
     #[inline]
+    #[inline]
     pub fn abs_row_id(&self) -> (usize, usize) {
-        abs_row_id_refs(
-            self.row_id,
-            self.batches.iter().map(|b| b.batch).collect::<Vec<_>>(),
-        )
+        let mut batch_id = 0;
+        let mut idx = self.row_id + self.offset;
+        for batch in self.batches {
+            if idx < batch.batch.num_rows() {
+                break;
+            }
+            idx -= batch.batch.num_rows();
+            batch_id += 1;
+        }
+        (batch_id, idx)
     }
 
     // get ts value of current row
