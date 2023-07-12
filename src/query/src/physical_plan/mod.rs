@@ -197,8 +197,9 @@ pub fn abs_row_id_refs(row_id: usize, batches: Vec<&RecordBatch>) -> (usize, usi
 pub struct Spans {
     spans: Vec<usize>,
     span_id: i64,
-    row_id: usize,
-    offset: usize,
+    offset: i64,
+    row_id: i64,
+    len: usize,
     batches: Vec<usize>,
 }
 
@@ -211,8 +212,9 @@ impl Spans {
         Self {
             spans,
             span_id: -1,
-            row_id: 0,
             offset: 0,
+            row_id: -1,
+            len: batches.iter().sum(),
             batches,
         }
     }
@@ -223,40 +225,41 @@ impl Spans {
     }
 
     pub fn skip(&mut self, skip: usize) -> bool {
-        if skip == 0 {
+        if skip == 0 || 1 == 1 {
             return false;
         }
 
+        self.span_id += 1;
         let spans = vec![vec![skip], self.spans.clone()].concat();
         self.spans = spans;
+        self.row_id += self.spans[self.span_id as usize] as i64;
 
         self.next_span()
     }
     // returns next span if exist
     pub fn next_span(&mut self) -> bool {
-        if self.span_id >= self.spans.len() as i64 - 1 {
+        if self.span_id >= self.spans.len() as i64 {
             return false;
         }
         self.span_id += 1;
         self.row_id = 0;
-        if self.span_id == 0 {
-            return true;
+        if self.span_id >= self.spans.len() as i64 {
+            return false;
         }
-        self.offset += self.spans[self.span_id as usize];
+        if self.span_id > 0 {
+            self.offset += self.spans[self.span_id as usize - 1] as i64;
+        }
 
         true
     }
+
     // return next batch_id and row_id of span if exist
     pub fn next_row(&mut self) -> Option<(usize, usize)> {
-        if self.span_id >= self.spans.len() as i64 {
+        if self.row_id >= self.spans[self.span_id as usize] as i64 {
             return None;
         }
-        if self.row_id >= self.spans[self.span_id as usize] {
-            return None;
-        }
-
         let mut batch_id = 0;
-        let mut row_id = self.row_id + self.offset;
+        let mut row_id = self.row_id as usize + self.offset as usize;
         if batch_id >= self.batches.len() {
             return None;
         }
@@ -264,7 +267,6 @@ impl Spans {
             row_id -= self.batches[batch_id];
             batch_id += 1;
         }
-
         self.row_id += 1;
 
         Some((batch_id, row_id))
