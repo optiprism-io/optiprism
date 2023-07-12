@@ -48,8 +48,6 @@ use crate::physical_plan::expressions::partitioned::AggregateFunction as Segment
 use crate::physical_plan::expressions::partitioned::SegmentationExpr;
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
-use crate::physical_plan::segmentation;
-use crate::physical_plan::segmentation::SegmentationExec;
 use crate::physical_plan::unpivot::UnpivotExec;
 
 pub struct QueryPlanner {}

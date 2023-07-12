@@ -246,7 +246,7 @@ macro_rules! agg {
 
             fn fields(&self) -> Vec<Field> {
                 vec![Field::new(
-                    format!("{}_agg", self.name),
+                    format!("{}_cond_agg", self.name),
                     DataType::Boolean,
                     false,
                 )]

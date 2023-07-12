@@ -182,7 +182,7 @@ where Op: ComparisonOp<i64>
 
     fn fields(&self) -> Vec<Field> {
         vec![Field::new(
-            format!("{}_count", self.name),
+            format!("{}_cond_count", self.name),
             DataType::Boolean,
             false,
         )]

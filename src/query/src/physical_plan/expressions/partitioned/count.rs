@@ -1,3 +1,4 @@
+use std::collections::BinaryHeap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -7,195 +8,142 @@ use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::BooleanBuilder;
+use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::PrimitiveArray;
 use arrow::array::TimestampMillisecondArray;
 use arrow::compute::filter;
 use arrow::compute::filter_record_batch;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 
 use crate::error::Result;
+use crate::physical_plan::abs_row_id;
+use crate::physical_plan::batch_id;
 use crate::physical_plan::expressions::partitioned::boolean_op::ComparisonOp;
 use crate::physical_plan::expressions::partitioned::boolean_op::Operator;
 use crate::physical_plan::expressions::partitioned::check_filter;
 use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
-use crate::physical_plan::expressions::partitioned::SegmentationExpr;
+use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
+use crate::physical_plan::Spans;
 
 #[derive(Debug)]
-struct CountInner {
-    last_hash: u64,
-    last_ts: i64,
-    out: BooleanBuilder,
-    count: i64,
-    skip: bool,
+struct Inner {
+    last_filter: Option<(usize, BooleanArray)>,
 }
 
 #[derive(Debug)]
-pub struct Count<Op> {
-    inner: Arc<Mutex<CountInner>>,
-    filter: PhysicalExprRef,
-    ts_col: Column,
-    time_range: TimeRange,
-    op: PhantomData<Op>,
-    right: i64,
-    time_window: i64,
+pub struct Count {
+    filter: Option<PhysicalExprRef>,
+    inner: Mutex<Inner>,
+    name: String,
 }
 
-impl<Op> Count<Op> {
-    pub fn new(
-        filter: PhysicalExprRef,
-        ts_col: Column,
-        right: i64,
-        time_range: TimeRange,
-        time_window: Option<i64>,
-    ) -> Self {
-        let inner = CountInner {
-            last_hash: 0,
-            last_ts: 0,
-            out: BooleanBuilder::with_capacity(10_000),
-            count: 0,
-            skip: false,
-        };
+impl Count {
+    pub fn new(filter: Option<PhysicalExprRef>, name: String) -> Self {
+        let inner = Inner { last_filter: None };
         Self {
-            inner: Arc::new(Mutex::new(inner)),
             filter,
-            ts_col,
-            time_range,
-            op: Default::default(),
-            right,
-            time_window: time_window
-                .map(|t| t)
-                .unwrap_or(Duration::days(365).num_milliseconds()),
+            inner: Mutex::new(inner),
+            name,
         }
     }
 }
 
-impl<Op> SegmentationExpr for Count<Op>
-where Op: ComparisonOp<i64>
-{
-    fn evaluate(&self, record_batch: &RecordBatch, hashes: &[u64]) -> Result<Option<BooleanArray>> {
-        // println!(".");
-        // println!("{:?}", record_batch.columns()[0]);
-        let ts = self
-            .ts_col
-            .evaluate(record_batch)?
-            .into_array(record_batch.num_rows())
-            .as_any()
-            .downcast_ref::<TimestampMillisecondArray>()
-            .unwrap()
-            .clone();
+impl PartitionedAggregateExpr for Count {
+    fn evaluate(
+        &self,
+        batches: &[RecordBatch],
+        spans: Vec<usize>,
+        skip: usize,
+    ) -> Result<Vec<ArrayRef>> {
+        let mut spans = Spans::new_from_batches(spans, batches);
+        spans.skip(skip);
 
-        let to_filter = self
-            .filter
-            .evaluate(record_batch)?
-            .into_array(record_batch.num_rows())
-            .as_any()
-            .downcast_ref::<BooleanArray>()
-            .unwrap()
-            .clone();
+        // quick path
+        if self.filter.is_none() {
+            return Ok(vec![Arc::new(Int64Array::from(
+                spans
+                    .spans
+                    .iter()
+                    .map(|v| Some(*v as i64))
+                    .collect::<Vec<_>>(),
+            ))]);
+        }
+
+        let num_rows = spans.spans.iter().sum::<usize>();
+        let mut out = Int64Builder::with_capacity(num_rows);
+
         let mut inner = self.inner.lock().unwrap();
-        for (idx, hash) in hashes.iter().enumerate() {
-            if inner.last_hash == 0 {
-                inner.last_hash = *hash;
-                inner.last_ts = ts.value(idx);
+
+        let to_filter = {
+            if let Some(filter) = self.filter.clone() {
+                let to_filter = batches
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, b)| {
+                        if let Some((id, a)) = &inner.last_filter {
+                            if *id == batch_id(b) {
+                                return Ok(a.to_owned());
+                            }
+                        }
+                        return filter.evaluate(b).and_then(|r| {
+                            Ok(r.into_array(b.num_rows())
+                                .as_any()
+                                .downcast_ref::<BooleanArray>()
+                                .unwrap()
+                                .clone())
+                        });
+                    })
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+
+                inner.last_filter = Some((
+                    batch_id(batches.last().unwrap()),
+                    to_filter.last().unwrap().clone(),
+                ));
+
+                Some(to_filter)
+            } else {
+                None
             }
-            if check_filter(&to_filter, idx) == false {
-                // println!("skip1");
-                continue;
-            }
-            if !self.time_range.check_bounds(ts.value(idx)) {
-                // println!("skip2");
-                continue;
-            }
-            if *hash != inner.last_hash {
-                // println!("{} != {}", *hash, inner.last_hash);
-                let count = inner.count;
-                let last_hash = inner.last_hash;
-                inner.last_hash = *hash;
-                inner.count = 0;
-                inner.last_ts = ts.value(idx);
-                let skip = inner.skip;
-                inner.skip = false;
-                if !skip {
-                    // println!("{} {}", count, self.right);
-                    let res = match Op::op() {
-                        Operator::Lt => count < self.right,
-                        Operator::LtEq => count <= self.right,
-                        Operator::Eq => count == self.right,
-                        Operator::NotEq => count != self.right,
-                        Operator::Gt => count > self.right,
-                        Operator::GtEq => count >= self.right,
-                    };
-                    if !res {
-                        // println!("a1 false {}", last_hash);
-                        inner.out.append_value(false);
-                        inner.count += 1;
+        };
+
+        while spans.next_span() {
+            let mut count = 0;
+            while let Some((batch_id, row_id)) = spans.next_row() {
+                if let Some(to_filter) = &to_filter {
+                    if !check_filter(&to_filter[batch_id], row_id) {
                         continue;
                     }
-                    // println!("a2 true {}", last_hash);
-                    inner.out.append_value(true);
                 }
-            } else if !inner.skip && ts.value(idx) - inner.last_ts >= self.time_window {
-                let count = inner.count;
-                inner.count = 0;
-                let res = match Op::op() {
-                    Operator::Lt => count < self.right,
-                    Operator::LtEq => count <= self.right,
-                    Operator::Eq => count == self.right,
-                    Operator::NotEq => count != self.right,
-                    Operator::Gt => count > self.right,
-                    Operator::GtEq => count >= self.right,
-                };
-                if !res {
-                    // println!("a3 false {}", *hash);
-                    inner.out.append_value(false);
-                    inner.skip = true;
-                } else {
-                    inner.last_ts = ts.value(idx);
-                }
-            } else if inner.skip {
-                continue;
-            }
-            inner.count += 1;
-        }
 
-        if inner.out.len() > 0 {
-            Ok(Some(inner.out.finish()))
-        } else {
-            Ok(None)
+                count += 1;
+            }
+
+            out.append_value(count);
+            count = 0;
         }
+        Ok(vec![Arc::new(out.finish())])
     }
 
-    fn finalize(&self) -> Result<BooleanArray> {
-        let mut inner = self.inner.lock().unwrap();
-        if inner.skip {
-            // println!("a4 false {}", inner.last_hash);
-            inner.out.append_value(false);
-            return Ok(inner.out.finish());
-        }
+    fn fields(&self) -> Vec<Field> {
+        vec![Field::new(
+            format!("{}_count", self.name),
+            DataType::Boolean,
+            false,
+        )]
+    }
 
-        let count = inner.count;
-        let res = match Op::op() {
-            Operator::Lt => count < self.right,
-            Operator::LtEq => count <= self.right,
-            Operator::Eq => count == self.right,
-            Operator::NotEq => count != self.right,
-            Operator::Gt => count > self.right,
-            Operator::GtEq => count >= self.right,
-        };
-
-        if !res {
-            // println!("a5 false {}", inner.last_hash);
-            inner.out.append_value(false);
-        } else {
-            // println!("a6 true {}", inner.last_hash);
-            inner.out.append_value(true);
-        }
-        Ok(inner.out.finish())
+    fn schema(&self) -> SchemaRef {
+        Arc::new(Schema::new(self.fields()))
     }
 }
 
@@ -209,12 +157,12 @@ mod tests {
     use arrow::array::Int64Array;
     use arrow::array::TimestampMillisecondArray;
     use arrow::datatypes::DataType;
+    use arrow::datatypes::DataType::Duration;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::datatypes::SchemaRef;
     use arrow::datatypes::TimeUnit;
     use arrow::record_batch::RecordBatch;
-    use chrono::Duration;
     use datafusion::physical_expr::expressions;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
@@ -233,315 +181,82 @@ mod tests {
     use crate::physical_plan::expressions::partitioned::boolean_op::Gt;
     use crate::physical_plan::expressions::partitioned::count::Count;
     use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
-    use crate::physical_plan::expressions::partitioned::SegmentationExpr;
+    use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
 
     #[test]
     fn test_predicate() {
         let data = r#"
 | user_id(i64) | ts(ts) | event(utf8) |
 |--------------|--------|-------------|
-| 0            | 1      | e1          |
-| 0            | 2      | e2          |
-| 0            | 3      | e3          |
-| 0            | 4      | e1          |
-| 0            | 5      | e1          |
-| 0            | 6      | e2          |
-| 0            | 7      | e3          |
-
-| 1            | 8      | e1          |
-| 1            | 9      | e3          |
-| 1            | 10      | e1          |
-| 1            | 11      | e2          |
-
-| 2            | 12      | e2          |
-| 2            | 13      | e1          |
-| 2            | 14      | e2          |
+| 0            | 1      | 1          |
+| 0            | 2      | 1          |
+|              |        |             |
+| 1            | 8      | 1          |
+|              |        |             |
+| 2            | 1      | 2          |
+| 2            | 2      | 1          |
 "#;
-
-        let res = parse_markdown_table_v1(data).unwrap();
-
-        let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
-        let mut hash_buf = vec![];
-        hash_buf.resize(res.num_rows(), 0);
-        create_hashes(
-            &vec![res.columns()[0].clone()],
-            &mut random_state,
-            &mut hash_buf,
-        )
-        .unwrap();
+        let mut res = parse_markdown_tables(data).unwrap();
+        res = res
+            .iter()
+            .enumerate()
+            .map(|(id, batch)| {
+                let mut schema = (*batch.schema()).to_owned();
+                schema.metadata.insert("id".to_string(), id.to_string());
+                RecordBatch::try_new(Arc::new(schema.clone()), batch.columns().to_owned()).unwrap()
+            })
+            .collect::<Vec<_>>();
 
         {
-            let left = Arc::new(Column::new_with_schema("event", &res.schema()).unwrap());
-            let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
+            let left = Arc::new(Column::new_with_schema("event", &res[0].schema()).unwrap());
+            let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
-            let mut count = Count::<Gt>::new(
-                Arc::new(f) as PhysicalExprRef,
-                Column::new_with_schema("ts", &res.schema()).unwrap(),
-                2,
-                TimeRange::None,
-                None,
-            );
-            let res = count.evaluate(&res, &hash_buf).unwrap();
-            let right = BooleanArray::from(vec![true, false]);
-            assert_eq!(res, Some(right));
+            let mut count = Count::new(Some(Arc::new(f) as PhysicalExprRef), "a".to_string());
 
-            let res = count.finalize().unwrap();
-            let right = BooleanArray::from(vec![false]);
-            assert_eq!(res, right);
-        }
-        {
-            let left = Arc::new(Column::new_with_schema("event", &res.schema()).unwrap());
-            let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e2".to_string()))));
-            let f = BinaryExpr::new(left, Operator::Eq, right);
-            let mut count = Count::<Gt>::new(
-                Arc::new(f) as PhysicalExprRef,
-                Column::new_with_schema("ts", &res.schema()).unwrap(),
-                1,
-                TimeRange::None,
-                None,
-            );
-            let res = count.evaluate(&res, &hash_buf).unwrap();
-            let right = BooleanArray::from(vec![true, false]);
-            assert_eq!(res, Some(right));
+            let spans = vec![2, 1, 2];
+            let res = count.evaluate(&res, spans, 0).unwrap();
+            let right = Int64Array::from(vec![2, 1, 1]);
 
-            let res = count.finalize().unwrap();
-            let right = BooleanArray::from(vec![true]);
-            assert_eq!(res, right);
+            let e: Arc<dyn PartitionedAggregateExpr> = Arc::new(count);
+            assert_eq!(res, vec![Arc::new(right) as ArrayRef]);
+            // assert_eq!(res, right);
         }
     }
 
     #[test]
-    fn time_range() {
-        let data = r#"
-    | user_id(i64) | ts(ts) | event(utf8) |
-    |--------------|--------|-------------|
-    | 0            | 1      | e1          |
-    | 0            | 2      | e2          |
-    | 0            | 3      | e3          |
-    | 0            | 4      | e1          |
-    | 0            | 5      | e1          |
-    | 0            | 6      | e2          |
-    | 0            | 7      | e3          |
-    | 1            | 5      | e1          |
-    | 1            | 6      | e3          |
-    | 1            | 7      | e1          |
-    | 1            | 8      | e2          |
-    | 2            | 9      | e1          |
-    "#;
-
-        let res = parse_markdown_table_v1(data).unwrap();
-
-        let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
-        let mut hash_buf = vec![];
-        hash_buf.resize(res.num_rows(), 0);
-        create_hashes(
-            &vec![res.columns()[0].clone()],
-            &mut random_state,
-            &mut hash_buf,
-        )
-        .unwrap();
-        let left = Arc::new(Column::new_with_schema("event", &res.schema()).unwrap());
-        let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
-        let f = BinaryExpr::new(left, Operator::Eq, right);
-        let mut count = Count::<Gt>::new(
-            Arc::new(f) as PhysicalExprRef,
-            Column::new_with_schema("ts", &res.schema()).unwrap(),
-            1,
-            TimeRange::From(2),
-            None,
-        );
-        let res = count.evaluate(&res, &hash_buf).unwrap();
-        let right = BooleanArray::from(vec![true, true]);
-        assert_eq!(res, Some(right));
-    }
-
-    #[test]
-    fn time_window_success() {
-        let data = r#"
-    | user_id(i64) | ts(ts) | event(utf8) |
-    |--------------|--------|-------------|
-    | 0            | 0     | e1          |
-    | 0            | 1     | e1          |
-
-    | 0            | 2     | e1          |
-    | 0            | 3     | e1          |
-
-    | 1            | 11     | e1          |
-    | 1            | 12     | e1          |
-
-    | 1            | 13     | e1          |
-    | 1            | 14     | e1          |
-
-    | 2            | 16     | e1          |
-    | 2            | 17     | e1          |
-
-    | 2            | 18     | e1          |
-
-    | 3            | 19     | e1          |
-    | 3            | 20     | e1          |
-
-    | 3            | 22     | e1          |
-    | 3            | 23     | e1          |
-
-   | 3            | 24     | e1          |
-   | 3            | 24     | e1          |
-
-    "#;
-
-        let res = parse_markdown_table_v1(data).unwrap();
-
-        let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
-        let mut hash_buf = vec![];
-        hash_buf.resize(res.num_rows(), 0);
-        create_hashes(
-            &vec![res.columns()[0].clone()],
-            &mut random_state,
-            &mut hash_buf,
-        )
-        .unwrap();
-        let left = Arc::new(Column::new_with_schema("event", &res.schema()).unwrap());
-        let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
-        let f = BinaryExpr::new(left, Operator::Eq, right);
-        let mut count = Count::<Gt>::new(
-            Arc::new(f) as PhysicalExprRef,
-            Column::new_with_schema("ts", &res.schema()).unwrap(),
-            1,
-            TimeRange::None,
-            Some(Duration::nanoseconds(2).num_nanoseconds().unwrap()),
-        );
-        let res = count.evaluate(&res, &hash_buf).unwrap();
-        let right = BooleanArray::from(vec![true, true, false]);
-        assert_eq!(res, Some(right));
-
-        let res = count.finalize().unwrap();
-        let right = BooleanArray::from(vec![true]);
-        assert_eq!(res, right);
-    }
-
-    #[test]
-    fn time_window_finalize_fail() {
-        let data = r#"
-    | user_id(i64) | ts(ts) | event(utf8) |
-    |--------------|--------|-------------|
-    | 0            | 0     | e1          |
-    | 0            | 1     | e1          |
-
-    | 0            | 2     | e1          |
-
-    "#;
-
-        let res = parse_markdown_table_v1(data).unwrap();
-
-        let mut random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
-        let mut hash_buf = vec![];
-        hash_buf.resize(res.num_rows(), 0);
-        create_hashes(
-            &vec![res.columns()[0].clone()],
-            &mut random_state,
-            &mut hash_buf,
-        )
-        .unwrap();
-        let left = Arc::new(Column::new_with_schema("event", &res.schema()).unwrap());
-        let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
-        let f = BinaryExpr::new(left, Operator::Eq, right);
-        let mut count = Count::<Gt>::new(
-            Arc::new(f) as PhysicalExprRef,
-            Column::new_with_schema("ts", &res.schema()).unwrap(),
-            1,
-            TimeRange::None,
-            Some(Duration::nanoseconds(2).num_nanoseconds().unwrap()),
-        );
-
-        let res = count.evaluate(&res, &hash_buf).unwrap();
-        assert_eq!(res, None);
-
-        let res = count.finalize().unwrap();
-        let right = BooleanArray::from(vec![false]);
-        assert_eq!(res, right);
-    }
-
-    #[test]
-    fn test_2() {
+    fn test_no_predicate() {
         let data = r#"
 | user_id(i64) | ts(ts) | event(utf8) |
 |--------------|--------|-------------|
-| 1            | 1      | 1           |
+| 0            | 1      | 1          |
+| 0            | 2      | 1          |
 |              |        |             |
-| 2            | 2      | 1           |
+| 1            | 8      | 1          |
 |              |        |             |
-| 3            | 3      | 1           |
-| 3            | 4      | 1           |
-| 3            | 5      | 1           |
-|              |        |             |
-| 3            | 6      | 1           |
-| 3            | 7      | 1           |
-| 3            | 8      | 1           |
-|              |        |             |
-| 3            | 9      | 1           |
-| 3            | 10     | 1           |
-| 3            | 11     | 1           |
-|              |        |             |
-| 3            | 12     | 1           |
-| 4            | 13     | 1           |
-| 5            | 14     | 1           |
-| 6            | 15     | 1           |
-| 6            | 16     | 1           |
-| 6            | 17     | 1           |
-| 7            | 18     | 1           |
-| 7            | 19     | 1           |
-| 8            | 20     | 1           |
-|              |        |             |
-| 9            | 21     | 1           |
-| 9            | 22     | 1           |
-| 10           | 23     | 1           |
-| 11           | 24     | 1           |
-|              |        |             |
-| 12           | 25     | 1           |
-| 12           | 26     | 1           |
-| 12           | 27     | 1           |
-| 12           | 28     | 1           |
-|              |        |             |
-| 12           | 29     | 1           |
-| 12           | 30     | 1           |
-| 12           | 31     | 1           |
-| 12           | 32     | 1           |
-|              |        |             |
-| 12           | 33     | 1           |
-| 12           | 34     | 1           |
-|              |        |             |
-| 12           | 35     | 1           |
-| 13           | 36     | 1           |
-| 14           | 37     | 1           |
-| 15           | 38     | 1           |
+| 2            | 1      | 2          |
+| 2            | 2      | 1          |
 "#;
+        let mut res = parse_markdown_tables(data).unwrap();
+        res = res
+            .iter()
+            .enumerate()
+            .map(|(id, batch)| {
+                let mut schema = (*batch.schema()).to_owned();
+                schema.metadata.insert("id".to_string(), id.to_string());
+                RecordBatch::try_new(Arc::new(schema.clone()), batch.columns().to_owned()).unwrap()
+            })
+            .collect::<Vec<_>>();
 
-        let batches = parse_markdown_tables(data).unwrap();
-        let schema = batches[0].schema();
-        let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
-        let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
-        let f = BinaryExpr::new(left, Operator::Eq, right);
-        let mut count = Count::<boolean_op::Eq>::new(
-            Arc::new(f) as PhysicalExprRef,
-            Column::new_with_schema("ts", &schema).unwrap(),
-            1,
-            TimeRange::None,
-            Some(Duration::nanoseconds(2).num_nanoseconds().unwrap()),
-        );
+        {
+            let mut count = Count::new(None, "a".to_string());
 
-        for batch in batches {
-            let mut hash_buf = batch.columns()[0]
-                .as_any()
-                .downcast_ref::<Int64Array>()
-                .unwrap()
-                .iter()
-                .map(|v| v.unwrap() as u64)
-                .collect::<Vec<_>>();
+            let spans = vec![2, 1, 2];
+            let res = count.evaluate(&res, spans, 0).unwrap();
+            let right = Int64Array::from(vec![2, 1, 2]);
 
-            let res = count.evaluate(&batch, &hash_buf).unwrap();
-            // println!("{:?}", res);
+            let e: Arc<dyn PartitionedAggregateExpr> = Arc::new(count);
+            assert_eq!(res, vec![Arc::new(right) as ArrayRef]);
+            // assert_eq!(res, right);
         }
-
-        let res = count.finalize().unwrap();
-        println!("{:?}", res);
     }
 }
