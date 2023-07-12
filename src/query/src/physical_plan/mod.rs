@@ -25,6 +25,7 @@ struct PartitionState {
     random_state: ahash::RandomState,
     hash_buffer: Vec<u64>,
     buf: Vec<RecordBatch>,
+    batch_id: usize,
     offsets: Vec<usize>,
     last_value: Option<u64>,
     last_value_count: usize,
@@ -48,6 +49,7 @@ impl PartitionState {
             random_state: ahash::RandomState::with_seeds(0, 0, 0, 0),
             hash_buffer: vec![],
             buf: Vec::with_capacity(10),
+            batch_id: 0,
             offsets: vec![],
             last_value: None,
             last_value_count: 0,
@@ -62,10 +64,17 @@ impl PartitionState {
     // Result will remain empty until we have enough batches to make a partition
     pub fn push(
         &mut self,
-        batch: RecordBatch,
+        mut batch: RecordBatch,
     ) -> DFResult<Option<(Vec<RecordBatch>, Vec<usize>, usize)>> {
+        // give an unique number to batch so it can be cached
+        batch
+            .schema()
+            .metadata()
+            .insert("id".to_string(), format!("{}", self.batch_id));
+        self.batch_id += 1;
         // push batch to buffer
         self.buf.push(batch.clone());
+        println!("{:p}", self.buf.last().unwrap());
         // evaluate partition
         let arrays = self
             .partition_key
@@ -118,11 +127,14 @@ impl PartitionState {
             self.last_value = Some(*v);
         }
 
-        // take batches we have enough batches and enough spans to take
+        // take batches if we have enough batches and enough spans to take
         if self.buf.len() > 1 && take {
             // drain the buffer except the last batch
             let mut take_batches = self.buf.drain(..self.buf.len() - 1).collect::<Vec<_>>();
+            // push the last batch so it will be overlapped in the next iteration
+            println!("b1 {:p}", self.buf.last().unwrap());
             take_batches.push(self.buf.last().unwrap().to_owned());
+            println!("b2 {:p}", take_batches.last().unwrap());
             // take the spans
             let take_spans = self
                 .spans

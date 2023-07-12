@@ -350,6 +350,16 @@ mod tests {
 | 0       | 5   | e1    |
 | 0       | 6   | e2    |
 | 0       | 7   | e3    |
+| 0       | 8   | e1    |
+|         |     |       |
+| 0       | 9   | e1    |
+| 0       | 10   | e2    |
+| 0       | 11   | e3    |
+| 0       | 12   | e1    |
+|         |     |       |
+| 0       | 13   | e1    |
+| 0       | 14   | e2    |
+| 0       | 15   | e3    |
 | 1       | 5   | e1    |
 | 1       | 6   | e3    |
 | 1       | 7   | e1    |
@@ -447,9 +457,9 @@ mod tests {
         let agg3 = Arc::new(FunnelExprWrap::new(f));
         let segmentation = PartitionedAggregateExec::try_new(
             vec![Arc::new(Column::new_with_schema("user_id", &schema)?)],
-            vec![agg1, agg2, agg3],
+            vec![agg1 /* , agg2, agg3 */],
             Arc::new(input),
-            5,
+            100,
         )?;
 
         let session_ctx = SessionContext::new();

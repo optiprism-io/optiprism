@@ -17,6 +17,7 @@ use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
@@ -67,100 +68,18 @@ impl<Op> Count<Op> {
     }
 }
 
-impl<Op> Count<Op>
+impl<Op> PartitionedAggregateExpr for Count<Op>
 where Op: ComparisonOp<i64>
 {
-    fn window(
+    fn evaluate(
         &self,
         batches: &[RecordBatch],
         spans: Vec<usize>,
         skip: usize,
     ) -> Result<Vec<ArrayRef>> {
-        let mut spans = Spans::new_from_batches(spans, batches);
-        spans.skip(skip);
-
-        let num_rows = spans.spans.iter().sum::<usize>();
-        let mut out = BooleanBuilder::with_capacity(num_rows);
-        let ts = batches
+        batches
             .iter()
-            .map(|b| {
-                self.ts_col.evaluate(b).and_then(|r| {
-                    Ok(r.into_array(b.num_rows())
-                        .as_any()
-                        .downcast_ref::<TimestampMillisecondArray>()
-                        .unwrap()
-                        .clone())
-                })
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-
-        let to_filter = batches
-            .iter()
-            .map(|b| {
-                self.filter.evaluate(b).and_then(|r| {
-                    Ok(r.into_array(b.num_rows())
-                        .as_any()
-                        .downcast_ref::<BooleanArray>()
-                        .unwrap()
-                        .clone())
-                })
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-
-        let mut in_bounds = false;
-        let mut window_end = 0;
-        let cur_window = 0;
-        'next_span: while spans.next_span() {
-            let mut count = 0;
-            while let Some((batch_id, row_id)) = spans.next_row() {
-                let cur_ts = ts[batch_id].value(row_id);
-                if !self.time_range.check_bounds(cur_ts) {
-                    if in_bounds {
-                        break;
-                    }
-                    continue;
-                } else {
-                    if !in_bounds {
-                        in_bounds = true;
-                        window_end = cur_ts + self.time_window - 1;
-                    }
-                }
-                if !check_filter(&to_filter[batch_id], row_id) {
-                    continue;
-                }
-                count += 1;
-
-                println!("cur_ts: {}, window_end: {}", cur_ts, window_end);
-                if cur_ts >= window_end {
-                    let res = match Op::op() {
-                        Operator::Lt => count < self.right,
-                        Operator::LtEq => count <= self.right,
-                        Operator::Eq => count == self.right,
-                        Operator::NotEq => count != self.right,
-                        Operator::Gt => count > self.right,
-                        Operator::GtEq => count >= self.right,
-                    };
-                    if !res {
-                        println!("? {}", count);
-                        out.append_value(false);
-                        continue 'next_span;
-                    }
-                    count = 0;
-                    window_end += self.time_window;
-                }
-            }
-            out.append_value(count == 0);
-        }
-
-        Ok(vec![Arc::new(out.finish())])
-    }
-
-    pub fn non_window(
-        &self,
-        batches: &[RecordBatch],
-        spans: Vec<usize>,
-        skip: usize,
-    ) -> Result<Vec<ArrayRef>> {
+            .for_each(|b| println!("{}", b.schema().metadata().get("id").unwrap()));
         let mut spans = Spans::new_from_batches(spans, batches);
         spans.skip(skip);
 
@@ -223,23 +142,6 @@ where Op: ComparisonOp<i64>
         }
 
         Ok(vec![Arc::new(out.finish())])
-    }
-}
-
-impl<Op> PartitionedAggregateExpr for Count<Op>
-where Op: ComparisonOp<i64>
-{
-    fn evaluate(
-        &self,
-        batches: &[RecordBatch],
-        spans: Vec<usize>,
-        skip: usize,
-    ) -> Result<Vec<ArrayRef>> {
-        if !self.is_window {
-            self.non_window(batches, spans, skip)
-        } else {
-            self.window(batches, spans, skip)
-        }
     }
 
     fn fields(&self) -> Vec<Field> {
