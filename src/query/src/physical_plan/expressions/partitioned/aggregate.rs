@@ -151,15 +151,14 @@ macro_rules! gen_agg_primitive {
                         inner.last_hash = *hash;
                         inner.last_ts = ts.value(idx);
                     }
-
-                    if check_filter(&to_filter, idx) == false {
-                        continue;
-                    }
                     if !self.time_range.check_bounds(ts.value(idx)) {
                         continue;
                     }
+                    if check_filter(&to_filter, idx) == false {
+                        continue;
+                    }
                     if *hash != inner.last_hash {
-                        let val = inner.val;
+                        let val = inner.vvakal;
                         inner.last_hash = *hash;
                         inner.val = <$acc_ty>::zero();
                         inner.agg.reset();

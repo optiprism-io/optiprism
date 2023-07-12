@@ -37,7 +37,6 @@ use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
-use crate::physical_plan::expressions::partitioned::aggregate::Aggregate;
 use crate::physical_plan::expressions::partitioned::boolean_op;
 use crate::physical_plan::expressions::partitioned::boolean_op::*;
 use crate::physical_plan::expressions::partitioned::comparison::And;
