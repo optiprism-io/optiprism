@@ -177,7 +177,6 @@ where Op: ComparisonOp<i64>
                 out.append_value(true);
             }
         }
-
         Ok(vec![Arc::new(out.finish())])
     }
 

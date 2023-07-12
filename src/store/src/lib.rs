@@ -800,6 +800,7 @@ pub mod test_util {
                     DataType::Int64
                     | DataType::Int32
                     | DataType::Float64
+                    | DataType::Float32
                     | DataType::Boolean
                     | DataType::Utf8 => out[idx].push(Value::parse(val, field.data_type())?),
                     DataType::List(f) | DataType::LargeList(f) => {
