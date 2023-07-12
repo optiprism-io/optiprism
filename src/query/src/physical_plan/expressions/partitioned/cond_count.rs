@@ -1,3 +1,4 @@
+use std::collections::BinaryHeap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -25,6 +26,7 @@ use datafusion::physical_expr::PhysicalExprRef;
 
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
+use crate::physical_plan::batch_id;
 use crate::physical_plan::expressions::partitioned::boolean_op::ComparisonOp;
 use crate::physical_plan::expressions::partitioned::boolean_op::Operator;
 use crate::physical_plan::expressions::partitioned::check_filter;
@@ -33,9 +35,16 @@ use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::Spans;
 
 #[derive(Debug)]
+struct Inner {
+    last_ts: Option<(usize, TimestampMillisecondArray)>,
+    last_filter: Option<(usize, BooleanArray)>,
+}
+
+#[derive(Debug)]
 pub struct Count<Op> {
     filter: PhysicalExprRef,
     ts_col: Column,
+    inner: Mutex<Inner>,
     time_range: TimeRange,
     op: PhantomData<Op>,
     right: i64,
@@ -53,9 +62,14 @@ impl<Op> Count<Op> {
         time_window: Option<i64>,
         name: String,
     ) -> Self {
+        let inner = Inner {
+            last_ts: None,
+            last_filter: None,
+        };
         Self {
             filter,
             ts_col,
+            inner: Mutex::new(inner),
             time_range,
             op: Default::default(),
             right,
@@ -77,39 +91,64 @@ where Op: ComparisonOp<i64>
         spans: Vec<usize>,
         skip: usize,
     ) -> Result<Vec<ArrayRef>> {
-        batches
-            .iter()
-            .for_each(|b| println!("{}", b.schema().metadata().get("id").unwrap()));
         let mut spans = Spans::new_from_batches(spans, batches);
         spans.skip(skip);
 
         let num_rows = spans.spans.iter().sum::<usize>();
         let mut out = BooleanBuilder::with_capacity(num_rows);
-        let ts = batches
-            .iter()
-            .map(|b| {
-                self.ts_col.evaluate(b).and_then(|r| {
-                    Ok(r.into_array(b.num_rows())
-                        .as_any()
-                        .downcast_ref::<TimestampMillisecondArray>()
-                        .unwrap()
-                        .clone())
-                })
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
 
-        let to_filter = batches
-            .iter()
-            .map(|b| {
-                self.filter.evaluate(b).and_then(|r| {
-                    Ok(r.into_array(b.num_rows())
-                        .as_any()
-                        .downcast_ref::<BooleanArray>()
-                        .unwrap()
-                        .clone())
+        let mut inner = self.inner.lock().unwrap();
+        let ts = {
+            batches
+                .iter()
+                .enumerate()
+                .map(|(idx, b)| {
+                    if let Some((id, ts)) = &inner.last_ts {
+                        if *id == batch_id(b) {
+                            return Ok(ts.to_owned());
+                        }
+                    }
+                    return self.ts_col.evaluate(b).and_then(|r| {
+                        Ok(r.into_array(b.num_rows())
+                            .as_any()
+                            .downcast_ref::<TimestampMillisecondArray>()
+                            .unwrap()
+                            .clone())
+                    });
                 })
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
+                .collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        inner.last_ts = Some((
+            batch_id(batches.last().unwrap()),
+            ts.last().unwrap().clone(),
+        ));
+
+        let to_filter = {
+            batches
+                .iter()
+                .enumerate()
+                .map(|(idx, b)| {
+                    if let Some((id, ts)) = &inner.last_filter {
+                        if *id == batch_id(b) {
+                            return Ok(ts.to_owned());
+                        }
+                    }
+                    return self.filter.evaluate(b).and_then(|r| {
+                        Ok(r.into_array(b.num_rows())
+                            .as_any()
+                            .downcast_ref::<BooleanArray>()
+                            .unwrap()
+                            .clone())
+                    });
+                })
+                .collect::<std::result::Result<Vec<_>, _>>()?
+        };
+
+        inner.last_filter = Some((
+            batch_id(batches.last().unwrap()),
+            to_filter.last().unwrap().clone(),
+        ));
 
         while spans.next_span() {
             let mut count = 0;

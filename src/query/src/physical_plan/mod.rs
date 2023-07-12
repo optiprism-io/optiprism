@@ -64,17 +64,17 @@ impl PartitionState {
     // Result will remain empty until we have enough batches to make a partition
     pub fn push(
         &mut self,
-        mut batch: RecordBatch,
+        batch: RecordBatch,
     ) -> DFResult<Option<(Vec<RecordBatch>, Vec<usize>, usize)>> {
-        // give an unique number to batch so it can be cached
-        batch
-            .schema()
-            .metadata()
+        let mut schema = (*batch.schema()).to_owned();
+        schema
+            .metadata
             .insert("id".to_string(), format!("{}", self.batch_id));
+        let batch = RecordBatch::try_new(Arc::new(schema), batch.columns().to_owned())?;
+        // give an unique number to batch so it can be cached
         self.batch_id += 1;
         // push batch to buffer
         self.buf.push(batch.clone());
-        println!("{:p}", self.buf.last().unwrap());
         // evaluate partition
         let arrays = self
             .partition_key
@@ -132,9 +132,7 @@ impl PartitionState {
             // drain the buffer except the last batch
             let mut take_batches = self.buf.drain(..self.buf.len() - 1).collect::<Vec<_>>();
             // push the last batch so it will be overlapped in the next iteration
-            println!("b1 {:p}", self.buf.last().unwrap());
             take_batches.push(self.buf.last().unwrap().to_owned());
-            println!("b2 {:p}", take_batches.last().unwrap());
             // take the spans
             let take_spans = self
                 .spans
@@ -272,6 +270,10 @@ impl Spans {
 
         Some((batch_id, row_id))
     }
+}
+
+pub fn batch_id(b: &RecordBatch) -> usize {
+    b.schema().metadata().get("id").unwrap().parse().unwrap()
 }
 
 #[cfg(test)]
