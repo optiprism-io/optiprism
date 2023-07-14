@@ -457,7 +457,106 @@ mod tests {
         let agg3 = Arc::new(FunnelExprWrap::new(f));
         let segmentation = PartitionedAggregateExec::try_new(
             vec![Arc::new(Column::new_with_schema("user_id", &schema)?)],
-            vec![agg1 /* , agg2, agg3 */],
+            vec![agg1, agg2, agg3],
+            Arc::new(input),
+            100,
+        )?;
+
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = segmentation.execute(0, task_ctx)?;
+        let result = collect(stream).await?;
+
+        print_batches(&result).unwrap();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn group_by_day() -> anyhow::Result<()> {
+        let data = r#"
+| user_id(i64) | ts(ts) | event(utf8) |
+|--------------|--------|-------------|
+| 0            | 1      | e1          |
+| 0            | 1      | e2          |
+| 0            | 1      | e3          |
+| 0            | 2      | e1          |
+| 0            | 2      | e2          |
+| 0            | 2      | e3          |
+| 0            | 3      | e1          |
+| 0            | 3      | e2          |
+| 0            | 3      | e3          |
+| 1            | 1      | e2          |
+| 1            | 1      | e2          |
+| 1            | 1      | e3          |
+| 1            | 2      | e1          |
+| 1            | 2      | e2          |
+| 1            | 2      | e3          |
+| 1            | 3      | e1          |
+| 1            | 3      | e2          |
+| 1            | 3      | e3          |
+"#;
+
+        let batches = parse_markdown_tables(data).unwrap();
+        let schema = batches[0].schema();
+        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+        let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
+        let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
+        let f = Arc::new(BinaryExpr::new(left, Operator::GtEq, right));
+        let mut agg1 = Arc::new(Count::<boolean_op::Eq>::new(
+            f.clone(),
+            Column::new_with_schema("ts", &schema).unwrap(),
+            5,
+            TimeRange::None,
+            None,
+            "a".to_string(),
+        ));
+
+        let mut agg2 = Arc::new(Count::<boolean_op::Eq>::new(
+            f.clone(),
+            Column::new_with_schema("ts", &schema).unwrap(),
+            2,
+            TimeRange::None,
+            None,
+            "b".to_string(),
+        ));
+
+        let e1 = {
+            let l = Column::new_with_schema("event", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Utf8(Some("e1".to_string())));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e2 = {
+            let l = Column::new_with_schema("event", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Utf8(Some("e2".to_string())));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e3 = {
+            let l = Column::new_with_schema("event", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Utf8(Some("e3".to_string())));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let opts = funnel::Options {
+            ts_col: Column::new_with_schema("ts", &schema)?,
+            window: Duration::seconds(15),
+            steps: vec![e1, e2, e3],
+            exclude: None,
+            constants: None,
+            count: funnel::Count::Unique,
+            filter: None,
+            touch: Touch::First,
+        };
+
+        let f = FunnelExpr::new(opts);
+        let agg3 = Arc::new(FunnelExprWrap::new(f));
+        let segmentation = PartitionedAggregateExec::try_new(
+            vec![
+                Arc::new(Column::new_with_schema("user_id", &schema)?),
+                Arc::new(Column::new_with_schema("ts", &schema)?),
+            ],
+            vec![agg1, agg2, agg3],
             Arc::new(input),
             100,
         )?;
