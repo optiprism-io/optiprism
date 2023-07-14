@@ -41,7 +41,7 @@ mod tests {
             property: PropertyRef::Event("Product Name".to_string()),
             event: Some(EventRef::RegularName("View Product".to_string())),
             filter: Some(Filter {
-                operation: PropValueOperation::Like,
+                operation: PropValueOperation::Eq,
                 value: Some(vec![ScalarValue::Utf8(Some("goo%".to_string()))]),
             }),
         };
