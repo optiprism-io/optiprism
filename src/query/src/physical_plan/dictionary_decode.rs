@@ -19,7 +19,6 @@ use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
-use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
@@ -198,7 +197,10 @@ impl DictionaryDecodeStream {
                         }
                     })
                     .collect();
-                Poll::Ready(Some(Ok(RecordBatch::try_new(self.schema.clone(), columns)?)))
+                Poll::Ready(Some(Ok(RecordBatch::try_new(
+                    self.schema.clone(),
+                    columns,
+                )?)))
             }
             other => other,
         }

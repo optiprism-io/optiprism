@@ -2,12 +2,12 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
-use std::hash::Hash;
 
 use arrow::datatypes::DataType;
-use datafusion_common::{Column, TableReference};
+use datafusion_common::Column;
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;

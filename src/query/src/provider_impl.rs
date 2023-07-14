@@ -125,9 +125,9 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let state = SessionState::with_config_rt(SessionConfig::new(), runtime)
         .with_query_planner(Arc::new(QueryPlanner {}))
         .with_optimizer_rules(vec![]);
-    let exec_ctx = SessionContext::with_state(state);
+    let exec_ctx = SessionContext::with_state(state.clone());
     debug!("logical plan: {:?}", plan);
-    let physical_plan = exec_ctx.create_physical_plan(plan).await?;
+    let physical_plan = state.create_physical_plan(plan).await?;
     let displayable_plan = displayable(physical_plan.as_ref());
 
     debug!("physical plan: {}", displayable_plan.indent());

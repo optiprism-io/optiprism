@@ -10,11 +10,7 @@ pub fn make_password_hash(password: &str) -> Result<String> {
         argon2::Version::V0x10,
         argon2::Params::default(),
     );
-    let hash = PasswordHash::generate(
-        phf,
-        password,
-        &salt,
-    )?;
+    let hash = PasswordHash::generate(phf, password, &salt)?;
 
     Ok(hash.to_string())
 }

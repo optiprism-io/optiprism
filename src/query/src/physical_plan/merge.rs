@@ -11,7 +11,6 @@ use std::task::Poll;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;

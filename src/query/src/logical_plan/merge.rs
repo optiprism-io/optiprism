@@ -2,7 +2,8 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use datafusion_common::DFSchema;
@@ -14,7 +15,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::error::QueryError;
 use crate::Result;
 
-#[derive(Hash,Eq,PartialEq)]
+#[derive(Hash, Eq, PartialEq)]
 pub struct MergeNode {
     inputs: Vec<LogicalPlan>,
     schema: DFSchemaRef,

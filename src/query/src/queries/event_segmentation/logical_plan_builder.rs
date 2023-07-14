@@ -308,8 +308,10 @@ impl LogicalPlanBuilder {
                         );
                         Expr::AggregateFunction(agg_fn)
                     }
-                    Query::CountUniqueGroups | Query::DailyActiveGroups =>
-                        sorted_distinct_count(input.schema(), col(Column::from_name(self.es.group.clone())))?,
+                    Query::CountUniqueGroups | Query::DailyActiveGroups => sorted_distinct_count(
+                        input.schema(),
+                        col(Column::from_name(self.es.group.clone())),
+                    )?,
                     Query::WeeklyActiveGroups => unimplemented!(),
                     Query::MonthlyActiveGroups => unimplemented!(),
                     Query::CountPerGroup { aggregate } => aggregate_partitioned(
@@ -334,7 +336,10 @@ impl LogicalPlanBuilder {
                             property,
                         ))?],
                     )?,
-                    Query::AggregateProperty { property, aggregate } => {
+                    Query::AggregateProperty {
+                        property,
+                        aggregate,
+                    } => {
                         let agg_fn = datafusion_expr::expr::AggregateFunction::new(
                             aggregate.to_owned().into(),
                             vec![executor::block_on(property_col(
@@ -361,16 +366,11 @@ impl LogicalPlanBuilder {
         // todo check for duplicates
         let all_expr = group_expr.iter().chain(aggr_expr.iter());
 
-        let aggr_schema =
+        let _aggr_schema =
             DFSchema::new_with_metadata(exprlist_to_fields(all_expr, &input)?, HashMap::new())?;
 
-
-        let expr = LogicalPlan::Aggregate(
-            Aggregate::try_new(
-                Arc::new(input),
-                group_expr,
-                aggr_expr,
-            )?);
+        let expr =
+            LogicalPlan::Aggregate(Aggregate::try_new(Arc::new(input), group_expr, aggr_expr)?);
 
         Ok(expr)
     }

@@ -1,7 +1,6 @@
 use std::mem;
-use arrow::ffi::{ArrowArray, ArrowArrayRef};
+
 use arrow_array::make_array;
-use arrow_data::ArrayData;
 
 use crate::error::Result;
 

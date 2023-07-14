@@ -1,6 +1,5 @@
 use std::result;
 
-use arrow2::error::Error as ArrowError;
 use parquet2::error::Error as ParquetError;
 // use parquet::errors::ParquetError;
 use thiserror::Error;

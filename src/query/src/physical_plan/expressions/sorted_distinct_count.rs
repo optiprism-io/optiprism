@@ -167,9 +167,7 @@ fn distinct_count(array: &ArrayRef, state: &mut SortedDistinctCountAccumulator) 
 
 impl Accumulator for SortedDistinctCountAccumulator {
     fn state(&self) -> Result<Vec<ScalarValue>> {
-        Ok(vec![ScalarValue::UInt64(Some(
-            self.count,
-        ))])
+        Ok(vec![ScalarValue::UInt64(Some(self.count))])
     }
 
     fn update_batch(&mut self, values: &[ArrayRef]) -> Result<()> {
@@ -205,7 +203,7 @@ mod tests {
             acc.update_batch(&[array_ref])?;
         }
         assert_eq!(
-            acc.state()?[0].as_scalar()?.to_owned(),
+            acc.state()?[0].to_owned(),
             ScalarValue::UInt64(Some(expected as u64))
         );
         Ok(())

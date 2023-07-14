@@ -1,24 +1,14 @@
-use std::any::Any;
-use std::cmp;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::io;
 use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
-use std::marker::PhantomData;
-use std::ops::Range;
-use std::ops::RangeBounds;
-use std::ops::SubAssign;
-use std::rc::Rc;
-use tracing::trace;
 
 use arrow2::array::new_null_array;
 use arrow2::array::Array;
 use arrow2::array::BinaryArray;
 use arrow2::array::BooleanArray;
-use arrow2::array::FixedSizeBinaryArray;
 use arrow2::array::Float32Array;
 use arrow2::array::Float64Array;
 use arrow2::array::Int128Array;
@@ -30,12 +20,9 @@ use arrow2::array::ListArray;
 use arrow2::array::MutableArray;
 use arrow2::array::MutableBinaryArray;
 use arrow2::array::MutableBooleanArray;
-use arrow2::array::MutableFixedSizeBinaryArray;
 use arrow2::array::MutableListArray;
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::array::MutableUtf8Array;
-use arrow2::array::PrimitiveArray;
-use arrow2::array::TryExtend;
 use arrow2::array::TryPush;
 use arrow2::array::UInt16Array;
 use arrow2::array::UInt32Array;
@@ -48,42 +35,23 @@ use arrow2::datatypes::Field;
 use arrow2::datatypes::PhysicalType as ArrowPhysicalType;
 use arrow2::datatypes::PrimitiveType as ArrowPrimitiveType;
 use arrow2::datatypes::Schema;
-use arrow2::ffi::mmap::slice;
-use arrow2::io::parquet::read::column_iter_to_arrays;
 use arrow2::io::parquet::read::infer_schema;
-use arrow2::io::parquet::read::schema::parquet_to_arrow_schema;
 use arrow2::io::parquet::write::add_arrow_schema;
-use arrow2::io::parquet::write::array_to_columns;
 use arrow2::io::parquet::write::to_parquet_schema;
 use arrow2::offset::OffsetsBuffer;
-use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::SchemaDescriptor;
-use parquet2::page::CompressedDataPage;
 use parquet2::page::CompressedPage;
-use parquet2::page::Page;
-use parquet2::page::Page::Data;
-use parquet2::read::decompress;
-use parquet2::schema::types::FieldInfo;
-use parquet2::schema::types::GroupLogicalType;
-use parquet2::schema::types::ParquetType;
-use parquet2::schema::types::PhysicalType;
-use parquet2::schema::types::PrimitiveType;
-use parquet2::schema::Repetition;
 use parquet2::write::FileSeqWriter;
 use parquet2::write::Version;
 use parquet2::write::WriteOptions;
 
 use crate::error::Result;
-use crate::error::StoreError;
 use crate::merge::arrow::merge_chunks;
 use crate::merge::arrow::try_merge_schemas as try_merge_arrow_schemas;
-use crate::merge::arrow::ArrowChunk;
-use crate::merge::parquet;
 use crate::merge::parquet::array_to_pages_simple;
 use crate::merge::parquet::check_intersection;
 use crate::merge::parquet::data_page_to_array;
-use crate::merge::parquet::pages_to_arrays;
 use crate::merge::parquet::ColumnPath;
 use crate::merge::parquet::CompressedPageIterator;
 use crate::merge::parquet::MergedPagesChunk;
@@ -103,7 +71,7 @@ enum TmpArray {
     Float32(Float32Array),
     Float64(Float64Array),
     Boolean(BooleanArray),
-    FixedSizeBinary(FixedSizeBinaryArray),
+    // FixedSizeBinary(FixedSizeBinaryArray),
     Binary(BinaryArray<i32>),
     LargeBinary(BinaryArray<i64>),
     Utf8(Utf8Array<i32>),
@@ -120,12 +88,12 @@ enum TmpArray {
     ListFloat32(Float32Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListFloat64(Float64Array, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListBoolean(BooleanArray, OffsetsBuffer<i32>, Option<Bitmap>, usize),
-    ListFixedSizeBinary(
-        FixedSizeBinaryArray,
-        OffsetsBuffer<i32>,
-        Option<Bitmap>,
-        usize,
-    ),
+    // ListFixedSizeBinary(
+    // FixedSizeBinaryArray,
+    // OffsetsBuffer<i32>,
+    // Option<Bitmap>,
+    // usize,
+    // ),
     ListBinary(BinaryArray<i32>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListLargeBinary(BinaryArray<i64>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
     ListUtf8(Utf8Array<i32>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
@@ -480,9 +448,9 @@ macro_rules! merge_list_primitive_arrays {
 }
 
 pub struct Merger<R, W>
-    where
-        R: Read,
-        W: Write,
+where
+    R: Read,
+    W: Write,
 {
     index_cols: Vec<ColumnDescriptor>,
     parquet_schema: SchemaDescriptor,
@@ -496,7 +464,7 @@ pub struct Merger<R, W>
     writer: FileSeqWriter<W>,
     row_group_values_limit: usize,
     array_page_size: usize,
-    null_pages_cache: HashMap<(DataType, usize), Rc<CompressedPage>>,
+    // null_pages_cache: HashMap<(DataType, usize), Rc<CompressedPage>>,
     data_page_size_limit: Option<usize>,
 }
 
@@ -508,9 +476,9 @@ pub enum MergeReorder {
 }
 
 impl<R, W> Merger<R, W>
-    where
-        R: Read + Seek,
-        W: Write,
+where
+    R: Read + Seek,
+    W: Write,
 {
     pub fn try_new(
         mut readers: Vec<R>,
@@ -539,7 +507,6 @@ impl<R, W> Merger<R, W>
         };
         let seq_writer = FileSeqWriter::new(writer, parquet_schema.clone(), opts, None);
         let index_cols = (0..index_cols)
-            .into_iter()
             .map(|idx| parquet_schema.columns()[idx].to_owned())
             .collect::<Vec<_>>();
 
@@ -548,15 +515,15 @@ impl<R, W> Merger<R, W>
             parquet_schema,
             arrow_schema,
             page_streams,
-            tmp_arrays: (0..streams_n).into_iter().map(|_| HashMap::new()).collect(),
-            tmp_array_idx: (0..streams_n).into_iter().map(|_| HashMap::new()).collect(),
+            tmp_arrays: (0..streams_n).map(|_| HashMap::new()).collect(),
+            tmp_array_idx: (0..streams_n).map(|_| HashMap::new()).collect(),
             sorter: BinaryHeap::new(),
             merge_queue: Vec::with_capacity(100),
             result_buffer: VecDeque::with_capacity(10),
             writer: seq_writer,
             row_group_values_limit,
             array_page_size,
-            null_pages_cache: HashMap::new(),
+            // null_pages_cache: HashMap::new(),
             data_page_size_limit,
         })
     }
@@ -582,11 +549,7 @@ impl<R, W> Merger<R, W>
         data_pagesize_limit: Option<usize>,
     ) -> Result<Vec<CompressedPage>> {
         let arr = new_null_array(field.data_type, num_rows);
-        Ok(array_to_pages_simple(
-            arr,
-            cd.base_type.clone(),
-            data_pagesize_limit,
-        )?)
+        array_to_pages_simple(arr, cd.base_type.clone(), data_pagesize_limit)
     }
 
     pub fn merge(&mut self) -> Result<()> {
@@ -626,9 +589,7 @@ impl<R, W> Merger<R, W>
                 for chunk in chunks.iter() {
                     let pages = match &chunk.1 {
                         MergeReorder::PickFromStream(stream_id, num_rows) => {
-                            let pages = if self.page_streams[*stream_id]
-                                .contains_column(&col.path_in_schema)
-                            {
+                            if self.page_streams[*stream_id].contains_column(&col.path_in_schema) {
                                 self.page_streams[*stream_id]
                                     .next_chunk(&col.path_in_schema)?
                                     .unwrap()
@@ -639,14 +600,10 @@ impl<R, W> Merger<R, W>
                                     *num_rows,
                                     self.data_page_size_limit,
                                 )?
-                            };
-
-                            pages
+                            }
                         }
                         MergeReorder::Merge(reorder, streams) => {
-                            let pages = self.merge_data(&col, field.clone(), reorder, streams)?;
-
-                            pages
+                            self.merge_data(&col, field.clone(), reorder, streams)?
                         }
                     };
 

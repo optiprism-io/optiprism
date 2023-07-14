@@ -53,7 +53,7 @@ impl PivotNode {
 
             let result_fields: Vec<DFField> = result_cols
                 .iter()
-                .map(|col| DFField::new_unqualified( col, value_type.clone(), true))
+                .map(|col| DFField::new_unqualified(col, value_type.clone(), true))
                 .collect();
 
             fields.extend_from_slice(&result_fields);
