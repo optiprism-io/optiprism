@@ -3,7 +3,6 @@ name = "store"
 version = "0.1.0"
 edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
-
 [profile.test]
 #lto = "fat"
 #codegen-units = 1
