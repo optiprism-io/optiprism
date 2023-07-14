@@ -47,9 +47,9 @@ impl UnpivotNode {
                 })
                 .collect();
 
-            let name_field = DFField::new_unqualified( name_col.as_str(), DataType::Utf8, false);
+            let name_field = DFField::new_unqualified(name_col.as_str(), DataType::Utf8, false);
             fields.push(name_field);
-            let value_field = DFField::new_unqualified( value_col.as_str(), value_type, false);
+            let value_field = DFField::new_unqualified(value_col.as_str(), value_type, false);
             fields.push(value_field);
 
             Arc::new(DFSchema::new_with_metadata(fields, HashMap::new())?)

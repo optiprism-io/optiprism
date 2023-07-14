@@ -16,10 +16,10 @@ use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
+use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
-use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
@@ -62,10 +62,14 @@ impl DictionaryDecodeExec {
                     .find(|(col, _)| col.name() == field.name().as_str())
                 {
                     None => field.clone(),
-                    Some(_) => Field::new(field.name(), DataType::Utf8, field.is_nullable()),
+                    Some(_) => FieldRef::new(Field::new(
+                        field.name(),
+                        DataType::Utf8,
+                        field.is_nullable(),
+                    )),
                 }
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         let schema = Arc::new(Schema::new(fields));
         Self {
@@ -198,7 +202,10 @@ impl DictionaryDecodeStream {
                         }
                     })
                     .collect();
-                Poll::Ready(Some(Ok(RecordBatch::try_new(self.schema.clone(), columns)?)))
+                Poll::Ready(Some(Ok(RecordBatch::try_new(
+                    self.schema.clone(),
+                    columns,
+                )?)))
             }
             other => other,
         }

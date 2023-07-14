@@ -1,98 +1,27 @@
 #![feature(trace_macros)]
 
-use std::env::temp_dir;
 use std::fs::create_dir_all;
 use std::fs::File;
-use std::io;
-use std::io::BufRead;
-use std::io::BufReader;
 use std::io::Cursor;
-use std::io::Write;
-use std::path::Path;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use arrow2::array::Array;
-use arrow2::array::BinaryArray;
-use arrow2::array::BooleanArray;
-use arrow2::array::FixedSizeBinaryArray;
-use arrow2::array::Float64Array;
-use arrow2::array::Int128Array;
-use arrow2::array::Int32Array;
-use arrow2::array::Int64Array;
-use arrow2::array::Int8Array;
-use arrow2::array::ListArray;
-use arrow2::array::MutableBooleanArray;
-use arrow2::array::MutableListArray;
-use arrow2::array::MutablePrimitiveArray;
-use arrow2::array::MutableUtf8Array;
 use arrow2::array::PrimitiveArray;
-use arrow2::array::TryExtend;
-use arrow2::array::Utf8Array;
-use arrow2::buffer::Buffer;
 use arrow2::chunk::Chunk;
-use arrow2::compute::concatenate::concatenate;
 use arrow2::datatypes::DataType;
 use arrow2::datatypes::Field;
-use arrow2::datatypes::IntervalUnit;
-use arrow2::datatypes::Schema;
 use arrow2::datatypes::TimeUnit;
-use arrow2::io::csv::read::deserialize_batch;
-use arrow2::io::csv::read::deserialize_column;
-use arrow2::io::csv::read::infer;
-use arrow2::io::csv::read::infer_schema;
-use arrow2::io::csv::read::read_rows;
-use arrow2::io::csv::read::ByteRecord;
-use arrow2::io::csv::read::ReaderBuilder;
 use arrow2::io::parquet::read;
-use arrow2::io::parquet::write::to_parquet_schema;
-use arrow2::io::parquet::write::to_parquet_type;
-use arrow2::io::parquet::write::transverse;
-use arrow2::io::parquet::write::FileWriter;
-use arrow2::io::parquet::write::RowGroupIterator;
 use arrow2::io::print;
-use arrow2::offset::Offset;
-use arrow2::types::NativeType;
-use arrow_schema::DataType::LargeUtf8;
-use parquet2::compression::CompressionOptions;
-use parquet2::encoding::Encoding;
-use parquet2::page::CompressedPage;
-use parquet2::read::get_page_iterator;
-use parquet2::read::read_metadata;
-use parquet2::schema::types::ParquetType;
-use parquet2::write::FileSeqWriter;
-use parquet2::write::Version;
-use parquet2::write::WriteOptions;
-use rstest::rstest;
-use store::error::Result;
 use store::merge::merger::Merger;
-use store::merge::parquet::CompressedPageIterator;
 use store::test_util::concat_chunks;
-use store::test_util::create_list_primitive_array;
-use store::test_util::create_parquet_file_from_chunk;
 use store::test_util::create_parquet_from_chunk;
 use store::test_util::create_parquet_from_chunks;
-use store::test_util::gen_binary_data_array;
-use store::test_util::gen_binary_data_list_array;
-use store::test_util::gen_boolean_data_array;
-use store::test_util::gen_boolean_data_list_array;
 use store::test_util::gen_chunk_for_parquet;
-use store::test_util::gen_fixed_size_binary_data_array;
-use store::test_util::gen_idx_primitive_array;
-use store::test_util::gen_primitive_data_array;
-use store::test_util::gen_primitive_data_list_array;
-use store::test_util::gen_secondary_idx_primitive_array;
-use store::test_util::gen_utf8_data_array;
-use store::test_util::gen_utf8_data_list_array;
-use store::test_util::make_missing_columns;
-use store::test_util::make_missing_fields;
-use store::test_util::parse_markdown_table;
-use store::test_util::read_parquet;
 use store::test_util::read_parquet_as_one_chunk;
 use store::test_util::unmerge_chunk;
 use store::test_util::PrimaryIndexType;
 use tracing::trace;
-use tracing::warn;
 use tracing_test::traced_test;
 
 #[derive(Clone)]
@@ -114,7 +43,7 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
     let idx_cols_len = tc.idx_fields.len();
     let fields = [tc.idx_fields, tc.data_fields].concat();
 
-    let names = fields
+    let _names = fields
         .iter()
         .map(|f| f.name.to_string())
         .collect::<Vec<_>>();
@@ -125,8 +54,8 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
         tc.primary_index_type,
         tc.gen_null_values_periodicity,
     );
-    /*trace!("original chunk");
-    trace!("{}", print::write(&[initial_chunk.clone()], &names));*/
+    // trace!("original chunk");
+    // trace!("{}", print::write(&[initial_chunk.clone()], &names));
     let out_streams_chunks = unmerge_chunk(
         initial_chunk.clone(),
         tc.gen_out_streams_count,
@@ -137,7 +66,7 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
     let readers = out_streams_chunks
         .into_iter()
         .enumerate()
-        .map(|(stream_id, chunks)| {
+        .map(|(_stream_id, chunks)| {
             let mut w = Cursor::new(vec![]);
             create_parquet_from_chunks(chunks, fields.clone(), &mut w, tc.gen_data_page_limit)
                 .unwrap();
@@ -161,7 +90,7 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
 
     let metadata = read::read_metadata(&mut out)?;
     let schema = read::infer_schema(&metadata)?;
-    let mut chunks = read::FileReader::new(
+    let chunks = read::FileReader::new(
         out,
         metadata.row_groups,
         schema,
@@ -222,7 +151,7 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
             out_streams_chunks
                 .into_iter()
                 .enumerate()
-                .for_each(|(stream_id, chunks)| {
+                .for_each(|(_stream_id, chunks)| {
                     let mut w = Cursor::new(vec![]);
                     create_parquet_from_chunks(
                         chunks,
@@ -230,7 +159,7 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
                         &mut w,
                         tc.gen_data_page_limit,
                     )
-                        .unwrap();
+                    .unwrap();
                 });
             println!("create parquets {:?}", start.elapsed());
         }
@@ -250,7 +179,7 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
                 tc.out_row_group_values_limit,
                 tc.out_arrow_page_size,
             )
-                .unwrap();
+            .unwrap();
             merger.merge().unwrap();
         }
     }
@@ -612,7 +541,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
                 Some(2),
                 (stream_id + 1) * (stream_id + 1),
             )
-                .unwrap();
+            .unwrap();
 
             w
         })
@@ -711,7 +640,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
             Some(8),
             None,
         ])
-            .boxed(),
+        .boxed(),
         PrimitiveArray::<i64>::from(vec![
             Some(1),
             None,
@@ -723,7 +652,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
             None,
             Some(9),
         ])
-            .boxed(),
+        .boxed(),
     ];
 
     let exp = Chunk::new(exp);
@@ -742,9 +671,7 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
             PrimitiveArray::<i64>::from_slice(&[1, 2, 3]).boxed(),
             PrimitiveArray::<i64>::from_slice(&[1, 2, 3]).boxed(),
         ],
-        vec![
-            PrimitiveArray::<i64>::from_slice(&[4, 5, 6]).boxed(),
-        ],
+        vec![PrimitiveArray::<i64>::from_slice(&[4, 5, 6]).boxed()],
     ];
 
     let fields = vec![
@@ -752,12 +679,10 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
             Field::new("f1", DataType::Int64, false),
             Field::new("f2", DataType::Int64, true),
         ],
-        vec![
-            Field::new("f1", DataType::Int64, false),
-        ],
+        vec![Field::new("f1", DataType::Int64, false)],
     ];
 
-    let names = vec!["f1", "f2"];
+    let _names = vec!["f1", "f2"];
     let readers = cols
         .into_iter()
         .zip(fields.iter())

@@ -41,7 +41,7 @@ mod tests {
             property: PropertyRef::Event("Product Name".to_string()),
             event: Some(EventRef::RegularName("View Product".to_string())),
             filter: Some(Filter {
-                operation: PropValueOperation::Like,
+                operation: PropValueOperation::Eq,
                 value: Some(vec![ScalarValue::Utf8(Some("goo%".to_string()))]),
             }),
         };
@@ -52,8 +52,8 @@ mod tests {
         let session_state = SessionState::with_config_rt(config, runtime)
             .with_query_planner(Arc::new(QueryPlanner {}));
 
-        let exec_ctx = SessionContext::with_state(session_state);
-        let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
+        let exec_ctx = SessionContext::with_state(session_state.clone());
+        let physical_plan = session_state.create_physical_plan(&plan).await?;
 
         let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
 

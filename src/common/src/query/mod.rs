@@ -216,7 +216,6 @@ impl From<DFOperator> for Operator {
             DFOperator::BitwiseShiftRight => Operator::BitwiseShiftRight,
             DFOperator::BitwiseShiftLeft => Operator::BitwiseShiftLeft,
             DFOperator::StringConcat => Operator::StringConcat,
-            _ => unreachable!("Operator {:?} not supported", o)
         }
     }
 }
@@ -249,7 +248,7 @@ impl From<Operator> for DFOperator {
             Operator::BitwiseShiftRight => DFOperator::BitwiseShiftRight,
             Operator::BitwiseShiftLeft => DFOperator::BitwiseShiftLeft,
             Operator::StringConcat => DFOperator::StringConcat,
-            _ => unreachable!("Operator {:?} not supported", o)
+            _ => unreachable!("Operator {:?} not supported", o),
         }
     }
 }
@@ -363,7 +362,7 @@ impl TryInto<DFOperator> for PropValueOperation {
         Ok(match self {
             PropValueOperation::Eq => DFOperator::Eq,
             PropValueOperation::Neq => DFOperator::NotEq,
-            // PropValueOperation::Like => DFOperator::Like,
+            // PropValueOperation::Like => DFOperator::Like, // todo actualize
             _ => unimplemented!(),
         })
     }
@@ -458,9 +457,7 @@ pub fn time_columns(
     };
 
     rule.with_end(to + granularity.relative_duration(1))
-        .map(|dt| {
-            dt.naive_utc().format("%Y-%m-%dT%H:%M:%S").to_string()
-        })
+        .map(|dt| dt.naive_utc().format("%Y-%m-%dT%H:%M:%S").to_string())
         .collect()
 }
 

@@ -53,7 +53,7 @@ async fn test_dashboards() -> anyhow::Result<()> {
     // list without dashboards should be empty
     {
         let resp = cl
-            .get(format!("{dash_url}/"))
+            .get(format!("{dash_url}"))
             .headers(admin_headers.clone())
             .send()
             .await?;

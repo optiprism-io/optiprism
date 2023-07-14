@@ -88,7 +88,6 @@ impl Provider for ProviderImpl {
             ProjectPermission::ExploreReports,
         )?;
         let resp = self.prov.list(organization_id, project_id).await?;
-
         Ok(ListResponse {
             data: resp.data.into_iter().map(|v| v.into()).collect(),
             meta: resp.meta.into(),

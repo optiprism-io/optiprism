@@ -132,7 +132,7 @@ async fn main() -> Result<(), anyhow::Error> {
             })
             .await?;
 
-        let user = md
+        let _user = md
             .accounts
             .create(CreateAccountRequest {
                 created_by: Some(admin.id),

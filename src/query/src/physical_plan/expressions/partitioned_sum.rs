@@ -142,8 +142,10 @@ mod tests {
 
     #[test]
     fn test_int64() -> Result<()> {
-        let outer_acc: Box<dyn Accumulator> =
-            Box::new(AvgAccumulator::try_new(&DataType::Float64)?);
+        let outer_acc: Box<dyn Accumulator> = Box::new(AvgAccumulator::try_new(
+            &DataType::Float64,
+            &DataType::Float64,
+        )?);
         let mut sum_acc = PartitionedSumAccumulator::try_new(DataType::Int64, outer_acc)?;
         let spans = vec![
             false, false, true, false, false, true, false, false, false, true,
@@ -173,8 +175,10 @@ mod tests {
 
     #[test]
     fn test_decimal() -> Result<()> {
-        let outer_acc: Box<dyn Accumulator> =
-            Box::new(AvgAccumulator::try_new(&DataType::Decimal128(10, 2))?);
+        let outer_acc: Box<dyn Accumulator> = Box::new(AvgAccumulator::try_new(
+            &DataType::Decimal128(10, 2),
+            &DataType::Decimal128(10, 2),
+        )?);
         let mut sum_acc =
             PartitionedSumAccumulator::try_new(DataType::Decimal128(10, 2), outer_acc)?;
         let spans = vec![

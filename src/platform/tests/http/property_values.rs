@@ -26,7 +26,7 @@ mod tests {
                 event_name: "View Product".to_string(),
             }),
             filter: Some(Filter {
-                operation: PropValueOperation::Like,
+                operation: PropValueOperation::Eq,
                 value: Some(vec![Value::String("goo%".to_string())]),
             }),
         };

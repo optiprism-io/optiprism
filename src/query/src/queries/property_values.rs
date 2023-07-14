@@ -7,7 +7,8 @@ use common::query::PropertyRef;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
-use datafusion_expr::{col, expr};
+use datafusion_expr::col;
+use datafusion_expr::expr;
 use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Aggregate;
 use datafusion_expr::Expr;
@@ -36,9 +37,9 @@ macro_rules! property_col {
         let col_name = prop.column_name($namespace);
         let expr = col(col_name.as_str());
 
-        let aggr_schema =
+        let _aggr_schema =
             DFSchema::new_with_metadata(exprlist_to_fields(vec![&expr], &$input)?, HashMap::new())?;
-        let agg_fn = Aggregate::try_new(Arc::new($input.clone()),vec![expr],vec![])?;
+        let agg_fn = Aggregate::try_new(Arc::new($input.clone()), vec![expr], vec![])?;
         let expr = LogicalPlan::Aggregate(agg_fn);
 
         match prop.dictionary_type {
@@ -112,7 +113,7 @@ impl LogicalPlanBuilder {
                     &filter.operation,
                     filter.value.clone(),
                 )
-                    .await?,
+                .await?,
                 Arc::new(input),
             )?),
             None => input,

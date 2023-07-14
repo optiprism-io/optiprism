@@ -1,4 +1,5 @@
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -27,7 +28,7 @@ fn make_key_key(organization_id: u64, project_id: u64, dict: &str, key: u64) -> 
         b"keys/",
         key.to_le_bytes().as_ref(),
     ]
-        .concat()
+    .concat()
 }
 
 fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str) -> Vec<u8> {
@@ -36,7 +37,7 @@ fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str
         b"values/",
         value.as_bytes(),
     ]
-        .concat()
+    .concat()
 }
 
 pub struct ProviderImpl {
@@ -111,7 +112,7 @@ impl Provider for ProviderImpl {
                 dict.to_string(),
                 key,
             ))
-                .into()),
+            .into()),
             Some(value) => Ok(String::from_utf8(value)?),
         }
     }
@@ -131,7 +132,7 @@ impl Provider for ProviderImpl {
                 dict.to_string(),
                 value.to_string(),
             ))
-                .into()),
+            .into()),
             Some(key) => Ok(LittleEndian::read_u64(key.as_slice())),
         }
     }

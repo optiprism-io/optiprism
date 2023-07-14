@@ -66,8 +66,10 @@ mod tests {
 
     #[test]
     fn test() -> Result<()> {
-        let outer_acc: Box<dyn Accumulator> =
-            Box::new(AvgAccumulator::try_new(&DataType::Float64)?);
+        let outer_acc: Box<dyn Accumulator> = Box::new(AvgAccumulator::try_new(
+            &DataType::Float64,
+            &DataType::Float64,
+        )?);
         let mut count_acc = PartitionedCountAccumulator::try_new(outer_acc)?;
         let spans = vec![
             false, false, true, false, false, true, false, false, false, true,

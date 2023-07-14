@@ -5,46 +5,33 @@ use std::io::Read;
 use std::io::Seek;
 
 use arrow2::array::Array;
-use arrow2::compute::concatenate::concatenate;
 use arrow2::datatypes::Field;
 use arrow2::io::parquet::read::column_iter_to_arrays;
 use arrow2::io::parquet::read::deserialize::page_iter_to_arrays;
-use arrow2::io::parquet::read::schema::convert::to_data_type;
 use arrow2::io::parquet::read::schema::convert::to_primitive_type;
-use arrow2::io::parquet::read::schema::parquet_to_arrow_schema;
 use arrow2::io::parquet::read::ParquetError;
 use arrow2::io::parquet::write::array_to_columns;
-use arrow2::io::parquet::write::array_to_page_simple;
 use arrow2::io::parquet::write::WriteOptions;
-use futures::stream::iter;
-use futures::StreamExt;
 use ordered_float::OrderedFloat;
 use parquet2::compression::CompressionOptions;
 use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::metadata::FileMetaData;
-use parquet2::metadata::RowGroupMetaData;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::page::CompressedDataPage;
 use parquet2::page::CompressedPage;
-use parquet2::page::Page;
 use parquet2::read::decompress;
 use parquet2::schema::types::ParquetType;
 use parquet2::schema::types::PhysicalType;
-use parquet2::schema::types::PrimitiveType;
 use parquet2::statistics::BinaryStatistics;
-use parquet2::statistics::BooleanStatistics;
 use parquet2::statistics::FixedLenStatistics;
 use parquet2::statistics::PrimitiveStatistics;
 use parquet2::write::compress;
-use parquet2::write::Compressor;
 use parquet2::write::Version;
-use tracing::error;
 
 use crate::error::Result;
 use crate::error::StoreError;
 use crate::merge::arrow::ArrowChunk;
-use crate::merge::arrow::MergedArrowChunk;
 use crate::merge::merger::MergeReorder;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
@@ -159,7 +146,7 @@ pub fn pages_to_arrays(
 
     let iter = decompressed_pages
         .iter()
-        .map(|page| Ok(page))
+        .map(Ok)
         .collect::<Vec<std::result::Result<_, ParquetError>>>();
     let fallible_pages = fallible_streaming_iterator::convert(iter.into_iter());
     let res = page_iter_to_arrays(
@@ -249,14 +236,12 @@ pub fn get_page_min_max_values(pages: &[CompressedPage]) -> Result<(Value, Value
 
                     Ok((min_value, max_value))
                 }
-                _ => return Err(StoreError::Internal("no stats".to_string())),
+                _ => Err(StoreError::Internal("no stats".to_string())),
             }
         }
-        _ => {
-            return Err(StoreError::Internal(
-                "compressed page should be data page".to_string(),
-            ));
-        }
+        _ => Err(StoreError::Internal(
+            "compressed page should be data page".to_string(),
+        )),
     }
 }
 
@@ -362,7 +347,7 @@ impl PagesChunk {
             .into_iter()
             .zip(index_cols.iter())
             .map(|(pages, cd)| {
-                pages_to_arrays(pages, cd, None, buf).and_then(|mut res| Ok(res.pop().unwrap()))
+                pages_to_arrays(pages, cd, None, buf).map(|mut res| res.pop().unwrap())
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -377,7 +362,7 @@ impl PagesChunk {
             data_pagesize_limit: None,
         };
         let cols = arrs
-            .into_iter()
+            .iter()
             .zip(index_cols.iter())
             .map(|(arr, cd)| {
                 array_to_columns(arr, cd.base_type.clone(), opts, &[Encoding::Plain])
@@ -445,18 +430,20 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
     }
 
     pub fn contains_column(&self, col_path: &ColumnPath) -> bool {
-        self.metadata
+        let maybe_desc = self
+            .metadata
             .schema()
             .columns()
             .iter()
-            .find(|col| col.path_in_schema.eq(col_path))
-            .is_some()
+            .find(|col| col.path_in_schema.eq(col_path));
+
+        maybe_desc.is_some()
     }
 
     pub fn next_chunk(&mut self, col_path: &ColumnPath) -> Result<Option<Vec<CompressedPage>>> {
-        self.chunk_buffer
-            .get_mut(col_path)
-            .and_then(|buf| Some(buf.clear()));
+        if let Some(buf) = self.chunk_buffer.get_mut(col_path) {
+            buf.clear()
+        }
 
         let row_group_id = *self.row_group_cursors.get(col_path).unwrap();
         if row_group_id > self.metadata.row_groups.len() - 1 {
@@ -480,10 +467,7 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
 
         let col = pages
             .into_iter()
-            .map(|page| {
-                page.map_err(|err| StoreError::from(err))
-                    .and_then(|page| Ok(page))
-            })
+            .map(|page| page.map_err(StoreError::from))
             .collect::<Result<Vec<_>>>()?;
 
         self.row_group_cursors

@@ -67,7 +67,7 @@ impl Table {
                         c.nullable,
                     )
                 })
-                .collect(),
+                .collect::<Vec<Field>>(),
         )
     }
 
