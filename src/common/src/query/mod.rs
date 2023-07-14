@@ -362,7 +362,7 @@ impl TryInto<DFOperator> for PropValueOperation {
         Ok(match self {
             PropValueOperation::Eq => DFOperator::Eq,
             PropValueOperation::Neq => DFOperator::NotEq,
-            // PropValueOperation::Like => DFOperator::Like,
+            // PropValueOperation::Like => DFOperator::Like, // todo actualize
             _ => unimplemented!(),
         })
     }

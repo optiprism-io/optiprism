@@ -64,7 +64,7 @@ async fn test_reports() -> anyhow::Result<()> {
     // list without reports should be empty
     {
         let resp = cl
-            .get(format!("{report_url}/"))
+            .get(format!("{report_url}"))
             .headers(admin_headers.clone())
             .send()
             .await?;

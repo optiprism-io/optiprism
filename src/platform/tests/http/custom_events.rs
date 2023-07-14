@@ -86,7 +86,7 @@ async fn test_custom_events() -> anyhow::Result<()> {
     // list without events should be empty
     {
         let resp = cl
-            .get(format!("{events_url}/"))
+            .get(format!("{events_url}"))
             .headers(admin_headers.clone())
             .send()
             .await?;
