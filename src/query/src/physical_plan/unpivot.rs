@@ -33,6 +33,7 @@ use arrow::array::UInt64Builder;
 use arrow::array::UInt8Builder;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
+use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::error::Result as ArrowResult;
@@ -96,7 +97,7 @@ impl UnpivotExec {
         }
 
         let schema = {
-            let mut fields: Vec<Field> = input
+            let mut fields = input
                 .schema()
                 .fields()
                 .iter()
@@ -104,12 +105,12 @@ impl UnpivotExec {
                     true => None,
                     false => Some(f.clone()),
                 })
-                .collect();
+                .collect::<Vec<_>>();
 
             let name_field = Field::new(name_col.as_str(), DataType::Utf8, false);
-            fields.push(name_field);
+            fields.push(FieldRef::new(name_field));
             let value_field = Field::new(value_col.as_str(), value_type, false);
-            fields.push(value_field);
+            fields.push(FieldRef::new(value_field));
 
             Arc::new(Schema::new(fields))
         };

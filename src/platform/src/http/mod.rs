@@ -32,7 +32,6 @@ use axum_core::extract::FromRequest;
 use axum_core::response::IntoResponse;
 use axum_core::response::Response;
 use axum_core::BoxError;
-use axum_extra::routing::SpaRouter;
 use bytes::Bytes;
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -46,6 +45,8 @@ use tokio::signal::unix::SignalKind;
 use tower_cookies::CookieManagerLayer;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
+use tower_http::services::ServeDir;
+use tower_http::services::ServeFile;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
@@ -126,8 +127,9 @@ impl Service {
         // };
         let mut router = self.router;
         info!("attaching ui static files handler...");
-        router = router.merge(
-            SpaRouter::new("/assets", path.join("assets")).index_file(path.join("index.html")),
+        let router = router.nest_service(
+            "/assets",
+            ServeDir::new(path.join("assets")).not_found_service(ServeFile::new("index.html")),
         );
 
         Self {

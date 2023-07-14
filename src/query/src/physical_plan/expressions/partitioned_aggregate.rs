@@ -316,9 +316,10 @@ impl PartitionedAggregateAccumulator {
         outer_agg: &AggregateFunction,
     ) -> Result<Self> {
         let outer_acc = match outer_agg {
-            AggregateFunction::Avg => {
-                Ok(Box::new(AvgAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>)
-            }
+            AggregateFunction::Avg => Ok(Box::new(AvgAccumulator::try_new(
+                data_type,
+                agg_return_type,
+            )?) as Box<dyn Accumulator>),
             AggregateFunction::Min => {
                 Ok(Box::new(MinAccumulator::try_new(agg_return_type)?) as Box<dyn Accumulator>)
             }

@@ -5,14 +5,14 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.66"
-arrow = { version = "36.0.0", features = ["prettyprint"] }
+arrow = { version = "38.0.0", features = ["prettyprint"] }
 bytesize = "1.1.0"
 chrono = { version = "0.4.23" }
 clap = { version = "4.0.29", features = ["derive"] }
 common = { path = "../common" }
 crossbeam-channel = "0.5.6"
 csv = "1.1"
-datafusion = "22.0.0"
+datafusion = "24.0.0"
 dateparser = "0.2.0"
 enum-iterator = "1.2.0"
 events-gen = { path = "../events-gen" }

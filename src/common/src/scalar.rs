@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use arrow_schema::DataType;
 use arrow_schema::Field;
+use arrow_schema::Fields;
 use datafusion_common::ScalarValue;
 use serde::Deserialize;
 use serde::Deserializer;
@@ -28,21 +31,21 @@ pub enum ScalarValueRef {
     Binary(Option<Vec<u8>>),
     FixedSizeBinary(i32, Option<Vec<u8>>),
     LargeBinary(Option<Vec<u8>>),
-    List(Option<Vec<ScalarValueRef>>, Box<Field>),
+    List(Option<Vec<ScalarValueRef>>, Arc<Field>),
     Date32(Option<i32>),
     Date64(Option<i64>),
     Time32Second(Option<i32>),
     Time32Millisecond(Option<i32>),
     Time64Microsecond(Option<i64>),
     Time64Nanosecond(Option<i64>),
-    TimestampSecond(Option<i64>, Option<String>),
-    TimestampMillisecond(Option<i64>, Option<String>),
-    TimestampMicrosecond(Option<i64>, Option<String>),
-    TimestampNanosecond(Option<i64>, Option<String>),
+    TimestampSecond(Option<i64>, Option<Arc<str>>),
+    TimestampMillisecond(Option<i64>, Option<Arc<str>>),
+    TimestampMicrosecond(Option<i64>, Option<Arc<str>>),
+    TimestampNanosecond(Option<i64>, Option<Arc<str>>),
     IntervalYearMonth(Option<i32>),
     IntervalDayTime(Option<i64>),
     IntervalMonthDayNano(Option<i128>),
-    Struct(Option<Vec<ScalarValueRef>>, Box<Vec<Field>>),
+    Struct(Option<Vec<ScalarValueRef>>, Fields),
     Dictionary(Box<DataType>, Box<ScalarValueRef>),
 }
 
