@@ -13,37 +13,51 @@ use crate::error::Result;
 use crate::error::StoreError;
 
 #[derive(Debug)]
+// Arrow chunk after being merged
 pub struct MergedArrowChunk {
+    // cultiple arrays as a result of merging multiple chunks
     pub arrs: Vec<Box<dyn Array>>,
+    // contains the stream id of each row so we can take the rows in the correct order
     pub reorder: Vec<usize>,
 }
 
 impl MergedArrowChunk {
+    // Create new merged arrow chunk
     pub fn new(arrs: Vec<Box<dyn Array>>, reorder: Vec<usize>) -> Self {
         Self { arrs, reorder }
     }
 }
 
 #[derive(Debug)]
+// Arrow chunk before being merged
+// Arrow chunk is an unpacked CompressedPage
 pub struct ArrowChunk {
+    // stream of arrow chunk Used to identify the chunk during merge
     pub stream: usize,
     pub arrs: Vec<Box<dyn Array>>,
 }
 
 impl ArrowChunk {
+    // Creates ArrowChunk
     pub fn new(arrs: Vec<Box<dyn Array>>, stream: usize) -> Self {
         Self { stream, arrs }
     }
 
+    // Get length of arrow chunk
     pub fn len(&self) -> usize {
         self.arrs[0].len()
     }
 
+    // Check if chunk is empty
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 }
 
+// Row for merge chunks with one column partition
+
+// usize - stream id
+// A - partition type
 pub struct OneColMergeRow<A>(usize, A);
 
 impl<A> Ord for OneColMergeRow<A>
@@ -72,6 +86,10 @@ where A: Eq
 
 impl<A> Eq for OneColMergeRow<A> where A: Eq {}
 
+// Row for merge chunks with two columns partition
+
+// usize - stream id
+// A,B - partition types
 pub struct TwoColMergeRow<A, B>(usize, A, B);
 
 impl<A, B> Ord for TwoColMergeRow<A, B>
@@ -111,10 +129,14 @@ where
 {
 }
 
+// merge chunks with single column partition which is primitive
+
+// array_size - size of output arrays
 pub fn merge_one_primitive<T: NativeType + Ord>(
     chunks: Vec<ArrowChunk>,
     array_size: usize,
 ) -> Result<Vec<MergedArrowChunk>> {
+    // downcast to primitive array
     let mut arr_iters = chunks
         .iter()
         .map(|row| {
@@ -126,17 +148,22 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
         })
         .collect::<Vec<_>>();
 
+    // use binary heap for sorting
     let mut sort = BinaryHeap::<OneColMergeRow<T>>::with_capacity(array_size);
 
     let mut res = vec![];
+    // create buffers
+    // perf: use predefined reusable buffers
     let mut out_col = Vec::with_capacity(array_size);
     let mut order = Vec::with_capacity(array_size);
 
+    // push all the values in sorter
     for (row_id, iters) in arr_iters.iter_mut().enumerate().take(chunks.len()) {
         let mr = OneColMergeRow(row_id, *iters.next().unwrap());
         sort.push(mr);
     }
 
+    // get sorted values
     while let Some(OneColMergeRow(row_idx, v)) = sort.pop() {
         out_col.push(v);
         order.push(chunks[row_idx].stream);
@@ -145,6 +172,7 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
             sort.push(mr);
         }
 
+        // limit output by array size
         if out_col.len() >= array_size {
             let out = vec![PrimitiveArray::<T>::from_vec(out_col.drain(..).collect()).boxed()];
             let arr_order = order.drain(..).collect();
@@ -152,6 +180,7 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
         }
     }
 
+    // drain the rest
     if !out_col.is_empty() {
         let out = vec![PrimitiveArray::<T>::from_vec(out_col.drain(..).collect()).boxed()];
         let arr_order = order.drain(..).collect();
@@ -161,6 +190,9 @@ pub fn merge_one_primitive<T: NativeType + Ord>(
     Ok(res)
 }
 
+// merge chunks with two column partition that are primitives
+
+// array_size - size of output arrays
 pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
     chunks: Vec<ArrowChunk>,
     array_size: usize,
@@ -226,6 +258,11 @@ pub fn merge_two_primitives<T1: NativeType + Ord, T2: NativeType + Ord>(
     Ok(res)
 }
 
+// Merge chunks
+
+// Merge multiple chunks into vector of MergedArrowChunk of arrays split by array_size
+
+// panics if merges is not implemented for combination of types
 pub fn merge_chunks(chunks: Vec<ArrowChunk>, array_size: usize) -> Result<Vec<MergedArrowChunk>> {
     // supported lengths (count of index columns)
     match chunks[0].arrs.len() {
@@ -276,6 +313,7 @@ pub fn merge_chunks(chunks: Vec<ArrowChunk>, array_size: usize) -> Result<Vec<Me
     }
 }
 
+// Merge arrow2 schemas
 pub fn try_merge_schemas(schemas: Vec<Schema>) -> Result<Schema> {
     let fields: Result<Vec<Field>> = schemas.into_iter().map(|schema| schema.fields).try_fold(
         Vec::<Field>::new(),

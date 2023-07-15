@@ -58,6 +58,7 @@ use crate::merge::parquet::MergedPagesChunk;
 use crate::merge::parquet::PagesChunk;
 
 // this is a temporary array used to merge data pages avoiding downcasting
+
 enum TmpArray {
     Int8(Int8Array),
     Int16(Int16Array),
@@ -100,10 +101,12 @@ enum TmpArray {
     ListLargeUtf8(Utf8Array<i64>, OffsetsBuffer<i32>, Option<Bitmap>, usize),
 }
 
+// Merge multiple arrays based on reorder
 macro_rules! merge_arrays_inner {
     ($self:expr,$field:expr,$tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
         let col_path: ColumnPath = $col.path_in_schema.clone();
         let mut buf = vec![];
+        // check if column is exist in each stream
         let col_exist_per_stream = $self
             .page_streams
             .iter()
@@ -113,6 +116,8 @@ macro_rules! merge_arrays_inner {
             })
             .collect::<Vec<bool>>();
 
+        // pop arrays from tmp_arrays
+        // used to downcast (TmpArray) and avoid borrow checker
         let mut arrs = $self
             .tmp_arrays
             .iter_mut()
@@ -135,6 +140,7 @@ macro_rules! merge_arrays_inner {
             })
             .collect::<Vec<_>>();
 
+        // calculate array indexes
         let mut arrs_idx: Vec<usize> = $self
             .tmp_array_idx
             .iter()
@@ -144,14 +150,19 @@ macro_rules! merge_arrays_inner {
             })
             .collect();
 
+        // make output array
+        // perf: make reusable buffer
         let mut out = <$out_ty>::with_capacity($reorder.len());
+        // go through each row idx in reorder, get stream id for row
         for idx in 0..$reorder.len() {
             let stream_id = $reorder[idx];
+            // push null if column doesn't exist
             if !col_exist_per_stream[stream_id] {
                 out.push_null();
                 continue;
             }
 
+            // downcast array if it is not exist in tmp
             if arrs[stream_id].is_none() {
                 let page = $self.page_streams[stream_id].next_page(&col_path)?.unwrap();
                 if let CompressedPage::Data(page) = page {
@@ -178,6 +189,7 @@ macro_rules! merge_arrays_inner {
             }
         }
 
+        // move all arrays back to tmp
         for (stream_id, maybe_arr) in arrs.into_iter().enumerate() {
             if let Some(arr) = maybe_arr {
                 $self.tmp_arrays[stream_id].insert(col_path.clone(), $tmp_ty(arr));
@@ -192,6 +204,7 @@ macro_rules! merge_arrays_inner {
     }};
 }
 
+// merge data arrays
 macro_rules! merge_arrays {
     ($self:expr,$field:expr,$tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
         let mut out = merge_arrays_inner!(
@@ -202,6 +215,7 @@ macro_rules! merge_arrays {
     }};
 }
 
+// merge primitive arrays
 macro_rules! merge_primitive_arrays {
     ($self:expr,$field:expr,$tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
         let out = merge_arrays_inner!(
@@ -212,6 +226,7 @@ macro_rules! merge_primitive_arrays {
     }};
 }
 
+// merge list arrays
 macro_rules! merge_list_arrays_inner {
     ($self:expr,$field:expr,$offset:ty, $tmp_ty:path,$in_ty:ty, $out_ty:ty,$col:expr,$reorder:expr,$streams:expr) => {{
         let col_path: ColumnPath = $col.path_in_schema.clone();
@@ -297,7 +312,7 @@ macro_rules! merge_list_arrays_inner {
             } else {
                 let (start, end) = offsets.start_end(cur_idx);
                 let length = end - start;
-                // TODO avoid clone?
+                // FIXME avoid clone?
                 let vals = arr.clone().sliced(start, length);
                 out.try_push(Some(vals.into_iter()))?;
             }
@@ -420,7 +435,7 @@ macro_rules! merge_list_primitive_arrays {
             } else {
                 let (start, end) = offsets.start_end(cur_idx);
                 let length = end - start;
-                // TODO avoid clone?
+                // FIXME avoid clone?
                 let vals = arr.clone().sliced(start, length);
                 out.try_push(Some(vals.into_iter()))?;
             }
@@ -452,24 +467,40 @@ where
     R: Read,
     W: Write,
 {
+    // list of index cols (partitions) in parquet file
     index_cols: Vec<ColumnDescriptor>,
+    // final schema of parquet file (merged multiple schemas)
     parquet_schema: SchemaDescriptor,
+    // final arrow schema
     arrow_schema: Schema,
+    // list of streams to merge
     page_streams: Vec<CompressedPageIterator<R>>,
+    // temporary array for merging data pages
+    // this is used to avoid downcast on each row iteration. See `merge_arrays`
     tmp_arrays: Vec<HashMap<ColumnPath, TmpArray>>,
+    // indices of temp arrays
     tmp_array_idx: Vec<HashMap<ColumnPath, usize>>,
+    // sorter for pages chunk from parquet
     sorter: BinaryHeap<PagesChunk>,
+    // pages chunk merge queue
     merge_queue: Vec<PagesChunk>,
+    // merge result
     result_buffer: VecDeque<MergedPagesChunk>,
+    // result parquet file writer
     writer: FileSeqWriter<W>,
+    // values/rows per row group
     row_group_values_limit: usize,
+    // merge result array size
     array_page_size: usize,
     // null_pages_cache: HashMap<(DataType, usize), Rc<CompressedPage>>,
+    // result page size
     data_page_size_limit: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
+// decision maker what to do with page
 pub enum MergeReorder {
+    // pick page from stream, e.g. don't merge and write as is
     PickFromStream(usize, usize),
     // first vector - stream_id to pick from, second vector - streams which were merged
     Merge(Vec<usize>, Vec<usize>),
@@ -480,6 +511,8 @@ where
     R: Read + Seek,
     W: Write,
 {
+    // Create new merger
+
     pub fn try_new(
         mut readers: Vec<R>,
         writer: W,
@@ -488,24 +521,30 @@ where
         row_group_values_limit: usize,
         array_page_size: usize,
     ) -> Result<Self> {
+        // get arrow schemas of streams
         let arrow_schemas = readers
             .iter_mut()
             .map(|r| arrow2::io::parquet::read::read_metadata(r).and_then(|md| infer_schema(&md)))
             .collect::<arrow2::error::Result<Vec<Schema>>>()?;
 
+        // make unified schema
         let arrow_schema = try_merge_arrow_schemas(arrow_schemas)?;
+        // make parquet schema
         let parquet_schema = to_parquet_schema(&arrow_schema)?;
+        // initialize parquet streams/readers
         let page_streams = readers
             .into_iter()
             .map(|r| CompressedPageIterator::try_new(r))
             .collect::<Result<Vec<_>>>()?;
         let streams_n = page_streams.len();
 
+        // initialize parquet writer
         let opts = WriteOptions {
             write_statistics: true,
             version: Version::V2,
         };
         let seq_writer = FileSeqWriter::new(writer, parquet_schema.clone(), opts, None);
+        // get descriptors of index/partition columns
         let index_cols = (0..index_cols)
             .map(|idx| parquet_schema.columns()[idx].to_owned())
             .collect::<Vec<_>>();
@@ -528,6 +567,7 @@ where
         })
     }
 
+    // Get next chunk by stream_id. Chunk - all pages within row group
     fn next_stream_index_chunk(&mut self, stream_id: usize) -> Result<Option<PagesChunk>> {
         let mut pages = Vec::with_capacity(self.index_cols.len());
         for col in &self.index_cols {
@@ -541,6 +581,7 @@ where
         Ok(Some(PagesChunk::new(pages, stream_id)))
     }
 
+    // Make null pages in case if there is no data pages for column
     fn make_null_pages(
         &mut self,
         cd: &ColumnDescriptor,
@@ -552,17 +593,22 @@ where
         array_to_pages_simple(arr, cd.base_type.clone(), data_pagesize_limit)
     }
 
+    // Merge iteration
     pub fn merge(&mut self) -> Result<()> {
+        // Read pages chunk for each stream
         for stream_id in 0..self.page_streams.len() {
             if let Some(chunk) = self.next_stream_index_chunk(stream_id)? {
+                // Push chunk to sorter
                 self.sorter.push(chunk);
             }
         }
 
+        // Request merge of index column
         while let Some(chunks) = self.next_index_chunk()? {
             for col_id in 0..self.index_cols.len() {
                 for chunk in chunks.iter() {
                     for page in chunk.0.cols[col_id].iter() {
+                        // write index pages
                         self.writer.write_page(page)?;
                     }
                 }
@@ -585,15 +631,20 @@ where
                 .skip(self.index_cols.len())
                 .map(|f| f.to_owned())
                 .collect::<Vec<_>>();
+
+            // merge data pages based on reorder from MergedPagesChunk
             for (col, field) in cols.into_iter().zip(fields.into_iter()) {
                 for chunk in chunks.iter() {
                     let pages = match &chunk.1 {
+                        // Exclusively pick page from the stream
                         MergeReorder::PickFromStream(stream_id, num_rows) => {
+                            // If column exist for stream id then write it
                             if self.page_streams[*stream_id].contains_column(&col.path_in_schema) {
                                 self.page_streams[*stream_id]
                                     .next_chunk(&col.path_in_schema)?
                                     .unwrap()
                             } else {
+                                // for non-existant column make null page and write
                                 self.make_null_pages(
                                     &col,
                                     field.clone(),
@@ -602,11 +653,13 @@ where
                                 )?
                             }
                         }
+                        // Merge pages
                         MergeReorder::Merge(reorder, streams) => {
                             self.merge_data(&col, field.clone(), reorder, streams)?
                         }
                     };
 
+                    // Write pages for column
                     for page in pages {
                         self.writer.write_page(&page)?;
                     }
@@ -617,12 +670,14 @@ where
             self.writer.end_row_group()?;
         }
 
+        // Add arrow schema to parquet metadata
         let key_value_metadata = add_arrow_schema(&self.arrow_schema, None);
         self.writer.end(key_value_metadata)?;
 
         Ok(())
     }
 
+    // Merge data pages
     fn merge_data(
         &mut self,
         col: &ColumnDescriptor,
@@ -630,6 +685,7 @@ where
         reorder: &[usize],
         streams: &[usize],
     ) -> Result<Vec<CompressedPage>> {
+        // Call merger for type
         let out = match field.data_type().to_physical_type() {
             ArrowPhysicalType::Boolean => merge_arrays!(
                 self,
@@ -872,33 +928,41 @@ where
         Ok(pages)
     }
 
+    // Queue merger
     fn merge_queue(&mut self) -> Result<()> {
         let mut buf = vec![];
+        // read page chunks from queue and convert to arrow chunks
         let arrow_chunks = self
             .merge_queue
             .drain(..)
             .map(|chunk| chunk.to_arrow_chunk(&mut buf, &self.index_cols))
             .collect::<Result<Vec<_>>>()?;
 
+        // get streams from chunks
         let mut streams = arrow_chunks
             .iter()
             .map(|chunk| chunk.stream)
             .collect::<Vec<_>>();
+        // remove duplicates in case if there are several chunks from the same stream
         streams.dedup();
+        // merge
         let merged_chunks = merge_chunks(arrow_chunks, self.array_page_size)?;
 
+        // convert arrow to parquet page chunks
         for chunk in merged_chunks {
             let pages_chunk = PagesChunk::from_arrow(chunk.arrs.as_slice(), &self.index_cols)?;
             let merged_chunk = MergedPagesChunk::new(
                 pages_chunk,
                 MergeReorder::Merge(chunk.reorder, streams.clone()),
             );
+            // push to the end of result buffer
             self.result_buffer.push_back(merged_chunk);
         }
 
         Ok(())
     }
 
+    // Get the next index chunk
     fn next_index_chunk(&mut self) -> Result<Option<Vec<MergedPagesChunk>>> {
         while let Some(chunk) = self.sorter.pop() {
             if let Some(next) = self.next_stream_index_chunk(chunk.stream)? {

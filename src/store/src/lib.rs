@@ -3,15 +3,9 @@
 
 extern crate core;
 
-// pub mod dictionary;
 pub mod arrow_conversion;
 pub mod error;
 pub mod merge;
-// mod table;
-// mod iterator;
-// mod parquet;
-
-// pub mod schema;
 
 pub mod test_util {
     use std::fs::File;
@@ -435,7 +429,6 @@ pub mod test_util {
                 ret.push(None);
             } else {
                 let _a = std::mem::size_of::<T>();
-                // println!("{}", idx % div);
                 ret.push(Some(T::from(idx % div).unwrap()));
             }
         }
