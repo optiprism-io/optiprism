@@ -31,8 +31,8 @@ use parquet2::write::Version;
 
 use crate::error::Result;
 use crate::error::StoreError;
-use crate::merge::arrow::ArrowChunk;
-use crate::merge::merger::MergeReorder;
+use crate::parquet::merger::arrow::ArrowChunk;
+use crate::parquet::merger::MergeReorder;
 
 #[derive(Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
 pub enum Value {

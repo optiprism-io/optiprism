@@ -350,9 +350,9 @@ mod tests {
     use arrow2::datatypes::Field;
     use arrow2::datatypes::Schema;
 
-    use crate::merge::arrow::merge_chunks;
-    use crate::merge::arrow::try_merge_schemas;
-    use crate::merge::arrow::ArrowChunk;
+    use crate::parquet::merger::arrow::merge_chunks;
+    use crate::parquet::merger::arrow::try_merge_schemas;
+    use crate::parquet::merger::arrow::ArrowChunk;
 
     #[test]
     fn test_merge_schemas() -> anyhow::Result<()> {
