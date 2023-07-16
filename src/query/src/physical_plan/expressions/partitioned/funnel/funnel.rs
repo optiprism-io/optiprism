@@ -37,6 +37,7 @@ use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::abs_row_id_refs;
 use crate::physical_plan::expressions::partitioned::funnel::evaluate_batch;
+use crate::physical_plan::expressions::partitioned::funnel::next_span;
 use crate::physical_plan::expressions::partitioned::funnel::Batch;
 use crate::physical_plan::expressions::partitioned::funnel::Count;
 use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
@@ -58,7 +59,6 @@ pub struct FunnelExpr {
     exclude_expr: Option<Vec<ExcludeExpr>>,
     // expr and vec of step ids
     constants: Option<Vec<Column>>,
-    cur_span: usize,
     count: Count,
     // vec of col ids
     filter: Option<Filter>,
@@ -118,7 +118,6 @@ impl FunnelExpr {
                 .collect::<Vec<_>>(),
             exclude_expr: opts.exclude,
             constants: opts.constants,
-            cur_span: 0,
             count: opts.count,
             filter: opts.filter,
             touch: opts.touch,
@@ -151,12 +150,13 @@ impl FunnelExpr {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        self.cur_span = 0;
+        let mut cur_span = 0;
 
+        let steps = self.steps.clone();
         // if skip is set, we need to skip the first span
         let spans = if skip > 0 {
             let spans = [vec![skip], spans].concat();
-            self.next_span(&batches, &spans);
+            next_span(&batches, &spans, &mut cur_span, &steps);
             spans
         } else {
             spans
@@ -166,7 +166,7 @@ impl FunnelExpr {
         let (window, filter) = (self.window.clone(), self.filter.clone());
         let mut dbg: Vec<DebugInfo> = vec![];
         // iterate over spans. For simplicity all ids are tied to span and start at 0
-        while let Some(mut span) = self.next_span(&batches, &spans) {
+        while let Some(mut span) = next_span(&batches, &spans, &mut cur_span, &steps) {
             // destructuring for to quick access to the fields
 
             // main loop Until all steps are completed or we run out of rows
@@ -261,33 +261,6 @@ impl FunnelExpr {
         self.dbg = dbg;
 
         Ok(results)
-    }
-
-    // take next span if exist
-    fn next_span<'a>(&'a mut self, batches: &'a [Batch], spans: &[usize]) -> Option<Span> {
-        if self.cur_span == spans.len() {
-            return None;
-        }
-
-        let span_len = spans[self.cur_span];
-        // offset is a sum of prev spans
-        let offset = (0..self.cur_span).into_iter().map(|i| spans[i]).sum();
-        let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
-        if offset + span_len > rows_count {
-            (
-                " offset {offset}, span len: {span_len} > rows count: {}",
-                rows_count,
-            );
-            return None;
-        }
-        self.cur_span += 1;
-        Some(Span::new(
-            self.cur_span - 1,
-            offset,
-            span_len,
-            &self.steps,
-            batches,
-        ))
     }
 }
 

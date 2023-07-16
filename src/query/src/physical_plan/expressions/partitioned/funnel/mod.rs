@@ -125,6 +125,12 @@ pub struct Batch<'a> {
     pub batch: &'a RecordBatch, // ref to actual record batch
 }
 
+impl<'a> Batch<'a> {
+    pub fn len(&self) -> usize {
+        self.batch.num_rows()
+    }
+}
+
 // calculate expressions
 fn evaluate_batch<'a>(
     batch: &'a RecordBatch,
@@ -493,10 +499,30 @@ impl<'a> Span<'a> {
     }
 }
 
-impl<'a> Batch<'a> {
-    pub fn len(&self) -> usize {
-        self.batch.num_rows()
+// take next span if exist
+fn next_span<'a>(
+    batches: &'a [Batch],
+    spans: &[usize],
+    cur_span: &mut usize,
+    steps: &[StepOrder],
+) -> Option<Span<'a>> {
+    if *cur_span == spans.len() {
+        return None;
     }
+
+    let span_len = spans[*cur_span];
+    // offset is a sum of prev spans
+    let offset = (0..*cur_span).into_iter().map(|i| spans[i]).sum();
+    let rows_count = batches.iter().map(|b| b.len()).sum::<usize>();
+    if offset + span_len > rows_count {
+        (
+            " offset {offset}, span len: {span_len} > rows count: {}",
+            rows_count,
+        );
+        return None;
+    }
+    *cur_span += 1;
+    Some(Span::new(*cur_span - 1, offset, span_len, steps, batches))
 }
 
 // Result of the funnel
