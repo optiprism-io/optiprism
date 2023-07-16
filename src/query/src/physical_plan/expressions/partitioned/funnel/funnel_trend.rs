@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fmt::Debug;
@@ -20,7 +21,10 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
+use chrono::DateTime;
 use chrono::Duration;
+use chrono::DurationRound;
+use chrono::NaiveDateTime;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::struct_expressions::struct_expr;
 use datafusion::physical_expr::PhysicalExpr;
@@ -52,11 +56,45 @@ use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
 use crate::StaticArray;
 
 #[derive(Clone, Debug)]
-struct DebugBuckets {}
+struct DateTimeBuckets {
+    size: Duration,
+    completed: BTreeMap<i64, usize>,
+    incompleted: BTreeMap<i64, usize>,
+    time_to_convert: BTreeMap<i64, i64>,
+    steps_count: BTreeMap<i64, usize>,
+}
 
-impl Buckets for DebugBuckets {
+impl DateTimeBuckets {
+    pub fn new(size: Duration) -> Self {
+        Self {
+            size,
+            completed: Default::default(),
+            incompleted: Default::default(),
+            time_to_convert: Default::default(),
+            steps_count: Default::default(),
+        }
+    }
+}
+
+impl Buckets for DateTimeBuckets {
     fn add(&mut self, result: &FunnelResult) -> Result<()> {
-        println!("{:?}", result);
+        match result {
+            FunnelResult::Completed(steps) => {
+                let ts = NaiveDateTime::from_timestamp_opt(steps[0].ts, 0).unwrap();
+                let ts = ts.duration_trunc(self.size).unwrap();
+                let k = ts.timestamp_millis();
+                self.completed.insert(k, 1);
+                let ttc = steps.last().unwrap().ts - steps[0].ts;
+                self.time_to_convert.insert(k, ttc);
+                self.steps_count.insert(k, steps.len());
+            }
+            FunnelResult::Incomplete(steps, stepsn) => {
+                let ts = NaiveDateTime::from_timestamp_opt(steps[0].ts, 0).unwrap();
+                let ts = ts.duration_trunc(self.size).unwrap();
+                self.incompleted.insert(ts.timestamp_millis(), 1);
+                self.steps_count.insert(k, *stepsn);
+            }
+        }
         Ok(())
     }
 }
@@ -292,7 +330,7 @@ mod tests {
     use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::DebugBuckets;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::DateTimeBuckets;
     use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::FunnelExpr;
     use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::Options;
     use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
@@ -346,7 +384,7 @@ mod tests {
             touch: Touch::First,
         };
 
-        let buckets = Box::new(DebugBuckets {});
+        let buckets = Box::new(DateTimeBuckets::new(Duration::nanoseconds(1)));
         let mut f = FunnelExpr::new(opts, buckets);
 
         let spans = vec![8];
