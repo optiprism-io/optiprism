@@ -502,7 +502,7 @@ where
 pub enum MergeReorder {
     // pick page from stream, e.g. don't merge and write as is
     PickFromStream(usize, usize),
-    // first vector - stream_id to pick from, second vector - streams which were merged
+    // first vector - stream_id to pick from, second vector - streams which are merged
     Merge(Vec<usize>, Vec<usize>),
 }
 
@@ -593,9 +593,9 @@ where
         array_to_pages_simple(arr, cd.base_type.clone(), data_pagesize_limit)
     }
 
-    // Merge iteration
+    // Main merge loop
     pub fn merge(&mut self) -> Result<()> {
-        // Read pages chunk for each stream
+        // Init sorter with chunk per stream
         for stream_id in 0..self.page_streams.len() {
             if let Some(chunk) = self.next_stream_index_chunk(stream_id)? {
                 // Push chunk to sorter
@@ -964,23 +964,35 @@ where
 
     // Get the next index chunk
     fn next_index_chunk(&mut self) -> Result<Option<Vec<MergedPagesChunk>>> {
+        // iterate over chunks in heap
         while let Some(chunk) = self.sorter.pop() {
+            // try to get next chunk of this stream
             if let Some(next) = self.next_stream_index_chunk(chunk.stream)? {
+                // push next chunk to sorter
                 self.sorter.push(next);
             }
 
+            // push chunk to merge queue
             self.merge_queue.push(chunk);
+            // check intersection of first chunk with merge queue
+            // all the intersected chunks should be merged
             while check_intersection(&self.merge_queue, self.sorter.peek()) {
+                // in case of intersection, take chunk and add it to merge queue
                 let next = self.sorter.pop().unwrap();
-                if let Some(row) = self.next_stream_index_chunk(next.stream)? {
-                    self.sorter.push(row);
+                // try to take next chunk of stream and add it to sorter
+                if let Some(chunk) = self.next_stream_index_chunk(next.stream)? {
+                    self.sorter.push(chunk);
                 }
+                // push chunk to merge queue
                 self.merge_queue.push(next);
             }
 
+            // check queue len. Queue len may be 1 if there is no intersection
             if self.merge_queue.len() > 1 {
+                // in case of intersection, merge queue
                 self.merge_queue()?;
             } else {
+                // queue contains only one chunk, so we can just push it to result
                 let chunk = self.merge_queue.pop().unwrap();
                 let num_vals = chunk.num_values();
                 let chunk_stream = chunk.stream;
@@ -990,6 +1002,7 @@ where
                 ));
             }
 
+            // try drain result
             if let Some(res) = self.try_drain_result(self.row_group_values_limit) {
                 return Ok(Some(res));
             }
@@ -998,6 +1011,7 @@ where
         Ok(self.try_drain_result(1))
     }
 
+    // check result length and drain if needed
     fn try_drain_result(&mut self, values_limit: usize) -> Option<Vec<MergedPagesChunk>> {
         if self.result_buffer.is_empty() {
             return None;
