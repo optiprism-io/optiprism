@@ -307,16 +307,15 @@ mod tests {
     use store::test_util::parse_markdown_table;
 
     use crate::event_eq;
-    use crate::physical_plan::expressions::funnel::test_utils::event_eq_;
-    use crate::physical_plan::expressions::funnel::Count;
-    use crate::physical_plan::expressions::funnel::FunnelExpr;
-    use crate::physical_plan::expressions::funnel::FunnelResult;
-    use crate::physical_plan::expressions::funnel::Options;
-    use crate::physical_plan::expressions::funnel::StepOrder::*;
-    use crate::physical_plan::expressions::funnel::Touch;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel::test_utils::event_eq_;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExpr;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel::Options;
+    use crate::physical_plan::expressions::partitioned::funnel::Count;
+    use crate::physical_plan::expressions::partitioned::funnel::FunnelResult;
+    use crate::physical_plan::expressions::partitioned::funnel::StepOrder::Sequential;
+    use crate::physical_plan::expressions::partitioned::funnel::Touch;
     // use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, Options, Touch};
     use crate::physical_plan::{abs_row_id, PartitionState};
-
     #[test]
     fn test_batches_state() -> anyhow::Result<()> {
         let schema = Schema::new(vec![Field::new("a", DataType::Int64, false)]);

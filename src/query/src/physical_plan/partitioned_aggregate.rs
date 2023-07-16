@@ -325,13 +325,14 @@ mod tests {
     use store::test_util::parse_markdown_tables;
 
     use crate::event_eq;
-    use crate::physical_plan::expressions::funnel;
-    use crate::physical_plan::expressions::funnel::FunnelExpr;
-    use crate::physical_plan::expressions::funnel::FunnelExprWrap;
-    use crate::physical_plan::expressions::funnel::StepOrder;
-    use crate::physical_plan::expressions::funnel::Touch;
     use crate::physical_plan::expressions::partitioned::boolean_op;
     use crate::physical_plan::expressions::partitioned::cond_count::Count;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExpr;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExprWrap;
+    use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
+    use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
+    use crate::physical_plan::expressions::partitioned::funnel::Touch;
     use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
     use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExec;
     use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
@@ -448,7 +449,7 @@ mod tests {
             steps: vec![e1, e2, e3],
             exclude: None,
             constants: None,
-            count: funnel::Count::Unique,
+            count: Unique,
             filter: None,
             touch: Touch::First,
         };
@@ -544,7 +545,7 @@ mod tests {
             steps: vec![e1, e2, e3],
             exclude: None,
             constants: None,
-            count: funnel::Count::Unique,
+            count: Unique,
             filter: None,
             touch: Touch::First,
         };

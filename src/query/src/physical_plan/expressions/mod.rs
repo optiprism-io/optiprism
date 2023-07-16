@@ -1,5 +1,4 @@
 pub mod aggregate;
-pub mod funnel;
 pub mod partitioned;
 pub mod partitioned_aggregate;
 pub mod partitioned_count;

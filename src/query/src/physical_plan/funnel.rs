@@ -59,8 +59,8 @@ use futures::StreamExt;
 
 use crate::error::QueryError;
 use crate::physical_plan::abs_row_id;
-use crate::physical_plan::expressions::funnel::FunnelExpr;
-use crate::physical_plan::expressions::funnel::FunnelResult;
+use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExpr;
+use crate::physical_plan::expressions::partitioned::funnel::FunnelResult;
 use crate::physical_plan::PartitionState;
 use crate::Result;
 use crate::DEFAULT_BATCH_SIZE;
@@ -424,16 +424,15 @@ mod tests {
 
     use crate::error::Result;
     use crate::event_eq;
-    use crate::physical_plan::expressions::funnel::test_utils::event_eq_;
-    use crate::physical_plan::expressions::funnel::Count;
-    use crate::physical_plan::expressions::funnel::FunnelExpr;
-    use crate::physical_plan::expressions::funnel::Options;
-    use crate::physical_plan::expressions::funnel::StepOrder::Sequential;
-    use crate::physical_plan::expressions::funnel::Touch;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel::test_utils::event_eq_;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExpr;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel::Options;
+    use crate::physical_plan::expressions::partitioned::funnel::Count;
+    use crate::physical_plan::expressions::partitioned::funnel::StepOrder::Sequential;
+    use crate::physical_plan::expressions::partitioned::funnel::Touch;
     use crate::physical_plan::funnel::FunnelExec;
     use crate::physical_plan::merge::MergeExec;
     use crate::physical_plan::PartitionState;
-
     #[tokio::test]
     async fn test_funnel() -> anyhow::Result<()> {
         let data = r#"
