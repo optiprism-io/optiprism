@@ -13,7 +13,7 @@ use arrow2::datatypes::Field;
 use arrow2::datatypes::TimeUnit;
 use arrow2::io::parquet::read;
 use arrow2::io::print;
-use store::merge::merger::Merger;
+use store::parquet::merger::ParquetMerger;
 use store::test_util::concat_chunks;
 use store::test_util::create_parquet_from_chunk;
 use store::test_util::create_parquet_from_chunks;
@@ -76,7 +76,7 @@ fn roundtrip(tc: TestCase) -> anyhow::Result<()> {
         .collect::<Vec<_>>();
 
     let mut out = Cursor::new(vec![]);
-    let mut merger = Merger::try_new(
+    let mut merger = ParquetMerger::try_new(
         readers,
         &mut out,
         idx_cols_len,
@@ -171,7 +171,7 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
                 .collect::<Vec<_>>();
 
             let mut out = Cursor::new(vec![]);
-            let mut merger = Merger::try_new(
+            let mut merger = ParquetMerger::try_new(
                 readers,
                 &mut out,
                 idx_cols_len,
@@ -548,7 +548,7 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
 
     let mut out = Cursor::new(vec![]);
-    let mut merger = Merger::try_new(readers, &mut out, 1, None, 100, 100)?;
+    let mut merger = ParquetMerger::try_new(readers, &mut out, 1, None, 100, 100)?;
 
     merger.merge()?;
 
@@ -623,7 +623,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
 
     let mut out = Cursor::new(vec![]);
-    let mut merger = Merger::try_new(readers, &mut out, 1, None, 100, 100)?;
+    let mut merger = ParquetMerger::try_new(readers, &mut out, 1, None, 100, 100)?;
     merger.merge()?;
     let final_chunk = read_parquet_as_one_chunk(&mut out);
 
@@ -696,7 +696,7 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
 
     let mut out = Cursor::new(vec![]);
-    let mut merger = Merger::try_new(readers, &mut out, 1, None, 100, 100)?;
+    let mut merger = ParquetMerger::try_new(readers, &mut out, 1, None, 100, 100)?;
     merger.merge()?;
     let final_chunk = read_parquet_as_one_chunk(&mut out);
 

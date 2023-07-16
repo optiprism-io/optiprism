@@ -5,7 +5,7 @@ extern crate core;
 
 pub mod arrow_conversion;
 pub mod error;
-pub mod merge;
+pub mod parquet;
 
 pub mod test_util {
     use std::fs::File;
