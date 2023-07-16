@@ -10,6 +10,7 @@ use crate::error::Result;
 use crate::StaticArray;
 
 pub mod funnel;
+pub mod funnel_trend;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum StepOrder {
@@ -342,6 +343,11 @@ impl<'a> Span<'a> {
         self.row_id += 1;
 
         true
+    }
+
+    #[inline]
+    pub fn is_next_row(&self) -> bool {
+        return self.row_id + 1 <= self.len - 1;
     }
 
     // go to next step
