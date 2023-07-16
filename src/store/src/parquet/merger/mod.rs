@@ -1,3 +1,16 @@
+//! Contains merger which merges multiple parquets into one.
+//!
+//! # Example:
+//! ```
+//! use std::fs::File;
+//!
+//! use store::parquet::merger::ParquetMerger;
+//! let mut f1 = File::open("1.parquet")?;
+//! let mut f2 = File::open("2.parquet")?;
+//! let mut out = File::create("out.parquet")?;
+//! let mut merger = ParquetMerger::try_new(vec![f1, f2], &mut out, 1, None, 100, 100)?;
+//! merger.merge()?;
+//! ```
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
