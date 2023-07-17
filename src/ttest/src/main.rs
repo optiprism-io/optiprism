@@ -1,12 +1,9 @@
+use chrono::Duration;
+use chrono::DurationRound;
+use chrono::NaiveDateTime;
+
 fn main() {
-    let sets = vec![
-        vec![0, 0, 0, 0],
-        vec![1, 1, 1, 1, 2, 2, 2, 2, 2],
-        vec![2, 3, 3, 3, 4, 4, 4, 5, 5],
-        vec![6],
-        vec![6],
-        vec![6],
-        vec![7, 7, 7],
-        vec![8, 8, 8],
-    ];
+    let dt = "2020-04-12 22:10:57".parse::<NaiveDateTime>().unwrap();
+    let ts = dt.duration_trunc(Duration::days(1)).unwrap();
+    println!("{ts}");
 }
