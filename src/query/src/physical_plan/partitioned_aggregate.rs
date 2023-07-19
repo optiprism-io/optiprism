@@ -14,6 +14,7 @@ use std::task::Poll;
 
 use arrow::array::Array;
 use arrow::array::ArrayRef;
+use arrow::array::BooleanArray;
 use arrow::array::UInt32Array;
 use arrow::compute::concat_batches;
 use arrow::compute::take;
@@ -55,6 +56,41 @@ pub trait PartitionedAggregateExpr: Send + Sync {
     ) -> Result<Vec<ArrayRef>>;
     fn fields(&self) -> Vec<Field>;
     fn schema(&self) -> SchemaRef;
+}
+
+pub trait SegmentExpr: Send + Sync {
+    fn evaluate(
+        &self,
+        batches: &[RecordBatch],
+        spans: Vec<usize>,
+        skip: usize,
+    ) -> Result<BooleanArray>;
+}
+
+pub struct SegmentExprWrap {
+    expr: Box<dyn PartitionedAggregateExpr>,
+}
+
+impl SegmentExpr for SegmentExprWrap {
+    fn evaluate(
+        &self,
+        batches: &[RecordBatch],
+        spans: Vec<usize>,
+        skip: usize,
+    ) -> Result<BooleanArray> {
+        let resp = self.expr.evaluate(batches, spans, skip)?;
+        Ok(resp[0]
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap()
+            .clone())
+    }
+}
+
+impl SegmentExprWrap {
+    pub fn new(expr: Box<dyn PartitionedAggregateExpr>) -> Self {
+        Self { expr }
+    }
 }
 
 pub struct PartitionedAggregateExec {
@@ -310,6 +346,9 @@ impl RecordBatchStream for PartitionedAggregateStream {
 mod tests {
     use std::sync::Arc;
 
+    use arrow::array::ArrayRef;
+    use arrow::array::UInt32Array;
+    use arrow::compute::take;
     use arrow::util::pretty::print_batches;
     use chrono::Duration;
     use datafusion::physical_expr::expressions::BinaryExpr;

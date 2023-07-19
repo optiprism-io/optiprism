@@ -13,9 +13,15 @@ use std::task::Context;
 use std::task::Poll;
 
 use arrow::array::Array;
+use arrow::array::ArrayAccessor;
+use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
+use arrow::array::Int32Array;
 use arrow::array::UInt32Array;
+use arrow::array::UInt32Builder;
+use arrow::compute::and;
 use arrow::compute::concat_batches;
+use arrow::compute::or;
 use arrow::compute::take;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
@@ -48,38 +54,39 @@ use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::partitioned_aggregate::SegmentExpr;
 use crate::physical_plan::PartitionState;
 
-pub struct PartitionedAggregateExec {
+pub struct SegmentedAggregateExpr {
     group_expr: Vec<Arc<dyn PhysicalExpr>>,
     segment_expr: Vec<Arc<dyn SegmentExpr>>,
     agg_expr: Arc<dyn PartitionedAggregateExpr>,
-    schema: SchemaRef,
-    agg_schema: SchemaRef,
     input: Arc<dyn ExecutionPlan>,
+    schema: SchemaRef,
     out_batch_size: usize,
     metrics: ExecutionPlanMetricsSet,
 }
 
-impl PartitionedAggregateExec {
+impl SegmentedAggregateExpr {
     pub fn try_new(
         group_expr: Vec<Arc<dyn PhysicalExpr>>,
         segment_expr: Vec<Arc<dyn SegmentExpr>>,
-        agg_expr: Vec<Arc<dyn PartitionedAggregateExpr>>,
+        agg_expr: Arc<dyn PartitionedAggregateExpr>,
         input: Arc<dyn ExecutionPlan>,
         out_batch_size: usize,
     ) -> Result<Self> {
-        let agg_schemas = agg_expr
-            .iter()
-            .map(|a| (*a.schema()).clone())
-            .collect::<Vec<_>>();
-        let agg_schema = Schema::try_merge(agg_schemas)?;
+        let seg_schema = Schema::new(vec![Field::new(
+            "segment",
+            arrow::datatypes::DataType::UInt32,
+            false,
+        )]);
         let input_schema = (*input.schema()).clone();
+        let agg_schema = (*agg_expr.schema()).clone();
         let schema =
-            Schema::try_merge(vec![vec![agg_schema.clone()], vec![input_schema]].concat())?;
+            Schema::try_merge(vec![vec![seg_schema, agg_schema], vec![input_schema]].concat())?;
+
         let ret = Self {
             group_expr,
+            segment_expr,
             agg_expr,
             schema: Arc::new(schema),
-            agg_schema: Arc::new(agg_schema),
             input,
             out_batch_size,
             metrics: Default::default(),
@@ -90,7 +97,7 @@ impl PartitionedAggregateExec {
 }
 
 #[async_trait]
-impl ExecutionPlan for PartitionedAggregateExec {
+impl ExecutionPlan for SegmentedAggregateExpr {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -116,8 +123,9 @@ impl ExecutionPlan for PartitionedAggregateExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
-            PartitionedAggregateExec::try_new(
+            SegmentedAggregateExpr::try_new(
                 self.group_expr.clone(),
+                self.segment_expr.clone(),
                 self.agg_expr.clone(),
                 children[0].clone(),
                 self.out_batch_size,
@@ -131,11 +139,11 @@ impl ExecutionPlan for PartitionedAggregateExec {
         partition: usize,
         context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
-        Ok(Box::pin(PartitionedAggregateStream {
+        Ok(Box::pin(SegmentedAggregateStream {
             group_expr: self.group_expr.clone(),
+            segment_expr: self.segment_expr.clone(),
             agg_expr: self.agg_expr.clone(),
             schema: self.schema.clone(),
-            agg_schema: self.agg_schema.clone(),
             input_schema: self.input.schema(),
             state: PartitionState::new(self.group_expr.clone()),
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
@@ -150,7 +158,7 @@ impl ExecutionPlan for PartitionedAggregateExec {
     }
 
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "PartitionedAggregateExec")
+        write!(f, "SegmentedAggregateExec")
     }
 
     fn statistics(&self) -> Statistics {
@@ -158,17 +166,17 @@ impl ExecutionPlan for PartitionedAggregateExec {
     }
 }
 
-impl Debug for PartitionedAggregateExec {
+impl Debug for SegmentedAggregateExpr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PartitionedAggregateExec")
+        write!(f, "SegmentedAggregateExec")
     }
 }
 
-pub struct PartitionedAggregateStream {
+pub struct SegmentedAggregateStream {
     group_expr: Vec<Arc<dyn PhysicalExpr>>,
-    agg_expr: Vec<Arc<dyn PartitionedAggregateExpr>>,
+    segment_expr: Vec<Arc<dyn SegmentExpr>>,
+    agg_expr: Arc<dyn PartitionedAggregateExpr>,
     schema: SchemaRef,
-    agg_schema: SchemaRef,
     input_schema: SchemaRef,
     state: PartitionState,
     baseline_metrics: BaselineMetrics,
@@ -177,7 +185,7 @@ pub struct PartitionedAggregateStream {
     input: SendableRecordBatchStream,
 }
 
-impl Stream for PartitionedAggregateStream {
+impl Stream for SegmentedAggregateStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -185,106 +193,121 @@ impl Stream for PartitionedAggregateStream {
             return Poll::Ready(None);
         }
 
+        let mut seg_out: UInt32Builder = UInt32Builder::new();
         let mut out_buf: VecDeque<RecordBatch> = Default::default();
         let mut out_res_buf: VecDeque<RecordBatch> = Default::default();
         let mut to_take: BTreeMap<usize, Vec<usize>> = Default::default();
+        let mut to_take_ev: Vec<i32> = Default::default();
 
         loop {
             let mut offset = 0;
             // let timer = self.baseline_metrics.elapsed_compute().timer();
-            let res = match self.input.poll_next_unpin(cx) {
+            match self.input.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
-                    // push batch to state
-                    if let Some((batches, spans, skip)) = self.state.push(batch)? {
-                        // state gives us a batch to process
-                        offset = skip;
-                        // evaluate
-                        let ev_res = self
-                            .agg_expr
-                            .iter()
-                            .map(|expr| expr.evaluate(&batches, spans.clone(), skip))
-                            .collect::<Result<Vec<Vec<ArrayRef>>>>()
-                            .map_err(|e| e.into_datafusion_execution_error())?;
-                        Some((batches, spans, ev_res))
-                    } else {
-                        None
+                    let maybe_res = self.state.push(batch)?;
+                    if maybe_res.is_none() {
+                        continue;
                     }
-                }
-                Poll::Ready(None) => {
-                    // no more batches, finalize the funnel
-                    self.is_ended = true;
-                    if let Some((batches, spans, skip)) = self.state.finalize()? {
-                        offset = skip;
-                        let ev_res = self
-                            .agg_expr
-                            .iter()
-                            .map(|expr| expr.evaluate(&batches, spans.clone(), skip))
-                            .collect::<Result<Vec<Vec<ArrayRef>>>>()
-                            .map_err(|e| e.into_datafusion_execution_error())?;
-                        Some((batches, spans, ev_res))
-                    } else {
-                        None
+
+                    let (batches, spans, skip) = maybe_res.unwrap();
+                    offset = skip;
+
+                    // evaluate agg
+                    let ev_res = self
+                        .agg_expr
+                        .evaluate(&batches, spans.clone(), skip)
+                        .map_err(|e| e.into_datafusion_execution_error())?;
+
+                    // evaluate segments
+                    let seg_res = self
+                        .segment_expr
+                        .iter()
+                        .map(|expr| expr.evaluate(&batches, spans.clone(), skip))
+                        .collect::<Result<Vec<_>>>()
+                        .map_err(|e| e.into_datafusion_execution_error())?;
+
+                    for (span_idx, span) in spans.iter().enumerate() {
+                        let (batch_id, row_id) = abs_row_id(offset, &batches);
+                        offset += span;
+                        for (seg_idx, valid) in seg_res.iter().enumerate() {
+                            if !valid.value(span_idx) {
+                                continue;
+                            }
+
+                            seg_out.append_value(seg_idx as u32);
+                            to_take_ev.push(span_idx as i32);
+                            to_take.entry(batch_id).or_default().push(row_id);
+                        }
+
+                        // evaluate agg
+                    }
+                    if seg_out.len() == 0 {
+                        println!("!");
+                        // todo return empty batch
+                        continue;
+                    }
+
+                    println!("!в");
+                    let to_take_idx =
+                        Int32Array::from(mem::replace(&mut to_take_ev, Default::default()));
+                    println!("{:?}\n", to_take_idx);
+                    println!("{:?}\n", ev_res);
+                    let ev_res_arrs = ev_res
+                        .iter()
+                        .map(|arr| take(arr, &to_take_idx, None))
+                        .collect::<std::result::Result<Vec<_>, _>>()?;
+                    println!("?");
+                    let mut group_batches = mem::replace(&mut to_take, Default::default())
+                        .iter()
+                        .map(|(batch_id, rows)| {
+                            // make take array from usize
+                            let take_arr = rows.iter().map(|b| Some(*b as u32)).collect::<Vec<_>>();
+                            let take_arr = UInt32Array::from(take_arr);
+                            // actual take of arrs
+                            let cols = batches[*batch_id]
+                                .columns()
+                                .iter()
+                                .map(|arr| take(arr, &take_arr, None))
+                                .collect::<std::result::Result<Vec<_>, _>>()?;
+
+                            // final record batch
+                            RecordBatch::try_new(self.input_schema.clone(), cols)
+                        })
+                        .collect::<Vec<std::result::Result<_, _>>>()
+                        .into_iter()
+                        .collect::<std::result::Result<Vec<RecordBatch>, _>>()?;
+
+                    // push to buffer
+                    out_buf.append(&mut group_batches.into());
+                    let ev_res_batch =
+                        RecordBatch::try_new(self.agg_expr.schema().clone(), ev_res_arrs)?;
+                    out_res_buf.push_back(ev_res_batch);
+
+                    let rows = out_buf.iter().map(|b| b.num_rows()).sum::<usize>();
+                    // return buffer only if it's full or we are at the end
+                    if rows >= self.out_batch_size || self.is_ended {
+                        let rb = concat_batches(
+                            &self.input_schema,
+                            out_buf.iter().map(|v| v).collect::<Vec<_>>(),
+                        )?;
+
+                        let evb = concat_batches(
+                            &self.agg_expr.schema(),
+                            out_res_buf.iter().map(|v| v).collect::<Vec<_>>(),
+                        )?;
+
+                        let sc = Arc::new(seg_out.finish()) as ArrayRef;
+                        let final_batch = RecordBatch::try_new(
+                            self.schema.clone(),
+                            vec![&vec![sc], evb.columns(), rb.columns()].concat(),
+                        )?;
+
+                        return self
+                            .baseline_metrics
+                            .record_poll(Poll::Ready(Some(Ok(final_batch))));
                     }
                 }
                 other => return other,
-            };
-
-            if let Some((batches, spans, ev_res)) = res {
-                for span in spans.into_iter() {
-                    let (batch_id, row_id) = abs_row_id(offset, &batches);
-                    // make arrays of indexes to take
-                    to_take.entry(batch_id).or_default().push(row_id);
-                    offset += span;
-                }
-                let mut batches = mem::replace(&mut to_take, Default::default())
-                    .iter()
-                    .map(|(batch_id, rows)| {
-                        // make take array from usize
-                        let take_arr = rows.iter().map(|b| Some(*b as u32)).collect::<Vec<_>>();
-                        let take_arr = UInt32Array::from(take_arr);
-                        // actual take of arrs
-                        let cols = batches[*batch_id]
-                            .columns()
-                            .iter()
-                            .map(|arr| take(arr, &take_arr, None))
-                            .collect::<std::result::Result<Vec<_>, _>>()?;
-
-                        // final record batch
-                        RecordBatch::try_new(self.input_schema.clone(), cols)
-                    })
-                    .collect::<Vec<std::result::Result<_, _>>>()
-                    .into_iter()
-                    .collect::<std::result::Result<Vec<RecordBatch>, _>>()?;
-
-                let ev_cols = ev_res.iter().flat_map(|v| v.clone()).collect::<Vec<_>>();
-                let res_batch = RecordBatch::try_new(self.agg_schema.clone(), ev_cols)?;
-                out_res_buf.push_back(res_batch);
-
-                // push to buffer
-                out_buf.append(&mut batches.into());
-            }
-
-            let rows = out_buf.iter().map(|b| b.num_rows()).sum::<usize>();
-            // return buffer only if it's full or we are at the end
-            if rows >= self.out_batch_size || self.is_ended {
-                let rb = concat_batches(
-                    &self.input_schema,
-                    out_buf.iter().map(|v| v).collect::<Vec<_>>(),
-                )?;
-
-                let evb = concat_batches(
-                    &self.agg_schema,
-                    out_res_buf.iter().map(|v| v).collect::<Vec<_>>(),
-                )?;
-
-                let final_batch = RecordBatch::try_new(
-                    self.schema.clone(),
-                    vec![evb.columns(), rb.columns()].concat(),
-                )?;
-
-                return self
-                    .baseline_metrics
-                    .record_poll(Poll::Ready(Some(Ok(final_batch))));
             }
 
             // timer.done();
@@ -293,7 +316,7 @@ impl Stream for PartitionedAggregateStream {
     }
 }
 
-impl RecordBatchStream for PartitionedAggregateStream {
+impl RecordBatchStream for SegmentedAggregateStream {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
@@ -319,6 +342,7 @@ mod tests {
 
     use crate::event_eq;
     use crate::physical_plan::expressions::partitioned::boolean_op;
+    use crate::physical_plan::expressions::partitioned::cond_aggregate::Aggregate;
     use crate::physical_plan::expressions::partitioned::cond_count::Count;
     use crate::physical_plan::expressions::partitioned::funnel::funnel;
     use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExpr;
@@ -327,324 +351,110 @@ mod tests {
     use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
     use crate::physical_plan::expressions::partitioned::funnel::Touch;
     use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
+    use crate::physical_plan::expressions::partitioned::AggregateFunction;
     use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExec;
     use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
+    use crate::physical_plan::partitioned_aggregate::SegmentExprWrap;
+    use crate::physical_plan::segmented_aggregate::SegmentedAggregateExpr;
     use crate::physical_plan::PartitionState;
 
     #[tokio::test]
     async fn it_works() -> anyhow::Result<()> {
         let data = r#"
-| user_id(i64) | ts(ts) | event(utf8) |
-|--------------|--------|-------------|
-| 0       | 1   | e1    |
-| 0       | 2   | e2    |
-| 0       | 3   | e3    |
-| 0       | 4   | e1    |
-|         |     |       |
-| 0       | 5   | e1    |
-| 0       | 6   | e2    |
-| 0       | 7   | e3    |
-| 0       | 8   | e1    |
-|         |     |       |
-| 0       | 9   | e1    |
-| 0       | 10   | e2    |
-| 0       | 11   | e3    |
-| 0       | 12   | e1    |
-|         |     |       |
-| 0       | 13   | e1    |
-| 0       | 14   | e2    |
-| 0       | 15   | e3    |
-| 1       | 5   | e1    |
-| 1       | 6   | e3    |
-| 1       | 7   | e1    |
-| 1       | 8   | e2    |
-| 2       | 9   | e1    |
-| 2       | 10  | e2    |
-|         |     |       |
-| 2       | 11  | e3    |
-| 2       | 12  | e3    |
-| 2       | 13  | e3    |
-| 2       | 14  | e3    |
-| 3       | 15  | e1    |
-| 3       | 16  | e2    |
-| 3       | 17  | e3    |
-| 4       | 18  | e1    |
-| 4       | 19  | e2    |
-|         |     |       |
-| 4       | 20  | e3    |
-|         |     |       |
-| 4       | 20  | e3    |
-|         |     |       |
-| 4       | 20  | e3    |
-|         |     |       |
-| 5       | 21  | e1    |
-|         |     |       |
-| 5       | 22  | e2    |
-|         |     |       |
-| 6       | 23  | e1    |
-| 6       | 24  | e3    |
-| 6       | 25  | e3    |
-|         |     |       |
-| 7       | 26  | e1    |
-| 7       | 27  | e2    |
-| 7       | 28  | e3    |
-|         |     |       |
-| 8       | 29  | e1    |
-| 8       | 30  | e2    |
-| 8       | 31  | e3    |
+| user_id(i64) | device(utf8) | v(i64) | ts(ts) | event(utf8) |
+|--------------|--------------|-------|--------|-------------|
+| 0            | iphone       | 1     | 1      | e1          |
+| 0            | iphone       | 0     | 2      | e2          |
+| 0            | iphone       | 0     | 3      | e3          |
+| 0            | android      | 1     | 4      | e1          |
+| 0            | android      | 1     | 5      | e2          |
+| 0            | android      | 0     | 6      | e3          |
+| 1            | osx          | 1     | 1      | e1          |
+| 1            | osx          | 1     | 2      | e2          |
+| 1            | osx          | 0     | 3      | e3          |
+| 1            | osx          | 0     | 4      | e1          |
+| 1            | osx          | 0     | 5      | e2          |
+| 1            | osx          | 0     | 6      | e3          |
+| 3            | osx          | 0     | 6      | e3          |
 "#;
 
         let batches = parse_markdown_tables(data).unwrap();
         let schema = batches[0].schema();
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
-        let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
-        let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
-        let f = Arc::new(BinaryExpr::new(left, Operator::GtEq, right));
-        let mut agg1 = Arc::new(Count::<boolean_op::Eq>::new(
+        let left = Arc::new(Column::new_with_schema("v", &schema).unwrap());
+        let right = Arc::new(Literal::new(ScalarValue::Int64(Some(1))));
+        let f = Arc::new(BinaryExpr::new(left, Operator::Eq, right));
+        let seg1 = Aggregate::<i64, i128, boolean_op::Eq>::new(
             f.clone(),
+            Column::new_with_schema("v", &schema).unwrap(),
+            AggregateFunction::new_sum(),
             Column::new_with_schema("ts", &schema).unwrap(),
-            5,
+            1,
             TimeRange::None,
             None,
-            "a".to_string(),
-        ));
-
-        let mut agg2 = Arc::new(Count::<boolean_op::Eq>::new(
-            f.clone(),
-            Column::new_with_schema("ts", &schema).unwrap(),
-            2,
-            TimeRange::None,
-            None,
-            "b".to_string(),
-        ));
-
-        let e1 = {
-            let l = Column::new_with_schema("event", &schema).unwrap();
-            let r = Literal::new(ScalarValue::Utf8(Some("e1".to_string())));
-            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
-        };
-        let e2 = {
-            let l = Column::new_with_schema("event", &schema).unwrap();
-            let r = Literal::new(ScalarValue::Utf8(Some("e2".to_string())));
-            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
-        };
-        let e3 = {
-            let l = Column::new_with_schema("event", &schema).unwrap();
-            let r = Literal::new(ScalarValue::Utf8(Some("e3".to_string())));
-            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
-        };
-        let opts = funnel::Options {
-            ts_col: Column::new_with_schema("ts", &schema)?,
-            window: Duration::seconds(15),
-            steps: vec![e1, e2, e3],
-            exclude: None,
-            constants: None,
-            count: Unique,
-            filter: None,
-            touch: Touch::First,
-        };
-
-        let f = FunnelExpr::new(opts);
-        let agg3 = Arc::new(FunnelExprWrap::new(f));
-        let segmentation = PartitionedAggregateExec::try_new(
-            vec![Arc::new(Column::new_with_schema("user_id", &schema)?)],
-            vec![agg1, agg2, agg3],
-            Arc::new(input),
-            100,
-        )?;
-
-        let session_ctx = SessionContext::new();
-        let task_ctx = session_ctx.task_ctx();
-        let stream = segmentation.execute(0, task_ctx)?;
-        let result = collect(stream).await?;
-
-        print_batches(&result).unwrap();
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn group_by_day() -> anyhow::Result<()> {
-        let data = r#"
-| user_id(i64) | ts(ts) | event(utf8) |
-|--------------|--------|-------------|
-| 0            | 1      | e1          |
-| 0            | 1      | e2          |
-| 0            | 1      | e3          |
-| 0            | 2      | e1          |
-| 0            | 2      | e2          |
-| 0            | 2      | e3          |
-| 0            | 3      | e1          |
-| 0            | 3      | e2          |
-| 0            | 3      | e3          |
-| 1            | 1      | e2          |
-| 1            | 1      | e2          |
-| 1            | 1      | e3          |
-| 1            | 2      | e1          |
-| 1            | 2      | e2          |
-| 1            | 2      | e3          |
-| 1            | 3      | e1          |
-| 1            | 3      | e2          |
-| 1            | 3      | e3          |
-"#;
-
-        let batches = parse_markdown_tables(data).unwrap();
-        let schema = batches[0].schema();
-        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
-        let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
-        let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
-        let f = Arc::new(BinaryExpr::new(left, Operator::GtEq, right));
-        let mut agg1 = Arc::new(Count::<boolean_op::Eq>::new(
-            f.clone(),
-            Column::new_with_schema("ts", &schema).unwrap(),
-            5,
-            TimeRange::None,
-            None,
-            "a".to_string(),
-        ));
-
-        let mut agg2 = Arc::new(Count::<boolean_op::Eq>::new(
-            f.clone(),
-            Column::new_with_schema("ts", &schema).unwrap(),
-            2,
-            TimeRange::None,
-            None,
-            "b".to_string(),
-        ));
-
-        let e1 = {
-            let l = Column::new_with_schema("event", &schema).unwrap();
-            let r = Literal::new(ScalarValue::Utf8(Some("e1".to_string())));
-            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
-        };
-        let e2 = {
-            let l = Column::new_with_schema("event", &schema).unwrap();
-            let r = Literal::new(ScalarValue::Utf8(Some("e2".to_string())));
-            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
-        };
-        let e3 = {
-            let l = Column::new_with_schema("event", &schema).unwrap();
-            let r = Literal::new(ScalarValue::Utf8(Some("e3".to_string())));
-            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
-            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
-        };
-        let opts = funnel::Options {
-            ts_col: Column::new_with_schema("ts", &schema)?,
-            window: Duration::seconds(15),
-            steps: vec![e1, e2, e3],
-            exclude: None,
-            constants: None,
-            count: Unique,
-            filter: None,
-            touch: Touch::First,
-        };
-
-        let f = FunnelExpr::new(opts);
-        let agg3 = Arc::new(FunnelExprWrap::new(f));
-        let segmentation = PartitionedAggregateExec::try_new(
-            vec![
-                Arc::new(Column::new_with_schema("user_id", &schema)?),
-                Arc::new(Column::new_with_schema("ts", &schema)?),
-            ],
-            vec![agg1, agg2, agg3],
-            Arc::new(input),
-            100,
-        )?;
-
-        let session_ctx = SessionContext::new();
-        let task_ctx = session_ctx.task_ctx();
-        let stream = segmentation.execute(0, task_ctx)?;
-        let result = collect(stream).await?;
-
-        print_batches(&result).unwrap();
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn it_works2() -> anyhow::Result<()> {
-        let data = r#"
-| user_id(i64) | ts(ts) | event(utf8) |
-|--------------|--------|-------------|
-| 0            | 1      | 1           |
-| 0            | 2      | 1           |
-| 0            | 3      | 1           |
-| 0            | 4      | 1           |
-|              |        |             |
-| 0            | 5      | 1           |
-| 0            | 6      | 1           |
-| 0            | 7      | 1           |
-| 1            | 5      | 1           |
-| 1            | 6      | 1           |
-| 1            | 7      | 1           |
-| 1            | 8      | 1           |
-| 2            | 9      | 1           |
-| 2            | 10     | 1           |
-|              |        |             |
-| 2            | 11     | 1           |
-| 2            | 12     | 1           |
-| 2            | 13     | 1           |
-| 2            | 14     | 1           |
-| 3            | 15     | 1           |
-| 3            | 16     | 1           |
-| 3            | 17     | 1           |
-| 4            | 18     | 1           |
-| 4            | 19     | 1           |
-|              |        |             |
-| 4            | 20     | 1           |
-|              |        |             |
-| 5            | 21     | 1           |
-|              |        |             |
-| 5            | 22     | 1           |
-|              |        |             |
-| 6            | 23     | 1           |
-| 6            | 24     | 1           |
-| 6            | 25     | 1           |
-|              |        |             |
-| 7            | 26     | 1           |
-| 7            | 27     | 1           |
-| 7            | 28     | 1           |
-|              |        |             |
-| 8            | 29     | 1           |
-| 8            | 30     | 1           |
-| 8            | 31     | 1           |
-"#;
-
-        let batches = parse_markdown_tables(data).unwrap();
-        let schema = batches[0].schema();
-        let col = Arc::new(Column::new_with_schema("user_id", &schema).unwrap());
-        let mut state = PartitionState::new(vec![col]);
-
-        let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
-        let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
-        let f = BinaryExpr::new(left, Operator::Eq, right);
-        let mut count = Count::<boolean_op::Eq>::new(
-            Arc::new(f) as PhysicalExprRef,
-            Column::new_with_schema("ts", &schema).unwrap(),
-            4,
-            TimeRange::None,
-            None,
-            "b".to_string(),
+            "1".to_string(),
         );
 
-        for batch in batches {
-            if let Some((batches, spans, skip)) = state.push(batch).unwrap() {
-                println!("spans: {:?} {}", spans, skip);
-                // println!("batches: {:?}", batches);
-                let res = count.evaluate(&batches, spans, skip).unwrap();
-                // println!("res: {:?}", res);
-            }
-        }
+        let seg1 = Arc::new(SegmentExprWrap::new(Box::new(seg1)));
+        let seg2 = Aggregate::<i64, i128, boolean_op::Eq>::new(
+            f,
+            Column::new_with_schema("v", &schema).unwrap(),
+            AggregateFunction::new_sum(),
+            Column::new_with_schema("ts", &schema).unwrap(),
+            2,
+            TimeRange::None,
+            None,
+            "2".to_string(),
+        );
+        let seg2 = Arc::new(SegmentExprWrap::new(Box::new(seg2)));
+        let e1 = {
+            let l = Column::new_with_schema("event", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Utf8(Some("e1".to_string())));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e2 = {
+            let l = Column::new_with_schema("event", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Utf8(Some("e2".to_string())));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e3 = {
+            let l = Column::new_with_schema("event", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Utf8(Some("e3".to_string())));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let opts = funnel::Options {
+            ts_col: Column::new_with_schema("ts", &schema)?,
+            window: Duration::seconds(15),
+            steps: vec![e1, e2, e3],
+            exclude: None,
+            constants: None,
+            count: Unique,
+            filter: None,
+            touch: Touch::First,
+        };
 
-        if let Some((batches, spans, skip)) = state.finalize().unwrap() {
-            println!("spans: {:?} {}", spans, skip);
-            let res = count.evaluate(&batches, spans, skip).unwrap();
-            println!("final: {:?}", res);
-        }
+        let f = FunnelExpr::new(opts);
+        let fexpr = Arc::new(FunnelExprWrap::new(f));
+        let seg = SegmentedAggregateExpr::try_new(
+            vec![
+                Arc::new(Column::new_with_schema("user_id", &schema)?),
+                Arc::new(Column::new_with_schema("device", &schema)?),
+            ],
+            vec![seg1, seg2],
+            fexpr,
+            Arc::new(input),
+            1,
+        )?;
 
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = seg.execute(0, task_ctx)?;
+        let result = collect(stream).await?;
+
+        print_batches(&result).unwrap();
         Ok(())
     }
 }

@@ -30,7 +30,7 @@ pub mod time_range;
 // pub mod aggregate;
 mod aggregate;
 pub mod comparison;
-mod cond_aggregate;
+pub mod cond_aggregate;
 pub mod cond_count;
 pub mod funnel;
 

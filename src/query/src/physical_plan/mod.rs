@@ -16,6 +16,7 @@ pub mod planner;
 // mod segmentation;
 // mod partitioned_aggregate;
 mod partitioned_aggregate;
+mod segmented_aggregate;
 mod unpivot;
 // pub mod merge;
 // pub mod planner;
@@ -98,8 +99,7 @@ impl PartitionState {
         self.hash_buffer.clear();
         self.hash_buffer.resize(num_rows, 0);
         create_hashes(&arrays, &mut self.random_state, &mut self.hash_buffer)?;
-
-        let mut take = false;
+        let mut to_take = false;
 
         // iterate over hashes
         for v in self.hash_buffer.iter() {
@@ -113,7 +113,7 @@ impl PartitionState {
                 // create new span with length of 0
                 self.spans.push(0);
                 // set take flag to true
-                take = true;
+                to_take = true;
                 self.last_value_count = 0;
             }
             let i = self.spans.len() - 1;
@@ -126,8 +126,19 @@ impl PartitionState {
             self.last_value = Some(*v);
         }
 
+        if self.buf.len() == 1 && to_take {
+            let take_spans = self
+                .spans
+                .drain(..self.spans.len() - 1)
+                .collect::<Vec<usize>>();
+            return Ok(Some((
+                vec![self.buf.last().unwrap().to_owned()],
+                take_spans,
+                0,
+            )));
+        }
         // take batches if we have enough batches and enough spans to take
-        if self.buf.len() > 1 && take {
+        if self.buf.len() > 1 && to_take {
             // drain the buffer except the last batch
             let mut take_batches = self.buf.drain(..self.buf.len() - 1).collect::<Vec<_>>();
             // push the last batch so it will be overlapped in the next iteration
@@ -316,6 +327,7 @@ mod tests {
     use crate::physical_plan::expressions::partitioned::funnel::Touch;
     // use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, Options, Touch};
     use crate::physical_plan::{abs_row_id, PartitionState};
+
     #[test]
     fn test_batches_state() -> anyhow::Result<()> {
         let schema = Schema::new(vec![Field::new("a", DataType::Int64, false)]);
@@ -443,6 +455,62 @@ mod tests {
 
         let exp_skips = vec![0, 4, 7, 0, 2];
         assert_eq!(skip_res, exp_skips);
+        Ok(())
+    }
+
+    #[test]
+    fn test_batches_state2() -> anyhow::Result<()> {
+        let schema = Schema::new(vec![Field::new("a", DataType::Int64, false)]);
+
+        let batches = {
+            let v = vec![
+                vec![0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2],
+                vec![3, 4, 5],
+                vec![3, 4, 5],
+            ];
+
+            v.into_iter()
+                .map(|v| {
+                    let arrays = vec![Arc::new(Int64Array::from(v)) as ArrayRef];
+                    RecordBatch::try_new(Arc::new(schema.clone()), arrays.clone()).unwrap()
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let col = Arc::new(Column::new_with_schema("a", &schema)?) as PhysicalExprRef;
+        let mut state = PartitionState::new(vec![col]);
+
+        let mut batches_res = vec![];
+        let mut spans_res = vec![];
+        let mut skip_res = vec![];
+        for (idx, batch) in batches.into_iter().enumerate() {
+            let res = state.push(batch)?;
+            match res {
+                None => {}
+                Some((batches, spans, skip)) => {
+                    batches_res.push(batches);
+                    spans_res.push(spans);
+                    skip_res.push(skip);
+                }
+            }
+        }
+
+        let res = state.finalize()?;
+        match res {
+            None => println!("none"),
+            Some((batches, spans, skip)) => {
+                batches_res.push(batches);
+                spans_res.push(spans);
+                skip_res.push(skip);
+            }
+        }
+
+        for i in batches_res {
+            println!("v: {:?}", i);
+        }
+        println!("spans_res: {:?}", spans_res);
+        println!("skip_res: {:?}", skip_res);
+
         Ok(())
     }
 

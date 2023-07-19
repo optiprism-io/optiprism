@@ -61,7 +61,7 @@ struct DateTimeBuckets {
     completed: BTreeMap<i64, usize>,
     incompleted: BTreeMap<i64, usize>,
     time_to_convert: BTreeMap<i64, i64>,
-    steps_count: BTreeMap<i64, usize>,
+    steps_completed: BTreeMap<i64, usize>,
 }
 
 impl DateTimeBuckets {
@@ -71,7 +71,7 @@ impl DateTimeBuckets {
             completed: Default::default(),
             incompleted: Default::default(),
             time_to_convert: Default::default(),
-            steps_count: Default::default(),
+            steps_completed: Default::default(),
         }
     }
 }
@@ -86,13 +86,14 @@ impl Buckets for DateTimeBuckets {
                 self.completed.insert(k, 1);
                 let ttc = steps.last().unwrap().ts - steps[0].ts;
                 self.time_to_convert.insert(k, ttc);
-                self.steps_count.insert(k, steps.len());
+                self.steps_completed.insert(k, steps.len());
             }
             FunnelResult::Incomplete(steps, stepsn) => {
                 let ts = NaiveDateTime::from_timestamp_opt(steps[0].ts, 0).unwrap();
                 let ts = ts.duration_trunc(self.size).unwrap();
+                let k = ts.timestamp_millis();
                 self.incompleted.insert(ts.timestamp_millis(), 1);
-                self.steps_count.insert(k, *stepsn);
+                self.steps_completed.insert(k, *stepsn);
             }
         }
         Ok(())
@@ -340,16 +341,16 @@ mod tests {
     #[test]
     fn test_funnel() {
         let data = r#"
-| user_id(i64) | ts(ts) | event(utf8) |
-|--------------|--------|-------------|
-| 0            | 1      | e1          |
-| 0            | 2      | e2          |
-| 0            | 3      | e3          |
-| 0            | 4      | e1          |
-| 0            | 5      | e2          |
-| 0            | 6      | e3          |
-| 0            | 7      | e1          |
-| 0            | 8      | e2          |
+| user_id(i64) | ts(ts)              | event(utf8) |
+|--------------|---------------------|-------------|
+| 0            | 2020-04-12 22:10:57 | e1          |
+| 0            | 2020-04-13 21:10:57 | e2          |
+| 0            | 2020-04-14 00:00:00 | e3          |
+| 0            | 2020-04-15 01:10:57 | e1          |
+| 0            | 2020-04-16 02:10:00 | e2          |
+| 0            | 2020-04-17 03:10:57 | e3          |
+| 0            | 2020-04-18 04:10:57 | e1          |
+| 0            | 2020-04-19 05:10:57 | e2          |
 "#;
 
         let batches = parse_markdown_tables(data).unwrap();
@@ -384,8 +385,8 @@ mod tests {
             touch: Touch::First,
         };
 
-        let buckets = Box::new(DateTimeBuckets::new(Duration::nanoseconds(1)));
-        let mut f = FunnelExpr::new(opts, buckets);
+        let buckets = Box::new(DateTimeBuckets::new(Duration::days(1)));
+        let mut f = FunnelExpr::new(opts, buckets.clone());
 
         let spans = vec![8];
         f.evaluate(&batches, spans, 0).unwrap();
