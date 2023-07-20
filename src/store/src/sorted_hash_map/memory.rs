@@ -1,9 +1,6 @@
-use datafusion_common::ScalarValue;
-use std::cmp::Ordering;
 use super::error::Result;
 use std::sync::atomic::{AtomicUsize, Ordering as MemoryOrdering};
-use crate::user_storage::storage::{Op, OpsBucket, OrderedOp};
-use std::sync::Arc;
+use crate::sorted_hash_map::storage::{Op, OrderedOp};
 
 pub struct Memory {
     ops: skiplist::OrderedSkipList<OrderedOp>,

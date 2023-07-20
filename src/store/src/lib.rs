@@ -6,6 +6,7 @@ extern crate core;
 pub mod arrow_conversion;
 pub mod error;
 pub mod parquet;
+pub mod sorted_hash_map;
 
 pub mod test_util {
     use std::fs::File;
@@ -38,15 +39,18 @@ pub mod test_util {
     use arrow2::datatypes::PhysicalType;
     use arrow2::datatypes::Schema;
     use arrow2::io::parquet::read;
+    use arrow2::io::parquet::write::CompressionOptions;
+    use arrow2::io::parquet::write::Encoding;
+    use arrow2::io::parquet::write::Version;
     use arrow2::io::parquet::write::transverse;
     use arrow2::io::parquet::write::FileWriter;
     use arrow2::io::parquet::write::RowGroupIterator;
     use arrow2::io::parquet::write::WriteOptions;
     use arrow2::offset::Offset;
     use arrow2::types::NativeType;
-    use parquet2::compression::CompressionOptions;
-    use parquet2::encoding::Encoding;
-    use parquet2::write::Version;
+    //use parquet2::compression::CompressionOptions;
+    //use parquet2::encoding::Encoding;
+    //use parquet2::write::Version;
 
     #[derive(Debug, Clone)]
     pub enum ListValue {
