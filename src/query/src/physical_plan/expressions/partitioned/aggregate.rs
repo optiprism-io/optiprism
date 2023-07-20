@@ -37,6 +37,8 @@ use arrow::ipc::DecimalBuilder;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
 use chrono::Duration;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
@@ -100,117 +102,8 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
     }
 }
 
-impl PartitionedAggregateExpr for Aggregate<i64, i128> {
-    fn evaluate(
-        &self,
-        batches: &[RecordBatch],
-        spans: Vec<usize>,
-        skip: usize,
-    ) -> Result<Vec<ArrayRef>> {
-        let mut spans = Spans::new_from_batches(spans, batches);
-        spans.skip(skip);
-
-        let num_rows = spans.spans.iter().sum::<usize>();
-        let mut out = Decimal128Builder::with_capacity(num_rows);
-
-        let mut inner = self.inner.lock().unwrap();
-
-        let to_filter = {
-            if let Some(filter) = self.filter.clone() {
-                let to_filter = batches
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, b)| {
-                        if let Some((id, a)) = &inner.last_filter {
-                            if *id == batch_id(b) {
-                                return Ok(a.to_owned());
-                            }
-                        }
-                        return filter.evaluate(b).and_then(|r| {
-                            Ok(r.into_array(b.num_rows())
-                                .as_any()
-                                .downcast_ref::<BooleanArray>()
-                                .unwrap()
-                                .clone())
-                        });
-                    })
-                    .collect::<std::result::Result<Vec<_>, _>>()?;
-
-                inner.last_filter = Some((
-                    batch_id(batches.last().unwrap()),
-                    to_filter.last().unwrap().clone(),
-                ));
-
-                Some(to_filter)
-            } else {
-                None
-            }
-        };
-
-        let arr = {
-            batches
-                .iter()
-                .enumerate()
-                .map(|(idx, b)| {
-                    if let Some((id, a)) = &inner.last_predicate {
-                        if *id == batch_id(b) {
-                            return Ok(a
-                                .to_owned()
-                                .as_any()
-                                .downcast_ref::<Int64Array>()
-                                .unwrap()
-                                .clone());
-                        }
-                    }
-                    return self.predicate.evaluate(b).and_then(|r| {
-                        Ok(r.into_array(b.num_rows())
-                            .as_any()
-                            .downcast_ref::<Int64Array>()
-                            .unwrap()
-                            .clone())
-                    });
-                })
-                .collect::<std::result::Result<Vec<_>, _>>()?
-        };
-
-        inner.last_predicate = Some((
-            batch_id(batches.last().unwrap()),
-            Arc::new(arr.last().unwrap().clone()),
-        ));
-
-        while spans.next_span() {
-            while let Some((batch_id, row_id)) = spans.next_row() {
-                if let Some(to_filter) = &to_filter {
-                    if !check_filter(&to_filter[batch_id], row_id) {
-                        continue;
-                    }
-                }
-
-                inner.agg.accumulate(arr[batch_id].value(row_id) as i128);
-            }
-
-            out.append_value(inner.agg.result());
-            inner.agg.reset();
-        }
-
-        Ok(vec![Arc::new(out.finish())])
-    }
-
-    fn fields(&self) -> Vec<Field> {
-        vec![Field::new(
-            format!("{}_cond_agg", self.name),
-            DataType::Boolean,
-            false,
-        )]
-    }
-
-    fn schema(&self) -> SchemaRef {
-        Arc::new(Schema::new(self.fields()))
-    }
-}
-
 macro_rules! agg {
-    ($ty:ty,$array_ty:ident,$acc_ty:ty,$builder:ty) => {
+    ($ty:ty,$array_ty:ident,$datatype_ty:ident,$acc_ty:ty,$builder:ty) => {
         impl PartitionedAggregateExpr for Aggregate<$ty, $acc_ty> {
             fn evaluate(
                 &self,
@@ -310,7 +203,7 @@ macro_rules! agg {
             fn fields(&self) -> Vec<Field> {
                 vec![Field::new(
                     format!("{}_cond_agg", self.name),
-                    DataType::Boolean,
+                    DataType::$datatype_ty,
                     false,
                 )]
             }
@@ -322,19 +215,135 @@ macro_rules! agg {
     };
 }
 
-agg!(i8, Int8Array, i64, Int64Builder);
-agg!(i16, Int16Array, i64, Int64Builder);
-agg!(i32, Int32Array, i64, Int64Builder);
-// agg!(i64, Int64Array, i128, Decimal128Builder);
-agg!(i128, Decimal128Array, i128, Decimal128Builder);
-agg!(u8, UInt8Array, i64, Int64Builder);
-agg!(u16, UInt16Array, i64, Int64Builder);
-agg!(u32, UInt32Array, i64, Int64Builder);
-agg!(u64, UInt64Array, i128, Decimal128Builder);
-agg!(u128, Decimal128Array, i128, Decimal128Builder);
-agg!(f32, Float32Array, f64, Float64Builder);
-agg!(f64, Float64Array, f64, Float64Builder);
-agg!(Decimal128Array, Decimal128Array, i128, Decimal128Builder);
+macro_rules! agg_decimal {
+    ($ty:ty,$array_ty:ident,$acc_ty:ty,$builder:ty) => {
+        impl PartitionedAggregateExpr for Aggregate<$ty, $acc_ty> {
+            fn evaluate(
+                &self,
+                batches: &[RecordBatch],
+                spans: Vec<usize>,
+                skip: usize,
+            ) -> Result<Vec<ArrayRef>> {
+                let mut spans = Spans::new_from_batches(spans, batches);
+                spans.skip(skip);
+
+                let num_rows = spans.spans.iter().sum::<usize>();
+                let mut out = <$builder>::with_capacity(num_rows);
+
+                let mut inner = self.inner.lock().unwrap();
+
+                let to_filter = {
+                    if let Some(filter) = self.filter.clone() {
+                        let to_filter = batches
+                            .iter()
+                            .enumerate()
+                            .map(|(idx, b)| {
+                                if let Some((id, a)) = &inner.last_filter {
+                                    if *id == batch_id(b) {
+                                        return Ok(a.to_owned());
+                                    }
+                                }
+                                return filter.evaluate(b).and_then(|r| {
+                                    Ok(r.into_array(b.num_rows())
+                                        .as_any()
+                                        .downcast_ref::<BooleanArray>()
+                                        .unwrap()
+                                        .clone())
+                                });
+                            })
+                            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+                        inner.last_filter = Some((
+                            batch_id(batches.last().unwrap()),
+                            to_filter.last().unwrap().clone(),
+                        ));
+
+                        Some(to_filter)
+                    } else {
+                        None
+                    }
+                };
+
+                let arr = {
+                    batches
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, b)| {
+                            if let Some((id, a)) = &inner.last_predicate {
+                                if *id == batch_id(b) {
+                                    return Ok(a
+                                        .to_owned()
+                                        .as_any()
+                                        .downcast_ref::<$array_ty>()
+                                        .unwrap()
+                                        .clone());
+                                }
+                            }
+                            return self.predicate.evaluate(b).and_then(|r| {
+                                Ok(r.into_array(b.num_rows())
+                                    .as_any()
+                                    .downcast_ref::<$array_ty>()
+                                    .unwrap()
+                                    .clone())
+                            });
+                        })
+                        .collect::<std::result::Result<Vec<_>, _>>()?
+                };
+
+                inner.last_predicate = Some((
+                    batch_id(batches.last().unwrap()),
+                    Arc::new(arr.last().unwrap().clone()),
+                ));
+
+                while spans.next_span() {
+                    while let Some((batch_id, row_id)) = spans.next_row() {
+                        if let Some(to_filter) = &to_filter {
+                            if !check_filter(&to_filter[batch_id], row_id) {
+                                continue;
+                            }
+                        }
+
+                        inner.agg.accumulate(arr[batch_id].value(row_id) as $acc_ty);
+                    }
+
+                    out.append_value(inner.agg.result());
+                    inner.agg.reset();
+                }
+
+                Ok(vec![Arc::new(out.finish().with_precision_and_scale(
+                    DECIMAL_PRECISION,
+                    DECIMAL_SCALE,
+                )?)])
+            }
+
+            fn fields(&self) -> Vec<Field> {
+                vec![Field::new(
+                    format!("{}_cond_agg", self.name),
+                    DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                    false,
+                )]
+            }
+
+            fn schema(&self) -> SchemaRef {
+                Arc::new(Schema::new(self.fields()))
+            }
+        }
+    };
+}
+
+agg!(i8, Int8Array, Int64, i64, Int64Builder);
+agg!(i16, Int16Array, Int64, i64, Int64Builder);
+agg!(i32, Int32Array, Int64, i64, Int64Builder);
+agg_decimal!(i64, Int64Array, i128, Decimal128Builder);
+agg_decimal!(i128, Decimal128Array, i128, Decimal128Builder);
+agg!(u8, UInt8Array, Int64, i64, Int64Builder);
+agg!(u16, UInt16Array, Int64, i64, Int64Builder);
+agg!(u32, UInt32Array, Int64, i64, Int64Builder);
+agg_decimal!(u64, UInt64Array, i128, Decimal128Builder);
+agg_decimal!(u128, Decimal128Array, i128, Decimal128Builder);
+agg!(f32, Float32Array, Float64, f64, Float64Builder);
+agg!(f64, Float64Array, Float64, f64, Float64Builder);
+agg_decimal!(Decimal128Array, Decimal128Array, i128, Decimal128Builder);
 
 #[cfg(test)]
 mod tests {

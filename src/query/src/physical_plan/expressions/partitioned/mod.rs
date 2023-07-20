@@ -28,7 +28,7 @@ pub mod count;
 pub mod time_range;
 // mod aggregate;
 // pub mod aggregate;
-mod aggregate;
+pub mod aggregate;
 pub mod comparison;
 pub mod cond_aggregate;
 pub mod cond_count;

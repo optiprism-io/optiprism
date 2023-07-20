@@ -341,6 +341,7 @@ mod tests {
     use store::test_util::parse_markdown_tables;
 
     use crate::event_eq;
+    use crate::physical_plan::expressions::partitioned::aggregate;
     use crate::physical_plan::expressions::partitioned::boolean_op;
     use crate::physical_plan::expressions::partitioned::cond_aggregate::Aggregate;
     use crate::physical_plan::expressions::partitioned::cond_count::Count;
@@ -438,13 +439,20 @@ mod tests {
 
         let f = FunnelExpr::new(opts);
         let fexpr = Arc::new(FunnelExprWrap::new(f));
+
+        let aggexpr = aggregate::Aggregate::<i64, i128>::new(
+            None,
+            Column::new_with_schema("v", &schema).unwrap(),
+            AggregateFunction::new_sum(),
+            "n1".to_string(),
+        );
         let seg = SegmentedAggregateExpr::try_new(
             vec![
                 Arc::new(Column::new_with_schema("user_id", &schema)?),
                 Arc::new(Column::new_with_schema("device", &schema)?),
             ],
             vec![seg1, seg2],
-            fexpr,
+            Arc::new(aggexpr),
             Arc::new(input),
             1,
         )?;
