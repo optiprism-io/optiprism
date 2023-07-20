@@ -57,8 +57,9 @@ use crate::physical_plan::PartitionState;
 pub struct SegmentedAggregateExpr {
     group_expr: Vec<Arc<dyn PhysicalExpr>>,
     segment_expr: Vec<Arc<dyn SegmentExpr>>,
-    agg_expr: Arc<dyn PartitionedAggregateExpr>,
+    agg_expr: Vec<Arc<dyn PartitionedAggregateExpr>>,
     input: Arc<dyn ExecutionPlan>,
+    agg_schema: SchemaRef,
     schema: SchemaRef,
     out_batch_size: usize,
     metrics: ExecutionPlanMetricsSet,
@@ -68,7 +69,7 @@ impl SegmentedAggregateExpr {
     pub fn try_new(
         group_expr: Vec<Arc<dyn PhysicalExpr>>,
         segment_expr: Vec<Arc<dyn SegmentExpr>>,
-        agg_expr: Arc<dyn PartitionedAggregateExpr>,
+        agg_expr: Vec<Arc<dyn PartitionedAggregateExpr>>,
         input: Arc<dyn ExecutionPlan>,
         out_batch_size: usize,
     ) -> Result<Self> {
@@ -78,16 +79,23 @@ impl SegmentedAggregateExpr {
             false,
         )]);
         let input_schema = (*input.schema()).clone();
-        let agg_schema = (*agg_expr.schema()).clone();
-        let schema =
-            Schema::try_merge(vec![vec![seg_schema, agg_schema], vec![input_schema]].concat())?;
+
+        let agg_schemas = agg_expr
+            .iter()
+            .map(|a| (*a.schema()).clone())
+            .collect::<Vec<_>>();
+        let agg_schema = Schema::try_merge(agg_schemas)?;
+        let schema = Schema::try_merge(
+            vec![vec![seg_schema, agg_schema.clone()], vec![input_schema]].concat(),
+        )?;
 
         let ret = Self {
             group_expr,
             segment_expr,
             agg_expr,
-            schema: Arc::new(schema),
             input,
+            agg_schema: Arc::new(agg_schema),
+            schema: Arc::new(schema),
             out_batch_size,
             metrics: Default::default(),
         };
@@ -144,6 +152,7 @@ impl ExecutionPlan for SegmentedAggregateExpr {
             segment_expr: self.segment_expr.clone(),
             agg_expr: self.agg_expr.clone(),
             schema: self.schema.clone(),
+            agg_schema: self.agg_schema.clone(),
             input_schema: self.input.schema(),
             state: PartitionState::new(self.group_expr.clone()),
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
@@ -175,8 +184,9 @@ impl Debug for SegmentedAggregateExpr {
 pub struct SegmentedAggregateStream {
     group_expr: Vec<Arc<dyn PhysicalExpr>>,
     segment_expr: Vec<Arc<dyn SegmentExpr>>,
-    agg_expr: Arc<dyn PartitionedAggregateExpr>,
+    agg_expr: Vec<Arc<dyn PartitionedAggregateExpr>>,
     schema: SchemaRef,
+    agg_schema: SchemaRef,
     input_schema: SchemaRef,
     state: PartitionState,
     baseline_metrics: BaselineMetrics,
@@ -215,7 +225,9 @@ impl Stream for SegmentedAggregateStream {
                     // evaluate agg
                     let ev_res = self
                         .agg_expr
-                        .evaluate(&batches, spans.clone(), skip)
+                        .iter()
+                        .map(|expr| expr.evaluate(&batches, spans.clone(), skip))
+                        .collect::<Result<Vec<_>>>()
                         .map_err(|e| e.into_datafusion_execution_error())?;
 
                     // evaluate segments
@@ -252,10 +264,15 @@ impl Stream for SegmentedAggregateStream {
                         Int32Array::from(mem::replace(&mut to_take_ev, Default::default()));
                     println!("{:?}\n", to_take_idx);
                     println!("{:?}\n", ev_res);
+
                     let ev_res_arrs = ev_res
                         .iter()
-                        .map(|arr| take(arr, &to_take_idx, None))
-                        .collect::<std::result::Result<Vec<_>, _>>()?;
+                        .flat_map(|arr| {
+                            arr.iter()
+                                .map(|arr| take(arr, &to_take_idx, None).unwrap())
+                                .collect::<Vec<_>>()
+                        })
+                        .collect::<Vec<_>>();
                     println!("?");
                     let mut group_batches = mem::replace(&mut to_take, Default::default())
                         .iter()
@@ -279,8 +296,7 @@ impl Stream for SegmentedAggregateStream {
 
                     // push to buffer
                     out_buf.append(&mut group_batches.into());
-                    let ev_res_batch =
-                        RecordBatch::try_new(self.agg_expr.schema().clone(), ev_res_arrs)?;
+                    let ev_res_batch = RecordBatch::try_new(self.agg_schema.clone(), ev_res_arrs)?;
                     out_res_buf.push_back(ev_res_batch);
 
                     let rows = out_buf.iter().map(|b| b.num_rows()).sum::<usize>();
@@ -292,7 +308,7 @@ impl Stream for SegmentedAggregateStream {
                         )?;
 
                         let evb = concat_batches(
-                            &self.agg_expr.schema(),
+                            &self.agg_schema,
                             out_res_buf.iter().map(|v| v).collect::<Vec<_>>(),
                         )?;
 
@@ -452,7 +468,7 @@ mod tests {
                 Arc::new(Column::new_with_schema("device", &schema)?),
             ],
             vec![seg1, seg2],
-            Arc::new(aggexpr),
+            vec![fexpr, Arc::new(aggexpr)],
             Arc::new(input),
             1,
         )?;
