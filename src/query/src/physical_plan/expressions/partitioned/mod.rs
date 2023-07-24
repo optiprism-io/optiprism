@@ -32,6 +32,7 @@ pub mod aggregate;
 pub mod comparison;
 pub mod cond_aggregate;
 pub mod cond_count;
+mod count_aggregate;
 pub mod funnel;
 
 use num::Integer;
@@ -133,6 +134,88 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum AggregateFunction2 {
+    Sum(i128),
+    Min(i128),
+    Max(i128),
+    Avg(i128, i128),
+    Count(i128),
+}
+
+impl AggregateFunction2 {
+    pub fn new_sum() -> Self {
+        AggregateFunction2::Sum(i128::zero())
+    }
+
+    pub fn new_min() -> Self {
+        AggregateFunction2::Min(i128::max_value())
+    }
+
+    pub fn new_max() -> Self {
+        AggregateFunction2::Max(i128::min_value())
+    }
+
+    pub fn new_avg() -> Self {
+        AggregateFunction2::Avg(i128::zero(), i128::zero())
+    }
+
+    pub fn new_count() -> Self {
+        AggregateFunction2::Count(i128::zero())
+    }
+
+    pub fn accumulate(&mut self, v: i128) -> i128 {
+        match self {
+            AggregateFunction2::Sum(s) => {
+                *s = *s + v;
+                *s
+            }
+            AggregateFunction2::Min(m) => {
+                if v < *m {
+                    *m = v;
+                }
+                *m
+            }
+            AggregateFunction2::Max(m) => {
+                if v > *m {
+                    *m = v;
+                }
+                *m
+            }
+            AggregateFunction2::Avg(s, c) => {
+                *s = *s + v;
+                *c = *c + 1;
+                *s / *c
+            }
+            AggregateFunction2::Count(s) => {
+                *s = *s + 1;
+                *s
+            }
+        }
+    }
+
+    pub fn result(&self) -> i128 {
+        match self {
+            AggregateFunction2::Sum(s) => *s,
+            AggregateFunction2::Min(m) => *m,
+            AggregateFunction2::Max(m) => *m,
+            AggregateFunction2::Avg(s, c) => *s / *c,
+            AggregateFunction2::Count(s) => *s,
+        }
+    }
+    pub fn reset(&mut self) {
+        match self {
+            AggregateFunction2::Sum(s) => *s = i128::zero(),
+            AggregateFunction2::Min(m) => *m = i128::max_value(),
+            AggregateFunction2::Max(m) => *m = i128::min_value(),
+            AggregateFunction2::Avg(s, c) => {
+                *s = i128::zero();
+                *c = i128::zero();
+            }
+            AggregateFunction2::Count(s) => *s = i128::zero(),
+        }
+    }
+}
 fn check_filter(filter: &BooleanArray, idx: usize) -> bool {
     if filter.is_null(idx) {
         return false;

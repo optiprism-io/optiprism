@@ -387,7 +387,19 @@ mod tests {
 | 1            | osx          | 0     | 4      | e1          |
 | 1            | osx          | 0     | 5      | e2          |
 | 1            | osx          | 0     | 6      | e3          |
+| 2            | osx          | 1     | 1      | e1          |
+| 2            | osx          | 1     | 2      | e2          |
+| 2            | osx          | 0     | 3      | e3          |
+| 2            | osx          | 0     | 4      | e1          |
+| 2            | osx          | 0     | 5      | e2          |
+| 2            | osx          | 0     | 6      | e3          |
+| 3            | osx          | 1     | 1      | e1          |
+| 3            | osx          | 1     | 2      | e2          |
+| 3            | osx          | 0     | 3      | e3          |
+| 3            | osx          | 0     | 4      | e1          |
+| 3            | osx          | 0     | 5      | e2          |
 | 3            | osx          | 0     | 6      | e3          |
+| 4            | osx          | 0     | 6      | e3          |
 "#;
 
         let batches = parse_markdown_tables(data).unwrap();
