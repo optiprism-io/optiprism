@@ -29,6 +29,7 @@ pub mod time_range;
 // mod aggregate;
 // pub mod aggregate;
 pub mod aggregate;
+mod aggregate_aggregate;
 pub mod comparison;
 pub mod cond_aggregate;
 pub mod cond_count;
@@ -41,6 +42,8 @@ use num_traits::Num;
 use num_traits::NumCast;
 use num_traits::PrimInt;
 use num_traits::Zero;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 
 pub trait SegmentationExpr: Debug + Send + Sync {
     fn evaluate(&self, record_batch: &RecordBatch, hashes: &[u64]) -> Result<Option<BooleanArray>>;
@@ -164,32 +167,27 @@ impl AggregateFunction2 {
         AggregateFunction2::Count(i128::zero())
     }
 
-    pub fn accumulate(&mut self, v: i128) -> i128 {
+    pub fn accumulate(&mut self, v: i128) {
         match self {
             AggregateFunction2::Sum(s) => {
                 *s = *s + v;
-                *s
             }
             AggregateFunction2::Min(m) => {
                 if v < *m {
                     *m = v;
                 }
-                *m
             }
             AggregateFunction2::Max(m) => {
                 if v > *m {
                     *m = v;
                 }
-                *m
             }
             AggregateFunction2::Avg(s, c) => {
                 *s = *s + v;
                 *c = *c + 1;
-                *s / *c
             }
             AggregateFunction2::Count(s) => {
                 *s = *s + 1;
-                *s
             }
         }
     }
@@ -199,7 +197,11 @@ impl AggregateFunction2 {
             AggregateFunction2::Sum(s) => *s,
             AggregateFunction2::Min(m) => *m,
             AggregateFunction2::Max(m) => *m,
-            AggregateFunction2::Avg(s, c) => *s / *c,
+            AggregateFunction2::Avg(s, c) => {
+                let v =
+                    Decimal::from_i128_with_scale(*s, 10) / Decimal::from_i128_with_scale(*c, 10);
+                v.mantissa()
+            }
             AggregateFunction2::Count(s) => *s,
         }
     }
@@ -216,6 +218,7 @@ impl AggregateFunction2 {
         }
     }
 }
+
 fn check_filter(filter: &BooleanArray, idx: usize) -> bool {
     if filter.is_null(idx) {
         return false;
