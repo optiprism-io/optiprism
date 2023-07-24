@@ -34,6 +34,7 @@ use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_plan::DisplayFormatType::Default;
 use datafusion_common::ScalarValue;
+use futures::stream::iter;
 use futures::SinkExt;
 use tracing::info;
 use tracing::instrument;
@@ -60,42 +61,44 @@ use crate::physical_plan::expressions::partitioned::funnel::Touch;
 use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
 use crate::StaticArray;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct BucketStep {
-    time_to_convert: Int64Builder,
-    time_to_convert_from_start: Int64Builder,
+    count: i64,
+    time_to_convert: i64,
+    time_to_convert_from_start: i64,
 }
 
 impl BucketStep {
     pub fn new() -> Self {
         Self {
-            time_to_convert: Int64Builder::with_capacity(1000),
-            time_to_convert_from_start: Int64Builder::with_capacity(1000),
+            count: 0,
+            time_to_convert: 0,
+            time_to_convert_from_start: 0,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Bucket {
-    ts: i64,
-    is_completed: BooleanBuilder,
-    completed_steps: Int64Builder,
+    total: i64,
+    completed: i64,
+    completed_steps: i64,
     steps: Vec<BucketStep>,
 }
 
 impl Bucket {
-    pub fn new(ts: i64, steps: usize) -> Self {
+    pub fn new(steps: usize) -> Self {
         let s = (0..steps).into_iter().map(|_| BucketStep::new()).collect();
         Self {
-            ts,
-            is_completed: BooleanBuilder::with_capacity(1000),
-            completed_steps: Int64Builder::with_capacity(1000),
+            total: 0,
+            completed: 0,
+            completed_steps: 0,
             steps: s,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct DateTimeBuckets {
     size: Duration,
     steps_count: usize,
@@ -107,7 +110,7 @@ impl DateTimeBuckets {
     pub fn new(steps_count: usize, ts: Vec<i64>, size: Duration) -> Self {
         let mut buckets = HashMap::new();
         for k in ts.clone() {
-            buckets.insert(k, Bucket::new(k, steps_count));
+            buckets.insert(k, Bucket::new(steps_count));
         }
         Self {
             size,
@@ -144,30 +147,27 @@ impl Buckets for DateTimeBuckets {
 
             for (idx, step) in result_steps.iter().enumerate() {
                 let time_to_convert = if idx == 0 {
-                    None
+                    0
                 } else {
-                    Some(step.ts - result_steps[idx - 1].ts)
+                    step.ts - result_steps[idx - 1].ts
                 };
                 let time_to_convert_from_start = if idx == 0 {
-                    None
+                    0
                 } else {
-                    Some(step.ts - result_steps[0].ts)
+                    step.ts - result_steps[0].ts
                 };
                 let bucket = self.buckets.get_mut(&k).unwrap();
-                bucket.completed_steps.append_value(completed_steps as i64);
-                bucket.is_completed.append_value(is_completed);
+                bucket.total += 1;
+                bucket.completed_steps += completed_steps as i64;
+                if is_completed {
+                    bucket.completed += 1;
+                }
 
                 for step in 0..self.steps_count {
-                    if step > completed_steps {
-                        bucket.steps[step].time_to_convert.append_null();
-                        bucket.steps[step].time_to_convert_from_start.append_null();
-                    } else {
-                        bucket.steps[step]
-                            .time_to_convert
-                            .append_option(time_to_convert);
-                        bucket.steps[step]
-                            .time_to_convert_from_start
-                            .append_option(time_to_convert_from_start);
+                    if step < completed_steps {
+                        bucket.steps[step].count += 1;
+                        bucket.steps[step].time_to_convert = time_to_convert;
+                        bucket.steps[step].time_to_convert_from_start = time_to_convert_from_start;
                     }
                 }
             }
@@ -177,27 +177,12 @@ impl Buckets for DateTimeBuckets {
     fn buckets(&self) -> Vec<i64> {
         self.ts.clone()
     }
-
-    fn finish(&mut self) -> Vec<ArrayRef> {
-        let mut res = Vec::with_capacity(2 + self.steps_count * 2);
-        for k in self.ts.clone() {
-            let bucket = self.buckets.get_mut(&k).unwrap();
-            res.push(Arc::new(bucket.is_completed.finish()) as ArrayRef);
-            res.push(Arc::new(bucket.completed_steps.finish()) as ArrayRef);
-            for step in bucket.steps.iter_mut() {
-                res.push(Arc::new(step.time_to_convert.finish()) as ArrayRef);
-                res.push(Arc::new(step.time_to_convert_from_start.finish()) as ArrayRef);
-            }
-        }
-
-        res
-    }
 }
 
 trait Buckets: Debug + Send + Sync {
     fn push(&mut self, results: Vec<FunnelResult>);
+
     fn buckets(&self) -> Vec<i64>;
-    fn finish(&mut self) -> Vec<ArrayRef>;
 }
 
 #[derive(Debug)]
@@ -214,7 +199,7 @@ pub struct FunnelExpr {
     filter: Option<Filter>,
     touch: Touch,
     dbg: Vec<DebugInfo>,
-    buckets: Mutex<Box<dyn Buckets>>,
+    buckets: Mutex<Vec<Box<dyn Buckets>>>,
     name: String,
 }
 
@@ -255,7 +240,7 @@ pub struct DebugInfo {
 }
 
 impl FunnelExpr {
-    pub fn new(opts: Options, buckets: Box<dyn Buckets>) -> Self {
+    pub fn new(opts: Options, buckets: Vec<Box<dyn Buckets>>) -> Self {
         Self {
             ts_col: opts.ts_col,
             window: opts.window,
@@ -275,23 +260,22 @@ impl FunnelExpr {
             filter: opts.filter,
             touch: opts.touch,
             dbg: vec![],
-            buckets: Mutex::new(buckets),
             name: opts.name,
+            buckets: Mutex::new(buckets),
         }
     }
 
     pub fn steps_count(&self) -> usize {
         self.steps.len()
     }
-}
 
-impl PartitionedAggregateExpr for FunnelExpr {
     fn evaluate(
         &self,
         batches: &[RecordBatch],
         spans: Vec<usize>,
         skip: usize,
-    ) -> Result<Vec<ArrayRef>> {
+        segments: Vec<usize>,
+    ) -> Result<()> {
         let spans_len = spans.len();
         // evaluate each batch, e.g. create batch state
         let batches = batches
@@ -322,7 +306,6 @@ impl PartitionedAggregateExpr for FunnelExpr {
         let (window, filter) = (self.window.clone(), self.filter.clone());
         let mut dbg: Vec<DebugInfo> = vec![];
         // iterate over spans. For simplicity all ids are tied to span and start at 0
-        let mut funnel_results: Vec<Vec<FunnelResult>> = Vec::with_capacity(spans_len);
         let mut buckets = self.buckets.lock().unwrap();
         let mut span_results: Vec<FunnelResult> = vec![];
         while let Some(mut span) = next_span(&batches, &spans, &mut cur_span, &steps) {
@@ -416,43 +399,12 @@ impl PartitionedAggregateExpr for FunnelExpr {
                     span.continue_from_last_step();
                 }
             }
-            funnel_results.push(span_results.drain(..).collect::<Vec<_>>());
-        }
-
-        Ok(buckets.finish())
-    }
-
-    fn fields(&self) -> Vec<Field> {
-        let mut fields = vec![];
-        for v in self.buckets.lock().unwrap().buckets() {
-            fields.push(Field::new(
-                format!("{}_{},is_completed", self.name, v),
-                DataType::Boolean,
-                false,
-            ));
-            fields.push(Field::new(
-                format!("{}_{}_completed_steps", self.name, v),
-                DataType::Int64,
-                false,
-            ));
-            for i in 0..self.steps.len() {
-                fields.push(Field::new(
-                    format!("{}_{}_step_{}_time_to_convert", self.name, v, i),
-                    DataType::Int64,
-                    false,
-                ));
-                fields.push(Field::new(
-                    format!("{}_{}_step_{}_time_to_convert_from_start", self.name, v, i),
-                    DataType::Int64,
-                    false,
-                ));
+            for s in segments.clone() {
+                buckets[s].push(span_results.drain(..).collect::<Vec<_>>());
             }
         }
-        fields
-    }
 
-    fn schema(&self) -> SchemaRef {
-        Arc::new(Schema::new(self.fields()))
+        Ok(())
     }
 }
 
@@ -475,10 +427,10 @@ mod tests {
     use futures::SinkExt;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::BucketStep;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::DateTimeBuckets;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::FunnelExpr;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::Options;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend2::Buckets;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend2::DateTimeBuckets;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend2::FunnelExpr;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend2::Options;
     use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
     use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
     use crate::physical_plan::expressions::partitioned::funnel::Touch;
@@ -534,17 +486,21 @@ mod tests {
             .duration_trunc(ds)
             .unwrap()
             .timestamp_millis();
-        let end = start + Duration::days(90).num_milliseconds();
+        let end = start + Duration::days(8).num_milliseconds();
         let v = (start..end)
             .into_iter()
             .step_by(ds.num_milliseconds() as usize)
             .collect::<Vec<_>>();
-        let buckets = Box::new(DateTimeBuckets::new(3, v, ds));
+        let b = DateTimeBuckets::new(3, v.clone(), ds.clone());
+        let buckets = (0..=1)
+            .into_iter()
+            .map(|_| Box::new(b.clone()) as Box<dyn Buckets>)
+            .collect::<Vec<_>>();
 
         let opts = Options {
             ts_col: Column::new_with_schema("ts", &schema).unwrap(),
-            window: Duration::seconds(15),
-            steps: vec![e1, e2, e3.clone()],
+            window: Duration::seconds(Duration::days(10).num_milliseconds()),
+            steps: vec![e1, e2, e3],
             exclude: None,
             constants: None,
             count: Unique,
@@ -555,8 +511,10 @@ mod tests {
         let mut f = FunnelExpr::new(opts, buckets);
 
         let spans = vec![8, 8];
-        let arrs = f.evaluate(&batches, spans, 0).unwrap();
-        let batch = RecordBatch::try_new(f.schema(), arrs).unwrap();
-        print_batches(&vec![batch]).unwrap();
+        f.evaluate(&batches, spans.clone(), 0, vec![0, 1]).unwrap();
+        // f.evaluate(&batches, spans.clone(), 0, vec![0, 1]).unwrap();
+        // f.evaluate(&batches, spans.clone(), 0, vec![0]).unwrap();
+
+        println!("{:?}", f.buckets);
     }
 }

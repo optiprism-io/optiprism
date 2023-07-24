@@ -10,7 +10,8 @@ use crate::error::Result;
 use crate::StaticArray;
 
 pub mod funnel;
-pub mod funnel_trend;
+// pub mod funnel_trend;
+mod funnel_trend2;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum StepOrder {

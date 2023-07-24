@@ -246,9 +246,16 @@ mod tests {
         println!("1 {:?}", span.next_row());
         println!("2 {:?}", span.next_row());
         println!("3 {:?}", span.next_row());
-        assert!(!span.next_span());
+
+        let mut span = Spans::new(vec![10], vec![13]);
+        span.skip(10);
+        assert!(span.next_span());
         println!("1 {:?}", span.next_row());
         println!("2 {:?}", span.next_row());
+        println!("3 {:?}", span.next_row());
+        assert!(span.next_span());
+        println!("3 {:?}", span.next_row());
+        println!("3 {:?}", span.next_row());
         println!("3 {:?}", span.next_row());
     }
 

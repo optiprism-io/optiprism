@@ -254,16 +254,12 @@ impl Stream for SegmentedAggregateStream {
                         // evaluate agg
                     }
                     if seg_out.len() == 0 {
-                        println!("!");
                         // todo return empty batch
                         continue;
                     }
 
-                    println!("!в");
                     let to_take_idx =
                         Int32Array::from(mem::replace(&mut to_take_ev, Default::default()));
-                    println!("{:?}\n", to_take_idx);
-                    println!("{:?}\n", ev_res);
 
                     let ev_res_arrs = ev_res
                         .iter()
@@ -273,7 +269,6 @@ impl Stream for SegmentedAggregateStream {
                                 .collect::<Vec<_>>()
                         })
                         .collect::<Vec<_>>();
-                    println!("?");
                     let mut group_batches = mem::replace(&mut to_take, Default::default())
                         .iter()
                         .map(|(batch_id, rows)| {
