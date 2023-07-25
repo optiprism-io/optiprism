@@ -36,6 +36,7 @@ pub mod cond_count;
 mod count_aggregate;
 pub mod funnel;
 
+use common::DECIMAL_SCALE;
 use num::Integer;
 use num_traits::Bounded;
 use num_traits::Num;
@@ -219,9 +220,128 @@ impl AggregateFunction2 {
     }
 }
 
+pub enum AggregateFunction3 {
+    Count,
+    Sum,
+    Min,
+    Max,
+    Avg,
+}
+
+pub struct Accumulator<T, O> {
+    agg_fn: AggregateFunction3,
+    v1: T,
+    v2: T,
+    o: PhantomData<O>,
+}
+
+impl<T, O> Accumulator<T, O>
+where
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
+    O: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
+{
+    pub fn new(agg_fn: AggregateFunction3) -> Self {
+        let v1 = {
+            match agg_fn {
+                AggregateFunction3::Min => T::max_value(),
+                AggregateFunction3::Max => T::min_value(),
+                _ => T::zero(),
+            }
+        };
+        Self {
+            agg_fn,
+            v1,
+            v2: T::zero(),
+            o: Default::default(),
+        }
+    }
+    pub fn accumulate(&mut self, v: T) {
+        match self.agg_fn {
+            AggregateFunction3::Count => self.v1 = self.v1 + T::one(),
+            AggregateFunction3::Sum => self.v1 = self.v1 + v,
+            AggregateFunction3::Min if v < self.v1 => self.v1 = v,
+            AggregateFunction3::Max if v > self.v1 => self.v1 = v,
+            AggregateFunction3::Avg => {
+                self.v1 = self.v1 + v;
+                self.v2 = self.v2 + T::one();
+            }
+            _ => {}
+        }
+    }
+
+    pub fn result(&mut self) -> O {
+        match self.agg_fn {
+            AggregateFunction3::Count => O::from(self.v1).unwrap(),
+            AggregateFunction3::Sum => O::from(self.v1).unwrap(),
+            AggregateFunction3::Min => O::from(self.v1).unwrap(),
+            AggregateFunction3::Max => O::from(self.v1).unwrap(),
+            AggregateFunction3::Avg => {
+                let v = Decimal::from_i128_with_scale(
+                    <i128 as NumCast>::from(self.v1).unwrap(),
+                    DECIMAL_SCALE as u32,
+                ) / Decimal::from_i128_with_scale(
+                    <i128 as NumCast>::from(self.v2).unwrap(),
+                    DECIMAL_SCALE as u32,
+                );
+                O::from(v.mantissa()).unwrap()
+            }
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.v1 = T::zero();
+        self.v2 = T::zero();
+    }
+}
+
 fn check_filter(filter: &BooleanArray, idx: usize) -> bool {
     if filter.is_null(idx) {
         return false;
     }
     filter.value(idx)
+}
+
+#[cfg(test)]
+mod tests {
+    use common::DECIMAL_SCALE;
+    use rust_decimal::Decimal;
+
+    use crate::physical_plan::expressions::partitioned::Accumulator;
+    use crate::physical_plan::expressions::partitioned::AggregateFunction3;
+
+    #[test]
+    fn it_works() {
+        let mut acc = Accumulator::<i64, i128>::new(AggregateFunction3::Count);
+        acc.accumulate(1);
+        acc.accumulate(1);
+        assert_eq!(acc.result(), 2);
+
+        let mut acc = Accumulator::<i64, i128>::new(AggregateFunction3::Min);
+        acc.accumulate(1);
+        acc.accumulate(2);
+        assert_eq!(acc.result(), 1);
+
+        let mut acc = Accumulator::<i64, i128>::new(AggregateFunction3::Max);
+        acc.accumulate(1);
+        acc.accumulate(2);
+        assert_eq!(acc.result(), 2);
+
+        let mut acc = Accumulator::<i64, i128>::new(AggregateFunction3::Avg);
+        acc.accumulate(2);
+        acc.accumulate(2);
+        acc.accumulate(1);
+
+        let exp = Decimal::from_i128_with_scale(5, DECIMAL_SCALE as u32)
+            / Decimal::from_i128_with_scale(3, DECIMAL_SCALE as u32);
+        assert_eq!(exp.mantissa(), acc.result());
+
+        let mut acc = Accumulator::<i64, i128>::new(AggregateFunction3::Max);
+        acc.accumulate(1);
+        acc.accumulate(2);
+        acc.reset();
+        assert_eq!(acc.result(), 0);
+        acc.accumulate(1);
+        acc.accumulate(2);
+        assert_eq!(acc.result(), 2);
+    }
 }

@@ -42,6 +42,8 @@ use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
+use datafusion_common::ScalarValue;
+use datafusion_expr::ColumnarValue;
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
@@ -68,14 +70,15 @@ struct Inner {
 }
 
 #[derive(Debug)]
-pub struct Aggregate {
+pub struct Aggregate<T> {
     inner: Mutex<Inner>,
     filter: Option<PhysicalExprRef>,
     predicate: Column,
     name: String,
+    t: PhantomData<T>,
 }
 
-impl Aggregate {
+impl<T> Aggregate<T> {
     pub fn new(
         filter: Option<PhysicalExprRef>,
         predicate: Column,
@@ -98,9 +101,12 @@ impl Aggregate {
             predicate,
             inner: Mutex::new(inner),
             name,
+            t: Default::default(),
         }
     }
+}
 
+impl Aggregate<i64> {
     fn evaluate(
         &self,
         batches: &[RecordBatch],
@@ -190,7 +196,6 @@ impl Aggregate {
             for (seg_idx, seg) in segments[spans.span_id as usize].iter().enumerate() {
                 if *seg {
                     let res = inner.agg.result();
-                    println!("{res}");
                     inner.outer_fn[seg_idx].accumulate(res);
                 }
             }
@@ -198,6 +203,26 @@ impl Aggregate {
         }
 
         Ok(())
+    }
+
+    fn data_types(&self) -> Vec<DataType> {
+        vec![DataType::Int64]
+    }
+
+    fn finalize(&self) -> Vec<Vec<ColumnarValue>> {
+        let inner = self.inner.lock().unwrap();
+        let res = inner
+            .outer_fn
+            .iter()
+            .map(|v| {
+                vec![ColumnarValue::Scalar(ScalarValue::Decimal128(
+                    Some(v.result()),
+                    DECIMAL_PRECISION,
+                    DECIMAL_SCALE,
+                ))]
+            })
+            .collect::<Vec<_>>();
+        res
     }
 }
 
@@ -279,7 +304,7 @@ mod tests {
             let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
             let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
-            let mut agg = Aggregate::new(
+            let mut agg = Aggregate::<i64>::new(
                 None,
                 Column::new_with_schema("v", &schema).unwrap(),
                 AggregateFunction2::new_sum(),
@@ -294,7 +319,7 @@ mod tests {
                 vec![true, true],
             ])
             .unwrap();
-            println!("{:?}", agg.inner.lock().unwrap().outer_fn);
+            println!("{:?}", agg.finalize());
             // let right = Decimal128Array::from(vec![2, 4, 2]);
             // assert_eq!(res, vec![Arc::new(right) as ArrayRef]);
         }
