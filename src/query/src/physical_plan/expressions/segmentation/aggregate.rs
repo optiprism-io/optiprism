@@ -47,12 +47,11 @@ use num_traits::Zero;
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::batch_id;
-use crate::physical_plan::expressions::partitioned::boolean_op::ComparisonOp;
-use crate::physical_plan::expressions::partitioned::boolean_op::Operator;
-use crate::physical_plan::expressions::partitioned::check_filter;
-use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
-use crate::physical_plan::expressions::partitioned::AggregateFunction;
-use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::check_filter;
+use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
+use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
+use crate::physical_plan::expressions::segmentation::AggregateFunction;
+use crate::physical_plan::expressions::segmentation::SegmentedAggregateExpr;
 use crate::physical_plan::Spans;
 
 #[derive(Debug)]
@@ -119,7 +118,7 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 
 macro_rules! agg {
     ($ty:ty,$array_ty:ident,$acc_ty:ty) => {
-        impl<Op> PartitionedAggregateExpr for Aggregate<$ty, $acc_ty, Op>
+        impl<Op> SegmentedAggregateExpr for Aggregate<$ty, $acc_ty, Op>
         where Op: ComparisonOp<$acc_ty>
         {
             fn evaluate(
@@ -127,7 +126,7 @@ macro_rules! agg {
                 batches: &[RecordBatch],
                 spans: Vec<usize>,
                 skip: usize,
-            ) -> Result<Vec<ArrayRef>> {
+            ) -> Result<BooleanArray> {
                 let mut spans = Spans::new_from_batches(spans, batches);
                 spans.skip(skip);
 
@@ -241,19 +240,7 @@ macro_rules! agg {
                     inner.agg.reset();
                 }
 
-                Ok(vec![Arc::new(out.finish())])
-            }
-
-            fn fields(&self) -> Vec<Field> {
-                vec![Field::new(
-                    format!("{}_cond_agg", self.name),
-                    DataType::Boolean,
-                    false,
-                )]
-            }
-
-            fn schema(&self) -> SchemaRef {
-                Arc::new(Schema::new(self.fields()))
+                Ok(out.finish())
             }
         }
     };
@@ -303,12 +290,12 @@ mod tests {
     use store::test_util::parse_markdown_table_v1;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::boolean_op;
-    use crate::physical_plan::expressions::partitioned::boolean_op::Gt;
-    use crate::physical_plan::expressions::partitioned::cond_aggregate::Aggregate;
-    use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
-    use crate::physical_plan::expressions::partitioned::AggregateFunction;
-    use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
+    use crate::physical_plan::expressions::segmentation::boolean_op;
+    use crate::physical_plan::expressions::segmentation::boolean_op::Gt;
+    use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
+    use crate::physical_plan::expressions::segmentation::AggregateFunction;
+    use crate::physical_plan::expressions::segmentation::SegmentedAggregateExpr;
 
     #[test]
     fn test_int() {
@@ -362,7 +349,7 @@ mod tests {
             let spans = vec![7, 4, 3];
             let res = agg.evaluate(&res, spans, 0).unwrap();
             let right = BooleanArray::from(vec![false, false, true]);
-            assert_eq!(res, vec![Arc::new(right) as ArrayRef]);
+            assert_eq!(res, right);
         }
     }
 
@@ -419,7 +406,7 @@ mod tests {
             let spans = vec![7, 4, 3];
             let res = agg.evaluate(&res, spans, 0).unwrap();
             let right = BooleanArray::from(vec![false, false, true]);
-            assert_eq!(res, vec![Arc::new(right) as ArrayRef]);
+            assert_eq!(res, right);
         }
     }
 }

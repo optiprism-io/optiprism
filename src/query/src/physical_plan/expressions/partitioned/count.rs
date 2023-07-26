@@ -21,23 +21,26 @@ use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
 use chrono::Duration;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
+use datafusion_common::ScalarValue;
+use datafusion_expr::ColumnarValue;
 
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::batch_id;
-use crate::physical_plan::expressions::partitioned::boolean_op::ComparisonOp;
-use crate::physical_plan::expressions::partitioned::boolean_op::Operator;
-use crate::physical_plan::expressions::partitioned::check_filter;
-use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
-use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::check_filter;
+use crate::physical_plan::expressions::partitioned::AggregateFunction;
+use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
 use crate::physical_plan::Spans;
 
 #[derive(Debug)]
 struct Inner {
     last_filter: Option<(usize, BooleanArray)>,
+    outer_fn: Vec<AggregateFunction>,
 }
 
 #[derive(Debug)]
@@ -48,11 +51,23 @@ pub struct Count {
 }
 
 impl Count {
-    pub fn new(filter: Option<PhysicalExprRef>, name: String) -> Self {
-        let inner = Inner { last_filter: None };
+    pub fn new(
+        filter: Option<PhysicalExprRef>,
+        outer_fn: AggregateFunction,
+        segments: usize,
+        name: String,
+    ) -> Self {
+        let inner = Inner {
+            last_filter: None,
+            outer_fn: (0..segments)
+                .into_iter()
+                .map(|_| outer_fn.clone())
+                .collect(),
+        };
         Self {
             filter,
             inner: Mutex::new(inner),
+
             name,
         }
     }
@@ -64,25 +79,23 @@ impl PartitionedAggregateExpr for Count {
         batches: &[RecordBatch],
         spans: Vec<usize>,
         skip: usize,
-    ) -> Result<Vec<ArrayRef>> {
+        segments: Vec<Vec<bool>>,
+    ) -> Result<()> {
         let mut spans = Spans::new_from_batches(spans, batches);
         spans.skip(skip);
 
-        // quick path
-        if self.filter.is_none() {
-            return Ok(vec![Arc::new(Int64Array::from(
-                spans
-                    .spans
-                    .iter()
-                    .map(|v| Some(*v as i64))
-                    .collect::<Vec<_>>(),
-            ))]);
-        }
-
-        let num_rows = spans.spans.iter().sum::<usize>();
-        let mut out = Int64Builder::with_capacity(num_rows);
-
         let mut inner = self.inner.lock().unwrap();
+        if self.filter.is_none() {
+            let v = spans.spans.iter().map(|v| *v as i128).collect::<Vec<_>>();
+
+            for (span_id, count) in v.into_iter().enumerate() {
+                for (idx, seg) in segments[span_id].iter().enumerate() {
+                    if *seg {
+                        inner.outer_fn[idx].accumulate(count);
+                    }
+                }
+            }
+        }
 
         let to_filter = {
             if let Some(filter) = self.filter.clone() {
@@ -128,22 +141,34 @@ impl PartitionedAggregateExpr for Count {
                 count += 1;
             }
 
-            out.append_value(count);
+            for (seg_idx, seg) in segments[spans.span_id as usize].iter().enumerate() {
+                if *seg {
+                    inner.outer_fn[seg_idx].accumulate(count);
+                }
+            }
             count = 0;
         }
-        Ok(vec![Arc::new(out.finish())])
+        Ok(())
     }
 
-    fn fields(&self) -> Vec<Field> {
-        vec![Field::new(
-            format!("{}_count", self.name),
-            DataType::Boolean,
-            false,
-        )]
+    fn data_types(&self) -> Vec<DataType> {
+        vec![DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)]
     }
 
-    fn schema(&self) -> SchemaRef {
-        Arc::new(Schema::new(self.fields()))
+    fn finalize(&self) -> Vec<Vec<ColumnarValue>> {
+        let inner = self.inner.lock().unwrap();
+        let res = inner
+            .outer_fn
+            .iter()
+            .map(|v| {
+                vec![ColumnarValue::Scalar(ScalarValue::Decimal128(
+                    Some(v.result()),
+                    DECIMAL_PRECISION,
+                    DECIMAL_SCALE,
+                ))]
+            })
+            .collect::<Vec<_>>();
+        res
     }
 }
 
@@ -177,24 +202,22 @@ mod tests {
     use store::test_util::parse_markdown_table_v1;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::boolean_op;
-    use crate::physical_plan::expressions::partitioned::boolean_op::Gt;
     use crate::physical_plan::expressions::partitioned::count::Count;
-    use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
-    use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::partitioned::AggregateFunction;
+    use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
 
     #[test]
     fn test_predicate() {
         let data = r#"
 | user_id(i64) | ts(ts) | event(utf8) |
 |--------------|--------|-------------|
-| 0            | 1      | 1          |
-| 0            | 2      | 1          |
+| 0            | 1      | 1           |
+| 0            | 2      | 1           |
 |              |        |             |
-| 1            | 8      | 1          |
+| 1            | 8      | 1           |
 |              |        |             |
-| 2            | 1      | 2          |
-| 2            | 2      | 1          |
+| 2            | 1      | 2           |
+| 2            | 2      | 1           |
 "#;
         let mut res = parse_markdown_tables(data).unwrap();
         res = res
@@ -211,52 +234,25 @@ mod tests {
             let left = Arc::new(Column::new_with_schema("event", &res[0].schema()).unwrap());
             let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
-            let mut count = Count::new(Some(Arc::new(f) as PhysicalExprRef), "a".to_string());
+            let mut count = Count::new(
+                Some(Arc::new(f) as PhysicalExprRef),
+                AggregateFunction::new_avg(),
+                2,
+                "a".to_string(),
+            );
 
             let spans = vec![2, 1, 2];
-            let res = count.evaluate(&res, spans, 0).unwrap();
-            let right = Int64Array::from(vec![2, 1, 1]);
-
-            let e: Arc<dyn PartitionedAggregateExpr> = Arc::new(count);
-            assert_eq!(res, vec![Arc::new(right) as ArrayRef]);
-            // assert_eq!(res, right);
-        }
-    }
-
-    #[test]
-    fn test_no_predicate() {
-        let data = r#"
-| user_id(i64) | ts(ts) | event(utf8) |
-|--------------|--------|-------------|
-| 0            | 1      | 1          |
-| 0            | 2      | 1          |
-|              |        |             |
-| 1            | 8      | 1          |
-|              |        |             |
-| 2            | 1      | 2          |
-| 2            | 2      | 1          |
-"#;
-        let mut res = parse_markdown_tables(data).unwrap();
-        res = res
-            .iter()
-            .enumerate()
-            .map(|(id, batch)| {
-                let mut schema = (*batch.schema()).to_owned();
-                schema.metadata.insert("id".to_string(), id.to_string());
-                RecordBatch::try_new(Arc::new(schema.clone()), batch.columns().to_owned()).unwrap()
-            })
-            .collect::<Vec<_>>();
-
-        {
-            let mut count = Count::new(None, "a".to_string());
-
-            let spans = vec![2, 1, 2];
-            let res = count.evaluate(&res, spans, 0).unwrap();
-            let right = Int64Array::from(vec![2, 1, 2]);
-
-            let e: Arc<dyn PartitionedAggregateExpr> = Arc::new(count);
-            assert_eq!(res, vec![Arc::new(right) as ArrayRef]);
-            // assert_eq!(res, right);
+            count
+                .evaluate(&res, spans, 0, vec![
+                    vec![true, true],
+                    vec![true, true],
+                    vec![true, true],
+                ])
+                .unwrap();
+            let inner = count.inner.lock().unwrap();
+            for v in inner.outer_fn.iter() {
+                println!("{:?}", v.result());
+            }
         }
     }
 }

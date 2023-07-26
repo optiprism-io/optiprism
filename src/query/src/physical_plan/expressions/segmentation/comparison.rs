@@ -12,12 +12,14 @@ use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 use datafusion_common::ScalarValue;
 
-use crate::physical_plan::expressions::partitioned::SegmentationExpr;
+use crate::physical_plan::expressions::segmentation::SegmentedAggregateExpr;
+
 #[derive(Debug)]
 struct AndInner {
-    left: Arc<dyn SegmentationExpr>,
-    right: Arc<dyn SegmentationExpr>,
+    left: Arc<dyn SegmentedAggregateExpr>,
+    right: Arc<dyn SegmentedAggregateExpr>,
 }
+
 #[derive(Debug)]
 pub struct And {
     inner: Arc<Mutex<AndInner>>,

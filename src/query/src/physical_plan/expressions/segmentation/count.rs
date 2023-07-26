@@ -27,11 +27,11 @@ use datafusion::physical_expr::PhysicalExprRef;
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::batch_id;
-use crate::physical_plan::expressions::partitioned::boolean_op::ComparisonOp;
-use crate::physical_plan::expressions::partitioned::boolean_op::Operator;
-use crate::physical_plan::expressions::partitioned::check_filter;
-use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
-use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::check_filter;
+use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
+use crate::physical_plan::expressions::segmentation::boolean_op::Operator;
+use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
+use crate::physical_plan::expressions::segmentation::SegmentedAggregateExpr;
 use crate::physical_plan::Spans;
 
 #[derive(Debug)]
@@ -80,7 +80,7 @@ impl<Op> Count<Op> {
     }
 }
 
-impl<Op> PartitionedAggregateExpr for Count<Op>
+impl<Op> SegmentedAggregateExpr for Count<Op>
 where Op: ComparisonOp<i64>
 {
     fn evaluate(
@@ -88,7 +88,7 @@ where Op: ComparisonOp<i64>
         batches: &[RecordBatch],
         spans: Vec<usize>,
         skip: usize,
-    ) -> Result<Vec<ArrayRef>> {
+    ) -> Result<BooleanArray> {
         let mut spans = Spans::new_from_batches(spans, batches);
         spans.skip(skip);
 
@@ -177,19 +177,7 @@ where Op: ComparisonOp<i64>
                 out.append_value(true);
             }
         }
-        Ok(vec![Arc::new(out.finish())])
-    }
-
-    fn fields(&self) -> Vec<Field> {
-        vec![Field::new(
-            format!("{}_cond_count", self.name),
-            DataType::Boolean,
-            false,
-        )]
-    }
-
-    fn schema(&self) -> SchemaRef {
-        Arc::new(Schema::new(self.fields()))
+        Ok(out.finish())
     }
 }
 
@@ -223,12 +211,11 @@ mod tests {
     use store::test_util::parse_markdown_table_v1;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::boolean_op;
-    use crate::physical_plan::expressions::partitioned::boolean_op::Gt;
-    use crate::physical_plan::expressions::partitioned::cond_count::Count;
-    use crate::physical_plan::expressions::partitioned::cond_count::PartitionedAggregateExpr;
-    use crate::physical_plan::expressions::partitioned::cond_count::Spans;
-    use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
+    use crate::physical_plan::expressions::segmentation::boolean_op;
+    use crate::physical_plan::expressions::segmentation::count::Count;
+    use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
+    use crate::physical_plan::expressions::segmentation::SegmentedAggregateExpr;
+    use crate::physical_plan::Spans;
 
     #[test]
     fn test_spans() {
@@ -297,7 +284,7 @@ mod tests {
             let res = count.evaluate(&res, spans, 0).unwrap();
             let right = BooleanArray::from(vec![true, false]);
 
-            let e: Arc<dyn PartitionedAggregateExpr> = Arc::new(count);
+            let e: Arc<dyn SegmentedAggregateExpr> = Arc::new(count);
             println!("{:?}", res);
             // assert_eq!(res, Some(right));
             // assert_eq!(res, right);
@@ -338,7 +325,7 @@ mod tests {
             let res = count.evaluate(&res, spans, 0).unwrap();
             let right = BooleanArray::from(vec![true, false]);
 
-            let e: Arc<dyn PartitionedAggregateExpr> = Arc::new(count);
+            let e: Arc<dyn SegmentedAggregateExpr> = Arc::new(count);
             println!("{:?}", res);
             // assert_eq!(res, Some(right));
             // assert_eq!(res, right);

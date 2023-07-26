@@ -47,7 +47,7 @@ use crate::physical_plan::expressions::partitioned::funnel::FunnelResult;
 use crate::physical_plan::expressions::partitioned::funnel::Span;
 use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
 use crate::physical_plan::expressions::partitioned::funnel::Touch;
-use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
 use crate::StaticArray;
 
 #[derive(Clone, Debug)]

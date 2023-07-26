@@ -50,7 +50,6 @@ use futures::StreamExt;
 use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
-use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::partitioned_aggregate::SegmentExpr;
 use crate::physical_plan::PartitionState;
 
@@ -353,19 +352,15 @@ mod tests {
 
     use crate::event_eq;
     use crate::physical_plan::expressions::partitioned::aggregate;
-    use crate::physical_plan::expressions::partitioned::boolean_op;
-    use crate::physical_plan::expressions::partitioned::cond_aggregate::Aggregate;
-    use crate::physical_plan::expressions::partitioned::cond_count::Count;
+    use crate::physical_plan::expressions::partitioned::aggregate::Aggregate;
     use crate::physical_plan::expressions::partitioned::funnel::funnel;
     use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExpr;
     use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExprWrap;
     use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
     use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
     use crate::physical_plan::expressions::partitioned::funnel::Touch;
-    use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
     use crate::physical_plan::expressions::partitioned::AggregateFunction;
     use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExec;
-    use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
     use crate::physical_plan::partitioned_aggregate::SegmentExprWrap;
     use crate::physical_plan::segmented_aggregate::SegmentedAggregateExpr;
     use crate::physical_plan::PartitionState;

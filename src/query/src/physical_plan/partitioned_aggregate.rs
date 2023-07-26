@@ -47,17 +47,6 @@ use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::PartitionState;
 
-pub trait PartitionedAggregateExpr: Send + Sync {
-    fn evaluate(
-        &self,
-        batches: &[RecordBatch],
-        spans: Vec<usize>,
-        skip: usize,
-    ) -> Result<Vec<ArrayRef>>;
-    fn fields(&self) -> Vec<Field>;
-    fn schema(&self) -> SchemaRef;
-}
-
 pub trait SegmentExpr: Send + Sync {
     fn evaluate(
         &self,
@@ -364,17 +353,13 @@ mod tests {
     use store::test_util::parse_markdown_tables;
 
     use crate::event_eq;
-    use crate::physical_plan::expressions::partitioned::boolean_op;
-    use crate::physical_plan::expressions::partitioned::cond_count::Count;
     use crate::physical_plan::expressions::partitioned::funnel::funnel;
     use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExpr;
     use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExprWrap;
     use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
     use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
     use crate::physical_plan::expressions::partitioned::funnel::Touch;
-    use crate::physical_plan::expressions::partitioned::time_range::TimeRange;
     use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExec;
-    use crate::physical_plan::partitioned_aggregate::PartitionedAggregateExpr;
     use crate::physical_plan::PartitionState;
 
     #[tokio::test]
