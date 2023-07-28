@@ -20,6 +20,7 @@ use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
+use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::hash_utils::create_hashes;
@@ -38,43 +39,39 @@ use futures::Stream;
 use futures::StreamExt;
 
 use crate::error::QueryError;
+use crate::physical_plan::expressions::segmentation::SegmentExpr;
 use crate::Result;
 
-pub struct PartitionExec {
+pub struct SegmentExec {
     input: Arc<dyn ExecutionPlan>,
-    partition_expr: Vec<Arc<dyn PhysicalExpr>>,
-    partition_col_name: String,
+    expr: Arc<dyn SegmentExpr>,
     schema: SchemaRef,
     metrics: ExecutionPlanMetricsSet,
 }
 
-impl PartitionExec {
-    pub fn try_new(
-        input: Arc<dyn ExecutionPlan>,
-        partition_expr: Vec<Arc<dyn PhysicalExpr>>,
-        partition_col_name: String,
-    ) -> Result<Self> {
-        let field = Field::new(partition_col_name.clone(), DataType::UInt64, false);
+impl SegmentExec {
+    pub fn try_new(input: Arc<dyn ExecutionPlan>, partition_col: Column) -> Result<Self> {
+        let field = Field::new("hash", DataType::UInt64, false);
         let mut schema = (*input.schema()).clone();
         schema.fields = vec![vec![field], schema.fields].concat();
         Ok(Self {
             input,
             partition_expr,
-            partition_col_name,
             schema: Arc::new(schema),
             metrics: ExecutionPlanMetricsSet::new(),
+            expr: Arc::new(()),
         })
     }
 }
 
-impl Debug for PartitionExec {
+impl Debug for SegmentExec {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "PartitionExec")
     }
 }
 
 #[async_trait]
-impl ExecutionPlan for PartitionExec {
+impl ExecutionPlan for SegmentExec {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -100,12 +97,8 @@ impl ExecutionPlan for PartitionExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
-            PartitionExec::try_new(
-                children[0].clone(),
-                self.partition_expr.clone(),
-                self.partition_col_name.clone(),
-            )
-            .map_err(QueryError::into_datafusion_execution_error)?,
+            SegmentExec::try_new(children[0].clone(), self.partition_expr.clone())
+                .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -255,7 +248,7 @@ mod tests {
                 Arc::new(Column::new_with_schema("user_id", &schema)?),
                 Arc::new(Column::new_with_schema("device", &schema)?),
             ],
-            "hash".to_string(),
+            "hash123".to_string(),
         )?;
 
         let session_ctx = SessionContext::new();

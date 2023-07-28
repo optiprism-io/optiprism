@@ -44,7 +44,7 @@ impl SegmentationExpr for And {
         match (left, right) {
             (Some(left), Some(right)) => {
                 let left = left
-                    .as_any()
+                    .as_any()`
                     .downcast_ref::<BooleanArray>()
                     .unwrap()
                     .clone();

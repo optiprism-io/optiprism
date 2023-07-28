@@ -1,4 +1,5 @@
 use arrow::array::BooleanArray;
+use arrow::array::Int64Array;
 use arrow::record_batch::RecordBatch;
 use num_traits::Bounded;
 use num_traits::Num;
@@ -10,7 +11,17 @@ mod aggregate;
 mod boolean_op;
 // mod comparison;
 mod count;
+mod count_pull;
 mod time_range;
+
+pub trait SegmentPullExpr<'a> {
+    fn evaluate(
+        &self,
+        batch: &RecordBatch,
+        partitions: impl IntoIterator<Item = &'a i64>,
+    ) -> Result<Option<Int64Array>>;
+    fn finalize(&self) -> Result<Int64Array>;
+}
 
 pub trait SegmentExpr {
     fn evaluate(
