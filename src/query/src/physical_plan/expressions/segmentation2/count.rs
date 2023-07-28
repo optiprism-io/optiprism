@@ -12,6 +12,7 @@ use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::PrimitiveArray;
 use arrow::array::TimestampMillisecondArray;
+use arrow::buffer::ScalarBuffer;
 use arrow::compute::filter;
 use arrow::compute::filter_record_batch;
 use arrow::datatypes::DataType;
@@ -29,11 +30,10 @@ use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::batch_id;
 use crate::physical_plan::expressions::check_filter;
-use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
-use crate::physical_plan::expressions::segmentation::boolean_op::Operator;
-use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-use crate::physical_plan::expressions::segmentation::SegmentExpr;
-use crate::physical_plan::expressions::segmentation::SegmentPullExpr;
+use crate::physical_plan::expressions::segmentation2::boolean_op::ComparisonOp;
+use crate::physical_plan::expressions::segmentation2::boolean_op::Operator;
+use crate::physical_plan::expressions::segmentation2::time_range::TimeRange;
+use crate::physical_plan::expressions::segmentation2::SegmentExpr;
 use crate::physical_plan::Spans;
 
 #[derive(Debug)]
@@ -86,13 +86,13 @@ impl<Op> Count<Op> {
     }
 }
 
-impl<'a, Op> SegmentPullExpr<'a> for Count<Op>
+impl<'a, Op> SegmentExpr<'a> for Count<Op>
 where Op: ComparisonOp<i64>
 {
     fn evaluate(
         &self,
         batch: &RecordBatch,
-        partitions: impl IntoIterator<Item = &'a i64>,
+        partitions: &ScalarBuffer<i64>,
     ) -> Result<Option<Int64Array>> {
         let ts = self
             .ts_col
@@ -191,10 +191,10 @@ mod tests {
     use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::segmentation::boolean_op;
-    use crate::physical_plan::expressions::segmentation::count_pull::Count;
-    use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-    use crate::physical_plan::expressions::segmentation::SegmentPullExpr;
+    use crate::physical_plan::expressions::segmentation2::boolean_op;
+    use crate::physical_plan::expressions::segmentation2::count::Count;
+    use crate::physical_plan::expressions::segmentation2::time_range::TimeRange;
+    use crate::physical_plan::expressions::segmentation2::SegmentExpr;
 
     #[test]
     fn it_works() {
