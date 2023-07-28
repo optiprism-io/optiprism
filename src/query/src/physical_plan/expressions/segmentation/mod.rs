@@ -12,7 +12,7 @@ mod boolean_op;
 mod count;
 mod time_range;
 
-trait SegmentedAggregateExpr {
+pub trait SegmentExpr {
     fn evaluate(
         &self,
         batches: &[RecordBatch],

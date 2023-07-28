@@ -11,6 +11,7 @@ use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::BooleanBuilder;
@@ -179,7 +180,7 @@ impl Buckets for DateTimeBuckets {
         self.ts.clone()
     }
 
-    fn finalize(&self) -> Vec<ColumnarValue> {
+    fn finalize(&self) -> Vec<ArrayRef> {
         let arr_len = self.buckets().len();
         let steps = self.steps_count;
         let ts = TimestampMillisecondArray::from(self.buckets());
@@ -209,25 +210,25 @@ impl Buckets for DateTimeBuckets {
             }
         }
 
-        let arrs: Vec<ColumnarValue> = vec![
-            ColumnarValue::Array(Arc::new(ts)),
-            ColumnarValue::Array(Arc::new(total.finish())),
-            ColumnarValue::Array(Arc::new(completed.finish())),
+        let arrs: Vec<ArrayRef> = vec![
+            Arc::new(ts),
+            Arc::new(total.finish()),
+            Arc::new(completed.finish()),
         ];
 
         let step_total = step_total
             .iter_mut()
-            .map(|v| ColumnarValue::Array(Arc::new(v.finish())))
+            .map(|v| Arc::new(v.finish()) as ArrayRef)
             .collect::<Vec<_>>();
 
         let step_time_to_convert = step_time_to_convert
             .iter_mut()
-            .map(|v| ColumnarValue::Array(Arc::new(v.finish())))
+            .map(|v| Arc::new(v.finish()) as ArrayRef)
             .collect::<Vec<_>>();
 
         let step_time_to_convert_from_start = step_time_to_convert_from_start
             .iter_mut()
-            .map(|v| ColumnarValue::Array(Arc::new(v.finish())))
+            .map(|v| Arc::new(v.finish()) as ArrayRef)
             .collect::<Vec<_>>();
 
         [
@@ -243,7 +244,7 @@ impl Buckets for DateTimeBuckets {
 trait Buckets: Debug + Send + Sync {
     fn push(&mut self, results: Vec<FunnelResult>);
     fn buckets(&self) -> Vec<i64>;
-    fn finalize(&self) -> Vec<ColumnarValue>;
+    fn finalize(&self) -> Vec<ArrayRef>;
 }
 
 #[derive(Debug)]
@@ -490,7 +491,20 @@ impl PartitionedAggregateExpr for FunnelTrend {
 
     fn finalize(&self) -> Vec<Vec<ColumnarValue>> {
         let buckets = self.buckets.lock().unwrap();
-        let ret = buckets.iter().map(|v| v.finalize()).collect::<Vec<_>>();
+        let ret = buckets
+            .iter()
+            .enumerate()
+            .map(|(seg_idx, v)| {
+                let mut cols = v.finalize();
+                let seg_col =
+                    ScalarValue::Int64(Some(seg_idx as i64)).to_array_of_size(cols[0].len());
+                cols = vec![vec![seg_col], cols].concat();
+
+                cols.iter()
+                    .map(|col| ColumnarValue::Array(col.clone()))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
 
         ret
     }

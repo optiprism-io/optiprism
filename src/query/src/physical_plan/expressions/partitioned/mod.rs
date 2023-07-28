@@ -40,7 +40,7 @@ use num_traits::Zero;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-trait PartitionedAggregateExpr {
+pub trait PartitionedAggregateExpr {
     fn evaluate(
         &self,
         batches: &[RecordBatch],
@@ -48,6 +48,14 @@ trait PartitionedAggregateExpr {
         skip: usize,
         segments: Vec<Vec<bool>>,
     ) -> Result<()>;
+    fn data_types(&self) -> Vec<DataType>;
+
+    fn finalize(&self) -> Vec<Vec<ColumnarValue>>;
+}
+
+pub trait PartitionedAggregatePullExpr {
+    fn evaluate(&self, batch: &RecordBatch, hashes: &[u64], segments: Vec<Vec<bool>>)
+    -> Result<()>;
     fn data_types(&self) -> Vec<DataType>;
 
     fn finalize(&self) -> Vec<Vec<ColumnarValue>>;

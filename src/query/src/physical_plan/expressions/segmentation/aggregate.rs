@@ -51,7 +51,7 @@ use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
 use crate::physical_plan::expressions::segmentation::AggregateFunction;
-use crate::physical_plan::expressions::segmentation::SegmentedAggregateExpr;
+use crate::physical_plan::expressions::segmentation::SegmentExpr;
 use crate::physical_plan::Spans;
 
 #[derive(Debug)]
@@ -118,7 +118,7 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 
 macro_rules! agg {
     ($ty:ty,$array_ty:ident,$acc_ty:ty) => {
-        impl<Op> SegmentedAggregateExpr for Aggregate<$ty, $acc_ty, Op>
+        impl<Op> SegmentExpr for Aggregate<$ty, $acc_ty, Op>
         where Op: ComparisonOp<$acc_ty>
         {
             fn evaluate(
@@ -295,7 +295,7 @@ mod tests {
     use crate::physical_plan::expressions::segmentation::boolean_op::Gt;
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
     use crate::physical_plan::expressions::segmentation::AggregateFunction;
-    use crate::physical_plan::expressions::segmentation::SegmentedAggregateExpr;
+    use crate::physical_plan::expressions::segmentation::SegmentExpr;
 
     #[test]
     fn test_int() {

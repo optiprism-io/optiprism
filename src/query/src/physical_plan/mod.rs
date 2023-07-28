@@ -17,6 +17,7 @@ pub mod planner;
 // mod partitioned_aggregate;
 // mod partitioned_aggregate;
 // mod segmented_aggregate;
+mod partition;
 mod unpivot;
 // pub mod merge;
 // pub mod planner;

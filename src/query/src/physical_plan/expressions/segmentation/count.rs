@@ -31,7 +31,7 @@ use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
 use crate::physical_plan::expressions::segmentation::boolean_op::Operator;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-use crate::physical_plan::expressions::segmentation::SegmentedAggregateExpr;
+use crate::physical_plan::expressions::segmentation::SegmentExpr;
 use crate::physical_plan::Spans;
 
 #[derive(Debug)]
@@ -80,7 +80,7 @@ impl<Op> Count<Op> {
     }
 }
 
-impl<Op> SegmentedAggregateExpr for Count<Op>
+impl<Op> SegmentExpr for Count<Op>
 where Op: ComparisonOp<i64>
 {
     fn evaluate(
@@ -214,7 +214,7 @@ mod tests {
     use crate::physical_plan::expressions::segmentation::boolean_op;
     use crate::physical_plan::expressions::segmentation::count::Count;
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-    use crate::physical_plan::expressions::segmentation::SegmentedAggregateExpr;
+    use crate::physical_plan::expressions::segmentation::SegmentExpr;
     use crate::physical_plan::Spans;
 
     #[test]
@@ -284,7 +284,7 @@ mod tests {
             let res = count.evaluate(&res, spans, 0).unwrap();
             let right = BooleanArray::from(vec![true, false]);
 
-            let e: Arc<dyn SegmentedAggregateExpr> = Arc::new(count);
+            let e: Arc<dyn SegmentExpr> = Arc::new(count);
             println!("{:?}", res);
             // assert_eq!(res, Some(right));
             // assert_eq!(res, right);
@@ -325,7 +325,7 @@ mod tests {
             let res = count.evaluate(&res, spans, 0).unwrap();
             let right = BooleanArray::from(vec![true, false]);
 
-            let e: Arc<dyn SegmentedAggregateExpr> = Arc::new(count);
+            let e: Arc<dyn SegmentExpr> = Arc::new(count);
             println!("{:?}", res);
             // assert_eq!(res, Some(right));
             // assert_eq!(res, right);
