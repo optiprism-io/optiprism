@@ -9,8 +9,11 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
+use arrow::array::Array;
 use arrow::array::ArrayRef;
+use arrow::array::Int64Array;
 use arrow::array::UInt64Array;
+use arrow::compute::concat;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
@@ -39,7 +42,7 @@ use futures::Stream;
 use futures::StreamExt;
 
 use crate::error::QueryError;
-use crate::physical_plan::expressions::segmentation::SegmentExpr;
+use crate::physical_plan::expressions::segmentation2::SegmentExpr;
 use crate::Result;
 
 pub struct SegmentExec {
@@ -47,26 +50,33 @@ pub struct SegmentExec {
     expr: Arc<dyn SegmentExpr>,
     schema: SchemaRef,
     metrics: ExecutionPlanMetricsSet,
+    partition_col: Column,
+    out_buffer_size: usize,
 }
 
 impl SegmentExec {
-    pub fn try_new(input: Arc<dyn ExecutionPlan>, partition_col: Column) -> Result<Self> {
-        let field = Field::new("hash", DataType::UInt64, false);
-        let mut schema = (*input.schema()).clone();
-        schema.fields = vec![vec![field], schema.fields].concat();
+    pub fn try_new(
+        input: Arc<dyn ExecutionPlan>,
+        expr: Arc<dyn SegmentExpr>,
+        partition_col: Column,
+        out_buffer_size: usize,
+    ) -> Result<Self> {
+        let field = Field::new("partition", DataType::Int64, true);
+        let schema = Schema::new(vec![field]);
         Ok(Self {
             input,
-            partition_expr,
             schema: Arc::new(schema),
             metrics: ExecutionPlanMetricsSet::new(),
-            expr: Arc::new(()),
+            expr,
+            partition_col,
+            out_buffer_size,
         })
     }
 }
 
 impl Debug for SegmentExec {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PartitionExec")
+        write!(f, "SegmentExec")
     }
 }
 
@@ -97,8 +107,13 @@ impl ExecutionPlan for SegmentExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
-            SegmentExec::try_new(children[0].clone(), self.partition_expr.clone())
-                .map_err(QueryError::into_datafusion_execution_error)?,
+            SegmentExec::try_new(
+                children[0].clone(),
+                self.expr.clone(),
+                self.partition_col.clone(),
+                self.out_buffer_size,
+            )
+            .map_err(QueryError::into_datafusion_execution_error)?,
         ))
     }
 
@@ -110,12 +125,15 @@ impl ExecutionPlan for SegmentExec {
         let stream = self.input.execute(partition, context.clone())?;
 
         let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
-        Ok(Box::pin(PartitionStream {
-            hash_buffer: vec![],
+        Ok(Box::pin(SegmentStream {
             stream,
+            partition_col: self.partition_col.clone(),
+            expr: self.expr.clone(),
+            out_buf: Vec::with_capacity(10),
+            out_buffer_size: self.out_buffer_size,
             schema: self.schema.clone(),
+            is_ended: false,
             baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
-            partition_expr: self.partition_expr.clone(),
         }))
     }
 
@@ -132,56 +150,99 @@ impl ExecutionPlan for SegmentExec {
     }
 }
 
-struct PartitionStream {
-    hash_buffer: Vec<u64>,
+struct SegmentStream {
     stream: SendableRecordBatchStream,
-    partition_expr: Vec<Arc<dyn PhysicalExpr>>,
+    partition_col: Column,
+    expr: Arc<dyn SegmentExpr>,
+    out_buf: Vec<Int64Array>,
+    out_buffer_size: usize,
     schema: SchemaRef,
+    is_ended: bool,
     baseline_metrics: BaselineMetrics,
 }
 
-impl RecordBatchStream for PartitionStream {
+impl RecordBatchStream for SegmentStream {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
 }
 
 #[async_trait]
-impl Stream for PartitionStream {
+impl Stream for SegmentStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.is_ended {
+            return Poll::Ready(None);
+        }
+
         let cloned_time = self.baseline_metrics.elapsed_compute().clone();
         let _timer = cloned_time.timer();
-        let random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
-        let poll = match self.stream.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok(batch))) => {
-                let arrs = self
-                    .partition_expr
-                    .iter()
-                    .map(|expr| Ok(expr.evaluate(&batch)?.into_array(batch.num_rows())))
-                    .collect::<DFResult<Vec<_>>>()?;
+        loop {
+            let res = match self.stream.poll_next_unpin(cx) {
+                Poll::Ready(Some(Ok(batch))) => {
+                    let partition = self
+                        .partition_col
+                        .evaluate(&batch)?
+                        .into_array(batch.num_rows())
+                        .as_any()
+                        .downcast_ref::<Int64Array>()
+                        .unwrap()
+                        .clone();
 
-                self.hash_buffer.clear();
-                self.hash_buffer.resize(batch.num_rows(), 0);
-                create_hashes(&arrs, &random_state, &mut self.hash_buffer)?;
-                let hash_arr = UInt64Array::from(self.hash_buffer.clone());
+                    let vals = partition.values();
+                    let res = self
+                        .expr
+                        .evaluate(&batch, vals)
+                        .map_err(|e| e.into_datafusion_execution_error())?;
+                    res
+                }
+                Poll::Ready(None) => {
+                    self.is_ended = true;
+                    let res = self
+                        .expr
+                        .finalize()
+                        .map_err(|e| e.into_datafusion_execution_error())?;
 
-                let result = RecordBatch::try_new(
-                    self.schema.clone(),
-                    vec![
-                        vec![Arc::new(hash_arr) as ArrayRef],
-                        batch.columns().to_owned(),
-                    ]
-                    .concat(),
-                )?;
-                Poll::Ready(Some(Ok(result)))
+                    Some(res)
+                }
+                other => return other,
+            };
+
+            if res.is_none() {
+                continue;
+            }
+            let v = res
+                .unwrap()
+                .iter()
+                .filter(|v| v.is_some())
+                .collect::<Vec<_>>();
+            if v.len() > 0 {
+                let arr = Int64Array::from(v);
+                self.out_buf.push(arr);
             }
 
-            other => other,
-        };
+            if self.out_buf.iter().map(|arr| arr.len()).sum::<usize>() <= self.out_buffer_size
+                && !self.is_ended
+            {
+                continue;
+            }
+            let arrs = self
+                .out_buf
+                .drain(..)
+                .map(|v| Arc::new(v) as ArrayRef)
+                .collect::<Vec<_>>();
 
-        self.baseline_metrics.record_poll(poll)
+            if arrs.is_empty() {
+                return Poll::Ready(None);
+            }
+            let arrs = arrs.iter().map(|a| a.as_ref()).collect::<Vec<_>>();
+            let arr = Arc::new(concat(arrs.as_slice())?);
+            let result = RecordBatch::try_new(self.schema.clone(), vec![arr])?;
+
+            return Poll::Ready(Some(Ok(result)));
+        }
+        unreachable!()
     }
 }
 
@@ -196,15 +257,24 @@ mod tests {
     use arrow::array::StringArray;
     use arrow::record_batch::RecordBatch;
     use arrow::util::pretty::print_batches;
+    use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
+    use datafusion::physical_expr::expressions::Literal;
+    use datafusion::physical_expr::PhysicalExprRef;
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
     pub use datafusion_common::Result;
+    use datafusion_common::ScalarValue;
+    use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;
 
+    use crate::physical_plan::expressions::segmentation2::boolean_op;
+    use crate::physical_plan::expressions::segmentation2::count::Count;
+    use crate::physical_plan::expressions::segmentation2::time_range::TimeRange;
     use crate::physical_plan::partition::PartitionExec;
+    use crate::physical_plan::segment::SegmentExec;
 
     #[tokio::test]
     async fn test() -> anyhow::Result<()> {
@@ -212,7 +282,7 @@ mod tests {
 | user_id(i64) | device(utf8) | v(i64) | ts(ts) | event(utf8) |
 |--------------|--------------|-------|--------|-------------|
 | 0            | iphone       | 1     | 1      | e1          |
-| 0            | iphone       | 0     | 2      | e2          |
+| 0            | iphone       | 0     | 2      | e1          |
 | 0            | iphone       | 0     | 3      | e3          |
 | 0            | android      | 1     | 4      | e1          |
 | 0            | android      | 1     | 5      | e2          |
@@ -221,34 +291,47 @@ mod tests {
 | 1            | osx          | 1     | 2      | e2          |
 | 1            | osx          | 0     | 3      | e3          |
 | 1            | osx          | 0     | 4      | e1          |
+||||||
 | 1            | osx          | 0     | 5      | e2          |
 | 1            | osx          | 0     | 6      | e3          |
 | 2            | osx          | 1     | 1      | e1          |
 | 2            | osx          | 1     | 2      | e2          |
 | 2            | osx          | 0     | 3      | e3          |
 | 2            | osx          | 0     | 4      | e1          |
-| 2            | osx          | 0     | 5      | e2          |
+| 2            | osx          | 0     | 5      | e1          |
 | 2            | osx          | 0     | 6      | e3          |
 | 3            | osx          | 1     | 1      | e1          |
+||||||
 | 3            | osx          | 1     | 2      | e2          |
 | 3            | osx          | 0     | 3      | e3          |
 | 3            | osx          | 0     | 4      | e1          |
 | 3            | osx          | 0     | 5      | e2          |
 | 3            | osx          | 0     | 6      | e3          |
-| 4            | osx          | 0     | 6      | e3          |
+||||||
+| 4            | osx          | 0     | 6      | e1          |
 "#;
 
         let batches = parse_markdown_tables(data).unwrap();
         let schema = batches[0].schema();
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
-        let seg = PartitionExec::try_new(
+        let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
+        let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
+        let f = BinaryExpr::new(left, Operator::Eq, right);
+        let count = Count::<boolean_op::Gt>::new(
+            Arc::new(f) as PhysicalExprRef,
+            Column::new_with_schema("ts", &schema).unwrap(),
+            2,
+            TimeRange::None,
+            None,
+            1,
+        );
+
+        let seg = SegmentExec::try_new(
             Arc::new(input),
-            vec![
-                Arc::new(Column::new_with_schema("user_id", &schema)?),
-                Arc::new(Column::new_with_schema("device", &schema)?),
-            ],
-            "hash123".to_string(),
+            Arc::new(count),
+            Column::new_with_schema("user_id", &schema).unwrap(),
+            1,
         )?;
 
         let session_ctx = SessionContext::new();

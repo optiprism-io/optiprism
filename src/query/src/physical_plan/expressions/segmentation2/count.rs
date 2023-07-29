@@ -86,7 +86,7 @@ impl<Op> Count<Op> {
     }
 }
 
-impl<'a, Op> SegmentExpr<'a> for Count<Op>
+impl<'a, Op> SegmentExpr for Count<Op>
 where Op: ComparisonOp<i64>
 {
     fn evaluate(

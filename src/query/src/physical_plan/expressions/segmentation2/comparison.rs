@@ -10,17 +10,17 @@ use arrow::record_batch::RecordBatch;
 use crate::error::Result;
 use crate::physical_plan::expressions::segmentation2::SegmentExpr;
 
-struct AndInner<'a> {
-    left: Arc<dyn SegmentExpr<'a>>,
-    right: Arc<dyn SegmentExpr<'a>>,
+struct AndInner {
+    left: Arc<dyn SegmentExpr>,
+    right: Arc<dyn SegmentExpr>,
 }
 
-pub struct And<'a> {
-    inner: Arc<Mutex<AndInner<'a>>>,
+pub struct And {
+    inner: Arc<Mutex<AndInner>>,
 }
 
-impl<'a> And<'a> {
-    pub fn new(left: Arc<dyn SegmentExpr<'a>>, right: Arc<dyn SegmentExpr<'a>>) -> Self {
+impl And {
+    pub fn new(left: Arc<dyn SegmentExpr>, right: Arc<dyn SegmentExpr>) -> Self {
         let inner = Arc::new(Mutex::new(AndInner { left, right }));
         Self { inner }
     }
@@ -46,7 +46,7 @@ impl<'a> And<'a> {
     }
 }
 
-impl<'a> SegmentExpr<'a> for And<'a> {
+impl SegmentExpr for And {
     fn evaluate(
         &self,
         batch: &RecordBatch,
@@ -64,17 +64,17 @@ impl<'a> SegmentExpr<'a> for And<'a> {
     }
 }
 
-struct OrInner<'a> {
-    left: Arc<dyn SegmentExpr<'a>>,
-    right: Arc<dyn SegmentExpr<'a>>,
+struct OrInner {
+    left: Arc<dyn SegmentExpr>,
+    right: Arc<dyn SegmentExpr>,
 }
 
-pub struct Or<'a> {
-    inner: Arc<Mutex<AndInner<'a>>>,
+pub struct Or {
+    inner: Arc<Mutex<AndInner>>,
 }
 
-impl<'a> Or<'a> {
-    pub fn new(left: Arc<dyn SegmentExpr<'a>>, right: Arc<dyn SegmentExpr<'a>>) -> Self {
+impl Or {
+    pub fn new(left: Arc<dyn SegmentExpr>, right: Arc<dyn SegmentExpr>) -> Self {
         let inner = Arc::new(Mutex::new(AndInner { left, right }));
         Self { inner }
     }
@@ -100,7 +100,7 @@ impl<'a> Or<'a> {
     }
 }
 
-impl<'a> SegmentExpr<'a> for Or<'a> {
+impl SegmentExpr for Or {
     fn evaluate(
         &self,
         batch: &RecordBatch,
@@ -145,7 +145,7 @@ mod tests {
         }
     }
 
-    impl<'a> SegmentExpr<'a> for Test {
+    impl SegmentExpr for Test {
         fn evaluate(
             &self,
             batch: &RecordBatch,

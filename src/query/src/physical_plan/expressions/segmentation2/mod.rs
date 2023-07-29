@@ -1,7 +1,7 @@
-mod boolean_op;
-mod comparison;
-mod count;
-mod time_range;
+pub mod boolean_op;
+pub mod comparison;
+pub mod count;
+pub mod time_range;
 
 use arrow::array::Int64Array;
 use arrow::buffer::ScalarBuffer;
@@ -9,7 +9,7 @@ use arrow::record_batch::RecordBatch;
 
 use crate::error::Result;
 
-pub trait SegmentExpr<'a> {
+pub trait SegmentExpr: Send + Sync {
     fn evaluate(
         &self,
         batch: &RecordBatch,
