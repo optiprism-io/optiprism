@@ -9,6 +9,7 @@ use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::TimestampMillisecondArray;
+use arrow::buffer::ScalarBuffer;
 use arrow::datatypes::DataType;
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_expr::PhysicalExpr;
@@ -24,11 +25,9 @@ use crate::Column;
 // pub mod aggregator;
 // pub mod comparison;
 // pub mod count;
-pub mod count;
+pub mod count2;
 // mod aggregate;
 // pub mod aggregate;
-pub mod aggregate;
-pub mod funnel;
 
 use common::DECIMAL_SCALE;
 use num::Integer;
@@ -41,16 +40,10 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
 pub trait PartitionedAggregateExpr {
-    fn evaluate(
-        &self,
-        batches: &[RecordBatch],
-        spans: Vec<usize>,
-        skip: usize,
-        segments: Vec<Vec<bool>>,
-    ) -> Result<()>;
+    fn evaluate(&self, batch: &RecordBatch, partitions: &ScalarBuffer<i64>) -> Result<()>;
     fn data_types(&self) -> Vec<DataType>;
 
-    fn finalize(&self) -> Vec<Vec<ColumnarValue>>;
+    fn finalize(&self) -> Vec<ColumnarValue>;
 }
 
 #[derive(Debug, Clone)]
