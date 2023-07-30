@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.23"
+arrow = { version = "44.0.0", features = ["prettyprint"] }
+arrow-row = "44.0.0"
+arrow-array = "44.0.0"
