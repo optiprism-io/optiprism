@@ -56,7 +56,11 @@ impl PartitionExec {
     ) -> Result<Self> {
         let field = Field::new(partition_col_name.clone(), DataType::UInt64, false);
         let mut schema = (*input.schema()).clone();
-        schema.fields = vec![vec![field], schema.fields].concat();
+        let a = schema.fields();
+
+        schema.fields = vec![vec![Arc::new(field)], schema.fields.to_vec()]
+            .concat()
+            .into();
         Ok(Self {
             input,
             partition_expr,

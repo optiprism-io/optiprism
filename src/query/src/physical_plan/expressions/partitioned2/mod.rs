@@ -26,7 +26,7 @@ use crate::Column;
 // pub mod comparison;
 // pub mod count;
 pub mod count2;
-mod count_hash;
+// mod count_hash;
 // mod aggregate;
 // pub mod aggregate;
 

@@ -15,6 +15,7 @@ use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_expr::col;
+use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
 use datafusion_expr::utils::exprlist_to_fields;
@@ -268,10 +269,11 @@ impl LogicalPlanBuilder {
         let mut group_expr: Vec<Expr> = vec![];
 
         let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
-        let time_expr = Expr::ScalarFunction {
+        let expr_fn = ScalarFunction {
             fun: BuiltinScalarFunction::DateTrunc,
             args: vec![lit(self.es.interval_unit.as_str()), ts_col],
         };
+        let time_expr = Expr::ScalarFunction(expr_fn);
 
         group_expr.push(Expr::Alias(
             Box::new(lit(event.event.name())),
@@ -304,6 +306,7 @@ impl LogicalPlanBuilder {
                             AggregateFunction::Count,
                             vec![col(event_fields::EVENT)],
                             false,
+                            None,
                             None,
                         );
                         Expr::AggregateFunction(agg_fn)
@@ -348,6 +351,7 @@ impl LogicalPlanBuilder {
                                 property,
                             ))?],
                             false,
+                            None,
                             None,
                         );
 

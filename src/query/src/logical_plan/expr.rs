@@ -8,11 +8,12 @@ use datafusion_common::DFSchema;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use datafusion_expr::aggregate_function::return_type;
+use datafusion_expr::expr;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::expr_fn::or;
 pub use datafusion_expr::lit;
 pub use datafusion_expr::lit_timestamp_nano;
-use datafusion_expr::AccumulatorFunctionImplementation;
+use datafusion_expr::AccumulatorFactoryFunction;
 use datafusion_expr::AggregateFunction;
 use datafusion_expr::AggregateUDF;
 use datafusion_expr::Expr;
@@ -79,11 +80,12 @@ pub fn sorted_distinct_count(input_schema: &DFSchema, col: Expr) -> Result<Expr>
     let sorted_distinct = SortedDistinctCount::new(name, data_type);
     let udf = sorted_distinct.try_into()?;
 
-    Ok(Expr::AggregateUDF {
+    Ok(Expr::AggregateUDF(expr::AggregateUDF {
         fun: Arc::new(udf),
         args: vec![col],
         filter: None,
-    })
+        order_by: None,
+    }))
 }
 
 pub fn aggregate_partitioned(
@@ -114,7 +116,7 @@ pub fn aggregate_partitioned(
     )?;
 
     // factory closure
-    let acc_fn: AccumulatorFunctionImplementation = Arc::new(move |_| {
+    let acc_fn: AccumulatorFactoryFunction = Arc::new(move |_| {
         pagg.create_accumulator()
             .map_err(QueryError::into_datafusion_plan_error)
     });
@@ -130,10 +132,10 @@ pub fn aggregate_partitioned(
         &state_type_fn,
     );
 
-    Ok(Expr::AggregateUDF {
+    Ok(Expr::AggregateUDF(expr::AggregateUDF {
         fun: Arc::new(udf),
-        // join partition and function arguments into one vector
         args: vec![vec![partition_by], args].concat(),
         filter: None,
-    })
+        order_by: None,
+    }))
 }

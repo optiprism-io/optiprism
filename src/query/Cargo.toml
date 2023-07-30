@@ -12,19 +12,21 @@ dyn-clone = "1.0.11"
 lazy_static = "1.4.0"
 anyhow = "1.0.66"
 ahash = { version = "0.8", default-features = false }
-arrow = { version = "38.0.0", features = ["prettyprint"] }
+arrow = { version = "42.0.0", features = ["prettyprint"] }
 async-trait = "0.1.59"
 axum = { version = "0.6.1", features = ["headers"] }
 chrono = "0.4.23"
 chronoutil = "0.2.3"
 common = { path = "../common" }
-datafusion = "24.0.0"
-datafusion-common = "24.0.0"
-datafusion-expr = "24.0.0"
+datafusion = "27.0.0"
+datafusion-common = "27.0.0"
+datafusion-expr = "27.0.0"
 fnv = "1.0.7"
+arrow2 = { git = "ssh://git@github.com/optiprism-io/arrow2.git", features = [ "compute_arithmetics", "compute_merge_sort", "compute_concatenate"] }
 futures = "0.3.25"
 metadata = { path = "../metadata" }
-object_store = "0.5.2"
+object_store = "0.6.1"
+store = { path = "../store" }
 rust_decimal = { version = "1.27.0", features = ["serde-with-float"] }
 rust_decimal_macros = "1.27"
 serde = { version = "1.0.149", features = ["derive"] }
@@ -37,7 +39,9 @@ tokio = { version = "1.23.0", features = [
     "sync",
 ] }
 tracing = "0.1.37"
-tracing-test = "0.2.3"
+tracing-subscriber = "0.3"
+tracing-core = "0.1.30"
+tracing-test = { version = "0.2.3", features = ["no-env-filter"] }
 uuid = { version = "1.2.2", features = ["serde", "v4"] }
 
 [dev-dependencies]

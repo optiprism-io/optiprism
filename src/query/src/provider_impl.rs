@@ -57,7 +57,13 @@ impl ProviderImpl {
 #[async_trait]
 impl Provider for ProviderImpl {
     async fn property_values(&self, ctx: Context, req: PropertyValues) -> Result<ArrayRef> {
-        let plan = property_values::build(&ctx, &self.metadata, self.input.clone(), &req).await?;
+        let plan = property_values::LogicalPlanBuilder::build(
+            ctx,
+            self.metadata.clone(),
+            self.input.clone(),
+            req.clone(),
+        )
+        .await?;
 
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 
@@ -68,12 +74,12 @@ impl Provider for ProviderImpl {
 
     async fn event_segmentation(&self, ctx: Context, es: EventSegmentation) -> Result<DataTable> {
         let cur_time = Utc::now();
-        let plan = event_segmentation::logical_plan_builder::build(
-            &ctx,
-            &self.metadata,
+        let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
+            ctx,
             cur_time,
+            self.metadata.clone(),
             self.input.clone(),
-            &es,
+            es.clone(),
         )
         .await?;
 
@@ -124,7 +130,7 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let physical_plan = state.create_physical_plan(plan).await?;
     let displayable_plan = displayable(physical_plan.as_ref());
 
-    debug!("physical plan: {}", displayable_plan.indent());
+    debug!("physical plan: {}", displayable_plan.indent(true));
     let batches = collect(physical_plan, exec_ctx.task_ctx()).await?;
     for batch in batches.iter() {
         println!("{}", pretty_format_batches(&[batch.clone()])?);

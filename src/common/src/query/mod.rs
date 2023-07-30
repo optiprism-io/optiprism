@@ -85,6 +85,7 @@ impl From<DFAggregateFunction> for AggregateFunction {
             }
             DFAggregateFunction::ApproxMedian => AggregateFunction::ApproxMedian,
             DFAggregateFunction::Grouping => AggregateFunction::Grouping,
+            _ => unimplemented!(),
         }
     }
 }
@@ -421,7 +422,7 @@ impl TimeIntervalUnit {
             TimeIntervalUnit::Hour => Duration::hours(n),
             TimeIntervalUnit::Day => Duration::days(n),
             TimeIntervalUnit::Week => Duration::weeks(n),
-            TimeIntervalUnit::Month => Duration::days(n  * 31),
+            TimeIntervalUnit::Month => Duration::days(n * 31),
             TimeIntervalUnit::Year => Duration::days(n * 31 * 12),
         }
     }

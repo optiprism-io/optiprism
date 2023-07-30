@@ -24,7 +24,7 @@ use datafusion::physical_plan::Accumulator;
 use datafusion_common::DataFusionError;
 use datafusion_common::Result;
 use datafusion_common::ScalarValue;
-use datafusion_expr::AccumulatorFunctionImplementation;
+use datafusion_expr::AccumulatorFactoryFunction;
 use datafusion_expr::ReturnTypeFunction;
 use datafusion_expr::Signature;
 use datafusion_expr::StateTypeFunction;
@@ -50,7 +50,7 @@ impl TryFrom<SortedDistinctCount> for AggregateUDF {
         let data_type = sorted_distinct.data_type.clone();
         let data_type_arc = Arc::new(data_type);
         let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(data_type_arc.clone()));
-        let accumulator: AccumulatorFunctionImplementation = Arc::new(move |dt| {
+        let accumulator: AccumulatorFactoryFunction = Arc::new(move |dt| {
             let acc = SortedDistinctCountAccumulator::try_new(dt)?;
             Ok(Box::new(acc))
         });
