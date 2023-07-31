@@ -25,7 +25,9 @@ use crate::Column;
 // pub mod aggregator;
 // pub mod comparison;
 // pub mod count;
-pub mod count2;
+// pub mod count2;
+mod count;
+mod count_hash;
 // mod count_hash;
 // mod aggregate;
 // pub mod aggregate;
@@ -41,10 +43,10 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
 pub trait PartitionedAggregateExpr {
-    fn evaluate(&self, batch: &RecordBatch, partitions: &ScalarBuffer<i64>) -> Result<()>;
+    fn evaluate(&mut self, batch: &RecordBatch, partitions: &ScalarBuffer<i64>) -> Result<()>;
     fn data_types(&self) -> Vec<DataType>;
 
-    fn finalize(&self) -> Vec<ColumnarValue>;
+    fn finalize(&mut self) -> Result<Vec<ArrayRef>>;
 }
 
 #[derive(Debug, Clone)]
