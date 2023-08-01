@@ -49,6 +49,7 @@ pub trait PartitionedAggregateExpr: Send + Sync {
     fn fields(&self) -> Vec<Field>;
     fn evaluate(&mut self, batch: &RecordBatch, partition_exist: &HashMap<i64, ()>) -> Result<()>;
     fn finalize(&mut self) -> Result<Vec<ArrayRef>>;
+    fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>>;
 }
 
 #[derive(Debug, Clone)]

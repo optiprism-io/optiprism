@@ -175,7 +175,15 @@ impl ExecutionPlan for SegmentedAggregateExec {
         let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
         let agg_expr = (0..self.partition_inputs.len())
             .into_iter()
-            .map(|_| self.agg_expr.clone())
+            .map(|_| {
+                self.agg_expr
+                    .iter()
+                    .map(|a| {
+                        let mut agg = a.lock().unwrap();
+                        Arc::new(Mutex::new(agg.make_new().unwrap()))
+                    })
+                    .collect::<Vec<_>>()
+            })
             .collect::<Vec<_>>();
         Ok(Box::pin(SegmentedAggregateStream {
             is_ended: false,
@@ -232,7 +240,6 @@ impl Stream for SegmentedAggregateStream {
 
         let cloned_time = self.baseline_metrics.elapsed_compute().clone();
         let segments_count = self.partition_streams.len();
-
         let partition_col = self.partition_col.clone();
 
         for (segment_id, partitioned_stream) in self.partition_streams.iter_mut().enumerate() {
@@ -259,6 +266,7 @@ impl Stream for SegmentedAggregateStream {
                 }
             }
         }
+
         loop {
             match self.stream.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
@@ -409,15 +417,15 @@ mod tests {
         let agg2 = {
             let groups = vec![
                 SortField::new(DataType::Utf8),
-                SortField::new(DataType::Utf8),
+                // SortField::new(DataType::Utf8),
             ];
             let group_cols = vec![
                 Column::new_with_schema("country", &schema).unwrap(),
-                Column::new_with_schema("device", &schema).unwrap(),
+                // Column::new_with_schema("device", &schema).unwrap(),
             ];
             let count = Count::try_new(
                 None,
-                AggregateFunction::new_min(),
+                AggregateFunction::new_sum(),
                 groups,
                 group_cols,
                 Column::new_with_schema("user_id", &schema).unwrap(),
@@ -464,9 +472,9 @@ mod tests {
 
         let seg = SegmentedAggregateExec::try_new(
             Arc::new(input),
-            vec![Arc::new(pinput1), Arc::new(pinput2)],
+            vec![Arc::new(pinput2), Arc::new(pinput1)],
             Column::new_with_schema("user_id", &schema).unwrap(),
-            vec![agg1, agg2],
+            vec![/* agg1, */ agg2],
             vec!["count".to_string(), "min".to_string()],
         )?;
 

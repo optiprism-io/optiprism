@@ -32,6 +32,7 @@ use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::partitioned2::AggregateFunction;
 use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
 
+#[derive(Debug)]
 struct Bucket {
     count: i64,
     outer_fn: AggregateFunction,
@@ -54,6 +55,7 @@ pub struct Count {
     filter: Option<PhysicalExprRef>,
     outer_fn: AggregateFunction,
     group_cols: Vec<Column>,
+    groups: Vec<SortField>,
     buckets: HashMap<OwnedRow, Bucket, RandomState>,
     row_converter: RowConverter,
     partition_col: Column,
@@ -73,8 +75,9 @@ impl Count {
             filter,
             outer_fn,
             group_cols,
+            groups: groups.clone(),
             buckets: HashMap::default(),
-            row_converter: RowConverter::new(groups)?,
+            row_converter: RowConverter::new(groups.clone())?,
             partition_col,
             skip: false,
             skip_partition: 0,
@@ -199,6 +202,22 @@ impl PartitionedAggregateExpr for Count {
             .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
         let res_col = Arc::new(res_col) as ArrayRef;
         Ok(vec![group_col, vec![res_col]].concat())
+    }
+
+    fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>> {
+        let a = Count {
+            filter: self.filter.clone(),
+            outer_fn: self.outer_fn.clone(),
+            group_cols: self.group_cols.clone(),
+            groups: self.groups.clone(),
+            buckets: HashMap::default(),
+            row_converter: RowConverter::new(self.groups.clone())?,
+            partition_col: self.partition_col.clone(),
+            skip: false,
+            skip_partition: 0,
+        };
+
+        Ok(Box::new(a))
     }
 }
 
