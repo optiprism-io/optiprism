@@ -5,11 +5,14 @@ use std::sync::Mutex;
 
 use ahash::AHasher;
 use ahash::RandomState;
+use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::Decimal128Builder;
+use arrow::array::Int64Array;
 use arrow::buffer::ScalarBuffer;
 use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
 use arrow::record_batch::RecordBatch;
 use arrow::row::OwnedRow;
 use arrow::row::Row;
@@ -17,6 +20,7 @@ use arrow::row::RowConverter;
 use arrow::row::SortField;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
+use datafusion::parquet::format::ColumnChunk;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
@@ -52,6 +56,9 @@ pub struct Count {
     group_cols: Vec<Column>,
     buckets: HashMap<OwnedRow, Bucket, RandomState>,
     row_converter: RowConverter,
+    partition_col: Column,
+    skip: bool,
+    skip_partition: i64,
 }
 
 impl Count {
@@ -60,6 +67,7 @@ impl Count {
         outer_fn: AggregateFunction,
         groups: Vec<SortField>,
         group_cols: Vec<Column>,
+        partition_col: Column,
     ) -> Result<Self> {
         Ok(Self {
             filter,
@@ -67,15 +75,31 @@ impl Count {
             group_cols,
             buckets: HashMap::default(),
             row_converter: RowConverter::new(groups)?,
+            partition_col,
+            skip: false,
+            skip_partition: 0,
         })
     }
 }
 
 impl PartitionedAggregateExpr for Count {
+    fn group_columns(&self) -> Vec<Column> {
+        self.group_cols.clone()
+    }
+
+    fn fields(&self) -> Vec<Field> {
+        let field = Field::new(
+            "count",
+            DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            true,
+        );
+        vec![field]
+    }
+
     fn evaluate(
         &mut self,
         batch: &RecordBatch,
-        partitions: &ScalarBuffer<i64>,
+        partition_exist: &HashMap<i64, ()>,
     ) -> crate::Result<()> {
         let filter = if self.filter.is_some() {
             Some(
@@ -104,7 +128,29 @@ impl PartitionedAggregateExpr for Count {
 
         let rows = self.row_converter.convert_columns(&arrs)?;
 
+        let partitions = self
+            .partition_col
+            .evaluate(batch)?
+            .into_array(batch.num_rows())
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap()
+            .clone();
+
         for (row_id, partition) in partitions.into_iter().enumerate() {
+            let partition = partition.unwrap();
+            if self.skip {
+                if self.skip_partition != partition {
+                    self.skip = false;
+                } else {
+                    continue;
+                }
+            }
+            if !partition_exist.contains_key(&partition) {
+                self.skip = true;
+                continue;
+            }
+
             let bucket = self
                 .buckets
                 .entry(rows.row(row_id).owned())
@@ -115,7 +161,7 @@ impl PartitionedAggregateExpr for Count {
 
             if bucket.first {
                 bucket.first = false;
-                bucket.last_partition = *partition;
+                bucket.last_partition = partition;
             }
 
             if let Some(filter) = &filter {
@@ -124,10 +170,10 @@ impl PartitionedAggregateExpr for Count {
                 }
             }
 
-            if bucket.last_partition != *partition {
+            if bucket.last_partition != partition {
                 let v = bucket.count as i128;
                 bucket.outer_fn.accumulate(v);
-                bucket.last_partition = *partition;
+                bucket.last_partition = partition;
 
                 bucket.count = 0;
             }
@@ -135,10 +181,6 @@ impl PartitionedAggregateExpr for Count {
         }
 
         Ok(())
-    }
-
-    fn data_types(&self) -> Vec<DataType> {
-        vec![DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)]
     }
 
     fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
@@ -162,6 +204,8 @@ impl PartitionedAggregateExpr for Count {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use arrow::array::Int64Array;
     use arrow::datatypes::DataType;
     use arrow::row::SortField;
@@ -201,22 +245,23 @@ mod tests {
 | 3            | osx          | 0     | 4      | e1          |
 | 3            | osx          | 0     | 5      | e2          |
 | 3            | osx          | 0     | 6      | e3          |
-| 4            | osx          | 0     | 6      | e3          
+| 4            | windows      | 0     | 6      | e3          
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
         let groups = vec![SortField::new(DataType::Utf8)];
         let group_cols = vec![Column::new_with_schema("device", &schema).unwrap()];
-        let mut count =
-            Count::try_new(None, AggregateFunction::new_avg(), groups, group_cols).unwrap();
+        let hash = HashMap::from([(0, ()), (1, ()), (4, ())]);
+        let mut count = Count::try_new(
+            None,
+            AggregateFunction::new_avg(),
+            groups,
+            group_cols,
+            Column::new_with_schema("user_id", &schema).unwrap(),
+        )
+        .unwrap();
         for b in res {
-            let p = b.columns()[0]
-                .as_any()
-                .downcast_ref::<Int64Array>()
-                .unwrap()
-                .values();
-
-            count.evaluate(&b, p).unwrap();
+            count.evaluate(&b, &hash).unwrap();
         }
 
         let res = count.finalize();

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -11,7 +12,9 @@ use arrow::array::BooleanArray;
 use arrow::array::TimestampMillisecondArray;
 use arrow::buffer::ScalarBuffer;
 use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
 use arrow::record_batch::RecordBatch;
+use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion_expr::ColumnarValue;
 use datafusion_expr::Operator;
@@ -19,7 +22,6 @@ use tracing::debug;
 
 use crate::error::Result;
 use crate::physical_plan::abs_row_id_refs;
-use crate::Column;
 
 // pub mod aggregate;
 // pub mod aggregator;
@@ -27,7 +29,7 @@ use crate::Column;
 // pub mod count;
 // pub mod count2;
 mod count;
-mod count_hash;
+pub mod count_hash;
 // mod count_hash;
 // mod aggregate;
 // pub mod aggregate;
@@ -42,10 +44,10 @@ use num_traits::Zero;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-pub trait PartitionedAggregateExpr {
-    fn evaluate(&mut self, batch: &RecordBatch, partitions: &ScalarBuffer<i64>) -> Result<()>;
-    fn data_types(&self) -> Vec<DataType>;
-
+pub trait PartitionedAggregateExpr: Send + Sync {
+    fn group_columns(&self) -> Vec<Column>;
+    fn fields(&self) -> Vec<Field>;
+    fn evaluate(&mut self, batch: &RecordBatch, partition_exist: &HashMap<i64, ()>) -> Result<()>;
     fn finalize(&mut self) -> Result<Vec<ArrayRef>>;
 }
 
