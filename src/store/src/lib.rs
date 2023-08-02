@@ -1,11 +1,34 @@
+#![warn(
+    clippy::all,
+    clippy::pedantic,
+    meta_variable_misuse,
+    missing_abi,
+    missing_copy_implementations,
+    missing_debug_implementations,
+    non_ascii_idents,
+    pointer_structural_match,
+    rust_2018_idioms,
+    single_use_lifetimes,
+    trivial_casts,
+    trivial_numeric_casts,
+    unused_crate_dependencies,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_lifetimes,
+    unused_qualifications,
+    unused_results,
+    variant_size_differences
+)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::module_name_repetitions)]
+
 #![feature(slice_take)]
 #![feature(let_chains)]
-
-extern crate core;
 
 pub mod arrow_conversion;
 pub mod error;
 pub mod parquet;
+pub mod storage;
 
 pub mod test_util {
     use std::fs::File;
