@@ -49,6 +49,14 @@ impl Bucket {
             last_partition: 0,
         }
     }
+
+    pub fn accumulate(&mut self) {
+        self.count += 1;
+    }
+
+    pub fn reset(&mut self) {
+        self.count = 0;
+    }
 }
 
 pub struct Count {
@@ -85,6 +93,117 @@ impl Count {
     }
 }
 
+macro_rules! filter {
+    ($filter:expr, $batch:expr) => {
+        if $filter.is_some() {
+            Some(
+                $filter
+                    .clone()
+                    .unwrap()
+                    .evaluate($batch)?
+                    .into_array($batch.num_rows())
+                    .as_any()
+                    .downcast_ref::<BooleanArray>()
+                    .unwrap()
+                    .clone(),
+            )
+        } else {
+            None
+        }
+    };
+}
+
+macro_rules! groups {
+    ($group_cols:expr,$batch:expr,$row_converter:expr) => {{
+        let arrs = $group_cols
+            .iter()
+            .map(|e| {
+                e.evaluate($batch)
+                    .and_then(|v| Ok(v.into_array($batch.num_rows()).clone()))
+            })
+            .collect::<result::Result<Vec<_>, _>>()?;
+
+        let rows = $row_converter.convert_columns(&arrs)?;
+
+        rows
+    };};
+}
+
+macro_rules! partitions {
+    ($batch:expr,$partition_col:expr) => {{
+        let partitions = $partition_col
+            .evaluate($batch)?
+            .into_array($batch.num_rows())
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap()
+            .clone();
+
+        partitions
+    };};
+}
+
+macro_rules! partition_loop {
+    ($self:expr,$partitions:expr,$partition_exist:expr,$rows:expr,$filter:expr) => {
+        for (row_id, partition) in $partitions.into_iter().enumerate() {
+            let partition = partition.unwrap();
+            if $self.skip {
+                if $self.skip_partition != partition {
+                    $self.skip = false;
+                } else {
+                    continue;
+                }
+            }
+            if !$partition_exist.contains_key(&partition) {
+                $self.skip = true;
+                continue;
+            }
+
+            let bucket = $self
+                .buckets
+                .entry($rows.row(row_id).owned())
+                .or_insert_with(|| {
+                    let mut bucket = Bucket::new($self.outer_fn.clone());
+                    bucket
+                });
+
+            if bucket.first {
+                bucket.first = false;
+                bucket.last_partition = partition;
+            }
+
+            if let Some(filter) = &$filter {
+                if !check_filter(filter, row_id) {
+                    continue;
+                }
+            }
+
+            if bucket.last_partition != partition {
+                let v = bucket.count as i128;
+                bucket.outer_fn.accumulate(v);
+                bucket.last_partition = partition;
+
+                bucket.reset();
+            }
+            bucket.accumulate();
+        }
+    };
+}
+
+macro_rules! finalize {
+    ($res_col:expr,$buckets:expr,$row_converter:expr) => {{
+        let mut rows: Vec<Row> = Vec::with_capacity($buckets.len());
+        for (row, bucket) in $buckets.iter_mut() {
+            rows.push(row.row());
+            bucket.outer_fn.accumulate(bucket.count as i128);
+            let res = bucket.outer_fn.result();
+            $res_col.append_value(res);
+        }
+
+        let group_col = $row_converter.convert_rows(rows)?;
+        (group_col, $res_col.finish())
+    };};
+}
 impl PartitionedAggregateExpr for Count {
     fn group_columns(&self) -> Vec<Column> {
         self.group_cols.clone()
@@ -99,107 +218,19 @@ impl PartitionedAggregateExpr for Count {
         vec![field]
     }
 
-    fn evaluate(
-        &mut self,
-        batch: &RecordBatch,
-        partition_exist: &HashMap<i64, ()>,
-    ) -> crate::Result<()> {
-        let filter = if self.filter.is_some() {
-            Some(
-                self.filter
-                    .clone()
-                    .unwrap()
-                    .evaluate(batch)?
-                    .into_array(batch.num_rows())
-                    .as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .unwrap()
-                    .clone(),
-            )
-        } else {
-            None
-        };
-
-        let arrs = self
-            .group_cols
-            .iter()
-            .map(|e| {
-                e.evaluate(batch)
-                    .and_then(|v| Ok(v.into_array(batch.num_rows()).clone()))
-            })
-            .collect::<result::Result<Vec<_>, _>>()?;
-
-        let rows = self.row_converter.convert_columns(&arrs)?;
-
-        let partitions = self
-            .partition_col
-            .evaluate(batch)?
-            .into_array(batch.num_rows())
-            .as_any()
-            .downcast_ref::<Int64Array>()
-            .unwrap()
-            .clone();
-
-        for (row_id, partition) in partitions.into_iter().enumerate() {
-            let partition = partition.unwrap();
-            if self.skip {
-                if self.skip_partition != partition {
-                    self.skip = false;
-                } else {
-                    continue;
-                }
-            }
-            if !partition_exist.contains_key(&partition) {
-                self.skip = true;
-                continue;
-            }
-
-            let bucket = self
-                .buckets
-                .entry(rows.row(row_id).owned())
-                .or_insert_with(|| {
-                    let mut bucket = Bucket::new(self.outer_fn.clone());
-                    bucket
-                });
-
-            if bucket.first {
-                bucket.first = false;
-                bucket.last_partition = partition;
-            }
-
-            if let Some(filter) = &filter {
-                if !check_filter(filter, row_id) {
-                    continue;
-                }
-            }
-
-            if bucket.last_partition != partition {
-                let v = bucket.count as i128;
-                bucket.outer_fn.accumulate(v);
-                bucket.last_partition = partition;
-
-                bucket.count = 0;
-            }
-            bucket.count += 1;
-        }
+    fn evaluate(&mut self, batch: &RecordBatch, partition_exist: &HashMap<i64, ()>) -> Result<()> {
+        let filter = filter!(self.filter, batch);
+        let rows = groups!(self.group_cols, batch, self.row_converter);
+        let partitions = partitions!(batch, self.partition_col);
+        partition_loop!(self, partitions, partition_exist, rows, filter);
 
         Ok(())
     }
 
     fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
-        let mut rows: Vec<Row> = Vec::with_capacity(self.buckets.len());
         let mut res_col_b = Decimal128Builder::with_capacity(self.buckets.len());
-        for (row, bucket) in self.buckets.iter_mut() {
-            rows.push(row.row());
-            bucket.outer_fn.accumulate(bucket.count as i128);
-            let res = bucket.outer_fn.result();
-            res_col_b.append_value(res);
-        }
-
-        let group_col = self.row_converter.convert_rows(rows)?;
-        let res_col = res_col_b
-            .finish()
-            .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
+        let (group_col, res_col) = finalize!(res_col_b, self.buckets, self.row_converter);
+        let res_col = res_col.with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
         let res_col = Arc::new(res_col) as ArrayRef;
         Ok(vec![group_col, vec![res_col]].concat())
     }
