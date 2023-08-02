@@ -353,6 +353,7 @@ mod tests {
     pub use datafusion_common::Result;
     use store::test_util::parse_markdown_tables;
 
+    use crate::physical_plan::expressions::partitioned2::count;
     use crate::physical_plan::expressions::partitioned2::count_grouped::Count;
     use crate::physical_plan::expressions::partitioned2::AggregateFunction;
     use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
@@ -474,7 +475,7 @@ mod tests {
             Arc::new(input),
             vec![Arc::new(pinput2), Arc::new(pinput1)],
             Column::new_with_schema("user_id", &schema).unwrap(),
-            vec![/* agg1, */ agg2],
+            vec![agg1, agg2],
             vec!["count".to_string(), "min".to_string()],
         )?;
 
@@ -527,13 +528,9 @@ mod tests {
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
         let agg1 = {
-            let groups = vec![SortField::new(DataType::Utf8)];
-            let group_cols = vec![Column::new_with_schema("device", &schema).unwrap()];
-            let count = Count::try_new(
+            let count = count::Count::try_new(
                 None,
                 AggregateFunction::new_avg(),
-                groups,
-                group_cols,
                 Column::new_with_schema("user_id", &schema).unwrap(),
             )
             .unwrap();
@@ -603,7 +600,7 @@ mod tests {
             Arc::new(input),
             vec![Arc::new(pinput2), Arc::new(pinput1)],
             Column::new_with_schema("user_id", &schema).unwrap(),
-            vec![/* agg1, */ agg2],
+            vec![agg1 /* ,  agg2 */],
             vec!["count".to_string(), "min".to_string()],
         )?;
 

@@ -28,7 +28,7 @@ use crate::physical_plan::abs_row_id_refs;
 // pub mod comparison;
 // pub mod count;
 // pub mod count2;
-mod count;
+pub mod count;
 pub mod count_grouped;
 // mod funnel;
 // mod count_hash;
