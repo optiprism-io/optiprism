@@ -262,7 +262,7 @@ mod tests {
     use datafusion::physical_expr::expressions::Column;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned2::count_hash::Count;
+    use crate::physical_plan::expressions::partitioned2::count_grouped::Count;
     use crate::physical_plan::expressions::partitioned2::AggregateFunction;
     use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
 

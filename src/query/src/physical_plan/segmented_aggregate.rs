@@ -353,13 +353,142 @@ mod tests {
     pub use datafusion_common::Result;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned2::count_hash::Count;
+    use crate::physical_plan::expressions::partitioned2::count_grouped::Count;
     use crate::physical_plan::expressions::partitioned2::AggregateFunction;
     use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
     use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
 
     #[tokio::test]
     async fn test() -> anyhow::Result<()> {
+        let data = r#"
+| user_id(i64) | device(utf8) | country(utf8) | v(i64) | ts(ts) | event(utf8) |
+|--------------|--------------|---------------|--------|--------|-------------|
+| 0            | iphone       | Spain         | 1      | 1      | e1          |
+| 0            | iphone       | Spain         | 0      | 2      | e2          |
+| 0            | iphone       | Spain         | 0      | 3      | e3          |
+| 0            | android      | Spain         | 1      | 4      | e1          |
+| 0            | android      | Spain         | 1      | 5      | e2          |
+|||||||
+| 0            | android      | Spain         | 0      | 6      | e3          |
+| 1            | osx          | Germany       | 1      | 1      | e1          |
+| 1            | osx          | Germany       | 1      | 2      | e2          |
+| 1            | osx          | Germany       | 0      | 3      | e3          |
+| 1            | osx          | UK            | 0      | 4      | e1          |
+| 1            | osx          | UK            | 0      | 5      | e2          |
+|||||||
+| 1            | osx          | UK            | 0      | 6      | e3          |
+| 2            | osx          | Portugal      | 1      | 1      | e1          |
+| 2            | osx          | Portugal      | 1      | 2      | e2          |
+| 2            | osx          | Portugal      | 0      | 3      | e3          |
+| 2            | osx          | Spain         | 0      | 4      | e1          |
+| 2            | osx          | Spain         | 0      | 5      | e2          |
+| 2            | osx          | Spain         | 0      | 6      | e3          |
+| 3            | osx          | Spain         | 1      | 1      | e1          |
+| 3            | osx          | Spain         | 1      | 2      | e2          |
+|||||||
+| 3            | osx          | Spain         | 0      | 3      | e3          |
+| 3            | osx          | UK            | 0      | 4      | e1          |
+| 3            | osx          | UK            | 0      | 5      | e2          |
+| 3            | osx          | UK            | 0      | 6      | e3          |
+| 4            | osx          | Russia        | 0      | 6      | e3          |
+"#;
+
+        let batches = parse_markdown_tables(data).unwrap();
+        let schema = batches[0].schema();
+        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+
+        let agg1 = {
+            let groups = vec![SortField::new(DataType::Utf8)];
+            let group_cols = vec![Column::new_with_schema("device", &schema).unwrap()];
+            let count = Count::try_new(
+                None,
+                AggregateFunction::new_avg(),
+                groups,
+                group_cols,
+                Column::new_with_schema("user_id", &schema).unwrap(),
+            )
+            .unwrap();
+
+            Arc::new(Mutex::new(
+                Box::new(count) as Box<dyn PartitionedAggregateExpr>
+            ))
+        };
+
+        let agg2 = {
+            let groups = vec![
+                SortField::new(DataType::Utf8),
+                // SortField::new(DataType::Utf8),
+            ];
+            let group_cols = vec![
+                Column::new_with_schema("country", &schema).unwrap(),
+                // Column::new_with_schema("device", &schema).unwrap(),
+            ];
+            let count = Count::try_new(
+                None,
+                AggregateFunction::new_sum(),
+                groups,
+                group_cols,
+                Column::new_with_schema("user_id", &schema).unwrap(),
+            )
+            .unwrap();
+
+            Arc::new(Mutex::new(
+                Box::new(count) as Box<dyn PartitionedAggregateExpr>
+            ))
+        };
+
+        let pinput1 = {
+            let data = r#"
+| user_id(i64) |
+|--------------|
+| 0            |
+||
+| 3            |
+| 4            |
+"#;
+
+            let batches = parse_markdown_tables(data).unwrap();
+            let schema = batches[0].schema();
+            let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+
+            input
+        };
+
+        let pinput2 = {
+            let data = r#"
+| user_id(i64) |
+|--------------|
+| 0            |
+| 1            |
+| 2            |
+"#;
+
+            let batches = parse_markdown_tables(data).unwrap();
+            let schema = batches[0].schema();
+            let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+
+            input
+        };
+
+        let seg = SegmentedAggregateExec::try_new(
+            Arc::new(input),
+            vec![Arc::new(pinput2), Arc::new(pinput1)],
+            Column::new_with_schema("user_id", &schema).unwrap(),
+            vec![/* agg1, */ agg2],
+            vec!["count".to_string(), "min".to_string()],
+        )?;
+
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = seg.execute(0, task_ctx)?;
+        let result = collect(stream).await?;
+
+        print_batches(&result).unwrap();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_ungrouped() -> anyhow::Result<()> {
         let data = r#"
 | user_id(i64) | device(utf8) | country(utf8) | v(i64) | ts(ts) | event(utf8) |
 |--------------|--------------|---------------|--------|--------|-------------|
