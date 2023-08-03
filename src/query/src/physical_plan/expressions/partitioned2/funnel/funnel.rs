@@ -1,10 +1,13 @@
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::result;
 
 use ahash::RandomState;
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
+use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
+use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
 use arrow_row::OwnedRow;
 use arrow_row::SortField;
@@ -13,6 +16,8 @@ use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 
+use crate::physical_plan::expressions::partitioned2::funnel::evaluate_batch;
+use crate::physical_plan::expressions::partitioned2::funnel::Batch;
 use crate::physical_plan::expressions::partitioned2::funnel::Count;
 use crate::physical_plan::expressions::partitioned2::funnel::ExcludeExpr;
 use crate::physical_plan::expressions::partitioned2::funnel::Filter;
@@ -21,11 +26,25 @@ use crate::physical_plan::expressions::partitioned2::funnel::Touch;
 use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
 
 #[derive(Debug)]
+struct Step {
+    ts: i64,
+    row_id: usize,
+    batch_id: usize,
+    offset: usize,
+}
+
+#[derive(Debug)]
+struct Row {
+    row_id: usize,
+    batch_id: usize,
+}
+
+#[derive(Debug)]
 pub struct Funnel {
     ts_col: Column,
     window: Duration,
     steps_expr: Vec<PhysicalExprRef>,
-    steps: Vec<StepOrder>,
+    steps_orders: Vec<StepOrder>,
     exclude_expr: Option<Vec<ExcludeExpr>>,
     // expr and vec of step ids
     constants: Option<Vec<Column>>,
@@ -36,6 +55,15 @@ pub struct Funnel {
     partition_col: Column,
     skip: bool,
     skip_partition: i64,
+    first: bool,
+    last_partition: i64,
+    partition_start: Row,
+    partition_len: i64,
+    cur_step: usize,
+    steps: Vec<Step>,
+    buf: HashMap<usize, Batch, RandomState>,
+    batch_id: usize,
+    processed_batches: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -61,7 +89,7 @@ impl Funnel {
                 .iter()
                 .map(|(expr, _)| expr.clone())
                 .collect::<Vec<_>>(),
-            steps: opts
+            steps_orders: opts
                 .steps
                 .iter()
                 .map(|(_, order)| order.clone())
@@ -74,11 +102,32 @@ impl Funnel {
             partition_col: opts.partition_col,
             skip: false,
             skip_partition: 0,
+            first: true,
+            last_partition: 0,
+            partition_len: 0,
+            partition_start: Row {
+                row_id: 0,
+                batch_id: 0,
+            },
+            cur_step: 0,
+            steps: opts
+                .steps
+                .iter()
+                .map(|_| Step {
+                    ts: 0,
+                    row_id: 0,
+                    batch_id: 0,
+                    offset: 0,
+                })
+                .collect(),
+            buf: Default::default(),
+            batch_id: 0,
+            processed_batches: 0,
         }
     }
 
     pub fn steps_count(&self) -> usize {
-        self.steps.len()
+        self.steps_orders.len()
     }
 }
 
@@ -88,7 +137,27 @@ impl PartitionedAggregateExpr for Funnel {
     }
 
     fn fields(&self) -> Vec<Field> {
-        todo!()
+        let mut fields = vec![
+            Field::new("completed", DataType::Boolean, false),
+            Field::new("steps", DataType::Int64, false),
+        ];
+
+        let mut steps_ts_fields = self
+            .steps_orders
+            .iter()
+            .enumerate()
+            .map(|(idx, _)| {
+                Field::new(
+                    format!("step{idx}_ts"),
+                    DataType::Timestamp(TimeUnit::Millisecond, None),
+                    true,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        fields.append(&mut steps_ts_fields);
+
+        fields
     }
 
     fn evaluate(
@@ -96,17 +165,14 @@ impl PartitionedAggregateExpr for Funnel {
         batch: &RecordBatch,
         partition_exist: &HashMap<i64, ()>,
     ) -> crate::Result<()> {
-        let arrs = self
-            .group_cols
-            .iter()
-            .map(|e| {
-                e.evaluate(batch)
-                    .and_then(|v| Ok(v.into_array(batch.num_rows()).clone()))
-            })
-            .collect::<result::Result<Vec<_>, _>>()?;
-
-        let rows = self.row_converter.convert_columns(&arrs)?;
-
+        let funnel_batch = evaluate_batch(
+            batch.to_owned(),
+            &self.steps_expr,
+            &self.exclude_expr,
+            &self.constants,
+            &self.ts_col,
+        )?;
+        self.buf.insert(self.batch_id, funnel_batch);
         let partitions = self
             .partition_col
             .evaluate(batch)?
@@ -125,27 +191,85 @@ impl PartitionedAggregateExpr for Funnel {
                     continue;
                 }
             }
+
             if !partition_exist.contains_key(&partition) {
                 self.skip = true;
                 continue;
             }
 
-            let buckets = self
-                .buckets
-                .entry(rows.row(row_id).owned())
-                .or_insert_with(|| {
-                    let mut buckets = self.buckets.make_new();
-
-                    buckets
-                });
-
-            if buckets.first {
-                buckets.first = false;
-                buckets.last_partition = partition;
+            if self.first {
+                self.first = false;
+                self.last_partition = partition;
+                self.partition_start = Row {
+                    row_id,
+                    batch_id: self.batch_id,
+                };
             }
+
+            if self.last_partition != partition {
+                self.cur_step = 0;
+                // println!("{} {:?}", self.partition_len, self.partition_start);
+                let mut cur_row_id = self.partition_start.row_id;
+                let mut cur_batch_id = self.partition_start.batch_id;
+                let mut batch = self.buf.get(&cur_batch_id).unwrap();
+                let mut offset: usize = 0;
+                while offset < self.partition_len as usize {
+                    if batch.steps[self.cur_step].value(cur_row_id) {
+                        println!(
+                            "step {} as row {cur_row_id} batch {cur_batch_id}",
+                            self.cur_step
+                        );
+                        let cur_ts = batch.ts.value(cur_row_id);
+                        self.steps[self.cur_step] = Step {
+                            ts: cur_ts,
+                            row_id: cur_row_id,
+                            batch_id: cur_batch_id,
+                            offset,
+                        };
+
+                        if self.cur_step == 0 {
+                        } else {
+                            if cur_ts - self.steps[0].ts > self.window.num_milliseconds() {
+                                self.cur_step = 0;
+                                offset = self.steps[self.cur_step].offset + 1;
+                                cur_row_id = self.steps[self.cur_step].row_id + 1;
+                                cur_batch_id = self.steps[self.cur_step].batch_id;
+                                continue;
+                            }
+                        }
+                        if self.cur_step >= self.steps.len() - 1 {
+                            break;
+                        }
+                        self.cur_step += 1;
+                    }
+                    cur_row_id += 1;
+                    if cur_row_id >= batch.len() {
+                        cur_batch_id += 1;
+                        cur_row_id = 0;
+                        batch = self.buf.get(&cur_batch_id).unwrap();
+                    }
+                    offset += 1;
+                }
+                if self.cur_step == self.steps_count() - 1 {
+                    println!("complete!");
+                }
+
+                self.partition_len = 0;
+
+                self.partition_start = Row {
+                    row_id,
+                    batch_id: self.batch_id,
+                };
+                self.last_partition = partition;
+            }
+
+            // println!("{row_id}");
+            self.partition_len += 1;
         }
 
-        sdf
+        self.batch_id += 1;
+
+        Ok(())
     }
 
     fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
@@ -154,5 +278,97 @@ impl PartitionedAggregateExpr for Funnel {
 
     fn make_new(&self) -> crate::Result<Box<dyn PartitionedAggregateExpr>> {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use arrow::array::Int64Array;
+    use arrow::datatypes::DataType;
+    use arrow::row::SortField;
+    use chrono::Duration;
+    use datafusion::physical_expr::expressions::BinaryExpr;
+    use datafusion::physical_expr::expressions::Column;
+    use datafusion::physical_expr::expressions::Literal;
+    use datafusion::physical_expr::PhysicalExprRef;
+    use datafusion_common::ScalarValue;
+    use datafusion_expr::Operator;
+    use store::test_util::parse_markdown_tables;
+
+    use crate::physical_plan::expressions::partitioned2::count::Count;
+    use crate::physical_plan::expressions::partitioned2::funnel::funnel::Funnel;
+    use crate::physical_plan::expressions::partitioned2::funnel::funnel::Options;
+    use crate::physical_plan::expressions::partitioned2::funnel::Count::Unique;
+    use crate::physical_plan::expressions::partitioned2::funnel::StepOrder;
+    use crate::physical_plan::expressions::partitioned2::funnel::Touch;
+    use crate::physical_plan::expressions::partitioned2::AggregateFunction;
+    use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
+
+    #[test]
+    fn test() {
+        let data = r#"
+| u(i64) | ts(ts) | v(i64) |
+|--------|--------|--------|
+| 0      | 1      | 1      |
+| 1      | 1      | 2      |
+| 1      | 2      | 1      |
+| 1      | 3      | 2      |
+|        |        |        |
+| 1      | 4      | 1      |
+| 1      | 5      | 2      |
+| 1      | 6      | 3      |
+| 2      | 1      | 1      |
+| 2      | 2      | 2      |
+| 2      | 3      | 3      |
+|        |        |        |
+| 3      | 1      | 1      |
+|        |        |        |
+| 3      | 2      | 2      |
+|        |        |        |
+| 3      | 3      | 3      |
+"#;
+        let res = parse_markdown_tables(data).unwrap();
+        let schema = res[0].schema().clone();
+        let hash = HashMap::from([(0, ()), (1, ()), (2, ()), (3, ())]);
+
+        let e1 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(1)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e2 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(2)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e3 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(3)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+
+        let opts = Options {
+            ts_col: Column::new_with_schema("ts", &schema).unwrap(),
+            window: Duration::milliseconds(2),
+            steps: vec![e1, e2, e3],
+            exclude: None,
+            constants: None,
+            count: Unique,
+            filter: None,
+            touch: Touch::First,
+            partition_col: Column::new_with_schema("u", &schema).unwrap(),
+        };
+        let mut f = Funnel::new(opts);
+        for b in res {
+            f.evaluate(&b, &hash).unwrap();
+        }
+
+        // f.finalize()?;
     }
 }

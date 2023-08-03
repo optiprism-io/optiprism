@@ -30,7 +30,7 @@ use crate::physical_plan::abs_row_id_refs;
 // pub mod count2;
 pub mod count;
 pub mod count_grouped;
-// mod funnel;
+mod funnel;
 // mod count_hash;
 // mod aggregate;
 // pub mod aggregate;
