@@ -214,12 +214,60 @@ impl PartitionedAggregateExpr for Funnel {
                 let mut batch = self.buf.get(&cur_batch_id).unwrap();
                 let mut offset: usize = 0;
                 while offset < self.partition_len as usize {
+                    let cur_ts = batch.ts.value(cur_row_id);
+
+                    if self.cur_step > 0 {
+                        if let Some(exclude) = &batch.exclude {
+                            for excl in exclude.iter() {
+                                let mut to_check = false;
+                                // check if this exclude is relevant to current step
+                                if let Some(steps) = &excl.steps {
+                                    for pair in steps {
+                                        if pair.from <= self.cur_step && pair.to >= self.cur_step {
+                                            to_check = true;
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // check anyway
+                                    to_check = true;
+                                }
+
+                                if to_check {
+                                    println!(
+                                        "to check {cur_batch_id}  {cur_row_id} {}",
+                                        self.cur_step
+                                    );
+                                    if excl.exists.value(cur_row_id) {
+                                        println!("exclude {cur_batch_id}  {cur_row_id}");
+                                        self.steps[0].offset = self.steps[self.cur_step].offset;
+                                        self.steps[0].row_id = self.steps[self.cur_step].row_id;
+                                        self.steps[0].batch_id = self.steps[self.cur_step].batch_id;
+                                        self.cur_step = 0;
+                                        offset = self.steps[self.cur_step].offset + 1;
+                                        cur_row_id = self.steps[self.cur_step].row_id + 1;
+                                        cur_batch_id = self.steps[self.cur_step].batch_id;
+
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                        if cur_ts - self.steps[0].ts > self.window.num_milliseconds() {
+                            println!("out of window {cur_batch_id} {cur_row_id}");
+                            self.cur_step = 0;
+                            offset = self.steps[self.cur_step].offset + 1;
+                            cur_row_id = self.steps[self.cur_step].row_id + 1;
+                            cur_batch_id = self.steps[self.cur_step].batch_id;
+                            continue;
+                        }
+                    }
+
                     if batch.steps[self.cur_step].value(cur_row_id) {
                         println!(
                             "step {} as row {cur_row_id} batch {cur_batch_id}",
                             self.cur_step
                         );
-                        let cur_ts = batch.ts.value(cur_row_id);
                         self.steps[self.cur_step] = Step {
                             ts: cur_ts,
                             row_id: cur_row_id,
@@ -227,16 +275,9 @@ impl PartitionedAggregateExpr for Funnel {
                             offset,
                         };
 
-                        if self.cur_step == 0 {
-                        } else {
-                            if cur_ts - self.steps[0].ts > self.window.num_milliseconds() {
-                                self.cur_step = 0;
-                                offset = self.steps[self.cur_step].offset + 1;
-                                cur_row_id = self.steps[self.cur_step].row_id + 1;
-                                cur_batch_id = self.steps[self.cur_step].batch_id;
-                                continue;
-                            }
-                        }
+                        // if self.cur_step == 0 {
+                        // } else
+
                         if self.cur_step >= self.steps.len() - 1 {
                             break;
                         }
@@ -302,6 +343,7 @@ mod tests {
     use crate::physical_plan::expressions::partitioned2::funnel::funnel::Funnel;
     use crate::physical_plan::expressions::partitioned2::funnel::funnel::Options;
     use crate::physical_plan::expressions::partitioned2::funnel::Count::Unique;
+    use crate::physical_plan::expressions::partitioned2::funnel::ExcludeExpr;
     use crate::physical_plan::expressions::partitioned2::funnel::StepOrder;
     use crate::physical_plan::expressions::partitioned2::funnel::Touch;
     use crate::physical_plan::expressions::partitioned2::AggregateFunction;
@@ -315,8 +357,13 @@ mod tests {
 | 0      | 1      | 1      |
 | 1      | 1      | 2      |
 | 1      | 2      | 1      |
+| 1      | 2      | 1      |
 | 1      | 3      | 2      |
 |        |        |        |
+| 1      | 4      | 1      |
+| 1      | 5      | 2      |
+| 1      | 5      | 4      |
+| 1      | 6      | 3      |
 | 1      | 4      | 1      |
 | 1      | 5      | 2      |
 | 1      | 6      | 3      |
@@ -353,11 +400,21 @@ mod tests {
             (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
         };
 
+        let ex = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(4)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            Arc::new(expr) as PhysicalExprRef
+        };
+
         let opts = Options {
             ts_col: Column::new_with_schema("ts", &schema).unwrap(),
-            window: Duration::milliseconds(2),
+            window: Duration::milliseconds(200),
             steps: vec![e1, e2, e3],
-            exclude: None,
+            exclude: Some(vec![ExcludeExpr {
+                expr: ex,
+                steps: None,
+            }]),
             constants: None,
             count: Unique,
             filter: None,
