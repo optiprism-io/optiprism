@@ -59,7 +59,9 @@ pub struct Funnel {
     last_partition: i64,
     partition_start: Row,
     partition_len: i64,
+    const_row: Option<Row>,
     cur_step: usize,
+    first_step: bool,
     steps: Vec<Step>,
     buf: HashMap<usize, Batch, RandomState>,
     batch_id: usize,
@@ -109,7 +111,9 @@ impl Funnel {
                 row_id: 0,
                 batch_id: 0,
             },
+            const_row: None,
             cur_step: 0,
+            first_step: true,
             steps: opts
                 .steps
                 .iter()
@@ -213,7 +217,7 @@ impl PartitionedAggregateExpr for Funnel {
                 let mut cur_batch_id = self.partition_start.batch_id;
                 let mut batch = self.buf.get(&cur_batch_id).unwrap();
                 let mut offset: usize = 0;
-                while offset < self.partition_len as usize {
+                'main: while offset < self.partition_len as usize {
                     let cur_ts = batch.ts.value(cur_row_id);
 
                     if self.cur_step > 0 {
@@ -264,10 +268,12 @@ impl PartitionedAggregateExpr for Funnel {
                     }
 
                     if batch.steps[self.cur_step].value(cur_row_id) {
+                        self.first_step = false;
                         println!(
                             "step {} as row {cur_row_id} batch {cur_batch_id}",
                             self.cur_step
                         );
+
                         self.steps[self.cur_step] = Step {
                             ts: cur_ts,
                             row_id: cur_row_id,
@@ -275,8 +281,39 @@ impl PartitionedAggregateExpr for Funnel {
                             offset,
                         };
 
-                        // if self.cur_step == 0 {
-                        // } else
+                        if self.cur_step == 0 {
+                            if batch.constants.is_some() {
+                                self.const_row = Some(Row {
+                                    row_id: cur_row_id,
+                                    batch_id: cur_batch_id,
+                                })
+                            }
+                        } else {
+                            // compare current value with constant
+                            // get constant row
+                            if batch.constants.is_some() {
+                                let const_row = self.const_row.as_ref().unwrap();
+                                for (const_idx, first_const) in
+                                    batch.constants.as_ref().unwrap().iter().enumerate()
+                                {
+                                    // compare the const values of current row and first row
+                                    let cur_const = &batch.constants.as_ref().unwrap()[const_idx];
+                                    if !first_const.eq_values(
+                                        const_row.row_id,
+                                        cur_const,
+                                        cur_row_id,
+                                    ) {
+                                        println!("constant violation {cur_batch_id} {cur_row_id}");
+                                        self.cur_step = 0;
+                                        self.first_step = true;
+                                        offset = self.steps[self.cur_step].offset + 1;
+                                        cur_row_id = self.steps[self.cur_step].row_id + 1;
+                                        cur_batch_id = self.steps[self.cur_step].batch_id;
+                                        continue 'main;
+                                    }
+                                }
+                            }
+                        }
 
                         if self.cur_step >= self.steps.len() - 1 {
                             break;
@@ -352,30 +389,30 @@ mod tests {
     #[test]
     fn test() {
         let data = r#"
-| u(i64) | ts(ts) | v(i64) |
-|--------|--------|--------|
-| 0      | 1      | 1      |
-| 1      | 1      | 2      |
-| 1      | 2      | 1      |
-| 1      | 2      | 1      |
-| 1      | 3      | 2      |
-|        |        |        |
-| 1      | 4      | 1      |
-| 1      | 5      | 2      |
-| 1      | 5      | 4      |
-| 1      | 6      | 3      |
-| 1      | 4      | 1      |
-| 1      | 5      | 2      |
-| 1      | 6      | 3      |
-| 2      | 1      | 1      |
-| 2      | 2      | 2      |
-| 2      | 3      | 3      |
-|        |        |        |
-| 3      | 1      | 1      |
-|        |        |        |
-| 3      | 2      | 2      |
-|        |        |        |
-| 3      | 3      | 3      |
+| u(i64) | ts(ts) | v(i64) | c(i64) |
+|--------|--------|--------|--------|
+| 0      | 1      | 1      | 1      |
+| 1      | 1      | 2      | 1      |
+| 1      | 2      | 1      | 1      |
+| 1      | 2      | 1      | 1      |
+| 1      | 3      | 2      | 1      |
+|        |        |        |        |
+| 1      | 4      | 1      | 1      |
+| 1      | 5      | 2      | 1      |
+| 1      | 5      | 4      | 1      |
+| 1      | 6      | 3      | 2      |
+| 1      | 4      | 1      | 1      |
+| 1      | 5      | 2      | 1      |
+| 1      | 6      | 3      | 1      |
+| 2      | 1      | 1      | 1      |
+| 2      | 2      | 2      | 1      |
+| 2      | 3      | 3      | 1      |
+|        |        |        |        |
+| 3      | 1      | 1      | 1      |
+|        |        |        |        |
+| 3      | 2      | 2      | 1      |
+|        |        |        |        |
+| 3      | 3      | 3      | 1      |
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
@@ -411,11 +448,12 @@ mod tests {
             ts_col: Column::new_with_schema("ts", &schema).unwrap(),
             window: Duration::milliseconds(200),
             steps: vec![e1, e2, e3],
-            exclude: Some(vec![ExcludeExpr {
-                expr: ex,
-                steps: None,
-            }]),
-            constants: None,
+            exclude: None,
+            // Some(vec![ExcludeExpr {
+            // expr: ex,
+            // steps: None,
+            // }]),
+            constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),
             count: Unique,
             filter: None,
             touch: Touch::First,
