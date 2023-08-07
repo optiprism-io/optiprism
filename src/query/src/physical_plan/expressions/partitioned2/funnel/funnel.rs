@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::result;
+use std::sync::Arc;
 
 use ahash::RandomState;
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
+use arrow::array::Int64Builder;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::TimeUnit;
@@ -16,6 +18,7 @@ use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 
+use crate::error::QueryError;
 use crate::physical_plan::expressions::partitioned2::funnel::evaluate_batch;
 use crate::physical_plan::expressions::partitioned2::funnel::Batch;
 use crate::physical_plan::expressions::partitioned2::funnel::Count;
@@ -26,6 +29,14 @@ use crate::physical_plan::expressions::partitioned2::funnel::StepOrder;
 use crate::physical_plan::expressions::partitioned2::funnel::Touch;
 use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
 use crate::StaticArray;
+
+#[derive(Debug, Clone)]
+enum Debug {
+    NextRow,
+    ExcludeViolation,
+    OutOfWindow,
+    ConstantViolation,
+}
 
 #[derive(Debug, Clone)]
 struct Step {
@@ -39,6 +50,42 @@ struct Step {
 struct Row {
     row_id: usize,
     batch_id: usize,
+}
+
+#[derive(Debug)]
+struct StepResult {
+    count: usize,
+    total_time: i64,
+    total_time_from_start: i64,
+}
+
+#[derive(Debug)]
+struct FunnelResult {
+    total_funnels: usize,
+    completed_funnels: usize,
+    steps: Vec<StepResult>,
+}
+
+impl FunnelResult {
+    // add result to self
+    pub fn add(&self, other: FunnelResult) -> FunnelResult {
+        let mut res = FunnelResult {
+            total_funnels: self.total_funnels + other.total_funnels,
+            completed_funnels: self.completed_funnels + other.completed_funnels,
+            steps: vec![],
+        };
+
+        for (idx, step) in self.steps.iter().enumerate() {
+            res.steps.push(StepResult {
+                count: step.count + other.steps[idx].count,
+                total_time: step.total_time + other.steps[idx].total_time,
+                total_time_from_start: step.total_time_from_start
+                    + other.steps[idx].total_time_from_start,
+            })
+        }
+
+        res
+    }
 }
 
 #[derive(Debug)]
@@ -69,6 +116,8 @@ pub struct Funnel {
     buf: HashMap<usize, Batch, RandomState>,
     batch_id: usize,
     processed_batches: usize,
+    debug: Vec<Debug>,
+    result: FunnelResult,
 }
 
 #[derive(Debug, Clone)]
@@ -137,6 +186,19 @@ impl Funnel {
             batch_id: 0,
             processed_batches: 0,
             cur_row_id: 0,
+            debug: Vec::with_capacity(100),
+            result: FunnelResult {
+                total_funnels: 0,
+                completed_funnels: 0,
+                steps: (0..opts.steps.len())
+                    .into_iter()
+                    .map(|_| StepResult {
+                        count: 0,
+                        total_time: 0,
+                        total_time_from_start: 0,
+                    })
+                    .collect::<Vec<_>>(),
+            },
         }
     }
 
@@ -213,6 +275,7 @@ impl Funnel {
 
         true
     }
+
     pub fn process_partition(&mut self, row_id: usize, partition: i64) {
         self.cur_step = 0;
         let mut cur_row_id = self.partition_start.row_id;
@@ -309,6 +372,57 @@ impl Funnel {
         };
         self.cur_partition = partition;
     }
+
+    fn process_result(&mut self) -> FunnelResult {
+        let is_completed = match &self.filter {
+            // if no filter, then funnel is completed id all steps are completed
+            None => self.cur_step == self.steps_count() - 1,
+            Some(filter) => match filter {
+                Filter::DropOffOnAnyStep => self.cur_step != self.steps_count() - 1,
+                // drop off on defined step
+                Filter::DropOffOnStep(drop_off_step_id) => self.cur_step == *drop_off_step_id,
+                // drop off if time to convert is out of range
+                Filter::TimeToConvert(from, to) => {
+                    if self.cur_step != self.steps_count() - 1 {
+                        false
+                    } else {
+                        let diff = self.steps[self.cur_step].ts - self.steps[0].ts;
+                        from.num_milliseconds() <= diff && diff <= to.num_milliseconds()
+                    }
+                }
+            },
+        };
+
+        self.result.total_funnels += 1;
+        if is_completed {
+            self.result.completed_funnels += 1;
+        }
+
+        let mut result = FunnelResult {
+            total_funnels: 0,
+            completed_funnels: 0,
+            steps: (0..self.steps.len())
+                .into_iter()
+                .map(|_| StepResult {
+                    count: 0,
+                    total_time: 0,
+                    total_time_from_start: 0,
+                })
+                .collect::<Vec<_>>(),
+        };
+
+        for step_id in 0..self.cur_step {
+            result.steps[step_id].count += 1;
+            if step_id > 0 {
+                result.steps[step_id].total_time +=
+                    self.steps[step_id].ts - self.steps[step_id - 1].ts;
+                result.steps[step_id].total_time_from_start +=
+                    self.steps[step_id].ts - self.steps[0].ts;
+            }
+        }
+
+        result
+    }
 }
 
 impl PartitionedAggregateExpr for Funnel {
@@ -318,8 +432,8 @@ impl PartitionedAggregateExpr for Funnel {
 
     fn fields(&self) -> Vec<Field> {
         let mut fields = vec![
-            Field::new("completed", DataType::Boolean, false),
-            Field::new("steps", DataType::Int64, false),
+            Field::new("total", DataType::Int64, false),
+            Field::new("completed", DataType::Int64, false),
         ];
 
         let mut steps_ts_fields = self
@@ -345,6 +459,7 @@ impl PartitionedAggregateExpr for Funnel {
         batch: &RecordBatch,
         partition_exist: &HashMap<i64, ()>,
     ) -> crate::Result<()> {
+        self.debug.clear();
         let funnel_batch = evaluate_batch(
             batch.to_owned(),
             &self.steps_expr,
@@ -369,7 +484,9 @@ impl PartitionedAggregateExpr for Funnel {
             }
 
             if self.cur_partition != partition {
-                self.process_partition(row_id, partition)
+                self.process_partition(row_id, partition);
+                let result = self.process_result();
+                self.result = self.result.add(result);
             }
 
             // println!("{row_id}");
@@ -382,11 +499,89 @@ impl PartitionedAggregateExpr for Funnel {
     }
 
     fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
-        todo!()
+        let result = self.process_result();
+        let result = self.result.add(result);
+        let mut total_funnels = Int64Builder::new();
+        let mut completed_funnels = Int64Builder::new();
+        let mut steps = self
+            .steps
+            .iter()
+            .map(|_| Int64Builder::new())
+            .collect::<Vec<_>>();
+
+        println!("{:?}", self.result);
+        total_funnels.append_value(self.result.total_funnels as i64);
+        completed_funnels.append_value(self.result.completed_funnels as i64);
+        for (step_id, step) in self.result.steps.iter().enumerate() {
+            steps[step_id].append_value(step.count as i64);
+        }
+
+        let arr = vec![
+            vec![Arc::new(total_funnels.finish()) as ArrayRef],
+            vec![Arc::new(completed_funnels.finish()) as ArrayRef],
+            steps
+                .iter_mut()
+                .map(|b| Arc::new(b.finish()) as ArrayRef)
+                .collect::<Vec<_>>(),
+        ]
+        .concat();
+        Ok(arr)
     }
 
     fn make_new(&self) -> crate::Result<Box<dyn PartitionedAggregateExpr>> {
-        todo!()
+        let res = Self {
+            ts_col: self.ts_col.clone(),
+            window: self.window.clone(),
+            steps_expr: self.steps_expr.clone(),
+            steps_orders: self.steps_orders.clone(),
+            exclude_expr: self.exclude_expr.clone(),
+            constants: self.constants.clone(),
+            count: self.count.clone(),
+            filter: self.filter.clone(),
+            touch: self.touch.clone(),
+            partition_col: self.partition_col.clone(),
+            skip: false,
+            skip_partition: 0,
+            first: true,
+            cur_partition: 0,
+            cur_row_id: 0,
+            partition_start: Row {
+                row_id: 0,
+                batch_id: 0,
+            },
+            partition_len: 0,
+            const_row: None,
+            cur_step: 0,
+            first_step: true,
+            steps: self
+                .steps
+                .iter()
+                .map(|_| Step {
+                    ts: 0,
+                    row_id: 0,
+                    batch_id: 0,
+                    offset: 0,
+                })
+                .collect(),
+            buf: Default::default(),
+            batch_id: 0,
+            processed_batches: 0,
+            debug: vec![],
+            result: FunnelResult {
+                total_funnels: 0,
+                completed_funnels: 0,
+                steps: (0..self.steps.len())
+                    .into_iter()
+                    .map(|_| StepResult {
+                        count: 0,
+                        total_time: 0,
+                        total_time_from_start: 0,
+                    })
+                    .collect::<Vec<_>>(),
+            },
+        };
+
+        Ok(Box::new(res))
     }
 }
 
@@ -496,6 +691,8 @@ mod tests {
             f.evaluate(&b, &hash).unwrap();
         }
 
+        let res = f.finalize().unwrap();
+        println!("{:?}", res);
         // f.finalize()?;
     }
 }
