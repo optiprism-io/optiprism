@@ -19,13 +19,15 @@ use datafusion::physical_expr::PhysicalExprRef;
 use crate::physical_plan::expressions::partitioned2::funnel::evaluate_batch;
 use crate::physical_plan::expressions::partitioned2::funnel::Batch;
 use crate::physical_plan::expressions::partitioned2::funnel::Count;
+use crate::physical_plan::expressions::partitioned2::funnel::Exclude;
 use crate::physical_plan::expressions::partitioned2::funnel::ExcludeExpr;
 use crate::physical_plan::expressions::partitioned2::funnel::Filter;
 use crate::physical_plan::expressions::partitioned2::funnel::StepOrder;
 use crate::physical_plan::expressions::partitioned2::funnel::Touch;
 use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
+use crate::StaticArray;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Step {
     ts: i64,
     row_id: usize,
@@ -56,7 +58,8 @@ pub struct Funnel {
     skip: bool,
     skip_partition: i64,
     first: bool,
-    last_partition: i64,
+    cur_partition: i64,
+    cur_row_id: i64,
     partition_start: Row,
     partition_len: i64,
     const_row: Option<Row>,
@@ -79,6 +82,12 @@ pub struct Options {
     pub filter: Option<Filter>,
     pub touch: Touch,
     pub partition_col: Column,
+}
+
+struct PartitionRow<'a> {
+    row_id: usize,
+    batch_id: usize,
+    batch: &'a Batch,
 }
 
 impl Funnel {
@@ -105,7 +114,7 @@ impl Funnel {
             skip: false,
             skip_partition: 0,
             first: true,
-            last_partition: 0,
+            cur_partition: 0,
             partition_len: 0,
             partition_start: Row {
                 row_id: 0,
@@ -127,11 +136,178 @@ impl Funnel {
             buf: Default::default(),
             batch_id: 0,
             processed_batches: 0,
+            cur_row_id: 0,
         }
     }
 
     pub fn steps_count(&self) -> usize {
         self.steps_orders.len()
+    }
+
+    fn check_partition_bounds(
+        &mut self,
+        row_id: usize,
+        partition: i64,
+        partition_exist: &HashMap<i64, ()>,
+    ) -> bool {
+        if self.skip {
+            if self.skip_partition != partition {
+                self.skip = false;
+            } else {
+                return false;
+            }
+        }
+
+        if !partition_exist.contains_key(&partition) {
+            self.skip = true;
+            return false;
+        }
+
+        if self.first {
+            self.first = false;
+            self.cur_partition = partition;
+            self.partition_start = Row {
+                row_id,
+                batch_id: self.batch_id,
+            };
+        }
+
+        true
+    }
+
+    fn check_exclude(&self, exclude: &Vec<Exclude>, cur_row_id: usize) -> bool {
+        for excl in exclude.iter() {
+            let mut to_check = false;
+            // check if this exclude is relevant to current step
+            if let Some(steps) = &excl.steps {
+                for pair in steps {
+                    if pair.from <= self.cur_step && pair.to >= self.cur_step {
+                        to_check = true;
+                        break;
+                    }
+                }
+            } else {
+                // check anyway
+                to_check = true;
+            }
+
+            if to_check {
+                if excl.exists.value(cur_row_id) {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
+    fn check_constants(&self, constants: &Vec<StaticArray>, cur_row_id: usize) -> bool {
+        let const_row = self.const_row.as_ref().unwrap();
+        for (const_idx, first_const) in constants.iter().enumerate() {
+            // compare the const values of current row and first row
+            let cur_const = &constants[const_idx];
+            if !first_const.eq_values(const_row.row_id, cur_const, cur_row_id) {
+                return false;
+            }
+        }
+
+        true
+    }
+    pub fn process_partition(&mut self, row_id: usize, partition: i64) {
+        self.cur_step = 0;
+        let mut cur_row_id = self.partition_start.row_id;
+        let mut cur_batch_id = self.partition_start.batch_id;
+        let mut batch = self.buf.get(&cur_batch_id).unwrap();
+        let mut offset: usize = 0;
+        while offset < self.partition_len as usize {
+            let cur_ts = batch.ts.value(cur_row_id);
+            println!(
+                "pk {} ts {cur_ts} row {cur_row_id} batch {cur_batch_id} offset {offset}",
+                self.cur_partition
+            );
+
+            if self.cur_step > 0 {
+                if let Some(exclude) = &batch.exclude {
+                    if !self.check_exclude(exclude, cur_row_id) {
+                        println!("exclude {cur_batch_id}  {cur_row_id}");
+                        self.steps[0] = self.steps[self.cur_step].clone();
+                        self.cur_step = 0;
+
+                        // continue, so this row will be processed twice, as possible first step as well
+                        continue;
+                    }
+                }
+
+                if cur_ts - self.steps[0].ts > self.window.num_milliseconds() {
+                    println!("out of window {cur_batch_id} {cur_row_id}");
+                    self.cur_step = 0;
+                    offset = self.steps[self.cur_step].offset + 1;
+                    cur_row_id = self.steps[self.cur_step].row_id + 1;
+                    cur_batch_id = self.steps[self.cur_step].batch_id;
+
+                    continue;
+                }
+            }
+
+            if batch.steps[self.cur_step].value(cur_row_id) {
+                self.first_step = false;
+                println!(
+                    "step {} as row {cur_row_id} batch {cur_batch_id}",
+                    self.cur_step
+                );
+
+                self.steps[self.cur_step] = Step {
+                    ts: cur_ts,
+                    row_id: cur_row_id,
+                    batch_id: cur_batch_id,
+                    offset,
+                };
+
+                if self.cur_step == 0 {
+                    if batch.constants.is_some() {
+                        self.const_row = Some(Row {
+                            row_id: cur_row_id,
+                            batch_id: cur_batch_id,
+                        })
+                    }
+                } else {
+                    // compare current value with constant
+                    // get constant row
+                    if let Some(constants) = &batch.constants {
+                        if !self.check_constants(&constants, cur_row_id) {
+                            println!("constant violation {cur_batch_id} {cur_row_id}");
+                            self.steps[0] = self.steps[self.cur_step].clone();
+                            self.cur_step = 0;
+
+                            continue;
+                        }
+                    }
+                }
+
+                if self.cur_step >= self.steps.len() - 1 {
+                    break;
+                }
+                self.cur_step += 1;
+            }
+            cur_row_id += 1;
+            if cur_row_id >= batch.len() {
+                cur_batch_id += 1;
+                cur_row_id = 0;
+                batch = self.buf.get(&cur_batch_id).unwrap();
+            }
+            offset += 1;
+        }
+        if self.cur_step == self.steps_count() - 1 {
+            println!("complete!");
+        }
+
+        self.partition_len = 0;
+
+        self.partition_start = Row {
+            row_id,
+            batch_id: self.batch_id,
+        };
+        self.cur_partition = partition;
     }
 }
 
@@ -188,157 +364,12 @@ impl PartitionedAggregateExpr for Funnel {
 
         for (row_id, partition) in partitions.into_iter().enumerate() {
             let partition = partition.unwrap();
-            if self.skip {
-                if self.skip_partition != partition {
-                    self.skip = false;
-                } else {
-                    continue;
-                }
-            }
-
-            if !partition_exist.contains_key(&partition) {
-                self.skip = true;
+            if !self.check_partition_bounds(row_id, partition, partition_exist) {
                 continue;
             }
 
-            if self.first {
-                self.first = false;
-                self.last_partition = partition;
-                self.partition_start = Row {
-                    row_id,
-                    batch_id: self.batch_id,
-                };
-            }
-
-            if self.last_partition != partition {
-                self.cur_step = 0;
-                // println!("{} {:?}", self.partition_len, self.partition_start);
-                let mut cur_row_id = self.partition_start.row_id;
-                let mut cur_batch_id = self.partition_start.batch_id;
-                let mut batch = self.buf.get(&cur_batch_id).unwrap();
-                let mut offset: usize = 0;
-                'main: while offset < self.partition_len as usize {
-                    let cur_ts = batch.ts.value(cur_row_id);
-
-                    if self.cur_step > 0 {
-                        if let Some(exclude) = &batch.exclude {
-                            for excl in exclude.iter() {
-                                let mut to_check = false;
-                                // check if this exclude is relevant to current step
-                                if let Some(steps) = &excl.steps {
-                                    for pair in steps {
-                                        if pair.from <= self.cur_step && pair.to >= self.cur_step {
-                                            to_check = true;
-                                            break;
-                                        }
-                                    }
-                                } else {
-                                    // check anyway
-                                    to_check = true;
-                                }
-
-                                if to_check {
-                                    println!(
-                                        "to check {cur_batch_id}  {cur_row_id} {}",
-                                        self.cur_step
-                                    );
-                                    if excl.exists.value(cur_row_id) {
-                                        println!("exclude {cur_batch_id}  {cur_row_id}");
-                                        self.steps[0].offset = self.steps[self.cur_step].offset;
-                                        self.steps[0].row_id = self.steps[self.cur_step].row_id;
-                                        self.steps[0].batch_id = self.steps[self.cur_step].batch_id;
-                                        self.cur_step = 0;
-                                        offset = self.steps[self.cur_step].offset + 1;
-                                        cur_row_id = self.steps[self.cur_step].row_id + 1;
-                                        cur_batch_id = self.steps[self.cur_step].batch_id;
-
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                        if cur_ts - self.steps[0].ts > self.window.num_milliseconds() {
-                            println!("out of window {cur_batch_id} {cur_row_id}");
-                            self.cur_step = 0;
-                            offset = self.steps[self.cur_step].offset + 1;
-                            cur_row_id = self.steps[self.cur_step].row_id + 1;
-                            cur_batch_id = self.steps[self.cur_step].batch_id;
-                            continue;
-                        }
-                    }
-
-                    if batch.steps[self.cur_step].value(cur_row_id) {
-                        self.first_step = false;
-                        println!(
-                            "step {} as row {cur_row_id} batch {cur_batch_id}",
-                            self.cur_step
-                        );
-
-                        self.steps[self.cur_step] = Step {
-                            ts: cur_ts,
-                            row_id: cur_row_id,
-                            batch_id: cur_batch_id,
-                            offset,
-                        };
-
-                        if self.cur_step == 0 {
-                            if batch.constants.is_some() {
-                                self.const_row = Some(Row {
-                                    row_id: cur_row_id,
-                                    batch_id: cur_batch_id,
-                                })
-                            }
-                        } else {
-                            // compare current value with constant
-                            // get constant row
-                            if batch.constants.is_some() {
-                                let const_row = self.const_row.as_ref().unwrap();
-                                for (const_idx, first_const) in
-                                    batch.constants.as_ref().unwrap().iter().enumerate()
-                                {
-                                    // compare the const values of current row and first row
-                                    let cur_const = &batch.constants.as_ref().unwrap()[const_idx];
-                                    if !first_const.eq_values(
-                                        const_row.row_id,
-                                        cur_const,
-                                        cur_row_id,
-                                    ) {
-                                        println!("constant violation {cur_batch_id} {cur_row_id}");
-                                        self.cur_step = 0;
-                                        self.first_step = true;
-                                        offset = self.steps[self.cur_step].offset + 1;
-                                        cur_row_id = self.steps[self.cur_step].row_id + 1;
-                                        cur_batch_id = self.steps[self.cur_step].batch_id;
-                                        continue 'main;
-                                    }
-                                }
-                            }
-                        }
-
-                        if self.cur_step >= self.steps.len() - 1 {
-                            break;
-                        }
-                        self.cur_step += 1;
-                    }
-                    cur_row_id += 1;
-                    if cur_row_id >= batch.len() {
-                        cur_batch_id += 1;
-                        cur_row_id = 0;
-                        batch = self.buf.get(&cur_batch_id).unwrap();
-                    }
-                    offset += 1;
-                }
-                if self.cur_step == self.steps_count() - 1 {
-                    println!("complete!");
-                }
-
-                self.partition_len = 0;
-
-                self.partition_start = Row {
-                    row_id,
-                    batch_id: self.batch_id,
-                };
-                self.last_partition = partition;
+            if self.cur_partition != partition {
+                self.process_partition(row_id, partition)
             }
 
             // println!("{row_id}");
@@ -394,16 +425,16 @@ mod tests {
 | 0      | 1      | 1      | 1      |
 | 1      | 1      | 2      | 1      |
 | 1      | 2      | 1      | 1      |
-| 1      | 2      | 1      | 1      |
-| 1      | 3      | 2      | 1      |
+| 1      | 3      | 1      | 1      |
+| 1      | 4      | 2      | 1      |
 |        |        |        |        |
-| 1      | 4      | 1      | 1      |
-| 1      | 5      | 2      | 1      |
-| 1      | 5      | 4      | 1      |
-| 1      | 6      | 3      | 2      |
-| 1      | 4      | 1      | 1      |
-| 1      | 5      | 2      | 1      |
-| 1      | 6      | 3      | 1      |
+| 1      | 5      | 1      | 1      |
+| 1      | 6      | 2      | 1      |
+| 1      | 7      | 4      | 1      |
+| 1      | 8      | 3      | 2      |
+| 1      | 9      | 1      | 1      |
+| 1      | 10     | 2      | 1      |
+| 1      | 11     | 3      | 1      |
 | 2      | 1      | 1      | 1      |
 | 2      | 2      | 2      | 1      |
 | 2      | 3      | 3      | 1      |
@@ -448,12 +479,13 @@ mod tests {
             ts_col: Column::new_with_schema("ts", &schema).unwrap(),
             window: Duration::milliseconds(200),
             steps: vec![e1, e2, e3],
-            exclude: None,
-            // Some(vec![ExcludeExpr {
-            // expr: ex,
-            // steps: None,
-            // }]),
-            constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),
+            exclude: Some(vec![ExcludeExpr {
+                expr: ex,
+                steps: None,
+            }]),
+            // exclude: None,
+            constants: None,
+            // constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),
             count: Unique,
             filter: None,
             touch: Touch::First,
