@@ -1,3 +1,15 @@
+// Привет. На самом деле всё же будет нужно гибридное (колоночное+kv) решение для хранения юзеров, 
+// так как я нашёл один запрос с джойном. Но давай это отложим и вместо этого лучше спроектируем сущности БД так, чтобы потом можно было всё расширить.
+//
+// - Возможность создавать один или более стораджа. Сторадж закрепляется за таблицой. 
+//   В нашем случае, SortrdMergeTree зауреплен за таблицей events. Но никто не мешает потом добавить ещё таблиц с этим стораджом или другим (например, ReplacingSortedMergeTree)
+// - В очень недалёком будущем — Materialized view (async и sync). Возможность делать агрегации таблицы. Например, сортировку по другим колонкам, 
+//   или агрегации данных (вот тут тоже будет любопытно, тк будет уже связь с с движком запросов)
+// - Миграции из таблицы в таблицу (а-ля insert into ... select from). Синхронная, асинхронна. По сути Materialized View.
+// 
+// У нас не будет богатого недетерминированного DDL, как в SQL-db, скорее всё будет управляться кодом с возможностью конфигурирования.
+
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{RwLock, Arc};
@@ -5,17 +17,27 @@ use std::sync::{RwLock, Arc};
 mod engine;
 mod ids;
 mod table;
+mod wal;
+mod engines_impl;
 
-use table::OptiTable;
+use self::engine::OptiEngine;
 
-#[derive(Debug)]
-pub struct OptiStorage {
+pub struct OptiStorage
+{
     path: PathBuf,
     // TODO: switch to lock-free hashmap
-    tables: Arc<RwLock<HashMap<String, OptiTable>>>,
+    tables: Arc<RwLock<HashMap<String, Box<dyn OptiEngine>>>>,
 }
 
-#[test]
+impl OptiStorage {
+    fn create(path: &str) -> Result<Self, String> {
+        let path = PathBuf::from(path);
+        let tables = Arc::new(RwLock::new(HashMap::new()));
+        Ok(Self { path, tables })
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

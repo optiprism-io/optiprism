@@ -31,11 +31,13 @@ env_logger = "*"
 fallible-streaming-iterator = "0.1.9"
 futures = "0.3.25"
 num-traits = "0.2.15"
+okaywal = "0.2.0"
 ordered-float = "3.4.0"
 parquet2 = { git = "ssh://git@github.com/optiprism-io/parquet2.git" }
 rand = "0.8.5"
 rayon = "1.6.1"
 serde = { version = "1.0.179", default-features = false, features = ["derive"] }
+skiplist = "0.5.1"
 #parquet = "33.0.0"
 thiserror = "1.0.37"
 tracing = "0.1.37"
