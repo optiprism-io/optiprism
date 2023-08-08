@@ -30,8 +30,9 @@ use crate::physical_plan::expressions::partitioned2::funnel::Touch;
 use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
 use crate::StaticArray;
 
-#[derive(Debug, Clone)]
-enum Debug {
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DebugStep {
+    Step,
     NextRow,
     ExcludeViolation,
     OutOfWindow,
@@ -52,15 +53,15 @@ struct Row {
     batch_id: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 struct StepResult {
     count: usize,
     total_time: i64,
     total_time_from_start: i64,
 }
 
-#[derive(Debug)]
-struct FunnelResult {
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FunnelResult {
     total_funnels: usize,
     completed_funnels: usize,
     steps: Vec<StepResult>,
@@ -116,7 +117,7 @@ pub struct Funnel {
     buf: HashMap<usize, Batch, RandomState>,
     batch_id: usize,
     processed_batches: usize,
-    debug: Vec<Debug>,
+    debug: Vec<DebugStep>,
     result: FunnelResult,
 }
 
@@ -282,6 +283,7 @@ impl Funnel {
         let mut cur_batch_id = self.partition_start.batch_id;
         let mut batch = self.buf.get(&cur_batch_id).unwrap();
         let mut offset: usize = 0;
+
         while offset < self.partition_len as usize {
             let cur_ts = batch.ts.value(cur_row_id);
             println!(
@@ -292,6 +294,7 @@ impl Funnel {
             if self.cur_step > 0 {
                 if let Some(exclude) = &batch.exclude {
                     if !self.check_exclude(exclude, cur_row_id) {
+                        self.debug.push(DebugStep::ExcludeViolation);
                         println!("exclude {cur_batch_id}  {cur_row_id}");
                         self.steps[0] = self.steps[self.cur_step].clone();
                         self.cur_step = 0;
@@ -303,6 +306,7 @@ impl Funnel {
 
                 if cur_ts - self.steps[0].ts > self.window.num_milliseconds() {
                     println!("out of window {cur_batch_id} {cur_row_id}");
+                    self.debug.push(DebugStep::OutOfWindow);
                     self.cur_step = 0;
                     offset = self.steps[self.cur_step].offset + 1;
                     cur_row_id = self.steps[self.cur_step].row_id + 1;
@@ -313,6 +317,8 @@ impl Funnel {
             }
 
             if batch.steps[self.cur_step].value(cur_row_id) {
+                self.debug.push(DebugStep::Step);
+
                 self.first_step = false;
                 println!(
                     "step {} as row {cur_row_id} batch {cur_batch_id}",
@@ -338,6 +344,7 @@ impl Funnel {
                     // get constant row
                     if let Some(constants) = &batch.constants {
                         if !self.check_constants(&constants, cur_row_id) {
+                            self.debug.push(DebugStep::ConstantViolation);
                             println!("constant violation {cur_batch_id} {cur_row_id}");
                             self.steps[0] = self.steps[self.cur_step].clone();
                             self.cur_step = 0;
@@ -353,6 +360,7 @@ impl Funnel {
                 self.cur_step += 1;
             }
             cur_row_id += 1;
+            self.debug.push(DebugStep::NextRow);
             if cur_row_id >= batch.len() {
                 cur_batch_id += 1;
                 cur_row_id = 0;
@@ -373,7 +381,7 @@ impl Funnel {
         self.cur_partition = partition;
     }
 
-    fn process_result(&mut self) -> FunnelResult {
+    fn result(&mut self) -> FunnelResult {
         let is_completed = match &self.filter {
             // if no filter, then funnel is completed id all steps are completed
             None => self.cur_step == self.steps_count() - 1,
@@ -411,7 +419,7 @@ impl Funnel {
                 .collect::<Vec<_>>(),
         };
 
-        for step_id in 0..self.cur_step {
+        for step_id in 0..=self.cur_step {
             result.steps[step_id].count += 1;
             if step_id > 0 {
                 result.steps[step_id].total_time +=
@@ -483,9 +491,14 @@ impl PartitionedAggregateExpr for Funnel {
                 continue;
             }
 
+            if !partition_exist.contains_key(&partition) {
+                self.skip = true;
+                continue;
+            }
+
             if self.cur_partition != partition {
                 self.process_partition(row_id, partition);
-                let result = self.process_result();
+                let result = self.result();
                 self.result = self.result.add(result);
             }
 
@@ -499,8 +512,12 @@ impl PartitionedAggregateExpr for Funnel {
     }
 
     fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
-        let result = self.process_result();
-        let result = self.result.add(result);
+        self.process_partition(0, 0);
+        let result = self.result();
+        // make it stateful so we can test it
+        self.result = self.result.add(result);
+        let result = self.result.clone();
+
         let mut total_funnels = Int64Builder::new();
         let mut completed_funnels = Int64Builder::new();
         let mut steps = self
@@ -509,10 +526,9 @@ impl PartitionedAggregateExpr for Funnel {
             .map(|_| Int64Builder::new())
             .collect::<Vec<_>>();
 
-        println!("{:?}", self.result);
-        total_funnels.append_value(self.result.total_funnels as i64);
-        completed_funnels.append_value(self.result.completed_funnels as i64);
-        for (step_id, step) in self.result.steps.iter().enumerate() {
+        total_funnels.append_value(result.total_funnels as i64);
+        completed_funnels.append_value(result.completed_funnels as i64);
+        for (step_id, step) in result.steps.iter().enumerate() {
             steps[step_id].append_value(step.count as i64);
         }
 
@@ -592,6 +608,10 @@ mod tests {
 
     use arrow::array::Int64Array;
     use arrow::datatypes::DataType;
+    use arrow::datatypes::Field;
+    use arrow::datatypes::Schema;
+    use arrow::datatypes::SchemaRef;
+    use arrow::record_batch::RecordBatch;
     use arrow::row::SortField;
     use chrono::Duration;
     use datafusion::physical_expr::expressions::BinaryExpr;
@@ -600,14 +620,23 @@ mod tests {
     use datafusion::physical_expr::PhysicalExprRef;
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
+    use store::test_util::parse_markdown_table_v1;
     use store::test_util::parse_markdown_tables;
+    use tracing_test::traced_test;
 
-    use crate::physical_plan::expressions::partitioned2::count::Count;
+    use crate::event_eq;
+    use crate::expected_debug;
+    use crate::physical_plan::expressions::partitioned2::funnel::event_eq_;
+    use crate::physical_plan::expressions::partitioned2::funnel::funnel::DebugStep;
     use crate::physical_plan::expressions::partitioned2::funnel::funnel::Funnel;
+    use crate::physical_plan::expressions::partitioned2::funnel::funnel::FunnelResult;
     use crate::physical_plan::expressions::partitioned2::funnel::funnel::Options;
+    use crate::physical_plan::expressions::partitioned2::funnel::funnel::StepResult;
+    use crate::physical_plan::expressions::partitioned2::funnel::Count;
     use crate::physical_plan::expressions::partitioned2::funnel::Count::Unique;
     use crate::physical_plan::expressions::partitioned2::funnel::ExcludeExpr;
     use crate::physical_plan::expressions::partitioned2::funnel::StepOrder;
+    use crate::physical_plan::expressions::partitioned2::funnel::StepOrder::Sequential;
     use crate::physical_plan::expressions::partitioned2::funnel::Touch;
     use crate::physical_plan::expressions::partitioned2::AggregateFunction;
     use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
@@ -694,5 +723,96 @@ mod tests {
         let res = f.finalize().unwrap();
         println!("{:?}", res);
         // f.finalize()?;
+    }
+
+    #[derive(Debug, Clone)]
+    struct TestCase {
+        name: String,
+        data: &'static str,
+        opts: Options,
+        exp_debug: Vec<DebugStep>,
+        partition_exist: HashMap<i64, ()>,
+        exp: FunnelResult,
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_cases() -> anyhow::Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("user_id", DataType::Int64, false),
+            Field::new("ts", DataType::Int64, false),
+            Field::new("event", DataType::Utf8, false),
+            Field::new("const", DataType::Int64, false),
+        ])) as SchemaRef;
+
+        let cases = vec![TestCase {
+            name: "3 steps in a row should pass".to_string(),
+            data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 1          |
+| 1            | 2      | e3          | 1          |
+"#,
+
+            opts: Options {
+                ts_col: Column::new("ts", 1),
+                window: Duration::seconds(15),
+                steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                exclude: None,
+                constants: None,
+                count: Count::Unique,
+                filter: None,
+                touch: Touch::First,
+                partition_col: Column::new("user_id", 0),
+            },
+            exp_debug: expected_debug!(Step NextRow Step NextRow Step),
+            partition_exist: HashMap::from([(1, ())]),
+            exp: FunnelResult {
+                total_funnels: 1,
+                completed_funnels: 1,
+                steps: vec![
+                    StepResult {
+                        count: 1,
+                        total_time: 0,
+                        total_time_from_start: 0,
+                    },
+                    StepResult {
+                        count: 1,
+                        total_time: 1,
+                        total_time_from_start: 1,
+                    },
+                    StepResult {
+                        count: 1,
+                        total_time: 1,
+                        total_time_from_start: 2,
+                    },
+                ],
+            },
+        }];
+
+        let run_only: Option<&str> = None;
+        for case in cases.iter().cloned() {
+            if let Some(name) = run_only {
+                if case.name != name {
+                    continue;
+                }
+            }
+            println!("\ntest case : {}", case.name);
+            println!("============================================================");
+            let rbs = parse_markdown_tables(case.data).unwrap();
+
+            let mut f = Funnel::new(case.opts);
+
+            for rb in rbs {
+                f.evaluate(&rb, &case.partition_exist)?;
+            }
+            f.finalize()?;
+            assert_eq!(f.debug, case.exp_debug);
+            assert_eq!(f.result, case.exp);
+            println!("PASSED");
+        }
+
+        Ok(())
     }
 }

@@ -1,13 +1,24 @@
+use std::sync::Arc;
+
 use arrow::array::BooleanArray;
 use arrow::array::TimestampMillisecondArray;
+use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use chrono::Duration;
+use datafusion::physical_expr::expressions::BinaryExpr;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
+use datafusion::physical_plan::expressions::Literal;
+use datafusion_common::ScalarValue;
+use datafusion_expr::Operator;
 
 use crate::error::Result;
+use crate::physical_plan::expressions::partitioned2::funnel::funnel::DebugStep;
+use crate::physical_plan::expressions::partitioned2::funnel::funnel::FunnelResult;
+use crate::physical_plan::expressions::partitioned2::funnel::funnel::Options;
 use crate::StaticArray;
+
 // mod trends_grouped;
 mod funnel;
 
@@ -184,3 +195,28 @@ fn evaluate_batch(
 
     Ok(res)
 }
+
+pub fn event_eq_(schema: &Schema, event: &str, order: StepOrder) -> (PhysicalExprRef, StepOrder) {
+    let l = Column::new_with_schema("event", schema).unwrap();
+    let r = Literal::new(ScalarValue::Utf8(Some(event.to_string())));
+    let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+    (Arc::new(expr) as PhysicalExprRef, order)
+}
+
+#[macro_export]
+macro_rules! event_eq {
+    ($schema:expr, $($name:literal $order:expr),+) => {
+        vec![
+            $(event_eq_($schema.as_ref(),$name,$order),)+
+            ]
+        }
+    }
+
+#[macro_export]
+macro_rules! expected_debug {
+    ($($ident:ident)+) => {
+        vec![
+            $(DebugStep::$ident,)+
+            ]
+    }
+    }
