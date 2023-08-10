@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::result;
@@ -68,28 +69,6 @@ pub struct FunnelResult {
     total_funnels: usize,
     completed_funnels: usize,
     steps: Vec<StepResult>,
-}
-
-impl FunnelResult {
-    // add result to self
-    pub fn add(&self, other: FunnelResult) -> FunnelResult {
-        let mut res = FunnelResult {
-            total_funnels: self.total_funnels + other.total_funnels,
-            completed_funnels: self.completed_funnels + other.completed_funnels,
-            steps: vec![],
-        };
-
-        for (idx, step) in self.steps.iter().enumerate() {
-            res.steps.push(StepResult {
-                count: step.count + other.steps[idx].count,
-                total_time: step.total_time + other.steps[idx].total_time,
-                total_time_from_start: step.total_time_from_start
-                    + other.steps[idx].total_time_from_start,
-            })
-        }
-
-        res
-    }
 }
 
 #[derive(Debug)]
@@ -279,7 +258,7 @@ impl Funnel {
         true
     }
 
-    fn result(&self) -> FunnelResult {
+    fn complete_partition(&self, result: &mut FunnelResult) {
         let is_completed = match &self.filter {
             // if no filter, then funnel is completed id all steps are completed
             None => self.cur_step == self.steps_count() - 1,
@@ -299,30 +278,10 @@ impl Funnel {
             },
         };
 
-        let mut result = FunnelResult {
-            total_funnels: 1,
-            completed_funnels: if is_completed { 1 } else { 0 },
-            steps: (0..self.steps.len())
-                .into_iter()
-                .map(|_| StepResult {
-                    count: 0,
-                    total_time: 0,
-                    total_time_from_start: 0,
-                })
-                .collect::<Vec<_>>(),
-        };
-
-        for step_id in 0..=self.cur_step {
-            result.steps[step_id].count += 1;
-            if step_id > 0 {
-                result.steps[step_id].total_time +=
-                    self.steps[step_id].ts - self.steps[step_id - 1].ts;
-                result.steps[step_id].total_time_from_start +=
-                    self.steps[step_id].ts - self.steps[0].ts;
-            }
+        result.total_funnels += 1;
+        if is_completed {
+            result.completed_funnels += 1;
         }
-
-        result
     }
 }
 
@@ -388,6 +347,9 @@ impl PartitionedAggregateExpr for Funnel {
         let mut row_id = 0;
         let mut batch_id = self.batch_id;
 
+        // to bypass borrow checker
+        let mut result = self.result.clone();
+
         loop {
             let mut batch = self.buf.get(&batch_id).unwrap();
             let cur_ts = batch.ts.value(row_id);
@@ -434,8 +396,7 @@ impl PartitionedAggregateExpr for Funnel {
             }
 
             if batch_id == self.batch_id && partitions.value(row_id) != self.cur_partition {
-                let result = self.result();
-                self.result = self.result.add(result);
+                self.complete_partition(&mut result);
 
                 self.debug.push((batch_id, row_id, DebugStep::NewPartition));
                 self.cur_partition = partitions.value(row_id);
@@ -447,17 +408,41 @@ impl PartitionedAggregateExpr for Funnel {
                 self.skip = false;
                 self.first_step = true;
             }
-            if !self.skip && batch.steps[self.cur_step].value(row_id) {
-                self.steps[self.cur_step].batch_id = batch_id;
-                self.steps[self.cur_step].row_id = row_id;
-                self.steps[self.cur_step].ts = cur_ts;
-                self.debug.push((batch_id, row_id, DebugStep::Step));
-                if self.cur_step < self.steps_count() - 1 {
-                    self.cur_step += 1;
-                } else {
-                    // make it stateful so we can test it
-                    self.debug.push((batch_id, row_id, DebugStep::Complete));
-                    self.skip = true;
+            if !self.skip {
+                let mut matched = false;
+                match &self.steps_orders[self.cur_step] {
+                    StepOrder::Sequential => {
+                        matched = batch.steps[self.cur_step].value(row_id);
+                    }
+                    StepOrder::Any(pairs) => {
+                        for (from, to) in pairs {
+                            for step in *from..=*to {
+                                matched = batch.steps[step].value(row_id);
+                                if matched {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if matched {
+                    result.steps[self.cur_step].count += 1;
+                    if self.cur_step > 0 {
+                        result.steps[self.cur_step].total_time +=
+                            cur_ts - self.steps[self.cur_step - 1].ts;
+                        result.steps[self.cur_step].total_time_from_start +=
+                            cur_ts - self.steps[0].ts;
+                    }
+                    self.steps[self.cur_step].batch_id = batch_id;
+                    self.steps[self.cur_step].row_id = row_id;
+                    self.steps[self.cur_step].ts = cur_ts;
+                    self.debug.push((batch_id, row_id, DebugStep::Step));
+                    if self.cur_step < self.steps_count() - 1 {
+                        self.cur_step += 1;
+                    } else {
+                        self.debug.push((batch_id, row_id, DebugStep::Complete));
+                        self.skip = true;
+                    }
                 }
             }
             row_id += 1;
@@ -473,15 +458,17 @@ impl PartitionedAggregateExpr for Funnel {
         }
 
         self.batch_id += 1;
+        self.result = result;
 
         Ok(())
     }
 
     fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
-        let result = self.result();
+        // bypassing borrow checker
+        let mut result = self.result.clone();
+        self.complete_partition(&mut result);
+        self.result = result.clone();
         // make it stateful so we can test it
-        self.result = self.result.add(result);
-        let result = self.result.clone();
 
         let mut total_funnels = Int64Builder::new();
         let mut completed_funnels = Int64Builder::new();
@@ -599,7 +586,9 @@ mod tests {
     use crate::physical_plan::expressions::partitioned2::funnel::Count;
     use crate::physical_plan::expressions::partitioned2::funnel::Count::Unique;
     use crate::physical_plan::expressions::partitioned2::funnel::ExcludeExpr;
+    use crate::physical_plan::expressions::partitioned2::funnel::Filter;
     use crate::physical_plan::expressions::partitioned2::funnel::StepOrder;
+    use crate::physical_plan::expressions::partitioned2::funnel::StepOrder::Any;
     use crate::physical_plan::expressions::partitioned2::funnel::StepOrder::Sequential;
     use crate::physical_plan::expressions::partitioned2::funnel::Touch;
     use crate::physical_plan::expressions::partitioned2::AggregateFunction;
@@ -1015,7 +1004,7 @@ mod tests {
                     completed_funnels: 1,
                     steps: vec![
                         StepResult {
-                            count: 1,
+                            count: 2,
                             total_time: 0,
                             total_time_from_start: 0,
                         },
@@ -1086,14 +1075,14 @@ mod tests {
                     completed_funnels: 1,
                     steps: vec![
                         StepResult {
-                            count: 1,
+                            count: 2,
                             total_time: 0,
                             total_time_from_start: 0,
                         },
                         StepResult {
-                            count: 1,
-                            total_time: 1,
-                            total_time_from_start: 1,
+                            count: 2,
+                            total_time: 2,
+                            total_time_from_start: 2,
                         },
                         StepResult {
                             count: 1,
@@ -1149,6 +1138,62 @@ mod tests {
                     completed_funnels: 1,
                     steps: vec![
                         StepResult {
+                            count: 2,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 2,
+                            total_time: 2,
+                            total_time_from_start: 2,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 2,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "3 steps in any order between 1-2 should pass".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e3          | 1          |
+| 1            | 2      | e2          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: vec![
+                        event_eq_(&schema, "e1", Sequential),
+                        event_eq_(&schema, "e2", Any(vec![(0, 2)])),
+                        event_eq_(&schema, "e3", Any(vec![(1, 2)])),
+                    ],
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 2, DebugStep::Step),
+                    (0, 2, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 1,
+                    steps: vec![
+                        StepResult {
                             count: 1,
                             total_time: 0,
                             total_time_from_start: 0,
@@ -1162,6 +1207,279 @@ mod tests {
                             count: 1,
                             total_time: 1,
                             total_time_from_start: 2,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "3 steps in a row should pass, 2 partitions".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 1          |
+| 1            | 2      | e3          | 1          |
+| 2            | 0      | e1          | 1          |
+| 2            | 1      | e2          | 1          |
+| 2            | 2      | e3          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 2, DebugStep::Step),
+                    (0, 2, DebugStep::Complete),
+                    (0, 3, DebugStep::NextRow),
+                    (0, 3, DebugStep::NewPartition),
+                    (0, 3, DebugStep::Step),
+                    (0, 4, DebugStep::NextRow),
+                    (0, 4, DebugStep::Step),
+                    (0, 5, DebugStep::NextRow),
+                    (0, 5, DebugStep::Step),
+                    (0, 5, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 2,
+                    completed_funnels: 2,
+                    steps: vec![
+                        StepResult {
+                            count: 2,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 2,
+                            total_time: 2,
+                            total_time_from_start: 2,
+                        },
+                        StepResult {
+                            count: 2,
+                            total_time: 2,
+                            total_time_from_start: 4,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "2 partition. First fails, second pass".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e1          | 1          |
+| 1            | 2      | e1          | 1          |
+| 2            | 0      | e1          | 1          |
+| 2            | 1      | e2          | 1          |
+| 2            | 2      | e3          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 3, DebugStep::NextRow),
+                    (0, 3, DebugStep::NewPartition),
+                    (0, 3, DebugStep::Step),
+                    (0, 4, DebugStep::NextRow),
+                    (0, 4, DebugStep::Step),
+                    (0, 5, DebugStep::NextRow),
+                    (0, 5, DebugStep::Step),
+                    (0, 5, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 2,
+                    completed_funnels: 1,
+                    steps: vec![
+                        StepResult {
+                            count: 2,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 2,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "dropoff on any should pass".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 1          |
+| 1            | 2      | e4          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: Some(Filter::DropOffOnAnyStep),
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 0,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 0,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "dropoff on second should pass".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 1          |
+| 1            | 2      | e4          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: Some(Filter::DropOffOnStep(2)),
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 1,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 0,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "dropoff on first step should fail".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 1          |
+| 1            | 2      | e4          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: Some(Filter::DropOffOnStep(0)),
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 0,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 0,
+                            total_time: 0,
+                            total_time_from_start: 0,
                         },
                     ],
                 },
