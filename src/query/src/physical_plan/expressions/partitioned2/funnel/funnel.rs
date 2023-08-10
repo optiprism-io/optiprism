@@ -48,7 +48,6 @@ struct Step {
     ts: i64,
     row_id: usize,
     batch_id: usize,
-    offset: usize,
 }
 
 #[derive(Debug)]
@@ -184,7 +183,6 @@ impl Funnel {
                     ts: 0,
                     row_id: 0,
                     batch_id: 0,
-                    offset: 0,
                 })
                 .collect(),
             buf: Default::default(),
@@ -281,111 +279,7 @@ impl Funnel {
         true
     }
 
-    // pub fn process_partition(&mut self, row_id: usize, partition: i64) {
-    // self.cur_step = 0;
-    // let mut cur_row_id = self.partition_start.row_id;
-    // let mut cur_batch_id = self.partition_start.batch_id;
-    // let mut batch = self.buf.get(&cur_batch_id).unwrap();
-    // let mut offset: usize = 0;
-    //
-    // while offset < self.partition_len as usize {
-    // let cur_ts = batch.ts.value(cur_row_id);
-    // println!(
-    // "pk {} ts {cur_ts} row {cur_row_id} batch {cur_batch_id} offset {offset}",
-    // self.cur_partition
-    // );
-    //
-    // if self.cur_step > 0 {
-    // if let Some(exclude) = &batch.exclude {
-    // if !self.check_exclude(exclude, cur_row_id) {
-    // self.debug.push((batch_id,row_id,DebugStep::ExcludeViolation));
-    // self.steps[0] = self.steps[self.cur_step].clone();
-    // self.cur_step = 0;
-    //
-    // continue, so this row will be processed twice, as possible first step as well
-    // continue;
-    // }
-    // }
-    //
-    // if cur_ts - self.steps[0].ts > self.window.num_milliseconds() {
-    // println!("out of window {cur_batch_id} {cur_row_id}");
-    // self.debug.push(DebugStep::OutOfWindow);
-    // self.cur_step = 0;
-    // offset = self.steps[self.cur_step].offset + 1;
-    // cur_row_id = self.steps[self.cur_step].row_id + 1;
-    // cur_batch_id = self.steps[self.cur_step].batch_id;
-    //
-    // continue;
-    // }
-    // }
-    //
-    // if batch.steps[self.cur_step].value(cur_row_id) {
-    // self.debug.push(DebugStep::Step);
-    //
-    // self.first_step = false;
-    // println!(
-    // "step {} as row {cur_row_id} batch {cur_batch_id}",
-    // self.cur_step
-    // );
-    //
-    // self.steps[self.cur_step] = Step {
-    // ts: cur_ts,
-    // row_id: cur_row_id,
-    // batch_id: cur_batch_id,
-    // offset,
-    // };
-    //
-    // if self.cur_step == 0 {
-    // if batch.constants.is_some() {
-    // self.const_row = Some(Row {
-    // row_id: cur_row_id,
-    // batch_id: cur_batch_id,
-    // })
-    // }
-    // } else {
-    // compare current value with constant
-    // get constant row
-    // if let Some(constants) = &batch.constants {
-    // if !self.check_constants(&constants, cur_row_id) {
-    // self.debug.push(DebugStep::ConstantViolation);
-    // println!("constant violation {cur_batch_id} {cur_row_id}");
-    // self.steps[0] = self.steps[self.cur_step].clone();
-    // self.cur_step = 0;
-    //
-    // continue;
-    // }
-    // }
-    // }
-    //
-    // if self.cur_step >= self.steps.len() - 1 {
-    // break;
-    // }
-    // self.cur_step += 1;
-    // }
-    // cur_row_id += 1;
-    // self.debug.push(DebugStep::NextRow);
-    // if cur_row_id >= batch.len() {
-    // cur_batch_id += 1;
-    // cur_row_id = 0;
-    // batch = self.buf.get(&cur_batch_id).unwrap();
-    // }
-    // offset += 1;
-    // }
-    // if self.cur_step == self.steps_count() - 1 {
-    // println!("complete!");
-    // }
-    //
-    // self.partition_len = 0;
-    //
-    // self.partition_start = Row {
-    // row_id,
-    // batch_id: self.batch_id,
-    // };
-    // self.cur_partition = partition;
-    // }
-
     fn result(&self) -> FunnelResult {
-        println!("! {}", self.cur_step);
         let is_completed = match &self.filter {
             // if no filter, then funnel is completed id all steps are completed
             None => self.cur_step == self.steps_count() - 1,
@@ -461,55 +355,6 @@ impl PartitionedAggregateExpr for Funnel {
         fields
     }
 
-    // fn evaluate(
-    // &mut self,
-    // batch: &RecordBatch,
-    // partition_exist: &HashMap<i64, ()>,
-    // ) -> crate::Result<()> {
-    // self.debug.clear();
-    // let funnel_batch = evaluate_batch(
-    // batch.to_owned(),
-    // &self.steps_expr,
-    // &self.exclude_expr,
-    // &self.constants,
-    // &self.ts_col,
-    // )?;
-    // self.buf.insert(self.batch_id, funnel_batch);
-    // let partitions = self
-    // .partition_col
-    // .evaluate(batch)?
-    // .into_array(batch.num_rows())
-    // .as_any()
-    // .downcast_ref::<Int64Array>()
-    // .unwrap()
-    // .clone();
-    //
-    // for (row_id, partition) in partitions.into_iter().enumerate() {
-    // let partition = partition.unwrap();
-    // if !self.check_partition_bounds(row_id, partition, partition_exist) {
-    // continue;
-    // }
-    //
-    // if !partition_exist.contains_key(&partition) {
-    // self.skip = true;
-    // continue;
-    // }
-    //
-    // if self.cur_partition != partition {
-    // self.process_partition(row_id, partition);
-    // let result = self.result();
-    // self.result = self.result.add(result);
-    // }
-    //
-    // println!("{row_id}");
-    // self.partition_len += 1;
-    // }
-    //
-    // self.batch_id += 1;
-    //
-    // Ok(())
-    // }
-
     fn evaluate(
         &mut self,
         batch: &RecordBatch,
@@ -562,10 +407,10 @@ impl PartitionedAggregateExpr for Funnel {
                 if cur_ts - self.steps[0].ts > self.window.num_milliseconds() {
                     self.debug.push((batch_id, row_id, DebugStep::OutOfWindow));
                     self.cur_step = 0;
-                    row_id = self.steps[self.cur_step].row_id + 1;
+                    row_id = self.steps[self.cur_step].row_id;
                     batch_id = self.steps[self.cur_step].batch_id;
 
-                    continue;
+                    // continue;
                 }
             }
 
@@ -603,6 +448,9 @@ impl PartitionedAggregateExpr for Funnel {
                 self.first_step = true;
             }
             if !self.skip && batch.steps[self.cur_step].value(row_id) {
+                self.steps[self.cur_step].batch_id = batch_id;
+                self.steps[self.cur_step].row_id = row_id;
+                self.steps[self.cur_step].ts = cur_ts;
                 self.debug.push((batch_id, row_id, DebugStep::Step));
                 if self.cur_step < self.steps_count() - 1 {
                     self.cur_step += 1;
@@ -612,7 +460,6 @@ impl PartitionedAggregateExpr for Funnel {
                     self.skip = true;
                 }
             }
-            self.debug.push((batch_id, row_id, DebugStep::NextRow));
             row_id += 1;
             if row_id >= batch.len() {
                 batch_id += 1;
@@ -622,6 +469,7 @@ impl PartitionedAggregateExpr for Funnel {
                 }
                 batch = self.buf.get(&batch_id).unwrap();
             }
+            self.debug.push((batch_id, row_id, DebugStep::NextRow));
         }
 
         self.batch_id += 1;
@@ -634,7 +482,6 @@ impl PartitionedAggregateExpr for Funnel {
         // make it stateful so we can test it
         self.result = self.result.add(result);
         let result = self.result.clone();
-        println!("result: {result:?}");
 
         let mut total_funnels = Int64Builder::new();
         let mut completed_funnels = Int64Builder::new();
@@ -694,7 +541,6 @@ impl PartitionedAggregateExpr for Funnel {
                     ts: 0,
                     row_id: 0,
                     batch_id: 0,
-                    offset: 0,
                 })
                 .collect(),
             buf: Default::default(),
@@ -851,7 +697,7 @@ mod tests {
         name: String,
         data: &'static str,
         opts: Options,
-        exp_debug: Vec<DebugStep>,
+        exp_debug: Vec<(usize, usize, DebugStep)>,
         partition_exist: HashMap<i64, ()>,
         exp: FunnelResult,
     }
@@ -866,9 +712,10 @@ mod tests {
             Field::new("const", DataType::Int64, false),
         ])) as SchemaRef;
 
-        let cases = vec![TestCase {
-            name: "3 steps in a row should pass".to_string(),
-            data: r#"
+        let cases = vec![
+            TestCase {
+                name: "3 steps in a row should pass".to_string(),
+                data: r#"
 | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
 |--------------|--------|-------------|------------|
 | 1            | 0      | e1          | 1          |
@@ -876,41 +723,450 @@ mod tests {
 | 1            | 2      | e3          | 1          |
 "#,
 
-            opts: Options {
-                ts_col: Column::new("ts", 1),
-                window: Duration::seconds(15),
-                steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
-                exclude: None,
-                constants: None,
-                count: Count::Unique,
-                filter: None,
-                touch: Touch::First,
-                partition_col: Column::new("user_id", 0),
-            },
-            exp_debug: expected_debug!(Step NextRow Step NextRow Step),
-            partition_exist: HashMap::from([(1, ())]),
-            exp: FunnelResult {
-                total_funnels: 1,
-                completed_funnels: 1,
-                steps: vec![
-                    StepResult {
-                        count: 1,
-                        total_time: 0,
-                        total_time_from_start: 0,
-                    },
-                    StepResult {
-                        count: 1,
-                        total_time: 1,
-                        total_time_from_start: 1,
-                    },
-                    StepResult {
-                        count: 1,
-                        total_time: 1,
-                        total_time_from_start: 2,
-                    },
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 2, DebugStep::Step),
+                    (0, 2, DebugStep::Complete),
                 ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 1,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 2,
+                        },
+                    ],
+                },
             },
-        }];
+            TestCase {
+                name: "3 steps in a row, 2 batches should pass".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+|||||
+| 1            | 1      | e2          | 1          |
+| 1            | 2      | e3          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (1, 0, DebugStep::Step),
+                    (1, 1, DebugStep::NextRow),
+                    (1, 1, DebugStep::Step),
+                    (1, 1, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 1,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 2,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "3 steps should pass".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 1          |
+| 1            | 1      | e2          | 1          |
+| 1            | 2      | e3          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 3, DebugStep::NextRow),
+                    (0, 3, DebugStep::Step),
+                    (0, 3, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 1,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 2,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "3 steps with same constant should pass".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 1          |
+| 1            | 2      | e3          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: Some(vec![Column::new_with_schema("const", &schema).unwrap()]),
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 2, DebugStep::Step),
+                    (0, 2, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 1,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 2,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "3 steps with different constant on second step should fail".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 2          |
+| 1            | 2      | e3          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: Some(vec![Column::new_with_schema("const", &schema).unwrap()]),
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::ConstantViolation),
+                    (0, 2, DebugStep::NextRow),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 0,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 0,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 0,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "3 steps with different constant on second step should continue and pass"
+                    .to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 2          |
+| 1            | 2      | e1          | 3          |
+| 1            | 3      | e2          | 3          |
+| 1            | 4      | e3          | 3          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: Some(vec![Column::new_with_schema("const", &schema).unwrap()]),
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::ConstantViolation),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 2, DebugStep::Step),
+                    (0, 3, DebugStep::NextRow),
+                    (0, 3, DebugStep::Step),
+                    (0, 4, DebugStep::NextRow),
+                    (0, 4, DebugStep::Step),
+                    (0, 4, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 1,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 2,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "3 steps with exclude should pass".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 1          |
+| 1            | 1      | e4          | 1          |
+| 1            | 2      | e3          | 1          |
+| 1            | 3      | e1          | 1          |
+| 1            | 4      | e2          | 1          |
+| 1            | 5      | e3          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::seconds(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: Some(vec![ExcludeExpr {
+                        expr: {
+                            let l = Column::new_with_schema("event", &schema).unwrap();
+                            let r = Literal::new(ScalarValue::Utf8(Some("e4".to_string())));
+                            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+                            Arc::new(expr) as PhysicalExprRef
+                        },
+                        steps: None,
+                    }]),
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 2, DebugStep::ExcludeViolation),
+                    (0, 3, DebugStep::NextRow),
+                    (0, 4, DebugStep::NextRow),
+                    (0, 4, DebugStep::Step),
+                    (0, 5, DebugStep::NextRow),
+                    (0, 5, DebugStep::Step),
+                    (0, 6, DebugStep::NextRow),
+                    (0, 6, DebugStep::Step),
+                    (0, 6, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 1,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 2,
+                        },
+                    ],
+                },
+            },
+            TestCase {
+                name: "3 steps in a row with window should pass".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 0      | e1          | 1          |
+| 1            | 1      | e2          | 1          |
+|||||
+| 1            | 5      | e3          | 1          |
+| 1            | 6      | e1          | 1          |
+| 1            | 7      | e2          | 1          |
+| 1            | 8      | e3          | 1          |
+"#,
+
+                opts: Options {
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::milliseconds(3),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (1, 0, DebugStep::OutOfWindow),
+                    (0, 1, DebugStep::NextRow),
+                    (1, 0, DebugStep::NextRow),
+                    (1, 1, DebugStep::NextRow),
+                    (1, 1, DebugStep::Step),
+                    (1, 2, DebugStep::NextRow),
+                    (1, 2, DebugStep::Step),
+                    (1, 3, DebugStep::NextRow),
+                    (1, 3, DebugStep::Step),
+                    (1, 3, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: FunnelResult {
+                    total_funnels: 1,
+                    completed_funnels: 1,
+                    steps: vec![
+                        StepResult {
+                            count: 1,
+                            total_time: 0,
+                            total_time_from_start: 0,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 1,
+                        },
+                        StepResult {
+                            count: 1,
+                            total_time: 1,
+                            total_time_from_start: 2,
+                        },
+                    ],
+                },
+            },
+        ];
 
         let run_only: Option<&str> = None;
         for case in cases.iter().cloned() {
@@ -929,8 +1185,8 @@ mod tests {
                 f.evaluate(&rb, &case.partition_exist)?;
             }
             f.finalize()?;
-            // assert_eq!(f.debug, case.exp_debug);
-            // assert_eq!(f.result, case.exp);
+            assert_eq!(f.debug, case.exp_debug);
+            assert_eq!(f.result, case.exp);
             println!("PASSED");
         }
 
