@@ -325,6 +325,7 @@ impl PartitionedAggregateExpr for Funnel {
             &self.exclude_expr,
             &self.constants,
             &self.ts_col,
+            &self.partition_col,
         )?;
         self.buf.insert(self.batch_id, funnel_batch);
         let partitions = self
@@ -344,6 +345,18 @@ impl PartitionedAggregateExpr for Funnel {
             };
             self.cur_partition = partitions.value(0);
         }
+
+        // clen up obsolete batches
+        let mut to_remove = Vec::with_capacity(self.buf.len() - 1);
+        for (idx, batch) in &self.buf {
+            if batch.first_partition < self.cur_partition {
+                to_remove.push(idx.to_owned())
+            }
+        }
+
+        for idx in to_remove {
+            self.buf.remove(&idx);
+        }
         let mut row_id = 0;
         let mut batch_id = self.batch_id;
 
@@ -361,7 +374,7 @@ impl PartitionedAggregateExpr for Funnel {
                         self.steps[0] = self.steps[self.cur_step].clone();
                         self.cur_step = 0;
 
-                        // continue, so this row will be processed twice, as possible first step as well
+                        // continue, so this row will be processed twice, possible first step as well
                         continue;
                     }
                 }

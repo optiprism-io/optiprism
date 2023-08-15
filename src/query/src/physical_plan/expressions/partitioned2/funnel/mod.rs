@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use arrow::array::BooleanArray;
+use arrow::array::Int64Array;
 use arrow::array::TimestampMillisecondArray;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
@@ -102,7 +103,8 @@ pub struct Batch {
     // optional constants
     pub ts: TimestampMillisecondArray,
     // timestamp
-    pub batch: RecordBatch, // ref to actual record batch
+    pub batch: RecordBatch,
+    pub first_partition: i64,
 }
 
 impl Batch {
@@ -118,6 +120,7 @@ fn evaluate_batch(
     exclude_expr: &Option<Vec<ExcludeExpr>>,
     constants: &Option<Vec<Column>>,
     ts_col: &Column,
+    partition_col: &Column,
 ) -> Result<Batch> {
     let mut steps = vec![];
     // evaluate steps
@@ -185,12 +188,21 @@ fn evaluate_batch(
         .unwrap()
         .clone();
 
+    let parr = partition_col
+        .evaluate(&batch)?
+        .into_array(batch.num_rows())
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap()
+        .clone();
+
     let res = Batch {
         steps,
         exclude,
         constants: constants_out,
         ts,
         batch,
+        first_partition: parr.value(0),
     };
 
     Ok(res)
