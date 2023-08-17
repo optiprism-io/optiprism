@@ -1,48 +1,82 @@
-use std::sync::Arc;
+struct Column(Vec<i64>);
 
-use chrono::Duration;
-use chrono::DurationRound;
-use chrono::NaiveDateTime;
+struct RecordBatch(Vec<Column>);
 
-fn main() {
-    let a1 = Arc::new(Int32Array::from_iter_values([-1, -1, 0, 3, 3])) as ArrayRef;
-    let a2 = Arc::new(StringArray::from_iter_values(["a", "b", "c", "d", "d"])) as ArrayRef;
-    let arrays = vec![a1, a2];
+struct Funnel {}
 
-    // Convert arrays to rows
-    let mut converter = RowConverter::new(vec![
-        SortField::new(DataType::Int32),
-        SortField::new(DataType::Utf8),
-    ])
-    .unwrap();
-    let rows = converter.convert_columns(&arrays).unwrap();
-
-    // Compare rows
-    for i in 0..4 {
-        assert!(rows.row(i) <= rows.row(i + 1));
+impl Funnel {
+    fn new(seq: Vec<usize>) -> Self {
+        unimplemented!()
     }
-    assert_eq!(rows.row(3), rows.row(4));
 
-    // Convert rows back to arrays
-    let converted = converter.convert_rows(&rows).unwrap();
-    assert_eq!(arrays, converted);
+    fn push(&mut self, batch: RecordBatch) -> Option<Vec<bool>> {
+        unimplemented!()
+    }
+    fn finalize(&self) -> bool {
+        unimplemented!()
+    }
+}
 
-    // Compare rows from different arrays
-    let a1 = Arc::new(Int32Array::from_iter_values([3, 4])) as ArrayRef;
-    let a2 = Arc::new(StringArray::from_iter_values(["e", "f"])) as ArrayRef;
-    let arrays = vec![a1, a2];
-    let rows2 = converter.convert_columns(&arrays).unwrap();
+// Определения:
+// Колонка — набор значений одного типа (Column)
+// Батч — набор колонок одинакового размера (RecordBatch)
+// Партиция - часть данных, объединённая одним значением ключа. В примере - 1,2,3,4
+// Ключ — значения из первой колонки
+// Значение — значения из второй колонки, В примере - 1,2,3,1,2,3,...
+// Последовательность - требуемая последовательность значений в заданном порядке
+// Последовательность задана как: 1,2,3
+// Между искомыми значениями могут встречаться произвольные значения
+//
+// Задача:
+// Для каждой партиции считать true, если последовательность найдена, иначе false
+// Учиывать то, что партиции (и значения) могут содержаться в разных батчах
+// Решение должно быть stateful. То есть каждый раз, когда батч "пушится", должен
+// возвращаться результат посчитанных партиций, либо None
+// Метод finalize возвращает последний результат, если он есть, либо false
+// Следует также учесть, что в реальности может быть произвольное количество батчей
+//
+// Пример ([партиция],[значения]):
+// Найденная партиция: [1,1,1],[1,2,3]
+// Найденная партиция: [1,1,1,1],[1,2,4,3]
+// Не найденная партиция: [1,1,1],[1,3,2]
+// Не найденная партиция: [1,1],[1,2]
 
-    assert!(rows.row(4) < rows2.row(0));
-    assert!(rows.row(4) < rows2.row(1));
+#[cfg(test)]
+mod tests {
+    use crate::Column;
+    use crate::Funnel;
+    use crate::RecordBatch;
 
-    // Convert selection of rows back to arrays
-    let selection = [rows.row(0), rows2.row(1), rows.row(2), rows2.row(0)];
-    let converted = converter.convert_rows(selection).unwrap();
-    let c1 = converted[0].as_primitive::<Int32Type>();
-    assert_eq!(c1.values(), &[-1, 4, 0, 3]);
+    #[test]
+    fn it_works() {
+        let mut funnel = Funnel::new(vec![1, 2, 3]);
 
-    let c2 = converted[1].as_string::<i32>();
-    let c2_values: Vec<_> = c2.iter().flatten().collect();
-    assert_eq!(&c2_values, &["a", "f", "c", "e"]);
+        let b1 = RecordBatch(vec![
+            Column(vec![1, 1, 1, 2, 2]),
+            Column(vec![1, 2, 3, 1, 2]),
+        ]);
+
+        let res = funnel.push(b1);
+        // партиция 1 найдена, результат партиции 2 ещё не определён
+        assert_eq!(Some(vec![true]), res);
+
+        let b2 = RecordBatch(vec![
+            Column(vec![2, 3, 3, 3, 3, 3, 4]),
+            Column(vec![3, 1, 2, 1, 4, 3, 1]),
+        ]);
+
+        let res = funnel.push(b2);
+        // партиция 2 собрана из двух батчей и найдена, также найдена партиция 3
+        assert_eq!(Some(vec![true, true]), res);
+
+        let b3 = RecordBatch(vec![Column(vec![4]), Column(vec![2])]);
+        // поскольку в батче только одна партиция, мы не можем знать, есть ли она дальше
+        // в батчах, поэтому возвращаем None
+        assert_eq!(None, res);
+
+        let res = funnel.finalize();
+        // финализируем результат, то есть вычисляем результат 4й прартиции. 4 партиция не имеет
+        // полной последовательности, поэтому falsr
+        assert_eq!(false, res);
+    }
 }
