@@ -102,7 +102,7 @@ struct Group {
     const_row: Option<Row>,
     cur_step: usize,
     steps: Vec<Step>,
-    result: Mutex<RefCell<FunnelResult>>,
+    buckets: FunnelResult,
     steps_completed: usize,
 }
 
@@ -148,7 +148,7 @@ impl Group {
                     batch_id: 0,
                 })
                 .collect::<Vec<_>>(),
-            result: Mutex::new(RefCell::new(FunnelResult { buckets })),
+            buckets: FunnelResult { buckets },
             steps_completed: 0,
         }
     }
@@ -192,7 +192,7 @@ impl Group {
         true
     }
 
-    pub fn push_result(&self, filter: &Option<Filter>, bucket_size: Duration) {
+    pub fn push_result(&mut self, filter: &Option<Filter>, bucket_size: Duration) {
         if self.steps_completed == 0 {
             return;
         }
@@ -222,27 +222,20 @@ impl Group {
         let ts = ts.duration_trunc(bucket_size).unwrap();
         let k = ts.timestamp_millis();
 
-        self.result
-            .lock()
-            .unwrap()
-            .get_mut()
-            .buckets
-            .entry(k)
-            .and_modify(|b| {
-                b.total_funnels += 1;
-                if is_completed {
-                    b.completed_funnels += 1;
-                }
+        self.buckets.buckets.entry(k).and_modify(|b| {
+            b.total_funnels += 1;
+            if is_completed {
+                b.completed_funnels += 1;
+            }
 
-                for idx in 0..self.steps_completed {
-                    b.steps[idx].count += 1;
-                    if idx > 0 {
-                        b.steps[idx].total_time += (self.steps[idx - 1].ts - self.steps[0].ts);
-                        b.steps[idx].total_time_from_start +=
-                            (self.steps[idx].ts - self.steps[0].ts);
-                    }
+            for idx in 0..self.steps_completed {
+                b.steps[idx].count += 1;
+                if idx > 0 {
+                    b.steps[idx].total_time += (self.steps[idx - 1].ts - self.steps[0].ts);
+                    b.steps[idx].total_time_from_start += (self.steps[idx].ts - self.steps[0].ts);
                 }
-            });
+            }
+        });
     }
 }
 
@@ -607,86 +600,85 @@ impl PartitionedAggregateExpr for Funnel {
     }
 
     fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
-        // self.push_result();
-        //
-        // let buckets = self.result.lock().unwrap().get_mut().buckets.clone();
-        // let arr_len = buckets.len();
-        // let steps = self.steps.len();
-        // let ts =
-        // TimestampMillisecondArray::from(buckets.iter().map(|(k, _)| *k).collect::<Vec<_>>());
-        // let mut total = Int64Builder::with_capacity(arr_len);
-        // let mut completed = Int64Builder::with_capacity(arr_len);
-        // let mut step_total = (0..steps)
-        // .into_iter()
-        // .map(|_| Int64Builder::with_capacity(arr_len))
-        // .collect::<Vec<_>>();
-        // let mut step_time_to_convert = (0..steps)
-        // .into_iter()
-        // .map(|_| Decimal128Builder::with_capacity(arr_len))
-        // .collect::<Vec<_>>();
-        // let mut step_time_to_convert_from_start = (0..steps)
-        // .into_iter()
-        // .map(|_| Decimal128Builder::with_capacity(arr_len))
-        // .collect::<Vec<_>>();
-        // for (k, b) in buckets {
-        // total.append_value(b.total_funnels);
-        // completed.append_value(b.completed_funnels);
-        // for (step_id, step) in b.steps.iter().enumerate() {
-        // step_total[step_id].append_value(step.count);
-        // let v = if step.count > 0 {
-        // println!("ttt {} {}", step.total_time, step.total_time / step.count);
-        // Decimal::from_i128_with_scale(step.total_time as i128, DECIMAL_SCALE as u32)
-        // / Decimal::from_i128_with_scale(step.count as i128, DECIMAL_SCALE as u32)
-        // } else {
-        // Decimal::from_i128_with_scale(0, 0)
-        // };
-        //
-        // step_time_to_convert[step_id].append_value(v.mantissa() * 10000000000); // fixme remove const
-        // let v = if step.count > 0 {
-        // Decimal::from_i128_with_scale(
-        // step.total_time_from_start as i128,
-        // DECIMAL_SCALE as u32,
-        // ) / Decimal::from_i128_with_scale(step.count as i128, DECIMAL_SCALE as u32)
-        // } else {
-        // Decimal::from_i128_with_scale(0, 0)
-        // };
-        // step_time_to_convert_from_start[step_id].append_value(v.mantissa() * 10000000000);
-        // }
-        // }
-        //
-        // let arrs: Vec<ArrayRef> = vec![
-        // Arc::new(ts),
-        // Arc::new(total.finish()),
-        // Arc::new(completed.finish()),
-        // ];
-        //
-        // let step_arrs = (0..steps)
-        // .into_iter()
-        // .map(|idx| {
-        // let mut arrs = vec![
-        // Arc::new(step_total[idx].finish()) as ArrayRef,
-        // Arc::new(
-        // step_time_to_convert[idx]
-        // .finish()
-        // .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
-        // .unwrap(),
-        // ) as ArrayRef,
-        // Arc::new(
-        // step_time_to_convert_from_start[idx]
-        // .finish()
-        // .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
-        // .unwrap(),
-        // ) as ArrayRef,
-        // ];
-        // arrs
-        // })
-        // .flatten()
-        // .collect::<Vec<_>>();
-        //
-        // let res = [arrs, step_arrs].concat();
-        //
-        // Ok(res)
-        unimplemented!()
+        self.single_group
+            .push_result(&self.filter, self.bucket_size.clone());
+        let buckets = &self.single_group.buckets.buckets;
+        let arr_len = buckets.len();
+        let steps = self.steps_len;
+        let ts =
+            TimestampMillisecondArray::from(buckets.iter().map(|(k, _)| *k).collect::<Vec<_>>());
+        let mut total = Int64Builder::with_capacity(arr_len);
+        let mut completed = Int64Builder::with_capacity(arr_len);
+        let mut step_total = (0..steps)
+            .into_iter()
+            .map(|_| Int64Builder::with_capacity(arr_len))
+            .collect::<Vec<_>>();
+        let mut step_time_to_convert = (0..steps)
+            .into_iter()
+            .map(|_| Decimal128Builder::with_capacity(arr_len))
+            .collect::<Vec<_>>();
+        let mut step_time_to_convert_from_start = (0..steps)
+            .into_iter()
+            .map(|_| Decimal128Builder::with_capacity(arr_len))
+            .collect::<Vec<_>>();
+        for (k, b) in buckets {
+            total.append_value(b.total_funnels);
+            completed.append_value(b.completed_funnels);
+            for (step_id, step) in b.steps.iter().enumerate() {
+                step_total[step_id].append_value(step.count);
+                let v = if step.count > 0 {
+                    println!("ttt {} {}", step.total_time, step.total_time / step.count);
+                    Decimal::from_i128_with_scale(step.total_time as i128, DECIMAL_SCALE as u32)
+                        / Decimal::from_i128_with_scale(step.count as i128, DECIMAL_SCALE as u32)
+                } else {
+                    Decimal::from_i128_with_scale(0, 0)
+                };
+
+                step_time_to_convert[step_id].append_value(v.mantissa() * 10000000000); // fixme remove const
+                let v = if step.count > 0 {
+                    Decimal::from_i128_with_scale(
+                        step.total_time_from_start as i128,
+                        DECIMAL_SCALE as u32,
+                    ) / Decimal::from_i128_with_scale(step.count as i128, DECIMAL_SCALE as u32)
+                } else {
+                    Decimal::from_i128_with_scale(0, 0)
+                };
+                step_time_to_convert_from_start[step_id].append_value(v.mantissa() * 10000000000);
+            }
+        }
+
+        let arrs: Vec<ArrayRef> = vec![
+            Arc::new(ts),
+            Arc::new(total.finish()),
+            Arc::new(completed.finish()),
+        ];
+
+        let step_arrs = (0..steps)
+            .into_iter()
+            .map(|idx| {
+                let mut arrs = vec![
+                    Arc::new(step_total[idx].finish()) as ArrayRef,
+                    Arc::new(
+                        step_time_to_convert[idx]
+                            .finish()
+                            .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                            .unwrap(),
+                    ) as ArrayRef,
+                    Arc::new(
+                        step_time_to_convert_from_start[idx]
+                            .finish()
+                            .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                            .unwrap(),
+                    ) as ArrayRef,
+                ];
+                arrs
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let res = [arrs, step_arrs].concat();
+
+        Ok(res)
     }
 
     fn make_new(&self) -> crate::Result<Box<dyn PartitionedAggregateExpr>> {
