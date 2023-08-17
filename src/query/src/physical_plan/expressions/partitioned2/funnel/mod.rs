@@ -25,6 +25,7 @@ mod funnel;
 // mod funnel_grouped;
 // mod funnel_grouped;
 mod funnel_trends;
+mod funnel_trends_mix;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum StepOrder {
