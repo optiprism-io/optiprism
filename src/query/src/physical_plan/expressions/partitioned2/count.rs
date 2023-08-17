@@ -32,13 +32,38 @@ use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::partitioned2::AggregateFunction;
 use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
 
+#[derive(Debug)]
+struct Bucket {
+    count: i64,
+    outer_fn: AggregateFunction,
+    first: bool,
+    last_partition: i64,
+}
+
+impl Bucket {
+    pub fn new(outer_fn: AggregateFunction) -> Self {
+        Self {
+            count: 0,
+            outer_fn,
+            first: true,
+            last_partition: 0,
+        }
+    }
+}
+
+struct Groups {
+    columns: Vec<Column>,
+    sort_fields: Vec<SortField>,
+    row_converter: RowConverter,
+    buckets: HashMap<OwnedRow, Bucket, RandomState>,
+}
+
 pub struct Count {
     filter: Option<PhysicalExprRef>,
     outer_fn: AggregateFunction,
+    groups: Option<Groups>,
+    single_bucket: Bucket,
     partition_col: Column,
-    count: i64,
-    first: bool,
-    last_partition: i64,
     skip: bool,
     skip_partition: i64,
 }
@@ -47,15 +72,26 @@ impl Count {
     pub fn try_new(
         filter: Option<PhysicalExprRef>,
         outer_fn: AggregateFunction,
+        groups: Option<(Vec<(Column, SortField)>)>,
         partition_col: Column,
     ) -> Result<Self> {
+        let groups = if let Some(pairs) = groups {
+            Some(Groups {
+                columns: pairs.iter().map(|(c, _)| c.clone()).collect(),
+                sort_fields: pairs.iter().map(|(_, s)| s.clone()).collect(),
+                row_converter: RowConverter::new(pairs.iter().map(|(_, s)| s.clone()).collect())?,
+                buckets: Default::default(),
+            })
+        } else {
+            None
+        };
+
         Ok(Self {
             filter,
-            outer_fn,
+            outer_fn: outer_fn.clone(),
+            groups,
+            single_bucket: Bucket::new(outer_fn),
             partition_col,
-            count: 0,
-            first: false,
-            last_partition: 0,
             skip: false,
             skip_partition: 0,
         })
@@ -64,7 +100,11 @@ impl Count {
 
 impl PartitionedAggregateExpr for Count {
     fn group_columns(&self) -> Vec<Column> {
-        vec![]
+        if let Some(groups) = &self.groups {
+            groups.columns.clone()
+        } else {
+            vec![]
+        }
     }
 
     fn fields(&self) -> Vec<Field> {
@@ -97,6 +137,21 @@ impl PartitionedAggregateExpr for Count {
             None
         };
 
+        let rows = if let Some(groups) = &mut self.groups {
+            let arrs = groups
+                .columns
+                .iter()
+                .map(|e| {
+                    e.evaluate(batch)
+                        .and_then(|v| Ok(v.into_array(batch.num_rows()).clone()))
+                })
+                .collect::<result::Result<Vec<_>, _>>()?;
+
+            Some(groups.row_converter.convert_columns(&arrs)?)
+        } else {
+            None
+        };
+
         let partitions = self
             .partition_col
             .evaluate(batch)?
@@ -120,9 +175,21 @@ impl PartitionedAggregateExpr for Count {
                 continue;
             }
 
-            if self.first {
-                self.first = false;
-                self.last_partition = partition;
+            let bucket = if let Some(groups) = &mut self.groups {
+                groups
+                    .buckets
+                    .entry(rows.as_ref().unwrap().row(row_id).owned())
+                    .or_insert_with(|| {
+                        let mut bucket = Bucket::new(self.outer_fn.clone());
+                        bucket
+                    })
+            } else {
+                &mut self.single_bucket
+            };
+
+            if bucket.first {
+                bucket.first = false;
+                bucket.last_partition = partition;
             }
 
             if let Some(filter) = &filter {
@@ -131,42 +198,69 @@ impl PartitionedAggregateExpr for Count {
                 }
             }
 
-            if self.last_partition != partition {
-                let v = self.count as i128;
-                self.outer_fn.accumulate(v);
-                self.last_partition = partition;
+            if bucket.last_partition != partition {
+                let v = bucket.count as i128;
+                bucket.outer_fn.accumulate(v);
+                bucket.last_partition = partition;
 
-                self.count = 0;
+                bucket.count = 0;
             }
-            self.count += 1;
+            bucket.count += 1;
         }
 
         Ok(())
     }
 
     fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
-        let mut res_col_b = Decimal128Builder::with_capacity(1);
-        res_col_b.append_value(self.outer_fn.result());
-        let res_col = res_col_b
-            .finish()
-            .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
-        let res_col = Arc::new(res_col) as ArrayRef;
-        Ok(vec![res_col])
+        if let Some(groups) = &mut self.groups {
+            let mut rows: Vec<Row> = Vec::with_capacity(groups.buckets.len());
+            let mut res_col_b = Decimal128Builder::with_capacity(groups.buckets.len());
+            for (row, bucket) in groups.buckets.iter_mut() {
+                rows.push(row.row());
+                bucket.outer_fn.accumulate(bucket.count as i128);
+                let res = bucket.outer_fn.result();
+                res_col_b.append_value(res);
+            }
+
+            let group_col = groups.row_converter.convert_rows(rows)?;
+            let res_col = res_col_b
+                .finish()
+                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
+            let res_col = Arc::new(res_col) as ArrayRef;
+            Ok(vec![group_col, vec![res_col]].concat())
+        } else {
+            let mut res_col_b = Decimal128Builder::with_capacity(1);
+            res_col_b.append_value(self.single_bucket.outer_fn.result());
+            let res_col = res_col_b
+                .finish()
+                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
+            let res_col = Arc::new(res_col) as ArrayRef;
+            Ok(vec![res_col])
+        }
     }
 
     fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>> {
-        let a = Count {
+        let groups = if let Some(groups) = &self.groups {
+            Some(Groups {
+                columns: groups.columns.clone(),
+                sort_fields: groups.sort_fields.clone(),
+                row_converter: RowConverter::new(groups.sort_fields.clone())?,
+                buckets: Default::default(),
+            })
+        } else {
+            None
+        };
+        let c = Count {
             filter: self.filter.clone(),
             outer_fn: self.outer_fn.clone(),
+            groups,
             partition_col: self.partition_col.clone(),
-            count: 0,
-            first: false,
-            last_partition: 0,
             skip: false,
             skip_partition: 0,
+            single_bucket: Bucket::new(self.outer_fn.clone()),
         };
 
-        Ok(Box::new(a))
+        Ok(Box::new(c))
     }
 }
 
@@ -176,13 +270,69 @@ mod tests {
 
     use arrow::array::Int64Array;
     use arrow::datatypes::DataType;
+    use arrow::datatypes::Schema;
+    use arrow::record_batch::RecordBatch;
     use arrow::row::SortField;
+    use arrow::util::pretty::print_batches;
     use datafusion::physical_expr::expressions::Column;
     use store::test_util::parse_markdown_tables;
 
     use crate::physical_plan::expressions::partitioned2::count::Count;
     use crate::physical_plan::expressions::partitioned2::AggregateFunction;
     use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
+
+    #[test]
+    fn count_sum_grouped() {
+        let data = r#"
+| user_id(i64) | device(utf8) | v(i64) | ts(ts) | event(utf8) |
+|--------------|--------------|-------|--------|-------------|
+| 0            | iphone       | 1     | 1      | e1          |
+| 0            | iphone       | 0     | 2      | e2          |
+| 0            | iphone       | 0     | 3      | e3          |
+| 0            | android      | 1     | 4      | e1          |
+| 0            | android      | 1     | 5      | e2          |
+| 0            | android      | 0     | 6      | e3          |
+| 1            | osx          | 1     | 1      | e1          |
+| 1            | osx          | 1     | 2      | e2          |
+| 1            | osx          | 0     | 3      | e3          |
+| 1            | osx          | 0     | 4      | e1          |
+| 1            | osx          | 0     | 5      | e2          |
+| 1            | osx          | 0     | 6      | e3          |
+| 2            | osx          | 1     | 1      | e1          |
+| 2            | osx          | 1     | 2      | e2          |
+| 2            | osx          | 0     | 3      | e3          |
+| 2            | osx          | 0     | 4      | e1          |
+| 2            | osx          | 0     | 5      | e2          |
+| 2            | osx          | 0     | 6      | e3          |
+| 3            | osx          | 1     | 1      | e1          |
+| 3            | osx          | 1     | 2      | e2          |
+| 3            | osx          | 0     | 3      | e3          |
+| 3            | osx          | 0     | 4      | e1          |
+| 3            | osx          | 0     | 5      | e2          |
+| 3            | osx          | 0     | 6      | e3          |
+| 4            | windows      | 0     | 6      | e3
+"#;
+        let res = parse_markdown_tables(data).unwrap();
+        let schema = res[0].schema().clone();
+        let groups = vec![(
+            Column::new_with_schema("device", &schema).unwrap(),
+            SortField::new(DataType::Utf8),
+        )];
+        let hash = HashMap::from([(0, ()), (1, ()), (4, ())]);
+        let mut count = Count::try_new(
+            None,
+            AggregateFunction::new_avg(),
+            Some(groups),
+            Column::new_with_schema("user_id", &schema).unwrap(),
+        )
+        .unwrap();
+        for b in res {
+            count.evaluate(&b, &hash).unwrap();
+        }
+
+        let res = count.finalize();
+        println!("{:?}", res);
+    }
 
     #[test]
     fn count_sum() {
@@ -213,7 +363,7 @@ mod tests {
 | 3            | osx          | 0     | 4      | e1          |
 | 3            | osx          | 0     | 5      | e2          |
 | 3            | osx          | 0     | 6      | e3          |
-| 4            | windows      | 0     | 6      | e3          
+| 4            | windows      | 0     | 6      | e3
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
@@ -221,6 +371,7 @@ mod tests {
         let mut count = Count::try_new(
             None,
             AggregateFunction::new_avg(),
+            None,
             Column::new_with_schema("user_id", &schema).unwrap(),
         )
         .unwrap();

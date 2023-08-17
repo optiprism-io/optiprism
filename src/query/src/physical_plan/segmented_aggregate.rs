@@ -353,8 +353,8 @@ mod tests {
     pub use datafusion_common::Result;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned2::count;
-    use crate::physical_plan::expressions::partitioned2::count_grouped::Count;
+    use crate::physical_plan::expressions::partitioned2::_count;
+    use crate::physical_plan::expressions::partitioned2::count::Count;
     use crate::physical_plan::expressions::partitioned2::AggregateFunction;
     use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
     use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
@@ -399,13 +399,14 @@ mod tests {
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
         let agg1 = {
-            let groups = vec![SortField::new(DataType::Utf8)];
-            let group_cols = vec![Column::new_with_schema("device", &schema).unwrap()];
+            let groups = vec![(
+                Column::new_with_schema("device", &schema).unwrap(),
+                SortField::new(DataType::Utf8),
+            )];
             let count = Count::try_new(
                 None,
                 AggregateFunction::new_avg(),
-                groups,
-                group_cols,
+                Some(groups),
                 Column::new_with_schema("user_id", &schema).unwrap(),
             )
             .unwrap();
@@ -417,18 +418,16 @@ mod tests {
 
         let agg2 = {
             let groups = vec![
-                SortField::new(DataType::Utf8),
+                (
+                    Column::new_with_schema("country", &schema).unwrap(),
+                    SortField::new(DataType::Utf8),
+                ),
                 // SortField::new(DataType::Utf8),
-            ];
-            let group_cols = vec![
-                Column::new_with_schema("country", &schema).unwrap(),
-                // Column::new_with_schema("device", &schema).unwrap(),
             ];
             let count = Count::try_new(
                 None,
                 AggregateFunction::new_sum(),
-                groups,
-                group_cols,
+                Some(groups),
                 Column::new_with_schema("user_id", &schema).unwrap(),
             )
             .unwrap();
@@ -528,7 +527,7 @@ mod tests {
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
         let agg1 = {
-            let count = count::Count::try_new(
+            let count = _count::Count::try_new(
                 None,
                 AggregateFunction::new_avg(),
                 Column::new_with_schema("user_id", &schema).unwrap(),
@@ -542,18 +541,16 @@ mod tests {
 
         let agg2 = {
             let groups = vec![
-                SortField::new(DataType::Utf8),
+                (
+                    Column::new_with_schema("country", &schema).unwrap(),
+                    SortField::new(DataType::Utf8),
+                ),
                 // SortField::new(DataType::Utf8),
-            ];
-            let group_cols = vec![
-                Column::new_with_schema("country", &schema).unwrap(),
-                // Column::new_with_schema("device", &schema).unwrap(),
             ];
             let count = Count::try_new(
                 None,
                 AggregateFunction::new_sum(),
-                groups,
-                group_cols,
+                Some(groups),
                 Column::new_with_schema("user_id", &schema).unwrap(),
             )
             .unwrap();

@@ -23,7 +23,7 @@ use crate::StaticArray;
 // mod trends_grouped;
 mod funnel;
 // mod funnel_grouped;
-mod funnel_grouped;
+// mod funnel_grouped;
 mod funnel_trends;
 
 #[derive(Debug, Clone, Eq, PartialEq)]

@@ -755,10 +755,10 @@ mod tests {
     use crate::event_eq;
     use crate::expected_debug;
     use crate::physical_plan::expressions::partitioned2::funnel::event_eq_;
-    use crate::physical_plan::expressions::partitioned2::funnel::funnel_trends::DebugStep;
-    use crate::physical_plan::expressions::partitioned2::funnel::funnel_trends::Funnel;
-    use crate::physical_plan::expressions::partitioned2::funnel::funnel_trends::FunnelResult;
-    use crate::physical_plan::expressions::partitioned2::funnel::funnel_trends::Options;
+    use crate::physical_plan::expressions::partitioned2::funnel::funnel_grouped::DebugStep;
+    use crate::physical_plan::expressions::partitioned2::funnel::funnel_grouped::Funnel;
+    use crate::physical_plan::expressions::partitioned2::funnel::funnel_grouped::FunnelResult;
+    use crate::physical_plan::expressions::partitioned2::funnel::funnel_grouped::Options;
     use crate::physical_plan::expressions::partitioned2::funnel::Count;
     use crate::physical_plan::expressions::partitioned2::funnel::Count::Unique;
     use crate::physical_plan::expressions::partitioned2::funnel::ExcludeExpr;
