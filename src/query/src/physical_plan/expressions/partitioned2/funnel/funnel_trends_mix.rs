@@ -105,6 +105,7 @@ struct Group {
 }
 
 impl Group {
+    // predefine buckets for each timestamp
     fn new(steps_len: usize, buckets: &[i64]) -> Self {
         let buckets = buckets
             .iter()
@@ -219,6 +220,7 @@ impl Group {
         let ts = ts.duration_trunc(bucket_size).unwrap();
         let k = ts.timestamp_millis();
 
+        // increment counters in bucket. Assume that bucket exist
         self.buckets.entry(k).and_modify(|b| {
             b.total_funnels += 1;
             if is_completed {
@@ -241,6 +243,7 @@ struct Groups {
     columns: Vec<Column>,
     sort_fields: Vec<SortField>,
     row_converter: RowConverter,
+    // hashmap of groups
     groups: HashMap<OwnedRow, Group, RandomState>,
 }
 
@@ -265,7 +268,9 @@ pub struct Funnel {
     debug: Vec<(usize, usize, DebugStep)>,
     buckets: Vec<i64>,
     bucket_size: Duration,
+    // groups when group by
     groups: Option<Groups>,
+    // special case for non-group
     single_group: Group,
     steps_len: usize,
 }
@@ -382,6 +387,7 @@ impl PartitionedAggregateExpr for Funnel {
             Field::new("completed", DataType::Int64, false),
         ];
 
+        // prepend group fields if we have grouping
         if let Some(groups) = &self.groups {
             let group_fields = groups
                 .columns
@@ -398,6 +404,7 @@ impl PartitionedAggregateExpr for Funnel {
             fields = [group_fields, fields].concat();
         }
 
+        // add fields for each step
         let mut step_fields = (0..self.steps_len)
             .into_iter()
             .map(|step_id| {
@@ -461,6 +468,7 @@ impl PartitionedAggregateExpr for Funnel {
             None
         };
 
+        // todo fixme
         // clen up obsolete batches
         // let mut to_remove = Vec::with_capacity(self.buf.len() - 1);
         // for (idx, batch) in &self.buf {
@@ -615,6 +623,7 @@ impl PartitionedAggregateExpr for Funnel {
     }
 
     fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
+        // in case of grouping make an array of groups (group_arrs)
         let (group_arrs, groups) = if let Some(groups) = &mut self.groups {
             let mut rows: Vec<arrow_row::Row> = Vec::with_capacity(groups.groups.len());
             for (row, group) in &mut groups.groups {
@@ -636,17 +645,21 @@ impl PartitionedAggregateExpr for Funnel {
             (None, vec![&self.single_group.buckets])
         };
 
-        println!("111 {:?}", group_arrs);
         let mut res = vec![];
 
+        // iterate over groups
         for (group_id, buckets) in groups.into_iter().enumerate() {
             let arr_len = buckets.len();
             let steps = self.steps_len;
+            // timestamp col
             let ts = TimestampMillisecondArray::from(
                 buckets.iter().map(|(k, _)| *k).collect::<Vec<_>>(),
             );
+            // total col
             let mut total = Int64Builder::with_capacity(arr_len);
+            // completed col
             let mut completed = Int64Builder::with_capacity(arr_len);
+            // step total col
             let mut step_total = (0..steps)
                 .into_iter()
                 .map(|_| Int64Builder::with_capacity(arr_len))
@@ -659,6 +672,8 @@ impl PartitionedAggregateExpr for Funnel {
                 .into_iter()
                 .map(|_| Decimal128Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
+
+            // iterate over buckets and fill values to builders
             for (_, bucket) in buckets {
                 total.append_value(bucket.total_funnels);
                 completed.append_value(bucket.completed_funnels);
@@ -693,10 +708,12 @@ impl PartitionedAggregateExpr for Funnel {
                 Arc::new(total.finish()),
                 Arc::new(completed.finish()),
             ];
+            // make groups
             if let Some(g) = &group_arrs {
                 let garr = g
                     .iter()
                     .map(|arr| {
+                        // make scalar value from group and stretch it to array size of buckets len
                         ScalarValue::try_from_array(arr.as_ref(), group_id)
                             .and_then(|v| Ok(v.to_array_of_size(buckets.len())))
                     })
