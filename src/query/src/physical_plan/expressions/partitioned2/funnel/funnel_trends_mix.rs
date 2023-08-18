@@ -11,6 +11,8 @@ use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::TimestampMillisecondArray;
+use arrow::compute::concat;
+use arrow::compute::concat_batches;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
@@ -31,6 +33,7 @@ use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
+use datafusion_common::ScalarValue;
 use rust_decimal::Decimal;
 
 use crate::error::QueryError;
@@ -85,11 +88,6 @@ struct BucketResult {
     steps: Vec<StepResult>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct FunnelResult {
-    buckets: HashMap<i64, BucketResult, RandomState>,
-}
-
 #[derive(Debug)]
 struct Group {
     skip: bool,
@@ -102,7 +100,7 @@ struct Group {
     const_row: Option<Row>,
     cur_step: usize,
     steps: Vec<Step>,
-    buckets: FunnelResult,
+    buckets: HashMap<i64, BucketResult, RandomState>,
     steps_completed: usize,
 }
 
@@ -148,7 +146,7 @@ impl Group {
                     batch_id: 0,
                 })
                 .collect::<Vec<_>>(),
-            buckets: FunnelResult { buckets },
+            buckets,
             steps_completed: 0,
         }
     }
@@ -217,12 +215,11 @@ impl Group {
             },
         };
 
-        println!("{:?}", self.steps);
         let mut ts = NaiveDateTime::from_timestamp_opt(self.steps[0].ts, 0).unwrap();
         let ts = ts.duration_trunc(bucket_size).unwrap();
         let k = ts.timestamp_millis();
 
-        self.buckets.buckets.entry(k).and_modify(|b| {
+        self.buckets.entry(k).and_modify(|b| {
             b.total_funnels += 1;
             if is_completed {
                 b.completed_funnels += 1;
@@ -244,11 +241,12 @@ struct Groups {
     columns: Vec<Column>,
     sort_fields: Vec<SortField>,
     row_converter: RowConverter,
-    buckets: HashMap<OwnedRow, Group, RandomState>,
+    groups: HashMap<OwnedRow, Group, RandomState>,
 }
 
 #[derive(Debug)]
 pub struct Funnel {
+    input_schema: SchemaRef,
     ts_col: Column,
     window: Duration,
     steps_expr: Vec<PhysicalExprRef>,
@@ -274,6 +272,7 @@ pub struct Funnel {
 
 #[derive(Debug, Clone)]
 pub struct Options {
+    pub schema: SchemaRef,
     pub ts_col: Column,
     from: DateTime<Utc>,
     to: DateTime<Utc>,
@@ -317,12 +316,13 @@ impl Funnel {
                 columns: pairs.iter().map(|(c, _)| c.clone()).collect(),
                 sort_fields: pairs.iter().map(|(_, s)| s.clone()).collect(),
                 row_converter: RowConverter::new(pairs.iter().map(|(_, s)| s.clone()).collect())?,
-                buckets: Default::default(),
+                groups: Default::default(),
             })
         } else {
             None
         };
         Ok(Self {
+            input_schema: opts.schema,
             ts_col: opts.ts_col,
             window: opts.window,
             steps_expr: opts
@@ -381,6 +381,22 @@ impl PartitionedAggregateExpr for Funnel {
             Field::new("total", DataType::Int64, false),
             Field::new("completed", DataType::Int64, false),
         ];
+
+        if let Some(groups) = &self.groups {
+            let group_fields = groups
+                .columns
+                .iter()
+                .map(|c| {
+                    Field::new(
+                        c.name(),
+                        c.data_type(&self.input_schema).unwrap(),
+                        c.nullable(&self.input_schema).unwrap(),
+                    )
+                })
+                .collect::<Vec<_>>();
+
+            fields = [group_fields, fields].concat();
+        }
 
         let mut step_fields = (0..self.steps_len)
             .into_iter()
@@ -446,17 +462,16 @@ impl PartitionedAggregateExpr for Funnel {
         };
 
         // clen up obsolete batches
-        let mut to_remove = Vec::with_capacity(self.buf.len() - 1);
+        // let mut to_remove = Vec::with_capacity(self.buf.len() - 1);
         // for (idx, batch) in &self.buf {
-        // if batch.first_partition < self.cur_partition {
-        // println!("!");
-        // to_remove.push(idx.to_owned())
-        // }
+        //     if batch.first_partition < self.cur_partition {
+        //         to_remove.push(idx.to_owned())
+        //     }
         // }
 
-        for idx in to_remove {
-            self.buf.remove(&idx);
-        }
+        // for idx in to_remove {
+        //     self.buf.remove(&idx);
+        // }
         let mut row_id = 0;
         let mut batch_id = self.batch_id;
 
@@ -469,7 +484,7 @@ impl PartitionedAggregateExpr for Funnel {
 
             let group = if let Some(groups) = &mut self.groups {
                 groups
-                    .buckets
+                    .groups
                     .entry(rows.as_ref().unwrap().row(row_id).owned())
                     .or_insert_with(|| {
                         let mut group = Group::new(self.steps_len, &self.buckets);
@@ -600,83 +615,127 @@ impl PartitionedAggregateExpr for Funnel {
     }
 
     fn finalize(&mut self) -> crate::Result<Vec<ArrayRef>> {
-        self.single_group
-            .push_result(&self.filter, self.bucket_size.clone());
-        let buckets = &self.single_group.buckets.buckets;
-        let arr_len = buckets.len();
-        let steps = self.steps_len;
-        let ts =
-            TimestampMillisecondArray::from(buckets.iter().map(|(k, _)| *k).collect::<Vec<_>>());
-        let mut total = Int64Builder::with_capacity(arr_len);
-        let mut completed = Int64Builder::with_capacity(arr_len);
-        let mut step_total = (0..steps)
-            .into_iter()
-            .map(|_| Int64Builder::with_capacity(arr_len))
-            .collect::<Vec<_>>();
-        let mut step_time_to_convert = (0..steps)
-            .into_iter()
-            .map(|_| Decimal128Builder::with_capacity(arr_len))
-            .collect::<Vec<_>>();
-        let mut step_time_to_convert_from_start = (0..steps)
-            .into_iter()
-            .map(|_| Decimal128Builder::with_capacity(arr_len))
-            .collect::<Vec<_>>();
-        for (k, b) in buckets {
-            total.append_value(b.total_funnels);
-            completed.append_value(b.completed_funnels);
-            for (step_id, step) in b.steps.iter().enumerate() {
-                step_total[step_id].append_value(step.count);
-                let v = if step.count > 0 {
-                    println!("ttt {} {}", step.total_time, step.total_time / step.count);
-                    Decimal::from_i128_with_scale(step.total_time as i128, DECIMAL_SCALE as u32)
-                        / Decimal::from_i128_with_scale(step.count as i128, DECIMAL_SCALE as u32)
-                } else {
-                    Decimal::from_i128_with_scale(0, 0)
-                };
-
-                step_time_to_convert[step_id].append_value(v.mantissa() * 10000000000); // fixme remove const
-                let v = if step.count > 0 {
-                    Decimal::from_i128_with_scale(
-                        step.total_time_from_start as i128,
-                        DECIMAL_SCALE as u32,
-                    ) / Decimal::from_i128_with_scale(step.count as i128, DECIMAL_SCALE as u32)
-                } else {
-                    Decimal::from_i128_with_scale(0, 0)
-                };
-                step_time_to_convert_from_start[step_id].append_value(v.mantissa() * 10000000000);
+        let (group_arrs, groups) = if let Some(groups) = &mut self.groups {
+            let mut rows: Vec<arrow_row::Row> = Vec::with_capacity(groups.groups.len());
+            for (row, group) in &mut groups.groups {
+                rows.push(row.row());
+                group.push_result(&self.filter, self.bucket_size.clone());
             }
+            let group_arrs = groups.row_converter.convert_rows(rows)?;
+
+            let buckets = groups
+                .groups
+                .iter()
+                .map(|g| &g.1.buckets)
+                .collect::<Vec<_>>();
+
+            (Some(group_arrs), buckets)
+        } else {
+            self.single_group
+                .push_result(&self.filter, self.bucket_size.clone());
+            (None, vec![&self.single_group.buckets])
+        };
+
+        println!("111 {:?}", group_arrs);
+        let mut res = vec![];
+
+        for (group_id, buckets) in groups.into_iter().enumerate() {
+            let arr_len = buckets.len();
+            let steps = self.steps_len;
+            let ts = TimestampMillisecondArray::from(
+                buckets.iter().map(|(k, _)| *k).collect::<Vec<_>>(),
+            );
+            let mut total = Int64Builder::with_capacity(arr_len);
+            let mut completed = Int64Builder::with_capacity(arr_len);
+            let mut step_total = (0..steps)
+                .into_iter()
+                .map(|_| Int64Builder::with_capacity(arr_len))
+                .collect::<Vec<_>>();
+            let mut step_time_to_convert = (0..steps)
+                .into_iter()
+                .map(|_| Decimal128Builder::with_capacity(arr_len))
+                .collect::<Vec<_>>();
+            let mut step_time_to_convert_from_start = (0..steps)
+                .into_iter()
+                .map(|_| Decimal128Builder::with_capacity(arr_len))
+                .collect::<Vec<_>>();
+            for (_, bucket) in buckets {
+                total.append_value(bucket.total_funnels);
+                completed.append_value(bucket.completed_funnels);
+                for (step_id, step) in bucket.steps.iter().enumerate() {
+                    step_total[step_id].append_value(step.count);
+                    let v = if step.count > 0 {
+                        Decimal::from_i128_with_scale(step.total_time as i128, DECIMAL_SCALE as u32)
+                            / Decimal::from_i128_with_scale(
+                                step.count as i128,
+                                DECIMAL_SCALE as u32,
+                            )
+                    } else {
+                        Decimal::from_i128_with_scale(0, 0)
+                    };
+
+                    step_time_to_convert[step_id].append_value(v.mantissa() * 10000000000); // fixme remove const
+                    let v = if step.count > 0 {
+                        Decimal::from_i128_with_scale(
+                            step.total_time_from_start as i128,
+                            DECIMAL_SCALE as u32,
+                        ) / Decimal::from_i128_with_scale(step.count as i128, DECIMAL_SCALE as u32)
+                    } else {
+                        Decimal::from_i128_with_scale(0, 0)
+                    };
+                    step_time_to_convert_from_start[step_id]
+                        .append_value(v.mantissa() * 10000000000);
+                }
+            }
+
+            let mut arrs: Vec<ArrayRef> = vec![
+                Arc::new(ts),
+                Arc::new(total.finish()),
+                Arc::new(completed.finish()),
+            ];
+            if let Some(g) = &group_arrs {
+                let garr = g
+                    .iter()
+                    .map(|arr| {
+                        ScalarValue::try_from_array(arr.as_ref(), group_id)
+                            .and_then(|v| Ok(v.to_array_of_size(buckets.len())))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                arrs = [garr, arrs].concat();
+            }
+
+            let step_arrs = (0..steps)
+                .into_iter()
+                .map(|idx| {
+                    let mut arrs = vec![
+                        Arc::new(step_total[idx].finish()) as ArrayRef,
+                        Arc::new(
+                            step_time_to_convert[idx]
+                                .finish()
+                                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                                .unwrap(),
+                        ) as ArrayRef,
+                        Arc::new(
+                            step_time_to_convert_from_start[idx]
+                                .finish()
+                                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                                .unwrap(),
+                        ) as ArrayRef,
+                    ];
+                    arrs
+                })
+                .flatten()
+                .collect::<Vec<_>>();
+            res.push([arrs, step_arrs].concat());
         }
 
-        let arrs: Vec<ArrayRef> = vec![
-            Arc::new(ts),
-            Arc::new(total.finish()),
-            Arc::new(completed.finish()),
-        ];
-
-        let step_arrs = (0..steps)
+        let res = (0..res[0].len())
             .into_iter()
-            .map(|idx| {
-                let mut arrs = vec![
-                    Arc::new(step_total[idx].finish()) as ArrayRef,
-                    Arc::new(
-                        step_time_to_convert[idx]
-                            .finish()
-                            .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
-                            .unwrap(),
-                    ) as ArrayRef,
-                    Arc::new(
-                        step_time_to_convert_from_start[idx]
-                            .finish()
-                            .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
-                            .unwrap(),
-                    ) as ArrayRef,
-                ];
-                arrs
+            .map(|col_id| {
+                let arrs = res.iter().map(|v| v[col_id].as_ref()).collect::<Vec<_>>();
+                concat(&arrs).unwrap()
             })
-            .flatten()
             .collect::<Vec<_>>();
-
-        let res = [arrs, step_arrs].concat();
 
         Ok(res)
     }
@@ -687,13 +746,14 @@ impl PartitionedAggregateExpr for Funnel {
                 columns: groups.columns.clone(),
                 sort_fields: groups.sort_fields.clone(),
                 row_converter: RowConverter::new(groups.sort_fields.clone())?,
-                buckets: Default::default(),
+                groups: Default::default(),
             })
         } else {
             None
         };
 
         let res = Self {
+            input_schema: self.input_schema.clone(),
             ts_col: self.ts_col.clone(),
             window: self.window.clone(),
             steps_expr: self.steps_expr.clone(),
@@ -750,7 +810,6 @@ mod tests {
     use crate::physical_plan::expressions::partitioned2::funnel::event_eq_;
     use crate::physical_plan::expressions::partitioned2::funnel::funnel_trends_mix::DebugStep;
     use crate::physical_plan::expressions::partitioned2::funnel::funnel_trends_mix::Funnel;
-    use crate::physical_plan::expressions::partitioned2::funnel::funnel_trends_mix::FunnelResult;
     use crate::physical_plan::expressions::partitioned2::funnel::funnel_trends_mix::Options;
     use crate::physical_plan::expressions::partitioned2::funnel::funnel_trends_mix::StepResult;
     use crate::physical_plan::expressions::partitioned2::funnel::Count;
@@ -813,6 +872,7 @@ mod tests {
         };
 
         let opts = Options {
+            schema: schema.clone(),
             ts_col: Column::new_with_schema("ts", &schema).unwrap(),
             from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
@@ -841,9 +901,6 @@ mod tests {
             f.evaluate(&b, &hash).unwrap();
         }
 
-        for (batch_id, row_id, op) in &f.debug {
-            println!("batch: {} row: {} op: {:?} ", batch_id, row_id, op);
-        }
         let res = f.finalize().unwrap();
 
         let b = RecordBatch::try_new(f.schema(), res).unwrap();
@@ -903,6 +960,7 @@ mod tests {
             SortField::new(DataType::Utf8),
         )];
         let opts = Options {
+            schema: schema.clone(),
             ts_col: Column::new_with_schema("ts", &schema).unwrap(),
             from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
                 .unwrap()
@@ -931,12 +989,9 @@ mod tests {
             f.evaluate(&b, &hash).unwrap();
         }
 
-        for (batch_id, row_id, op) in &f.debug {
-            println!("batch: {} row: {} op: {:?} ", batch_id, row_id, op);
-        }
-        // let res = f.finalize().unwrap();
+        let res = f.finalize().unwrap();
 
-        // let b = RecordBatch::try_new(f.schema(), res).unwrap();
-        // print_batches(&[b]).unwrap();
+        let b = RecordBatch::try_new(f.schema(), res).unwrap();
+        print_batches(&[b]).unwrap();
     }
 }

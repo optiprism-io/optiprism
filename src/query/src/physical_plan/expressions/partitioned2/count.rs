@@ -33,14 +33,14 @@ use crate::physical_plan::expressions::partitioned2::AggregateFunction;
 use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
 
 #[derive(Debug)]
-struct Bucket {
+struct Group {
     count: i64,
     outer_fn: AggregateFunction,
     first: bool,
     last_partition: i64,
 }
 
-impl Bucket {
+impl Group {
     pub fn new(outer_fn: AggregateFunction) -> Self {
         Self {
             count: 0,
@@ -55,14 +55,14 @@ struct Groups {
     columns: Vec<Column>,
     sort_fields: Vec<SortField>,
     row_converter: RowConverter,
-    buckets: HashMap<OwnedRow, Bucket, RandomState>,
+    groups: HashMap<OwnedRow, Group, RandomState>,
 }
 
 pub struct Count {
     filter: Option<PhysicalExprRef>,
     outer_fn: AggregateFunction,
     groups: Option<Groups>,
-    single_bucket: Bucket,
+    single_group: Group,
     partition_col: Column,
     skip: bool,
     skip_partition: i64,
@@ -80,7 +80,7 @@ impl Count {
                 columns: pairs.iter().map(|(c, _)| c.clone()).collect(),
                 sort_fields: pairs.iter().map(|(_, s)| s.clone()).collect(),
                 row_converter: RowConverter::new(pairs.iter().map(|(_, s)| s.clone()).collect())?,
-                buckets: Default::default(),
+                groups: Default::default(),
             })
         } else {
             None
@@ -90,7 +90,7 @@ impl Count {
             filter,
             outer_fn: outer_fn.clone(),
             groups,
-            single_bucket: Bucket::new(outer_fn),
+            single_group: Group::new(outer_fn),
             partition_col,
             skip: false,
             skip_partition: 0,
@@ -177,14 +177,14 @@ impl PartitionedAggregateExpr for Count {
 
             let bucket = if let Some(groups) = &mut self.groups {
                 groups
-                    .buckets
+                    .groups
                     .entry(rows.as_ref().unwrap().row(row_id).owned())
                     .or_insert_with(|| {
-                        let mut bucket = Bucket::new(self.outer_fn.clone());
+                        let mut bucket = Group::new(self.outer_fn.clone());
                         bucket
                     })
             } else {
-                &mut self.single_bucket
+                &mut self.single_group
             };
 
             if bucket.first {
@@ -213,12 +213,12 @@ impl PartitionedAggregateExpr for Count {
 
     fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
         if let Some(groups) = &mut self.groups {
-            let mut rows: Vec<Row> = Vec::with_capacity(groups.buckets.len());
-            let mut res_col_b = Decimal128Builder::with_capacity(groups.buckets.len());
-            for (row, bucket) in groups.buckets.iter_mut() {
+            let mut rows: Vec<Row> = Vec::with_capacity(groups.groups.len());
+            let mut res_col_b = Decimal128Builder::with_capacity(groups.groups.len());
+            for (row, group) in groups.groups.iter_mut() {
                 rows.push(row.row());
-                bucket.outer_fn.accumulate(bucket.count as i128);
-                let res = bucket.outer_fn.result();
+                group.outer_fn.accumulate(group.count as i128);
+                let res = group.outer_fn.result();
                 res_col_b.append_value(res);
             }
 
@@ -230,7 +230,7 @@ impl PartitionedAggregateExpr for Count {
             Ok(vec![group_col, vec![res_col]].concat())
         } else {
             let mut res_col_b = Decimal128Builder::with_capacity(1);
-            res_col_b.append_value(self.single_bucket.outer_fn.result());
+            res_col_b.append_value(self.single_group.outer_fn.result());
             let res_col = res_col_b
                 .finish()
                 .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
@@ -245,7 +245,7 @@ impl PartitionedAggregateExpr for Count {
                 columns: groups.columns.clone(),
                 sort_fields: groups.sort_fields.clone(),
                 row_converter: RowConverter::new(groups.sort_fields.clone())?,
-                buckets: Default::default(),
+                groups: Default::default(),
             })
         } else {
             None
@@ -257,7 +257,7 @@ impl PartitionedAggregateExpr for Count {
             partition_col: self.partition_col.clone(),
             skip: false,
             skip_partition: 0,
-            single_bucket: Bucket::new(self.outer_fn.clone()),
+            single_group: Group::new(self.outer_fn.clone()),
         };
 
         Ok(Box::new(c))
