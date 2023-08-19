@@ -91,7 +91,6 @@ struct BucketResult {
 #[derive(Debug)]
 struct Group {
     skip: bool,
-    skip_partition: i64,
     first: bool,
     cur_partition: i64,
     cur_row_id: i64,
@@ -128,7 +127,6 @@ impl Group {
 
         Self {
             skip: false,
-            skip_partition: 0,
             first: true,
             cur_partition: 0,
             cur_row_id: 0,
@@ -191,9 +189,9 @@ impl Group {
         true
     }
 
-    pub fn push_result(&mut self, filter: &Option<Filter>, bucket_size: Duration) {
+    pub fn push_result(&mut self, filter: &Option<Filter>, bucket_size: Duration) -> bool {
         if self.steps_completed == 0 {
-            return;
+            return false;
         }
         let steps_count = self.steps.len();
         let steps_completed = self.steps_completed;
@@ -217,6 +215,7 @@ impl Group {
         };
 
         let mut ts = NaiveDateTime::from_timestamp_opt(self.steps[0].ts, 0).unwrap();
+        println!("{ts} {bucket_size}");
         let ts = ts.duration_trunc(bucket_size).unwrap();
         let k = ts.timestamp_millis();
 
@@ -235,6 +234,8 @@ impl Group {
                 }
             }
         });
+
+        is_completed
     }
 }
 
@@ -270,6 +271,9 @@ pub struct Funnel {
     bucket_size: Duration,
     // groups when group by
     groups: Option<Groups>,
+    cur_partition: i64,
+    skip_partition: bool,
+    first: bool,
     // special case for non-group
     single_group: Group,
     steps_len: usize,
@@ -311,11 +315,15 @@ impl Funnel {
             .duration_trunc(opts.bucket_size)
             .unwrap()
             .timestamp_millis();
-        let v = (from..to)
+        let mut buckets = (from..to)
             .into_iter()
             .step_by(opts.bucket_size.num_milliseconds() as usize)
             .collect::<Vec<i64>>();
 
+        // case where bucket size is bigger than time range
+        if buckets.len() == 0 {
+            buckets.push(from);
+        }
         let groups = if let Some(pairs) = opts.groups {
             Some(Groups {
                 columns: pairs.iter().map(|(c, _)| c.clone()).collect(),
@@ -350,10 +358,13 @@ impl Funnel {
             batch_id: 0,
             processed_batches: 0,
             debug: Vec::with_capacity(100),
-            buckets: v.clone(),
+            buckets: buckets.clone(),
             bucket_size: opts.bucket_size,
             groups,
-            single_group: Group::new(opts.steps.len(), &v),
+            cur_partition: 0,
+            skip_partition: false,
+            first: true,
+            single_group: Group::new(opts.steps.len(), &buckets),
             steps_len: opts.steps.len(),
         })
     }
@@ -484,8 +495,16 @@ impl PartitionedAggregateExpr for Funnel {
         let mut batch_id = self.batch_id;
 
         loop {
+            if self.skip_partition {
+                println!("{:?} {}", self.cur_partition, partitions.value(row_id));
+                while self.cur_partition == partitions.value(row_id)
+                    && row_id < batch.num_rows() - 1
+                {
+                    row_id += 1;
+                }
+            }
             while !partition_exist.contains_key(&partitions.value(row_id))
-                && row_id < batch.num_rows()
+                && row_id < batch.num_rows() - 1
             {
                 row_id += 1;
             }
@@ -501,6 +520,9 @@ impl PartitionedAggregateExpr for Funnel {
             } else {
                 &mut self.single_group
             };
+            if self.first {
+                self.cur_partition = partitions.value(row_id);
+            }
 
             if group.first {
                 group.first = false;
@@ -560,6 +582,7 @@ impl PartitionedAggregateExpr for Funnel {
                 group.push_result(&self.filter, self.bucket_size.clone());
                 self.debug.push((batch_id, row_id, DebugStep::NewPartition));
                 group.cur_partition = partitions.value(row_id);
+                self.cur_partition = partitions.value(row_id);
                 group.partition_start = Row {
                     row_id: 0,
                     batch_id: self.batch_id,
@@ -599,7 +622,11 @@ impl PartitionedAggregateExpr for Funnel {
                         // uncommit for single funnel per partition
                         // self.skip = true;
 
-                        group.push_result(&self.filter, self.bucket_size.clone());
+                        let is_completed =
+                            group.push_result(&self.filter, self.bucket_size.clone());
+                        if is_completed && self.count == Count::Unique {
+                            self.skip_partition = true;
+                        }
                         group.cur_step = 0;
                         group.steps_completed = 0;
                     }
@@ -788,6 +815,9 @@ impl PartitionedAggregateExpr for Funnel {
             buckets: self.buckets.clone(),
             bucket_size: self.bucket_size,
             groups,
+            cur_partition: 0,
+            skip_partition: false,
+            first: true,
             single_group: Group::new(self.steps_len, &self.buckets),
             steps_len: self.steps_len,
         };
@@ -808,6 +838,7 @@ mod tests {
     use arrow::datatypes::SchemaRef;
     use arrow::record_batch::RecordBatch;
     use arrow::row::SortField;
+    use arrow::util::pretty::pretty_format_batches;
     use arrow::util::pretty::print_batches;
     use chrono::DateTime;
     use chrono::Duration;
@@ -840,23 +871,630 @@ mod tests {
     use crate::physical_plan::expressions::partitioned2::AggregateFunction;
     use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
 
+    #[derive(Debug, Clone)]
+    struct TestCase {
+        name: String,
+        data: &'static str,
+        opts: Options,
+        exp_debug: Vec<(usize, usize, DebugStep)>,
+        partition_exist: HashMap<i64, ()>,
+        exp: &'static str,
+    }
+
+    #[traced_test]
     #[test]
-    fn test() {
+    fn test_cases() -> anyhow::Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("user_id", DataType::Int64, false),
+            Field::new("ts", DataType::Int64, false),
+            Field::new("event", DataType::Utf8, false),
+            Field::new("const", DataType::Int64, false),
+        ])) as SchemaRef;
+
+        let cases = vec![
+            TestCase {
+                name: "3 steps in a row should pass".to_string(),
+                data: r#"
+| user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+|--------------|--------|-------------|------------|
+| 1            | 1976-01-01 12:00:00      | e1          | 1          |
+| 1            | 1976-01-01 13:00:00      | e2          | 1          |
+| 1            | 1976-01-01 14:00:00      | e3          | 1          |
+"#,
+
+                opts: Options {
+                    from: DateTime::parse_from_str(
+                        "1976-01-01 12:00:00 +0000",
+                        "%Y-%m-%d %H:%M:%S %z",
+                    )
+                    .unwrap()
+                    .with_timezone(&Utc),
+                    to: DateTime::parse_from_str(
+                        "1976-02-01 12:00:00 +0000",
+                        "%Y-%m-%d %H:%M:%S %z",
+                    )
+                    .unwrap()
+                    .with_timezone(&Utc),
+                    schema: schema.clone(),
+                    groups: None,
+                    ts_col: Column::new("ts", 1),
+                    window: Duration::minutes(15),
+                    steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+                    exclude: None,
+                    constants: None,
+                    count: Count::Unique,
+                    filter: None,
+                    touch: Touch::First,
+                    partition_col: Column::new("user_id", 0),
+                    bucket_size: Duration::minutes(10),
+                },
+                exp_debug: vec![
+                    (0, 0, DebugStep::Step),
+                    (0, 1, DebugStep::NextRow),
+                    (0, 1, DebugStep::Step),
+                    (0, 2, DebugStep::NextRow),
+                    (0, 2, DebugStep::Step),
+                    (0, 2, DebugStep::Complete),
+                ],
+                partition_exist: HashMap::from([(1, ())]),
+                exp: r#"
+asd
+                "#,
+            },
+            // TestCase {
+            // name: "3 steps in a row, 2 batches should pass".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // |||||
+            // | 1            | 1      | e2          | 1          |
+            // | 1            | 2      | e3          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: None,
+            // count: Count::Unique,
+            // filter: None,
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (1, 0, DebugStep::Step),
+            // (1, 1, DebugStep::NextRow),
+            // (1, 1, DebugStep::Step),
+            // (1, 1, DebugStep::Complete),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "3 steps should pass".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e2          | 1          |
+            // | 1            | 1      | e2          | 1          |
+            // | 1            | 2      | e3          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: None,
+            // count: Count::Unique,
+            // filter: None,
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::Step),
+            // (0, 2, DebugStep::NextRow),
+            // (0, 3, DebugStep::NextRow),
+            // (0, 3, DebugStep::Step),
+            // (0, 3, DebugStep::Complete),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "3 steps with same constant should pass".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e2          | 1          |
+            // | 1            | 2      | e3          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: Some(vec![Column::new_with_schema("const", &schema).unwrap()]),
+            // count: Count::Unique,
+            // filter: None,
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::Step),
+            // (0, 2, DebugStep::NextRow),
+            // (0, 2, DebugStep::Step),
+            // (0, 2, DebugStep::Complete),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "3 steps with different constant on second step should fail".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e2          | 2          |
+            // | 1            | 2      | e3          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: Some(vec![Column::new_with_schema("const", &schema).unwrap()]),
+            // count: Count::Unique,
+            // filter: None,
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::ConstantViolation),
+            // (0, 2, DebugStep::NextRow),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "3 steps with different constant on second step should continue and pass"
+            // .to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e2          | 2          |
+            // | 1            | 2      | e1          | 3          |
+            // | 1            | 3      | e2          | 3          |
+            // | 1            | 4      | e3          | 3          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: Some(vec![Column::new_with_schema("const", &schema).unwrap()]),
+            // count: Count::Unique,
+            // filter: None,
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::ConstantViolation),
+            // (0, 2, DebugStep::NextRow),
+            // (0, 2, DebugStep::Step),
+            // (0, 3, DebugStep::NextRow),
+            // (0, 3, DebugStep::Step),
+            // (0, 4, DebugStep::NextRow),
+            // (0, 4, DebugStep::Step),
+            // (0, 4, DebugStep::Complete),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "3 steps with exclude should pass".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e2          | 1          |
+            // | 1            | 1      | e4          | 1          |
+            // | 1            | 2      | e3          | 1          |
+            // | 1            | 3      | e1          | 1          |
+            // | 1            | 4      | e2          | 1          |
+            // | 1            | 5      | e3          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: Some(vec![ExcludeExpr {
+            // expr: {
+            // let l = Column::new_with_schema("event", &schema).unwrap();
+            // let r = Literal::new(ScalarValue::Utf8(Some("e4".to_string())));
+            // let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            // Arc::new(expr) as PhysicalExprRef
+            // },
+            // steps: None,
+            // }]),
+            // constants: None,
+            // count: Count::Unique,
+            // filter: None,
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::Step),
+            // (0, 2, DebugStep::NextRow),
+            // (0, 2, DebugStep::ExcludeViolation),
+            // (0, 3, DebugStep::NextRow),
+            // (0, 4, DebugStep::NextRow),
+            // (0, 4, DebugStep::Step),
+            // (0, 5, DebugStep::NextRow),
+            // (0, 5, DebugStep::Step),
+            // (0, 6, DebugStep::NextRow),
+            // (0, 6, DebugStep::Step),
+            // (0, 6, DebugStep::Complete),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "3 steps in a row with window should pass".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e2          | 1          |
+            // |||||
+            // | 1            | 5      | e3          | 1          |
+            // | 1            | 6      | e1          | 1          |
+            // | 1            | 7      | e2          | 1          |
+            // | 1            | 8      | e3          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::milliseconds(3),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: None,
+            // count: Count::Unique,
+            // filter: None,
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::Step),
+            // (1, 0, DebugStep::OutOfWindow),
+            // (0, 1, DebugStep::NextRow),
+            // (1, 0, DebugStep::NextRow),
+            // (1, 1, DebugStep::NextRow),
+            // (1, 1, DebugStep::Step),
+            // (1, 2, DebugStep::NextRow),
+            // (1, 2, DebugStep::Step),
+            // (1, 3, DebugStep::NextRow),
+            // (1, 3, DebugStep::Step),
+            // (1, 3, DebugStep::Complete),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "3 steps in any order between 1-2 should pass".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e3          | 1          |
+            // | 1            | 2      | e2          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: vec![
+            // event_eq_(&schema, "e1", Sequential),
+            // event_eq_(&schema, "e2", Any(vec![(0, 2)])),
+            // event_eq_(&schema, "e3", Any(vec![(1, 2)])),
+            // ],
+            // exclude: None,
+            // constants: None,
+            // count: Count::Unique,
+            // filter: None,
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::Step),
+            // (0, 2, DebugStep::NextRow),
+            // (0, 2, DebugStep::Step),
+            // (0, 2, DebugStep::Complete),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "3 steps in a row should pass, 2 partitions".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e2          | 1          |
+            // | 1            | 2      | e3          | 1          |
+            // | 2            | 0      | e1          | 1          |
+            // | 2            | 1      | e2          | 1          |
+            // | 2            | 2      | e3          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: None,
+            // count: Count::Unique,
+            // filter: None,
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::Step),
+            // (0, 2, DebugStep::NextRow),
+            // (0, 2, DebugStep::Step),
+            // (0, 2, DebugStep::Complete),
+            // (0, 3, DebugStep::NextRow),
+            // (0, 3, DebugStep::NewPartition),
+            // (0, 3, DebugStep::Step),
+            // (0, 4, DebugStep::NextRow),
+            // (0, 4, DebugStep::Step),
+            // (0, 5, DebugStep::NextRow),
+            // (0, 5, DebugStep::Step),
+            // (0, 5, DebugStep::Complete),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "2 partition. First fails, second pass".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e1          | 1          |
+            // | 1            | 2      | e1          | 1          |
+            // | 2            | 0      | e1          | 1          |
+            // | 2            | 1      | e2          | 1          |
+            // | 2            | 2      | e3          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: None,
+            // count: Count::Unique,
+            // filter: None,
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 2, DebugStep::NextRow),
+            // (0, 3, DebugStep::NextRow),
+            // (0, 3, DebugStep::NewPartition),
+            // (0, 3, DebugStep::Step),
+            // (0, 4, DebugStep::NextRow),
+            // (0, 4, DebugStep::Step),
+            // (0, 5, DebugStep::NextRow),
+            // (0, 5, DebugStep::Step),
+            // (0, 5, DebugStep::Complete),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "dropoff on any should pass".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e2          | 1          |
+            // | 1            | 2      | e4          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: None,
+            // count: Count::Unique,
+            // filter: Some(Filter::DropOffOnAnyStep),
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::Step),
+            // (0, 2, DebugStep::NextRow),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "dropoff on second should pass".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e2          | 1          |
+            // | 1            | 2      | e4          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: None,
+            // count: Count::Unique,
+            // filter: Some(Filter::DropOffOnStep(2)),
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::Step),
+            // (0, 2, DebugStep::NextRow),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: r#"
+            // asd
+            // "#
+            // },
+            // TestCase {
+            // name: "dropoff on first step should fail".to_string(),
+            // data: r#"
+            // | user_id(i64) | ts(ts) | event(utf8) | const(i64) |
+            // |--------------|--------|-------------|------------|
+            // | 1            | 0      | e1          | 1          |
+            // | 1            | 1      | e2          | 1          |
+            // | 1            | 2      | e4          | 1          |
+            // "#,
+            //
+            // opts: Options {
+            // ts_col: Column::new("ts", 1),
+            // window: Duration::seconds(15),
+            // steps: event_eq!(schema, "e1" Sequential, "e2" Sequential, "e3" Sequential),
+            // exclude: None,
+            // constants: None,
+            // count: Count::Unique,
+            // filter: Some(Filter::DropOffOnStep(0)),
+            // touch: Touch::First,
+            // partition_col: Column::new("user_id", 0),
+            // },
+            // exp_debug: vec![
+            // (0, 0, DebugStep::Step),
+            // (0, 1, DebugStep::NextRow),
+            // (0, 1, DebugStep::Step),
+            // (0, 2, DebugStep::NextRow),
+            // ],
+            // partition_exist: HashMap::from([(1, ())]),
+            // exp: FunnelResult {
+            // total_funnels: 1,
+            // completed_funnels: 0,
+            // steps: vec![
+            // StepResult {
+            // count: 1,
+            // total_time: 0,
+            // total_time_from_start: 0,
+            // },
+            // StepResult {
+            // count: 1,
+            // total_time: 1,
+            // total_time_from_start: 1,
+            // },
+            // StepResult {
+            // count: 0,
+            // total_time: 0,
+            // total_time_from_start: 0,
+            // },
+            // ],
+            // },
+            // },
+        ];
+
+        let run_only: Option<&str> = None;
+        for case in cases.iter().cloned() {
+            if let Some(name) = run_only {
+                if case.name != name {
+                    continue;
+                }
+            }
+            println!("\ntest case : {}", case.name);
+            println!("============================================================");
+            let rbs = parse_markdown_tables(case.data).unwrap();
+
+            let mut f = Funnel::try_new(case.opts).unwrap();
+
+            for rb in rbs {
+                f.evaluate(&rb, &case.partition_exist)?;
+            }
+            let res = f.finalize()?;
+            let rb = RecordBatch::try_new(f.schema(), res).unwrap();
+            let res = pretty_format_batches(&[rb]).unwrap();
+            assert_eq!(f.debug, case.exp_debug);
+            assert_eq!(format!("{}", res), case.exp);
+            println!("PASSED");
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test3() {
         let data = r#"
 | u(i64) | ts(ts) | v(i64) | c(i64) |
 |--------|--------|--------|--------|
 | 1      | 2020-04-12 22:10:57      | 1      | 1      |
 | 1      | 2020-04-12 22:11:57      | 2      | 1      |
 | 1      | 2020-04-12 22:12:57      | 3      | 1      |
-|||||
 | 1      | 2020-04-12 22:13:57      | 1      | 1      |
-| 1      | 2020-04-12 22:15:57      | 2      | 1      |
-| 1      | 2020-04-12 22:17:57      | 3      | 1      |
-|||||
-| 2      | 2020-04-12 22:10:57      | 1      | 1      |
-|||||
-| 2      | 2020-04-12 22:11:57      | 2      | 1      |
-| 2      | 2020-04-12 22:12:57      | 3      | 1      |
+| 1      | 2020-04-12 22:14:57      | 2      | 1      |
+| 1      | 2020-04-12 22:15:57      | 3      | 1      |
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
@@ -922,6 +1560,94 @@ mod tests {
 
         let b = RecordBatch::try_new(f.schema(), res).unwrap();
         print_batches(&[b]).unwrap();
+    }
+
+    #[test]
+    fn test2() {
+        let data = r#"
+| u(i64) | ts(ts) | v(i64) | c(i64) |
+|--------|--------|--------|--------|
+| 1      | 2020-04-12 22:10:57      | 1      | 1      |
+| 1      | 2020-04-12 22:11:57      | 2      | 1      |
+| 1      | 2020-04-12 22:12:57      | 3      | 1      |
+|||||
+| 1      | 2020-04-12 22:13:57      | 1      | 1      |
+| 1      | 2020-04-12 22:15:57      | 2      | 1      |
+| 1      | 2020-04-12 22:17:57      | 3      | 1      |
+|||||
+| 2      | 2020-04-12 22:10:57      | 1      | 1      |
+|||||
+| 2      | 2020-04-12 22:11:57      | 2      | 1      |
+| 2      | 2020-04-12 22:12:57      | 3      | 1      |
+"#;
+        let res = parse_markdown_tables(data).unwrap();
+        let schema = res[0].schema().clone();
+        let hash = HashMap::from([(0, ()), (1, ()), (2, ()), (3, ())]);
+
+        let e1 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(1)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e2 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(2)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e3 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(3)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+
+        let ex = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(4)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            Arc::new(expr) as PhysicalExprRef
+        };
+
+        let opts = Options {
+            schema: schema.clone(),
+            ts_col: Column::new_with_schema("ts", &schema).unwrap(),
+            from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+                .unwrap()
+                .with_timezone(&Utc),
+            to: DateTime::parse_from_str("2020-04-12 22:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+                .unwrap()
+                .with_timezone(&Utc),
+            window: Duration::seconds(100),
+            steps: vec![e1, e2, e3],
+            exclude: Some(vec![ExcludeExpr {
+                expr: ex,
+                steps: None,
+            }]),
+            // exclude: None,
+            constants: None,
+            // constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),
+            count: Unique,
+            filter: None,
+            touch: Touch::First,
+            partition_col: Column::new_with_schema("u", &schema).unwrap(),
+            bucket_size: Duration::minutes(1),
+            groups: None,
+        };
+        let mut f = Funnel::try_new(opts).unwrap();
+        for b in res {
+            f.evaluate(&b, &hash).unwrap();
+        }
+
+        let res = f.finalize().unwrap();
+
+        let b = RecordBatch::try_new(f.schema(), res).unwrap();
+        print_batches(&[b]).unwrap();
+
+        for (_, _, ds) in f.debug {
+            println!("{ds:?}");
+        }
     }
 
     #[test]
@@ -999,6 +1725,90 @@ mod tests {
             touch: Touch::First,
             partition_col: Column::new_with_schema("u", &schema).unwrap(),
             bucket_size: Duration::minutes(1),
+            groups: Some(groups),
+        };
+        let mut f = Funnel::try_new(opts).unwrap();
+        for b in res {
+            f.evaluate(&b, &hash).unwrap();
+        }
+
+        let res = f.finalize().unwrap();
+
+        let b = RecordBatch::try_new(f.schema(), res).unwrap();
+        print_batches(&[b]).unwrap();
+    }
+
+    #[test]
+    fn test_groups2() {
+        let data = r#"
+| u(i64) | ts(ts)              | device(utf8) | v(i64) | c(i64) |
+|--------|---------------------|--------------|--------|--------|
+| 1      | 2020-04-12 22:10:57 | iphone       | 1      | 1      |
+| 1      | 2020-04-12 22:11:57 | iphone       | 2      | 1      |
+| 1      | 2020-04-12 22:12:57 | iphone       | 3      | 1      |
+|        |                     |              |        |        |
+| 1      | 2020-04-12 22:13:57 | android      | 1      | 1      |
+| 1      | 2020-04-12 22:15:57 | android      | 2      | 1      |
+| 1      | 2020-04-12 22:17:57 | android      | 3      | 1      |
+| 3      | 2020-04-12 22:17:57 | android      | 1      | 1      |
+"#;
+        let res = parse_markdown_tables(data).unwrap();
+        let schema = res[0].schema().clone();
+        let hash = HashMap::from([(1, ())]);
+
+        let e1 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(1)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e2 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(2)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+        let e3 = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(3)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+        };
+
+        let ex = {
+            let l = Column::new_with_schema("v", &schema).unwrap();
+            let r = Literal::new(ScalarValue::Int64(Some(4)));
+            let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+            Arc::new(expr) as PhysicalExprRef
+        };
+
+        let groups = vec![(
+            Column::new_with_schema("device", &schema).unwrap(),
+            SortField::new(DataType::Utf8),
+        )];
+        let opts = Options {
+            schema: schema.clone(),
+            ts_col: Column::new_with_schema("ts", &schema).unwrap(),
+            from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+                .unwrap()
+                .with_timezone(&Utc),
+            to: DateTime::parse_from_str("2020-04-12 22:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+                .unwrap()
+                .with_timezone(&Utc),
+            window: Duration::milliseconds(1200),
+            steps: vec![e1, e2, e3],
+            exclude: Some(vec![ExcludeExpr {
+                expr: ex,
+                steps: None,
+            }]),
+            // exclude: None,
+            constants: None,
+            // constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),
+            count: Unique,
+            filter: None,
+            touch: Touch::First,
+            partition_col: Column::new_with_schema("u", &schema).unwrap(),
+            bucket_size: Duration::days(1),
             groups: Some(groups),
         };
         let mut f = Funnel::try_new(opts).unwrap();

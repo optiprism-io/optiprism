@@ -15,16 +15,12 @@ use datafusion_common::ScalarValue;
 use datafusion_expr::Operator;
 
 use crate::error::Result;
-use crate::physical_plan::expressions::partitioned2::funnel::funnel::DebugStep;
-use crate::physical_plan::expressions::partitioned2::funnel::funnel::FunnelResult;
-use crate::physical_plan::expressions::partitioned2::funnel::funnel::Options;
 use crate::StaticArray;
 
 // mod trends_grouped;
-mod funnel;
+// mod funnel;
 // mod funnel_grouped;
 // mod funnel_grouped;
-mod funnel_trends;
 mod funnel_trends_mix;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -63,7 +59,7 @@ pub enum Touch {
     Step(usize),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Count {
     Unique,
     NonUnique,
