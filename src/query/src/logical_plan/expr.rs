@@ -106,7 +106,7 @@ pub fn aggregate_partitioned(
     // determine state types
     let state_types: Vec<DataType> = state_types(rtype.clone(), &outer_fun)?;
 
-    // make partitioned aggregate factory
+    // make _partitioned aggregate factory
     let pagg = PartitionedAggregate::try_new(
         partition_by.get_type(input_schema)?,
         args[0].get_type(input_schema)?,

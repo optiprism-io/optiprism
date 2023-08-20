@@ -42,7 +42,7 @@ use futures::Stream;
 use futures::StreamExt;
 
 use crate::error::QueryError;
-use crate::physical_plan::expressions::segmentation2::SegmentExpr;
+use crate::physical_plan::expressions::segmentation::SegmentExpr;
 use crate::Result;
 
 pub struct SegmentExec {
@@ -270,9 +270,9 @@ mod tests {
     use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::segmentation2::boolean_op;
-    use crate::physical_plan::expressions::segmentation2::count::Count;
-    use crate::physical_plan::expressions::segmentation2::time_range::TimeRange;
+    use crate::physical_plan::expressions::segmentation::boolean_op;
+    use crate::physical_plan::expressions::segmentation::count::Count;
+    use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
     use crate::physical_plan::partition::PartitionExec;
     use crate::physical_plan::segment::SegmentExec;
 

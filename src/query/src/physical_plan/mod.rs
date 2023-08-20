@@ -12,8 +12,8 @@ pub mod expressions;
 pub mod merge;
 mod pivot;
 pub mod planner;
-// mod segmentation;
-// mod segmentation;
+// mod _segmentation;
+// mod _segmentation;
 // mod partitioned_aggregate;
 // mod partitioned_aggregate;
 // mod segmented_aggregate;
@@ -320,13 +320,13 @@ pub fn batch_id(b: &RecordBatch) -> usize {
 // use store::test_util::parse_markdown_table;
 //
 // use crate::event_eq;
-// use crate::physical_plan::expressions::partitioned::funnel::funnel::test_utils::event_eq_;
-// use crate::physical_plan::expressions::partitioned::funnel::funnel::FunnelExpr;
-// use crate::physical_plan::expressions::partitioned::funnel::funnel::Options;
-// use crate::physical_plan::expressions::partitioned::funnel::Count;
-// use crate::physical_plan::expressions::partitioned::funnel::FunnelResult;
-// use crate::physical_plan::expressions::partitioned::funnel::StepOrder::Sequential;
-// use crate::physical_plan::expressions::partitioned::funnel::Touch;
+// use crate::physical_plan::expressions::_partitioned::funnel::funnel::test_utils::event_eq_;
+// use crate::physical_plan::expressions::_partitioned::funnel::funnel::FunnelExpr;
+// use crate::physical_plan::expressions::_partitioned::funnel::funnel::Options;
+// use crate::physical_plan::expressions::_partitioned::funnel::Count;
+// use crate::physical_plan::expressions::_partitioned::funnel::FunnelResult;
+// use crate::physical_plan::expressions::_partitioned::funnel::StepOrder::Sequential;
+// use crate::physical_plan::expressions::_partitioned::funnel::Touch;
 // use crate::physical_plan::expressions::funnel::{Count, FunnelExpr, Options, Touch};
 // use crate::physical_plan::{abs_row_id, PartitionState};
 //

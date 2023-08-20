@@ -4,14 +4,14 @@ use num_traits::Bounded;
 use num_traits::Zero;
 use rust_decimal::Decimal;
 
+// pub mod _partitioned;
+// pub mod _segmentation;
 pub mod aggregate;
 pub mod partitioned;
-pub mod partitioned2;
 pub mod partitioned_aggregate;
 pub mod partitioned_count;
 pub mod partitioned_sum;
 pub mod segmentation;
-pub mod segmentation2;
 pub mod sorted_distinct_count;
 // psub mod funnel2;
 

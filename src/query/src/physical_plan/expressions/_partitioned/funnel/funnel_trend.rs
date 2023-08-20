@@ -49,18 +49,18 @@ use crate::error::QueryError;
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::abs_row_id_refs;
-use crate::physical_plan::expressions::partitioned::funnel::evaluate_batch;
-use crate::physical_plan::expressions::partitioned::funnel::next_span;
-use crate::physical_plan::expressions::partitioned::funnel::Batch;
-use crate::physical_plan::expressions::partitioned::funnel::Count;
-use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
-use crate::physical_plan::expressions::partitioned::funnel::ExcludeExpr;
-use crate::physical_plan::expressions::partitioned::funnel::Filter;
-use crate::physical_plan::expressions::partitioned::funnel::FunnelResult;
-use crate::physical_plan::expressions::partitioned::funnel::Span;
-use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
-use crate::physical_plan::expressions::partitioned::funnel::Touch;
-use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::_partitioned::funnel::evaluate_batch;
+use crate::physical_plan::expressions::_partitioned::funnel::next_span;
+use crate::physical_plan::expressions::_partitioned::funnel::Batch;
+use crate::physical_plan::expressions::_partitioned::funnel::Count;
+use crate::physical_plan::expressions::_partitioned::funnel::Count::Unique;
+use crate::physical_plan::expressions::_partitioned::funnel::ExcludeExpr;
+use crate::physical_plan::expressions::_partitioned::funnel::Filter;
+use crate::physical_plan::expressions::_partitioned::funnel::FunnelResult;
+use crate::physical_plan::expressions::_partitioned::funnel::Span;
+use crate::physical_plan::expressions::_partitioned::funnel::StepOrder;
+use crate::physical_plan::expressions::_partitioned::funnel::Touch;
+use crate::physical_plan::expressions::_partitioned::PartitionedAggregateExpr;
 use crate::StaticArray;
 
 #[derive(Clone, Debug)]
@@ -533,14 +533,14 @@ mod tests {
     use futures::SinkExt;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::Buckets;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::DateTimeBuckets;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::FunnelTrend;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel_trend::Options;
-    use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
-    use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
-    use crate::physical_plan::expressions::partitioned::funnel::Touch;
-    use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::_partitioned::funnel::funnel_trend::Buckets;
+    use crate::physical_plan::expressions::_partitioned::funnel::funnel_trend::DateTimeBuckets;
+    use crate::physical_plan::expressions::_partitioned::funnel::funnel_trend::FunnelTrend;
+    use crate::physical_plan::expressions::_partitioned::funnel::funnel_trend::Options;
+    use crate::physical_plan::expressions::_partitioned::funnel::Count::Unique;
+    use crate::physical_plan::expressions::_partitioned::funnel::StepOrder;
+    use crate::physical_plan::expressions::_partitioned::funnel::Touch;
+    use crate::physical_plan::expressions::_partitioned::PartitionedAggregateExpr;
 
     #[test]
     fn test_funnel() {

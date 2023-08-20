@@ -118,7 +118,7 @@ macro_rules! dictionary_prop_to_col {
     }};
 }
 impl LogicalPlanBuilder {
-    /// creates logical plan for event segmentation
+    /// creates logical plan for event _segmentation
     pub async fn build(
         ctx: Context,
         cur_time: DateTime<Utc>,

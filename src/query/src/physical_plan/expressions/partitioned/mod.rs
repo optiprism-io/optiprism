@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -9,8 +10,11 @@ use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::TimestampMillisecondArray;
+use arrow::buffer::ScalarBuffer;
 use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
 use arrow::record_batch::RecordBatch;
+use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion_expr::ColumnarValue;
 use datafusion_expr::Operator;
@@ -18,17 +22,18 @@ use tracing::debug;
 
 use crate::error::Result;
 use crate::physical_plan::abs_row_id_refs;
-use crate::Column;
 
 // pub mod aggregate;
 // pub mod aggregator;
 // pub mod comparison;
 // pub mod count;
+// pub mod count2;
+// pub mod count_grouped;
 pub mod count;
+pub mod funnel;
+// mod count_hash;
 // mod aggregate;
 // pub mod aggregate;
-pub mod aggregate;
-pub mod funnel;
 
 use common::DECIMAL_SCALE;
 use num::Integer;
@@ -40,17 +45,12 @@ use num_traits::Zero;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-pub trait PartitionedAggregateExpr {
-    fn evaluate(
-        &self,
-        batches: &[RecordBatch],
-        spans: Vec<usize>,
-        skip: usize,
-        segments: Vec<Vec<bool>>,
-    ) -> Result<()>;
-    fn data_types(&self) -> Vec<DataType>;
-
-    fn finalize(&self) -> Vec<Vec<ColumnarValue>>;
+pub trait PartitionedAggregateExpr: Send + Sync {
+    fn group_columns(&self) -> Vec<Column>;
+    fn fields(&self) -> Vec<Field>;
+    fn evaluate(&mut self, batch: &RecordBatch, partition_exist: &HashMap<i64, ()>) -> Result<()>;
+    fn finalize(&mut self) -> Result<Vec<ArrayRef>>;
+    fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>>;
 }
 
 #[derive(Debug, Clone)]

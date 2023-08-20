@@ -46,7 +46,7 @@ pub fn attach_routes(router: Router) -> Router {
         "/organizations/:organization_id/projects/:project_id",
         Router::new()
             .route(
-                "/queries/event-segmentation",
+                "/queries/event-_segmentation",
                 routing::post(event_segmentation),
             )
             .route("/property-values", routing::post(property_values)),

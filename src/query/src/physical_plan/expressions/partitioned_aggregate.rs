@@ -244,7 +244,7 @@ impl From<u64> for Value {
     }
 }
 
-// partitioned aggregate is used as a accumulator factory from closure
+// _partitioned aggregate is used as a accumulator factory from closure
 pub struct PartitionedAggregate {
     partition_type: DataType,
     data_type: DataType,
@@ -281,7 +281,7 @@ impl PartitionedAggregate {
     }
 }
 
-// partitioned aggregate accumulator aggregates incoming partitioned values via acc accumulator and
+// _partitioned aggregate accumulator aggregates incoming _partitioned values via acc accumulator and
 // aggregates acc result via outer_acc
 #[derive(Debug)]
 pub struct PartitionedAggregateAccumulator {

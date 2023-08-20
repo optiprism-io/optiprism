@@ -101,7 +101,7 @@ mod tests {
 
         let resp = cl
             .post(format!(
-                "{base_url}/organizations/1/projects/1/queries/event-segmentation"
+                "{base_url}/organizations/1/projects/1/queries/event-_segmentation"
             ))
             .body(serde_json::to_string(&es)?)
             .headers(admin_headers.clone())

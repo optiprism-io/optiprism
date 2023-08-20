@@ -33,17 +33,12 @@ use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-use arrow::ipc::DecimalBuilder;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
 use chrono::Duration;
-use common::DECIMAL_PRECISION;
-use common::DECIMAL_SCALE;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
-use datafusion_common::ScalarValue;
-use datafusion_expr::ColumnarValue;
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
@@ -52,102 +47,144 @@ use num_traits::Zero;
 use crate::error::Result;
 use crate::physical_plan::abs_row_id;
 use crate::physical_plan::batch_id;
+use crate::physical_plan::expressions::_segmentation::boolean_op::ComparisonOp;
+use crate::physical_plan::expressions::_segmentation::time_range::TimeRange;
+use crate::physical_plan::expressions::_segmentation::AggregateFunction;
+use crate::physical_plan::expressions::_segmentation::SegmentExpr;
 use crate::physical_plan::expressions::check_filter;
-use crate::physical_plan::expressions::partitioned::AggregateFunction;
-use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
 use crate::physical_plan::Spans;
 
 #[derive(Debug)]
-struct Inner {
+struct Inner<OT>
+where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+{
+    last_ts: Option<(usize, TimestampMillisecondArray)>,
     last_filter: Option<(usize, BooleanArray)>,
     last_predicate: Option<(usize, ArrayRef)>,
-    agg: AggregateFunction,
-    outer_fn: Vec<AggregateFunction>,
+    agg: AggregateFunction<OT>,
 }
 
 #[derive(Debug)]
-pub struct Aggregate<T> {
-    inner: Mutex<Inner>,
-    filter: Option<PhysicalExprRef>,
+pub struct Aggregate<T, OT, Op>
+where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+{
+    inner: Mutex<Inner<OT>>,
+    filter: PhysicalExprRef,
     predicate: Column,
+    ts_col: Column,
+    time_range: TimeRange,
+    op: PhantomData<Op>,
+    right: OT,
+    typ: PhantomData<T>,
+    time_window: i64,
     name: String,
-    t: PhantomData<T>,
 }
 
-impl<T> Aggregate<T> {
+impl<T, OT, Op> Aggregate<T, OT, Op>
+where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+{
     pub fn new(
-        filter: Option<PhysicalExprRef>,
+        filter: PhysicalExprRef,
         predicate: Column,
-        agg: AggregateFunction,
-        outer_fn: AggregateFunction,
-        segments: usize,
+        agg: AggregateFunction<OT>,
+        ts_col: Column,
+        right: OT,
+        time_range: TimeRange,
+        time_window: Option<i64>,
         name: String,
     ) -> Self {
         let inner = Inner {
+            last_ts: None,
             last_filter: None,
             last_predicate: None,
             agg,
-            outer_fn: (0..segments)
-                .into_iter()
-                .map(|_| outer_fn.clone())
-                .collect(),
         };
         Self {
             filter,
             predicate,
+            ts_col,
             inner: Mutex::new(inner),
+            time_range,
+            op: Default::default(),
+            right,
+            typ: Default::default(),
+            time_window: time_window
+                .map(|t| t)
+                .unwrap_or(Duration::days(365).num_milliseconds()),
             name,
-            t: Default::default(),
         }
     }
 }
 
 macro_rules! agg {
-    ($ty:ty,$arr:ident) => {
-        impl PartitionedAggregateExpr for Aggregate<$ty> {
+    ($ty:ty,$array_ty:ident,$acc_ty:ty) => {
+        impl<Op> SegmentExpr for Aggregate<$ty, $acc_ty, Op>
+        where Op: ComparisonOp<$acc_ty>
+        {
             fn evaluate(
                 &self,
                 batches: &[RecordBatch],
                 spans: Vec<usize>,
                 skip: usize,
-                segments: Vec<Vec<bool>>,
-            ) -> Result<()> {
+            ) -> Result<BooleanArray> {
                 let mut spans = Spans::new_from_batches(spans, batches);
                 spans.skip(skip);
 
+                let num_rows = spans.spans.iter().sum::<usize>();
+                let mut out = BooleanBuilder::with_capacity(num_rows);
+
                 let mut inner = self.inner.lock().unwrap();
+                let ts = {
+                    batches
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, b)| {
+                            if let Some((id, ts)) = &inner.last_ts {
+                                if *id == batch_id(b) {
+                                    return Ok(ts.to_owned());
+                                }
+                            }
+                            return self.ts_col.evaluate(b).and_then(|r| {
+                                Ok(r.into_array(b.num_rows())
+                                    .as_any()
+                                    .downcast_ref::<TimestampMillisecondArray>()
+                                    .unwrap()
+                                    .clone())
+                            });
+                        })
+                        .collect::<std::result::Result<Vec<_>, _>>()?
+                };
+
+                inner.last_ts = Some((
+                    batch_id(batches.last().unwrap()),
+                    ts.last().unwrap().clone(),
+                ));
 
                 let to_filter = {
-                    if let Some(filter) = self.filter.clone() {
-                        let to_filter = batches
-                            .iter()
-                            .enumerate()
-                            .map(|(idx, b)| {
-                                if let Some((id, a)) = &inner.last_filter {
-                                    if *id == batch_id(b) {
-                                        return Ok(a.to_owned());
-                                    }
+                    batches
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, b)| {
+                            if let Some((id, a)) = &inner.last_filter {
+                                if *id == batch_id(b) {
+                                    return Ok(a.to_owned());
                                 }
-                                return filter.evaluate(b).and_then(|r| {
-                                    Ok(r.into_array(b.num_rows())
-                                        .as_any()
-                                        .downcast_ref::<BooleanArray>()
-                                        .unwrap()
-                                        .clone())
-                                });
-                            })
-                            .collect::<std::result::Result<Vec<_>, _>>()?;
-
-                        inner.last_filter = Some((
-                            batch_id(batches.last().unwrap()),
-                            to_filter.last().unwrap().clone(),
-                        ));
-
-                        Some(to_filter)
-                    } else {
-                        None
-                    }
+                            }
+                            return self.filter.evaluate(b).and_then(|r| {
+                                Ok(r.into_array(b.num_rows())
+                                    .as_any()
+                                    .downcast_ref::<BooleanArray>()
+                                    .unwrap()
+                                    .clone())
+                            });
+                        })
+                        .collect::<std::result::Result<Vec<_>, _>>()?
                 };
+
+                inner.last_filter = Some((
+                    batch_id(batches.last().unwrap()),
+                    to_filter.last().unwrap().clone(),
+                ));
 
                 let arr = {
                     batches
@@ -159,18 +196,18 @@ macro_rules! agg {
                                     return Ok(a
                                         .to_owned()
                                         .as_any()
-                                        .downcast_ref::<$arr>()
+                                        .downcast_ref::<$array_ty>()
                                         .unwrap()
                                         .clone());
                                 }
                             }
-                            self.predicate.evaluate(b).and_then(|r| {
+                            return self.predicate.evaluate(b).and_then(|r| {
                                 Ok(r.into_array(b.num_rows())
                                     .as_any()
-                                    .downcast_ref::<$arr>()
+                                    .downcast_ref::<$array_ty>()
                                     .unwrap()
                                     .clone())
-                            })
+                            });
                         })
                         .collect::<std::result::Result<Vec<_>, _>>()?
                 };
@@ -182,52 +219,47 @@ macro_rules! agg {
 
                 while spans.next_span() {
                     while let Some((batch_id, row_id)) = spans.next_row() {
-                        if let Some(to_filter) = &to_filter {
-                            if !check_filter(&to_filter[batch_id], row_id) {
-                                continue;
-                            }
+                        if !self.time_range.check_bounds(ts[batch_id].value(row_id)) {
+                            continue;
                         }
 
-                        inner.agg.accumulate(arr[batch_id].value(row_id) as i128);
+                        if !check_filter(&to_filter[batch_id], row_id) {
+                            continue;
+                        }
+
+                        inner.agg.accumulate(arr[batch_id].value(row_id) as $acc_ty);
                     }
 
-                    for (seg_idx, seg) in segments[spans.span_id as usize].iter().enumerate() {
-                        if *seg {
-                            let res = inner.agg.result();
-                            inner.outer_fn[seg_idx].accumulate(res);
-                        }
+                    let res = Op::perform(inner.agg.result(), self.right);
+                    if !res {
+                        out.append_value(false);
+                    } else {
+                        out.append_value(true);
                     }
+
                     inner.agg.reset();
                 }
 
-                Ok(())
-            }
-
-            fn data_types(&self) -> Vec<DataType> {
-                vec![DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)]
-            }
-
-            fn finalize(&self) -> Vec<Vec<ColumnarValue>> {
-                let inner = self.inner.lock().unwrap();
-                let res = inner
-                    .outer_fn
-                    .iter()
-                    .map(|v| {
-                        vec![ColumnarValue::Scalar(ScalarValue::Decimal128(
-                            Some(v.result()),
-                            DECIMAL_PRECISION,
-                            DECIMAL_SCALE,
-                        ))]
-                    })
-                    .collect::<Vec<_>>();
-                res
+                Ok(out.finish())
             }
         }
     };
 }
 
-agg!(i64, Int64Array);
-agg!(i128, Decimal128Array);
+agg!(i8, Int8Array, i64);
+agg!(i16, Int16Array, i64);
+agg!(i32, Int32Array, i64);
+agg!(i64, Int64Array, i128);
+agg!(i128, Decimal128Array, i128);
+agg!(u8, UInt8Array, i64);
+agg!(u16, UInt16Array, i64);
+agg!(u32, UInt32Array, i64);
+agg!(u64, UInt64Array, i128);
+agg!(u128, Decimal128Array, i128);
+agg!(f32, Float32Array, f64);
+agg!(f64, Float64Array, f64);
+agg!(Decimal128Array, Decimal128Array, i128);
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -235,7 +267,6 @@ mod tests {
     use arrow::array::Array;
     use arrow::array::ArrayRef;
     use arrow::array::BooleanArray;
-    use arrow::array::Decimal128Array;
     use arrow::array::Int64Array;
     use arrow::array::TimestampMillisecondArray;
     use arrow::datatypes::DataType;
@@ -259,9 +290,12 @@ mod tests {
     use store::test_util::parse_markdown_table_v1;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::aggregate::Aggregate;
-    use crate::physical_plan::expressions::partitioned::AggregateFunction;
-    use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::_segmentation::aggregate::Aggregate;
+    use crate::physical_plan::expressions::_segmentation::boolean_op;
+    use crate::physical_plan::expressions::_segmentation::boolean_op::Gt;
+    use crate::physical_plan::expressions::_segmentation::time_range::TimeRange;
+    use crate::physical_plan::expressions::_segmentation::AggregateFunction;
+    use crate::physical_plan::expressions::_segmentation::SegmentExpr;
 
     #[test]
     fn test_int() {
@@ -302,33 +336,30 @@ mod tests {
             let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
             let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
-            let mut agg = Aggregate::<i64>::new(
-                None,
+            let mut agg = Aggregate::<i64, i128, Gt>::new(
+                Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("v", &schema).unwrap(),
                 AggregateFunction::new_sum(),
-                AggregateFunction::new_avg(),
-                2,
+                Column::new_with_schema("ts", &schema).unwrap(),
+                3,
+                TimeRange::None,
+                None,
                 "1".to_string(),
             );
             let spans = vec![7, 4, 3];
-            agg.evaluate(&res, spans, 0, vec![
-                vec![true, true],
-                vec![true, true],
-                vec![true, true],
-            ])
-            .unwrap();
-            println!("{:?}", agg.finalize());
-            // let right = Decimal128Array::from(vec![2, 4, 2]);
-            // assert_eq!(res, vec![Arc::new(right) as ArrayRef]);
+            let res = agg.evaluate(&res, spans, 0).unwrap();
+            let right = BooleanArray::from(vec![false, false, true]);
+            assert_eq!(res, right);
         }
     }
 
+    // todo fix tests and fix float processing
     #[test]
-    fn test_decimal() {
+    fn test_float() {
         let data = r#"
-| user_id(i64) | ts(ts) | event(utf8) | v(decimal) |
+| user_id(i64) | ts(ts) | event(utf8) | v(f64) |
 |--------------|--------|-------------|--------|
-| 0            | 1      | e1          | 1.1      |
+| 0            | 1      | e1          | 1      |
 | 0            | 2      | e2          | 1      |
 | 0            | 3      | e3          | 1      |
 | 0            | 4      | e1          | 0      |
@@ -362,24 +393,20 @@ mod tests {
             let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
             let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
-            let mut agg = Aggregate::<i128>::new(
-                None,
+            let mut agg = Aggregate::<f32, f64, boolean_op::Eq>::new(
+                Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("v", &schema).unwrap(),
                 AggregateFunction::new_sum(),
-                AggregateFunction::new_avg(),
-                2,
+                Column::new_with_schema("ts", &schema).unwrap(),
+                3.,
+                TimeRange::None,
+                None,
                 "1".to_string(),
             );
             let spans = vec![7, 4, 3];
-            agg.evaluate(&res, spans, 0, vec![
-                vec![true, true],
-                vec![true, true],
-                vec![true, true],
-            ])
-            .unwrap();
-            println!("{:?}", agg.finalize());
-            // let right = Decimal128Array::from(vec![2, 4, 2]);
-            // assert_eq!(res, vec![Arc::new(right) as ArrayRef]);
+            let res = agg.evaluate(&res, spans, 0).unwrap();
+            let right = BooleanArray::from(vec![false, false, true]);
+            assert_eq!(res, right);
         }
     }
 }

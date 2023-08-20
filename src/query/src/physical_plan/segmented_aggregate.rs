@@ -46,7 +46,7 @@ use futures::Stream;
 use futures::StreamExt;
 
 use crate::error::QueryError;
-use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
 use crate::Result;
 
 pub struct SegmentedAggregateExec {
@@ -345,18 +345,33 @@ mod tests {
     use arrow::record_batch::RecordBatch;
     use arrow::util::pretty::print_batches;
     use arrow_row::SortField;
+    use chrono::DateTime;
+    use chrono::Duration;
+    use chrono::Utc;
+    use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
+    use datafusion::physical_expr::expressions::Literal;
+    use datafusion::physical_expr::PhysicalExprRef;
     use datafusion::physical_plan::common::collect;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::ExecutionPlan;
     use datafusion::prelude::SessionContext;
     pub use datafusion_common::Result;
+    use datafusion_common::ScalarValue;
+    use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned2::_count;
-    use crate::physical_plan::expressions::partitioned2::count::Count;
-    use crate::physical_plan::expressions::partitioned2::AggregateFunction;
-    use crate::physical_plan::expressions::partitioned2::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::partitioned::count;
+    use crate::physical_plan::expressions::partitioned::count::Count;
+    use crate::physical_plan::expressions::partitioned::funnel;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel::Funnel;
+    use crate::physical_plan::expressions::partitioned::funnel::funnel::Options;
+    use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
+    use crate::physical_plan::expressions::partitioned::funnel::ExcludeExpr;
+    use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
+    use crate::physical_plan::expressions::partitioned::funnel::Touch;
+    use crate::physical_plan::expressions::partitioned::AggregateFunction;
+    use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
     use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
 
     #[tokio::test]
@@ -364,34 +379,34 @@ mod tests {
         let data = r#"
 | user_id(i64) | device(utf8) | country(utf8) | v(i64) | ts(ts) | event(utf8) |
 |--------------|--------------|---------------|--------|--------|-------------|
-| 0            | iphone       | Spain         | 1      | 1      | e1          |
-| 0            | iphone       | Spain         | 0      | 2      | e2          |
-| 0            | iphone       | Spain         | 0      | 3      | e3          |
-| 0            | android      | Spain         | 1      | 4      | e1          |
-| 0            | android      | Spain         | 1      | 5      | e2          |
+| 0            | iphone       | Spain         | 1      | 2020-04-12 22:10:57      | e1          |
+| 0            | iphone       | Spain         | 0      | 2020-04-12 22:11:57      | e2          |
+| 0            | iphone       | Spain         | 0      | 2020-04-12 22:12:57      | e3          |
+| 0            | android      | Spain         | 1      | 2020-04-12 22:13:57      | e1          |
+| 0            | android      | Spain         | 1      | 2020-04-12 22:14:57      | e2          |
 |||||||
-| 0            | android      | Spain         | 0      | 6      | e3          |
-| 1            | osx          | Germany       | 1      | 1      | e1          |
-| 1            | osx          | Germany       | 1      | 2      | e2          |
-| 1            | osx          | Germany       | 0      | 3      | e3          |
-| 1            | osx          | UK            | 0      | 4      | e1          |
-| 1            | osx          | UK            | 0      | 5      | e2          |
+| 0            | android      | Spain         | 0      | 2020-04-12 22:15:57      | e3          |
+| 1            | osx          | Germany       | 1      | 2020-04-12 22:10:57      | e1          |
+| 1            | osx          | Germany       | 1      | 2020-04-12 22:11:57      | e2          |
+| 1            | osx          | Germany       | 0      | 2020-04-12 22:12:57      | e3          |
+| 1            | osx          | UK            | 0      | 2020-04-12 22:13:57      | e1          |
+| 1            | osx          | UK            | 0      | 2020-04-12 22:14:57      | e2          |
 |||||||
-| 1            | osx          | UK            | 0      | 6      | e3          |
-| 2            | osx          | Portugal      | 1      | 1      | e1          |
-| 2            | osx          | Portugal      | 1      | 2      | e2          |
-| 2            | osx          | Portugal      | 0      | 3      | e3          |
-| 2            | osx          | Spain         | 0      | 4      | e1          |
-| 2            | osx          | Spain         | 0      | 5      | e2          |
-| 2            | osx          | Spain         | 0      | 6      | e3          |
-| 3            | osx          | Spain         | 1      | 1      | e1          |
-| 3            | osx          | Spain         | 1      | 2      | e2          |
+| 1            | osx          | UK            | 0      | 2020-04-12 22:15:57      | e3          |
+| 2            | osx          | Portugal      | 1      | 2020-04-12 22:10:57      | e1          |
+| 2            | osx          | Portugal      | 1      | 2020-04-12 22:11:57      | e2          |
+| 2            | osx          | Portugal      | 0      | 2020-04-12 22:12:57      | e3          |
+| 2            | osx          | Spain         | 0      | 2020-04-12 22:13:57      | e1          |
+| 2            | osx          | Spain         | 0      | 2020-04-12 22:14:57      | e2          |
+| 2            | osx          | Spain         | 0      | 2020-04-12 22:15:57      | e3          |
+| 3            | osx          | Spain         | 1      | 2020-04-12 22:10:57     | e1          |
+| 3            | osx          | Spain         | 1      | 2020-04-12 22:12:57      | e2          |
 |||||||
-| 3            | osx          | Spain         | 0      | 3      | e3          |
-| 3            | osx          | UK            | 0      | 4      | e1          |
-| 3            | osx          | UK            | 0      | 5      | e2          |
-| 3            | osx          | UK            | 0      | 6      | e3          |
-| 4            | osx          | Russia        | 0      | 6      | e3          |
+| 3            | osx          | Spain         | 0      | 2020-04-12 22:12:57      | e3          |
+| 3            | osx          | UK            | 0      | 2020-04-12 22:13:57      | e1          |
+| 3            | osx          | UK            | 0      | 2020-04-12 22:14:57      | e2          |
+| 3            | osx          | UK            | 0      | 2020-04-12 22:15:57      | e3          |
+| 4            | osx          | Russia        | 0      | 2020-04-12 22:10:57      | e3          |
 "#;
 
         let batches = parse_markdown_tables(data).unwrap();
@@ -399,10 +414,17 @@ mod tests {
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
         let agg1 = {
-            let groups = vec![(
-                Column::new_with_schema("device", &schema).unwrap(),
-                SortField::new(DataType::Utf8),
-            )];
+            //            let groups = vec![(
+            // Column::new_with_schema("device", &schema).unwrap(),
+            // SortField::new(DataType::Utf8),
+            // )];
+            let groups = vec![
+                (
+                    Column::new_with_schema("country", &schema).unwrap(),
+                    SortField::new(DataType::Utf8),
+                ),
+                // SortField::new(DataType::Utf8),
+            ];
             let count = Count::try_new(
                 None,
                 AggregateFunction::new_avg(),
@@ -435,6 +457,81 @@ mod tests {
             Arc::new(Mutex::new(
                 Box::new(count) as Box<dyn PartitionedAggregateExpr>
             ))
+        };
+
+        let agg3 = {
+            let groups = vec![
+                (
+                    Column::new_with_schema("country", &schema).unwrap(),
+                    SortField::new(DataType::Utf8),
+                ),
+                // SortField::new(DataType::Utf8),
+            ];
+            let count = Count::try_new(
+                None,
+                AggregateFunction::new_sum(),
+                None,
+                Column::new_with_schema("user_id", &schema).unwrap(),
+            )
+            .unwrap();
+
+            Arc::new(Mutex::new(
+                Box::new(count) as Box<dyn PartitionedAggregateExpr>
+            ))
+        };
+
+        let agg4 = {
+            /*let groups = vec![
+                (
+                    Column::new_with_schema("country", &schema).unwrap(),
+                    SortField::new(DataType::Utf8),
+                ),
+                // SortField::new(DataType::Utf8),
+            ];*/
+            let e1 = {
+                let l = Column::new_with_schema("event", &schema).unwrap();
+                let r = Literal::new(ScalarValue::Utf8(Some("e1".to_string())));
+                let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+                (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            };
+            let e2 = {
+                let l = Column::new_with_schema("event", &schema).unwrap();
+                let r = Literal::new(ScalarValue::Utf8(Some("e2".to_string())));
+                let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+                (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            };
+            let e3 = {
+                let l = Column::new_with_schema("event", &schema).unwrap();
+                let r = Literal::new(ScalarValue::Utf8(Some("e3".to_string())));
+                let expr = BinaryExpr::new(Arc::new(l), Operator::Eq, Arc::new(r));
+                (Arc::new(expr) as PhysicalExprRef, StepOrder::Sequential)
+            };
+
+            let opts = Options {
+                schema: schema.clone(),
+                ts_col: Column::new_with_schema("ts", &schema).unwrap(),
+                from: DateTime::parse_from_str("2020-04-12 22:10:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+                    .unwrap()
+                    .with_timezone(&Utc),
+                to: DateTime::parse_from_str("2020-04-12 22:21:57 +0000", "%Y-%m-%d %H:%M:%S %z")
+                    .unwrap()
+                    .with_timezone(&Utc),
+                window: Duration::seconds(100),
+                steps: vec![e1, e2, e3],
+                exclude: None,
+                // exclude: None,
+                constants: None,
+                // constants: Some(vec![Column::new_with_schema("c", &schema).unwrap()]),
+                count: Unique,
+                filter: None,
+                touch: Touch::First,
+                partition_col: Column::new_with_schema("user_id", &schema).unwrap(),
+                bucket_size: Duration::days(100),
+                groups: None,
+            };
+            let f = Funnel::try_new(opts).unwrap();
+
+            Arc::new(Mutex::new(Box::new(f) as Box<dyn PartitionedAggregateExpr>))
         };
 
         let pinput1 = {
@@ -474,8 +571,13 @@ mod tests {
             Arc::new(input),
             vec![Arc::new(pinput2), Arc::new(pinput1)],
             Column::new_with_schema("user_id", &schema).unwrap(),
-            vec![agg1, agg2],
-            vec!["count".to_string(), "min".to_string()],
+            vec![agg1, agg2, agg3, agg4],
+            vec![
+                "count".to_string(),
+                "min".to_string(),
+                "min2".to_string(),
+                "f1".to_string(),
+            ],
         )?;
 
         let session_ctx = SessionContext::new();
@@ -527,9 +629,10 @@ mod tests {
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
         let agg1 = {
-            let count = _count::Count::try_new(
+            let count = count::Count::try_new(
                 None,
                 AggregateFunction::new_avg(),
+                None,
                 Column::new_with_schema("user_id", &schema).unwrap(),
             )
             .unwrap();
