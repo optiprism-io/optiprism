@@ -47,9 +47,96 @@ use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
 use crate::physical_plan::expressions::segmentation::boolean_op::Operator;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-use crate::physical_plan::expressions::segmentation::AggregateFunction;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
 use crate::physical_plan::Spans;
+
+// TODO change to simple i128? Like in Partitioned module
+#[derive(Debug, Clone)]
+pub enum AggregateFunction<T>
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+{
+    Sum(T),
+    Min(T),
+    Max(T),
+    Avg(T, T),
+    Count(T),
+}
+
+impl<T> AggregateFunction<T>
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+{
+    pub fn new_sum() -> Self {
+        AggregateFunction::Sum(T::zero())
+    }
+
+    pub fn new_min() -> Self {
+        AggregateFunction::Min(T::max_value())
+    }
+
+    pub fn new_max() -> Self {
+        AggregateFunction::Max(T::min_value())
+    }
+
+    pub fn new_avg() -> Self {
+        AggregateFunction::Avg(T::zero(), T::zero())
+    }
+
+    pub fn new_count() -> Self {
+        AggregateFunction::Count(T::zero())
+    }
+
+    pub fn accumulate(&mut self, v: T) -> T {
+        match self {
+            AggregateFunction::Sum(s) => {
+                *s = *s + v;
+                *s
+            }
+            AggregateFunction::Min(m) => {
+                if v < *m {
+                    *m = v;
+                }
+                *m
+            }
+            AggregateFunction::Max(m) => {
+                if v > *m {
+                    *m = v;
+                }
+                *m
+            }
+            AggregateFunction::Avg(s, c) => {
+                *s = *s + v;
+                *c = *c + T::one();
+                *s / *c
+            }
+            AggregateFunction::Count(s) => {
+                *s = *s + T::one();
+                *s
+            }
+        }
+    }
+
+    pub fn result(&self) -> T {
+        match self {
+            AggregateFunction::Sum(s) => *s,
+            AggregateFunction::Min(m) => *m,
+            AggregateFunction::Max(m) => *m,
+            AggregateFunction::Avg(s, c) => *s / *c,
+            AggregateFunction::Count(s) => T::from(*s).unwrap(),
+        }
+    }
+    pub fn reset(&mut self) {
+        match self {
+            AggregateFunction::Sum(s) => *s = T::zero(),
+            AggregateFunction::Min(m) => *m = T::max_value(),
+            AggregateFunction::Max(m) => *m = T::min_value(),
+            AggregateFunction::Avg(s, c) => {
+                *s = T::zero();
+                *c = T::zero();
+            }
+            AggregateFunction::Count(s) => *s = T::zero(),
+        }
+    }
+}
 
 #[derive(Debug)]
 struct Inner<T>
@@ -189,6 +276,7 @@ macro_rules! agg {
             fn finalize(&self) -> Result<Int64Array> {
                 let mut inner = self.inner.lock().unwrap();
                 let res = Op::perform(inner.agg.result(), self.right);
+                println!("{:?} {:?}", inner.agg.result(), self.right);
                 if !res {
                     inner.res.append_null();
                 } else {
@@ -235,10 +323,10 @@ mod tests {
     use store::test_util::parse_markdown_tables;
 
     use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
+    use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
     use crate::physical_plan::expressions::segmentation::boolean_op;
     use crate::physical_plan::expressions::segmentation::boolean_op::Gt;
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-    use crate::physical_plan::expressions::segmentation::AggregateFunction;
     use crate::physical_plan::expressions::segmentation::SegmentExpr;
 
     #[test]
@@ -313,8 +401,8 @@ mod tests {
 |--------------|--------|-------------|--------|
 | 0            | 1      | e1          | 0.5   |
 | 0            | 1      | e1          | 0.5   |
-| 1            | 8      | e1          | 0.55   |
-| 1            | 8      | e1          | 0.55   |
+| 1            | 8      | e1          | 4.18   |
+| 1            | 8      | e1          | 0.15   |
 "#;
 
         let mut res = parse_markdown_tables(data).unwrap();
@@ -333,7 +421,7 @@ mod tests {
             let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
             let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
-            let right = Decimal::new(11 * DECIMAL_SCALE as i64, DECIMAL_SCALE as u32);
+            let right = Decimal::from_str_exact("4.33").unwrap();
             let mut agg = Aggregate::<i128, i128, boolean_op::Eq>::new(
                 Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("ts", &schema).unwrap(),

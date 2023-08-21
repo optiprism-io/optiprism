@@ -230,6 +230,9 @@ impl PartitionedAggregateExpr for Count {
             Ok(vec![group_col, vec![res_col]].concat())
         } else {
             let mut res_col_b = Decimal128Builder::with_capacity(1);
+            self.single_group
+                .outer_fn
+                .accumulate(self.single_group.count as i128);
             res_col_b.append_value(self.single_group.outer_fn.result());
             let res_col = res_col_b
                 .finish()
@@ -363,7 +366,7 @@ mod tests {
 | 3            | osx          | 0     | 4      | e1          |
 | 3            | osx          | 0     | 5      | e2          |
 | 3            | osx          | 0     | 6      | e3          |
-| 4            | windows      | 0     | 6      | e3
+| 4            | windows      | 0     | 6      | e3          |
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
