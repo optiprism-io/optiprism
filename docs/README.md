@@ -4,7 +4,7 @@ OptiPrism — platform for tracking user events and building different reports b
 
 # Architecture
 
-![](docs/OptiPrism Arch.drawio.svg)
+![](assets/OptiPrism%20Arch.drawio.svg)
 
 # Terms
 ## User
