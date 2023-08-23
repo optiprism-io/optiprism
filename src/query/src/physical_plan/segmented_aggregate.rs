@@ -11,10 +11,13 @@ use std::sync::Mutex;
 use std::task::Context;
 use std::task::Poll;
 
+use ahash::RandomState;
 use arrow::array::Array;
+use arrow::array::ArrayDataBuilder;
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
+use arrow::array::ListBuilder;
 use arrow::array::UInt64Array;
 use arrow::compute::concat_batches;
 use arrow::datatypes::DataType;
@@ -25,12 +28,23 @@ use arrow::datatypes::SchemaRef;
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
+use arrow_row::OwnedRow;
+use arrow_row::RowConverter;
+use arrow_row::SortField;
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
+use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
+use datafusion::physical_expr::expressions::Max;
+use datafusion::physical_expr::AggregateExpr;
 use datafusion::physical_expr::PhysicalExpr;
+use datafusion::physical_plan::aggregates::AggregateExec;
+use datafusion::physical_plan::aggregates::AggregateMode;
+use datafusion::physical_plan::aggregates::PhysicalGroupBy;
+use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
 use datafusion::physical_plan::hash_utils::create_hashes;
+use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
@@ -40,8 +54,10 @@ use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
+use datafusion::prelude::SessionContext;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
+use futures::executor::block_on;
 use futures::Stream;
 use futures::StreamExt;
 
@@ -58,6 +74,11 @@ pub struct SegmentedAggregateExec {
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
     metrics: ExecutionPlanMetricsSet,
+    group_fields: Vec<FieldRef>,
+}
+
+struct Group {
+    cols: Vec<ScalarValue>,
 }
 
 impl SegmentedAggregateExec {
@@ -100,8 +121,8 @@ impl SegmentedAggregateExec {
             .filter(|f| group_cols.contains_key(f.name()))
             .cloned()
             .collect::<Vec<_>>();
-        let fields: Vec<FieldRef> =
-            vec![vec![segment_field], group_fields, agg_result_fields].concat();
+        let group_fields = vec![vec![segment_field], group_fields.clone()].concat();
+        let fields: Vec<FieldRef> = vec![group_fields.clone(), agg_result_fields].concat();
 
         let schema = Schema::new(fields);
         Ok(Self {
@@ -113,6 +134,7 @@ impl SegmentedAggregateExec {
             schema: Arc::new(schema),
             agg_schemas,
             metrics: ExecutionPlanMetricsSet::new(),
+            group_fields,
         })
     }
 }
@@ -194,6 +216,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
             partition_col: self.partition_col.clone(),
             partition_streams,
             agg_expr,
+            group_fields: self.group_fields.clone(),
         }))
     }
 
@@ -216,6 +239,7 @@ struct SegmentedAggregateStream {
     partition_streams: Vec<SendableRecordBatchStream>,
     partition_col: Column,
     agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
+    group_fields: Vec<FieldRef>,
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
     baseline_metrics: BaselineMetrics,
@@ -326,6 +350,50 @@ impl Stream for SegmentedAggregateStream {
 
         let batch = concat_batches(&self.schema, batches.iter().map(|b| b).collect::<Vec<_>>())?;
 
+        // merge
+        let agg_fields = self.schema.fields()[self.group_fields.len()..].to_owned();
+        let aggs: Vec<Arc<dyn AggregateExpr>> = agg_fields
+            .iter()
+            .map(|f| {
+                Arc::new(Max::new(
+                    col(f.name(), &self.schema).unwrap(),
+                    f.name().to_owned(),
+                    f.data_type().to_owned(),
+                )) as Arc<dyn AggregateExpr>
+            })
+            .collect::<Vec<_>>();
+
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+
+        println!("{:?}", self.group_fields);
+        let group_by_expr = self
+            .group_fields
+            .iter()
+            .map(|f| (col(f.name(), &self.schema).unwrap(), f.name().to_owned()))
+            .collect::<Vec<_>>();
+        println!("{} {}", group_by_expr.len(), aggs.len());
+
+        let group_by = PhysicalGroupBy::new_single(group_by_expr);
+        let input = Arc::new(MemoryExec::try_new(
+            &vec![vec![batch]],
+            self.schema.clone(),
+            None,
+        )?);
+        let partial_aggregate = Arc::new(AggregateExec::try_new(
+            AggregateMode::Final,
+            group_by,
+            aggs,
+            vec![None],
+            vec![None],
+            input,
+            self.schema.clone(),
+        )?);
+
+        let stream = partial_aggregate.execute(0, task_ctx)?;
+        let result = block_on(collect(stream))?;
+        let batch = concat_batches(&self.schema, &result)?;
+
         Poll::Ready(Some(Ok(batch)))
     }
 }
@@ -414,7 +482,7 @@ mod tests {
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
         let agg1 = {
-            //            let groups = vec![(
+            // let groups = vec![(
             // Column::new_with_schema("device", &schema).unwrap(),
             // SortField::new(DataType::Utf8),
             // )];
@@ -444,7 +512,10 @@ mod tests {
                     Column::new_with_schema("country", &schema).unwrap(),
                     SortField::new(DataType::Utf8),
                 ),
+                // (
+                // Column::new_with_schema("device", &schema).unwrap(),
                 // SortField::new(DataType::Utf8),
+                // ),
             ];
             let count = Count::try_new(
                 None,
@@ -460,13 +531,10 @@ mod tests {
         };
 
         let agg3 = {
-            let groups = vec![
-                (
-                    Column::new_with_schema("country", &schema).unwrap(),
-                    SortField::new(DataType::Utf8),
-                ),
-                // SortField::new(DataType::Utf8),
-            ];
+            let groups = vec![(
+                Column::new_with_schema("country", &schema).unwrap(),
+                SortField::new(DataType::Utf8),
+            )];
             let count = Count::try_new(
                 None,
                 AggregateFunction::new_sum(),
@@ -648,7 +716,10 @@ mod tests {
                     Column::new_with_schema("country", &schema).unwrap(),
                     SortField::new(DataType::Utf8),
                 ),
-                // SortField::new(DataType::Utf8),
+                (
+                    Column::new_with_schema("device", &schema).unwrap(),
+                    SortField::new(DataType::Utf8),
+                ),
             ];
             let count = Count::try_new(
                 None,
