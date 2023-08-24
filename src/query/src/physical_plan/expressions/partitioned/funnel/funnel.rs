@@ -439,7 +439,7 @@ impl PartitionedAggregateExpr for Funnel {
     fn evaluate(
         &mut self,
         batch: &RecordBatch,
-        partition_exist: &HashMap<i64, ()>,
+        partition_exist: Option<&HashMap<i64, ()>>,
     ) -> crate::Result<()> {
         let funnel_batch = evaluate_batch(
             batch.to_owned(),
@@ -497,10 +497,12 @@ impl PartitionedAggregateExpr for Funnel {
                     row_id += 1;
                 }
             }
-            while !partition_exist.contains_key(&partitions.value(row_id))
-                && row_id < batch.num_rows() - 1
-            {
-                row_id += 1;
+            if let Some(exists) = partition_exist {
+                while !exists.contains_key(&partitions.value(row_id))
+                    && row_id < batch.num_rows() - 1
+                {
+                    row_id += 1;
+                }
             }
 
             let group = if let Some(groups) = &mut self.groups {
@@ -1465,7 +1467,7 @@ asd
             let mut f = Funnel::try_new(case.opts).unwrap();
 
             for rb in rbs {
-                f.evaluate(&rb, &case.partition_exist)?;
+                f.evaluate(&rb, Some(&case.partition_exist))?;
             }
             let res = f.finalize()?;
             let rb = RecordBatch::try_new(f.schema(), res).unwrap();
@@ -1547,7 +1549,7 @@ asd
         };
         let mut f = Funnel::try_new(opts).unwrap();
         for b in res {
-            f.evaluate(&b, &hash).unwrap();
+            f.evaluate(&b, Some(&hash)).unwrap();
         }
 
         let res = f.finalize().unwrap();
@@ -1631,7 +1633,7 @@ asd
         };
         let mut f = Funnel::try_new(opts).unwrap();
         for b in res {
-            f.evaluate(&b, &hash).unwrap();
+            f.evaluate(&b, Some(&hash)).unwrap();
         }
 
         let res = f.finalize().unwrap();
@@ -1723,7 +1725,7 @@ asd
         };
         let mut f = Funnel::try_new(opts).unwrap();
         for b in res {
-            f.evaluate(&b, &hash).unwrap();
+            f.evaluate(&b, Some(&hash)).unwrap();
         }
 
         let res = f.finalize().unwrap();
@@ -1807,7 +1809,7 @@ asd
         };
         let mut f = Funnel::try_new(opts).unwrap();
         for b in res {
-            f.evaluate(&b, &hash).unwrap();
+            f.evaluate(&b, Some(&hash)).unwrap();
         }
 
         let res = f.finalize().unwrap();

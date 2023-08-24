@@ -119,7 +119,7 @@ impl PartitionedAggregateExpr for Count {
     fn evaluate(
         &mut self,
         batch: &RecordBatch,
-        partition_exist: &HashMap<i64, ()>,
+        partition_exist: Option<&HashMap<i64, ()>>,
     ) -> crate::Result<()> {
         let filter = if self.filter.is_some() {
             Some(
@@ -170,9 +170,11 @@ impl PartitionedAggregateExpr for Count {
                     continue;
                 }
             }
-            if !partition_exist.contains_key(&partition) {
-                self.skip = true;
-                continue;
+            if let Some(exists) = partition_exist {
+                if !exists.contains_key(&partition) {
+                    self.skip = true;
+                    continue;
+                }
             }
 
             let bucket = if let Some(groups) = &mut self.groups {
@@ -330,7 +332,7 @@ mod tests {
         )
         .unwrap();
         for b in res {
-            count.evaluate(&b, &hash).unwrap();
+            count.evaluate(&b, Some(&hash)).unwrap();
         }
 
         let res = count.finalize();
@@ -379,7 +381,7 @@ mod tests {
         )
         .unwrap();
         for b in res {
-            count.evaluate(&b, &hash).unwrap();
+            count.evaluate(&b, Some(&hash)).unwrap();
         }
 
         let res = count.finalize();
