@@ -476,16 +476,16 @@ impl PartitionedAggregateExpr for Funnel {
 
         // todo fixme
         // clen up obsolete batches
-        // let mut to_remove = Vec::with_capacity(self.buf.len() - 1);
-        // for (idx, batch) in &self.buf {
-        //     if batch.first_partition < self.cur_partition {
-        //         to_remove.push(idx.to_owned())
-        //     }
-        // }
+        let mut to_remove = Vec::with_capacity(self.buf.len() - 1);
+        for (idx, batch) in &self.buf {
+            if batch.first_partition < self.cur_partition {
+                to_remove.push(idx.to_owned())
+            }
+        }
 
-        // for idx in to_remove {
-        //     self.buf.remove(&idx);
-        // }
+        for idx in to_remove {
+            self.buf.remove(&idx);
+        }
         let mut row_id = 0;
         let mut batch_id = self.batch_id;
 
