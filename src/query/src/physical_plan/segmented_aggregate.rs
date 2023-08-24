@@ -67,7 +67,7 @@ use crate::Result;
 
 pub struct SegmentedAggregateExec {
     input: Arc<dyn ExecutionPlan>,
-    partition_inputs: Vec<Arc<dyn ExecutionPlan>>,
+    partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
     partition_col: Column,
     agg_expr: Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>,
     agg_aliases: Vec<String>,
@@ -84,7 +84,7 @@ struct Group {
 impl SegmentedAggregateExec {
     pub fn try_new(
         input: Arc<dyn ExecutionPlan>,
-        partition_inputs: Vec<Arc<dyn ExecutionPlan>>,
+        partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
         partition_col: Column,
         agg_expr: Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>,
         agg_aliases: Vec<String>,
@@ -189,24 +189,29 @@ impl ExecutionPlan for SegmentedAggregateExec {
         context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
         let stream = self.input.execute(partition, context.clone())?;
-        let partition_streams = self
-            .partition_inputs
-            .iter()
-            .map(|s| s.execute(partition, context.clone()))
-            .collect::<DFResult<Vec<_>>>()?;
+        let (agg_expr, partition_streams) = if let Some(partition_inputs) = &self.partition_inputs {
+            let aggs = (0..partition_inputs.len())
+                .into_iter()
+                .map(|_| {
+                    self.agg_expr
+                        .iter()
+                        .map(|a| {
+                            let mut agg = a.lock().unwrap();
+                            Arc::new(Mutex::new(agg.make_new().unwrap()))
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+
+            let streams = partition_inputs
+                .iter()
+                .map(|s| s.execute(partition, context.clone()))
+                .collect::<DFResult<Vec<_>>>()?;
+            (aggs, Some(streams))
+        } else {
+            (vec![self.agg_expr.clone()], None)
+        };
         let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
-        let agg_expr = (0..self.partition_inputs.len())
-            .into_iter()
-            .map(|_| {
-                self.agg_expr
-                    .iter()
-                    .map(|a| {
-                        let mut agg = a.lock().unwrap();
-                        Arc::new(Mutex::new(agg.make_new().unwrap()))
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
         Ok(Box::pin(SegmentedAggregateStream {
             is_ended: false,
             stream,
@@ -236,7 +241,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
 struct SegmentedAggregateStream {
     is_ended: bool,
     stream: SendableRecordBatchStream,
-    partition_streams: Vec<SendableRecordBatchStream>,
+    partition_streams: Option<Vec<SendableRecordBatchStream>>,
     partition_col: Column,
     agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
     group_fields: Vec<FieldRef>,
@@ -260,36 +265,46 @@ impl Stream for SegmentedAggregateStream {
             return Poll::Ready(None);
         }
         self.is_ended = true;
-        let mut exist: Vec<HashMap<i64, ()>> = vec![HashMap::new(); self.partition_streams.len()];
 
         let cloned_time = self.baseline_metrics.elapsed_compute().clone();
-        let segments_count = self.partition_streams.len();
         let partition_col = self.partition_col.clone();
 
-        for (segment_id, partitioned_stream) in self.partition_streams.iter_mut().enumerate() {
-            loop {
-                match partitioned_stream.poll_next_unpin(cx) {
-                    Poll::Ready(Some(Ok(batch))) => {
-                        let vals = partition_col
-                            .evaluate(&batch)?
-                            .into_array(batch.num_rows())
-                            .as_any()
-                            .downcast_ref::<Int64Array>()
-                            .unwrap()
-                            .clone();
+        let exist = if let Some(partition_streams) = &mut self.partition_streams {
+            let mut exist: Vec<HashMap<i64, ()>> = vec![HashMap::new(); partition_streams.len()];
 
-                        for val in vals.iter() {
-                            exist[segment_id].insert(val.unwrap(), ());
+            for (segment_id, partitioned_stream) in partition_streams.iter_mut().enumerate() {
+                loop {
+                    match partitioned_stream.poll_next_unpin(cx) {
+                        Poll::Ready(Some(Ok(batch))) => {
+                            let vals = partition_col
+                                .evaluate(&batch)?
+                                .into_array(batch.num_rows())
+                                .as_any()
+                                .downcast_ref::<Int64Array>()
+                                .unwrap()
+                                .clone();
+
+                            for val in vals.iter() {
+                                exist[segment_id].insert(val.unwrap(), ());
+                            }
                         }
-                    }
 
-                    Poll::Ready(None) => {
-                        break;
+                        Poll::Ready(None) => {
+                            break;
+                        }
+                        _ => unreachable!(),
                     }
-                    _ => unreachable!(),
                 }
             }
-        }
+            Some(exist)
+        } else {
+            None
+        };
+        let segments_count = if let Some(streams) = &self.partition_streams {
+            streams.len()
+        } else {
+            1
+        };
 
         loop {
             match self.stream.poll_next_unpin(cx) {
@@ -297,8 +312,14 @@ impl Stream for SegmentedAggregateStream {
                     for segment in 0..segments_count {
                         for aggm in self.agg_expr[segment].iter() {
                             let mut agg = aggm.lock().unwrap();
-                            agg.evaluate(&batch, Some(&exist[segment]))
-                                .map_err(QueryError::into_datafusion_execution_error)?
+
+                            if let Some(exist) = &exist {
+                                agg.evaluate(&batch, Some(&exist[segment]))
+                                    .map_err(QueryError::into_datafusion_execution_error)?
+                            } else {
+                                agg.evaluate(&batch, None)
+                                    .map_err(QueryError::into_datafusion_execution_error)?
+                            }
                         }
                     }
                 }
@@ -637,7 +658,7 @@ mod tests {
 
         let seg = SegmentedAggregateExec::try_new(
             Arc::new(input),
-            vec![Arc::new(pinput2), Arc::new(pinput1)],
+            Some(vec![Arc::new(pinput2), Arc::new(pinput1)]),
             Column::new_with_schema("user_id", &schema).unwrap(),
             vec![agg1, agg2, agg3, agg4],
             vec![
@@ -769,7 +790,101 @@ mod tests {
 
         let seg = SegmentedAggregateExec::try_new(
             Arc::new(input),
-            vec![Arc::new(pinput2), Arc::new(pinput1)],
+            Some(vec![Arc::new(pinput2), Arc::new(pinput1)]),
+            Column::new_with_schema("user_id", &schema).unwrap(),
+            vec![agg1 /* ,  agg2 */],
+            vec!["count".to_string(), "min".to_string()],
+        )?;
+
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+        let stream = seg.execute(0, task_ctx)?;
+        let result = collect(stream).await?;
+
+        print_batches(&result).unwrap();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_no_segments() -> anyhow::Result<()> {
+        let data = r#"
+| user_id(i64) | device(utf8) | country(utf8) | v(i64) | ts(ts) | event(utf8) |
+|--------------|--------------|---------------|--------|--------|-------------|
+| 0            | iphone       | Spain         | 1      | 1      | e1          |
+| 0            | iphone       | Spain         | 0      | 2      | e2          |
+| 0            | iphone       | Spain         | 0      | 3      | e3          |
+| 0            | android      | Spain         | 1      | 4      | e1          |
+| 0            | android      | Spain         | 1      | 5      | e2          |
+|||||||
+| 0            | android      | Spain         | 0      | 6      | e3          |
+| 1            | osx          | Germany       | 1      | 1      | e1          |
+| 1            | osx          | Germany       | 1      | 2      | e2          |
+| 1            | osx          | Germany       | 0      | 3      | e3          |
+| 1            | osx          | UK            | 0      | 4      | e1          |
+| 1            | osx          | UK            | 0      | 5      | e2          |
+|||||||
+| 1            | osx          | UK            | 0      | 6      | e3          |
+| 2            | osx          | Portugal      | 1      | 1      | e1          |
+| 2            | osx          | Portugal      | 1      | 2      | e2          |
+| 2            | osx          | Portugal      | 0      | 3      | e3          |
+| 2            | osx          | Spain         | 0      | 4      | e1          |
+| 2            | osx          | Spain         | 0      | 5      | e2          |
+| 2            | osx          | Spain         | 0      | 6      | e3          |
+| 3            | osx          | Spain         | 1      | 1      | e1          |
+| 3            | osx          | Spain         | 1      | 2      | e2          |
+|||||||
+| 3            | osx          | Spain         | 0      | 3      | e3          |
+| 3            | osx          | UK            | 0      | 4      | e1          |
+| 3            | osx          | UK            | 0      | 5      | e2          |
+| 3            | osx          | UK            | 0      | 6      | e3          |
+| 4            | osx          | Russia        | 0      | 6      | e3          |
+"#;
+
+        let batches = parse_markdown_tables(data).unwrap();
+        let schema = batches[0].schema();
+        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+
+        let agg1 = {
+            let count = count::Count::try_new(
+                None,
+                AggregateFunction::new_avg(),
+                None,
+                Column::new_with_schema("user_id", &schema).unwrap(),
+            )
+            .unwrap();
+
+            Arc::new(Mutex::new(
+                Box::new(count) as Box<dyn PartitionedAggregateExpr>
+            ))
+        };
+
+        let agg2 = {
+            let groups = vec![
+                (
+                    Column::new_with_schema("country", &schema).unwrap(),
+                    SortField::new(DataType::Utf8),
+                ),
+                (
+                    Column::new_with_schema("device", &schema).unwrap(),
+                    SortField::new(DataType::Utf8),
+                ),
+            ];
+            let count = Count::try_new(
+                None,
+                AggregateFunction::new_sum(),
+                Some(groups),
+                Column::new_with_schema("user_id", &schema).unwrap(),
+            )
+            .unwrap();
+
+            Arc::new(Mutex::new(
+                Box::new(count) as Box<dyn PartitionedAggregateExpr>
+            ))
+        };
+
+        let seg = SegmentedAggregateExec::try_new(
+            Arc::new(input),
+            None,
             Column::new_with_schema("user_id", &schema).unwrap(),
             vec![agg1 /* ,  agg2 */],
             vec!["count".to_string(), "min".to_string()],
