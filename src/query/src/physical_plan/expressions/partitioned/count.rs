@@ -66,6 +66,7 @@ pub struct Count {
     partition_col: Column,
     skip: bool,
     skip_partition: i64,
+    distinct: bool,
 }
 
 impl Count {
@@ -74,6 +75,7 @@ impl Count {
         outer_fn: AggregateFunction,
         groups: Option<(Vec<(Column, SortField)>)>,
         partition_col: Column,
+        distinct: bool,
     ) -> Result<Self> {
         let groups = if let Some(pairs) = groups {
             Some(Groups {
@@ -94,6 +96,7 @@ impl Count {
             partition_col,
             skip: false,
             skip_partition: 0,
+            distinct,
         })
     }
 }
@@ -208,6 +211,10 @@ impl PartitionedAggregateExpr for Count {
                 bucket.count = 0;
             }
             bucket.count += 1;
+            if self.distinct {
+                self.skip = true;
+                continue;
+            }
         }
 
         Ok(())
@@ -263,6 +270,7 @@ impl PartitionedAggregateExpr for Count {
             skip: false,
             skip_partition: 0,
             single_group: Group::new(self.outer_fn.clone()),
+            distinct: self.distinct.clone(),
         };
 
         Ok(Box::new(c))
@@ -329,6 +337,7 @@ mod tests {
             AggregateFunction::new_avg(),
             Some(groups),
             Column::new_with_schema("user_id", &schema).unwrap(),
+            false,
         )
         .unwrap();
         for b in res {
@@ -340,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn count_sum() {
+    fn count() {
         let data = r#"
 | user_id(i64) | device(utf8) | v(i64) | ts(ts) | event(utf8) |
 |--------------|--------------|-------|--------|-------------|
@@ -378,6 +387,57 @@ mod tests {
             AggregateFunction::new_avg(),
             None,
             Column::new_with_schema("user_id", &schema).unwrap(),
+            false,
+        )
+        .unwrap();
+        for b in res {
+            count.evaluate(&b, Some(&hash)).unwrap();
+        }
+
+        let res = count.finalize();
+        println!("{:?}", res);
+    }
+
+    #[test]
+    fn count_distinct() {
+        let data = r#"
+| user_id(i64) | device(utf8) | v(i64) | ts(ts) | event(utf8) |
+|--------------|--------------|-------|--------|-------------|
+| 0            | iphone       | 1     | 1      | e1          |
+| 0            | iphone       | 0     | 2      | e2          |
+| 0            | iphone       | 0     | 3      | e3          |
+| 0            | android      | 1     | 4      | e1          |
+| 0            | android      | 1     | 5      | e2          |
+| 0            | android      | 0     | 6      | e3          |
+| 1            | osx          | 1     | 1      | e1          |
+| 1            | osx          | 1     | 2      | e2          |
+| 1            | osx          | 0     | 3      | e3          |
+| 1            | osx          | 0     | 4      | e1          |
+| 1            | osx          | 0     | 5      | e2          |
+| 1            | osx          | 0     | 6      | e3          |
+| 2            | osx          | 1     | 1      | e1          |
+| 2            | osx          | 1     | 2      | e2          |
+| 2            | osx          | 0     | 3      | e3          |
+| 2            | osx          | 0     | 4      | e1          |
+| 2            | osx          | 0     | 5      | e2          |
+| 2            | osx          | 0     | 6      | e3          |
+| 3            | osx          | 1     | 1      | e1          |
+| 3            | osx          | 1     | 2      | e2          |
+| 3            | osx          | 0     | 3      | e3          |
+| 3            | osx          | 0     | 4      | e1          |
+| 3            | osx          | 0     | 5      | e2          |
+| 3            | osx          | 0     | 6      | e3          |
+| 4            | windows      | 0     | 6      | e3          |
+"#;
+        let res = parse_markdown_tables(data).unwrap();
+        let schema = res[0].schema().clone();
+        let hash = HashMap::from([(0, ()), (1, ()), (4, ())]);
+        let mut count = Count::try_new(
+            None,
+            AggregateFunction::new_count(),
+            None,
+            Column::new_with_schema("user_id", &schema).unwrap(),
+            true,
         )
         .unwrap();
         for b in res {

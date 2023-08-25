@@ -519,6 +519,7 @@ mod tests {
                 AggregateFunction::new_avg(),
                 Some(groups),
                 Column::new_with_schema("user_id", &schema).unwrap(),
+                false,
             )
             .unwrap();
 
@@ -543,6 +544,7 @@ mod tests {
                 AggregateFunction::new_sum(),
                 Some(groups),
                 Column::new_with_schema("user_id", &schema).unwrap(),
+                false,
             )
             .unwrap();
 
@@ -561,6 +563,7 @@ mod tests {
                 AggregateFunction::new_sum(),
                 None,
                 Column::new_with_schema("user_id", &schema).unwrap(),
+                false,
             )
             .unwrap();
 
@@ -723,6 +726,7 @@ mod tests {
                 AggregateFunction::new_avg(),
                 None,
                 Column::new_with_schema("user_id", &schema).unwrap(),
+                false,
             )
             .unwrap();
 
@@ -747,6 +751,7 @@ mod tests {
                 AggregateFunction::new_sum(),
                 Some(groups),
                 Column::new_with_schema("user_id", &schema).unwrap(),
+                false,
             )
             .unwrap();
 
@@ -850,6 +855,7 @@ mod tests {
                 AggregateFunction::new_avg(),
                 None,
                 Column::new_with_schema("user_id", &schema).unwrap(),
+                false,
             )
             .unwrap();
 
@@ -874,6 +880,7 @@ mod tests {
                 AggregateFunction::new_sum(),
                 Some(groups),
                 Column::new_with_schema("user_id", &schema).unwrap(),
+                false,
             )
             .unwrap();
 
