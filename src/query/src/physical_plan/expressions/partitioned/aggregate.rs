@@ -61,7 +61,6 @@ impl Group {
             outer_fn,
             first: true,
             last_partition: 0,
-            distinct,
         }
     }
 }

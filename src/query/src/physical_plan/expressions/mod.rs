@@ -7,6 +7,7 @@ use rust_decimal::Decimal;
 // pub mod _partitioned;
 // pub mod _segmentation;
 pub mod aggregate;
+mod non_partitioned;
 pub mod partitioned;
 pub mod partitioned_aggregate;
 pub mod partitioned_count;
