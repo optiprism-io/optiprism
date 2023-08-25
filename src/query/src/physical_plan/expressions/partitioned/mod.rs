@@ -58,7 +58,7 @@ pub trait PartitionedAggregateExpr: Send + Sync {
     fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum AggregateFunction {
     Sum(i128),
     Min(i128),
@@ -86,6 +86,16 @@ impl AggregateFunction {
 
     pub fn new_count() -> Self {
         AggregateFunction::Count(i128::zero())
+    }
+
+    pub fn make_new(&self) -> Self {
+        match self {
+            AggregateFunction::Sum(_) => AggregateFunction::new_sum(),
+            AggregateFunction::Min(_) => AggregateFunction::new_min(),
+            AggregateFunction::Max(_) => AggregateFunction::new_max(),
+            AggregateFunction::Avg(_, _) => AggregateFunction::new_avg(),
+            AggregateFunction::Count(_) => AggregateFunction::new_count(),
+        }
     }
 
     pub fn accumulate(&mut self, v: i128) {

@@ -90,7 +90,7 @@ impl Count {
 
         Ok(Self {
             filter,
-            outer_fn: outer_fn.clone(),
+            outer_fn: outer_fn.make_new(),
             groups,
             single_group: Group::new(outer_fn),
             partition_col,
@@ -185,7 +185,7 @@ impl PartitionedAggregateExpr for Count {
                     .groups
                     .entry(rows.as_ref().unwrap().row(row_id).owned())
                     .or_insert_with(|| {
-                        let mut bucket = Group::new(self.outer_fn.clone());
+                        let mut bucket = Group::new(self.outer_fn.make_new());
                         bucket
                     })
             } else {
@@ -264,12 +264,12 @@ impl PartitionedAggregateExpr for Count {
         };
         let c = Count {
             filter: self.filter.clone(),
-            outer_fn: self.outer_fn.clone(),
+            outer_fn: self.outer_fn.make_new(),
             groups,
             partition_col: self.partition_col.clone(),
             skip: false,
             skip_partition: 0,
-            single_group: Group::new(self.outer_fn.clone()),
+            single_group: Group::new(self.outer_fn.make_new()),
             distinct: self.distinct.clone(),
         };
 

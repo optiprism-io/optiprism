@@ -5,6 +5,7 @@ use datafusion::physical_plan::expressions::Column;
 
 use crate::error::Result;
 
+mod aggregate;
 mod count;
 
 pub trait AggregateExpr: Send + Sync {

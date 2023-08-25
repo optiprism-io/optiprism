@@ -43,25 +43,18 @@ use datafusion_expr::ColumnarValue;
 
 use crate::error::Result;
 use crate::physical_plan::expressions::check_filter;
+use crate::physical_plan::expressions::non_partitioned::AggregateExpr;
 use crate::physical_plan::expressions::partitioned::AggregateFunction;
 use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
 
 #[derive(Debug)]
 struct Group {
-    inner_fn: AggregateFunction,
-    outer_fn: AggregateFunction,
-    first: bool,
-    last_partition: i64,
+    agg: AggregateFunction,
 }
 
 impl Group {
-    pub fn new(inner_fn: AggregateFunction, outer_fn: AggregateFunction) -> Self {
-        Self {
-            inner_fn,
-            outer_fn,
-            first: true,
-            last_partition: 0,
-        }
+    pub fn new(agg: AggregateFunction) -> Self {
+        Self { agg }
     }
 }
 
@@ -74,25 +67,19 @@ struct Groups {
 
 pub struct Aggregate<T> {
     filter: Option<PhysicalExprRef>,
-    predicate: Column,
-    typ: PhantomData<T>,
-    inner_fn: AggregateFunction,
-    outer_fn: AggregateFunction,
     groups: Option<Groups>,
     single_group: Group,
-    partition_col: Column,
-    skip: bool,
-    skip_partition: i64,
+    predicate: Column,
+    agg: AggregateFunction,
+    t: PhantomData<T>,
 }
 
 impl<T> Aggregate<T> {
     pub fn try_new(
         filter: Option<PhysicalExprRef>,
-        inner_fn: AggregateFunction,
-        outer_fn: AggregateFunction,
-        predicate: Column,
         groups: Option<(Vec<(Column, SortField)>)>,
-        partition_col: Column,
+        predicate: Column,
+        agg: AggregateFunction,
     ) -> Result<Self> {
         let groups = if let Some(pairs) = groups {
             Some(Groups {
@@ -107,22 +94,18 @@ impl<T> Aggregate<T> {
 
         Ok(Self {
             filter,
-            predicate,
-            typ: Default::default(),
-            inner_fn: inner_fn.make_new(),
-            outer_fn: outer_fn.make_new(),
             groups,
-            single_group: Group::new(inner_fn, outer_fn),
-            partition_col,
-            skip: false,
-            skip_partition: 0,
+            single_group: Group::new(agg.make_new()),
+            predicate,
+            agg,
+            t: Default::default(),
         })
     }
 }
 
 macro_rules! agg {
     ($ty:ident,$array_ty:ident) => {
-        impl PartitionedAggregateExpr for Aggregate<$ty> {
+        impl AggregateExpr for Aggregate<$ty> {
             fn group_columns(&self) -> Vec<Column> {
                 if let Some(groups) = &self.groups {
                     groups.columns.clone()
@@ -140,11 +123,7 @@ macro_rules! agg {
                 vec![field]
             }
 
-            fn evaluate(
-                &mut self,
-                batch: &RecordBatch,
-                partition_exist: Option<&HashMap<i64, ()>>,
-            ) -> crate::Result<()> {
+            fn evaluate(&mut self, batch: &RecordBatch) -> crate::Result<()> {
                 let filter = if self.filter.is_some() {
                     Some(
                         self.filter
@@ -161,6 +140,15 @@ macro_rules! agg {
                     None
                 };
 
+                let predicate = self
+                    .predicate
+                    .evaluate(batch)?
+                    .into_array(batch.num_rows())
+                    .as_any()
+                    .downcast_ref::<$array_ty>()
+                    .unwrap()
+                    .clone();
+
                 let rows = if let Some(groups) = &mut self.groups {
                     let arrs = groups
                         .columns
@@ -176,38 +164,15 @@ macro_rules! agg {
                     None
                 };
 
-                let predicate = self
-                    .predicate
-                    .evaluate(batch)?
-                    .into_array(batch.num_rows())
-                    .as_any()
-                    .downcast_ref::<$array_ty>()
-                    .unwrap()
-                    .clone();
-
-                let partitions = self
-                    .partition_col
-                    .evaluate(batch)?
-                    .into_array(batch.num_rows())
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .clone();
-
-                for (row_id, partition) in partitions.into_iter().enumerate() {
-                    let partition = partition.unwrap();
-                    if self.skip {
-                        if self.skip_partition != partition {
-                            self.skip = false;
-                        } else {
+                for (row_id, val) in predicate.into_iter().enumerate() {
+                    if let Some(filter) = &filter {
+                        if !check_filter(filter, row_id) {
                             continue;
                         }
                     }
-                    if let Some(exists) = partition_exist {
-                        if !exists.contains_key(&partition) {
-                            self.skip = true;
-                            continue;
-                        }
+
+                    if val.is_none() {
+                        continue;
                     }
 
                     let bucket = if let Some(groups) = &mut self.groups {
@@ -215,33 +180,14 @@ macro_rules! agg {
                             .groups
                             .entry(rows.as_ref().unwrap().row(row_id).owned())
                             .or_insert_with(|| {
-                                let mut bucket =
-                                    Group::new(self.inner_fn.make_new(), self.outer_fn.make_new());
+                                let mut bucket = Group::new(self.agg.make_new());
                                 bucket
                             })
                     } else {
                         &mut self.single_group
                     };
 
-                    if bucket.first {
-                        bucket.first = false;
-                        bucket.last_partition = partition;
-                    }
-
-                    if let Some(filter) = &filter {
-                        if !check_filter(filter, row_id) {
-                            continue;
-                        }
-                    }
-
-                    if bucket.last_partition != partition {
-                        let v = bucket.inner_fn.result();
-                        bucket.outer_fn.accumulate(v);
-                        bucket.last_partition = partition;
-
-                        bucket.inner_fn.reset();
-                    }
-                    bucket.inner_fn.accumulate(predicate.value(row_id) as i128);
+                    bucket.agg.accumulate(val.unwrap() as i128);
                 }
 
                 Ok(())
@@ -253,8 +199,7 @@ macro_rules! agg {
                     let mut res_col_b = Decimal128Builder::with_capacity(groups.groups.len());
                     for (row, group) in groups.groups.iter_mut() {
                         rows.push(row.row());
-                        group.outer_fn.accumulate(group.inner_fn.result() as i128);
-                        let res = group.outer_fn.result();
+                        let res = group.agg.result() as i128;
                         res_col_b.append_value(res);
                     }
 
@@ -266,10 +211,7 @@ macro_rules! agg {
                     Ok(vec![group_col, vec![res_col]].concat())
                 } else {
                     let mut res_col_b = Decimal128Builder::with_capacity(1);
-                    self.single_group
-                        .outer_fn
-                        .accumulate(self.single_group.inner_fn.result() as i128);
-                    res_col_b.append_value(self.single_group.outer_fn.result());
+                    res_col_b.append_value(self.single_group.agg.result() as i128);
                     let res_col = res_col_b
                         .finish()
                         .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
@@ -278,7 +220,7 @@ macro_rules! agg {
                 }
             }
 
-            fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>> {
+            fn make_new(&self) -> Result<Box<dyn AggregateExpr>> {
                 let groups = if let Some(groups) = &self.groups {
                     Some(Groups {
                         columns: groups.columns.clone(),
@@ -289,17 +231,13 @@ macro_rules! agg {
                 } else {
                     None
                 };
-                let c: Aggregate<$ty> = Aggregate {
+                let c = Aggregate::<$ty> {
                     filter: self.filter.clone(),
-                    typ: Default::default(),
-                    predicate: self.predicate.clone(),
-                    inner_fn: self.inner_fn.make_new(),
-                    outer_fn: self.outer_fn.make_new(),
                     groups,
-                    partition_col: self.partition_col.clone(),
-                    skip: false,
-                    skip_partition: 0,
-                    single_group: Group::new(self.inner_fn.make_new(), self.outer_fn.make_new()),
+                    single_group: Group::new(self.agg.make_new()),
+                    predicate: self.predicate.clone(),
+                    agg: self.agg.make_new(),
+                    t: Default::default(),
                 };
 
                 Ok(Box::new(c))
@@ -307,6 +245,7 @@ macro_rules! agg {
         }
     };
 }
+
 agg!(i8, Int8Array);
 agg!(i16, Int16Array);
 agg!(i32, Int32Array);
@@ -334,40 +273,21 @@ mod tests {
     use datafusion::physical_expr::expressions::Column;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::aggregate::Aggregate;
+    use crate::physical_plan::expressions::non_partitioned::aggregate::Aggregate;
+    use crate::physical_plan::expressions::non_partitioned::AggregateExpr;
     use crate::physical_plan::expressions::partitioned::AggregateFunction;
-    use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
 
     #[test]
-    fn sum_avg_grouped() {
+    fn sum_grouped() {
         let data = r#"
-| user_id(i64) | device(utf8) | v(i64) | ts(ts) | event(utf8) |
-|--------------|--------------|-------|--------|-------------|
-| 0            | iphone       | 1     | 1      | e1          |
-| 0            | iphone       | 0     | 2      | e2          |
-| 0            | iphone       | 0     | 3      | e3          |
-| 0            | android      | 1     | 4      | e1          |
-| 0            | android      | 1     | 5      | e2          |
-| 0            | android      | 0     | 6      | e3          |
-| 1            | osx          | 1     | 1      | e1          |
-| 1            | osx          | 1     | 2      | e2          |
-| 1            | osx          | 0     | 3      | e3          |
-| 1            | osx          | 0     | 4      | e1          |
-| 1            | osx          | 0     | 5      | e2          |
-| 1            | osx          | 0     | 6      | e3          |
-| 2            | osx          | 1     | 1      | e1          |
-| 2            | osx          | 1     | 2      | e2          |
-| 2            | osx          | 0     | 3      | e3          |
-| 2            | osx          | 0     | 4      | e1          |
-| 2            | osx          | 0     | 5      | e2          |
-| 2            | osx          | 0     | 6      | e3          |
-| 3            | osx          | 1     | 1      | e1          |
-| 3            | osx          | 1     | 2      | e2          |
-| 3            | osx          | 0     | 3      | e3          |
-| 3            | osx          | 0     | 4      | e1          |
-| 3            | osx          | 0     | 5      | e2          |
-| 3            | osx          | 0     | 6      | e3          |
-| 4            | windows      | 0     | 6      | e3
+| device(utf8) | v(i64)| event(utf8) |
+|--------------|-------|-------------|
+| iphone       | 1     | e1          |
+| android      | 1     | e1          |
+| android      | 1     | e1          |
+| osx          | 1     | e1          |
+| osx          | 1     | e3          |
+| osx          | 1     | e3          |
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
@@ -375,51 +295,18 @@ mod tests {
             Column::new_with_schema("device", &schema).unwrap(),
             SortField::new(DataType::Utf8),
         )];
-        let hash = HashMap::from([(0, ()), (1, ()), (4, ())]);
         let mut agg = Aggregate::<i64>::try_new(
             None,
-            AggregateFunction::new_sum(),
-            AggregateFunction::new_avg(),
-            Column::new_with_schema("v", &schema).unwrap(),
             Some(groups),
-            Column::new_with_schema("user_id", &schema).unwrap(),
+            Column::new_with_schema("v", &schema).unwrap(),
+            AggregateFunction::new_sum(),
         )
         .unwrap();
         for b in res {
-            agg.evaluate(&b, Some(&hash)).unwrap();
+            agg.evaluate(&b).unwrap();
         }
 
         let res = agg.finalize();
-        println!("{:?}", res);
-    }
-
-    #[test]
-    fn sum_avg() {
-        let data = r#"
-| user_id(i64) | v(i64) | ts(ts) | event(utf8) |
-|--------------|-------|--------|-------------|
-| 1            | 1     | 1      | e1          |
-| 1            | 1     | 1      | e1          |
-| 2            | 0     | 6      | e3
-"#;
-        let res = parse_markdown_tables(data).unwrap();
-        let schema = res[0].schema().clone();
-
-        let hash = HashMap::from([(1, ()), (2, ())]);
-        let mut count = Aggregate::<i64>::try_new(
-            None,
-            AggregateFunction::new_sum(),
-            AggregateFunction::new_avg(),
-            Column::new_with_schema("v", &schema).unwrap(),
-            None,
-            Column::new_with_schema("user_id", &schema).unwrap(),
-        )
-        .unwrap();
-        for b in res {
-            count.evaluate(&b, Some(&hash)).unwrap();
-        }
-
-        let res = count.finalize();
         println!("{:?}", res);
     }
 }
