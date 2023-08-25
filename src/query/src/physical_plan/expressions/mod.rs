@@ -2,13 +2,11 @@ use arrow::array::Array;
 use arrow::array::BooleanArray;
 use num_traits::Bounded;
 use num_traits::Zero;
-use rust_decimal::Decimal;
 
 // pub mod _partitioned;
 // pub mod _segmentation;
 pub mod aggregate;
-mod non_partitioned;
-pub mod partitioned;
+pub mod aggregate_old;
 pub mod partitioned_aggregate;
 pub mod partitioned_count;
 pub mod partitioned_sum;

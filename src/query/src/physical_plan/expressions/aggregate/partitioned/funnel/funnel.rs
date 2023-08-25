@@ -37,15 +37,15 @@ use datafusion_common::ScalarValue;
 use rust_decimal::Decimal;
 
 use crate::error::QueryError;
-use crate::physical_plan::expressions::partitioned::funnel::evaluate_batch;
-use crate::physical_plan::expressions::partitioned::funnel::Batch;
-use crate::physical_plan::expressions::partitioned::funnel::Count;
-use crate::physical_plan::expressions::partitioned::funnel::Exclude;
-use crate::physical_plan::expressions::partitioned::funnel::ExcludeExpr;
-use crate::physical_plan::expressions::partitioned::funnel::Filter;
-use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
-use crate::physical_plan::expressions::partitioned::funnel::Touch;
-use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::aggregate::partitioned::funnel::evaluate_batch;
+use crate::physical_plan::expressions::aggregate::partitioned::funnel::Batch;
+use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count;
+use crate::physical_plan::expressions::aggregate::partitioned::funnel::Exclude;
+use crate::physical_plan::expressions::aggregate::partitioned::funnel::ExcludeExpr;
+use crate::physical_plan::expressions::aggregate::partitioned::funnel::Filter;
+use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
+use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
+use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::StaticArray;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -439,7 +439,7 @@ impl PartitionedAggregateExpr for Funnel {
     fn evaluate(
         &mut self,
         batch: &RecordBatch,
-        partition_exist: Option<&HashMap<i64, ()>>,
+        partition_exist: Option<&HashMap<i64, (), RandomState>>,
     ) -> crate::Result<()> {
         let funnel_batch = evaluate_batch(
             batch.to_owned(),
@@ -827,6 +827,7 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
+    use ahash::RandomState;
     use arrow::array::Int64Array;
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
@@ -851,21 +852,17 @@ mod tests {
 
     use crate::event_eq;
     use crate::expected_debug;
-    use crate::physical_plan::expressions::partitioned::funnel::event_eq_;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel::DebugStep;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel::Funnel;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel::Options;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel::StepResult;
-    use crate::physical_plan::expressions::partitioned::funnel::Count;
-    use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
-    use crate::physical_plan::expressions::partitioned::funnel::ExcludeExpr;
-    use crate::physical_plan::expressions::partitioned::funnel::Filter;
-    use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
-    use crate::physical_plan::expressions::partitioned::funnel::StepOrder::Any;
-    use crate::physical_plan::expressions::partitioned::funnel::StepOrder::Sequential;
-    use crate::physical_plan::expressions::partitioned::funnel::Touch;
-    use crate::physical_plan::expressions::partitioned::AggregateFunction;
-    use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::event_eq_;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::DebugStep;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Options;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::StepOrder::Sequential;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count::Unique;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::ExcludeExpr;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
+    use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 
     #[derive(Debug, Clone)]
     struct TestCase {
@@ -873,7 +870,7 @@ mod tests {
         data: &'static str,
         opts: Options,
         exp_debug: Vec<(usize, usize, DebugStep)>,
-        partition_exist: HashMap<i64, ()>,
+        partition_exist: HashMap<i64, (), RandomState>,
         exp: &'static str,
     }
 
@@ -897,7 +894,6 @@ mod tests {
 | 1            | 1976-01-01 13:00:00      | e2          | 1          |
 | 1            | 1976-01-01 14:00:00      | e3          | 1          |
 "#,
-
                 opts: Options {
                     from: DateTime::parse_from_str(
                         "1976-01-01 12:00:00 +0000",
@@ -932,7 +928,7 @@ mod tests {
                     (0, 2, DebugStep::Step),
                     (0, 2, DebugStep::Complete),
                 ],
-                partition_exist: HashMap::from([(1, ())]),
+                partition_exist: HashMap::from_iter([(1, ())]),
                 exp: r#"
 asd
                 "#,
@@ -1494,7 +1490,7 @@ asd
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
-        let hash = HashMap::from([(0, ()), (1, ()), (2, ()), (3, ())]);
+        let hash = HashMap::from_iter([(0, ()), (1, ()), (2, ()), (3, ())]);
 
         let e1 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
@@ -1578,7 +1574,7 @@ asd
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
-        let hash = HashMap::from([(0, ()), (1, ()), (2, ()), (3, ())]);
+        let hash = HashMap::from_iter([(0, ()), (1, ()), (2, ()), (3, ())]);
 
         let e1 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
@@ -1666,7 +1662,7 @@ asd
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
-        let hash = HashMap::from([(0, ()), (1, ()), (2, ()), (3, ())]);
+        let hash = HashMap::from_iter([(0, ()), (1, ()), (2, ()), (3, ())]);
 
         let e1 = {
             let l = Column::new_with_schema("v", &schema).unwrap();
@@ -1750,7 +1746,7 @@ asd
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
-        let hash = HashMap::from([(1, ())]);
+        let hash = HashMap::from_iter([(1, ())]);
 
         let e1 = {
             let l = Column::new_with_schema("v", &schema).unwrap();

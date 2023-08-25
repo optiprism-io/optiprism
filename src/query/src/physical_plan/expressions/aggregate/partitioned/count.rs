@@ -28,9 +28,9 @@ use datafusion_common::ScalarValue;
 use datafusion_expr::ColumnarValue;
 
 use crate::error::Result;
+use crate::physical_plan::expressions::aggregate::AggregateFunction;
+use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::expressions::check_filter;
-use crate::physical_plan::expressions::partitioned::AggregateFunction;
-use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
 
 #[derive(Debug)]
 struct Group {
@@ -122,7 +122,7 @@ impl PartitionedAggregateExpr for Count {
     fn evaluate(
         &mut self,
         batch: &RecordBatch,
-        partition_exist: Option<&HashMap<i64, ()>>,
+        partition_exist: Option<&HashMap<i64, (), RandomState>>,
     ) -> crate::Result<()> {
         let filter = if self.filter.is_some() {
             Some(
@@ -290,9 +290,9 @@ mod tests {
     use datafusion::physical_expr::expressions::Column;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::count::Count;
-    use crate::physical_plan::expressions::partitioned::AggregateFunction;
-    use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::aggregate::partitioned::count::Count;
+    use crate::physical_plan::expressions::aggregate::AggregateFunction;
+    use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 
     #[test]
     fn count_sum_grouped() {
@@ -331,7 +331,7 @@ mod tests {
             Column::new_with_schema("device", &schema).unwrap(),
             SortField::new(DataType::Utf8),
         )];
-        let hash = HashMap::from([(0, ()), (1, ()), (4, ())]);
+        let hash = HashMap::from_iter([(0, ()), (1, ()), (4, ())]);
         let mut count = Count::try_new(
             None,
             AggregateFunction::new_avg(),
@@ -381,7 +381,7 @@ mod tests {
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
-        let hash = HashMap::from([(0, ()), (1, ()), (4, ())]);
+        let hash = HashMap::from_iter([(0, ()), (1, ()), (4, ())]);
         let mut count = Count::try_new(
             None,
             AggregateFunction::new_avg(),
@@ -431,7 +431,7 @@ mod tests {
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
-        let hash = HashMap::from([(0, ()), (1, ()), (4, ())]);
+        let hash = HashMap::from_iter([(0, ()), (1, ()), (4, ())]);
         let mut count = Count::try_new(
             None,
             AggregateFunction::new_count(),

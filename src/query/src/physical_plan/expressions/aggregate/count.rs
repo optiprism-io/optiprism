@@ -42,19 +42,16 @@ use datafusion_common::ScalarValue;
 use datafusion_expr::ColumnarValue;
 
 use crate::error::Result;
+use crate::physical_plan::expressions::aggregate::AggregateExpr;
 use crate::physical_plan::expressions::check_filter;
-use crate::physical_plan::expressions::non_partitioned::AggregateExpr;
-use crate::physical_plan::expressions::partitioned::AggregateFunction;
-use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
-
 #[derive(Debug)]
 struct Group {
-    agg: AggregateFunction,
+    count: i64,
 }
 
 impl Group {
-    pub fn new(agg: AggregateFunction) -> Self {
-        Self { agg }
+    pub fn new() -> Self {
+        Self { count: 0 }
     }
 }
 
@@ -65,21 +62,21 @@ struct Groups {
     groups: HashMap<OwnedRow, Group, RandomState>,
 }
 
-pub struct Aggregate<T> {
+pub struct Count<T> {
     filter: Option<PhysicalExprRef>,
     groups: Option<Groups>,
     single_group: Group,
+    distinct: bool,
     predicate: Column,
-    agg: AggregateFunction,
     t: PhantomData<T>,
 }
 
-impl<T> Aggregate<T> {
+impl<T> Count<T> {
     pub fn try_new(
         filter: Option<PhysicalExprRef>,
         groups: Option<(Vec<(Column, SortField)>)>,
         predicate: Column,
-        agg: AggregateFunction,
+        distinct: bool,
     ) -> Result<Self> {
         let groups = if let Some(pairs) = groups {
             Some(Groups {
@@ -95,17 +92,17 @@ impl<T> Aggregate<T> {
         Ok(Self {
             filter,
             groups,
-            single_group: Group::new(agg.make_new()),
+            single_group: Group::new(),
+            distinct,
             predicate,
-            agg,
             t: Default::default(),
         })
     }
 }
 
-macro_rules! agg {
+macro_rules! count {
     ($ty:ident,$array_ty:ident) => {
-        impl AggregateExpr for Aggregate<$ty> {
+        impl AggregateExpr for Count<$ty> {
             fn group_columns(&self) -> Vec<Column> {
                 if let Some(groups) = &self.groups {
                     groups.columns.clone()
@@ -180,14 +177,14 @@ macro_rules! agg {
                             .groups
                             .entry(rows.as_ref().unwrap().row(row_id).owned())
                             .or_insert_with(|| {
-                                let mut bucket = Group::new(self.agg.make_new());
+                                let mut bucket = Group::new();
                                 bucket
                             })
                     } else {
                         &mut self.single_group
                     };
 
-                    bucket.agg.accumulate(val.unwrap() as i128);
+                    bucket.count += 1;
                 }
 
                 Ok(())
@@ -199,7 +196,7 @@ macro_rules! agg {
                     let mut res_col_b = Decimal128Builder::with_capacity(groups.groups.len());
                     for (row, group) in groups.groups.iter_mut() {
                         rows.push(row.row());
-                        let res = group.agg.result() as i128;
+                        let res = group.count as i128;
                         res_col_b.append_value(res);
                     }
 
@@ -211,7 +208,7 @@ macro_rules! agg {
                     Ok(vec![group_col, vec![res_col]].concat())
                 } else {
                     let mut res_col_b = Decimal128Builder::with_capacity(1);
-                    res_col_b.append_value(self.single_group.agg.result() as i128);
+                    res_col_b.append_value(self.single_group.count as i128);
                     let res_col = res_col_b
                         .finish()
                         .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
@@ -231,12 +228,12 @@ macro_rules! agg {
                 } else {
                     None
                 };
-                let c = Aggregate::<$ty> {
+                let c = Count::<$ty> {
                     filter: self.filter.clone(),
                     groups,
-                    single_group: Group::new(self.agg.make_new()),
+                    single_group: Group::new(),
+                    distinct: self.distinct.clone(),
                     predicate: self.predicate.clone(),
-                    agg: self.agg.make_new(),
                     t: Default::default(),
                 };
 
@@ -246,19 +243,19 @@ macro_rules! agg {
     };
 }
 
-agg!(i8, Int8Array);
-agg!(i16, Int16Array);
-agg!(i32, Int32Array);
-agg!(i64, Int64Array);
-agg!(i128, Decimal128Array);
-agg!(u8, UInt8Array);
-agg!(u16, UInt16Array);
-agg!(u32, UInt32Array);
-agg!(u64, UInt64Array);
-agg!(u128, Decimal128Array);
-agg!(f32, Float32Array);
-agg!(f64, Float64Array);
-agg!(Decimal128Array, Decimal128Array);
+count!(i8, Int8Array);
+count!(i16, Int16Array);
+count!(i32, Int32Array);
+count!(i64, Int64Array);
+count!(i128, Decimal128Array);
+count!(u8, UInt8Array);
+count!(u16, UInt16Array);
+count!(u32, UInt32Array);
+count!(u64, UInt64Array);
+count!(u128, Decimal128Array);
+count!(f32, Float32Array);
+count!(f64, Float64Array);
+count!(Decimal128Array, Decimal128Array);
 
 #[cfg(test)]
 mod tests {
@@ -273,12 +270,11 @@ mod tests {
     use datafusion::physical_expr::expressions::Column;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::non_partitioned::aggregate::Aggregate;
-    use crate::physical_plan::expressions::non_partitioned::AggregateExpr;
-    use crate::physical_plan::expressions::partitioned::AggregateFunction;
+    use crate::physical_plan::expressions::aggregate::count::Count;
+    use crate::physical_plan::expressions::aggregate::AggregateExpr;
 
     #[test]
-    fn sum_grouped() {
+    fn count_grouped() {
         let data = r#"
 | device(utf8) | v(i64)| event(utf8) |
 |--------------|-------|-------------|
@@ -295,18 +291,18 @@ mod tests {
             Column::new_with_schema("device", &schema).unwrap(),
             SortField::new(DataType::Utf8),
         )];
-        let mut agg = Aggregate::<i64>::try_new(
+        let mut count = Count::<i64>::try_new(
             None,
             Some(groups),
             Column::new_with_schema("v", &schema).unwrap(),
-            AggregateFunction::new_sum(),
+            false,
         )
         .unwrap();
         for b in res {
-            agg.evaluate(&b).unwrap();
+            count.evaluate(&b).unwrap();
         }
 
-        let res = agg.finalize();
+        let res = count.finalize();
         println!("{:?}", res);
     }
 }

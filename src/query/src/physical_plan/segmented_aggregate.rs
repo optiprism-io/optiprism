@@ -11,6 +11,7 @@ use std::sync::Mutex;
 use std::task::Context;
 use std::task::Poll;
 
+use ahash::HashMapExt;
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayDataBuilder;
@@ -62,7 +63,7 @@ use futures::Stream;
 use futures::StreamExt;
 
 use crate::error::QueryError;
-use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::Result;
 
 pub struct SegmentedAggregateExec {
@@ -270,7 +271,8 @@ impl Stream for SegmentedAggregateStream {
         let partition_col = self.partition_col.clone();
 
         let exist = if let Some(partition_streams) = &mut self.partition_streams {
-            let mut exist: Vec<HashMap<i64, ()>> = vec![HashMap::new(); partition_streams.len()];
+            let mut exist: Vec<HashMap<i64, (), RandomState>> =
+                vec![ahash::HashMap::new(); partition_streams.len()];
 
             for (segment_id, partitioned_stream) in partition_streams.iter_mut().enumerate() {
                 loop {
@@ -450,17 +452,15 @@ mod tests {
     use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::count;
-    use crate::physical_plan::expressions::partitioned::count::Count;
-    use crate::physical_plan::expressions::partitioned::funnel;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel::Funnel;
-    use crate::physical_plan::expressions::partitioned::funnel::funnel::Options;
-    use crate::physical_plan::expressions::partitioned::funnel::Count::Unique;
-    use crate::physical_plan::expressions::partitioned::funnel::ExcludeExpr;
-    use crate::physical_plan::expressions::partitioned::funnel::StepOrder;
-    use crate::physical_plan::expressions::partitioned::funnel::Touch;
-    use crate::physical_plan::expressions::partitioned::AggregateFunction;
-    use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::aggregate::partitioned::count;
+    use crate::physical_plan::expressions::aggregate::partitioned::count::Count;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Options;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count::Unique;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
+    use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
+    use crate::physical_plan::expressions::aggregate::AggregateFunction;
+    use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
     use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
 
     #[tokio::test]

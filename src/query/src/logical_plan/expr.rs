@@ -25,7 +25,7 @@ use datafusion_expr::StateTypeFunction;
 use datafusion_expr::Volatility;
 
 use crate::error::QueryError;
-use crate::physical_plan::expressions::aggregate::state_types;
+use crate::physical_plan::expressions::aggregate_old::state_types;
 use crate::physical_plan::expressions::partitioned_aggregate::PartitionedAggregate;
 use crate::physical_plan::expressions::sorted_distinct_count::SortedDistinctCount;
 use crate::Result;

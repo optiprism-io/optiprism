@@ -37,7 +37,6 @@ use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
-use crate::physical_plan::expressions::partitioned::AggregateFunction as SegmentAggregateFunction;
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::unpivot::UnpivotExec;

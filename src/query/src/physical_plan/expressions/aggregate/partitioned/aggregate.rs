@@ -42,9 +42,9 @@ use datafusion_common::ScalarValue;
 use datafusion_expr::ColumnarValue;
 
 use crate::error::Result;
+use crate::physical_plan::expressions::aggregate::AggregateFunction;
+use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::expressions::check_filter;
-use crate::physical_plan::expressions::partitioned::AggregateFunction;
-use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
 
 #[derive(Debug)]
 struct Group {
@@ -143,7 +143,7 @@ macro_rules! agg {
             fn evaluate(
                 &mut self,
                 batch: &RecordBatch,
-                partition_exist: Option<&HashMap<i64, ()>>,
+                partition_exist: Option<&HashMap<i64, (), RandomState>>,
             ) -> crate::Result<()> {
                 let filter = if self.filter.is_some() {
                     Some(
@@ -325,6 +325,8 @@ agg!(Decimal128Array, Decimal128Array);
 mod tests {
     use std::collections::HashMap;
 
+    use ahash::AHasher;
+    use ahash::RandomState;
     use arrow::array::Int64Array;
     use arrow::datatypes::DataType;
     use arrow::datatypes::Schema;
@@ -334,9 +336,9 @@ mod tests {
     use datafusion::physical_expr::expressions::Column;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::partitioned::aggregate::Aggregate;
-    use crate::physical_plan::expressions::partitioned::AggregateFunction;
-    use crate::physical_plan::expressions::partitioned::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::aggregate::partitioned::aggregate::Aggregate;
+    use crate::physical_plan::expressions::aggregate::AggregateFunction;
+    use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 
     #[test]
     fn sum_avg_grouped() {
@@ -375,7 +377,8 @@ mod tests {
             Column::new_with_schema("device", &schema).unwrap(),
             SortField::new(DataType::Utf8),
         )];
-        let hash = HashMap::from([(0, ()), (1, ()), (4, ())]);
+
+        let hash = ahash::HashMap::from_iter(vec![(0, ()), (1, ()), (4, ())]);
         let mut agg = Aggregate::<i64>::try_new(
             None,
             AggregateFunction::new_sum(),
@@ -405,7 +408,7 @@ mod tests {
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
 
-        let hash = HashMap::from([(1, ()), (2, ())]);
+        let hash = ahash::HashMap::from_iter([(1, ()), (2, ())]);
         let mut count = Aggregate::<i64>::try_new(
             None,
             AggregateFunction::new_sum(),
