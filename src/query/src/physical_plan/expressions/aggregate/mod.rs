@@ -13,14 +13,6 @@ pub mod aggregate;
 pub mod count;
 pub mod partitioned;
 
-pub trait AggregateExpr: Send + Sync {
-    fn group_columns(&self) -> Vec<Column>;
-    fn fields(&self) -> Vec<Field>;
-    fn evaluate(&mut self, batch: &RecordBatch) -> Result<()>;
-    fn finalize(&mut self) -> Result<Vec<ArrayRef>>;
-    fn make_new(&self) -> Result<Box<dyn AggregateExpr>>;
-}
-
 pub trait PartitionedAggregateExpr: Send + Sync {
     fn group_columns(&self) -> Vec<Column>;
     fn fields(&self) -> Vec<Field>;

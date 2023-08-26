@@ -37,9 +37,8 @@ use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::expressions::Max;
-use datafusion::physical_expr::AggregateExpr;
 use datafusion::physical_expr::PhysicalExpr;
-use datafusion::physical_plan::aggregates::AggregateExec;
+use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
 use datafusion::physical_plan::aggregates::AggregateMode;
 use datafusion::physical_plan::aggregates::PhysicalGroupBy;
 use datafusion::physical_plan::common::collect;
@@ -49,6 +48,7 @@ use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
+use datafusion::physical_plan::AggregateExpr as DFAggregateExpr;
 use datafusion::physical_plan::DisplayFormatType;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::Partitioning;
@@ -66,7 +66,7 @@ use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::Result;
 
-pub struct SegmentedAggregateExec {
+pub struct AggregateExec {
     input: Arc<dyn ExecutionPlan>,
     partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
     partition_col: Column,
@@ -82,7 +82,7 @@ struct Group {
     cols: Vec<ScalarValue>,
 }
 
-impl SegmentedAggregateExec {
+impl AggregateExec {
     pub fn try_new(
         input: Arc<dyn ExecutionPlan>,
         partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
@@ -140,14 +140,14 @@ impl SegmentedAggregateExec {
     }
 }
 
-impl Debug for SegmentedAggregateExec {
+impl Debug for AggregateExec {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "SegmentedAggregateExec")
     }
 }
 
 #[async_trait]
-impl ExecutionPlan for SegmentedAggregateExec {
+impl ExecutionPlan for AggregateExec {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -173,7 +173,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
-            SegmentedAggregateExec::try_new(
+            AggregateExec::try_new(
                 children[0].clone(),
                 self.partition_inputs.clone(),
                 self.partition_col.clone(),
@@ -190,30 +190,32 @@ impl ExecutionPlan for SegmentedAggregateExec {
         context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
         let stream = self.input.execute(partition, context.clone())?;
-        let (agg_expr, partition_streams) = if let Some(partition_inputs) = &self.partition_inputs {
-            let aggs = (0..partition_inputs.len())
-                .into_iter()
-                .map(|_| {
-                    self.agg_expr
-                        .iter()
-                        .map(|a| {
-                            let mut agg = a.lock().unwrap();
-                            Arc::new(Mutex::new(agg.make_new().unwrap()))
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>();
+        let (agg_expr, partition_streams) =
+            if let Some(partition_inputs) = &self.partition_inputs && self.agg_expr.len() > 0 {
+                let aggs = (0..partition_inputs.len())
+                    .into_iter()
+                    .map(|_| {
+                        self.agg_expr
+                            .iter()
+                            .map(|a| {
+                                let mut agg = a.lock().unwrap();
+                                Arc::new(Mutex::new(agg.make_new().unwrap()))
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
 
-            let streams = partition_inputs
-                .iter()
-                .map(|s| s.execute(partition, context.clone()))
-                .collect::<DFResult<Vec<_>>>()?;
-            (aggs, Some(streams))
-        } else {
-            (vec![self.agg_expr.clone()], None)
-        };
+                let streams = partition_inputs
+                    .iter()
+                    .map(|s| s.execute(partition, context.clone()))
+                    .collect::<DFResult<Vec<_>>>()?;
+                (aggs, Some(streams))
+            } else {
+                (vec![self.agg_expr.clone()], None)
+            };
+
         let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
-        Ok(Box::pin(SegmentedAggregateStream {
+        Ok(Box::pin(AggregateStream {
             is_ended: false,
             stream,
             schema: self.schema.clone(),
@@ -231,7 +233,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
     }
 
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "SegmentedAggregateExec")
+        write!(f, "AggregateExec")
     }
 
     fn statistics(&self) -> Statistics {
@@ -239,7 +241,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
     }
 }
 
-struct SegmentedAggregateStream {
+struct AggregateStream {
     is_ended: bool,
     stream: SendableRecordBatchStream,
     partition_streams: Option<Vec<SendableRecordBatchStream>>,
@@ -251,14 +253,14 @@ struct SegmentedAggregateStream {
     baseline_metrics: BaselineMetrics,
 }
 
-impl RecordBatchStream for SegmentedAggregateStream {
+impl RecordBatchStream for AggregateStream {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
 }
 
 #[async_trait]
-impl Stream for SegmentedAggregateStream {
+impl Stream for AggregateStream {
     type Item = DFResult<RecordBatch>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -370,32 +372,29 @@ impl Stream for SegmentedAggregateStream {
                 batches.push(result);
             }
         }
-
         let batch = concat_batches(&self.schema, batches.iter().map(|b| b).collect::<Vec<_>>())?;
 
         // merge
         let agg_fields = self.schema.fields()[self.group_fields.len()..].to_owned();
-        let aggs: Vec<Arc<dyn AggregateExpr>> = agg_fields
+        let aggs: Vec<Arc<dyn DFAggregateExpr>> = agg_fields
             .iter()
             .map(|f| {
                 Arc::new(Max::new(
                     col(f.name(), &self.schema).unwrap(),
                     f.name().to_owned(),
                     f.data_type().to_owned(),
-                )) as Arc<dyn AggregateExpr>
+                )) as Arc<dyn DFAggregateExpr>
             })
             .collect::<Vec<_>>();
 
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
 
-        println!("{:?}", self.group_fields);
         let group_by_expr = self
             .group_fields
             .iter()
             .map(|f| (col(f.name(), &self.schema).unwrap(), f.name().to_owned()))
             .collect::<Vec<_>>();
-        println!("{} {}", group_by_expr.len(), aggs.len());
 
         let group_by = PhysicalGroupBy::new_single(group_by_expr);
         let input = Arc::new(MemoryExec::try_new(
@@ -403,7 +402,7 @@ impl Stream for SegmentedAggregateStream {
             self.schema.clone(),
             None,
         )?);
-        let partial_aggregate = Arc::new(AggregateExec::try_new(
+        let partial_aggregate = Arc::new(DFAggregateExec::try_new(
             AggregateMode::Final,
             group_by,
             aggs,
@@ -452,6 +451,7 @@ mod tests {
     use datafusion_expr::Operator;
     use store::test_util::parse_markdown_tables;
 
+    use crate::physical_plan::expressions::aggregate;
     use crate::physical_plan::expressions::aggregate::partitioned::count;
     use crate::physical_plan::expressions::aggregate::partitioned::count::Count;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
@@ -461,7 +461,7 @@ mod tests {
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
     use crate::physical_plan::expressions::aggregate::AggregateFunction;
     use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
-    use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
+    use crate::physical_plan::segmented_aggregate::AggregateExec;
 
     #[tokio::test]
     async fn test() -> anyhow::Result<()> {
@@ -473,14 +473,12 @@ mod tests {
 | 0            | iphone       | Spain         | 0      | 2020-04-12 22:12:57      | e3          |
 | 0            | android      | Spain         | 1      | 2020-04-12 22:13:57      | e1          |
 | 0            | android      | Spain         | 1      | 2020-04-12 22:14:57      | e2          |
-|||||||
 | 0            | android      | Spain         | 0      | 2020-04-12 22:15:57      | e3          |
 | 1            | osx          | Germany       | 1      | 2020-04-12 22:10:57      | e1          |
 | 1            | osx          | Germany       | 1      | 2020-04-12 22:11:57      | e2          |
 | 1            | osx          | Germany       | 0      | 2020-04-12 22:12:57      | e3          |
 | 1            | osx          | UK            | 0      | 2020-04-12 22:13:57      | e1          |
 | 1            | osx          | UK            | 0      | 2020-04-12 22:14:57      | e2          |
-|||||||
 | 1            | osx          | UK            | 0      | 2020-04-12 22:15:57      | e3          |
 | 2            | osx          | Portugal      | 1      | 2020-04-12 22:10:57      | e1          |
 | 2            | osx          | Portugal      | 1      | 2020-04-12 22:11:57      | e2          |
@@ -490,7 +488,6 @@ mod tests {
 | 2            | osx          | Spain         | 0      | 2020-04-12 22:15:57      | e3          |
 | 3            | osx          | Spain         | 1      | 2020-04-12 22:10:57     | e1          |
 | 3            | osx          | Spain         | 1      | 2020-04-12 22:12:57      | e2          |
-|||||||
 | 3            | osx          | Spain         | 0      | 2020-04-12 22:12:57      | e3          |
 | 3            | osx          | UK            | 0      | 2020-04-12 22:13:57      | e1          |
 | 3            | osx          | UK            | 0      | 2020-04-12 22:14:57      | e2          |
@@ -502,7 +499,7 @@ mod tests {
         let schema = batches[0].schema();
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
-        let agg1 = {
+        let pagg1 = {
             // let groups = vec![(
             // Column::new_with_schema("device", &schema).unwrap(),
             // SortField::new(DataType::Utf8),
@@ -528,7 +525,7 @@ mod tests {
             ))
         };
 
-        let agg2 = {
+        let pagg2 = {
             let groups = vec![
                 (
                     Column::new_with_schema("country", &schema).unwrap(),
@@ -553,7 +550,7 @@ mod tests {
             ))
         };
 
-        let agg3 = {
+        let pagg3 = {
             let groups = vec![(
                 Column::new_with_schema("country", &schema).unwrap(),
                 SortField::new(DataType::Utf8),
@@ -572,7 +569,7 @@ mod tests {
             ))
         };
 
-        let agg4 = {
+        let pagg4 = {
             /*let groups = vec![
                 (
                     Column::new_with_schema("country", &schema).unwrap(),
@@ -626,6 +623,18 @@ mod tests {
             Arc::new(Mutex::new(Box::new(f) as Box<dyn PartitionedAggregateExpr>))
         };
 
+        let agg1 = aggregate::count::Count::<i64>::try_new(
+            None,
+            None,
+            Column::new_with_schema("v", &schema).unwrap(),
+            Column::new_with_schema("user_id", &schema).unwrap(),
+            false,
+        )
+        .unwrap();
+        let agg1 = Arc::new(Mutex::new(
+            Box::new(agg1) as Box<dyn PartitionedAggregateExpr>
+        ));
+
         let pinput1 = {
             let data = r#"
 | user_id(i64) |
@@ -659,16 +668,17 @@ mod tests {
             input
         };
 
-        let seg = SegmentedAggregateExec::try_new(
+        let seg = AggregateExec::try_new(
             Arc::new(input),
             Some(vec![Arc::new(pinput2), Arc::new(pinput1)]),
             Column::new_with_schema("user_id", &schema).unwrap(),
-            vec![agg1, agg2, agg3, agg4],
+            vec![pagg1, pagg2, pagg3, pagg4, agg1],
             vec![
                 "count".to_string(),
                 "min".to_string(),
                 "min2".to_string(),
                 "f1".to_string(),
+                "f2".to_string(),
             ],
         )?;
 
@@ -793,11 +803,11 @@ mod tests {
             input
         };
 
-        let seg = SegmentedAggregateExec::try_new(
+        let seg = AggregateExec::try_new(
             Arc::new(input),
             Some(vec![Arc::new(pinput2), Arc::new(pinput1)]),
             Column::new_with_schema("user_id", &schema).unwrap(),
-            vec![agg1 /* ,  agg2 */],
+            vec![agg1, agg2],
             vec!["count".to_string(), "min".to_string()],
         )?;
 
@@ -889,11 +899,11 @@ mod tests {
             ))
         };
 
-        let seg = SegmentedAggregateExec::try_new(
+        let seg = AggregateExec::try_new(
             Arc::new(input),
             None,
             Column::new_with_schema("user_id", &schema).unwrap(),
-            vec![agg1 /* ,  agg2 */],
+            vec![agg1, agg2],
             vec!["count".to_string(), "min".to_string()],
         )?;
 

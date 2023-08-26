@@ -42,8 +42,9 @@ use datafusion_common::ScalarValue;
 use datafusion_expr::ColumnarValue;
 
 use crate::error::Result;
-use crate::physical_plan::expressions::aggregate::AggregateExpr;
+use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::expressions::check_filter;
+
 #[derive(Debug)]
 struct Group {
     count: i64,
@@ -68,6 +69,7 @@ pub struct Count<T> {
     single_group: Group,
     distinct: bool,
     predicate: Column,
+    partition_col: Column,
     t: PhantomData<T>,
 }
 
@@ -76,6 +78,7 @@ impl<T> Count<T> {
         filter: Option<PhysicalExprRef>,
         groups: Option<(Vec<(Column, SortField)>)>,
         predicate: Column,
+        partition_col: Column,
         distinct: bool,
     ) -> Result<Self> {
         let groups = if let Some(pairs) = groups {
@@ -95,14 +98,14 @@ impl<T> Count<T> {
             single_group: Group::new(),
             distinct,
             predicate,
+            partition_col,
             t: Default::default(),
         })
     }
 }
-
 macro_rules! count {
     ($ty:ident,$array_ty:ident) => {
-        impl AggregateExpr for Count<$ty> {
+        impl PartitionedAggregateExpr for Count<$ty> {
             fn group_columns(&self) -> Vec<Column> {
                 if let Some(groups) = &self.groups {
                     groups.columns.clone()
@@ -120,7 +123,12 @@ macro_rules! count {
                 vec![field]
             }
 
-            fn evaluate(&mut self, batch: &RecordBatch) -> crate::Result<()> {
+            fn evaluate(
+                &mut self,
+                batch: &RecordBatch,
+                partition_exist: Option<&HashMap<i64, (), RandomState>>,
+            ) -> crate::Result<()> {
+                println!("{:?}", partition_exist);
                 let filter = if self.filter.is_some() {
                     Some(
                         self.filter
@@ -161,7 +169,34 @@ macro_rules! count {
                     None
                 };
 
+                let partitions = self
+                    .partition_col
+                    .evaluate(batch)?
+                    .into_array(batch.num_rows())
+                    .as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap()
+                    .clone();
+
+                let mut skip_partition = 0;
+                let mut skip = false;
                 for (row_id, val) in predicate.into_iter().enumerate() {
+                    if skip {
+                        if partitions.value(row_id) == skip_partition {
+                            continue;
+                        } else {
+                            skip = false;
+                        }
+                    }
+                    if let Some(exists) = partition_exist {
+                        let pid = partitions.value(row_id);
+                        if !exists.contains_key(&pid) {
+                            skip = true;
+                            skip_partition = pid;
+                            continue;
+                        }
+                    }
+
                     if let Some(filter) = &filter {
                         if !check_filter(filter, row_id) {
                             continue;
@@ -217,7 +252,7 @@ macro_rules! count {
                 }
             }
 
-            fn make_new(&self) -> Result<Box<dyn AggregateExpr>> {
+            fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>> {
                 let groups = if let Some(groups) = &self.groups {
                     Some(Groups {
                         columns: groups.columns.clone(),
@@ -234,6 +269,7 @@ macro_rules! count {
                     single_group: Group::new(),
                     distinct: self.distinct.clone(),
                     predicate: self.predicate.clone(),
+                    partition_col: self.partition_col.clone(),
                     t: Default::default(),
                 };
 
@@ -271,19 +307,19 @@ mod tests {
     use store::test_util::parse_markdown_tables;
 
     use crate::physical_plan::expressions::aggregate::count::Count;
-    use crate::physical_plan::expressions::aggregate::AggregateExpr;
+    use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 
     #[test]
     fn count_grouped() {
         let data = r#"
-| device(utf8) | v(i64)| event(utf8) |
-|--------------|-------|-------------|
-| iphone       | 1     | e1          |
-| android      | 1     | e1          |
-| android      | 1     | e1          |
-| osx          | 1     | e1          |
-| osx          | 1     | e3          |
-| osx          | 1     | e3          |
+| user_id(i64)| device(utf8) | v(i64)| event(utf8) |
+|-------------|--------------|-------|-------------|
+| 0           | iphone       | 1     | e1          |
+| 0           | android      | 1     | e1          |
+| 0           | android      | 1     | e1          |
+| 0           | osx          | 1     | e1          |
+| 0           | osx          | 1     | e3          |
+| 0           | osx          | 1     | e3          |
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
@@ -295,11 +331,12 @@ mod tests {
             None,
             Some(groups),
             Column::new_with_schema("v", &schema).unwrap(),
+            Column::new_with_schema("user_id", &schema).unwrap(),
             false,
         )
         .unwrap();
         for b in res {
-            count.evaluate(&b).unwrap();
+            count.evaluate(&b, None).unwrap();
         }
 
         let res = count.finalize();
