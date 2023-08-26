@@ -23,7 +23,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::error::QueryError;
 use crate::Result;
 
-enum AggregateFunction {
+pub enum AggregateFunction {
     Sum,
     Min,
     Max,
@@ -41,8 +41,8 @@ pub mod funnel {
     }
 
     pub struct ExcludeSteps {
-        from: usize,
-        to: usize,
+        pub from: usize,
+        pub to: usize,
     }
 
     pub struct ExcludeExpr {
@@ -76,17 +76,17 @@ pub mod funnel {
     }
 }
 
-enum AggregateExpr {
+pub enum AggregateExpr {
     Count {
         filter: Option<Expr>,
-        groups: Option<Vec<Column, SortField>>,
+        groups: Option<Vec<(Column, SortField)>>,
         predicate: Column,
         partition_col: Column,
         distinct: bool,
     },
     Aggregate {
         filter: Option<Expr>,
-        groups: Option<Vec<Column, SortField>>,
+        groups: Option<Vec<(Column, SortField)>>,
         partition_col: Column,
         predicate: Column,
         agg: AggregateFunction,
@@ -94,7 +94,7 @@ enum AggregateExpr {
     PartitionedCount {
         filter: Option<Expr>,
         outer_fn: AggregateFunction,
-        groups: Option<Vec<Column, SortField>>,
+        groups: Option<Vec<(Column, SortField)>>,
         partition_col: Column,
         distinct: bool,
     },
@@ -103,7 +103,7 @@ enum AggregateExpr {
         inner_fn: AggregateFunction,
         outer_fn: AggregateFunction,
         predicate: Column,
-        groups: Option<Vec<Column, SortField>>,
+        groups: Option<Vec<(Column, SortField)>>,
         partition_col: Column,
     },
     Funnel {
@@ -119,18 +119,18 @@ enum AggregateExpr {
         touch: funnel::Touch,
         partition_col: Column,
         bucket_size: Duration,
-        groups: Option<Vec<Column, SortField>>,
+        groups: Option<Vec<(Column, SortField)>>,
     },
 }
 
 #[derive(Hash, Eq, PartialEq)]
 pub struct SegmentedAggregateNode {
-    input: LogicalPlan,
-    partition_inputs: Option<Vec<LogicalPlan>>,
+    pub input: LogicalPlan,
+    pub partition_inputs: Option<Vec<LogicalPlan>>,
     pub partition_col: Column,
     pub agg_expr: Vec<AggregateExpr>,
     pub agg_aliases: Vec<String>,
-    schema: DFSchemaRef,
+    pub schema: DFSchemaRef,
 }
 
 impl SegmentedAggregateNode {
@@ -201,7 +201,13 @@ impl UserDefinedLogicalNode for SegmentedAggregateNode {
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
-        vec![&self.input]
+        let mut inputs = vec![];
+        inputs.push(&self.input);
+        if let Some(pi) = &self.partition_inputs {
+            inputs.extend(pi.iter().map(|x| x));
+        }
+
+        inputs
     }
 
     fn schema(&self) -> &DFSchemaRef {

@@ -27,8 +27,8 @@ pub enum StepOrder {
 
 #[derive(Clone, Debug)]
 pub struct ExcludeSteps {
-    from: usize,
-    to: usize,
+    pub from: usize,
+    pub to: usize,
 }
 
 impl ExcludeSteps {
