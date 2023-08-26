@@ -37,7 +37,6 @@ use crate::expr::property_col;
 use crate::expr::property_expression;
 use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
-use crate::logical_plan::expr::aggregate_partitioned;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::expr::sorted_distinct_count;
 use crate::logical_plan::merge::MergeNode;

@@ -66,7 +66,7 @@ use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::Result;
 
-pub struct AggregateExec {
+pub struct SegmentedAggregateExec {
     input: Arc<dyn ExecutionPlan>,
     partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
     partition_col: Column,
@@ -82,7 +82,7 @@ struct Group {
     cols: Vec<ScalarValue>,
 }
 
-impl AggregateExec {
+impl SegmentedAggregateExec {
     pub fn try_new(
         input: Arc<dyn ExecutionPlan>,
         partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
@@ -140,14 +140,14 @@ impl AggregateExec {
     }
 }
 
-impl Debug for AggregateExec {
+impl Debug for SegmentedAggregateExec {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "SegmentedAggregateExec")
     }
 }
 
 #[async_trait]
-impl ExecutionPlan for AggregateExec {
+impl ExecutionPlan for SegmentedAggregateExec {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -173,7 +173,7 @@ impl ExecutionPlan for AggregateExec {
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(
-            AggregateExec::try_new(
+            SegmentedAggregateExec::try_new(
                 children[0].clone(),
                 self.partition_inputs.clone(),
                 self.partition_col.clone(),
@@ -461,7 +461,7 @@ mod tests {
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
     use crate::physical_plan::expressions::aggregate::AggregateFunction;
     use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
-    use crate::physical_plan::segmented_aggregate::AggregateExec;
+    use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
 
     #[tokio::test]
     async fn test() -> anyhow::Result<()> {
@@ -668,7 +668,7 @@ mod tests {
             input
         };
 
-        let seg = AggregateExec::try_new(
+        let seg = SegmentedAggregateExec::try_new(
             Arc::new(input),
             Some(vec![Arc::new(pinput2), Arc::new(pinput1)]),
             Column::new_with_schema("user_id", &schema).unwrap(),
@@ -803,7 +803,7 @@ mod tests {
             input
         };
 
-        let seg = AggregateExec::try_new(
+        let seg = SegmentedAggregateExec::try_new(
             Arc::new(input),
             Some(vec![Arc::new(pinput2), Arc::new(pinput1)]),
             Column::new_with_schema("user_id", &schema).unwrap(),
@@ -899,7 +899,7 @@ mod tests {
             ))
         };
 
-        let seg = AggregateExec::try_new(
+        let seg = SegmentedAggregateExec::try_new(
             Arc::new(input),
             None,
             Column::new_with_schema("user_id", &schema).unwrap(),
