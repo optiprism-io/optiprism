@@ -41,7 +41,6 @@ use crate::logical_plan;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
-use crate::logical_plan::segmented_aggregate::funnel::Count;
 use crate::logical_plan::segmented_aggregate::funnel::Filter;
 use crate::logical_plan::segmented_aggregate::funnel::StepOrder;
 use crate::logical_plan::segmented_aggregate::funnel::Touch;
@@ -55,6 +54,7 @@ use crate::physical_plan;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
 use crate::physical_plan::expressions::aggregate::aggregate;
 use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
+use crate::physical_plan::expressions::aggregate::count::Count;
 use crate::physical_plan::expressions::aggregate::partitioned;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
@@ -223,7 +223,7 @@ fn segment_agg_expr(
                     Aggregate::<u16>::try_new(filter, groups, predicate, partition_col, agg)?
                 }
                 DataType::UInt32 => {
-                    Aggregate::<y32>::try_new(filter, groups, predicate, partition_col, agg)?
+                    Aggregate::<u32>::try_new(filter, groups, predicate, partition_col, agg)?
                 }
                 DataType::UInt64 => {
                     Aggregate::<u64>::try_new(filter, groups, predicate, partition_col, agg)?
@@ -431,9 +431,11 @@ fn segment_agg_expr(
             let constants =
                 constants.map(|cols| cols.iter.map(|c| col(c, &dfschema)).collect::<Vec<_>>());
             let count = match count {
-                Count::Unique => funnel::Count::Unique,
-                Count::NonUnique => funnel::Count::NonUnique,
-                Count::Session => funnel::Count::Session,
+                logical_plan::segmented_aggregate::funnel::Count::Unique => funnel::Count::Unique,
+                logical_plan::segmented_aggregate::funnel::Count::NonUnique => {
+                    funnel::Count::NonUnique
+                }
+                logical_plan::segmented_aggregate::funnel::Count::Session => funnel::Count::Session,
             };
 
             let filter = filter.map(|f| match f {
@@ -445,7 +447,7 @@ fn segment_agg_expr(
             let touch = match touch {
                 Touch::First => funnel::Touch::First,
                 Touch::Last => funnel::Touch::Last,
-                Touch::Step(s) => funnel::Touch::Step(s),
+                Touch::Step(s) => funnel::Touch::Step(*s),
             };
 
             let groups = build_groups(groups, &dfschema)?;
@@ -466,7 +468,8 @@ fn segment_agg_expr(
                 bucket_size: *bucket_size,
                 groups,
             };
-            Funnel::try_new()
+            let funnel = Funnel::try_new(opts)?;
+            Ok(Box::new(funnel) as Box<dyn PartitionedAggregateExpr>)
         }
     };
 
@@ -544,8 +547,13 @@ impl DFExtensionPlanner for ExtensionPlanner {
             let agg_expr = node
                 .agg_expr
                 .iter()
-                .map(|expr| Arc::new(Mutex::new(segment_agg_expr(expr))))
-                .collect::<Vec<_>>();
+                .map(|expr| {
+                    Arc::new(Mutex::new(segment_agg_expr(
+                        expr,
+                        &physical_inputs[0].schema(),
+                    )))
+                })
+                .collect::<Result<Vec<_>>>()?;
             let exec = SegmentedAggregateExec::try_new(
                 physical_inputs[0].clone(),
                 partition_inputs,
