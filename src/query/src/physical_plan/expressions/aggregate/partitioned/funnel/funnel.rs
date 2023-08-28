@@ -45,6 +45,7 @@ use crate::physical_plan::expressions::aggregate::partitioned::funnel::ExcludeEx
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Filter;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
+use crate::physical_plan::expressions::aggregate::Groups;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::StaticArray;
 
@@ -88,7 +89,7 @@ struct BucketResult {
     steps: Vec<StepResult>,
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 struct Group {
     skip: bool,
     first: bool,
@@ -238,16 +239,7 @@ impl Group {
     }
 }
 
-#[derive(Debug)]
-struct Groups {
-    columns: Vec<Column>,
-    sort_fields: Vec<SortField>,
-    row_converter: RowConverter,
-    // hashmap of groups
-    groups: HashMap<OwnedRow, Group, RandomState>,
-}
-
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Funnel {
     input_schema: SchemaRef,
     ts_col: Column,
@@ -269,7 +261,7 @@ pub struct Funnel {
     buckets: Vec<i64>,
     bucket_size: Duration,
     // groups when group by
-    groups: Option<Groups>,
+    groups: Option<Groups<Group>>,
     cur_partition: i64,
     skip_partition: bool,
     first: bool,
@@ -293,7 +285,7 @@ pub struct Options {
     pub touch: Touch,
     pub partition_col: Column,
     pub bucket_size: Duration,
-    pub groups: Option<(Vec<(Column, SortField)>)>,
+    pub groups: Option<(Vec<(PhysicalExprRef, String, SortField)>)>,
 }
 
 struct PartitionRow<'a> {
@@ -323,16 +315,7 @@ impl Funnel {
         if buckets.len() == 0 {
             buckets.push(from);
         }
-        let groups = if let Some(pairs) = opts.groups {
-            Some(Groups {
-                columns: pairs.iter().map(|(c, _)| c.clone()).collect(),
-                sort_fields: pairs.iter().map(|(_, s)| s.clone()).collect(),
-                row_converter: RowConverter::new(pairs.iter().map(|(_, s)| s.clone()).collect())?,
-                groups: Default::default(),
-            })
-        } else {
-            None
-        };
+
         Ok(Self {
             input_schema: opts.schema,
             ts_col: opts.ts_col,
@@ -359,7 +342,7 @@ impl Funnel {
             debug: Vec::with_capacity(100),
             buckets: buckets.clone(),
             bucket_size: opts.bucket_size,
-            groups,
+            groups: Groups::maybe_from(opts.groups)?,
             cur_partition: 0,
             skip_partition: false,
             first: true,
@@ -378,9 +361,14 @@ impl Funnel {
 }
 
 impl PartitionedAggregateExpr for Funnel {
-    fn group_columns(&self) -> Vec<Column> {
+    fn group_columns(&self) -> Vec<(PhysicalExprRef, String)> {
         if let Some(groups) = &self.groups {
-            groups.columns.clone()
+            groups
+                .exprs
+                .iter()
+                .zip(groups.names.iter())
+                .map(|(a, b)| (a.clone(), b.clone()))
+                .collect()
         } else {
             vec![]
         }
@@ -396,13 +384,14 @@ impl PartitionedAggregateExpr for Funnel {
         // prepend group fields if we have grouping
         if let Some(groups) = &self.groups {
             let group_fields = groups
-                .columns
+                .exprs
                 .iter()
-                .map(|c| {
+                .zip(groups.names.iter())
+                .map(|(expr, name)| {
                     Field::new(
-                        c.name(),
-                        c.data_type(&self.input_schema).unwrap(),
-                        c.nullable(&self.input_schema).unwrap(),
+                        name,
+                        expr.data_type(&self.input_schema).unwrap(),
+                        expr.nullable(&self.input_schema).unwrap(),
                     )
                 })
                 .collect::<Vec<_>>();
@@ -461,7 +450,7 @@ impl PartitionedAggregateExpr for Funnel {
 
         let rows = if let Some(groups) = &mut self.groups {
             let arrs = groups
-                .columns
+                .exprs
                 .iter()
                 .map(|e| {
                     e.evaluate(batch)
@@ -780,12 +769,7 @@ impl PartitionedAggregateExpr for Funnel {
 
     fn make_new(&self) -> crate::Result<Box<dyn PartitionedAggregateExpr>> {
         let groups = if let Some(groups) = &self.groups {
-            Some(Groups {
-                columns: groups.columns.clone(),
-                sort_fields: groups.sort_fields.clone(),
-                row_converter: RowConverter::new(groups.sort_fields.clone())?,
-                groups: Default::default(),
-            })
+            Some(groups.try_make_new()?)
         } else {
             None
         };
@@ -1689,7 +1673,8 @@ asd
         };
 
         let groups = vec![(
-            Column::new_with_schema("device", &schema).unwrap(),
+            Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
+            "device".to_string(),
             SortField::new(DataType::Utf8),
         )];
         let opts = Options {
@@ -1773,7 +1758,8 @@ asd
         };
 
         let groups = vec![(
-            Column::new_with_schema("device", &schema).unwrap(),
+            Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
+            "device".to_string(),
             SortField::new(DataType::Utf8),
         )];
         let opts = Options {

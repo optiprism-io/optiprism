@@ -43,6 +43,7 @@ use datafusion_expr::ColumnarValue;
 
 use crate::error::Result;
 use crate::physical_plan::expressions::aggregate::AggregateFunction;
+use crate::physical_plan::expressions::aggregate::Groups;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::expressions::check_filter;
 
@@ -65,20 +66,13 @@ impl Group {
     }
 }
 
-struct Groups {
-    columns: Vec<Column>,
-    sort_fields: Vec<SortField>,
-    row_converter: RowConverter,
-    groups: HashMap<OwnedRow, Group, RandomState>,
-}
-
 pub struct Aggregate<T> {
     filter: Option<PhysicalExprRef>,
     predicate: Column,
     typ: PhantomData<T>,
     inner_fn: AggregateFunction,
     outer_fn: AggregateFunction,
-    groups: Option<Groups>,
+    groups: Option<Groups<Group>>,
     single_group: Group,
     partition_col: Column,
     skip: bool,
@@ -91,27 +85,16 @@ impl<T> Aggregate<T> {
         inner_fn: AggregateFunction,
         outer_fn: AggregateFunction,
         predicate: Column,
-        groups: Option<(Vec<(Column, SortField)>)>,
+        groups: Option<(Vec<(PhysicalExprRef, String, SortField)>)>,
         partition_col: Column,
     ) -> Result<Self> {
-        let groups = if let Some(pairs) = groups {
-            Some(Groups {
-                columns: pairs.iter().map(|(c, _)| c.clone()).collect(),
-                sort_fields: pairs.iter().map(|(_, s)| s.clone()).collect(),
-                row_converter: RowConverter::new(pairs.iter().map(|(_, s)| s.clone()).collect())?,
-                groups: Default::default(),
-            })
-        } else {
-            None
-        };
-
         Ok(Self {
             filter,
             predicate,
             typ: Default::default(),
             inner_fn: inner_fn.make_new(),
             outer_fn: outer_fn.make_new(),
-            groups,
+            groups: Groups::maybe_from(groups)?,
             single_group: Group::new(inner_fn, outer_fn),
             partition_col,
             skip: false,
@@ -123,9 +106,14 @@ impl<T> Aggregate<T> {
 macro_rules! agg {
     ($ty:ident,$array_ty:ident) => {
         impl PartitionedAggregateExpr for Aggregate<$ty> {
-            fn group_columns(&self) -> Vec<Column> {
+            fn group_columns(&self) -> Vec<(PhysicalExprRef, String)> {
                 if let Some(groups) = &self.groups {
-                    groups.columns.clone()
+                    groups
+                        .exprs
+                        .iter()
+                        .zip(groups.names.iter())
+                        .map(|(a, b)| (a.clone(), b.clone()))
+                        .collect()
                 } else {
                     vec![]
                 }
@@ -163,7 +151,7 @@ macro_rules! agg {
 
                 let rows = if let Some(groups) = &mut self.groups {
                     let arrs = groups
-                        .columns
+                        .exprs
                         .iter()
                         .map(|e| {
                             e.evaluate(batch)
@@ -280,12 +268,7 @@ macro_rules! agg {
 
             fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>> {
                 let groups = if let Some(groups) = &self.groups {
-                    Some(Groups {
-                        columns: groups.columns.clone(),
-                        sort_fields: groups.sort_fields.clone(),
-                        row_converter: RowConverter::new(groups.sort_fields.clone())?,
-                        groups: Default::default(),
-                    })
+                    Some(groups.try_make_new()?)
                 } else {
                     None
                 };
@@ -324,6 +307,7 @@ agg!(Decimal128Array, Decimal128Array);
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     use ahash::AHasher;
     use ahash::RandomState;
@@ -334,6 +318,7 @@ mod tests {
     use arrow::row::SortField;
     use arrow::util::pretty::print_batches;
     use datafusion::physical_expr::expressions::Column;
+    use datafusion::physical_expr::PhysicalExprRef;
     use store::test_util::parse_markdown_tables;
 
     use crate::physical_plan::expressions::aggregate::partitioned::aggregate::Aggregate;
@@ -374,7 +359,8 @@ mod tests {
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
         let groups = vec![(
-            Column::new_with_schema("device", &schema).unwrap(),
+            Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
+            "device".to_owned(),
             SortField::new(DataType::Utf8),
         )];
 

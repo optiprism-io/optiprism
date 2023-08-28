@@ -53,12 +53,16 @@ use crate::logical_plan::segmented_aggregate::SortField;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
-use crate::physical_plan::expressions::aggregate::aggregate;
 use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
 use crate::physical_plan::expressions::aggregate::count::Count;
+// use crate::physical_plan::expressions::aggregate::aggregate;
+// use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
+// use crate::physical_plan::expressions::aggregate::count::Count;
 use crate::physical_plan::expressions::aggregate::partitioned;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
+// use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
+// use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
 use crate::physical_plan::expressions::aggregate::AggregateFunction;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::merge::MergeExec;
@@ -104,19 +108,31 @@ fn col(col: datafusion_common::Column, dfschema: &DFSchema) -> Column {
 }
 
 fn build_groups(
-    groups: Option<Vec<(datafusion_common::Column, SortField)>>,
+    groups: Option<Vec<(Expr, SortField)>>,
     dfschema: &DFSchema,
-) -> Result<Option<(Vec<(Column, arrow_row::SortField)>)>> {
-    let ret = groups.clone().map(|g| {
-        g.iter()
-            .map(|(c, sf)| {
-                let col = Column::new(c.name.as_str(), dfschema.index_of_column(&c).unwrap());
-
-                let sf = arrow_row::SortField::new(sf.data_type.clone());
-                (col, sf.to_owned())
-            })
-            .collect::<Vec<_>>()
-    });
+    schema: &Schema,
+    execution_props: &ExecutionProps,
+) -> Result<Option<(Vec<(PhysicalExprRef, String, arrow_row::SortField)>)>> {
+    let ret = groups
+        .clone()
+        .map(|g| {
+            g.iter()
+                .map(|(expr, sf)| {
+                    create_physical_expr(&expr, &dfschema, schema, &execution_props).and_then(
+                        |physexpr| {
+                            let sf = arrow_row::SortField::new(sf.data_type.clone());
+                            Ok((
+                                physexpr as PhysicalExprRef,
+                                expr.display_name().unwrap(),
+                                sf.to_owned(),
+                            ))
+                        },
+                    )
+                })
+                .collect::<DFResult<Vec<_>>>()
+                .and_then(|f| Ok(f))
+        })
+        .transpose()?;
 
     Ok(ret)
 }
@@ -148,7 +164,7 @@ fn segment_agg_expr(
             distinct,
         } => {
             let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema)?;
+            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
 
@@ -246,7 +262,7 @@ fn segment_agg_expr(
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
             let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema)?;
+            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
             let agg = aggregate(&agg);
@@ -343,7 +359,7 @@ fn segment_agg_expr(
             distinct,
         } => {
             let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema)?;
+            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let partition_col = col(partition_col, &dfschema);
             let outer = aggregate(&outer_fn);
             let count =
@@ -362,7 +378,7 @@ fn segment_agg_expr(
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
             let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
-            let groups = build_groups(groups, &dfschema)?;
+            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
             let inner = aggregate(&inner_fn);
@@ -553,7 +569,7 @@ fn segment_agg_expr(
                 Touch::Step(s) => partitioned::funnel::Touch::Step(s),
             };
 
-            let groups = build_groups(groups, &dfschema)?;
+            let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let partition_col = col(partition_col, &dfschema);
             let opts = funnel::Options {
                 schema: Arc::new(schema.clone()),

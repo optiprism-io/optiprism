@@ -18,6 +18,7 @@ use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
+use datafusion_expr::ExprSchemable;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
@@ -94,14 +95,14 @@ pub struct SortField {
 pub enum AggregateExpr {
     Count {
         filter: Option<Expr>,
-        groups: Option<Vec<(Column, SortField)>>,
+        groups: Option<Vec<(Expr, SortField)>>,
         predicate: Column,
         partition_col: Column,
         distinct: bool,
     },
     Aggregate {
         filter: Option<Expr>,
-        groups: Option<Vec<(Column, SortField)>>,
+        groups: Option<Vec<(Expr, SortField)>>,
         partition_col: Column,
         predicate: Column,
         agg: AggregateFunction,
@@ -109,7 +110,7 @@ pub enum AggregateExpr {
     PartitionedCount {
         filter: Option<Expr>,
         outer_fn: AggregateFunction,
-        groups: Option<Vec<(Column, SortField)>>,
+        groups: Option<Vec<(Expr, SortField)>>,
         partition_col: Column,
         distinct: bool,
     },
@@ -118,7 +119,7 @@ pub enum AggregateExpr {
         inner_fn: AggregateFunction,
         outer_fn: AggregateFunction,
         predicate: Column,
-        groups: Option<Vec<(Column, SortField)>>,
+        groups: Option<Vec<(Expr, SortField)>>,
         partition_col: Column,
     },
     Funnel {
@@ -134,12 +135,12 @@ pub enum AggregateExpr {
         touch: funnel::Touch,
         partition_col: Column,
         bucket_size: Duration,
-        groups: Option<Vec<(Column, SortField)>>,
+        groups: Option<Vec<(Expr, SortField)>>,
     },
 }
 
 impl AggregateExpr {
-    pub fn group_columns(&self) -> Vec<Column> {
+    pub fn group_exprs(&self) -> Vec<Expr> {
         let groups = match self {
             AggregateExpr::Count { groups, .. } => groups,
             AggregateExpr::Aggregate { groups, .. } => groups,
@@ -192,7 +193,12 @@ impl AggregateExpr {
                 if let Some(groups) = &groups {
                     let group_fields = groups
                         .iter()
-                        .map(|(c, _)| schema.field_from_column(c).unwrap().to_owned())
+                        .map(|(expr, _)| {
+                            schema
+                                .field_with_unqualified_name(expr.display_name().unwrap().as_str())
+                                .unwrap()
+                                .to_owned()
+                        })
                         .collect::<Vec<_>>();
 
                     fields = [group_fields, fields].concat();
@@ -256,8 +262,8 @@ impl SegmentedAggregateNode {
         let input_schema = input.schema();
 
         for (agg_idx, agg) in agg_expr.iter().enumerate() {
-            for group_col in agg.group_columns() {
-                group_cols.insert(group_col.name.to_string(), ());
+            for group_expr in agg.group_exprs() {
+                group_cols.insert(group_expr.display_name()?, ());
             }
 
             for f in agg.fields(input_schema)?.iter() {

@@ -97,9 +97,10 @@ impl SegmentedAggregateExec {
         for (agg_idx, agg) in agg_expr.iter().enumerate() {
             let mut agg_fields: Vec<FieldRef> = Vec::new();
             let agg = agg.lock().unwrap();
-            for group_col in agg.group_columns() {
-                group_cols.insert(group_col.name().to_string(), ());
-                agg_fields.push(input_schema.fields[group_col.index()].clone());
+            for (expr, col_name) in agg.group_columns() {
+                group_cols.insert(col_name.clone(), ());
+                let f = input_schema.field_with_name(col_name.as_str())?;
+                agg_fields.push(Arc::new(f.to_owned()));
             }
 
             for f in agg.fields().iter() {
@@ -459,6 +460,11 @@ mod tests {
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count::Unique;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
+    // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
+    // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Options;
+    // use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count::Unique;
+    // use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
+    // use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
     use crate::physical_plan::expressions::aggregate::AggregateFunction;
     use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
     use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
@@ -506,7 +512,9 @@ mod tests {
             // )];
             let groups = vec![
                 (
-                    Column::new_with_schema("country", &schema).unwrap(),
+                    Arc::new(Column::new_with_schema("country", &schema).unwrap())
+                        as PhysicalExprRef,
+                    "country".to_string(),
                     SortField::new(DataType::Utf8),
                 ),
                 // SortField::new(DataType::Utf8),
@@ -528,7 +536,9 @@ mod tests {
         let pagg2 = {
             let groups = vec![
                 (
-                    Column::new_with_schema("country", &schema).unwrap(),
+                    Arc::new(Column::new_with_schema("country", &schema).unwrap())
+                        as PhysicalExprRef,
+                    "country".to_string(),
                     SortField::new(DataType::Utf8),
                 ),
                 // (
@@ -748,11 +758,15 @@ mod tests {
         let agg2 = {
             let groups = vec![
                 (
-                    Column::new_with_schema("country", &schema).unwrap(),
+                    Arc::new(Column::new_with_schema("country", &schema).unwrap())
+                        as PhysicalExprRef,
+                    "country".to_string(),
                     SortField::new(DataType::Utf8),
                 ),
                 (
-                    Column::new_with_schema("device", &schema).unwrap(),
+                    Arc::new(Column::new_with_schema("device", &schema).unwrap())
+                        as PhysicalExprRef,
+                    "device".to_string(),
                     SortField::new(DataType::Utf8),
                 ),
             ];
@@ -877,11 +891,15 @@ mod tests {
         let agg2 = {
             let groups = vec![
                 (
-                    Column::new_with_schema("country", &schema).unwrap(),
+                    Arc::new(Column::new_with_schema("country", &schema).unwrap())
+                        as PhysicalExprRef,
+                    "country".to_string(),
                     SortField::new(DataType::Utf8),
                 ),
                 (
-                    Column::new_with_schema("device", &schema).unwrap(),
+                    Arc::new(Column::new_with_schema("device", &schema).unwrap())
+                        as PhysicalExprRef,
+                    "device".to_string(),
                     SortField::new(DataType::Utf8),
                 ),
             ];

@@ -42,6 +42,7 @@ use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::Context;
+use crate::logical_plan::segmented_aggregate::SegmentedAggregateNode;
 
 pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
@@ -309,7 +310,7 @@ impl LogicalPlanBuilder {
                         );
                         Expr::AggregateFunction(agg_fn)
                     }
-                    Query::CountUniqueGroups | Query::DailyActiveGroups => {}
+                    Query::CountUniqueGroups | Query::DailyActiveGroups => todo!(),
                     Query::WeeklyActiveGroups => unimplemented!(),
                     Query::MonthlyActiveGroups => unimplemented!(),
                     Query::CountPerGroup { aggregate } => todo!(),
@@ -351,6 +352,10 @@ impl LogicalPlanBuilder {
 
         let _aggr_schema =
             DFSchema::new_with_metadata(exprlist_to_fields(all_expr, &input)?, HashMap::new())?;
+
+        let expr = LogicalPlan::Extension(Extension {
+            node: Arc::new(SegmentedAggregateNode::try_new(input,partition_inputs,partition_col,agg_expr,agg_aliass?),
+        });
 
         let expr =
             LogicalPlan::Aggregate(Aggregate::try_new(Arc::new(input), group_expr, aggr_expr)?);
