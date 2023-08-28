@@ -38,7 +38,6 @@ use crate::expr::property_expression;
 use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
-use crate::logical_plan::expr::sorted_distinct_count;
 use crate::logical_plan::merge::MergeNode;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::unpivot::UnpivotNode;
@@ -310,34 +309,15 @@ impl LogicalPlanBuilder {
                         );
                         Expr::AggregateFunction(agg_fn)
                     }
-                    Query::CountUniqueGroups | Query::DailyActiveGroups => sorted_distinct_count(
-                        input.schema(),
-                        col(Column::from_name(self.es.group.clone())),
-                    )?,
+                    Query::CountUniqueGroups | Query::DailyActiveGroups => todo!(),
                     Query::WeeklyActiveGroups => unimplemented!(),
                     Query::MonthlyActiveGroups => unimplemented!(),
-                    Query::CountPerGroup { aggregate } => aggregate_partitioned(
-                        input.schema(),
-                        col(Column::from_name(self.es.group.clone())),
-                        PartitionedAggregateFunction::Count,
-                        aggregate.to_owned().into(),
-                        vec![col(Column::from_name(self.es.group.clone()))],
-                    )?,
+                    Query::CountPerGroup { aggregate } => todo!(),
                     Query::AggregatePropertyPerGroup {
                         property,
                         aggregate_per_group,
                         aggregate,
-                    } => aggregate_partitioned(
-                        input.schema(),
-                        col(Column::from_name(self.es.group.clone())),
-                        aggregate_per_group.clone(),
-                        aggregate.to_owned().into(),
-                        vec![executor::block_on(property_col(
-                            &self.ctx,
-                            &self.metadata,
-                            property,
-                        ))?],
-                    )?,
+                    } => todo!(),
                     Query::AggregateProperty {
                         property,
                         aggregate,

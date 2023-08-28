@@ -7,15 +7,16 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
-use arrow_row::SortField;
+use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use datafusion_common::Column;
 use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
-use datafusion_common::Result as DFResult;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
@@ -23,6 +24,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::error::QueryError;
 use crate::Result;
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum AggregateFunction {
     Sum,
     Min,
@@ -35,32 +37,38 @@ pub mod funnel {
     use chrono::Duration;
     use datafusion_expr::Expr;
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub enum StepOrder {
         Sequential,
         Any(Vec<(usize, usize)>), // any of the steps
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub struct ExcludeSteps {
         pub from: usize,
         pub to: usize,
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub struct ExcludeExpr {
         pub expr: Expr,
         pub steps: Option<Vec<ExcludeSteps>>,
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub enum Count {
         Unique,
         NonUnique,
         Session,
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub enum Order {
         Any,
         Asc,
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub enum Filter {
         DropOffOnAnyStep,
         // funnel should fail on any step
@@ -69,6 +77,7 @@ pub mod funnel {
         TimeToConvert(Duration, Duration), // conversion should be within certain window
     }
 
+    #[derive(Clone, PartialEq, Eq, Hash)]
     pub enum Touch {
         First,
         Last,
@@ -76,6 +85,12 @@ pub mod funnel {
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct SortField {
+    pub data_type: DataType,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum AggregateExpr {
     Count {
         filter: Option<Expr>,
@@ -123,6 +138,101 @@ pub enum AggregateExpr {
     },
 }
 
+impl AggregateExpr {
+    pub fn group_columns(&self) -> Vec<Column> {
+        let groups = match self {
+            AggregateExpr::Count { groups, .. } => groups,
+            AggregateExpr::Aggregate { groups, .. } => groups,
+            AggregateExpr::PartitionedCount { groups, .. } => groups,
+            AggregateExpr::PartitionedAggregate { groups, .. } => groups,
+            AggregateExpr::Funnel { groups, .. } => groups,
+        };
+
+        if let Some(groups) = groups {
+            groups.iter().map(|(col, _)| col.clone()).collect()
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn fields(&self, schema: &DFSchema) -> Result<Vec<DFField>> {
+        let fields = match self {
+            AggregateExpr::Count { .. } => vec![DFField::new_unqualified(
+                "count",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            )],
+            AggregateExpr::Aggregate { .. } => vec![DFField::new_unqualified(
+                "agg",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            )],
+            AggregateExpr::PartitionedCount { .. } => vec![DFField::new_unqualified(
+                "count",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            )],
+            AggregateExpr::PartitionedAggregate { .. } => vec![DFField::new_unqualified(
+                "agg",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                false,
+            )],
+            AggregateExpr::Funnel { groups, steps, .. } => {
+                let mut fields = vec![
+                    DFField::new_unqualified(
+                        "ts",
+                        DataType::Timestamp(TimeUnit::Millisecond, None),
+                        true,
+                    ),
+                    DFField::new_unqualified("total", DataType::Int64, true),
+                    DFField::new_unqualified("completed", DataType::Int64, true),
+                ];
+
+                // prepend group fields if we have grouping
+                if let Some(groups) = &groups {
+                    let group_fields = groups
+                        .iter()
+                        .map(|(c, _)| schema.field_from_column(c).unwrap().to_owned())
+                        .collect::<Vec<_>>();
+
+                    fields = [group_fields, fields].concat();
+                }
+
+                // add fields for each step
+                let mut step_fields = (0..steps.len())
+                    .into_iter()
+                    .map(|step_id| {
+                        let fields = vec![
+                            DFField::new_unqualified(
+                                format!("step{}_total", step_id).as_str(),
+                                DataType::Int64,
+                                true,
+                            ),
+                            DFField::new_unqualified(
+                                format!("step{}_time_to_convert", step_id).as_str(),
+                                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                                true,
+                            ),
+                            DFField::new_unqualified(
+                                format!("step{}_time_to_convert_from_start", step_id).as_str(),
+                                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                                true,
+                            ),
+                        ];
+                        fields
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>();
+                fields.append(&mut step_fields);
+
+                fields
+            }
+        };
+
+        Ok(fields)
+    }
+}
+
 #[derive(Hash, Eq, PartialEq)]
 pub struct SegmentedAggregateNode {
     pub input: LogicalPlan,
@@ -147,12 +257,11 @@ impl SegmentedAggregateNode {
 
         for (agg_idx, agg) in agg_expr.iter().enumerate() {
             for group_col in agg.group_columns() {
-                group_cols.insert(group_col.name().to_string(), ());
+                group_cols.insert(group_col.name.to_string(), ());
             }
 
-            for f in agg.fields().iter() {
-                let f = DFField::new(
-                    None,
+            for f in agg.fields(input_schema)?.iter() {
+                let f = DFField::new_unqualified(
                     format!("{}_{}", agg_aliases[agg_idx], f.name()).as_str(),
                     f.data_type().to_owned(),
                     f.is_nullable(),
@@ -161,8 +270,7 @@ impl SegmentedAggregateNode {
             }
         }
 
-        let segment_field =
-            Arc::new(DFField::new(None, "segment", DataType::Int64, false)) as DFField;
+        let segment_field = DFField::new_unqualified("segment", DataType::Int64, false);
 
         let group_fields = input_schema
             .fields()
