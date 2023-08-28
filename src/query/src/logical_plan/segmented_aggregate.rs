@@ -244,8 +244,7 @@ pub struct SegmentedAggregateNode {
     pub input: LogicalPlan,
     pub partition_inputs: Option<Vec<LogicalPlan>>,
     pub partition_col: Column,
-    pub agg_expr: Vec<AggregateExpr>,
-    pub agg_aliases: Vec<String>,
+    pub agg_expr: Vec<(AggregateExpr, String)>,
     pub schema: DFSchemaRef,
 }
 
@@ -254,21 +253,20 @@ impl SegmentedAggregateNode {
         input: LogicalPlan,
         partition_inputs: Vec<LogicalPlan>,
         partition_col: Column,
-        agg_expr: Vec<AggregateExpr>,
-        agg_aliases: Vec<String>,
+        agg_expr: Vec<(AggregateExpr, String)>,
     ) -> Result<Self> {
         let mut group_cols: HashMap<String, ()> = Default::default();
         let mut agg_result_fields: Vec<DFField> = Vec::new();
         let input_schema = input.schema();
 
-        for (agg_idx, agg) in agg_expr.iter().enumerate() {
+        for (agg_idx, (agg, name)) in agg_expr.iter().enumerate() {
             for group_expr in agg.group_exprs() {
                 group_cols.insert(group_expr.display_name()?, ());
             }
 
             for f in agg.fields(input_schema)?.iter() {
                 let f = DFField::new_unqualified(
-                    format!("{}_{}", agg_aliases[agg_idx], f.name()).as_str(),
+                    format!("{}_{}", name, f.name()).as_str(),
                     f.data_type().to_owned(),
                     f.is_nullable(),
                 );
@@ -292,7 +290,6 @@ impl SegmentedAggregateNode {
             partition_inputs: Some(partition_inputs),
             partition_col,
             agg_expr,
-            agg_aliases,
             schema: Arc::new(schema),
         };
         Ok(ret)
@@ -342,7 +339,6 @@ impl UserDefinedLogicalNode for SegmentedAggregateNode {
             self.partition_inputs.clone().unwrap(),
             self.partition_col.clone(),
             self.agg_expr.clone(),
-            self.agg_aliases.clone(),
         )
         .map_err(QueryError::into_datafusion_plan_error)
         .unwrap();

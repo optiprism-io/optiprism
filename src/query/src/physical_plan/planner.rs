@@ -667,9 +667,9 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .agg_expr
                 .clone()
                 .into_iter()
-                .map(|expr| {
+                .map(|(expr, name)| {
                     segment_agg_expr(expr, &physical_inputs[0].schema())
-                        .and_then(|expr| Ok(Arc::new(Mutex::new(expr))))
+                        .and_then(|expr| Ok((Arc::new(Mutex::new(expr)), name)))
                 })
                 .collect::<Result<Vec<_>>>()
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;
@@ -678,7 +678,6 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 partition_inputs,
                 partition_col,
                 agg_expr,
-                node.agg_aliases.clone(),
             )
             .map_err(|err| DataFusionError::Plan(err.to_string()))?;
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)

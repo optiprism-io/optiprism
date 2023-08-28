@@ -70,8 +70,7 @@ pub struct SegmentedAggregateExec {
     input: Arc<dyn ExecutionPlan>,
     partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
     partition_col: Column,
-    agg_expr: Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>,
-    agg_aliases: Vec<String>,
+    agg_expr: Vec<(Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>, String)>,
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
     metrics: ExecutionPlanMetricsSet,
@@ -87,14 +86,13 @@ impl SegmentedAggregateExec {
         input: Arc<dyn ExecutionPlan>,
         partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
         partition_col: Column,
-        agg_expr: Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>,
-        agg_aliases: Vec<String>,
+        agg_expr: Vec<(Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>, String)>,
     ) -> Result<Self> {
         let input_schema = input.schema();
         let mut agg_schemas: Vec<SchemaRef> = Vec::new();
         let mut group_cols: HashMap<String, ()> = Default::default();
         let mut agg_result_fields: Vec<FieldRef> = Vec::new();
-        for (agg_idx, agg) in agg_expr.iter().enumerate() {
+        for (agg, agg_name) in agg_expr.iter() {
             let mut agg_fields: Vec<FieldRef> = Vec::new();
             let agg = agg.lock().unwrap();
             for (expr, col_name) in agg.group_columns() {
@@ -105,7 +103,7 @@ impl SegmentedAggregateExec {
 
             for f in agg.fields().iter() {
                 let f = Field::new(
-                    format!("{}_{}", agg_aliases[agg_idx], f.name()),
+                    format!("{}_{}", agg_name, f.name()),
                     f.data_type().to_owned(),
                     f.is_nullable(),
                 );
@@ -132,7 +130,6 @@ impl SegmentedAggregateExec {
             partition_inputs,
             partition_col,
             agg_expr,
-            agg_aliases,
             schema: Arc::new(schema),
             agg_schemas,
             metrics: ExecutionPlanMetricsSet::new(),
@@ -179,7 +176,6 @@ impl ExecutionPlan for SegmentedAggregateExec {
                 self.partition_inputs.clone(),
                 self.partition_col.clone(),
                 self.agg_expr.clone(),
-                self.agg_aliases.clone(),
             )
             .map_err(QueryError::into_datafusion_execution_error)?,
         ))
@@ -198,8 +194,8 @@ impl ExecutionPlan for SegmentedAggregateExec {
                     .map(|_| {
                         self.agg_expr
                             .iter()
-                            .map(|a| {
-                                let mut agg = a.lock().unwrap();
+                            .map(|(e, name)| {
+                                let mut agg = e.lock().unwrap();
                                 Arc::new(Mutex::new(agg.make_new().unwrap()))
                             })
                             .collect::<Vec<_>>()
@@ -212,7 +208,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
                     .collect::<DFResult<Vec<_>>>()?;
                 (aggs, Some(streams))
             } else {
-                (vec![self.agg_expr.clone()], None)
+                (vec![self.agg_expr.iter().map(|(expr,_)|expr.clone()).collect::<Vec<_>>()], None)
             };
 
         let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
@@ -682,13 +678,12 @@ mod tests {
             Arc::new(input),
             Some(vec![Arc::new(pinput2), Arc::new(pinput1)]),
             Column::new_with_schema("user_id", &schema).unwrap(),
-            vec![pagg1, pagg2, pagg3, pagg4, agg1],
             vec![
-                "count".to_string(),
-                "min".to_string(),
-                "min2".to_string(),
-                "f1".to_string(),
-                "f2".to_string(),
+                (pagg1, "count".to_string()),
+                (pagg2, "min".to_string()),
+                (pagg3, "min2".to_string()),
+                (pagg4, "f1".to_string()),
+                (agg1, "f2".to_string()),
             ],
         )?;
 
@@ -821,8 +816,7 @@ mod tests {
             Arc::new(input),
             Some(vec![Arc::new(pinput2), Arc::new(pinput1)]),
             Column::new_with_schema("user_id", &schema).unwrap(),
-            vec![agg1, agg2],
-            vec!["count".to_string(), "min".to_string()],
+            vec![(agg1, "count".to_string()), (agg2, "min".to_string())],
         )?;
 
         let session_ctx = SessionContext::new();
@@ -921,8 +915,7 @@ mod tests {
             Arc::new(input),
             None,
             Column::new_with_schema("user_id", &schema).unwrap(),
-            vec![agg1, agg2],
-            vec!["count".to_string(), "min".to_string()],
+            vec![(agg1, "count".to_string()), (agg2, "min".to_string())],
         )?;
 
         let session_ctx = SessionContext::new();
