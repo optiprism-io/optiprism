@@ -309,7 +309,7 @@ impl LogicalPlanBuilder {
                         );
                         Expr::AggregateFunction(agg_fn)
                     }
-                    Query::CountUniqueGroups | Query::DailyActiveGroups => todo!(),
+                    Query::CountUniqueGroups | Query::DailyActiveGroups => {}
                     Query::WeeklyActiveGroups => unimplemented!(),
                     Query::MonthlyActiveGroups => unimplemented!(),
                     Query::CountPerGroup { aggregate } => todo!(),
