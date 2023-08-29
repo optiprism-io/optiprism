@@ -54,7 +54,6 @@ use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::physical_plan;
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
-use crate::physical_plan::expressions::segmentation::aggregate::{Aggregate, AggregateFunction};
 // use crate::physical_plan::expressions::aggregate::aggregate;
 // use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
 use crate::physical_plan::expressions::aggregate::partitioned;
@@ -63,6 +62,8 @@ use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::F
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
+use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 use crate::physical_plan::expressions::segmentation::boolean_op;
 use crate::physical_plan::expressions::segmentation::comparison::And;
 use crate::physical_plan::expressions::segmentation::comparison::Or;
@@ -83,12 +84,9 @@ fn aggregate<T>(agg: &logical_plan::segment::AggregateFunction) -> AggregateFunc
         logical_plan::segment::AggregateFunction::Min => AggregateFunction::new_min(),
         logical_plan::segment::AggregateFunction::Max => AggregateFunction::new_max(),
         logical_plan::segment::AggregateFunction::Avg => AggregateFunction::new_avg(),
-        logical_plan::segment::AggregateFunction::Count => {
-            AggregateFunction::new_count()
-        }
+        logical_plan::segment::AggregateFunction::Count => AggregateFunction::new_count(),
     }
 }
-
 
 fn build_time_range(time_range: logical_plan::segment::TimeRange) -> TimeRange {
     match time_range {
@@ -99,6 +97,184 @@ fn build_time_range(time_range: logical_plan::segment::TimeRange) -> TimeRange {
     }
 }
 
+macro_rules! count {
+    ($op:ident,$filter:expr,$ts_cl:expr,$right:expr,$time_range:expr,$time_window:expr) => {
+        Arc::new(Count::<$op>::new(
+            $filter,
+            $ts_col,
+            $right,
+            $time_range,
+            $time_window,
+            10_000,
+        )) as Arc<dyn SegmentExpr>
+    };
+}
+
+macro_rules! _aggregate {
+    ($t1:ident,$t2:ident, $op:expr, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr,$time_window:expr) => {
+        Arc::new(Aggregate::<$t1, $t2, $op>::new(
+            $filter,
+            $ts_col,
+            $predicate_col,
+            $agg,
+            $right.into(),
+            $time_range,
+            $time_window,
+            10_000,
+        )) as Arc<dyn SegmentExpr>
+    };
+}
+macro_rules! aggregate {
+    ($op:expr, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr,$time_window:expr) => {
+        match right.get_datatype() {
+            DataType::Int8 => _aggregate!(
+                i8,
+                i64,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::Int16 => _aggregate!(
+                i16,
+                i64,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::Int32 => _aggregate!(
+                i32,
+                i128,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::Int64 => _aggregate!(
+                i64,
+                i64,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::Int128 => _aggregate!(
+                i128,
+                i128,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::UInt8 => _aggregate!(
+                u8,
+                i64,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::UInt16 => _aggregate!(
+                u16,
+                i64,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::UInt32 => _aggregate!(
+                u32,
+                i128,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::UInt64 => _aggregate!(
+                u64,
+                u128,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::Float32 => _aggregate!(
+                f32,
+                i64,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::Float64 => _aggregate!(
+                f64,
+                i64,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            DataType::Decimal128(_, _) => _aggregate!(
+                Decimal128Array,
+                i128,
+                $op,
+                $filter,
+                $ts_col,
+                $predicate_col,
+                $agg,
+                $right,
+                $time_range,
+                $time_window
+            ),
+            _ => unimplemented!(),
+        }
+    };
+}
 pub fn build_segment_expr(
     expr: logical_plan::segment::SegmentExpr,
     schema: &Schema,
@@ -129,57 +305,27 @@ pub fn build_segment_expr(
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
             let filter = build_filter(Some(filter), &dfschema, schema, &execution_props)?.unwrap();
-
+            let ts_col = col(ts_col, &dfschema);
+            let time_range = build_time_range(time_range);
             let expr = match op {
-                logical_plan::segment::Operator::Eq => Arc::new(Count::<boolean_op::Eq>::new(
-                    filter,
-                    col(ts_col, &dfschema),
-                    right,
-                    build_time_range(time_range),
-                    time_window,
-                    10_000,
-                )) as Arc<dyn SegmentExpr>,
-                logical_plan::segment::Operator::NotEq => Arc::new(Count::<boolean_op::NotEq>::new(
-                    filter,
-                    col(ts_col, &dfschema),
-                    right,
-                    build_time_range(time_range),
-                    time_window,
-                    10_000,
-                ))
-                    as Arc<dyn SegmentExpr>,
-                logical_plan::segment::Operator::Lt => Arc::new(Count::<boolean_op::Lt>::new(
-                    filter,
-                    col(ts_col, &dfschema),
-                    right,
-                    build_time_range(time_range),
-                    time_window,
-                    10_000,
-                )) as Arc<dyn SegmentExpr>,
-                logical_plan::segment::Operator::LtEq => Arc::new(Count::<boolean_op::LtEq>::new(
-                    filter,
-                    col(ts_col, &dfschema),
-                    right,
-                    build_time_range(time_range),
-                    time_window,
-                    10_000,
-                )) as Arc<dyn SegmentExpr>,
-                logical_plan::segment::Operator::Gt => Arc::new(Count::<boolean_op::Gt>::new(
-                    filter,
-                    col(ts_col, &dfschema),
-                    right,
-                    build_time_range(time_range),
-                    time_window,
-                    10_000,
-                )) as Arc<dyn SegmentExpr>,
-                logical_plan::segment::Operator::GtEq => Arc::new(Count::<boolean_op::GtEq>::new(
-                    filter,
-                    col(ts_col, &dfschema),
-                    right,
-                    build_time_range(time_range),
-                    time_window,
-                    10_000,
-                )) as Arc<dyn SegmentExpr>,
+                logical_plan::segment::Operator::Eq => {
+                    count!(boolean_op::Eq, filter, ts_col, time_range, time_window)
+                }
+                logical_plan::segment::Operator::NotEq => {
+                    count!(boolean_op::NotEq, filter, ts_col, time_range, time_window)
+                }
+                logical_plan::segment::Operator::Lt => {
+                    count!(boolean_op::Lt, filter, ts_col, time_range, time_window)
+                }
+                logical_plan::segment::Operator::LtEq => {
+                    count!(boolean_op::LtEq, filter, ts_col, time_range, time_window)
+                }
+                logical_plan::segment::Operator::Gt => {
+                    count!(boolean_op::Gt, filter, ts_col, time_range, time_window)
+                }
+                logical_plan::segment::Operator::GtEq => {
+                    count!(boolean_op::GtEq, filter, ts_col, time_range, time_window)
+                }
             };
             Ok(expr)
         }
@@ -196,41 +342,71 @@ pub fn build_segment_expr(
             let dfschema = schema.clone().to_dfschema()?;
             let execution_props = ExecutionProps::new();
             let filter = build_filter(Some(filter), &dfschema, schema, &execution_props)?.unwrap();
-
+            let ts_col = col(ts_col, &dfschema);
+            let predicate_col = col(predicate, &dfschema);
+            let agg = aggregate(&agg);
+            let time_range = build_time_range(time_range);
             let expr = match op {
-                logical_plan::segment::Operator::Eq => {
-                    match right.get_datatype() {
-                        DataType::Int8 => {
-                            Arc::new(Aggregate::<i8, i32, boolean_op::Gt>::new(
-                                filter,
-                                col(ts_col, &dfschema),
-                                col(predicate, &dfschema),
-                                aggregate(&agg),
-                                right.into(),
-                                build_time_range(time_range),
-                                time_window,
-                                10_000,
-                            )) as Arc<dyn SegmentExpr>,
-                        }
-                        DataType::Int16 => {}
-                        DataType::Int32 => {}
-                        DataType::Int64 => {}
-                        DataType::UInt8 => {}
-                        DataType::UInt16 => {}
-                        DataType::UInt32 => {}
-                        DataType::UInt64 => {}
-                        DataType::Float16 => {}
-                        DataType::Float32 => {}
-                        DataType::Float64 => {}
-                        DataType::Decimal128(_, _) => {}
-                        _ => unimplemented!()
-                    }
-                }
-                logical_plan::segment::Operator::NotEq => {}
-                logical_plan::segment::Operator::Lt => {}
-                logical_plan::segment::Operator::LtEq => {}
-                logical_plan::segment::Operator::Gt => {}
-                logical_plan::segment::Operator::GtEq => {}
+                logical_plan::segment::Operator::Eq => aggregate!(
+                    boolean_op::Eq,
+                    filter,
+                    ts_col,
+                    predicate_col,
+                    agg,
+                    right,
+                    time_range,
+                    time_window
+                ),
+                logical_plan::segment::Operator::NotEq => aggregate!(
+                    boolean_op::NotEq,
+                    filter,
+                    ts_col,
+                    predicate_col,
+                    agg,
+                    right,
+                    time_range,
+                    time_window
+                ),
+                logical_plan::segment::Operator::Lt => aggregate!(
+                    boolean_op::Lt,
+                    filter,
+                    ts_col,
+                    predicate_col,
+                    agg,
+                    right,
+                    time_range,
+                    time_window
+                ),
+                logical_plan::segment::Operator::LtEq => aggregate!(
+                    boolean_op::LtEq,
+                    filter,
+                    ts_col,
+                    predicate_col,
+                    agg,
+                    right,
+                    time_range,
+                    time_window
+                ),
+                logical_plan::segment::Operator::Gt => aggregate!(
+                    boolean_op::Gt,
+                    filter,
+                    ts_col,
+                    predicate_col,
+                    agg,
+                    right,
+                    time_range,
+                    time_window
+                ),
+                logical_plan::segment::Operator::GtEq => aggregate!(
+                    boolean_op::GtEq,
+                    filter,
+                    ts_col,
+                    predicate_col,
+                    agg,
+                    right,
+                    time_range,
+                    time_window
+                ),
             };
 
             Ok(expr)

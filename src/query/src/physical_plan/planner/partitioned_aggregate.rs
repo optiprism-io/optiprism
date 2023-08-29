@@ -116,6 +116,42 @@ fn aggregate(agg: &logical_plan::partitioned_aggregate::AggregateFunction) -> Ag
     }
 }
 
+macro_rules! count {
+    ($ty:ident,$filter:expr,$groups:expr,$predicate:expr,$partition_col:expr,$distinct:expr) => {
+        Box::new(Count::<$ty>::try_new(
+            $filter,
+            $groups,
+            $predicate,
+            $partition_col,
+            $distinct,
+        )?) as Box<dyn PartitionedAggregateExpr>
+    };
+}
+
+macro_rules! aggregate {
+    ($ty:ident,$filter:expr,$groups:expr,$predicate:expr,$partition_col:expr,$agg:expr) => {
+        Box::new(Aggregate::<$ty>::try_new(
+            $filter,
+            $groups,
+            $predicate,
+            $partition_col,
+            $agg,
+        )?) as Box<dyn PartitionedAggregateExpr>
+    };
+}
+
+macro_rules! partitioned_aggregate {
+    ($ty:ident,$filter:expr,$groups:expr,$inner:expr,$outer:expr,$predicate:expr,$partition_col:expr) => {
+        Box::new(partitioned::aggregate::Aggregate::<$ty>::try_new(
+            $filter,
+            $inner,
+            $outer,
+            $predicate,
+            $groups,
+            $partition_col,
+        )?) as Box<dyn PartitionedAggregateExpr>
+    };
+}
 pub fn build_partitioned_aggregate_expr(
     expr: AggregateExpr,
     schema: &Schema,
@@ -136,84 +172,21 @@ pub fn build_partitioned_aggregate_expr(
             let partition_col = col(partition_col, &dfschema);
 
             let count = match predicate.data_type(schema)? {
-                DataType::Int8 => Box::new(Count::<i8>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Int16 => Box::new(Count::<i16>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Int32 => Box::new(Count::<i32>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Int64 => Box::new(Count::<i64>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt8 => Box::new(Count::<u8>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt16 => Box::new(Count::<u16>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt32 => Box::new(Count::<u32>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt64 => Box::new(Count::<u64>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Float32 => Box::new(Count::<f32>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Float64 => Box::new(Count::<f64>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Decimal128(_, _) => Box::new(Count::<i128>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    distinct,
-                )?)
-                    as Box<dyn PartitionedAggregateExpr>,
+                DataType::Int8 => count!(i8, filter, groups, predicate, partition_col, distinct),
+                DataType::Int16 => count!(i16, filter, groups, predicate, partition_col, distinct),
+                DataType::Int32 => count!(i32, filter, groups, predicate, partition_col, distinct),
+                DataType::Int64 => count!(i64, filter, groups, predicate, partition_col, distinct),
+                DataType::UInt8 => count!(u8, filter, groups, predicate, partition_col, distinct),
+                DataType::UInt16 => count!(u16, filter, groups, predicate, partition_col, distinct),
+                DataType::UInt32 => count!(u32, filter, groups, predicate, partition_col, distinct),
+                DataType::UInt64 => count!(u64, filter, groups, predicate, partition_col, distinct),
+                DataType::Float32 => {
+                    count!(f32, filter, groups, predicate, partition_col, distinct)
+                }
+                DataType::Float64 => {
+                    count!(f64, filter, groups, predicate, partition_col, distinct)
+                }
+                DataType::Decimal128(_, _) => count!(i128),
                 _ => return Err(QueryError::Plan("unsupported predicate type".to_string())),
             };
 
@@ -235,84 +208,19 @@ pub fn build_partitioned_aggregate_expr(
             let agg = aggregate(&agg);
 
             let count = match predicate.data_type(schema)? {
-                DataType::Int8 => Box::new(Aggregate::<i8>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Int16 => Box::new(Aggregate::<i16>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Int32 => Box::new(Aggregate::<i32>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Int64 => Box::new(Aggregate::<i64>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt8 => Box::new(Aggregate::<u8>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt16 => Box::new(Aggregate::<u16>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt32 => Box::new(Aggregate::<u32>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt64 => Box::new(Aggregate::<u64>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Float32 => Box::new(Aggregate::<f32>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Float64 => Box::new(Aggregate::<f64>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Decimal128(_, _) => Box::new(Aggregate::<i128>::try_new(
-                    filter,
-                    groups,
-                    predicate,
-                    partition_col,
-                    agg,
-                )?)
-                    as Box<dyn PartitionedAggregateExpr>,
+                DataType::Int8 => aggregate!(i8, filter, groups, predicate, partition_col, agg),
+                DataType::Int16 => aggregate!(i16, filter, groups, predicate, partition_col, agg),
+                DataType::Int32 => aggregate!(i32, filter, groups, predicate, partition_col, agg),
+                DataType::Int64 => aggregate!(i64, filter, groups, predicate, partition_col, agg),
+                DataType::UInt8 => aggregate!(u8, filter, groups, predicate, partition_col, agg),
+                DataType::UInt16 => aggregate!(u16, filter, groups, predicate, partition_col, agg),
+                DataType::UInt32 => aggregate!(u32, filter, groups, predicate, partition_col, agg),
+                DataType::UInt64 => aggregate!(u64, filter, groups, predicate, partition_col, agg),
+                DataType::Float32 => aggregate!(f32, filter, groups, predicate, partition_col, agg),
+                DataType::Float64 => aggregate!(f64, filter, groups, predicate, partition_col, agg),
+                DataType::Decimal128(_, _) => {
+                    aggregate!(i128, filter, groups, predicate, partition_col, agg)
+                }
                 _ => return Err(QueryError::Plan("unsupported predicate type".to_string())),
             };
 
@@ -352,96 +260,105 @@ pub fn build_partitioned_aggregate_expr(
             let outer = aggregate(&outer_fn);
 
             let ret = match predicate.data_type(schema)? {
-                DataType::Int8 => Box::new(partitioned::aggregate::Aggregate::<i8>::try_new(
+                DataType::Int8 => partitioned_aggregate!(
+                    i8,
                     filter,
                     inner,
                     outer,
                     predicate,
                     groups,
-                    partition_col,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Int16 => Box::new(partitioned::aggregate::Aggregate::<i16>::try_new(
+                    partition_col
+                ),
+                DataType::Int16 => partitioned_aggregate!(
+                    i16,
                     filter,
                     inner,
                     outer,
                     predicate,
                     groups,
-                    partition_col,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Int32 => Box::new(partitioned::aggregate::Aggregate::<i32>::try_new(
+                    partition_col
+                ),
+                DataType::Int32 => partitioned_aggregate!(
+                    i32,
                     filter,
                     inner,
                     outer,
                     predicate,
                     groups,
-                    partition_col,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Int64 => Box::new(partitioned::aggregate::Aggregate::<i64>::try_new(
+                    partition_col
+                ),
+                DataType::Int64 => partitioned_aggregate!(
+                    i64,
                     filter,
                     inner,
                     outer,
                     predicate,
                     groups,
-                    partition_col,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt8 => Box::new(partitioned::aggregate::Aggregate::<u8>::try_new(
+                    partition_col
+                ),
+                DataType::UInt8 => partitioned_aggregate!(
+                    u8,
                     filter,
                     inner,
                     outer,
                     predicate,
                     groups,
-                    partition_col,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt16 => Box::new(partitioned::aggregate::Aggregate::<u16>::try_new(
+                    partition_col
+                ),
+                DataType::UInt16 => partitioned_aggregate!(
+                    u16,
                     filter,
                     inner,
                     outer,
                     predicate,
                     groups,
-                    partition_col,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt32 => Box::new(partitioned::aggregate::Aggregate::<u32>::try_new(
+                    partition_col
+                ),
+                DataType::UInt32 => partitioned_aggregate!(
+                    u32,
                     filter,
                     inner,
                     outer,
                     predicate,
                     groups,
-                    partition_col,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::UInt64 => Box::new(partitioned::aggregate::Aggregate::<u64>::try_new(
+                    partition_col
+                ),
+                DataType::UInt64 => partitioned_aggregate!(
+                    u64,
                     filter,
                     inner,
                     outer,
                     predicate,
                     groups,
-                    partition_col,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Float32 => Box::new(partitioned::aggregate::Aggregate::<f32>::try_new(
+                    partition_col
+                ),
+                DataType::Float32 => partitioned_aggregate!(
+                    f32,
                     filter,
                     inner,
                     outer,
                     predicate,
                     groups,
-                    partition_col,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Float64 => Box::new(partitioned::aggregate::Aggregate::<f64>::try_new(
+                    partition_col
+                ),
+                DataType::Float64 => partitioned_aggregate!(
+                    f64,
                     filter,
                     inner,
                     outer,
                     predicate,
                     groups,
-                    partition_col,
-                )?) as Box<dyn PartitionedAggregateExpr>,
-                DataType::Decimal128(_, _) => {
-                    Box::new(partitioned::aggregate::Aggregate::<i128>::try_new(
-                        filter,
-                        inner,
-                        outer,
-                        predicate,
-                        groups,
-                        partition_col,
-                    )?) as Box<dyn PartitionedAggregateExpr>
-                }
+                    partition_col
+                ),
+                DataType::Decimal128(_, _) => partitioned_aggregate!(
+                    i128,
+                    filter,
+                    inner,
+                    outer,
+                    predicate,
+                    groups,
+                    partition_col
+                ),
                 _ => return Err(QueryError::Plan("unsupported predicate type".to_string())),
             };
 
