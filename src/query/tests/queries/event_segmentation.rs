@@ -31,7 +31,7 @@ use metadata::custom_events;
 use metadata::custom_events::CreateCustomEventRequest;
 use query::error::Result;
 use query::event_fields;
-use query::physical_plan::planner::QueryPlanner;
+use query::physical_plan::plannerd::QueryPlanner;
 use query::queries::event_segmentation::logical_plan_builder::build;
 use query::test_util::create_entities;
 use query::test_util::create_md;

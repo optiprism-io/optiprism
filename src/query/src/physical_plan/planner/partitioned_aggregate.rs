@@ -39,14 +39,15 @@ use crate::expr::property_col;
 use crate::logical_plan;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
+use crate::logical_plan::partitioned_aggregate::funnel::ExcludeExpr;
+use crate::logical_plan::partitioned_aggregate::funnel::Filter;
+use crate::logical_plan::partitioned_aggregate::funnel::StepOrder;
+use crate::logical_plan::partitioned_aggregate::funnel::Touch;
+use crate::logical_plan::partitioned_aggregate::AggregateExpr;
+use crate::logical_plan::partitioned_aggregate::SegmentedAggregateNode;
+use crate::logical_plan::partitioned_aggregate::SortField;
 use crate::logical_plan::pivot::PivotNode;
-use crate::logical_plan::segmented_aggregate::funnel::ExcludeExpr;
-use crate::logical_plan::segmented_aggregate::funnel::Filter;
-use crate::logical_plan::segmented_aggregate::funnel::StepOrder;
-use crate::logical_plan::segmented_aggregate::funnel::Touch;
-use crate::logical_plan::segmented_aggregate::AggregateExpr;
-use crate::logical_plan::segmented_aggregate::SegmentedAggregateNode;
-use crate::logical_plan::segmented_aggregate::SortField;
+use crate::logical_plan::segment::SegmentNode;
 // use crate::logical_plan::_segmentation::AggregateFunction;
 // use crate::logical_plan::_segmentation::SegmentationNode;
 // use crate::logical_plan::_segmentation::TimeRange;
@@ -67,45 +68,11 @@ use crate::physical_plan::expressions::aggregate::AggregateFunction;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
+use crate::physical_plan::planner::build_filter;
+use crate::physical_plan::planner::planner::col;
+use crate::physical_plan::segment::SegmentExec;
 use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
 use crate::physical_plan::unpivot::UnpivotExec;
-
-pub struct QueryPlanner {}
-
-#[async_trait]
-impl DFQueryPlanner for QueryPlanner {
-    async fn create_physical_plan(
-        &self,
-        logical_plan: &LogicalPlan,
-        ctx_state: &SessionState,
-    ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let physical_planner =
-            DefaultPhysicalPlanner::with_extension_planners(vec![Arc::new(ExtensionPlanner {})]);
-        physical_planner
-            .create_physical_plan(logical_plan, ctx_state)
-            .await
-    }
-}
-
-pub struct ExtensionPlanner {}
-
-fn build_filter(
-    filter: Option<Expr>,
-    dfschema: &DFSchema,
-    schema: &Schema,
-    execution_props: &ExecutionProps,
-) -> Result<Option<Arc<dyn PhysicalExpr>>> {
-    let ret = filter
-        .clone()
-        .map(|e| create_physical_expr(&e, &dfschema, schema, &execution_props))
-        .transpose()?;
-
-    Ok(ret)
-}
-
-fn col(col: datafusion_common::Column, dfschema: &DFSchema) -> Column {
-    Column::new(col.name.as_str(), dfschema.index_of_column(&col).unwrap())
-}
 
 fn build_groups(
     groups: Option<Vec<(Expr, SortField)>>,
@@ -137,19 +104,19 @@ fn build_groups(
     Ok(ret)
 }
 
-fn aggregate(agg: &logical_plan::segmented_aggregate::AggregateFunction) -> AggregateFunction {
+fn aggregate(agg: &logical_plan::partitioned_aggregate::AggregateFunction) -> AggregateFunction {
     match agg {
-        logical_plan::segmented_aggregate::AggregateFunction::Sum => AggregateFunction::new_sum(),
-        logical_plan::segmented_aggregate::AggregateFunction::Min => AggregateFunction::new_min(),
-        logical_plan::segmented_aggregate::AggregateFunction::Max => AggregateFunction::new_max(),
-        logical_plan::segmented_aggregate::AggregateFunction::Avg => AggregateFunction::new_avg(),
-        logical_plan::segmented_aggregate::AggregateFunction::Count => {
+        logical_plan::partitioned_aggregate::AggregateFunction::Sum => AggregateFunction::new_sum(),
+        logical_plan::partitioned_aggregate::AggregateFunction::Min => AggregateFunction::new_min(),
+        logical_plan::partitioned_aggregate::AggregateFunction::Max => AggregateFunction::new_max(),
+        logical_plan::partitioned_aggregate::AggregateFunction::Avg => AggregateFunction::new_avg(),
+        logical_plan::partitioned_aggregate::AggregateFunction::Count => {
             AggregateFunction::new_count()
         }
     }
 }
 
-fn segment_agg_expr(
+pub fn build_partitioned_aggregate_expr(
     expr: AggregateExpr,
     schema: &Schema,
 ) -> Result<Box<dyn PartitionedAggregateExpr>> {
@@ -546,13 +513,13 @@ fn segment_agg_expr(
                     .collect::<Vec<_>>()
             });
             let count = match count {
-                logical_plan::segmented_aggregate::funnel::Count::Unique => {
+                logical_plan::partitioned_aggregate::funnel::Count::Unique => {
                     partitioned::funnel::Count::Unique
                 }
-                logical_plan::segmented_aggregate::funnel::Count::NonUnique => {
+                logical_plan::partitioned_aggregate::funnel::Count::NonUnique => {
                     partitioned::funnel::Count::NonUnique
                 }
-                logical_plan::segmented_aggregate::funnel::Count::Session => {
+                logical_plan::partitioned_aggregate::funnel::Count::Session => {
                     partitioned::funnel::Count::Session
                 }
             };
@@ -593,97 +560,4 @@ fn segment_agg_expr(
     };
 
     ret
-}
-
-#[async_trait]
-impl DFExtensionPlanner for ExtensionPlanner {
-    async fn plan_extension(
-        &self,
-        _planner: &dyn PhysicalPlanner,
-        node: &dyn UserDefinedLogicalNode,
-        logical_inputs: &[&LogicalPlan],
-        physical_inputs: &[Arc<dyn ExecutionPlan>],
-        ctx_state: &SessionState,
-    ) -> DFResult<Option<Arc<dyn ExecutionPlan>>> {
-        let any = node.as_any();
-        let plan = if any.downcast_ref::<MergeNode>().is_some() {
-            let exec = MergeExec::try_new(physical_inputs.to_vec())
-                .map_err(|err| DataFusionError::Plan(err.to_string()))?;
-            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        } else if let Some(node) = any.downcast_ref::<UnpivotNode>() {
-            let exec = UnpivotExec::try_new(
-                physical_inputs[0].clone(),
-                node.cols.clone(),
-                node.name_col.clone(),
-                node.value_col.clone(),
-            )
-            .map_err(|err| DataFusionError::Plan(err.to_string()))?;
-            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        } else if let Some(node) = any.downcast_ref::<PivotNode>() {
-            let schema = node.input.schema();
-            let exec = PivotExec::try_new(
-                physical_inputs[0].clone(),
-                expressions::Column::new(
-                    node.name_col.name.as_str(),
-                    schema.index_of_column(&node.name_col)?,
-                ),
-                expressions::Column::new(
-                    node.value_col.name.as_str(),
-                    schema.index_of_column(&node.value_col)?,
-                ),
-                node.result_cols.clone(),
-            )
-            .map_err(|err| DataFusionError::Plan(err.to_string()))?;
-            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        } else if let Some(node) = any.downcast_ref::<DictionaryDecodeNode>() {
-            let schema = node.input.schema();
-            let decode_cols = node
-                .decode_cols
-                .iter()
-                .map(|(col, dict)| {
-                    (
-                        expressions::Column::new(
-                            col.name.as_str(),
-                            schema.index_of_column(col).unwrap(),
-                        ),
-                        dict.to_owned(),
-                    )
-                })
-                .collect();
-            let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
-            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        } else if let Some(node) = any.downcast_ref::<SegmentedAggregateNode>() {
-            let partition_inputs = match &node.partition_inputs {
-                None => None,
-                Some(c) => Some(physical_inputs[1..c.len()].to_vec()),
-            };
-
-            let partition_col = Column::new(
-                node.partition_col.name.as_str(),
-                node.schema.index_of_column(&node.partition_col).unwrap(),
-            );
-
-            let agg_expr = node
-                .agg_expr
-                .clone()
-                .into_iter()
-                .map(|(expr, name)| {
-                    segment_agg_expr(expr, &physical_inputs[0].schema())
-                        .and_then(|expr| Ok((Arc::new(Mutex::new(expr)), name)))
-                })
-                .collect::<Result<Vec<_>>>()
-                .map_err(|err| DataFusionError::Plan(err.to_string()))?;
-            let exec = SegmentedAggregateExec::try_new(
-                physical_inputs[0].clone(),
-                partition_inputs,
-                partition_col,
-                agg_expr,
-            )
-            .map_err(|err| DataFusionError::Plan(err.to_string()))?;
-            Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
-        } else {
-            None
-        };
-        Ok(plan)
-    }
 }

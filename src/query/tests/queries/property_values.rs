@@ -11,7 +11,7 @@ use datafusion::prelude::SessionConfig;
 use datafusion::prelude::SessionContext;
 use datafusion_common::ScalarValue;
 use query::error::Result;
-use query::physical_plan::planner::QueryPlanner;
+use query::physical_plan::plannerd::QueryPlanner;
 use query::queries::property_values::build;
 use query::queries::property_values::Filter;
 use query::queries::property_values::PropertyValues;

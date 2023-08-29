@@ -1,4 +1,4 @@
-mod aggregate;
+pub mod aggregate;
 // mod aggregate_decimal;
 pub mod boolean_op;
 pub mod comparison;

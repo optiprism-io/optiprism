@@ -7,6 +7,7 @@ use common::query::event_segmentation::Breakdown;
 use common::query::event_segmentation::Event;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
+use common::query::event_segmentation::Segment;
 use common::query::time_columns;
 use common::query::EventFilter;
 use common::query::PartitionedAggregateFunction;
@@ -189,6 +190,11 @@ impl LogicalPlanBuilder {
         input = self
             .build_aggregate_logical_plan(input, &self.es.events[event_id])
             .await?;
+
+        let segment_inputs = match &self.es.segments {
+            None => None,
+            Some(segments) => for segment in segments {},
+        };
 
         // unpivot aggregate values into value column
         input = {
