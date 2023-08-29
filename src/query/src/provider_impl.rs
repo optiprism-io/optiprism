@@ -21,7 +21,7 @@ use datafusion_expr::LogicalPlan;
 use metadata::MetadataProvider;
 use tracing::debug;
 
-use crate::physical_plan::plannerd::QueryPlanner;
+use crate::physical_plan::planner::planner::QueryPlanner;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::queries::property_values;

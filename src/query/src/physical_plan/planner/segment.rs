@@ -64,7 +64,7 @@ use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::F
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
 use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
-use crate::physical_plan::expressions::segmentation::boolean_op;
+use crate::physical_plan::expressions::segmentation::boolean_op::*;
 use crate::physical_plan::expressions::segmentation::comparison::And;
 use crate::physical_plan::expressions::segmentation::comparison::Or;
 use crate::physical_plan::expressions::segmentation::count::Count;
@@ -98,7 +98,7 @@ fn build_time_range(time_range: logical_plan::segment::TimeRange) -> TimeRange {
 }
 
 macro_rules! count {
-    ($op:ident,$filter:expr,$ts_cl:expr,$right:expr,$time_range:expr,$time_window:expr) => {
+    ($op:ident,$filter:expr,$ts_col:expr,$right:expr,$time_range:expr,$time_window:expr) => {
         Arc::new(Count::<$op>::new(
             $filter,
             $ts_col,
@@ -126,7 +126,7 @@ macro_rules! _aggregate {
 }
 macro_rules! aggregate {
     ($op:expr, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr,$time_window:expr) => {
-        match right.get_datatype() {
+        match $right.get_datatype() {
             DataType::Int8 => _aggregate!(
                 i8,
                 i64,
@@ -309,22 +309,22 @@ pub fn build_segment_expr(
             let time_range = build_time_range(time_range);
             let expr = match op {
                 logical_plan::segment::Operator::Eq => {
-                    count!(boolean_op::Eq, filter, ts_col, time_range, time_window)
+                    count!(Eq, filter, ts_col, right, time_range, time_window)
                 }
                 logical_plan::segment::Operator::NotEq => {
-                    count!(boolean_op::NotEq, filter, ts_col, time_range, time_window)
+                    count!(NotEq, filter, ts_col, right, time_range, time_window)
                 }
                 logical_plan::segment::Operator::Lt => {
-                    count!(boolean_op::Lt, filter, ts_col, time_range, time_window)
+                    count!(Lt, filter, ts_col, right, time_range, time_window)
                 }
                 logical_plan::segment::Operator::LtEq => {
-                    count!(boolean_op::LtEq, filter, ts_col, time_range, time_window)
+                    count!(LtEq, filter, ts_col, right, time_range, time_window)
                 }
                 logical_plan::segment::Operator::Gt => {
-                    count!(boolean_op::Gt, filter, ts_col, time_range, time_window)
+                    count!(Gt, filter, ts_col, right, time_range, time_window)
                 }
                 logical_plan::segment::Operator::GtEq => {
-                    count!(boolean_op::GtEq, filter, ts_col, time_range, time_window)
+                    count!(GtEq, filter, ts_col, right, time_range, time_window)
                 }
             };
             Ok(expr)
@@ -348,7 +348,7 @@ pub fn build_segment_expr(
             let time_range = build_time_range(time_range);
             let expr = match op {
                 logical_plan::segment::Operator::Eq => aggregate!(
-                    boolean_op::Eq,
+                    Eq,
                     filter,
                     ts_col,
                     predicate_col,
@@ -358,7 +358,7 @@ pub fn build_segment_expr(
                     time_window
                 ),
                 logical_plan::segment::Operator::NotEq => aggregate!(
-                    boolean_op::NotEq,
+                    NotEq,
                     filter,
                     ts_col,
                     predicate_col,
@@ -368,7 +368,7 @@ pub fn build_segment_expr(
                     time_window
                 ),
                 logical_plan::segment::Operator::Lt => aggregate!(
-                    boolean_op::Lt,
+                    Lt,
                     filter,
                     ts_col,
                     predicate_col,
@@ -378,7 +378,7 @@ pub fn build_segment_expr(
                     time_window
                 ),
                 logical_plan::segment::Operator::LtEq => aggregate!(
-                    boolean_op::LtEq,
+                    LtEq,
                     filter,
                     ts_col,
                     predicate_col,
@@ -388,7 +388,7 @@ pub fn build_segment_expr(
                     time_window
                 ),
                 logical_plan::segment::Operator::Gt => aggregate!(
-                    boolean_op::Gt,
+                    Gt,
                     filter,
                     ts_col,
                     predicate_col,
@@ -398,7 +398,7 @@ pub fn build_segment_expr(
                     time_window
                 ),
                 logical_plan::segment::Operator::GtEq => aggregate!(
-                    boolean_op::GtEq,
+                    GtEq,
                     filter,
                     ts_col,
                     predicate_col,

@@ -186,7 +186,9 @@ pub fn build_partitioned_aggregate_expr(
                 DataType::Float64 => {
                     count!(f64, filter, groups, predicate, partition_col, distinct)
                 }
-                DataType::Decimal128(_, _) => count!(i128),
+                DataType::Decimal128(_, _) => {
+                    count!(i128, filter, groups, predicate, partition_col, distinct)
+                }
                 _ => return Err(QueryError::Plan("unsupported predicate type".to_string())),
             };
 
