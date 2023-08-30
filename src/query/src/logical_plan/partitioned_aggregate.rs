@@ -11,6 +11,7 @@ use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
+use common::query;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion_common::Column;
@@ -25,7 +26,7 @@ use datafusion_expr::UserDefinedLogicalNode;
 use crate::error::QueryError;
 use crate::Result;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AggregateFunction {
     Sum,
     Min,
@@ -34,42 +35,65 @@ pub enum AggregateFunction {
     Count,
 }
 
+impl Into<AggregateFunction> for &query::AggregateFunction {
+    fn into(self) -> AggregateFunction {
+        match self {
+            query::AggregateFunction::Count => AggregateFunction::Count,
+            query::AggregateFunction::Sum => AggregateFunction::Sum,
+            query::AggregateFunction::Min => AggregateFunction::Min,
+            query::AggregateFunction::Max => AggregateFunction::Max,
+            query::AggregateFunction::Avg => AggregateFunction::Avg,
+            _ => panic!("Unsupported aggregate function: {:?}", self),
+        }
+    }
+}
+
+impl Into<AggregateFunction> for &query::PartitionedAggregateFunction {
+    fn into(self) -> AggregateFunction {
+        match self {
+            query::PartitionedAggregateFunction::Count => AggregateFunction::Count,
+            query::PartitionedAggregateFunction::Sum => AggregateFunction::Sum,
+            _ => panic!("Unsupported partitioned aggregate function: {:?}", self),
+        }
+    }
+}
+
 pub mod funnel {
     use chrono::Duration;
     use datafusion_expr::Expr;
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     pub enum StepOrder {
         Sequential,
         Any(Vec<(usize, usize)>), // any of the steps
     }
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     pub struct ExcludeSteps {
         pub from: usize,
         pub to: usize,
     }
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     pub struct ExcludeExpr {
         pub expr: Expr,
         pub steps: Option<Vec<ExcludeSteps>>,
     }
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     pub enum Count {
         Unique,
         NonUnique,
         Session,
     }
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     pub enum Order {
         Any,
         Asc,
     }
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     pub enum Filter {
         DropOffOnAnyStep,
         // funnel should fail on any step
@@ -78,7 +102,7 @@ pub mod funnel {
         TimeToConvert(Duration, Duration), // conversion should be within certain window
     }
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
+    #[derive(Clone, PartialEq, Eq, Hash, Debug)]
     pub enum Touch {
         First,
         Last,
@@ -86,12 +110,12 @@ pub mod funnel {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct SortField {
     pub data_type: DataType,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AggregateExpr {
     Count {
         filter: Option<Expr>,
@@ -240,7 +264,7 @@ impl AggregateExpr {
 }
 
 #[derive(Hash, Eq, PartialEq)]
-pub struct SegmentedAggregateNode {
+pub struct PartitionedAggregateNode {
     pub input: LogicalPlan,
     pub partition_inputs: Option<Vec<LogicalPlan>>,
     pub partition_col: Column,
@@ -248,10 +272,10 @@ pub struct SegmentedAggregateNode {
     pub schema: DFSchemaRef,
 }
 
-impl SegmentedAggregateNode {
+impl PartitionedAggregateNode {
     pub fn try_new(
         input: LogicalPlan,
-        partition_inputs: Vec<LogicalPlan>,
+        partition_inputs: Option<Vec<LogicalPlan>>,
         partition_col: Column,
         agg_expr: Vec<(AggregateExpr, String)>,
     ) -> Result<Self> {
@@ -287,7 +311,7 @@ impl SegmentedAggregateNode {
         let schema = DFSchema::new_with_metadata(fields, Default::default())?;
         let ret = Self {
             input,
-            partition_inputs: Some(partition_inputs),
+            partition_inputs,
             partition_col,
             agg_expr,
             schema: Arc::new(schema),
@@ -296,13 +320,13 @@ impl SegmentedAggregateNode {
     }
 }
 
-impl Debug for SegmentedAggregateNode {
+impl Debug for PartitionedAggregateNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.fmt_for_explain(f)
     }
 }
 
-impl UserDefinedLogicalNode for SegmentedAggregateNode {
+impl UserDefinedLogicalNode for PartitionedAggregateNode {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -334,9 +358,9 @@ impl UserDefinedLogicalNode for SegmentedAggregateNode {
     }
 
     fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {
-        let node = SegmentedAggregateNode::try_new(
+        let node = PartitionedAggregateNode::try_new(
             inputs[0].clone(),
-            self.partition_inputs.clone().unwrap(),
+            self.partition_inputs.clone(),
             self.partition_col.clone(),
             self.agg_expr.clone(),
         )

@@ -32,6 +32,10 @@ use datafusion_common::ToDFSchema;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
+use num_traits::Bounded;
+use num_traits::Num;
+use num_traits::NumCast;
+use rust_decimal::Decimal;
 
 use crate::error::QueryError;
 use crate::error::Result;
@@ -44,7 +48,7 @@ use crate::logical_plan::partitioned_aggregate::funnel::Filter;
 use crate::logical_plan::partitioned_aggregate::funnel::StepOrder;
 use crate::logical_plan::partitioned_aggregate::funnel::Touch;
 use crate::logical_plan::partitioned_aggregate::AggregateExpr;
-use crate::logical_plan::partitioned_aggregate::SegmentedAggregateNode;
+use crate::logical_plan::partitioned_aggregate::PartitionedAggregateNode;
 use crate::logical_plan::partitioned_aggregate::SortField;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::segment::SegmentNode;
@@ -78,7 +82,8 @@ use crate::physical_plan::segment::SegmentExec;
 use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
 use crate::physical_plan::unpivot::UnpivotExec;
 
-fn aggregate<T>(agg: &logical_plan::segment::AggregateFunction) -> AggregateFunction<T> {
+fn aggregate<T>(agg: &logical_plan::segment::AggregateFunction) -> AggregateFunction<T>
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone {
     match agg {
         logical_plan::segment::AggregateFunction::Sum => AggregateFunction::new_sum(),
         logical_plan::segment::AggregateFunction::Min => AggregateFunction::new_min(),
@@ -111,13 +116,13 @@ macro_rules! count {
 }
 
 macro_rules! _aggregate {
-    ($t1:ident,$t2:ident, $op:expr, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr,$time_window:expr) => {
+    ($t1:ident,$t2:ident, $op:ty, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr,$time_window:expr) => {
         Arc::new(Aggregate::<$t1, $t2, $op>::new(
             $filter,
             $ts_col,
             $predicate_col,
             $agg,
-            $right.into(),
+            $right,
             $time_range,
             $time_window,
             10_000,
@@ -125,141 +130,129 @@ macro_rules! _aggregate {
     };
 }
 macro_rules! aggregate {
-    ($op:expr, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr,$time_window:expr) => {
-        match $right.get_datatype() {
-            DataType::Int8 => _aggregate!(
-                i8,
+    ($op:ty, $filter:expr,$ts_col:expr,$predicate_col:expr,$agg:expr,$right:expr,$time_range:expr,$time_window:expr) => {
+        match $right {
+            // ScalarValue::Int8(Some(v)) => _aggregate!(
+            // i8,
+            // i64,
+            // $op,
+            // $filter,
+            // $ts_col,
+            // $predicate_col,
+            // $agg,
+            // v as i64,
+            // $time_range,
+            // $time_window
+            // ),
+            // ScalarValue::Int16(Some(v)) => _aggregate!(
+            // i16,
+            // i64,
+            // $op,
+            // $filter,
+            // $ts_col,
+            // $predicate_col,
+            // $agg,
+            // v as i64,
+            // $time_range,
+            // $time_window
+            // ),
+            // ScalarValue::Int32(Some(v)) => _aggregate!(
+            // i32,
+            // i64,
+            // $op,
+            // $filter,
+            // $ts_col,
+            // $predicate_col,
+            // $agg,
+            // v as i64,
+            // $time_range,
+            // $time_window
+            // ),
+            ScalarValue::Int64(Some(v)) => _aggregate!(
                 i64,
-                $op,
-                $filter,
-                $ts_col,
-                $predicate_col,
-                $agg,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Int16 => _aggregate!(
-                i16,
-                i64,
-                $op,
-                $filter,
-                $ts_col,
-                $predicate_col,
-                $agg,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Int32 => _aggregate!(
-                i32,
                 i128,
                 $op,
                 $filter,
                 $ts_col,
                 $predicate_col,
                 $agg,
-                $right,
+                v as i128,
                 $time_range,
                 $time_window
             ),
-            DataType::Int64 => _aggregate!(
-                i64,
-                i64,
-                $op,
-                $filter,
-                $ts_col,
-                $predicate_col,
-                $agg,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Int128 => _aggregate!(
-                i128,
-                i128,
-                $op,
-                $filter,
-                $ts_col,
-                $predicate_col,
-                $agg,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::UInt8 => _aggregate!(
-                u8,
-                i64,
-                $op,
-                $filter,
-                $ts_col,
-                $predicate_col,
-                $agg,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::UInt16 => _aggregate!(
-                u16,
-                i64,
-                $op,
-                $filter,
-                $ts_col,
-                $predicate_col,
-                $agg,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::UInt32 => _aggregate!(
-                u32,
-                i128,
-                $op,
-                $filter,
-                $ts_col,
-                $predicate_col,
-                $agg,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::UInt64 => _aggregate!(
-                u64,
-                u128,
-                $op,
-                $filter,
-                $ts_col,
-                $predicate_col,
-                $agg,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Float32 => _aggregate!(
-                f32,
-                i64,
-                $op,
-                $filter,
-                $ts_col,
-                $predicate_col,
-                $agg,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Float64 => _aggregate!(
-                f64,
-                i64,
-                $op,
-                $filter,
-                $ts_col,
-                $predicate_col,
-                $agg,
-                $right,
-                $time_range,
-                $time_window
-            ),
-            DataType::Decimal128(_, _) => _aggregate!(
+            // ScalarValue::UInt8(Some(v)) => _aggregate!(
+            // u8,
+            // i64,
+            // $op,
+            // $filter,
+            // $ts_col,
+            // $predicate_col,
+            // $agg,
+            // v as i64,
+            // $time_range,
+            // $time_window
+            // ),
+            // ScalarValue::UInt16(Some(v)) => _aggregate!(
+            // u16,
+            // i64,
+            // $op,
+            // $filter,
+            // $ts_col,
+            // $predicate_col,
+            // $agg,
+            // v as i64,
+            // $time_range,
+            // $time_window
+            // ),
+            // ScalarValue::UInt32(Some(v)) => _aggregate!(
+            // u32,
+            // i64,
+            // $op,
+            // $filter,
+            // $ts_col,
+            // $predicate_col,
+            // $agg,
+            // v as i64,
+            // $time_range,
+            // $time_window
+            // ),
+            // ScalarValue::UInt64(Some(v)) => _aggregate!(
+            // u64,
+            // u128,
+            // $op,
+            // $filter,
+            // $ts_col,
+            // $predicate_col,
+            // $agg,
+            // v as i128,
+            // $time_range,
+            // $time_window
+            // ),
+            // ScalarValue::Float32(Some(v)) => _aggregate!(
+            // f32,
+            // i64,
+            // $op,
+            // $filter,
+            // $ts_col,
+            // $predicate_col,
+            // $agg,
+            // $right,
+            // $time_range,
+            // $time_window
+            // ),
+            // ScalarValue::Float64(Some(v)) => _aggregate!(
+            // f64,
+            // i64,
+            // $op,
+            // $filter,
+            // $ts_col,
+            // $predicate_col,
+            // $agg,
+            // $right,
+            // $time_range,
+            // $time_window
+            // ),
+            ScalarValue::Decimal128(Some(v), _, _) => _aggregate!(
                 Decimal128Array,
                 i128,
                 $op,
@@ -267,7 +260,7 @@ macro_rules! aggregate {
                 $ts_col,
                 $predicate_col,
                 $agg,
-                $right,
+                v,
                 $time_range,
                 $time_window
             ),
@@ -285,14 +278,14 @@ pub fn build_segment_expr(
                 build_segment_expr(*l, schema)?,
                 build_segment_expr(*r, schema)?,
             );
-            Ok(Box::new(expr) as Arc<dyn PartitionedAggregateExpr>)
+            Ok(Arc::new(expr) as Arc<dyn SegmentExpr>)
         }
         logical_plan::segment::SegmentExpr::Or(l, r) => {
             let expr = Or::new(
                 build_segment_expr(*l, schema)?,
                 build_segment_expr(*r, schema)?,
             );
-            Ok(Box::new(expr) as Arc<dyn PartitionedAggregateExpr>)
+            Ok(Arc::new(expr) as Arc<dyn SegmentExpr>)
         }
         logical_plan::segment::SegmentExpr::Count {
             filter,
@@ -344,19 +337,25 @@ pub fn build_segment_expr(
             let filter = build_filter(Some(filter), &dfschema, schema, &execution_props)?.unwrap();
             let ts_col = col(ts_col, &dfschema);
             let predicate_col = col(predicate, &dfschema);
-            let agg = aggregate(&agg);
+
             let time_range = build_time_range(time_range);
+
+            // todo remove
+            let right = ScalarValue::Int64(Some(1));
+            let agg = aggregate(&agg);
             let expr = match op {
-                logical_plan::segment::Operator::Eq => aggregate!(
-                    Eq,
-                    filter,
-                    ts_col,
-                    predicate_col,
-                    agg,
-                    right,
-                    time_range,
-                    time_window
-                ),
+                logical_plan::segment::Operator::Eq => {
+                    aggregate!(
+                        Eq,
+                        filter,
+                        ts_col,
+                        predicate_col,
+                        agg,
+                        right,
+                        time_range,
+                        time_window
+                    )
+                }
                 logical_plan::segment::Operator::NotEq => aggregate!(
                     NotEq,
                     filter,

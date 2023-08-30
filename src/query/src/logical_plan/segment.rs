@@ -4,6 +4,10 @@ use std::fmt::Formatter;
 use std::hash::Hasher;
 use std::sync::Arc;
 
+use common::query;
+use common::query::event_segmentation::QueryAggregate;
+use common::query::event_segmentation::Segment;
+use common::query::event_segmentation::SegmentTime;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
@@ -26,6 +30,11 @@ pub enum AggregateFunction {
     Count,
 }
 
+impl Into<AggregateFunction> for &QueryAggregate {
+    fn into(self) -> AggregateFunction {
+        todo!()
+    }
+}
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Operator {
     Eq,
@@ -36,12 +45,23 @@ pub enum Operator {
     GtEq,
 }
 
+impl Into<Operator> for &query::PropValueOperation {
+    fn into(self) -> Operator {
+        todo!()
+    }
+}
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TimeRange {
     Between(i64, i64),
     From(i64),
     Last(i64, i64),
     None,
+}
+
+impl Into<TimeRange> for &SegmentTime {
+    fn into(self) -> TimeRange {
+        todo!()
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -71,17 +91,13 @@ pub enum SegmentExpr {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SegmentNode {
     pub input: LogicalPlan,
-    pub expr: Vec<SegmentExpr>,
+    pub expr: SegmentExpr,
     pub partition_col: Column,
     pub schema: DFSchemaRef,
 }
 
 impl SegmentNode {
-    pub fn try_new(
-        input: LogicalPlan,
-        expr: Vec<SegmentExpr>,
-        partition_col: Column,
-    ) -> Result<Self> {
+    pub fn try_new(input: LogicalPlan, expr: SegmentExpr, partition_col: Column) -> Result<Self> {
         let field = input.schema().field_from_column(&partition_col)?.to_owned();
         let schema = DFSchema::new_with_metadata(vec![field], Default::default())?;
         Ok(Self {

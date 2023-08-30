@@ -44,7 +44,7 @@ use crate::logical_plan::partitioned_aggregate::funnel::Filter;
 use crate::logical_plan::partitioned_aggregate::funnel::StepOrder;
 use crate::logical_plan::partitioned_aggregate::funnel::Touch;
 use crate::logical_plan::partitioned_aggregate::AggregateExpr;
-use crate::logical_plan::partitioned_aggregate::SegmentedAggregateNode;
+use crate::logical_plan::partitioned_aggregate::PartitionedAggregateNode;
 use crate::logical_plan::partitioned_aggregate::SortField;
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::segment::SegmentNode;
@@ -141,7 +141,7 @@ macro_rules! aggregate {
 }
 
 macro_rules! partitioned_aggregate {
-    ($ty:ident,$filter:expr,$groups:expr,$inner:expr,$outer:expr,$predicate:expr,$partition_col:expr) => {
+    ($ty:ident,$filter:expr,$inner:expr,$outer:expr,$predicate:expr,$groups:expr,$partition_col:expr) => {
         Box::new(partitioned::aggregate::Aggregate::<$ty>::try_new(
             $filter,
             $inner,

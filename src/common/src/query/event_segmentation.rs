@@ -4,6 +4,7 @@ use datafusion_common::ScalarValue;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::error::CommonError;
 use crate::query::time_columns;
 use crate::query::AggregateFunction;
 use crate::query::EventFilter;
@@ -14,7 +15,6 @@ use crate::query::PropertyRef;
 use crate::query::QueryTime;
 use crate::query::TimeIntervalUnit;
 use crate::scalar::ScalarValueRef;
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum SegmentTime {
     Between {
@@ -36,6 +36,14 @@ pub enum SegmentTime {
     },
 }
 
+impl SegmentTime {
+    pub fn try_window(&self) -> Option<i64> {
+        match self {
+            SegmentTime::Each { n, unit } => Some(unit.duration(*n).num_seconds()),
+            _ => None,
+        }
+    }
+}
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum ChartType {
     Line,
@@ -175,7 +183,7 @@ impl Event {
 pub enum DidEventAggregate {
     Count {
         operation: PropValueOperation,
-        value: u64,
+        value: i64,
         time: SegmentTime,
     },
     RelativeCount {
@@ -205,14 +213,12 @@ pub enum SegmentCondition {
     HasPropertyValue {
         property_name: String,
         operation: PropValueOperation,
-        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
-        value: Option<Vec<ScalarValue>>,
+        value: i64,
     },
     HadPropertyValue {
         property_name: String,
         operation: PropValueOperation,
-        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
-        value: Option<Vec<ScalarValue>>,
+        value: i64,
         time: SegmentTime,
     },
     DidEvent {

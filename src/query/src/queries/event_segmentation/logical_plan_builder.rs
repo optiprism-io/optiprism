@@ -4,10 +4,12 @@ use std::sync::Arc;
 use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::Breakdown;
+use common::query::event_segmentation::DidEventAggregate;
 use common::query::event_segmentation::Event;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
 use common::query::event_segmentation::Segment;
+use common::query::event_segmentation::SegmentCondition;
 use common::query::time_columns;
 use common::query::EventFilter;
 use common::query::PartitionedAggregateFunction;
@@ -15,6 +17,7 @@ use common::query::PropertyRef;
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
+use datafusion_common::ScalarValue;
 use datafusion_expr::col;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
@@ -23,6 +26,7 @@ use datafusion_expr::utils::exprlist_to_fields;
 use datafusion_expr::Aggregate;
 use datafusion_expr::BuiltinScalarFunction;
 use datafusion_expr::Expr;
+use datafusion_expr::ExprSchemable;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
@@ -40,7 +44,12 @@ use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::merge::MergeNode;
+use crate::logical_plan::partitioned_aggregate::AggregateExpr;
+use crate::logical_plan::partitioned_aggregate::PartitionedAggregateNode;
+use crate::logical_plan::partitioned_aggregate::SortField;
 use crate::logical_plan::pivot::PivotNode;
+use crate::logical_plan::segment::SegmentExpr;
+use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
 use crate::Context;
 
@@ -116,8 +125,9 @@ macro_rules! dictionary_prop_to_col {
         $decode_cols.push((col, Arc::new(dict)));
     }};
 }
+
 impl LogicalPlanBuilder {
-    /// creates logical plan for event _segmentation
+    /// creates logical plan for event segmentation
     pub async fn build(
         ctx: Context,
         cur_time: DateTime<Utc>,
@@ -133,13 +143,56 @@ impl LogicalPlanBuilder {
             es: es.clone(),
         };
 
+        let segment_inputs = if let Some(segments) = es.segments.clone() {
+            let mut inputs = Vec::new();
+            for segment in segments {
+                let mut or: Option<SegmentExpr> = None;
+                for conditions in segment.conditions {
+                    let mut and: Option<SegmentExpr> = None;
+                    for condition in conditions {
+                        let expr = builder.build_segment_condition(&condition).await?;
+                        and = match and {
+                            None => Some(expr),
+                            Some(e) => Some(SegmentExpr::And(Box::new(e), Box::new(expr))),
+                        };
+                    }
+
+                    or = match or {
+                        None => Some(and.unwrap()),
+                        Some(e) => Some(SegmentExpr::Or(Box::new(e), Box::new(and.unwrap()))),
+                    };
+                }
+
+                let node = SegmentNode::try_new(
+                    input.clone(),
+                    or.unwrap(),
+                    Column::from_qualified_name(event_fields::USER_ID),
+                )?;
+                let input = LogicalPlan::Extension(Extension {
+                    node: Arc::new(node),
+                });
+
+                inputs.push(input);
+            }
+
+            Some(inputs)
+        } else {
+            None
+        };
+
         // build main query
         let mut input = match events.len() {
-            1 => builder.build_event_logical_plan(input.clone(), 0).await?,
+            1 => {
+                builder
+                    .build_event_logical_plan(input.clone(), 0, segment_inputs)
+                    .await?
+            }
             _ => {
                 let mut inputs: Vec<LogicalPlan> = vec![];
                 for idx in 0..events.len() {
-                    let input = builder.build_event_logical_plan(input.clone(), idx).await?;
+                    let input = builder
+                        .build_event_logical_plan(input.clone(), idx, segment_inputs.clone())
+                        .await?;
 
                     inputs.push(input);
                 }
@@ -154,6 +207,83 @@ impl LogicalPlanBuilder {
         input = builder.decode_dictionaries(input).await?;
 
         Ok(input)
+    }
+
+    async fn build_segment_condition(&self, condition: &SegmentCondition) -> Result<SegmentExpr> {
+        let expr = match condition {
+            SegmentCondition::HasPropertyValue { .. } => unimplemented!(),
+            SegmentCondition::HadPropertyValue {
+                property_name,
+                operation,
+                value,
+                time,
+            } => {
+                let property = PropertyRef::User(property_name.to_owned());
+                let filter = property_col(&self.ctx, &self.metadata, &property).await?;
+
+                SegmentExpr::Count {
+                    filter,
+                    ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
+                    time_range: time.into(),
+                    op: operation.into(),
+                    right: *value,
+                    time_window: time.try_window(),
+                }
+            }
+            SegmentCondition::DidEvent {
+                event,
+                filters,
+                aggregate,
+            } => {
+                // event expression
+                let mut event_expr = event_expression(&self.ctx, &self.metadata, event).await?;
+                // apply event filters
+                if let Some(filters) = &filters {
+                    event_expr = and(
+                        event_expr.clone(),
+                        self.event_filters_expression(filters).await?,
+                    )
+                }
+                match aggregate {
+                    DidEventAggregate::Count {
+                        operation,
+                        value,
+                        time,
+                    } => SegmentExpr::Count {
+                        filter: event_expr,
+                        ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
+                        time_range: time.into(),
+                        op: operation.into(),
+                        right: *value,
+                        time_window: time.try_window(),
+                    },
+                    DidEventAggregate::RelativeCount { .. } => unimplemented!(),
+                    DidEventAggregate::AggregateProperty {
+                        property,
+                        aggregate,
+                        operation,
+                        value,
+                        time,
+                    } => SegmentExpr::Aggregate {
+                        filter: event_expr,
+                        predicate: property_col(&self.ctx, &self.metadata, &property)
+                            .await?
+                            .try_into_col()?,
+                        ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
+                        time_range: time.into(),
+                        agg: aggregate.into(),
+                        op: operation.into(),
+                        right: value.to_owned().unwrap(),
+                        time_window: time.try_window(),
+                    },
+                    DidEventAggregate::HistoricalCount { .. } => {
+                        unimplemented!()
+                    }
+                }
+            }
+        };
+
+        Ok(expr)
     }
 
     async fn decode_dictionaries(&self, input: LogicalPlan) -> Result<LogicalPlan> {
@@ -183,19 +313,14 @@ impl LogicalPlanBuilder {
         &self,
         input: LogicalPlan,
         event_id: usize,
+        segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
         let mut input = self
             .build_filter_logical_plan(input.clone(), &self.es.events[event_id])
             .await?;
         input = self
-            .build_aggregate_logical_plan(input, &self.es.events[event_id])
+            .build_aggregate_logical_plan(input, &self.es.events[event_id], segment_inputs)
             .await?;
-
-        let segment_inputs = match &self.es.segments {
-            None => None,
-            Some(segments) => for segment in segments {},
-        };
-
         // unpivot aggregate values into value column
         input = {
             let agg_cols = self.es.events[event_id]
@@ -269,6 +394,7 @@ impl LogicalPlanBuilder {
         &self,
         input: LogicalPlan,
         event: &Event,
+        segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
         let mut group_expr: Vec<Expr> = vec![];
 
@@ -299,69 +425,93 @@ impl LogicalPlanBuilder {
             }
         }
 
-        let aggr_expr = event
-            .queries
+        let group_expr = group_expr
             .iter()
             .enumerate()
-            .map(|(id, query)| {
-                let q = match &query.agg {
-                    Query::CountEvents => {
-                        let agg_fn = datafusion_expr::expr::AggregateFunction::new(
-                            AggregateFunction::Count,
-                            vec![col(event_fields::EVENT)],
-                            false,
-                            None,
-                            None,
-                        );
-                        Expr::AggregateFunction(agg_fn)
-                    }
-                    Query::CountUniqueGroups | Query::DailyActiveGroups => todo!(),
-                    Query::WeeklyActiveGroups => unimplemented!(),
-                    Query::MonthlyActiveGroups => unimplemented!(),
-                    Query::CountPerGroup { aggregate } => todo!(),
-                    Query::AggregatePropertyPerGroup {
-                        property,
-                        aggregate_per_group,
-                        aggregate,
-                    } => todo!(),
-                    Query::AggregateProperty {
-                        property,
-                        aggregate,
-                    } => {
-                        let agg_fn = datafusion_expr::expr::AggregateFunction::new(
-                            aggregate.to_owned().into(),
-                            vec![executor::block_on(property_col(
-                                &self.ctx,
-                                &self.metadata,
-                                property,
-                            ))?],
-                            false,
-                            None,
-                            None,
-                        );
-
-                        Expr::AggregateFunction(agg_fn)
-                    }
-                    Query::QueryFormula { .. } => unimplemented!(),
-                };
-
-                match &query.name {
-                    None => Ok(Expr::Alias(Box::new(q), format!("agg_{id}"))),
-                    Some(name) => Ok(Expr::Alias(Box::new(q), name.clone())),
-                }
+            .map(|(idx, expr)| {
+                (expr.to_owned(), SortField {
+                    data_type: expr.get_type(input.schema()).unwrap(),
+                })
             })
-            .collect::<Result<Vec<Expr>>>()?;
+            .collect::<Vec<_>>();
+        let mut aggr_expr = Vec::new();
+
+        for (idx, query) in event.queries.iter().enumerate() {
+            let agg = match &query.agg {
+                Query::CountEvents => AggregateExpr::Count {
+                    filter: None,
+                    groups: Some(group_expr.clone()),
+                    predicate: col(event_fields::EVENT).try_into_col()?,
+                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    distinct: false,
+                },
+                Query::CountUniqueGroups | Query::DailyActiveGroups => AggregateExpr::Count {
+                    filter: None,
+                    groups: Some(group_expr.clone()),
+                    predicate: col(event_fields::EVENT).try_into_col()?,
+                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    distinct: true,
+                },
+                Query::WeeklyActiveGroups => unimplemented!(),
+                Query::MonthlyActiveGroups => unimplemented!(),
+                Query::CountPerGroup { aggregate } => AggregateExpr::PartitionedCount {
+                    filter: None,
+                    outer_fn: aggregate.into(),
+                    groups: Some(group_expr.clone()),
+                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    distinct: false,
+                },
+                Query::AggregatePropertyPerGroup {
+                    property,
+                    aggregate_per_group,
+                    aggregate,
+                } => AggregateExpr::PartitionedAggregate {
+                    filter: None,
+                    inner_fn: aggregate_per_group.into(),
+                    outer_fn: aggregate.into(),
+                    predicate: executor::block_on(property_col(
+                        &self.ctx,
+                        &self.metadata,
+                        property,
+                    ))?
+                    .try_into_col()?,
+                    groups: Some(group_expr.clone()),
+                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                },
+                Query::AggregateProperty {
+                    property,
+                    aggregate,
+                } => AggregateExpr::Aggregate {
+                    filter: None,
+                    groups: Some(group_expr.clone()),
+                    partition_col: col(event_fields::USER_ID).try_into_col()?,
+                    predicate: executor::block_on(property_col(
+                        &self.ctx,
+                        &self.metadata,
+                        property,
+                    ))?
+                    .try_into_col()?,
+                    agg: aggregate.into(),
+                },
+                Query::QueryFormula { .. } => unimplemented!(),
+            };
+
+            aggr_expr.push((agg, idx.to_string()));
+        }
 
         // todo check for duplicates
-        let all_expr = group_expr.iter().chain(aggr_expr.iter());
 
-        let _aggr_schema =
-            DFSchema::new_with_metadata(exprlist_to_fields(all_expr, &input)?, HashMap::new())?;
+        println!("{:?}", aggr_expr);
+        let agg_node = PartitionedAggregateNode::try_new(
+            input,
+            segment_inputs,
+            Column::from_qualified_name(event_fields::USER_ID),
+            aggr_expr,
+        )?;
 
-        let expr =
-            LogicalPlan::Aggregate(Aggregate::try_new(Arc::new(input), group_expr, aggr_expr)?);
-
-        Ok(expr)
+        Ok(LogicalPlan::Extension(Extension {
+            node: Arc::new(agg_node),
+        }))
     }
 
     /// builds event filters expression

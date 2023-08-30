@@ -33,7 +33,7 @@ mod tests {
     use metadata::custom_events::CreateCustomEventRequest;
     use query::error::Result;
     use query::event_fields;
-    use query::physical_plan::plannerd::QueryPlanner;
+    use query::physical_plan::planner::planner::QueryPlanner;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
     use query::test_util::create_entities;
     use query::test_util::create_md;

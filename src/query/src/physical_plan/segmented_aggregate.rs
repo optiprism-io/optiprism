@@ -92,12 +92,17 @@ impl SegmentedAggregateExec {
         let mut agg_schemas: Vec<SchemaRef> = Vec::new();
         let mut group_cols: HashMap<String, ()> = Default::default();
         let mut agg_result_fields: Vec<FieldRef> = Vec::new();
+
         for (agg, agg_name) in agg_expr.iter() {
             let mut agg_fields: Vec<FieldRef> = Vec::new();
             let agg = agg.lock().unwrap();
+
             for (expr, col_name) in agg.group_columns() {
                 group_cols.insert(col_name.clone(), ());
+                println!("!@#wqe!");
                 let f = input_schema.field_with_name(col_name.as_str())?;
+                println!("?");
+
                 agg_fields.push(Arc::new(f.to_owned()));
             }
 
