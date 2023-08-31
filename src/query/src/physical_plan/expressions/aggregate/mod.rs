@@ -8,6 +8,7 @@ use arrow::record_batch::RecordBatch;
 use arrow_row::OwnedRow;
 use arrow_row::RowConverter;
 use arrow_row::SortField;
+use common::DECIMAL_SCALE;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_plan::expressions::Column;
 use num_traits::Zero;
@@ -140,8 +141,8 @@ impl AggregateFunction {
             AggregateFunction::Min(m) => *m,
             AggregateFunction::Max(m) => *m,
             AggregateFunction::Avg(s, c) => {
-                let v =
-                    Decimal::from_i128_with_scale(*s, 10) / Decimal::from_i128_with_scale(*c, 10);
+                let v = Decimal::from_i128_with_scale(*s, DECIMAL_SCALE as u32)
+                    / Decimal::from_i128_with_scale(*c, DECIMAL_SCALE as u32);
                 v.mantissa()
             }
             AggregateFunction::Count(s) => *s,

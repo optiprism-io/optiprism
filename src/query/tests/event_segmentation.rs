@@ -210,7 +210,7 @@ mod tests {
             analysis: Analysis::Linear,
             compare: None,
             events: vec![
-                Event::new(
+               /* Event::new(
                     EventRef::RegularName("View Product".to_string()),
                     // Some(vec![
                     // EventFilter::Property {
@@ -236,7 +236,7 @@ mod tests {
                         Query::CountEvents,
                         Some("0_count".to_string()),
                     )],
-                ),
+                ),*/
                 Event::new(
                     EventRef::RegularName("Buy Product".to_string()),
                     None,

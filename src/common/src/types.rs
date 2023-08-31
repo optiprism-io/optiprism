@@ -5,7 +5,10 @@ use serde::Serializer;
 
 pub const DECIMAL_PRECISION: u8 = 19;
 pub const DECIMAL_SCALE: i8 = 10;
-
+pub fn int128_to_decimal(v: i128) -> i128 {
+    let multiplier = 10_i128.pow(DECIMAL_SCALE as u32);
+    v * multiplier
+}
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash, Default)]
 pub enum OptionalProperty<T> {
     #[default]

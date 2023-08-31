@@ -307,16 +307,20 @@ agg!(Decimal128Array, Decimal128Array);
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::default;
     use std::sync::Arc;
 
     use ahash::AHasher;
     use ahash::RandomState;
     use arrow::array::Int64Array;
     use arrow::datatypes::DataType;
+    use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::record_batch::RecordBatch;
     use arrow::row::SortField;
     use arrow::util::pretty::print_batches;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
     use store::test_util::parse_markdown_tables;
@@ -385,17 +389,18 @@ mod tests {
     #[test]
     fn sum_avg() {
         let data = r#"
-| user_id(i64) | v(i64) | ts(ts) | event(utf8) |
+| user_id(i64) | v(decimal) | ts(ts) | event(utf8) |
 |--------------|-------|--------|-------------|
 | 1            | 1     | 1      | e1          |
 | 1            | 1     | 1      | e1          |
-| 2            | 0     | 6      | e3
+| 2            | 0     | 6      | e3          |
 "#;
         let res = parse_markdown_tables(data).unwrap();
+        print_batches(res.as_ref()).unwrap();
         let schema = res[0].schema().clone();
 
         let hash = ahash::HashMap::from_iter([(1, ()), (2, ())]);
-        let mut count = Aggregate::<i64>::try_new(
+        let mut count = Aggregate::<i128>::try_new(
             None,
             AggregateFunction::new_sum(),
             AggregateFunction::new_avg(),
@@ -408,7 +413,17 @@ mod tests {
             count.evaluate(&b, Some(&hash)).unwrap();
         }
 
-        let res = count.finalize();
+        let res = count.finalize().unwrap();
         println!("{:?}", res);
+        let schema = Schema::new_with_metadata(
+            vec![Field::new(
+                "f",
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                true,
+            )],
+            Default::default(),
+        );
+        let batch = RecordBatch::try_new(Arc::new(schema), res).unwrap();
+        print_batches(vec![batch].as_ref()).unwrap();
     }
 }

@@ -134,6 +134,7 @@ mod tests {
     use crate::physical_plan::expressions::segmentation::comparison::Or;
     use crate::physical_plan::expressions::segmentation::SegmentExpr;
 
+    #[derive(Debug)]
     struct Test {
         a: Option<Int64Array>,
         f: Int64Array,

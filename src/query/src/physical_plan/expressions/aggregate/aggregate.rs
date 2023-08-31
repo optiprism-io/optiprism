@@ -265,6 +265,7 @@ macro_rules! agg {
 agg!(i8, Int8Array);
 agg!(i16, Int16Array);
 agg!(i32, Int32Array);
+
 agg!(i64, Int64Array);
 agg!(i128, Decimal128Array);
 agg!(u8, UInt8Array);

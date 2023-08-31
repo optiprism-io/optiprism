@@ -18,6 +18,7 @@ use arrow::row::OwnedRow;
 use arrow::row::Row;
 use arrow::row::RowConverter;
 use arrow::row::SortField;
+use common::types::int128_to_decimal;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::parquet::format::ColumnChunk;
@@ -51,6 +52,7 @@ impl Group {
         }
     }
 }
+
 #[derive(Debug)]
 pub struct Count {
     filter: Option<PhysicalExprRef>,
@@ -211,29 +213,29 @@ impl PartitionedAggregateExpr for Count {
     fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
         if let Some(groups) = &mut self.groups {
             let mut rows: Vec<Row> = Vec::with_capacity(groups.groups.len());
-            let mut res_col_b = Decimal128Builder::with_capacity(groups.groups.len());
+            let mut res_col_b = Decimal128Builder::with_capacity(groups.groups.len())
+                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
             for (row, group) in groups.groups.iter_mut() {
                 rows.push(row.row());
                 group.outer_fn.accumulate(group.count as i128);
                 let res = group.outer_fn.result();
-                res_col_b.append_value(res);
+
+                res_col_b.append_value(int128_to_decimal(res));
             }
 
             let group_col = groups.row_converter.convert_rows(rows)?;
-            let res_col = res_col_b
-                .finish()
-                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
+            let res_col = res_col_b.finish();
             let res_col = Arc::new(res_col) as ArrayRef;
             Ok(vec![group_col, vec![res_col]].concat())
         } else {
-            let mut res_col_b = Decimal128Builder::with_capacity(1);
+            let mut res_col_b = Decimal128Builder::with_capacity(1)
+                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
             self.single_group
                 .outer_fn
                 .accumulate(self.single_group.count as i128);
-            res_col_b.append_value(self.single_group.outer_fn.result());
-            let res_col = res_col_b
-                .finish()
-                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
+            let res = self.single_group.outer_fn.result();
+            res_col_b.append_value(int128_to_decimal(res));
+            let res_col = res_col_b.finish();
             let res_col = Arc::new(res_col) as ArrayRef;
             Ok(vec![res_col])
         }
@@ -335,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn count() {
+    fn count_avg() {
         let data = r#"
 | user_id(i64) | device(utf8) | v(i64) | ts(ts) | event(utf8) |
 |--------------|--------------|-------|--------|-------------|
@@ -367,7 +369,7 @@ mod tests {
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
-        let hash = HashMap::from_iter([(0, ()), (1, ()), (4, ())]);
+        let hash = HashMap::from_iter([(0, ()), (1, ()), (3, ()), (4, ())]);
         let mut count = Count::try_new(
             None,
             AggregateFunction::new_avg(),

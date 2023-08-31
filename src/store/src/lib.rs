@@ -995,7 +995,9 @@ pub mod test_util {
                 }
                 DataType::Decimal(_, _) => {
                     let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                    Int128Array::from(vals).boxed()
+                    let a = Int128Array::from(vals).boxed();
+                    println!("d {:?}", a);
+                    a
                 }
                 DataType::List(inner) => match inner.data_type() {
                     DataType::Decimal(_, _) => {

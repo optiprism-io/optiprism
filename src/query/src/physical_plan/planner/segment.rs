@@ -340,8 +340,6 @@ pub fn build_segment_expr(
 
             let time_range = build_time_range(time_range);
 
-            // todo remove
-            let right = ScalarValue::Int64(Some(1));
             let agg = aggregate(&agg);
             let expr = match op {
                 logical_plan::segment::Operator::Eq => {

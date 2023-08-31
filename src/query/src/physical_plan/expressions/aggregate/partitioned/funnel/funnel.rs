@@ -699,7 +699,7 @@ impl PartitionedAggregateExpr for Funnel {
                         Decimal::from_i128_with_scale(0, 0)
                     };
 
-                    step_time_to_convert[step_id].append_value(v.mantissa() * 10000000000); // fixme remove const
+                    step_time_to_convert[step_id].append_value(v.mantissa());
                     let v = if step.count > 0 {
                         Decimal::from_i128_with_scale(
                             step.total_time_from_start as i128,
