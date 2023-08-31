@@ -5,6 +5,8 @@ pub mod comparison;
 pub mod count;
 pub mod time_range;
 
+use std::fmt::Debug;
+
 use arrow::array::BooleanArray;
 use arrow::array::Int64Array;
 use arrow::buffer::ScalarBuffer;
@@ -18,7 +20,7 @@ use rust_decimal::Decimal;
 
 use crate::error::Result;
 
-pub trait SegmentExpr: Send + Sync {
+pub trait SegmentExpr: Send + Sync + Debug {
     fn evaluate(
         &self,
         batch: &RecordBatch,

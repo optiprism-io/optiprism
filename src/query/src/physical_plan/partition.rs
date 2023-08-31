@@ -40,6 +40,7 @@ use futures::StreamExt;
 use crate::error::QueryError;
 use crate::Result;
 
+#[derive(Debug)]
 pub struct PartitionExec {
     input: Arc<dyn ExecutionPlan>,
     partition_expr: Vec<Arc<dyn PhysicalExpr>>,
@@ -68,12 +69,6 @@ impl PartitionExec {
             schema: Arc::new(schema),
             metrics: ExecutionPlanMetricsSet::new(),
         })
-    }
-}
-
-impl Debug for PartitionExec {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PartitionExec")
     }
 }
 

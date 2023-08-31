@@ -575,7 +575,7 @@ impl database::Provider for Database {
         Ok(())
     }
 }
-
+#[derive(Debug)]
 pub struct Dictionaries {}
 
 #[async_trait]

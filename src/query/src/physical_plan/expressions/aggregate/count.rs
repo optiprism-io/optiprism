@@ -23,6 +23,7 @@ use arrow::array::TimestampMillisecondArray;
 use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
+use arrow::array::UInt64Builder;
 use arrow::array::UInt8Array;
 use arrow::buffer::ScalarBuffer;
 use arrow::datatypes::DataType;
@@ -56,7 +57,7 @@ impl Group {
         Self { count: 0 }
     }
 }
-
+#[derive(Debug)]
 pub struct Count<T> {
     filter: Option<PhysicalExprRef>,
     groups: Option<Groups<Group>>,
@@ -103,11 +104,7 @@ macro_rules! count {
             }
 
             fn fields(&self) -> Vec<Field> {
-                let field = Field::new(
-                    "count",
-                    DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                    true,
-                );
+                let field = Field::new("count", DataType::UInt64, true);
                 vec![field]
             }
 
@@ -116,7 +113,6 @@ macro_rules! count {
                 batch: &RecordBatch,
                 partition_exist: Option<&HashMap<i64, (), RandomState>>,
             ) -> crate::Result<()> {
-                println!("{:?}", partition_exist);
                 let filter = if self.filter.is_some() {
                     Some(
                         self.filter
@@ -216,25 +212,21 @@ macro_rules! count {
             fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
                 if let Some(groups) = &mut self.groups {
                     let mut rows: Vec<Row> = Vec::with_capacity(groups.groups.len());
-                    let mut res_col_b = Decimal128Builder::with_capacity(groups.groups.len());
+                    let mut res_col_b = UInt64Builder::with_capacity(groups.groups.len());
                     for (row, group) in groups.groups.iter_mut() {
                         rows.push(row.row());
-                        let res = group.count as i128;
+                        let res = group.count as u64;
                         res_col_b.append_value(res);
                     }
 
                     let group_col = groups.row_converter.convert_rows(rows)?;
-                    let res_col = res_col_b
-                        .finish()
-                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
+                    let res_col = res_col_b.finish();
                     let res_col = Arc::new(res_col) as ArrayRef;
                     Ok(vec![group_col, vec![res_col]].concat())
                 } else {
-                    let mut res_col_b = Decimal128Builder::with_capacity(1);
-                    res_col_b.append_value(self.single_group.count as i128);
-                    let res_col = res_col_b
-                        .finish()
-                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
+                    let mut res_col_b = UInt64Builder::with_capacity(1);
+                    res_col_b.append_value(self.single_group.count as u64);
+                    let res_col = res_col_b.finish();
                     let res_col = Arc::new(res_col) as ArrayRef;
                     Ok(vec![res_col])
                 }

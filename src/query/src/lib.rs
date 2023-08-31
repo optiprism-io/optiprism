@@ -435,6 +435,8 @@ pub mod test_util {
     use std::sync::Arc;
 
     use arrow::datatypes::DataType;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion::datasource::listing::ListingTable;
     use datafusion::datasource::listing::ListingTableConfig;
     use datafusion::datasource::listing::ListingTableUrl;
@@ -539,7 +541,7 @@ pub mod test_util {
                 TableRef::Events(org_id, proj_id),
                 Column::new(
                     event_fields::USER_ID.to_string(),
-                    DataType::UInt64,
+                    DataType::Int64,
                     false,
                     None,
                 ),
@@ -715,7 +717,7 @@ pub mod test_util {
                 name: "Revenue".to_string(),
                 description: None,
                 display_name: None,
-                typ: DataType::Float64,
+                typ: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 status: properties::Status::Enabled,
                 nullable: true,
                 is_array: false,

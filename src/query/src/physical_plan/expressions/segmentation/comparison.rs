@@ -9,12 +9,12 @@ use arrow::record_batch::RecordBatch;
 
 use crate::error::Result;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
-
+#[derive(Debug)]
 struct AndInner {
     left: Arc<dyn SegmentExpr>,
     right: Arc<dyn SegmentExpr>,
 }
-
+#[derive(Debug)]
 pub struct And {
     inner: Arc<Mutex<AndInner>>,
 }
@@ -68,7 +68,7 @@ struct OrInner {
     left: Arc<dyn SegmentExpr>,
     right: Arc<dyn SegmentExpr>,
 }
-
+#[derive(Debug)]
 pub struct Or {
     inner: Arc<Mutex<AndInner>>,
 }

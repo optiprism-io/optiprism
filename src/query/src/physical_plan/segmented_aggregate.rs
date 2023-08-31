@@ -66,6 +66,7 @@ use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::Result;
 
+#[derive(Debug)]
 pub struct SegmentedAggregateExec {
     input: Arc<dyn ExecutionPlan>,
     partition_inputs: Option<Vec<Arc<dyn ExecutionPlan>>>,
@@ -137,12 +138,6 @@ impl SegmentedAggregateExec {
             metrics: ExecutionPlanMetricsSet::new(),
             group_fields,
         })
-    }
-}
-
-impl Debug for SegmentedAggregateExec {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SegmentedAggregateExec")
     }
 }
 
@@ -266,7 +261,6 @@ impl Stream for AggregateStream {
         if self.is_ended {
             return Poll::Ready(None);
         }
-        self.is_ended = true;
 
         let cloned_time = self.baseline_metrics.elapsed_compute().clone();
         let partition_col = self.partition_col.clone();
@@ -312,6 +306,7 @@ impl Stream for AggregateStream {
         loop {
             match self.stream.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(batch))) => {
+                    print_batches(&vec![batch.clone()])?;
                     for segment in 0..segments_count {
                         for aggm in self.agg_expr[segment].iter() {
                             let mut agg = aggm.lock().unwrap();
@@ -327,9 +322,13 @@ impl Stream for AggregateStream {
                     }
                 }
                 Poll::Ready(None) => {
+                    self.is_ended = true;
+
                     break;
                 }
-                other => return other,
+                other => {
+                    return other;
+                }
             };
         }
 

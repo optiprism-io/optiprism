@@ -65,7 +65,7 @@ impl Group {
         }
     }
 }
-
+#[derive(Debug)]
 pub struct Aggregate<T> {
     filter: Option<PhysicalExprRef>,
     predicate: Column,

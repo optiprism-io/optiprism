@@ -40,6 +40,7 @@ use futures::Stream;
 use futures::StreamExt;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 
+#[derive(Debug)]
 pub struct DictionaryDecodeExec {
     input: Arc<dyn ExecutionPlan>,
     decode_cols: Vec<(Column, Arc<SingleDictionaryProvider>)>,
@@ -138,12 +139,6 @@ impl ExecutionPlan for DictionaryDecodeExec {
 
     fn statistics(&self) -> Statistics {
         Statistics::default()
-    }
-}
-
-impl Debug for DictionaryDecodeExec {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "DictionaryDecodeExec")
     }
 }
 

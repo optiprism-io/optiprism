@@ -57,7 +57,7 @@ impl Group {
         Self { agg }
     }
 }
-
+#[derive(Debug)]
 pub struct Aggregate<T> {
     filter: Option<PhysicalExprRef>,
     groups: Option<Groups<Group>>,

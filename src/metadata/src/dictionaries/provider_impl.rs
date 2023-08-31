@@ -40,6 +40,7 @@ fn make_value_key(organization_id: u64, project_id: u64, dict: &str, value: &str
     .concat()
 }
 
+#[derive(Debug)]
 pub struct ProviderImpl {
     store: Arc<Store>,
     _guard: RwLock<()>,
@@ -138,6 +139,7 @@ impl Provider for ProviderImpl {
     }
 }
 
+#[derive(Debug)]
 pub struct SingleDictionaryProvider {
     organization_id: u64,
     project_id: u64,

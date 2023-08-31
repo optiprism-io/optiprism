@@ -12,7 +12,7 @@ use rocksdb::DB;
 use crate::Result;
 
 type KVBytes = (Box<[u8]>, Box<[u8]>);
-
+#[derive(Debug)]
 pub struct Store {
     db: DB,
 }

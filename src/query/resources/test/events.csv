@@ -1,11 +1,25 @@
 user_id,created_at,event,user_country,user_device,user_is_premium,event_product_name,event_revenue
-1,2021-09-08 13:42:00.000000+00:00,1,1,iphone,true,google pixel,
-1,2021-09-08 13:43:00.000000+00:00,2,1,iphone,true,google pixel,533
-1,2021-09-08 13:44:00.000000+00:00,1,1,iphone,true,samsung s9,
-1,2021-09-08 13:45:00.000000+00:00,2,1,iphone,false,samsung s9,576
-2,2021-09-08 13:43:00.000000+00:00,1,1,android,false,google pixel,
-2,2021-09-08 13:45:00.000000+00:00,2,1,android,false,google pixel,533.5
-3,2021-09-08 13:42:00.000000+00:00,1,2,android,false,iphone 13,
-3,2021-09-08 13:46:00.000000+00:00,1,2,android,true,samsung s9,
-3,2021-09-08 13:47:00.000000+00:00,2,2,android,false,iphone 13,999.9
-3,2021-09-08 13:48:00.000000+00:00,1,2,android,false,iphone case,
+1,2021-09-01T13:42:00.000000+00:00,1,1,iphone,true,google pixel,533
+1,2021-09-01T14:43:00.000000+00:00,2,1,iphone,true,google pixel,533
+1,2021-09-02T02:45:00.000000+00:00,1,1,iphone,true,samsung s9,31
+1,2021-09-03T01:45:00.000000+00:00,1,1,iphone,false,samsung s10,12
+1,2021-09-03T05:45:00.000000+00:00,1,1,iphone,false,samsung s11,131
+1,2021-09-04T01:45:00.000000+00:00,1,1,iphone,false,samsung s12,11.3
+1,2021-09-04T02:45:00.000000+00:00,2,1,iphone,false,samsung s10,11.3
+1,2021-09-04T03:45:00.000000+00:00,1,1,iphone,false,samsung s13,44
+1,2021-09-04T04:45:00.000000+00:00,1,1,iphone,false,samsung s14,576
+1,2021-09-05T01:45:00.000000+00:00,1,1,iphone,false,samsung s15,576
+1,2021-09-07T01:45:00.000000+00:00,2,1,iphone,false,samsung s13,576
+1,2021-09-07T03:45:00.000000+00:00,2,1,iphone,false,samsung s14,576
+2,2021-09-02T13:43:00.000000+00:00,1,1,android,false,google pixel,33.23
+2,2021-09-02T14:45:00.000000+00:00,1,1,android,false,google pixel 2,533.5
+2,2021-09-05T18:45:00.000000+00:00,1,1,android,false,google pixel 2,533.5
+2,2021-09-05T18:45:00.000000+00:00,1,1,android,false,google pixel 2,533.5
+2,2021-09-06T12:45:00.000000+00:00,2,1,android,false,google pixel 2,533.5
+2,2021-09-08T13:42:00.000000+00:00,1,2,android,false,iphone 13,999.9
+3,2021-09-01T13:46:00.000000+00:00,1,2,android,true,samsung s9,31
+3,2021-09-02T13:47:00.000000+00:00,2,2,android,false,iphone 13,999.9
+3,2021-09-02T13:48:00.000000+00:00,1,2,android,false,iphone case,12
+3,2021-09-15T13:48:00.000000+00:00,1,2,android,false,iphone case,13
+3,2021-09-15T13:50:00.000000+00:00,1,2,android,false,iphone case,14
+3,2021-09-15T14:48:00.000000+00:00,1,2,android,false,iphone case,15

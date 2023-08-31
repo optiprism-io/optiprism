@@ -51,7 +51,7 @@ impl Group {
         }
     }
 }
-
+#[derive(Debug)]
 pub struct Count {
     filter: Option<PhysicalExprRef>,
     outer_fn: AggregateFunction,

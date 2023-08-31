@@ -45,6 +45,7 @@ use crate::error::QueryError;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
 use crate::Result;
 
+#[derive(Debug)]
 pub struct SegmentExec {
     input: Arc<dyn ExecutionPlan>,
     expr: Arc<dyn SegmentExpr>,
@@ -71,12 +72,6 @@ impl SegmentExec {
             partition_col,
             out_buffer_size,
         })
-    }
-}
-
-impl Debug for SegmentExec {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SegmentExec")
     }
 }
 

@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use ahash::HashMap;
 use ahash::RandomState;
 use arrow::array::ArrayRef;
@@ -16,7 +18,7 @@ use crate::error::Result;
 pub mod aggregate;
 pub mod count;
 pub mod partitioned;
-
+#[derive(Debug)]
 struct Groups<T> {
     exprs: Vec<PhysicalExprRef>,
     names: Vec<String>,
@@ -55,7 +57,7 @@ impl<T> Groups<T> {
     }
 }
 
-pub trait PartitionedAggregateExpr: Send + Sync {
+pub trait PartitionedAggregateExpr: Send + Sync + Debug {
     fn group_columns(&self) -> Vec<(PhysicalExprRef, String)>;
     fn fields(&self) -> Vec<Field>;
     fn evaluate(

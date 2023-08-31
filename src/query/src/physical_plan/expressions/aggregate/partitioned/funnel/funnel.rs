@@ -89,7 +89,7 @@ struct BucketResult {
     steps: Vec<StepResult>,
 }
 
-// #[derive(Debug)]
+#[derive(Debug)]
 struct Group {
     skip: bool,
     first: bool,
@@ -239,7 +239,7 @@ impl Group {
     }
 }
 
-// #[derive(Debug)]
+#[derive(Debug)]
 pub struct Funnel {
     input_schema: SchemaRef,
     ts_col: Column,

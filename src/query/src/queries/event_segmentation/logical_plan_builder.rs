@@ -405,10 +405,10 @@ impl LogicalPlanBuilder {
         };
         let time_expr = Expr::ScalarFunction(expr_fn);
 
-        group_expr.push(Expr::Alias(
-            Box::new(lit(event.event.name())),
-            event_fields::EVENT.to_string(),
-        ));
+        // group_expr.push(Expr::Alias(
+        // Box::new(lit(event.event.name())),
+        // event_fields::EVENT.to_string(),
+        // ));
         group_expr.push(Expr::Alias(
             Box::new(time_expr),
             event_fields::CREATED_AT.to_string(),
