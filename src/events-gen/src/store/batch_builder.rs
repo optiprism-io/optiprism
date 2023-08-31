@@ -7,13 +7,13 @@ use arrow::array::UInt16Builder;
 use arrow::array::UInt64Builder;
 use arrow::array::UInt8Builder;
 use arrow::datatypes::SchemaRef;
+use arrow::ipc::Decimal;
 use arrow::record_batch::RecordBatch;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use events_gen::profiles::Profile;
-use rust_decimal::Decimal;
 
 use crate::error::Result;
+use crate::profiles::Profile;
 use crate::store::events::Event;
 use crate::store::scenario::State;
 

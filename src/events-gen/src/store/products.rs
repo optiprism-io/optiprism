@@ -3,7 +3,6 @@ use std::io;
 use std::sync::Arc;
 
 use common::DECIMAL_SCALE;
-use events_gen::probability;
 use futures::executor::block_on;
 use metadata::dictionaries;
 use rand::distributions::WeightedIndex;
@@ -13,8 +12,9 @@ use rand::seq::SliceRandom;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-use crate::error::DemoError;
+use crate::error::EventsGenError;
 use crate::error::Result;
+use crate::probability;
 
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
@@ -70,7 +70,6 @@ impl ProductProvider {
         org_id: u64,
         proj_id: u64,
         rng: &mut ThreadRng,
-        dicts: Arc<dyn dictionaries::Provider>,
         rdr: R,
     ) -> Result<Self> {
         let mut rdr = csv::Reader::from_reader(rdr);
@@ -157,7 +156,7 @@ impl ProductProvider {
             WeightedIndex::new(probability::calc_cubic_spline(categories.len(), vec![
                 1., 0.5, 0.3, 0.1,
             ])?)
-            .map_err(|err| DemoError::Internal(err.to_string()))?;
+            .map_err(|err| EventsGenError::Internal(err.to_string()))?;
 
         // make rating weights from 0 to 5 with 10 bins for each int value
         let rating_weights = probability::calc_cubic_spline(50, vec![0.01, 0.01, 0.1, 0.7, 1.])?;

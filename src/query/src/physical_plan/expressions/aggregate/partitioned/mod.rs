@@ -37,4 +37,3 @@ use rust_decimal_macros::dec;
 use tracing::debug;
 
 use crate::error::Result;
-use crate::physical_plan::abs_row_id_refs;

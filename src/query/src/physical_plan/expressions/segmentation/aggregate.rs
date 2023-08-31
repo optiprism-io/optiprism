@@ -41,14 +41,11 @@ use num_traits::Num;
 use num_traits::NumCast;
 
 use crate::error::Result;
-use crate::physical_plan::abs_row_id;
-use crate::physical_plan::batch_id;
 use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
 use crate::physical_plan::expressions::segmentation::boolean_op::Operator;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
-use crate::physical_plan::Spans;
 
 // TODO change to simple i128? Like in Partitioned module
 #[derive(Debug, Clone)]

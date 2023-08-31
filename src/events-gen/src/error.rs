@@ -19,4 +19,6 @@ pub enum EventsGenError {
     MetadataError(#[from] MetadataError),
     #[error("UserSessionEnded")]
     UserSessionEnded,
+    #[error("General {0:?}")]
+    General(String),
 }

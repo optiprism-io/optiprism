@@ -65,6 +65,7 @@ impl TryInto<common::query::event_segmentation::SegmentTime> for SegmentTime {
             }
             SegmentTime::WindowEach { unit } => {
                 common::query::event_segmentation::SegmentTime::Each {
+                    n: 0,
                     unit: unit.try_into()?,
                 }
             }

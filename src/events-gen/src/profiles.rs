@@ -60,7 +60,6 @@ impl ProfileProvider {
     pub fn try_new_from_csv<R: io::Read>(
         org_id: u64,
         proj_id: u64,
-        dicts: &Arc<dyn dictionaries::Provider>,
         geo_rdr: R,
         device_rdr: R,
     ) -> Result<Self> {

@@ -6,7 +6,6 @@ use arrow::datatypes::TimeUnit;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use enum_iterator::all;
-use events_gen::error::Result;
 use metadata::database::Column;
 use metadata::database::Table;
 use metadata::database::TableRef;
@@ -19,7 +18,8 @@ use metadata::properties::CreatePropertyRequest;
 use metadata::properties::Property;
 use metadata::MetadataProvider;
 
-use crate::store::events::Event;
+use crate::error::Result;
+use crate::store_dictionary::events::Event;
 
 async fn create_event(
     md: &Arc<MetadataProvider>,

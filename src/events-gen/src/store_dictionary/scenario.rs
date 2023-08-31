@@ -13,22 +13,22 @@ use chrono::Duration;
 use chrono::Utc;
 use common::DECIMAL_SCALE;
 use crossbeam_channel::tick;
-use events_gen::generator::Generator;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use rust_decimal::Decimal;
 use tracing::info;
 
 use crate::error::Result;
-use crate::store::actions::Action;
-use crate::store::batch_builder::RecordBatchBuilder;
-use crate::store::coefficients::make_coefficients;
-use crate::store::events::Event;
-use crate::store::intention::select_intention;
-use crate::store::intention::Intention;
-use crate::store::products::Product;
-use crate::store::products::ProductProvider;
-use crate::store::transitions::make_transitions;
+use crate::generator::Generator;
+use crate::store_dictionary::actions::Action;
+use crate::store_dictionary::batch_builder::RecordBatchBuilder;
+use crate::store_dictionary::coefficients::make_coefficients;
+use crate::store_dictionary::events::Event;
+use crate::store_dictionary::intention::select_intention;
+use crate::store_dictionary::intention::Intention;
+use crate::store_dictionary::products::Product;
+use crate::store_dictionary::products::ProductProvider;
+use crate::store_dictionary::transitions::make_transitions;
 
 pub struct State<'a> {
     pub session_id: usize,

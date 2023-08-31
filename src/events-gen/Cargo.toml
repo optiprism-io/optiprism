@@ -5,6 +5,17 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
+service = { path = "../service" }
+anyhow = "1.0.66"
+humantime = "2.1.0"
+rust_decimal = { version = "1.27.0", features = ["serde-float"] }
+bytesize = "1.1.0"
+num_cpus = "1.14.0"
+crossbeam-channel = "0.5.6"
+parse_duration = "2.1.1"
+enum-iterator = "1.2.0"
+dateparser = "0.2.0"
+clap = { version = "4.0.29", features = ["derive"] }
 arrow = { version = "42.0.0", features = ["prettyprint"] }
 chrono = { version = "0.4.23" }
 common = { path = "../common" }

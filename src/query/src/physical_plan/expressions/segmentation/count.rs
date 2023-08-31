@@ -27,14 +27,11 @@ use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 
 use crate::error::Result;
-use crate::physical_plan::abs_row_id;
-use crate::physical_plan::batch_id;
 use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
 use crate::physical_plan::expressions::segmentation::boolean_op::Operator;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
-use crate::physical_plan::Spans;
 
 #[derive(Debug)]
 struct Inner {
