@@ -14,6 +14,7 @@ pub struct Coefficients {
     pub view_product_to_buy: f64,
     pub refund: f64,
     pub product_rating: f64,
+    f
 }
 
 pub fn make_coefficients(intention: &Intention) -> Coefficients {
