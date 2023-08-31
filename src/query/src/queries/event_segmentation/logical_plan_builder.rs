@@ -346,7 +346,7 @@ impl LogicalPlanBuilder {
             LogicalPlan::Extension(Extension {
                 node: Arc::new(PivotNode::try_new(
                     input,
-                    Column::from_name(COL_DATE),
+                    Column::from_name(event_fields::CREATED_AT),
                     Column::from_name(COL_VALUE),
                     result_cols,
                 )?),
@@ -407,9 +407,12 @@ impl LogicalPlanBuilder {
 
         group_expr.push(Expr::Alias(
             Box::new(lit(event.event.name())),
-            COL_EVENT.to_string(),
+            event_fields::EVENT.to_string(),
         ));
-        group_expr.push(Expr::Alias(Box::new(time_expr), COL_DATE.to_string()));
+        group_expr.push(Expr::Alias(
+            Box::new(time_expr),
+            event_fields::CREATED_AT.to_string(),
+        ));
 
         // event groups
         if let Some(breakdowns) = &event.breakdowns {

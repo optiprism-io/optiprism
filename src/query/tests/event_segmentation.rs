@@ -232,7 +232,7 @@ mod tests {
                     ))]),
                     vec![NamedQuery::new(
                         Query::CountEvents,
-                        Some("count1".to_string()),
+                        Some("0_count".to_string()),
                     )],
                 ),
                 Event::new(
@@ -240,16 +240,13 @@ mod tests {
                     None,
                     None, /* Some(vec![Breakdown::Property(PropertyRef::Event("Product Name".to_string()))]), */
                     vec![
-                        NamedQuery::new(Query::CountEvents, Some("count2".to_string())),
-                        NamedQuery::new(
-                            Query::CountUniqueGroups,
-                            Some("count_unique_users".to_string()),
-                        ),
+                        NamedQuery::new(Query::CountEvents, Some("0_count".to_string())),
+                        NamedQuery::new(Query::CountUniqueGroups, Some("1_count".to_string())),
                         NamedQuery::new(
                             Query::CountPerGroup {
                                 aggregate: AggregateFunction::Avg,
                             },
-                            Some("count_per_user".to_string()),
+                            Some("2_count".to_string()),
                         ),
                         NamedQuery::new(
                             Query::AggregatePropertyPerGroup {
@@ -257,14 +254,14 @@ mod tests {
                                 aggregate_per_group: PartitionedAggregateFunction::Sum,
                                 aggregate: AggregateFunction::Avg,
                             },
-                            Some("avg_revenue_per_user".to_string()),
+                            Some("3_agg".to_string()),
                         ),
                         NamedQuery::new(
                             Query::AggregateProperty {
                                 property: PropertyRef::Event("Revenue".to_string()),
                                 aggregate: AggregateFunction::Sum,
                             },
-                            Some("sum_revenue".to_string()),
+                            Some("4_agg".to_string()),
                         ),
                     ],
                 ),
@@ -288,12 +285,11 @@ mod tests {
 
         create_entities(md.clone(), org_id, proj_id).await?;
         let input = events_provider(md.database.clone(), org_id, proj_id).await?;
-        println!("{:?}", input.schema());
         let cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
         let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
-        println!("logical plan: {:?}", plan);
+        println!("logical plan: {}", plan.display_indent_schema());
 
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
@@ -303,7 +299,7 @@ mod tests {
 
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;
-
+        println!("physical plan: {:?}", physical_plan);
         let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
         print_batches(&result)?;
 
@@ -399,7 +395,7 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
         let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
-        println!("logical plan: {:?}", plan);
+        println!("logical plan: {}", plan.display_indent_schema());
 
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);

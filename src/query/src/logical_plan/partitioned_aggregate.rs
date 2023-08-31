@@ -332,7 +332,7 @@ impl UserDefinedLogicalNode for PartitionedAggregateNode {
     }
 
     fn name(&self) -> &str {
-        "SegmentedAggregate"
+        "PartitionedAggregate"
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
@@ -354,7 +354,12 @@ impl UserDefinedLogicalNode for PartitionedAggregateNode {
     }
 
     fn fmt_for_explain(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "SegmentedAggregate")
+        write!(f, "PartitionedAggregate: ")?;
+        for (expr, name) in &self.agg_expr {
+            write!(f, ", agg: {:?} as {:?}", expr, name)?;
+        }
+
+        Ok(())
     }
 
     fn from_template(&self, _: &[Expr], inputs: &[LogicalPlan]) -> Arc<dyn UserDefinedLogicalNode> {

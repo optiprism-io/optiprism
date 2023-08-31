@@ -4,17 +4,58 @@
 
 extern crate core;
 
-use arrow::array::{Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, Decimal128Array, Decimal256Array, DurationMicrosecondArray, DurationMillisecondArray, DurationNanosecondArray, DurationSecondArray, FixedSizeBinaryArray, Float16Array, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeBinaryArray, LargeStringArray, StringArray, Time32MillisecondArray, Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array};
-use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
+pub use std::cmp::Ordering;
+
+use arrow::array::Array;
+use arrow::array::ArrayRef;
+use arrow::array::BinaryArray;
+use arrow::array::BooleanArray;
+use arrow::array::Date32Array;
+use arrow::array::Date64Array;
+use arrow::array::Decimal128Array;
+use arrow::array::Decimal256Array;
+use arrow::array::DurationMicrosecondArray;
+use arrow::array::DurationMillisecondArray;
+use arrow::array::DurationNanosecondArray;
+use arrow::array::DurationSecondArray;
+use arrow::array::FixedSizeBinaryArray;
+use arrow::array::Float16Array;
+use arrow::array::Float32Array;
+use arrow::array::Float64Array;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
+use arrow::array::IntervalDayTimeArray;
+use arrow::array::IntervalMonthDayNanoArray;
+use arrow::array::IntervalYearMonthArray;
+use arrow::array::LargeBinaryArray;
+use arrow::array::LargeStringArray;
+use arrow::array::StringArray;
+use arrow::array::Time32MillisecondArray;
+use arrow::array::Time32SecondArray;
+use arrow::array::Time64MicrosecondArray;
+use arrow::array::Time64NanosecondArray;
+use arrow::array::TimestampMicrosecondArray;
+use arrow::array::TimestampMillisecondArray;
+use arrow::array::TimestampNanosecondArray;
+use arrow::array::TimestampSecondArray;
+use arrow::array::UInt16Array;
+use arrow::array::UInt32Array;
+use arrow::array::UInt64Array;
+use arrow::array::UInt8Array;
+use arrow::datatypes::DataType;
+use arrow::datatypes::IntervalUnit;
 use arrow::datatypes::SchemaRef;
+use arrow::datatypes::TimeUnit;
+use arrow2::array::Int128Array;
 use async_trait::async_trait;
-use datafusion_common::ScalarValue;
 use common::query::event_segmentation::EventSegmentation;
 pub use context::Context;
+use datafusion_common::ScalarValue;
 pub use error::Result;
 pub use provider_impl::ProviderImpl;
-pub use std::cmp::Ordering;
-use arrow2::array::Int128Array;
+
 use crate::queries::property_values::PropertyValues;
 
 pub mod context;
@@ -36,7 +77,7 @@ pub const DEFAULT_BATCH_SIZE: usize = 4096;
 macro_rules! static_array_enum_variant {
     ($variant:ident) => {
         $variant($variantArray)
-    }
+    };
 }
 
 macro_rules! static_array_enum {
@@ -74,54 +115,186 @@ impl_into_static_array!( Int8 Int16 Int32 Int64 Int128 UInt8 UInt16 UInt32 UInt6
 impl From<ArrayRef> for StaticArray {
     fn from(arr: ArrayRef) -> Self {
         match arr.data_type() {
-            DataType::Boolean => StaticArray::Boolean(arr.as_any().downcast_ref::<BooleanArray>().unwrap().clone()),
-            DataType::Int8 => StaticArray::Int8(arr.as_any().downcast_ref::<Int8Array>().unwrap().clone()),
-            DataType::Int16 => StaticArray::Int16(arr.as_any().downcast_ref::<Int16Array>().unwrap().clone()),
-            DataType::Int32 => StaticArray::Int32(arr.as_any().downcast_ref::<Int32Array>().unwrap().clone()),
-            DataType::Int64 => StaticArray::Int64(arr.as_any().downcast_ref::<Int64Array>().unwrap().clone()),
-            DataType::UInt8 => StaticArray::UInt8(arr.as_any().downcast_ref::<UInt8Array>().unwrap().clone()),
-            DataType::UInt16 => StaticArray::UInt16(arr.as_any().downcast_ref::<UInt16Array>().unwrap().clone()),
-            DataType::UInt32 => StaticArray::UInt32(arr.as_any().downcast_ref::<UInt32Array>().unwrap().clone()),
-            DataType::UInt64 => StaticArray::UInt64(arr.as_any().downcast_ref::<UInt64Array>().unwrap().clone()),
-            DataType::Float16 => StaticArray::Float16(arr.as_any().downcast_ref::<Float16Array>().unwrap().clone()),
-            DataType::Float32 => StaticArray::Float32(arr.as_any().downcast_ref::<Float32Array>().unwrap().clone()),
-            DataType::Float64 => StaticArray::Float64(arr.as_any().downcast_ref::<Float64Array>().unwrap().clone()),
+            DataType::Boolean => {
+                StaticArray::Boolean(arr.as_any().downcast_ref::<BooleanArray>().unwrap().clone())
+            }
+            DataType::Int8 => {
+                StaticArray::Int8(arr.as_any().downcast_ref::<Int8Array>().unwrap().clone())
+            }
+            DataType::Int16 => {
+                StaticArray::Int16(arr.as_any().downcast_ref::<Int16Array>().unwrap().clone())
+            }
+            DataType::Int32 => {
+                StaticArray::Int32(arr.as_any().downcast_ref::<Int32Array>().unwrap().clone())
+            }
+            DataType::Int64 => {
+                StaticArray::Int64(arr.as_any().downcast_ref::<Int64Array>().unwrap().clone())
+            }
+            DataType::UInt8 => {
+                StaticArray::UInt8(arr.as_any().downcast_ref::<UInt8Array>().unwrap().clone())
+            }
+            DataType::UInt16 => {
+                StaticArray::UInt16(arr.as_any().downcast_ref::<UInt16Array>().unwrap().clone())
+            }
+            DataType::UInt32 => {
+                StaticArray::UInt32(arr.as_any().downcast_ref::<UInt32Array>().unwrap().clone())
+            }
+            DataType::UInt64 => {
+                StaticArray::UInt64(arr.as_any().downcast_ref::<UInt64Array>().unwrap().clone())
+            }
+            DataType::Float16 => {
+                StaticArray::Float16(arr.as_any().downcast_ref::<Float16Array>().unwrap().clone())
+            }
+            DataType::Float32 => {
+                StaticArray::Float32(arr.as_any().downcast_ref::<Float32Array>().unwrap().clone())
+            }
+            DataType::Float64 => {
+                StaticArray::Float64(arr.as_any().downcast_ref::<Float64Array>().unwrap().clone())
+            }
             DataType::Timestamp(tu, tz) => match tu {
-                TimeUnit::Second => StaticArray::TimestampSecond(arr.as_any().downcast_ref::<TimestampSecondArray>().unwrap().clone()),
-                TimeUnit::Millisecond => StaticArray::TimestampMillisecond(arr.as_any().downcast_ref::<TimestampMillisecondArray>().unwrap().clone()),
-                TimeUnit::Microsecond => StaticArray::TimestampMicrosecond(arr.as_any().downcast_ref::<TimestampMicrosecondArray>().unwrap().clone()),
-                TimeUnit::Nanosecond => StaticArray::TimestampNanosecond(arr.as_any().downcast_ref::<TimestampNanosecondArray>().unwrap().clone()),
+                TimeUnit::Second => StaticArray::TimestampSecond(
+                    arr.as_any()
+                        .downcast_ref::<TimestampSecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Millisecond => StaticArray::TimestampMillisecond(
+                    arr.as_any()
+                        .downcast_ref::<TimestampMillisecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Microsecond => StaticArray::TimestampMicrosecond(
+                    arr.as_any()
+                        .downcast_ref::<TimestampMicrosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Nanosecond => StaticArray::TimestampNanosecond(
+                    arr.as_any()
+                        .downcast_ref::<TimestampNanosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+            },
+            DataType::Date32 => {
+                StaticArray::Date32(arr.as_any().downcast_ref::<Date32Array>().unwrap().clone())
             }
-            DataType::Date32 => StaticArray::Date32(arr.as_any().downcast_ref::<Date32Array>().unwrap().clone()),
-            DataType::Date64 => StaticArray::Date64(arr.as_any().downcast_ref::<Date64Array>().unwrap().clone()),
+            DataType::Date64 => {
+                StaticArray::Date64(arr.as_any().downcast_ref::<Date64Array>().unwrap().clone())
+            }
             DataType::Time32(tu) => match tu {
-                TimeUnit::Second => StaticArray::Time32Second(arr.as_any().downcast_ref::<Time32SecondArray>().unwrap().clone()),
-                TimeUnit::Millisecond => StaticArray::Time32Millisecond(arr.as_any().downcast_ref::<Time32MillisecondArray>().unwrap().clone()),
-                _ => unimplemented!()
-            }
+                TimeUnit::Second => StaticArray::Time32Second(
+                    arr.as_any()
+                        .downcast_ref::<Time32SecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Millisecond => StaticArray::Time32Millisecond(
+                    arr.as_any()
+                        .downcast_ref::<Time32MillisecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                _ => unimplemented!(),
+            },
             DataType::Time64(tu) => match tu {
-                TimeUnit::Microsecond => StaticArray::Time64Microsecond(arr.as_any().downcast_ref::<Time64MicrosecondArray>().unwrap().clone()),
-                TimeUnit::Nanosecond => StaticArray::Time64Nanosecond(arr.as_any().downcast_ref::<Time64NanosecondArray>().unwrap().clone()),
-                _ => unimplemented!()
-            }
+                TimeUnit::Microsecond => StaticArray::Time64Microsecond(
+                    arr.as_any()
+                        .downcast_ref::<Time64MicrosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Nanosecond => StaticArray::Time64Nanosecond(
+                    arr.as_any()
+                        .downcast_ref::<Time64NanosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                _ => unimplemented!(),
+            },
             DataType::Duration(tu) => match tu {
-                TimeUnit::Second => StaticArray::DurationSecond(arr.as_any().downcast_ref::<DurationSecondArray>().unwrap().clone()),
-                TimeUnit::Millisecond => StaticArray::DurationMillisecond(arr.as_any().downcast_ref::<DurationMillisecondArray>().unwrap().clone()),
-                TimeUnit::Microsecond => StaticArray::DurationMicrosecond(arr.as_any().downcast_ref::<DurationMicrosecondArray>().unwrap().clone()),
-                TimeUnit::Nanosecond => StaticArray::DurationNanosecond(arr.as_any().downcast_ref::<DurationNanosecondArray>().unwrap().clone()),
-            }
+                TimeUnit::Second => StaticArray::DurationSecond(
+                    arr.as_any()
+                        .downcast_ref::<DurationSecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Millisecond => StaticArray::DurationMillisecond(
+                    arr.as_any()
+                        .downcast_ref::<DurationMillisecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Microsecond => StaticArray::DurationMicrosecond(
+                    arr.as_any()
+                        .downcast_ref::<DurationMicrosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Nanosecond => StaticArray::DurationNanosecond(
+                    arr.as_any()
+                        .downcast_ref::<DurationNanosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+            },
             DataType::Interval(i) => match i {
-                IntervalUnit::YearMonth => StaticArray::IntervalYearMonth(arr.as_any().downcast_ref::<IntervalYearMonthArray>().unwrap().clone()),
-                IntervalUnit::DayTime => StaticArray::IntervalDayTime(arr.as_any().downcast_ref::<IntervalDayTimeArray>().unwrap().clone()),
-                IntervalUnit::MonthDayNano => StaticArray::IntervalMonthDayNano(arr.as_any().downcast_ref::<IntervalMonthDayNanoArray>().unwrap().clone()),
+                IntervalUnit::YearMonth => StaticArray::IntervalYearMonth(
+                    arr.as_any()
+                        .downcast_ref::<IntervalYearMonthArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                IntervalUnit::DayTime => StaticArray::IntervalDayTime(
+                    arr.as_any()
+                        .downcast_ref::<IntervalDayTimeArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                IntervalUnit::MonthDayNano => StaticArray::IntervalMonthDayNano(
+                    arr.as_any()
+                        .downcast_ref::<IntervalMonthDayNanoArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+            },
+            DataType::Binary => {
+                StaticArray::Binary(arr.as_any().downcast_ref::<BinaryArray>().unwrap().clone())
             }
-            DataType::Binary => StaticArray::Binary(arr.as_any().downcast_ref::<BinaryArray>().unwrap().clone()),
-            DataType::FixedSizeBinary(_) => StaticArray::FixedSizeBinary(arr.as_any().downcast_ref::<FixedSizeBinaryArray>().unwrap().clone()),
-            DataType::LargeBinary => StaticArray::LargeBinary(arr.as_any().downcast_ref::<LargeBinaryArray>().unwrap().clone()),
-            DataType::Utf8 => StaticArray::String(arr.as_any().downcast_ref::<StringArray>().unwrap().clone()),
-            DataType::LargeUtf8 => StaticArray::LargeString(arr.as_any().downcast_ref::<LargeStringArray>().unwrap().clone()),
-            DataType::Decimal128(_, _) => StaticArray::Decimal128(arr.as_any().downcast_ref::<Decimal128Array>().unwrap().clone()),
-            DataType::Decimal256(_, _) => StaticArray::Decimal256(arr.as_any().downcast_ref::<Decimal256Array>().unwrap().clone()),
+            DataType::FixedSizeBinary(_) => StaticArray::FixedSizeBinary(
+                arr.as_any()
+                    .downcast_ref::<FixedSizeBinaryArray>()
+                    .unwrap()
+                    .clone(),
+            ),
+            DataType::LargeBinary => StaticArray::LargeBinary(
+                arr.as_any()
+                    .downcast_ref::<LargeBinaryArray>()
+                    .unwrap()
+                    .clone(),
+            ),
+            DataType::Utf8 => {
+                StaticArray::String(arr.as_any().downcast_ref::<StringArray>().unwrap().clone())
+            }
+            DataType::LargeUtf8 => StaticArray::LargeString(
+                arr.as_any()
+                    .downcast_ref::<LargeStringArray>()
+                    .unwrap()
+                    .clone(),
+            ),
+            DataType::Decimal128(_, _) => StaticArray::Decimal128(
+                arr.as_any()
+                    .downcast_ref::<Decimal128Array>()
+                    .unwrap()
+                    .clone(),
+            ),
+            DataType::Decimal256(_, _) => StaticArray::Decimal256(
+                arr.as_any()
+                    .downcast_ref::<Decimal256Array>()
+                    .unwrap()
+                    .clone(),
+            ),
             _ => unimplemented!(),
         }
     }
@@ -160,7 +333,6 @@ impl DataTable {
         Self { schema, columns }
     }
 }
-
 
 macro_rules! make_one_col_spans {
     ($spans_state:expr, $arr:expr,$arr_type:ident,$_type:ident, $scalar_type:ident) => {{
@@ -215,37 +387,42 @@ impl OneColSpansState {
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::{Array, ArrayRef, Int64Array, PrimitiveArray};
-    use crate::OneColSpansState;
-    use datafusion_common::ScalarValue;
     pub use std::cmp::Ordering;
     use std::sync::Arc;
+
+    use arrow::array::Array;
+    use arrow::array::ArrayRef;
+    use arrow::array::Int64Array;
+    use arrow::array::PrimitiveArray;
     use arrow::datatypes::Int64Type;
+    use datafusion_common::ScalarValue;
+
+    use crate::OneColSpansState;
 
     #[test]
     fn test_make_one_col_spans() {
         let arr = Arc::new(Int64Array::from(vec![1, 1, 1, 1, 2, 2])) as ArrayRef;
         let mut state = OneColSpansState::new(arr.len());
 
-        make_one_col_spans!(state, arr, Int64Array,i64,Int64);
+        make_one_col_spans!(state, arr, Int64Array, i64, Int64);
 
         assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(2)));
         assert_eq!(state.spans, vec![false, false, false, false, true, false]);
 
         let arr = Arc::new(Int64Array::from(vec![2, 2, 2, 2, 3])) as ArrayRef;
-        make_one_col_spans!(state, arr, Int64Array,i64,Int64);
+        make_one_col_spans!(state, arr, Int64Array, i64, Int64);
 
         assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(3)));
         assert_eq!(state.spans, vec![false, false, false, false, true]);
 
         let arr = Arc::new(Int64Array::from(vec![4, 4])) as ArrayRef;
-        make_one_col_spans!(state, arr, Int64Array,i64,Int64);
+        make_one_col_spans!(state, arr, Int64Array, i64, Int64);
 
         assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(4)));
         assert_eq!(state.spans, vec![true, false]);
 
         let arr = Arc::new(Int64Array::from(vec![5])) as ArrayRef;
-        make_one_col_spans!(state, arr, Int64Array,i64,Int64);
+        make_one_col_spans!(state, arr, Int64Array, i64, Int64);
 
         assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(5)));
         assert_eq!(state.spans, vec![true]);
@@ -262,6 +439,7 @@ pub mod test_util {
     use datafusion::datasource::listing::ListingTableConfig;
     use datafusion::datasource::listing::ListingTableUrl;
     use datafusion::datasource::provider_as_source;
+    use datafusion::datasource::TableProvider;
     use datafusion::execution::options::ReadOptions;
     use datafusion::prelude::CsvReadOptions;
     use datafusion::prelude::SessionConfig;

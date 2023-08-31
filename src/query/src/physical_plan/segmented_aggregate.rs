@@ -99,9 +99,7 @@ impl SegmentedAggregateExec {
 
             for (expr, col_name) in agg.group_columns() {
                 group_cols.insert(col_name.clone(), ());
-                println!("!@#wqe!");
                 let f = input_schema.field_with_name(col_name.as_str())?;
-                println!("?");
 
                 agg_fields.push(Arc::new(f.to_owned()));
             }
@@ -115,7 +113,6 @@ impl SegmentedAggregateExec {
                 agg_result_fields.push(f.clone().into());
                 agg_fields.push(f.into());
             }
-
             agg_schemas.push(Arc::new(Schema::new(agg_fields)));
         }
 

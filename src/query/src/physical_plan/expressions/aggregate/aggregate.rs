@@ -106,7 +106,7 @@ macro_rules! agg {
 
             fn fields(&self) -> Vec<Field> {
                 let field = Field::new(
-                    "count",
+                    "agg",
                     DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                     true,
                 );
