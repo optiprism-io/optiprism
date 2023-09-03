@@ -81,6 +81,7 @@ impl Service {
         router = reports::attach_routes(router);
         router = event_records::attach_routes(router);
         router = group_records::attach_routes(router);
+        // fixme get rid of cloning
         router = router.clone().nest("/api/v1", router);
         router = router
             .layer(Extension(md.accounts.clone()))

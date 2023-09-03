@@ -29,11 +29,10 @@ use crate::store::intention::Intention;
 use crate::store::products::Product;
 use crate::store::products::ProductProvider;
 use crate::store::transitions::make_transitions;
-
 pub struct State<'a> {
     pub session_id: usize,
     pub event_id: usize,
-    pub user_id: u64,
+    pub user_id: i64,
     pub cur_timestamp: i64,
     pub selected_product: Option<&'a Product>,
     pub products_bought: HashMap<usize, usize>,
@@ -48,6 +47,7 @@ pub struct Config {
     pub rng: ThreadRng,
     pub gen: Generator,
     pub schema: SchemaRef,
+    pub events_map: HashMap<Event, u64>,
     pub products: ProductProvider,
     pub to: DateTime<Utc>,
     pub batch_size: usize,
@@ -111,7 +111,7 @@ impl Scenario {
             }
         });
 
-        let mut user_id: u64 = 0;
+        let mut user_id: i64 = 0;
         let mut overall_events: usize = 0;
         let mut partition_id: usize;
         while let Some(sample) = self.gen.next_sample() {

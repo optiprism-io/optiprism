@@ -110,7 +110,7 @@ pub async fn create_entities(
         proj_id,
         CreatePropertyMainRequest {
             name: "User ID".to_string(),
-            data_type: DataType::UInt64,
+            data_type: DataType::Int64,
             nullable: false,
             dict: None,
         },

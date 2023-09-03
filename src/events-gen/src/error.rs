@@ -21,4 +21,6 @@ pub enum EventsGenError {
     UserSessionEnded,
     #[error("General {0:?}")]
     General(String),
+    #[error("FileNotFound: {0:?}")]
+    FileNotFound(String),
 }

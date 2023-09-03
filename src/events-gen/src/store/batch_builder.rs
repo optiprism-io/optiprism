@@ -2,23 +2,24 @@ use std::sync::Arc;
 
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Builder;
+use arrow::array::Int64Builder;
 use arrow::array::TimestampSecondBuilder;
 use arrow::array::UInt16Builder;
 use arrow::array::UInt64Builder;
 use arrow::array::UInt8Builder;
 use arrow::datatypes::SchemaRef;
-use arrow::ipc::Decimal;
 use arrow::record_batch::RecordBatch;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
+use rust_decimal::Decimal;
 
 use crate::error::Result;
-use crate::profiles::Profile;
 use crate::store::events::Event;
+use crate::store::profiles::Profile;
 use crate::store::scenario::State;
 
 pub struct RecordBatchBuilder {
-    user_id: UInt64Builder,
+    user_id: Int64Builder,
     created_at: TimestampSecondBuilder,
     event: UInt64Builder,
     product_name: UInt16Builder,
@@ -46,7 +47,7 @@ pub struct RecordBatchBuilder {
 impl RecordBatchBuilder {
     pub fn new(cap: usize, schema: SchemaRef) -> Self {
         Self {
-            user_id: UInt64Builder::with_capacity(cap),
+            user_id: Int64Builder::with_capacity(cap),
             created_at: TimestampSecondBuilder::with_capacity(cap),
             event: UInt64Builder::with_capacity(cap),
             product_name: UInt16Builder::with_capacity(cap),

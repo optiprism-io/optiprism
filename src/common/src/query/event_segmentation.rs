@@ -213,12 +213,14 @@ pub enum SegmentCondition {
     HasPropertyValue {
         property_name: String,
         operation: PropValueOperation,
-        value: i64,
+        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
+        value: Option<Vec<ScalarValue>>,
     },
     HadPropertyValue {
         property_name: String,
         operation: PropValueOperation,
-        value: i64,
+        #[serde_as(as = "Option<Vec<ScalarValueRef>>")]
+        value: Option<Vec<ScalarValue>>,
         time: SegmentTime,
     },
     DidEvent {

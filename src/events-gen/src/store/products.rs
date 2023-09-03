@@ -70,6 +70,7 @@ impl ProductProvider {
         org_id: u64,
         proj_id: u64,
         rng: &mut ThreadRng,
+        dicts: Arc<dyn dictionaries::Provider>,
         rdr: R,
     ) -> Result<Self> {
         let mut rdr = csv::Reader::from_reader(rdr);

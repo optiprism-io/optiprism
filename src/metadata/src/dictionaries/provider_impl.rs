@@ -65,7 +65,7 @@ impl Provider for ProviderImpl {
         value: &str,
     ) -> Result<u64> {
         // TODO investigate deadlock
-        // self.guard.write().await;
+        // let a = self._guard.write().await;
         match self
             .store
             .get(make_value_key(organization_id, project_id, dict, value))

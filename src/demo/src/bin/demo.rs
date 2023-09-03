@@ -1,11 +1,22 @@
 use std::collections::HashMap;
 use std::env::temp_dir;
+use std::fmt::Write;
 use std::fs::File;
 use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use arrow::array::ArrayRef;
+use arrow::array::StringBuilder;
+use arrow::array::UInt16Array;
+use arrow::array::UInt32Array;
+use arrow::array::UInt64Array;
+use arrow::array::UInt8Array;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
+use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use bytesize::ByteSize;
 use chrono::DateTime;
@@ -16,20 +27,28 @@ use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
 use datafusion::datasource::MemTable;
+use datafusion::parquet::arrow::ArrowWriter;
+use datafusion::parquet::basic::Compression;
+use datafusion::parquet::file::properties::WriterProperties;
 use dateparser::DateTimeUtc;
 use demo::error::DemoError;
 use enum_iterator::all;
 use events_gen::generator;
 use events_gen::generator::Generator;
-use events_gen::profiles::ProfileProvider;
-use events_gen::store_dictionary::events::Event;
-use events_gen::store_dictionary::products::ProductProvider;
-use events_gen::store_dictionary::scenario;
-use events_gen::store_dictionary::scenario::Scenario;
-use events_gen::store_dictionary::schema::create_entities;
+use events_gen::store::events::Event;
+use events_gen::store::products::ProductProvider;
+use events_gen::store::profiles::ProfileProvider;
+use events_gen::store::scenario;
+use events_gen::store::scenario::Scenario;
+use events_gen::store::schema::create_entities;
+use futures::executor::block_on;
+use indicatif::ProgressBar;
+use indicatif::ProgressState;
+use indicatif::ProgressStyle;
 use metadata::accounts::CreateAccountRequest;
 use metadata::organizations::CreateOrganizationRequest;
 use metadata::projects::CreateProjectRequest;
+use metadata::properties::provider_impl::Namespace;
 use metadata::store::Store;
 use metadata::MetadataProvider;
 use platform::auth;
@@ -49,7 +68,6 @@ extern crate parse_duration;
 struct Args {
     #[clap(flatten)]
     tracing: TracingCliArgs,
-
     #[arg(long, default_value = "0.0.0.0:8080")]
     host: SocketAddr,
     #[arg(long)]
@@ -58,12 +76,16 @@ struct Args {
     md_path: Option<PathBuf>,
     #[arg(long)]
     ui_path: Option<PathBuf>,
+    #[arg(long)]
+    out_parquet: Option<PathBuf>,
     #[arg(long, default_value = "365 days")]
     duration: Option<String>,
     #[arg(long)]
     to_date: Option<String>,
     #[arg(long, default_value = "10")]
     new_daily_users: usize,
+    #[arg(long)]
+    partitions: Option<usize>,
 }
 
 #[tokio::main]
@@ -177,7 +199,7 @@ async fn main() -> Result<(), anyhow::Error> {
     info!("expecting total unique users: {total_users}");
     info!("starting sample data generation...");
 
-    let batches = {
+    let partitions = {
         let store_cfg = Config {
             org_id: 1,
             project_id: 1,
@@ -192,16 +214,16 @@ async fn main() -> Result<(), anyhow::Error> {
                 .map_err(|err| DemoError::Internal(format!("can't open device.csv: {err}")))?,
             new_daily_users: args.new_daily_users,
             batch_size: 4096,
-            partitions: num_cpus::get(),
+            partitions: args.partitions.unwrap_or_else(|| num_cpus::get()),
         };
 
-        gen(store_cfg).await?
+        gen(&md, store_cfg).await?
     };
 
     info!("successfully generated!");
     let mut rows: usize = 0;
     let mut data_size_bytes: usize = 0;
-    for partition in batches.iter() {
+    for partition in partitions.iter() {
         for batch in partition.iter() {
             rows += batch.num_rows();
             for column in batch.columns() {
@@ -211,8 +233,8 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     debug!(
         "partitions: {}, batches: {}",
-        batches.len(),
-        batches[0].len()
+        partitions.len(),
+        partitions[0].len()
     );
     debug!("average {} event(s) per 1 user", rows as i64 / total_users);
     debug!(
@@ -220,7 +242,12 @@ async fn main() -> Result<(), anyhow::Error> {
         ByteSize::b(data_size_bytes as u64)
     );
 
-    let data_provider = Arc::new(MemTable::try_new(batches[0][0].schema(), batches)?);
+    let schema = partitions[0][0].schema().clone();
+    if let Some(path) = args.out_parquet {
+        write_parquet(1, 1, &md, &path, &partitions, &schema)?;
+    }
+
+    let data_provider = Arc::new(MemTable::try_new(partitions[0][0].schema(), partitions)?);
     let query_provider = Arc::new(ProviderImpl::try_new_from_provider(
         md.clone(),
         data_provider,
@@ -264,8 +291,13 @@ pub struct Config<R> {
     pub partitions: usize,
 }
 
-pub async fn gen<R>(cfg: Config<R>) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error>
-where R: io::Read {
+pub async fn gen<R>(
+    md: &Arc<MetadataProvider>,
+    cfg: Config<R>,
+) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error>
+where
+    R: io::Read,
+{
     let mut rng = thread_rng();
 
     info!("loading profiles...");
@@ -311,6 +343,12 @@ where R: io::Read {
             .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str())
             .await?;
         events_map.insert(event, md_event.id);
+        block_on(md.dictionaries.get_key_or_create(
+            1,
+            1,
+            "event_event",
+            event.to_string().as_str(),
+        ))?;
     }
 
     info!("generating events...");
@@ -329,4 +367,210 @@ where R: io::Read {
     let result = scenario.run().await?;
 
     Ok(result)
+}
+
+fn write_parquet(
+    org_id: u64,
+    project_id: u64,
+    md: &Arc<MetadataProvider>,
+    path: &PathBuf,
+    partitions: &Vec<Vec<RecordBatch>>,
+    schema: &SchemaRef,
+) -> Result<(), anyhow::Error> {
+    info!("converting dictionaries to raw...");
+
+    let num_events = partitions
+        .iter()
+        .map(|v| v.iter().map(|v| v.num_rows()).sum::<usize>())
+        .sum::<usize>();
+
+    let pb = ProgressBar::new(num_events as u64);
+
+    pb.set_style(
+        ProgressStyle::with_template(
+            "{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} events ({eta})",
+        )
+            .unwrap()
+            .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
+                write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+            })
+            .progress_chars("#>-"),
+    );
+
+    let event_props = block_on(md.event_properties.list(org_id, project_id))?.data;
+    let user_props = block_on(md.user_properties.list(org_id, project_id))?.data;
+    let mut out_fields = vec![];
+    for field in schema.fields().iter() {
+        if field.name().starts_with("event_") {
+            let prop = event_props
+                .iter()
+                .find(|p| p.column_name(Namespace::Event) == *field.name())
+                .unwrap();
+            out_fields.push(Field::new(
+                prop.column_name(Namespace::Event),
+                prop.typ.clone(),
+                prop.nullable,
+            ));
+        } else if field.name().starts_with("user_") {
+            let prop = user_props
+                .iter()
+                .find(|p| p.column_name(Namespace::User) == *field.name())
+                .unwrap();
+            out_fields.push(Field::new(
+                prop.column_name(Namespace::User),
+                prop.typ.clone(),
+                prop.nullable,
+            ));
+        } else {
+            unimplemented!("{}", field.name())
+        };
+    }
+
+    let out_schema = Arc::new(Schema::new(out_fields));
+    for (pid, partition) in partitions.iter().enumerate() {
+        let props = WriterProperties::builder()
+            .set_compression(Compression::SNAPPY)
+            .build();
+
+        let path = path.join(format!("{}.parquet", pid));
+        let file = File::create(path.clone())?;
+        let mut writer = ArrowWriter::try_new(file, out_schema.clone(), Some(props)).unwrap();
+
+        for batch in partition {
+            let mut cols = vec![];
+            let mut fields = vec![];
+            for (idx, field) in schema.fields().iter().enumerate() {
+                let prop = if field.name().starts_with("event_") {
+                    event_props
+                        .iter()
+                        .find(|p| p.column_name(Namespace::Event) == *field.name())
+                        .unwrap()
+                } else if field.name().starts_with("user_") {
+                    user_props
+                        .iter()
+                        .find(|p| p.column_name(Namespace::User) == *field.name())
+                        .unwrap()
+                } else {
+                    unimplemented!("{}", field.name())
+                };
+
+                if let Some(typ) = &prop.dictionary_type {
+                    let mut b = StringBuilder::with_capacity(100, 100 * batch.columns()[idx].len());
+
+                    let field = Field::new(field.name(), DataType::Utf8, field.is_nullable());
+                    fields.push(field.clone());
+                    let arr = match typ {
+                        DataType::UInt8 => {
+                            let arr = batch.columns()[idx]
+                                .as_any()
+                                .downcast_ref::<UInt8Array>()
+                                .unwrap();
+
+                            for v in arr {
+                                if let Some(i) = v {
+                                    let s = block_on(md.dictionaries.get_value(
+                                        org_id,
+                                        project_id,
+                                        field.name(),
+                                        i as u64,
+                                    ))?;
+                                    b.append_value(s);
+                                } else {
+                                    b.append_null();
+                                }
+                            }
+
+                            Arc::new(b.finish()) as ArrayRef
+                        }
+                        DataType::UInt16 => {
+                            let arr = batch.columns()[idx]
+                                .as_any()
+                                .downcast_ref::<UInt16Array>()
+                                .unwrap();
+                            for v in arr {
+                                if let Some(i) = v {
+                                    let s = block_on(md.dictionaries.get_value(
+                                        org_id,
+                                        project_id,
+                                        field.name(),
+                                        i as u64,
+                                    ))?;
+                                    b.append_value(s);
+                                } else {
+                                    b.append_null();
+                                }
+                            }
+
+                            Arc::new(b.finish()) as ArrayRef
+                        }
+                        DataType::UInt32 => {
+                            let arr = batch.columns()[idx]
+                                .as_any()
+                                .downcast_ref::<UInt32Array>()
+                                .unwrap();
+                            for v in arr {
+                                if let Some(i) = v {
+                                    let s = block_on(md.dictionaries.get_value(
+                                        org_id,
+                                        project_id,
+                                        field.name(),
+                                        i as u64,
+                                    ))?;
+                                    b.append_value(s);
+                                } else {
+                                    b.append_null();
+                                }
+                            }
+
+                            Arc::new(b.finish()) as ArrayRef
+                        }
+                        DataType::UInt64 => {
+                            let arr = batch.columns()[idx]
+                                .as_any()
+                                .downcast_ref::<UInt64Array>()
+                                .unwrap();
+                            for v in arr {
+                                if let Some(i) = v {
+                                    let s = block_on(md.dictionaries.get_value(
+                                        org_id,
+                                        project_id,
+                                        field.name(),
+                                        i,
+                                    ))?;
+                                    b.append_value(s);
+                                } else {
+                                    b.append_null();
+                                }
+                            }
+
+                            Arc::new(b.finish()) as ArrayRef
+                        }
+                        _ => unimplemented!("dictionary type {:?} is unsupported", prop.typ),
+                    };
+
+                    cols.push(arr);
+                } else {
+                    let field = Field::new(
+                        field.name(),
+                        prop.dictionary_type
+                            .clone()
+                            .unwrap_or_else(|| prop.typ.clone()),
+                        field.is_nullable(),
+                    );
+                    fields.push(field.clone());
+
+                    cols.push(batch.columns()[idx].clone());
+                }
+            }
+
+            let out_schema = Arc::new(Schema::new(fields.clone()));
+            let out_batch = RecordBatch::try_new(out_schema.clone(), cols.clone())?;
+            pb.inc(out_batch.num_rows() as u64);
+
+            writer.write(&out_batch)?;
+        }
+        writer.close()?;
+    }
+
+    Ok(())
 }

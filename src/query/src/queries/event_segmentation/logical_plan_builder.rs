@@ -48,6 +48,7 @@ use crate::logical_plan::partitioned_aggregate::AggregateExpr;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregateNode;
 use crate::logical_plan::partitioned_aggregate::SortField;
 use crate::logical_plan::pivot::PivotNode;
+use crate::logical_plan::segment;
 use crate::logical_plan::segment::SegmentExpr;
 use crate::logical_plan::segment::SegmentNode;
 use crate::logical_plan::unpivot::UnpivotNode;
@@ -219,14 +220,20 @@ impl LogicalPlanBuilder {
                 time,
             } => {
                 let property = PropertyRef::User(property_name.to_owned());
-                let filter = property_col(&self.ctx, &self.metadata, &property).await?;
+                let filter = executor::block_on(property_expression(
+                    &self.ctx,
+                    &self.metadata,
+                    &property,
+                    operation,
+                    value.to_owned(),
+                ))?;
 
                 SegmentExpr::Count {
                     filter,
                     ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
                     time_range: time.into(),
-                    op: operation.into(),
-                    right: *value,
+                    op: segment::Operator::GtEq,
+                    right: 1,
                     time_window: time.try_window(),
                 }
             }

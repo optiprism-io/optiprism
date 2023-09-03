@@ -369,7 +369,7 @@ pub enum MetadataError {
     Property(#[from] PropertyError),
     #[error("dictionary {0:?}")]
     Dictionary(#[from] DictionaryError),
-    #[error("store_dictionary {0:?}")]
+    #[error("store {0:?}")]
     Store(#[from] StoreError),
     #[error("rocksdb {0:?}")]
     RocksDb(#[from] rocksdb::Error),

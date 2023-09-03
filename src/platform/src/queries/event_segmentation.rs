@@ -19,6 +19,7 @@ use crate::EventRef;
 use crate::PlatformError;
 use crate::PropValueOperation;
 use crate::PropertyRef;
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum SegmentTime {
@@ -37,6 +38,7 @@ pub enum SegmentTime {
     },
     WindowEach {
         unit: TimeIntervalUnit,
+        n: i64,
     },
 }
 
@@ -63,9 +65,9 @@ impl TryInto<common::query::event_segmentation::SegmentTime> for SegmentTime {
                     unit: unit.try_into()?,
                 }
             }
-            SegmentTime::WindowEach { unit } => {
+            SegmentTime::WindowEach { unit, n } => {
                 common::query::event_segmentation::SegmentTime::Each {
-                    n: 0,
+                    n,
                     unit: unit.try_into()?,
                 }
             }
@@ -571,7 +573,7 @@ impl TryInto<Event> for &common::query::event_segmentation::Event {
 pub enum DidEventAggregate {
     Count {
         operation: PropValueOperation,
-        value: u64,
+        value: i64,
         time: SegmentTime,
     },
     RelativeCount {
@@ -651,6 +653,7 @@ impl TryInto<common::query::event_segmentation::DidEventAggregate> for DidEventA
         })
     }
 }
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum SegmentCondition {
@@ -682,7 +685,7 @@ pub enum SegmentCondition {
 #[serde(rename_all = "camelCase")]
 pub struct Segment {
     name: String,
-    conditions: Vec<SegmentCondition>,
+    conditions: Vec<Vec<SegmentCondition>>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -754,6 +757,7 @@ impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCon
         })
     }
 }
+
 impl TryInto<SegmentTime> for common::query::event_segmentation::SegmentTime {
     type Error = PlatformError;
 
@@ -773,9 +777,10 @@ impl TryInto<SegmentTime> for common::query::event_segmentation::SegmentTime {
                     unit: unit.try_into()?,
                 }
             }
-            common::query::event_segmentation::SegmentTime::Each { unit } => {
+            common::query::event_segmentation::SegmentTime::Each { n, unit } => {
                 SegmentTime::WindowEach {
                     unit: unit.try_into()?,
+                    n: n,
                 }
             }
         })
@@ -834,6 +839,7 @@ impl TryInto<DidEventAggregate> for common::query::event_segmentation::DidEventA
         })
     }
 }
+
 impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCondition {
     type Error = PlatformError;
 
@@ -885,6 +891,7 @@ impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCon
         })
     }
 }
+
 impl TryInto<common::query::event_segmentation::Segment> for Segment {
     type Error = PlatformError;
 
@@ -896,7 +903,11 @@ impl TryInto<common::query::event_segmentation::Segment> for Segment {
             conditions: self
                 .conditions
                 .iter()
-                .map(|v| v.to_owned().try_into())
+                .map(|v| {
+                    v.iter()
+                        .map(|v| v.to_owned().try_into())
+                        .collect::<Result<Vec<_>>>()
+                })
                 .collect::<Result<_>>()?,
         })
     }
@@ -911,7 +922,11 @@ impl TryInto<Segment> for common::query::event_segmentation::Segment {
             conditions: self
                 .conditions
                 .iter()
-                .map(|v| v.to_owned().try_into())
+                .map(|v| {
+                    v.iter()
+                        .map(|v| v.to_owned().try_into())
+                        .collect::<Result<Vec<_>>>()
+                })
                 .collect::<Result<_>>()?,
         })
     }

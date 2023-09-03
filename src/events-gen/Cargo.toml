@@ -15,8 +15,10 @@ crossbeam-channel = "0.5.6"
 parse_duration = "2.1.1"
 enum-iterator = "1.2.0"
 dateparser = "0.2.0"
+platform = { path = "../platform" }
 clap = { version = "4.0.29", features = ["derive"] }
 arrow = { version = "42.0.0", features = ["prettyprint"] }
+parquet = "42.0.0"
 chrono = { version = "0.4.23" }
 common = { path = "../common" }
 csv = "1.1"
@@ -26,6 +28,7 @@ indicatif = "0.17.2"
 lazy_static = "1.4.0"
 metadata = { path = "../metadata" }
 rand = "0.8.5"
+uuid = { version = "1.2.2", features = ["serde", "v4"] }
 serde = { version = "1.0.149", features = ["derive"] }
 strum = "0.24"
 strum_macros = "0.24"
