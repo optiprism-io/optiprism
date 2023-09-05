@@ -98,9 +98,9 @@ impl Provider for ProviderImpl {
                     true => ColumnType::MetricValue,
                     false => {
                         if field.name() == COL_AGG_NAME {
-                            ColumnType::Metric
-                        } else {
                             ColumnType::Dimension
+                        } else {
+                            ColumnType::Metric
                         }
                     }
                 };
@@ -122,9 +122,10 @@ impl Provider for ProviderImpl {
 async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let start = Instant::now();
     let runtime = Arc::new(RuntimeEnv::default());
-    let state = SessionState::with_config_rt(SessionConfig::new(), runtime)
-        .with_query_planner(Arc::new(QueryPlanner {}))
-        .with_optimizer_rules(vec![]);
+    let state =
+        SessionState::with_config_rt(SessionConfig::new().with_target_partitions(1), runtime)
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_optimizer_rules(vec![]);
     let exec_ctx = SessionContext::with_state(state.clone());
     debug!("logical plan: {:?}", plan);
     let physical_plan = state.create_physical_plan(plan).await?;
@@ -132,10 +133,6 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
 
     debug!("physical plan: {}", displayable_plan.indent(true));
     let batches = collect(physical_plan, exec_ctx.task_ctx()).await?;
-    for batch in batches.iter() {
-        println!("{}", pretty_format_batches(&[batch.clone()])?);
-    }
-
     let duration = start.elapsed();
     debug!("elapsed: {:?}", duration);
     let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());

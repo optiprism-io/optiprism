@@ -273,7 +273,6 @@ macro_rules! agg {
             fn finalize(&self) -> Result<Int64Array> {
                 let mut inner = self.inner.lock().unwrap();
                 let res = Op::perform(inner.agg.result(), self.right);
-                println!("{:?} {:?}", inner.agg.result(), self.right);
                 if !res {
                     inner.res.append_null();
                 } else {

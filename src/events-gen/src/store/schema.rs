@@ -125,7 +125,7 @@ pub async fn create_entities(
         proj_id,
         CreatePropertyMainRequest {
             name: "Created At".to_string(),
-            data_type: DataType::Timestamp(TimeUnit::Second, None),
+            data_type: DataType::Timestamp(TimeUnit::Nanosecond, None),
             nullable: false,
             dict: None,
         },

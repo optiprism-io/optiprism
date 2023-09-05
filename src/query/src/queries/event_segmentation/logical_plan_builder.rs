@@ -34,6 +34,7 @@ use futures::executor;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
+use tracing::debug;
 
 use crate::error::Result;
 use crate::event_fields;
@@ -44,6 +45,7 @@ use crate::expr::time_expression;
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::expr::multi_and;
 use crate::logical_plan::merge::MergeNode;
+use crate::logical_plan::partitioned_aggregate;
 use crate::logical_plan::partitioned_aggregate::AggregateExpr;
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregateNode;
 use crate::logical_plan::partitioned_aggregate::SortField;
@@ -136,6 +138,7 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         es: EventSegmentation,
     ) -> Result<LogicalPlan> {
+        debug!("{:?}", es);
         let events = es.events.clone();
         let builder = LogicalPlanBuilder {
             ctx: ctx.clone(),
@@ -328,37 +331,49 @@ impl LogicalPlanBuilder {
         input = self
             .build_aggregate_logical_plan(input, &self.es.events[event_id], segment_inputs)
             .await?;
-        // unpivot aggregate values into value column
-        input = {
-            let agg_cols = self.es.events[event_id]
-                .queries
-                .iter()
-                .map(|q| q.clone().name.unwrap())
-                .collect();
-
-            LogicalPlan::Extension(Extension {
-                node: Arc::new(UnpivotNode::try_new(
-                    input,
-                    agg_cols,
-                    COL_AGG_NAME.to_string(),
-                    COL_VALUE.to_string(),
-                )?),
-            })
-        };
-
+        debug!("{:#?}", input.schema());
+        // // unpivot aggregate values into value column
+        // input = {
+        // let agg_cols = self.es.events[event_id]
+        // .queries
+        // .iter()
+        // .enumerate()
+        // .map(|(idx, q)| match q.agg {
+        // Query::CountEvents => format!("{idx}_count"),
+        // Query::CountUniqueGroups => format!("{idx}_partitioned_count"),
+        // Query::DailyActiveGroups => format!("{idx}_partitioned_count"),
+        // Query::WeeklyActiveGroups => unimplemented!(),
+        // Query::MonthlyActiveGroups => unimplemented!(),
+        // Query::CountPerGroup { .. } => format!("{idx}_partitioned_count"),
+        // Query::AggregatePropertyPerGroup { .. } => format!("{idx}_partitioned_agg"),
+        // Query::AggregateProperty { .. } => format!("{idx}_agg"),
+        // Query::QueryFormula { .. } => format!("{idx}_count"),
+        // })
+        // .collect();
+        //
+        // LogicalPlan::Extension(Extension {
+        // node: Arc::new(UnpivotNode::try_new(
+        // input,
+        // agg_cols,
+        // COL_AGG_NAME.to_string(),
+        // COL_VALUE.to_string(),
+        // )?),
+        // })
+        // };
+        //
         // pivot date
-        input = {
-            let (from_time, to_time) = self.es.time.range(self.cur_time);
-            let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
-            LogicalPlan::Extension(Extension {
-                node: Arc::new(PivotNode::try_new(
-                    input,
-                    Column::from_name(event_fields::CREATED_AT),
-                    Column::from_name(COL_VALUE),
-                    result_cols,
-                )?),
-            })
-        };
+        // input = {
+        // let (from_time, to_time) = self.es.time.range(self.cur_time);
+        // let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
+        // LogicalPlan::Extension(Extension {
+        // node: Arc::new(PivotNode::try_new(
+        // input,
+        // Column::from_name(event_fields::CREATED_AT),
+        // Column::from_name(COL_VALUE),
+        // result_cols,
+        // )?),
+        // })
+        // };
 
         Ok(input)
     }
@@ -455,13 +470,15 @@ impl LogicalPlanBuilder {
                     partition_col: col(event_fields::USER_ID).try_into_col()?,
                     distinct: false,
                 },
-                Query::CountUniqueGroups | Query::DailyActiveGroups => AggregateExpr::Count {
-                    filter: None,
-                    groups: Some(group_expr.clone()),
-                    predicate: col(event_fields::EVENT).try_into_col()?,
-                    partition_col: col(event_fields::USER_ID).try_into_col()?,
-                    distinct: true,
-                },
+                Query::CountUniqueGroups | Query::DailyActiveGroups => {
+                    AggregateExpr::PartitionedCount {
+                        filter: None,
+                        outer_fn: partitioned_aggregate::AggregateFunction::Count,
+                        groups: Some(group_expr.clone()),
+                        partition_col: col(event_fields::USER_ID).try_into_col()?,
+                        distinct: true,
+                    }
+                }
                 Query::WeeklyActiveGroups => unimplemented!(),
                 Query::MonthlyActiveGroups => unimplemented!(),
                 Query::CountPerGroup { aggregate } => AggregateExpr::PartitionedCount {
@@ -511,7 +528,6 @@ impl LogicalPlanBuilder {
 
         // todo check for duplicates
 
-        println!("{:?}", aggr_expr);
         let agg_node = PartitionedAggregateNode::try_new(
             input,
             segment_inputs,
@@ -547,7 +563,7 @@ impl LogicalPlanBuilder {
             })
             .collect::<Result<Vec<Expr>>>()?;
 
-        if filters_exprs.len() == 1 {
+        if filters_exprs.len() > 1 {
             return Ok(filters_exprs[0].clone());
         }
 

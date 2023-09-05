@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod custom_events;
+pub mod custom_properties;
 pub mod dashboards;
 pub mod database;
 pub mod dictionaries;

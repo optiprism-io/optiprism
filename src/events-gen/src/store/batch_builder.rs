@@ -3,6 +3,7 @@ use std::sync::Arc;
 use arrow::array::ArrayRef;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Builder;
+use arrow::array::TimestampNanosecondBuilder;
 use arrow::array::TimestampSecondBuilder;
 use arrow::array::UInt16Builder;
 use arrow::array::UInt64Builder;
@@ -20,7 +21,7 @@ use crate::store::scenario::State;
 
 pub struct RecordBatchBuilder {
     user_id: Int64Builder,
-    created_at: TimestampSecondBuilder,
+    created_at: TimestampNanosecondBuilder,
     event: UInt64Builder,
     product_name: UInt16Builder,
     product_category: UInt16Builder,
@@ -48,7 +49,7 @@ impl RecordBatchBuilder {
     pub fn new(cap: usize, schema: SchemaRef) -> Self {
         Self {
             user_id: Int64Builder::with_capacity(cap),
-            created_at: TimestampSecondBuilder::with_capacity(cap),
+            created_at: TimestampNanosecondBuilder::with_capacity(cap),
             event: UInt64Builder::with_capacity(cap),
             product_name: UInt16Builder::with_capacity(cap),
             product_category: UInt16Builder::with_capacity(cap),
@@ -132,7 +133,8 @@ impl RecordBatchBuilder {
     ) -> Result<()> {
         // println!("event: {event}, time: {}", NaiveDateTime::from_timestamp(state.cur_timestamp, 0));
         self.user_id.append_value(state.user_id);
-        self.created_at.append_value(state.cur_timestamp);
+        self.created_at
+            .append_value(state.cur_timestamp * 10i64.pow(9));
         self.event.append_value(event_id);
 
         match state.selected_product {

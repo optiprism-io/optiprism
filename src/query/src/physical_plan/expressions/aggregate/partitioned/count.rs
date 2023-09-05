@@ -54,7 +54,7 @@ impl Group {
 }
 
 #[derive(Debug)]
-pub struct Count {
+pub struct PartitionedCount {
     filter: Option<PhysicalExprRef>,
     outer_fn: AggregateFunction,
     groups: Option<Groups<Group>>,
@@ -65,7 +65,7 @@ pub struct Count {
     distinct: bool,
 }
 
-impl Count {
+impl PartitionedCount {
     pub fn try_new(
         filter: Option<PhysicalExprRef>,
         outer_fn: AggregateFunction,
@@ -86,7 +86,7 @@ impl Count {
     }
 }
 
-impl PartitionedAggregateExpr for Count {
+impl PartitionedAggregateExpr for PartitionedCount {
     fn group_columns(&self) -> Vec<(PhysicalExprRef, String)> {
         if let Some(groups) = &self.groups {
             groups
@@ -101,11 +101,7 @@ impl PartitionedAggregateExpr for Count {
     }
 
     fn fields(&self) -> Vec<Field> {
-        let field = Field::new(
-            "count",
-            DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-            true,
-        );
+        let field = Field::new("partitioned_count", DataType::UInt64, false);
         vec![field]
     }
 
@@ -247,7 +243,7 @@ impl PartitionedAggregateExpr for Count {
         } else {
             None
         };
-        let c = Count {
+        let c = PartitionedCount {
             filter: self.filter.clone(),
             outer_fn: self.outer_fn.make_new(),
             groups,
@@ -277,7 +273,7 @@ mod tests {
     use datafusion::physical_expr::PhysicalExprRef;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::aggregate::partitioned::count::Count;
+    use crate::physical_plan::expressions::aggregate::partitioned::count::PartitionedCount;
     use crate::physical_plan::expressions::aggregate::AggregateFunction;
     use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 
@@ -320,7 +316,7 @@ mod tests {
             SortField::new(DataType::Utf8),
         )];
         let hash = HashMap::from_iter([(0, ()), (1, ()), (4, ())]);
-        let mut count = Count::try_new(
+        let mut count = PartitionedCount::try_new(
             None,
             AggregateFunction::new_avg(),
             Some(groups),
@@ -370,7 +366,7 @@ mod tests {
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
         let hash = HashMap::from_iter([(0, ()), (1, ()), (3, ()), (4, ())]);
-        let mut count = Count::try_new(
+        let mut count = PartitionedCount::try_new(
             None,
             AggregateFunction::new_avg(),
             None,
@@ -420,7 +416,7 @@ mod tests {
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
         let hash = HashMap::from_iter([(0, ()), (1, ()), (4, ())]);
-        let mut count = Count::try_new(
+        let mut count = PartitionedCount::try_new(
             None,
             AggregateFunction::new_count(),
             None,

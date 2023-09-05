@@ -507,20 +507,30 @@ impl TryInto<common::query::event_segmentation::Event> for &Event {
             filters: self
                 .filters
                 .as_ref()
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.try_into())
-                        .collect::<std::result::Result<_, _>>()
-                })
+                .map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                        }
+                    },
+                )
                 .transpose()?,
             breakdowns: self
                 .breakdowns
                 .as_ref()
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.try_into())
-                        .collect::<std::result::Result<_, _>>()
-                })
+                .map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                        }
+                    },
+                )
                 .transpose()?,
             queries: self
                 .queries
@@ -544,20 +554,30 @@ impl TryInto<Event> for &common::query::event_segmentation::Event {
             filters: self
                 .filters
                 .as_ref()
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.try_into())
-                        .collect::<std::result::Result<_, _>>()
-                })
+                .map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                        }
+                    },
+                )
                 .transpose()?,
             breakdowns: self
                 .breakdowns
                 .as_ref()
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.try_into())
-                        .collect::<std::result::Result<_, _>>()
-                })
+                .map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                        }
+                    },
+                )
                 .transpose()?,
             queries: self
                 .queries
@@ -624,7 +644,16 @@ impl TryInto<common::query::event_segmentation::DidEventAggregate> for DidEventA
                 event: event.into(),
                 operation: operation.try_into()?,
                 filters: filters
-                    .map(|v| v.iter().map(|v| v.try_into()).collect::<Result<Vec<_>>>())
+                    .map_or_else(
+                        || None,
+                        |v| {
+                            if v.is_empty() {
+                                None
+                            } else {
+                                Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                            }
+                        },
+                    )
                     .transpose()?,
                 time: time.try_into()?,
             },
@@ -721,14 +750,25 @@ impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCon
             } => common::query::event_segmentation::SegmentCondition::HasPropertyValue {
                 property_name,
                 operation: operation.try_into()?,
-                value: value
-                    .map(|v| {
+                value: match value {
+                    Some(v) if v.len() > 0 => Some(
                         v.iter()
                             .map(|v| json_value_to_scalar(v))
-                            .collect::<Result<_>>()
-                    })
-                    .transpose()
-                    .unwrap(),
+                            .collect::<Result<_>>()?,
+                    ),
+                    _ => None,
+                },
+                // value
+                // .map(|v| {
+                // if v.is_empty() {
+                // None
+                // } else {
+                // v.iter()
+                // .map(|v| json_value_to_scalar(v))
+                // .collect::<Result<_>>()
+                // }
+                // })
+                // .transpose()?,
             },
             SegmentCondition::HadPropertyValue {
                 property_name,
@@ -738,9 +778,14 @@ impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCon
             } => common::query::event_segmentation::SegmentCondition::HadPropertyValue {
                 property_name,
                 operation: operation.try_into()?,
-                value: value
-                    .map(|v| v.iter().map(json_value_to_scalar).collect::<Result<_>>())
-                    .transpose()?,
+                value: match value {
+                    Some(v) if v.len() > 0 => Some(
+                        v.iter()
+                            .map(|v| json_value_to_scalar(v))
+                            .collect::<Result<_>>()?,
+                    ),
+                    _ => None,
+                },
                 time: time.try_into()?,
             },
             SegmentCondition::DidEvent {
@@ -750,7 +795,16 @@ impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCon
             } => common::query::event_segmentation::SegmentCondition::DidEvent {
                 event: event.into(),
                 filters: filters
-                    .map(|v| v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                    .map_or_else(
+                        || None,
+                        |v| {
+                            if v.is_empty() {
+                                None
+                            } else {
+                                Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                            }
+                        },
+                    )
                     .transpose()?,
                 aggregate: aggregate.try_into()?,
             },
@@ -780,7 +834,7 @@ impl TryInto<SegmentTime> for common::query::event_segmentation::SegmentTime {
             common::query::event_segmentation::SegmentTime::Each { n, unit } => {
                 SegmentTime::WindowEach {
                     unit: unit.try_into()?,
-                    n: n,
+                    n,
                 }
             }
         })
@@ -810,7 +864,16 @@ impl TryInto<DidEventAggregate> for common::query::event_segmentation::DidEventA
                 event: event.try_into()?,
                 operation: operation.try_into()?,
                 filters: filters
-                    .map(|v| v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                    .map_or_else(
+                        || None,
+                        |v| {
+                            if v.is_empty() {
+                                None
+                            } else {
+                                Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                            }
+                        },
+                    )
                     .transpose()?,
                 time: time.try_into()?,
             },
@@ -853,11 +916,20 @@ impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCon
                 property_name,
                 operation: operation.try_into()?,
                 value: value
-                    .map(|v| {
-                        v.into_iter()
-                            .map(|v| scalar_to_json_value(&v))
-                            .collect::<Result<_>>()
-                    })
+                    .map_or_else(
+                        || None,
+                        |v| {
+                            if v.is_empty() {
+                                None
+                            } else {
+                                Some(
+                                    v.iter()
+                                        .map(|v| scalar_to_json_value(v))
+                                        .collect::<Result<_>>(),
+                                )
+                            }
+                        },
+                    )
                     .transpose()?,
             },
             common::query::event_segmentation::SegmentCondition::HadPropertyValue {
@@ -869,12 +941,22 @@ impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCon
                 property_name,
                 operation: operation.try_into()?,
                 value: value
-                    .map(|v| {
-                        v.into_iter()
-                            .map(|v| scalar_to_json_value(&v))
-                            .collect::<Result<_>>()
-                    })
+                    .map_or_else(
+                        || None,
+                        |v| {
+                            if v.is_empty() {
+                                None
+                            } else {
+                                Some(
+                                    v.iter()
+                                        .map(|v| scalar_to_json_value(v))
+                                        .collect::<Result<_>>(),
+                                )
+                            }
+                        },
+                    )
                     .transpose()?,
+
                 time: time.try_into()?,
             },
             common::query::event_segmentation::SegmentCondition::DidEvent {
@@ -884,7 +966,16 @@ impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCon
             } => SegmentCondition::DidEvent {
                 event: event.try_into()?,
                 filters: filters
-                    .map(|v| v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                    .map_or_else(
+                        || None,
+                        |v| {
+                            if v.is_empty() {
+                                None
+                            } else {
+                                Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                            }
+                        },
+                    )
                     .transpose()?,
                 aggregate: aggregate.try_into()?,
             },
@@ -1049,19 +1140,33 @@ impl TryInto<common::query::event_segmentation::EventSegmentation> for EventSegm
             // filters: self.filters.map(|v| v.try_into()).transpose()?,
             breakdowns: self
                 .breakdowns
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.try_into())
-                        .collect::<std::result::Result<_, _>>()
-                })
+                .map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                        }
+                    },
+                )
                 .transpose()?,
             segments: self
                 .segments
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.to_owned().try_into())
-                        .collect::<Result<_>>()
-                })
+                .map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(
+                                v.iter()
+                                    .map(|v| v.to_owned().try_into())
+                                    .collect::<Result<_>>(),
+                            )
+                        }
+                    },
+                )
                 .transpose()?,
         })
     }
@@ -1094,11 +1199,16 @@ impl TryInto<EventSegmentation> for common::query::event_segmentation::EventSegm
             //     .transpose()?,
             breakdowns: self
                 .breakdowns
-                .map(|v| {
-                    v.iter()
-                        .map(|v| v.try_into())
-                        .collect::<std::result::Result<_, _>>()
-                })
+                .map_or_else(
+                    || None,
+                    |v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(|v| v.try_into()).collect::<Result<_>>())
+                        }
+                    },
+                )
                 .transpose()?,
             segments: self
                 .segments

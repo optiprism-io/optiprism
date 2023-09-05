@@ -1,7 +1,0 @@
-# Seeds for failure cases proptest has generated in the past. It is
-# automatically read and these particular cases re-run before any
-# novel cases are generated.
-#
-# It is recommended to check this file in to source control so that
-# everyone who runs the test benefits from these saved cases.
-cc 620808ca8891669b52a78cc75938a0251b1a7876105af70109437839777a4f0c # shrinks to Payload { query_params: QueryParams([]), path_params: PathParams([]), headers: Headers([]), body: OptionalJSON(Some(Object {"email": String(""), "password": String("")})) }

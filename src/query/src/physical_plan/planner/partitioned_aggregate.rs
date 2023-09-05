@@ -239,8 +239,13 @@ pub fn build_partitioned_aggregate_expr(
             let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let partition_col = col(partition_col, &dfschema);
             let outer = aggregate(&outer_fn);
-            let count =
-                partitioned::count::Count::try_new(filter, outer, groups, partition_col, distinct)?;
+            let count = partitioned::count::PartitionedCount::try_new(
+                filter,
+                outer,
+                groups,
+                partition_col,
+                distinct,
+            )?;
 
             Ok(Box::new(count) as Box<dyn PartitionedAggregateExpr>)
         }

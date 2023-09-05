@@ -4,6 +4,7 @@ pub mod accounts;
 pub mod auth;
 pub mod context;
 pub mod custom_events;
+pub mod custom_properties;
 pub mod dashboards;
 pub mod datatype;
 pub mod error;
@@ -57,6 +58,7 @@ pub struct PlatformProvider {
     pub custom_events: Arc<dyn custom_events::Provider>,
     pub event_properties: Arc<dyn properties::Provider>,
     pub user_properties: Arc<dyn properties::Provider>,
+    pub custom_properties: Arc<dyn custom_properties::Provider>,
     pub accounts: Arc<dyn accounts::Provider>,
     pub auth: Arc<dyn auth::Provider>,
     pub query: Arc<dyn queries::Provider>,
@@ -81,6 +83,7 @@ impl PlatformProvider {
             user_properties: Arc::new(properties::ProviderImpl::new_user(
                 md.user_properties.clone(),
             )),
+            custom_properties: Arc::new(stub::CustomProperties {}),
             accounts: Arc::new(accounts::ProviderImpl::new(md.accounts.clone())),
             auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
             query: Arc::new(queries::ProviderImpl::new(query_prov)),
@@ -97,6 +100,7 @@ impl PlatformProvider {
             custom_events: Arc::new(stub::CustomEvents {}),
             event_properties: Arc::new(stub::Properties {}),
             user_properties: Arc::new(stub::Properties {}),
+            custom_properties: Arc::new(stub::CustomProperties {}),
             accounts: Arc::new(stub::Accounts {}),
             auth: Arc::new(stub::Auth {}),
             query: Arc::new(stub::Queries {}),
@@ -422,7 +426,13 @@ impl TryInto<common::query::EventFilter> for &EventFilter {
                 operation: operation.to_owned().try_into()?,
                 value: match value {
                     None => None,
-                    Some(v) => Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?),
+                    Some(v) => {
+                        if v.len() == 0 {
+                            None
+                        } else {
+                            Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?)
+                        }
+                    }
                 },
             },
             _ => todo!(),

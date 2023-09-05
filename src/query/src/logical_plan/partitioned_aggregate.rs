@@ -182,23 +182,21 @@ impl AggregateExpr {
 
     pub fn fields(&self, schema: &DFSchema) -> Result<Vec<DFField>> {
         let fields = match self {
-            AggregateExpr::Count { .. } => vec![DFField::new_unqualified(
-                "count",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
-            )],
+            AggregateExpr::Count { .. } => {
+                vec![DFField::new_unqualified("count", DataType::UInt64, false)]
+            }
             AggregateExpr::Aggregate { .. } => vec![DFField::new_unqualified(
                 "agg",
                 DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 false,
             )],
             AggregateExpr::PartitionedCount { .. } => vec![DFField::new_unqualified(
-                "count",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                "partitioned_count",
+                DataType::UInt64,
                 false,
             )],
             AggregateExpr::PartitionedAggregate { .. } => vec![DFField::new_unqualified(
-                "agg",
+                "partitioned_agg",
                 DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 false,
             )],
@@ -314,7 +312,7 @@ impl PartitionedAggregateNode {
             partition_inputs,
             partition_col,
             agg_expr,
-            schema: Arc::new(schema),
+            schema: Arc::new(schema.clone()),
         };
         Ok(ret)
     }

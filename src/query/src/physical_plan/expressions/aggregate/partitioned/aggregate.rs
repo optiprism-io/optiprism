@@ -121,7 +121,7 @@ macro_rules! agg {
 
             fn fields(&self) -> Vec<Field> {
                 let field = Field::new(
-                    "agg",
+                    "partitioned_agg",
                     DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                     true,
                 );
