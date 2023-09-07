@@ -61,7 +61,6 @@ use datafusion_common::ScalarValue;
 use futures::executor::block_on;
 use futures::Stream;
 use futures::StreamExt;
-use tracing::debug;
 
 use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
@@ -96,7 +95,6 @@ impl SegmentedAggregateExec {
         let mut agg_result_fields: Vec<FieldRef> = Vec::new();
 
         for (agg, agg_name) in agg_expr.iter() {
-            println!("agg name {:?}", agg_name);
             let mut agg_fields: Vec<FieldRef> = Vec::new();
             let agg = agg.lock().unwrap();
 
@@ -108,11 +106,10 @@ impl SegmentedAggregateExec {
             }
 
             for f in agg.fields().iter() {
-                println!("fsfsd@!#$ {} {}", f.name(), f.is_nullable());
                 let f = Field::new(
                     format!("{}_{}", agg_name, f.name()),
                     f.data_type().to_owned(),
-                    true,
+                    f.is_nullable(),
                 );
                 agg_result_fields.push(f.clone().into());
                 agg_fields.push(f.into());
@@ -131,7 +128,6 @@ impl SegmentedAggregateExec {
         let fields: Vec<FieldRef> = vec![group_fields.clone(), agg_result_fields].concat();
 
         let schema = Schema::new(fields);
-        println!("ASDQ#$2");
         Ok(Self {
             input,
             partition_inputs,
@@ -377,7 +373,6 @@ impl Stream for AggregateStream {
 
         // merge
         let agg_fields = self.schema.fields()[self.group_fields.len()..].to_owned();
-        println!("{:?}", agg_fields);
         let aggs: Vec<Arc<dyn DFAggregateExpr>> = agg_fields
             .iter()
             .map(|f| {
@@ -388,7 +383,7 @@ impl Stream for AggregateStream {
                 )) as Arc<dyn DFAggregateExpr>
             })
             .collect::<Vec<_>>();
-        println!("{:?}", aggs);
+
         let session_ctx = SessionContext::new();
         let task_ctx = session_ctx.task_ctx();
 
@@ -397,16 +392,13 @@ impl Stream for AggregateStream {
             .iter()
             .map(|f| (col(f.name(), &self.schema).unwrap(), f.name().to_owned()))
             .collect::<Vec<_>>();
-        println!("{:?}", group_by_expr);
-        println!("ASDQ#$3");
+
         let group_by = PhysicalGroupBy::new_single(group_by_expr);
         let input = Arc::new(MemoryExec::try_new(
             &vec![vec![batch]],
             self.schema.clone(),
             None,
         )?);
-        println!("ASDQ#$5");
-        println!("{:#?}", aggs);
         let partial_aggregate = Arc::new(DFAggregateExec::try_new(
             AggregateMode::Final,
             group_by,
@@ -416,14 +408,11 @@ impl Stream for AggregateStream {
             input,
             self.schema.clone(),
         )?);
-        println!("ASDQ#$6");
+
         let stream = partial_aggregate.execute(0, task_ctx)?;
         let result = block_on(collect(stream))?;
-        println!("ASDQ#$7");
-        debug!("{:#?}", self.schema);
-        debug!("{:#?}", result[0].schema());
         let batch = concat_batches(&self.schema, &result)?;
-        debug!("ASDQ#$4");
+
         print_batches(vec![batch.clone()].as_slice())?;
         Poll::Ready(Some(Ok(batch)))
     }

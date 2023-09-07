@@ -52,6 +52,7 @@ use crate::queries::event_segmentation::ChartType;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::event_segmentation::Query;
 use crate::queries::property_values::ListPropertyValuesRequest;
+use crate::queries::QueryParams;
 use crate::queries::QueryTime;
 use crate::queries::TimeIntervalUnit;
 use crate::reports;
@@ -64,9 +65,11 @@ use crate::Context;
 use crate::DataTable;
 use crate::EventFilter;
 use crate::EventRef;
+use crate::JSONQueryResponse;
 use crate::ListResponse;
 use crate::PropValueOperation;
 use crate::PropertyRef;
+use crate::QueryResponse;
 use crate::ResponseMetadata;
 use crate::Result;
 
@@ -510,8 +513,9 @@ impl queries::Provider for Queries {
         _organization_id: u64,
         _project_id: u64,
         _req: EventSegmentation,
-    ) -> Result<DataTable> {
-        Ok(DataTable::new(vec![Column {
+        _query: QueryParams,
+    ) -> Result<QueryResponse> {
+        let columns = vec![Column {
             typ: ColumnType::Dimension,
             name: "name".to_string(),
             is_nullable: true,
@@ -519,7 +523,9 @@ impl queries::Provider for Queries {
             data: vec![Value::from(1)],
             step: Some(1),
             compare_values: Some(vec![Value::from(2)]),
-        }]))
+        }];
+
+        Ok(QueryResponse::JSON(JSONQueryResponse { columns }))
     }
 
     async fn property_values(

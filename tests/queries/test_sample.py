@@ -13,12 +13,13 @@ class Query:
 
 queries = [
     Query(
-        "SELECT toDate(event_created_at, 'UTC'), count(1), count(distinct event_user_id) "
-        "FROM file('*.parquet', Parquet) "
-        "where event_event = 'Product Viewed' "
-        "and toStartOfDay(event_created_at, 'UTC') > toStartOfDay(parseDateTime('2023-09-21','%Y-%m-%d')-INTERVAL 20 day, 'UTC') "
-        "group by 1 "
-        "order by 1 desc format JSONCompact;",
+        """SELECT toUnixTimestamp(toDate(event_created_at)) , count(1), count(distinct event_user_id)
+FROM file('*.parquet', Parquet)
+where event_event = 'Product Viewed'
+  and toStartOfDay(event_created_at, 'UTC') >
+      toStartOfDay(parseDateTime('2023-09-21', '%Y-%m-%d'), 'UTC')- INTERVAL 20 day
+group by 1
+order by 1 desc format JSONColumns;""",
     {
         "time": {
             "type": "last",
@@ -61,9 +62,9 @@ op_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJleHAiOjE2OTQwMjQyMDIsImFjY29
 def test_sql_queries():
     for query in queries:
         ch_query = query.ch_query.replace("{from}", "file('*.parquet', Parquet)").replace("{format}", "JSONCompact")
-
+        print(ch_query)
         ch_resp = requests.get(ch_addr, params={"query": ch_query})
-        print(ch_resp.json()["data"])
+        print(ch_resp.json())
 
         op_resp = requests.post(op_addr, json=query.op_query, headers={"Content-Type": "application/json",
                                                                        "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJleHAiOjE2OTQwMjQyMDIsImFjY291bnRJZCI6MX0.I0T8P-b13-0A-6c0BI2MU9JgxlrCMr7VSBfmlpc3-FE8Xjsf8LTdRGCWkVbR_T_ddwD-TEVXMUJI4YbiC3dU_w"})

@@ -101,7 +101,11 @@ impl PartitionedAggregateExpr for PartitionedCount {
     }
 
     fn fields(&self) -> Vec<Field> {
-        let field = Field::new("partitioned_count", DataType::UInt64, false);
+        let field = Field::new(
+            "partitioned_count",
+            DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            true,
+        );
         vec![field]
     }
 

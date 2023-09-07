@@ -103,8 +103,8 @@ impl Service {
 
         router = router
             .layer(CookieManagerLayer::new())
-            .layer(TraceLayer::new_for_http())
-            .layer(middleware::from_fn(print_request_response));
+            .layer(TraceLayer::new_for_http());
+        // .layer(middleware::from_fn(print_request_response));
 
         let cors = CorsLayer::new()
             .allow_methods(Any)

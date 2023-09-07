@@ -7,6 +7,7 @@ use crate::Context;
 use crate::DataTable;
 use crate::ListResponse;
 use crate::PlatformError;
+use crate::QueryResponse;
 
 pub mod event_segmentation;
 pub mod property_values;
@@ -20,6 +21,18 @@ use serde_json::Value;
 
 use crate::Result;
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum QueryResponseFormat {
+    Json,
+    JsonCompact,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct QueryParams {
+    format: Option<QueryResponseFormat>,
+}
+
 #[async_trait]
 pub trait Provider: Sync + Send {
     async fn event_segmentation(
@@ -28,7 +41,8 @@ pub trait Provider: Sync + Send {
         organization_id: u64,
         project_id: u64,
         req: EventSegmentation,
-    ) -> Result<DataTable>;
+        params: QueryParams,
+    ) -> Result<QueryResponse>;
 
     async fn property_values(
         &self,

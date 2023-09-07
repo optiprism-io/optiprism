@@ -86,7 +86,7 @@ impl Provider for ProviderImpl {
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 
         let result = execute_plan(&plan).await?;
-
+        println!("{:?}", result);
         let metric_cols = es.time_columns(cur_time);
         let cols = result
             .schema()

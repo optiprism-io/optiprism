@@ -31,10 +31,12 @@ use arrow::array::Int32Array;
 use arrow::array::Int64Array;
 use arrow::array::Int8Array;
 use arrow::array::StringArray;
+use arrow::array::TimestampNanosecondArray;
 use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
+use arrow::datatypes::TimeUnit;
 use common::DECIMAL_PRECISION;
 pub use context::Context;
 use convert_case::Case;
@@ -43,6 +45,7 @@ use datafusion_common::ScalarValue;
 pub use error::PlatformError;
 pub use error::Result;
 use metadata::MetadataProvider;
+use query::DataTable;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -134,6 +137,9 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
         arrow::datatypes::DataType::Float64 => arr_to_json_values!(arr, Float64Array),
         arrow::datatypes::DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
         arrow::datatypes::DataType::Utf8 => arr_to_json_values!(arr, StringArray),
+        arrow::datatypes::DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+            arr_to_json_values!(arr, TimestampNanosecondArray)
+        }
         arrow::datatypes::DataType::Decimal128(_, s) => {
             let arr = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
             arr.iter()
@@ -485,22 +491,25 @@ pub struct Column {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct DataTable {
+pub struct JSONQueryResponse {
     columns: Vec<Column>,
 }
 
-impl DataTable {
-    pub fn new(columns: Vec<Column>) -> Self {
-        Self { columns }
-    }
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct JSONCompactQueryResponse(Vec<Vec<Value>>);
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+#[serde(untagged)]
+pub enum QueryResponse {
+    JSON(JSONQueryResponse),
+    JSONCompact(JSONCompactQueryResponse),
 }
 
-impl TryFrom<query::DataTable> for DataTable {
-    type Error = PlatformError;
-
-    fn try_from(value: query::DataTable) -> std::result::Result<Self, Self::Error> {
-        let cols = value
-            .columns
+impl QueryResponse {
+    pub fn try_new_json(columns: Vec<query::Column>) -> Result<Self> {
+        let columns = columns
             .iter()
             .cloned()
             .map(|column| match array_ref_to_json_values(&column.data) {
@@ -517,7 +526,20 @@ impl TryFrom<query::DataTable> for DataTable {
             })
             .collect::<Result<_>>()?;
 
-        Ok(DataTable::new(cols))
+        Ok(Self::JSON(JSONQueryResponse { columns }))
+    }
+
+    pub fn try_new_json_compact(columns: Vec<query::Column>) -> Result<Self> {
+        let data = columns
+            .iter()
+            .cloned()
+            .map(|column| match array_ref_to_json_values(&column.data) {
+                Ok(data) => Ok(data),
+                Err(err) => Err(err),
+            })
+            .collect::<Result<_>>()?;
+
+        Ok(Self::JSONCompact(JSONCompactQueryResponse(data)))
     }
 }
 

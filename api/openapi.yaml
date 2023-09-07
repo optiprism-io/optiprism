@@ -1250,6 +1250,14 @@ paths:
       parameters:
         - $ref: '#/components/parameters/OrganizationID'
         - $ref: '#/components/parameters/ProjectID'
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum:
+              - json
+              - jsonCompact
+          required: true
       requestBody:
         content:
           application/json:

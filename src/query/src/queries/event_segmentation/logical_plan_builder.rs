@@ -19,6 +19,7 @@ use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::ScalarValue;
 use datafusion_expr::col;
+use datafusion_expr::expr;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
@@ -30,6 +31,7 @@ use datafusion_expr::ExprSchemable;
 use datafusion_expr::Extension;
 use datafusion_expr::Filter;
 use datafusion_expr::LogicalPlan;
+use datafusion_expr::Sort;
 use futures::executor;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::properties::provider_impl::Namespace;
@@ -331,49 +333,63 @@ impl LogicalPlanBuilder {
         input = self
             .build_aggregate_logical_plan(input, &self.es.events[event_id], segment_inputs)
             .await?;
-        debug!("{:#?}", input.schema());
-        // // unpivot aggregate values into value column
-        // input = {
-        // let agg_cols = self.es.events[event_id]
-        // .queries
-        // .iter()
-        // .enumerate()
-        // .map(|(idx, q)| match q.agg {
-        // Query::CountEvents => format!("{idx}_count"),
-        // Query::CountUniqueGroups => format!("{idx}_partitioned_count"),
-        // Query::DailyActiveGroups => format!("{idx}_partitioned_count"),
-        // Query::WeeklyActiveGroups => unimplemented!(),
-        // Query::MonthlyActiveGroups => unimplemented!(),
-        // Query::CountPerGroup { .. } => format!("{idx}_partitioned_count"),
-        // Query::AggregatePropertyPerGroup { .. } => format!("{idx}_partitioned_agg"),
-        // Query::AggregateProperty { .. } => format!("{idx}_agg"),
-        // Query::QueryFormula { .. } => format!("{idx}_count"),
-        // })
-        // .collect();
-        //
-        // LogicalPlan::Extension(Extension {
-        // node: Arc::new(UnpivotNode::try_new(
-        // input,
-        // agg_cols,
-        // COL_AGG_NAME.to_string(),
-        // COL_VALUE.to_string(),
-        // )?),
-        // })
-        // };
-        //
+
+        // unpivot aggregate values into value column
+        input = {
+            let agg_cols = self.es.events[event_id]
+                .queries
+                .iter()
+                .enumerate()
+                .map(|(idx, q)| match q.agg {
+                    Query::CountEvents => format!("{idx}_count"),
+                    Query::CountUniqueGroups => format!("{idx}_partitioned_count"),
+                    Query::DailyActiveGroups => format!("{idx}_partitioned_count"),
+                    Query::WeeklyActiveGroups => unimplemented!(),
+                    Query::MonthlyActiveGroups => unimplemented!(),
+                    Query::CountPerGroup { .. } => format!("{idx}_partitioned_count"),
+                    Query::AggregatePropertyPerGroup { .. } => format!("{idx}_partitioned_agg"),
+                    Query::AggregateProperty { .. } => format!("{idx}_agg"),
+                    Query::QueryFormula { .. } => format!("{idx}_count"),
+                })
+                .collect();
+
+            LogicalPlan::Extension(Extension {
+                node: Arc::new(UnpivotNode::try_new(
+                    input,
+                    agg_cols,
+                    COL_AGG_NAME.to_string(),
+                    COL_VALUE.to_string(),
+                )?),
+            })
+        };
+
+        input = {
+            let sort = Sort {
+                expr: vec![Expr::Sort(expr::Sort {
+                    expr: Box::new(col(event_fields::CREATED_AT)),
+                    asc: true,
+                    nulls_first: false,
+                })],
+                input: Arc::new(input),
+                fetch: None,
+            };
+
+            LogicalPlan::Sort(sort)
+        };
+
         // pivot date
-        // input = {
-        // let (from_time, to_time) = self.es.time.range(self.cur_time);
-        // let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
-        // LogicalPlan::Extension(Extension {
-        // node: Arc::new(PivotNode::try_new(
-        // input,
-        // Column::from_name(event_fields::CREATED_AT),
-        // Column::from_name(COL_VALUE),
-        // result_cols,
-        // )?),
-        // })
-        // };
+        input = {
+            let (from_time, to_time) = self.es.time.range(self.cur_time);
+            let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
+            LogicalPlan::Extension(Extension {
+                node: Arc::new(PivotNode::try_new(
+                    input,
+                    Column::from_name(event_fields::CREATED_AT),
+                    Column::from_name(COL_VALUE),
+                    result_cols,
+                )?),
+            })
+        };
 
         Ok(input)
     }

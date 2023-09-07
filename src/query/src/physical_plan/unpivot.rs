@@ -38,6 +38,7 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use axum::async_trait;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -215,6 +216,8 @@ impl Stream for UnpivotStream {
 
         let poll = match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => {
+                println!("????");
+                print_batches(vec![batch.clone()].as_ref())?;
                 Poll::Ready(Some(Ok(unpivot(&batch, self.schema.clone(), &self.cols)?)))
             }
             other => other,
