@@ -65,6 +65,7 @@ impl Group {
         }
     }
 }
+
 #[derive(Debug)]
 pub struct Aggregate<T> {
     filter: Option<PhysicalExprRef>,
@@ -229,6 +230,7 @@ macro_rules! agg {
 
                         bucket.inner_fn.reset();
                     }
+                    println!("asd2 {:?}", predicate.value(row_id));
                     bucket.inner_fn.accumulate(predicate.value(row_id) as i128);
                 }
 
@@ -382,7 +384,13 @@ mod tests {
             agg.evaluate(&b, Some(&hash)).unwrap();
         }
 
-        let res = agg.finalize();
+        let res = agg.finalize().unwrap();
+
+        let schema = Schema::new(vec![Field::new(
+            "partitioned_agg",
+            DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            true,
+        )]);
         println!("{:?}", res);
     }
 

@@ -133,8 +133,8 @@ macro_rules! aggregate {
         Box::new(Aggregate::<$ty>::try_new(
             $filter,
             $groups,
-            $predicate,
             $partition_col,
+            $predicate,
             $agg,
         )?) as Box<dyn PartitionedAggregateExpr>
     };

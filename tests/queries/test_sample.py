@@ -26,37 +26,22 @@ def auth():
     return auth_resp.json()['accessToken']
 
 
-def test_sql_queries():
+def test_count():
     ch_query = """SELECT toUnixTimestamp(toDate(event_created_at, 'UTC')),
-       count(event_user_id)                 as q1,
-       count(distinct event_user_id)        as q2
-FROM file('*.parquet', Parquet)
-where event_event = 'Product Viewed'
-  and toStartOfDay(event_created_at, 'UTC') >=
-      toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
-group by 1
-order by 1 asc format JSONCompactColumns;"""
+           count(event_user_id)                 as q1,
+           count(distinct event_user_id)        as q2
+    FROM file('*.parquet', Parquet)
+    where event_event = 'Order Completed'
+      and toStartOfDay(event_created_at, 'UTC') >=
+          toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+    group by 1
+    order by 1 asc format JSONCompactColumns;"""
 
     ch_resp = requests.get(ch_addr,
                            params={"query": ch_query})
-    ch_ts = list(map(lambda x: x * 1000000000,ch_resp.json()[0]))
-    ch_val1 = list(map(lambda x: float(x),ch_resp.json()[1]))
-    ch_val2 = list(map(lambda x: float(x),ch_resp.json()[2]))
-
-    ch_query = """select c, avg(counts)
-from (
-         select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, count(1) as counts
-         from file('*.parquet', Parquet) as b
-         where b.event_event = 'Product Viewed'
-           and toStartOfDay(event_created_at, 'UTC') >=
-               toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
-         group by event_user_id, c)
-group by c
-order by 1 asc format JSONCompactColumns;"""
-
-    ch_resp = requests.get(ch_addr,
-                           params={"query": ch_query})
-    ch_val3 = list(map(lambda x: float(x), ch_resp.json()[1]))
+    ch_ts = list(map(lambda x: x * 1000000000, ch_resp.json()[0]))
+    ch_val1 = list(map(lambda x: float(x), ch_resp.json()[1]))
+    ch_val2 = list(map(lambda x: float(x), ch_resp.json()[2]))
 
     op_query = {
         "time": {
@@ -72,7 +57,289 @@ order by 1 asc format JSONCompactColumns;"""
         },
         "events": [
             {
-                "eventName": "Product Viewed",
+                "eventName": "Order Completed",
+                "queries": [
+                    {
+                        "type": "countEvents"
+                    },
+                    {
+                        "type": "countUniqueGroups"
+                    },
+                ],
+                "eventType": "regular",
+                "eventId": 8,
+                "filters": []
+            }
+        ],
+        "filters": {
+            "groupsCondition": "and",
+            "groups": []
+        },
+        "segments": [],
+        "breakdowns": []
+    }
+
+    op_token = auth()
+    op_resp = requests.post(
+        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
+        json=op_query,
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer " + op_token})
+
+    op_ts = op_resp.json()[1]
+    op_val1 = op_resp.json()[2]
+    op_val2 = op_resp.json()[3]
+
+    assert ch_ts == op_ts
+    assert ch_val1 == op_val1
+    assert ch_val2 == op_val2
+
+
+def test_agg():
+    ch_query = """select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, sum(event_revenue) as sums
+    from file('*.parquet', Parquet) as b
+    where b.event_event = 'Order Completed'
+      and toStartOfDay(event_created_at, 'UTC') >=
+          toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+    group by c order by 1 asc format JSONCompactColumns;"""
+    ch_resp = requests.get(ch_addr,
+                           params={"query": ch_query})
+
+    ch_ts = list(map(lambda x: x * 1000000000, ch_resp.json()[0]))
+    ch_val1 = list(map(lambda x: float(x), ch_resp.json()[1]))
+    print(ch_resp.json())
+    op_query = {
+        "time": {
+            "type": "last",
+            "last": 3,
+            "unit": "day"
+        },
+        "group": "user",
+        "intervalUnit": "day",
+        "chartType": "line",
+        "analysis": {
+            "type": "linear"
+        },
+        "events": [
+            {
+                "eventName": "Order Completed",
+                "queries": [
+                    {
+                        "type": "aggregateProperty",
+                        "aggregate": "avg",
+                        "propertyType": "event",
+                        "propertyName": "Revenue"
+                    },
+                ],
+                "eventType": "regular",
+                "eventId": 8,
+                "filters": []
+            }
+        ],
+        "filters": {
+            "groupsCondition": "and",
+            "groups": []
+        },
+        "segments": [],
+        "breakdowns": []
+    }
+
+    op_token = auth()
+    op_resp = requests.post(
+        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
+        json=op_query,
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer " + op_token})
+
+    print(op_resp.json())
+    op_ts = op_resp.json()[1]
+    op_val1 = op_resp.json()[2]
+
+    assert ch_ts == op_ts
+    assert ch_val1 == op_val1
+
+
+def test_count_per_group():
+    ch_query = """select c, avg(counts),min(counts),max(counts)
+    from (
+             select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, count(1) as counts
+             from file('*.parquet', Parquet) as b
+             where b.event_event = 'Order Completed'
+               and toStartOfDay(event_created_at, 'UTC') >=
+                   toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+             group by event_user_id, c)
+    group by c
+    order by 1 asc format JSONCompactColumns;"""
+
+    ch_resp = requests.get(ch_addr,
+                           params={"query": ch_query})
+    ch_ts = list(map(lambda x: x * 1000000000, ch_resp.json()[0]))
+    ch_val1 = list(map(lambda x: float(x), ch_resp.json()[1]))
+    ch_val2 = list(map(lambda x: float(x), ch_resp.json()[2]))
+    ch_val3 = list(map(lambda x: float(x), ch_resp.json()[3]))
+
+    op_query = {
+        "time": {
+            "type": "last",
+            "last": 3,
+            "unit": "day"
+        },
+        "group": "user",
+        "intervalUnit": "day",
+        "chartType": "line",
+        "analysis": {
+            "type": "linear"
+        },
+        "events": [
+            {
+                "eventName": "Order Completed",
+                "queries": [
+                    {
+                        "type": "countPerGroup",
+                        "aggregate": "avg"
+                    },
+                    {
+                        "type": "countPerGroup",
+                        "aggregate": "min"
+                    },
+                    {
+                        "type": "countPerGroup",
+                        "aggregate": "max"
+                    },
+                ],
+                "eventType": "regular",
+                "eventId": 8,
+                "filters": []
+            }
+        ],
+        "filters": {
+            "groupsCondition": "and",
+            "groups": []
+        },
+        "segments": [],
+        "breakdowns": []
+    }
+
+    op_token = auth()
+    op_resp = requests.post(
+        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
+        json=op_query,
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer " + op_token})
+
+    op_ts = op_resp.json()[1]
+    op_val1 = op_resp.json()[2]
+    op_val2 = op_resp.json()[3]
+    op_val3 = op_resp.json()[3]
+
+    assert ch_ts == op_ts
+    assert ch_val1 == op_val1
+    assert ch_val2 == op_val2
+    assert ch_val3 == op_val3
+
+
+def test_agg_per_group():
+    # avg(sum(revenue))
+    ch_query = """select c, avg(sums)
+    from (
+             select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, sum(event_revenue) as sums
+             from file('*.parquet', Parquet) as b
+             where b.event_event = 'Order Completed'
+               and toStartOfDay(event_created_at, 'UTC') >=
+                   toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+             group by event_user_id, c)
+    group by c
+    order by 1 asc format JSONCompactColumns;"""
+
+    ch_resp = requests.get(ch_addr,
+                           params={"query": ch_query})
+    ch_ts = list(map(lambda x: x * 1000000000, ch_resp.json()[0]))
+    ch_val1 = list(map(lambda x: float(x), ch_resp.json()[1]))
+
+    op_query = {
+        "time": {
+            "type": "last",
+            "last": 3,
+            "unit": "day"
+        },
+        "group": "user",
+        "intervalUnit": "day",
+        "chartType": "line",
+        "analysis": {
+            "type": "linear"
+        },
+        "events": [
+            {
+                "eventName": "Order Completed",
+                "queries": [
+                    {
+                        "type": "aggregatePropertyPerGroup",
+                        "aggregatePerGroup": "sum",
+                        "aggregate": "avg",
+                        "propertyType": "event",
+                        "propertyName": "Revenue"
+                    }
+                ],
+                "eventType": "regular",
+                "eventId": 8,
+                "filters": []
+            }
+        ],
+        "filters": {
+            "groupsCondition": "and",
+            "groups": []
+        },
+        "segments": [],
+        "breakdowns": []
+    }
+
+    op_token = auth()
+    op_resp = requests.post(
+        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
+        json=op_query,
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer " + op_token})
+
+    op_ts = op_resp.json()[1]
+    op_val1 = op_resp.json()[2]
+
+    assert ch_ts == op_ts
+    assert ch_val1 == op_val1
+
+
+def test_sql_queries():
+    # avg(sum(revenue))
+    ch_query = """select c, avg(sums)
+from (
+         select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, sum(event_revenue) as sums
+         from file('*.parquet', Parquet) as b
+         where b.event_event = 'Order Completed'
+           and toStartOfDay(event_created_at, 'UTC') >=
+               toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+         group by event_user_id, c)
+group by c
+order by 1 asc format JSONCompactColumns;"""
+
+    ch_resp = requests.get(ch_addr,
+                           params={"query": ch_query})
+    ch_val7 = list(map(lambda x: float(x), ch_resp.json()[1]))
+    print("ff")
+    print(ch_val7)
+    op_query = {
+        "time": {
+            "type": "last",
+            "last": 3,
+            "unit": "day"
+        },
+        "group": "user",
+        "intervalUnit": "day",
+        "chartType": "line",
+        "analysis": {
+            "type": "linear"
+        },
+        "events": [
+            {
+                "eventName": "Order Completed",
                 "queries": [
                     {
                         "type": "countEvents"
@@ -81,8 +348,29 @@ order by 1 asc format JSONCompactColumns;"""
                         "type": "countUniqueGroups"
                     },
                     {
+                        "type": "aggregateProperty",
+                        "aggregate": "avg",
+                        "propertyType": "event",
+                        "propertyName": "Revenue"
+                    },
+                    {
                         "type": "countPerGroup",
                         "aggregate": "avg"
+                    },
+                    {
+                        "type": "countPerGroup",
+                        "aggregate": "min"
+                    },
+                    {
+                        "type": "countPerGroup",
+                        "aggregate": "max"
+                    },
+                    {
+                        "type": "aggregatePropertyPerGroup",
+                        "aggregatePerGroup": "sum",
+                        "aggregate": "avg",
+                        "propertyType": "event",
+                        "propertyName": "Revenue"
                     }
                 ],
                 "eventType": "regular",
@@ -110,8 +398,15 @@ order by 1 asc format JSONCompactColumns;"""
     op_val1 = op_resp.json()[2]
     op_val2 = op_resp.json()[3]
     op_val3 = op_resp.json()[4]
+    op_val4 = op_resp.json()[5]
+    op_val5 = op_resp.json()[6]
+    op_val6 = op_resp.json()[7]
 
+    print(op_val6)
     assert ch_ts == op_ts
     assert ch_val1 == op_val1
     assert ch_val2 == op_val2
     assert ch_val3 == op_val3
+    assert ch_val4 == op_val4
+    assert ch_val5 == op_val5
+    assert ch_val6 == op_val6

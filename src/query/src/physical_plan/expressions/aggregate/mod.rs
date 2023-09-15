@@ -139,10 +139,11 @@ impl AggregateFunction {
 
     pub fn result(&self) -> i128 {
         match self {
-            AggregateFunction::Sum(s) => *s * 10_i128.pow(DECIMAL_SCALE as u32),
-            AggregateFunction::Min(m) => *m * 10_i128.pow(DECIMAL_SCALE as u32),
-            AggregateFunction::Max(m) => *m * 10_i128.pow(DECIMAL_SCALE as u32),
+            AggregateFunction::Sum(s) => *s,
+            AggregateFunction::Min(m) => *m,
+            AggregateFunction::Max(m) => *m,
             AggregateFunction::Avg(s, c) => {
+                println!("{s} {c}");
                 let r = *s as f64 / *c as f64;
                 (r * 10_i128.pow(DECIMAL_SCALE as u32) as f64) as i128
             }

@@ -32,6 +32,7 @@ use arrow::row::OwnedRow;
 use arrow::row::Row;
 use arrow::row::RowConverter;
 use arrow::row::SortField;
+use arrow::util::pretty::print_batches;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::parquet::format::ColumnChunk;
@@ -134,6 +135,17 @@ macro_rules! agg {
                     None
                 };
 
+                let a = self
+                    .predicate
+                    .evaluate(batch)?
+                    .into_array(batch.num_rows())
+                    .as_any();
+
+                print_batches(&[batch.to_owned()]).unwrap();
+                println!(
+                    "{:?}",
+                    predicate = self.predicate.evaluate(batch)?.into_array(batch.num_rows())
+                );
                 let predicate = self
                     .predicate
                     .evaluate(batch)?
@@ -207,6 +219,7 @@ macro_rules! agg {
                         &mut self.single_group
                     };
 
+                    println!("asd {:?}", val.unwrap());
                     bucket.agg.accumulate(val.unwrap() as i128);
                 }
 
@@ -262,19 +275,27 @@ macro_rules! agg {
     };
 }
 
+//
 agg!(i8, Int8Array);
 agg!(i16, Int16Array);
 agg!(i32, Int32Array);
-
 agg!(i64, Int64Array);
+
 agg!(i128, Decimal128Array);
 agg!(u8, UInt8Array);
+
 agg!(u16, UInt16Array);
+
 agg!(u32, UInt32Array);
+
 agg!(u64, UInt64Array);
+
 agg!(u128, Decimal128Array);
+
 agg!(f32, Float32Array);
+
 agg!(f64, Float64Array);
+
 agg!(Decimal128Array, Decimal128Array);
 
 #[cfg(test)]
@@ -284,10 +305,13 @@ mod tests {
 
     use arrow::array::Int64Array;
     use arrow::datatypes::DataType;
+    use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::record_batch::RecordBatch;
     use arrow::row::SortField;
     use arrow::util::pretty::print_batches;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
     use store::test_util::parse_markdown_tables;
@@ -299,7 +323,7 @@ mod tests {
     #[test]
     fn sum_grouped() {
         let data = r#"
-| user_id(i64)| device(utf8) | v(i64)| event(utf8) |
+| user_id(i64)| device(utf8) | v(decimal)| event(utf8) |
 |-------------|--------------|-------|-------------|
 | 0           | iphone       | 1     | e1          |
 | 0           | android      | 1     | e1          |
@@ -315,7 +339,7 @@ mod tests {
             "device".to_string(),
             SortField::new(DataType::Utf8),
         )];
-        let mut agg = Aggregate::<i64>::try_new(
+        let mut agg = Aggregate::<i128>::try_new(
             None,
             Some(groups),
             Column::new_with_schema("user_id", &schema).unwrap(),
@@ -327,7 +351,20 @@ mod tests {
             agg.evaluate(&b, None).unwrap();
         }
 
-        let res = agg.finalize();
+        let res = agg.finalize().unwrap();
+        let schema = Schema::new_with_metadata(
+            vec![
+                Field::new("f", DataType::Utf8, true),
+                Field::new(
+                    "f",
+                    DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                    true,
+                ),
+            ],
+            Default::default(),
+        );
         println!("{:?}", res);
+        let batch = RecordBatch::try_new(Arc::new(schema), res).unwrap();
+        print_batches(vec![batch].as_ref()).unwrap();
     }
 }

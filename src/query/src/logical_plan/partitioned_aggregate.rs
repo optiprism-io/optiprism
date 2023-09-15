@@ -189,7 +189,7 @@ impl AggregateExpr {
             AggregateExpr::Aggregate { .. } => vec![DFField::new_unqualified(
                 "agg",
                 DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
+                true,
             )],
             AggregateExpr::PartitionedCount { .. } => vec![DFField::new_unqualified(
                 "partitioned_count",
@@ -199,7 +199,7 @@ impl AggregateExpr {
             AggregateExpr::PartitionedAggregate { .. } => vec![DFField::new_unqualified(
                 "partitioned_agg",
                 DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
+                true,
             )],
             AggregateExpr::Funnel { groups, steps, .. } => {
                 let mut fields = vec![

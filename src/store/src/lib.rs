@@ -40,6 +40,7 @@ pub mod test_util {
     use arrow2::array::UInt64Array;
     use arrow2::array::Utf8Array;
     use arrow2::chunk::Chunk;
+    use arrow2::compute::cast::integer_to_decimal;
     use arrow2::compute::concatenate::concatenate;
     use arrow2::compute::take::take;
     use arrow2::datatypes::DataType;
@@ -995,9 +996,12 @@ pub mod test_util {
                 }
                 DataType::Decimal(_, _) => {
                     let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                    let a = Int128Array::from(vals).boxed();
-                    println!("d {:?}", a);
-                    a
+                    let a = Int128Array::from(vals);
+
+                    // todo make type casting for decimal lists
+                    let a =
+                        integer_to_decimal(&a, DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize);
+                    a.boxed()
                 }
                 DataType::List(inner) => match inner.data_type() {
                     DataType::Decimal(_, _) => {
