@@ -7,6 +7,7 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
+use arrow::datatypes::DataType::UInt64;
 use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
 use chrono::Duration;
@@ -182,11 +183,9 @@ impl AggregateExpr {
 
     pub fn fields(&self, schema: &DFSchema) -> Result<Vec<DFField>> {
         let fields = match self {
-            AggregateExpr::Count { .. } => vec![DFField::new_unqualified(
-                "count",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
-            )],
+            AggregateExpr::Count { .. } => {
+                vec![DFField::new_unqualified("count", DataType::UInt64, true)]
+            }
             AggregateExpr::Aggregate { .. } => vec![DFField::new_unqualified(
                 "agg",
                 DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
@@ -195,7 +194,7 @@ impl AggregateExpr {
             AggregateExpr::PartitionedCount { .. } => vec![DFField::new_unqualified(
                 "partitioned_count",
                 DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                false,
+                true,
             )],
             AggregateExpr::PartitionedAggregate { .. } => vec![DFField::new_unqualified(
                 "partitioned_agg",

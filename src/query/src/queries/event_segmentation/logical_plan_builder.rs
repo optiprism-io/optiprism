@@ -1,7 +1,10 @@
 use std::collections::HashMap;
+use std::ops::Add;
 use std::sync::Arc;
 
 use chrono::DateTime;
+use chrono::Duration;
+use chrono::DurationRound;
 use chrono::Utc;
 use common::query::event_segmentation::Breakdown;
 use common::query::event_segmentation::DidEventAggregate;
@@ -14,6 +17,7 @@ use common::query::time_columns;
 use common::query::EventFilter;
 use common::query::PartitionedAggregateFunction;
 use common::query::PropertyRef;
+use common::query::TimeIntervalUnit;
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
@@ -38,6 +42,7 @@ use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
 use tracing::debug;
 
+use crate::context::Format;
 use crate::error::Result;
 use crate::event_fields;
 use crate::expr::event_expression;
@@ -334,34 +339,37 @@ impl LogicalPlanBuilder {
             .build_aggregate_logical_plan(input, &self.es.events[event_id], segment_inputs)
             .await?;
 
+        println!("asd@ {:?}", input.schema());
         // unpivot aggregate values into value column
-        input = {
-            let agg_cols = self.es.events[event_id]
-                .queries
-                .iter()
-                .enumerate()
-                .map(|(idx, q)| match q.agg {
-                    Query::CountEvents => format!("{idx}_count"),
-                    Query::CountUniqueGroups => format!("{idx}_partitioned_count"),
-                    Query::DailyActiveGroups => format!("{idx}_partitioned_count"),
-                    Query::WeeklyActiveGroups => unimplemented!(),
-                    Query::MonthlyActiveGroups => unimplemented!(),
-                    Query::CountPerGroup { .. } => format!("{idx}_partitioned_count"),
-                    Query::AggregatePropertyPerGroup { .. } => format!("{idx}_partitioned_agg"),
-                    Query::AggregateProperty { .. } => format!("{idx}_agg"),
-                    Query::QueryFormula { .. } => format!("{idx}_count"),
-                })
-                .collect();
+        if self.ctx.format != Format::Compact {
+            input = {
+                let agg_cols = self.es.events[event_id]
+                    .queries
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, q)| match q.agg {
+                        Query::CountEvents => format!("{idx}_count"),
+                        Query::CountUniqueGroups => format!("{idx}_partitioned_count"),
+                        Query::DailyActiveGroups => format!("{idx}_partitioned_count"),
+                        Query::WeeklyActiveGroups => unimplemented!(),
+                        Query::MonthlyActiveGroups => unimplemented!(),
+                        Query::CountPerGroup { .. } => format!("{idx}_partitioned_count"),
+                        Query::AggregatePropertyPerGroup { .. } => format!("{idx}_partitioned_agg"),
+                        Query::AggregateProperty { .. } => format!("{idx}_agg"),
+                        Query::QueryFormula { .. } => format!("{idx}_count"),
+                    })
+                    .collect();
 
-            LogicalPlan::Extension(Extension {
-                node: Arc::new(UnpivotNode::try_new(
-                    input,
-                    agg_cols,
-                    COL_AGG_NAME.to_string(),
-                    COL_VALUE.to_string(),
-                )?),
-            })
-        };
+                LogicalPlan::Extension(Extension {
+                    node: Arc::new(UnpivotNode::try_new(
+                        input,
+                        agg_cols,
+                        COL_AGG_NAME.to_string(),
+                        COL_VALUE.to_string(),
+                    )?),
+                })
+            };
+        }
 
         input = {
             let sort = Sort {
@@ -377,20 +385,21 @@ impl LogicalPlanBuilder {
             LogicalPlan::Sort(sort)
         };
 
-        // pivot date
-        input = {
-            let (from_time, to_time) = self.es.time.range(self.cur_time);
-            let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
-            LogicalPlan::Extension(Extension {
-                node: Arc::new(PivotNode::try_new(
-                    input,
-                    Column::from_name(event_fields::CREATED_AT),
-                    Column::from_name(COL_VALUE),
-                    result_cols,
-                )?),
-            })
-        };
-
+        if self.ctx.format != Format::Compact {
+            // pivot date
+            input = {
+                let (from_time, to_time) = self.es.time.range(self.cur_time);
+                let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
+                LogicalPlan::Extension(Extension {
+                    node: Arc::new(PivotNode::try_new(
+                        input,
+                        Column::from_name(event_fields::CREATED_AT),
+                        Column::from_name(COL_VALUE),
+                        result_cols,
+                    )?),
+                })
+            };
+        }
         Ok(input)
     }
 
@@ -400,12 +409,25 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         event: &Event,
     ) -> Result<LogicalPlan> {
+        let trunc = match &self.es.interval_unit {
+            TimeIntervalUnit::Second => Duration::seconds(1),
+            TimeIntervalUnit::Minute => Duration::minutes(1),
+            TimeIntervalUnit::Hour => Duration::hours(1),
+            TimeIntervalUnit::Day => Duration::days(1),
+            TimeIntervalUnit::Week => Duration::weeks(1),
+            TimeIntervalUnit::Month => Duration::weeks(1) * 4,
+            TimeIntervalUnit::Year => Duration::weeks(1) * 365,
+        };
+
+        let cur_time = self.cur_time.duration_trunc(trunc).unwrap();
+        // TODO remove
+        let cur_time = cur_time.add(Duration::days(1));
         // time expression
         let mut expr = time_expression(
             event_fields::CREATED_AT,
             input.schema(),
             &self.es.time,
-            self.cur_time,
+            cur_time,
         )?;
 
         // event expression

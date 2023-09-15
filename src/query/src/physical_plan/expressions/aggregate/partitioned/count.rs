@@ -10,6 +10,7 @@ use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
+use arrow::array::UInt64Builder;
 use arrow::buffer::ScalarBuffer;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
@@ -220,7 +221,9 @@ impl PartitionedAggregateExpr for PartitionedCount {
                 group.outer_fn.accumulate(group.count as i128);
                 let res = group.outer_fn.result();
 
-                res_col_b.append_value(int128_to_decimal(res));
+                println!("{res}");
+
+                res_col_b.append_value(res);
             }
 
             let group_col = groups.row_converter.convert_rows(rows)?;
@@ -234,7 +237,7 @@ impl PartitionedAggregateExpr for PartitionedCount {
                 .outer_fn
                 .accumulate(self.single_group.count as i128);
             let res = self.single_group.outer_fn.result();
-            res_col_b.append_value(int128_to_decimal(res));
+            res_col_b.append_value(res);
             let res_col = res_col_b.finish();
             let res_col = Arc::new(res_col) as ArrayRef;
             Ok(vec![res_col])
@@ -269,10 +272,13 @@ mod tests {
 
     use arrow::array::Int64Array;
     use arrow::datatypes::DataType;
+    use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::record_batch::RecordBatch;
     use arrow::row::SortField;
     use arrow::util::pretty::print_batches;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
     use store::test_util::parse_markdown_tables;
@@ -345,6 +351,7 @@ mod tests {
 | 0            | iphone       | 0     | 2      | e2          |
 | 0            | iphone       | 0     | 3      | e3          |
 | 0            | android      | 1     | 4      | e1          |
+| 0            | android      | 1     | 4      | e1          |
 | 0            | android      | 1     | 5      | e2          |
 | 0            | android      | 0     | 6      | e3          |
 | 1            | osx          | 1     | 1      | e1          |
@@ -369,7 +376,7 @@ mod tests {
 "#;
         let res = parse_markdown_tables(data).unwrap();
         let schema = res[0].schema().clone();
-        let hash = HashMap::from_iter([(0, ()), (1, ()), (3, ()), (4, ())]);
+        let hash = HashMap::from_iter([(0, ()), (1, ()), (4, ())]);
         let mut count = PartitionedCount::try_new(
             None,
             AggregateFunction::new_avg(),
@@ -382,8 +389,15 @@ mod tests {
             count.evaluate(&b, Some(&hash)).unwrap();
         }
 
-        let res = count.finalize();
-        println!("{:?}", res);
+        let res = count.finalize().unwrap();
+
+        let schema = Schema::new(vec![Field::new(
+            "partitioned_count",
+            DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            true,
+        )]);
+        let rb = RecordBatch::try_new(Arc::new(schema), res).unwrap();
+        print_batches(&[rb]).unwrap();
     }
 
     #[test]

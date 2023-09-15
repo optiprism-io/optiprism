@@ -2,13 +2,17 @@ use std::sync::Arc;
 
 use arrow::datatypes::DataType;
 use chrono::DateTime;
+use chrono::Duration;
+use chrono::DurationRound;
+use chrono::SubsecRound;
 use chrono::Utc;
-use datafusion::physical_expr::expressions::BinaryExpr;
 use common::query::EventFilter;
 use common::query::EventRef;
 use common::query::PropValueOperation;
 use common::query::PropertyRef;
 use common::query::QueryTime;
+use common::query::TimeIntervalUnit;
+use datafusion::physical_expr::expressions::BinaryExpr;
 use datafusion_common::Column;
 use datafusion_common::ExprSchema;
 use datafusion_common::ScalarValue;

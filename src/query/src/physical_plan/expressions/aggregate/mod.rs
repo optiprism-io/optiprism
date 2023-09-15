@@ -13,12 +13,14 @@ use datafusion::physical_expr::PhysicalExprRef;
 use datafusion::physical_plan::expressions::Column;
 use num_traits::Zero;
 use rust_decimal::Decimal;
+use store::test_util::PrimaryIndexType;
 
 use crate::error::Result;
 
 pub mod aggregate;
 pub mod count;
 pub mod partitioned;
+
 #[derive(Debug)]
 struct Groups<T> {
     exprs: Vec<PhysicalExprRef>,
@@ -137,15 +139,14 @@ impl AggregateFunction {
 
     pub fn result(&self) -> i128 {
         match self {
-            AggregateFunction::Sum(s) => *s,
-            AggregateFunction::Min(m) => *m,
-            AggregateFunction::Max(m) => *m,
+            AggregateFunction::Sum(s) => *s * 10_i128.pow(DECIMAL_SCALE as u32),
+            AggregateFunction::Min(m) => *m * 10_i128.pow(DECIMAL_SCALE as u32),
+            AggregateFunction::Max(m) => *m * 10_i128.pow(DECIMAL_SCALE as u32),
             AggregateFunction::Avg(s, c) => {
-                let v = Decimal::from_i128_with_scale(*s, DECIMAL_SCALE as u32)
-                    / Decimal::from_i128_with_scale(*c, DECIMAL_SCALE as u32);
-                v.mantissa()
+                let r = *s as f64 / *c as f64;
+                (r * 10_i128.pow(DECIMAL_SCALE as u32) as f64) as i128
             }
-            AggregateFunction::Count(s) => *s,
+            AggregateFunction::Count(s) => *s * 10_i128.pow(DECIMAL_SCALE as u32),
         }
     }
     pub fn reset(&mut self) {

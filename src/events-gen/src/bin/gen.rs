@@ -50,7 +50,7 @@ use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
 use platform::auth::password::make_password_hash;
-use rand::ableRng;
+// use rand::ableRng;
 use rand::prelude::StdRng;
 use rand::thread_rng;
 use rand::Rng;

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use common::rbac::ProjectPermission;
+use query::context::Format;
 use serde_json::Value;
 
 use crate::queries::event_segmentation::EventSegmentation;
@@ -41,20 +42,27 @@ impl Provider for ProviderImpl {
             ProjectPermission::ExploreReports,
         )?;
         let lreq = req.try_into()?;
-        let data = self
-            .query
-            .event_segmentation(query::Context::new(organization_id, project_id), lreq)
-            .await?;
+        let ctx = query::Context {
+            organization_id,
+            project_id,
+            format: match &query.format {
+                None => Format::Regular,
+                Some(format) => match format {
+                    QueryResponseFormat::Json => Format::Regular,
+                    QueryResponseFormat::JsonCompact => Format::Compact,
+                    _ => unimplemented!(),
+                },
+            },
+        };
+
+        let data = self.query.event_segmentation(ctx, lreq).await?;
 
         let resp = match query.format {
             None => QueryResponse::try_new_json(data.columns),
-            Some(format) => match format {
-                QueryResponseFormat::Json => QueryResponse::try_new_json(data.columns),
-                QueryResponseFormat::JsonCompact => {
-                    QueryResponse::try_new_json_compact(data.columns)
-                }
-                _ => unimplemented!(),
-            },
+            Some(QueryResponseFormat::Json) => QueryResponse::try_new_json(data.columns),
+            Some(QueryResponseFormat::JsonCompact) => {
+                QueryResponse::try_new_json_compact(data.columns)
+            }
         }?;
 
         Ok(resp)
