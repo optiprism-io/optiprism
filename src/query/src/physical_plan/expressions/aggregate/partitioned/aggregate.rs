@@ -397,7 +397,7 @@ mod tests {
     #[test]
     fn sum_avg() {
         let data = r#"
-| user_id(i64) | v(decimal) | ts(ts) | event(utf8) |
+| user_id(i64) | v(i64) | ts(ts) | event(utf8) |
 |--------------|-------|--------|-------------|
 | 1            | 1     | 1      | e1          |
 | 1            | 1     | 1      | e1          |
@@ -408,7 +408,7 @@ mod tests {
         let schema = res[0].schema().clone();
 
         let hash = ahash::HashMap::from_iter([(1, ()), (2, ())]);
-        let mut count = Aggregate::<i128>::try_new(
+        let mut count = Aggregate::<i64>::try_new(
             None,
             AggregateFunction::new_sum(),
             AggregateFunction::new_avg(),

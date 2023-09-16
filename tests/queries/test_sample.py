@@ -15,6 +15,81 @@ ch_addr = "http://localhost:8123"
 op_addr = "http://localhost:8080/api/v1"
 
 
+def agg_prop_ch_query(agg, field):
+    q = """select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, {0}({1}) as sums
+        from file('*.parquet', Parquet) as b
+        where b.event_event = 'Order Completed'
+          and toStartOfDay(event_created_at, 'UTC') >=
+              toStartOfDay(parseDateTime('2023-09-16', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+        group by c order by 1 asc format JSONCompactColumns;""".format(agg, field)
+
+    resp = requests.get(ch_addr,
+                        params={"query": q})
+
+    ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
+    val = list(map(lambda x: float(x), resp.json()[1]))
+
+    return [ts, val]
+
+
+def agg_prop_op_query(agg, field: str):
+    parts = field.split("_")
+    prop_type = parts[0]
+    prop_name: str = " ".join(list(map(lambda p: p.capitalize(), parts[1:])))
+
+    q = {
+        "time": {
+            "type": "last",
+            "last": 3,
+            "unit": "day"
+        },
+        "group": "user",
+        "intervalUnit": "day",
+        "chartType": "line",
+        "analysis": {
+            "type": "linear"
+        },
+        "events": [
+            {
+                "eventName": "Order Completed",
+                "queries": [
+                    {
+                        "type": "aggregateProperty",
+                        "aggregate": agg,
+                        "propertyType": prop_type,
+                        "propertyName": prop_name
+                    },
+                ],
+                "eventType": "regular",
+                "eventId": 8,
+                "filters": []
+            }
+        ],
+        "filters": {
+            "groupsCondition": "and",
+            "groups": []
+        },
+        "segments": [],
+        "breakdowns": []
+    }
+
+    token = auth()
+    resp = requests.post(
+        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
+        json=q,
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer " + token})
+
+    ts = resp.json()[1]
+    val = resp.json()[2]
+
+    return [ts, val]
+
+
+def agg_prop(agg, field: str):
+    assert agg_prop_ch_query(agg, field) == agg_prop_op_query(agg, field)
+
+
 def auth():
     auth_body = {
         "email": "admin@email.com",
@@ -33,7 +108,7 @@ def test_count():
     FROM file('*.parquet', Parquet)
     where event_event = 'Order Completed'
       and toStartOfDay(event_created_at, 'UTC') >=
-          toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+          toStartOfDay(parseDateTime('2023-09-16', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
     group by 1
     order by 1 asc format JSONCompactColumns;"""
 
@@ -95,18 +170,39 @@ def test_count():
     assert ch_val2 == op_val2
 
 
-def test_agg():
-    ch_query = """select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, sum(event_revenue) as sums
+def test_count_uint8():
+    agg_prop("count", "user_cart_items_number")
+
+
+def test_min_uint8():
+    agg_prop("min", "user_cart_items_number")
+
+
+def test_max_uint8():
+    agg_prop("max", "user_cart_items_number")
+
+
+def test_sum_uint8():
+    agg_prop("sum", "user_cart_items_number")
+
+
+def test_avg_uint8():
+    agg_prop("avg", "user_cart_items_number")
+
+
+def test_agg_avg():
+    ch_query = """select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, avg(user_cart_items_number) as sums
     from file('*.parquet', Parquet) as b
     where b.event_event = 'Order Completed'
       and toStartOfDay(event_created_at, 'UTC') >=
-          toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+          toStartOfDay(parseDateTime('2023-09-16', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
     group by c order by 1 asc format JSONCompactColumns;"""
     ch_resp = requests.get(ch_addr,
                            params={"query": ch_query})
 
     ch_ts = list(map(lambda x: x * 1000000000, ch_resp.json()[0]))
     ch_val1 = list(map(lambda x: float(x), ch_resp.json()[1]))
+    print("ch resp")
     print(ch_resp.json())
     op_query = {
         "time": {
@@ -127,8 +223,8 @@ def test_agg():
                     {
                         "type": "aggregateProperty",
                         "aggregate": "avg",
-                        "propertyType": "event",
-                        "propertyName": "Revenue"
+                        "propertyType": "user",
+                        "propertyName": "Cart Items Number"
                     },
                 ],
                 "eventType": "regular",
@@ -166,7 +262,7 @@ def test_count_per_group():
              from file('*.parquet', Parquet) as b
              where b.event_event = 'Order Completed'
                and toStartOfDay(event_created_at, 'UTC') >=
-                   toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+                   toStartOfDay(parseDateTime('2023-09-16', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
              group by event_user_id, c)
     group by c
     order by 1 asc format JSONCompactColumns;"""
@@ -246,7 +342,7 @@ def test_agg_per_group():
              from file('*.parquet', Parquet) as b
              where b.event_event = 'Order Completed'
                and toStartOfDay(event_created_at, 'UTC') >=
-                   toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+                   toStartOfDay(parseDateTime('2023-09-16', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
              group by event_user_id, c)
     group by c
     order by 1 asc format JSONCompactColumns;"""
@@ -315,7 +411,7 @@ from (
          from file('*.parquet', Parquet) as b
          where b.event_event = 'Order Completed'
            and toStartOfDay(event_created_at, 'UTC') >=
-               toStartOfDay(parseDateTime('2023-09-15', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+               toStartOfDay(parseDateTime('2023-09-16', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
          group by event_user_id, c)
 group by c
 order by 1 asc format JSONCompactColumns;"""

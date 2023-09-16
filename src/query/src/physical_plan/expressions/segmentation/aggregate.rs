@@ -82,6 +82,15 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
         AggregateFunction::Count(T::zero())
     }
 
+    pub fn make_new(&self) -> Self {
+        match self {
+            AggregateFunction::Sum(_) => AggregateFunction::new_sum(),
+            AggregateFunction::Min(_) => AggregateFunction::new_min(),
+            AggregateFunction::Max(_) => AggregateFunction::new_max(),
+            AggregateFunction::Avg(_, _) => AggregateFunction::new_avg(),
+            AggregateFunction::Count(_) => AggregateFunction::new_count(),
+        }
+    }
     pub fn accumulate(&mut self, v: T) -> T {
         match self {
             AggregateFunction::Sum(s) => {
