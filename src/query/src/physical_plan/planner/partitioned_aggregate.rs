@@ -32,6 +32,9 @@ use datafusion_common::ToDFSchema;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
+use num_traits::Bounded;
+use num_traits::Num;
+use num_traits::NumCast;
 
 use crate::error::QueryError;
 use crate::error::Result;
@@ -62,10 +65,10 @@ use crate::physical_plan::expressions::aggregate::count::Count;
 use crate::physical_plan::expressions::aggregate::partitioned;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
+use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
-use crate::physical_plan::expressions::aggregate::AggregateFunction;
-use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::planner::build_filter;
@@ -104,7 +107,10 @@ fn build_groups(
     Ok(ret)
 }
 
-fn aggregate(agg: &logical_plan::partitioned_aggregate::AggregateFunction) -> AggregateFunction {
+fn aggregate<T>(
+    agg: &logical_plan::partitioned_aggregate::AggregateFunction,
+) -> AggregateFunction<T>
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone {
     match agg {
         logical_plan::partitioned_aggregate::AggregateFunction::Sum => AggregateFunction::new_sum(),
         logical_plan::partitioned_aggregate::AggregateFunction::Min => AggregateFunction::new_min(),
@@ -129,8 +135,8 @@ macro_rules! count {
 }
 
 macro_rules! aggregate {
-    ($ty:ident,$filter:expr,$groups:expr,$predicate:expr,$partition_col:expr,$agg:expr) => {
-        Box::new(Aggregate::<$ty>::try_new(
+    ($ty:ident,$out_ty:ident,$filter:expr,$groups:expr,$predicate:expr,$partition_col:expr,$agg:expr) => {
+        Box::new(Aggregate::<$ty, $out_ty>::try_new(
             $filter,
             $groups,
             $partition_col,
@@ -207,21 +213,52 @@ pub fn build_partitioned_aggregate_expr(
             let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
-            let agg = aggregate(&agg);
+            // let agg = aggregate(&agg);
 
             let count = match predicate.data_type(schema)? {
-                DataType::Int8 => aggregate!(i8, filter, groups, predicate, partition_col, agg),
-                DataType::Int16 => aggregate!(i16, filter, groups, predicate, partition_col, agg),
-                DataType::Int32 => aggregate!(i32, filter, groups, predicate, partition_col, agg),
-                DataType::Int64 => aggregate!(i64, filter, groups, predicate, partition_col, agg),
-                DataType::UInt8 => aggregate!(u8, filter, groups, predicate, partition_col, agg),
-                DataType::UInt16 => aggregate!(u16, filter, groups, predicate, partition_col, agg),
-                DataType::UInt32 => aggregate!(u32, filter, groups, predicate, partition_col, agg),
-                DataType::UInt64 => aggregate!(u64, filter, groups, predicate, partition_col, agg),
-                DataType::Float32 => aggregate!(f32, filter, groups, predicate, partition_col, agg),
-                DataType::Float64 => aggregate!(f64, filter, groups, predicate, partition_col, agg),
+                DataType::Int8 => {
+                    let agg = aggregate::<i64>(&agg);
+                    aggregate!(i8, i64, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Int16 => {
+                    let agg = aggregate::<i64>(&agg);
+                    aggregate!(i16, i64, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Int32 => {
+                    let agg = aggregate::<i64>(&agg);
+                    aggregate!(i32, i64, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Int64 => {
+                    let agg = aggregate::<i128>(&agg);
+                    aggregate!(i64, i128, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::UInt8 => {
+                    let agg = aggregate::<u64>(&agg);
+                    aggregate!(u8, u64, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::UInt16 => {
+                    let agg = aggregate::<u64>(&agg);
+                    aggregate!(u16, u64, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::UInt32 => {
+                    let agg = aggregate::<u64>(&agg);
+                    aggregate!(u32, u64, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::UInt64 => {
+                    let agg = aggregate::<i128>(&agg);
+                    aggregate!(u64, i128, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Float32 => {
+                    let agg = aggregate::<f64>(&agg);
+                    aggregate!(f32, f64, filter, groups, predicate, partition_col, agg)
+                }
+                DataType::Float64 => {
+                    let agg = aggregate::<f64>(&agg);
+                    aggregate!(f64, f64, filter, groups, predicate, partition_col, agg)
+                }
                 DataType::Decimal128(_, _) => {
-                    aggregate!(i128, filter, groups, predicate, partition_col, agg)
+                    let agg = aggregate::<i128>(&agg);
+                    aggregate!(i128, i128, filter, groups, predicate, partition_col, agg)
                 }
                 _ => return Err(QueryError::Plan("unsupported predicate type".to_string())),
             };

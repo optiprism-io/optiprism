@@ -10,6 +10,7 @@ use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Array;
+use arrow::array::Int64Builder;
 use arrow::array::UInt64Builder;
 use arrow::buffer::ScalarBuffer;
 use arrow::datatypes::DataType;
@@ -30,21 +31,21 @@ use datafusion_common::ScalarValue;
 use datafusion_expr::ColumnarValue;
 
 use crate::error::Result;
-use crate::physical_plan::expressions::aggregate::AggregateFunction;
 use crate::physical_plan::expressions::aggregate::Groups;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::expressions::check_filter;
+use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 
 #[derive(Debug)]
 struct Group {
     count: i64,
-    outer_fn: AggregateFunction,
+    outer_fn: AggregateFunction<i64>,
     first: bool,
     last_partition: i64,
 }
 
 impl Group {
-    pub fn new(outer_fn: AggregateFunction) -> Self {
+    pub fn new(outer_fn: AggregateFunction<i64>) -> Self {
         Self {
             count: 0,
             outer_fn,
@@ -57,7 +58,7 @@ impl Group {
 #[derive(Debug)]
 pub struct PartitionedCount {
     filter: Option<PhysicalExprRef>,
-    outer_fn: AggregateFunction,
+    outer_fn: AggregateFunction<i64>,
     groups: Option<Groups<Group>>,
     single_group: Group,
     partition_col: Column,
@@ -69,7 +70,7 @@ pub struct PartitionedCount {
 impl PartitionedCount {
     pub fn try_new(
         filter: Option<PhysicalExprRef>,
-        outer_fn: AggregateFunction,
+        outer_fn: AggregateFunction<i64>,
         groups: Option<(Vec<(PhysicalExprRef, String, SortField)>)>,
         partition_col: Column,
         distinct: bool,
@@ -102,11 +103,7 @@ impl PartitionedAggregateExpr for PartitionedCount {
     }
 
     fn fields(&self) -> Vec<Field> {
-        let field = Field::new(
-            "partitioned_count",
-            DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-            true,
-        );
+        let field = Field::new("partitioned_count", DataType::Int64, true);
         vec![field]
     }
 
@@ -195,7 +192,7 @@ impl PartitionedAggregateExpr for PartitionedCount {
             }
 
             if bucket.last_partition != partition {
-                let v = bucket.count as i128;
+                let v = bucket.count;
                 bucket.outer_fn.accumulate(v);
                 bucket.last_partition = partition;
 
@@ -214,11 +211,10 @@ impl PartitionedAggregateExpr for PartitionedCount {
     fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
         if let Some(groups) = &mut self.groups {
             let mut rows: Vec<Row> = Vec::with_capacity(groups.groups.len());
-            let mut res_col_b = Decimal128Builder::with_capacity(groups.groups.len())
-                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
+            let mut res_col_b = Int64Builder::with_capacity(groups.groups.len());
             for (row, group) in groups.groups.iter_mut() {
                 rows.push(row.row());
-                group.outer_fn.accumulate(group.count as i128);
+                group.outer_fn.accumulate(group.count);
                 let res = group.outer_fn.result();
 
                 println!("{res}");
@@ -231,11 +227,10 @@ impl PartitionedAggregateExpr for PartitionedCount {
             let res_col = Arc::new(res_col) as ArrayRef;
             Ok(vec![group_col, vec![res_col]].concat())
         } else {
-            let mut res_col_b = Decimal128Builder::with_capacity(1)
-                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
+            let mut res_col_b = Int64Builder::with_capacity(1);
             self.single_group
                 .outer_fn
-                .accumulate(self.single_group.count as i128);
+                .accumulate(self.single_group.count);
             let res = self.single_group.outer_fn.result();
             res_col_b.append_value(res);
             let res_col = res_col_b.finish();
@@ -284,8 +279,8 @@ mod tests {
     use store::test_util::parse_markdown_tables;
 
     use crate::physical_plan::expressions::aggregate::partitioned::count::PartitionedCount;
-    use crate::physical_plan::expressions::aggregate::AggregateFunction;
     use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 
     #[test]
     fn count_sum_grouped() {
