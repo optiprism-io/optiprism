@@ -481,7 +481,7 @@ agg_decimal!(i128, Decimal128Array);
 agg!(u8, UInt8Array, u64, UInt64Builder, UInt64);
 agg!(u16, UInt16Array, u64, UInt64Builder, UInt64);
 agg!(u32, UInt32Array, u64, UInt64Builder, UInt64);
-agg!(u64, UInt64Array, u64, UInt64Builder, UInt64);
+agg_decimal!(u64, Decimal128Array);
 agg_decimal!(u128, Decimal128Array);
 agg!(f32, Float32Array, f64, Float64Builder, Float64);
 agg!(f64, Float64Array, f64, Float64Builder, Float64);

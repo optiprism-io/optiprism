@@ -20,7 +20,7 @@ def agg_prop_ch_query(agg, field):
         from file('*.parquet', Parquet) as b
         where b.event_event = 'Order Completed'
           and toStartOfDay(event_created_at, 'UTC') >=
-              toStartOfDay(parseDateTime('2023-09-16', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+              toStartOfDay(parseDateTime('2023-09-17', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
         group by c order by 1 asc format JSONCompactColumns;""".format(agg, field)
 
     resp = requests.get(ch_addr,

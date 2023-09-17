@@ -7,6 +7,7 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use arrow::datatypes::DataType;
+use arrow::datatypes::DataType::Decimal128;
 use arrow::datatypes::DataType::UInt64;
 use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
@@ -164,6 +165,26 @@ pub enum AggregateExpr {
     },
 }
 
+fn return_type(col: &Column, schema: &DFSchema) -> Result<DataType> {
+    let f = schema.field_from_column(col)?;
+    let dt = match f.data_type() {
+        DataType::Int8 => DataType::Int64,
+        DataType::Int16 => DataType::Int64,
+        DataType::Int32 => DataType::Int64,
+        DataType::Int64 => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+        DataType::UInt8 => DataType::UInt64,
+        DataType::UInt16 => DataType::UInt64,
+        DataType::UInt32 => DataType::UInt64,
+        UInt64 => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+        DataType::Float32 => DataType::Float64,
+        DataType::Float64 => DataType::Float64,
+        DataType::Decimal128(_, _) => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+        _ => unreachable!(),
+    };
+
+    Ok(dt)
+}
+
 impl AggregateExpr {
     pub fn group_exprs(&self) -> Vec<Expr> {
         let groups = match self {
@@ -186,11 +207,13 @@ impl AggregateExpr {
             AggregateExpr::Count { .. } => {
                 vec![DFField::new_unqualified("count", DataType::UInt64, true)]
             }
-            AggregateExpr::Aggregate { .. } => vec![DFField::new_unqualified(
-                "agg",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                true,
-            )],
+            AggregateExpr::Aggregate { predicate, .. } => {
+                vec![DFField::new_unqualified(
+                    "agg",
+                    return_type(predicate, schema)?,
+                    true,
+                )]
+            }
             AggregateExpr::PartitionedCount { .. } => vec![DFField::new_unqualified(
                 "partitioned_count",
                 DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),

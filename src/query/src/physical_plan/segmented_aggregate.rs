@@ -457,13 +457,13 @@ mod tests {
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count::Unique;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
+    use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
     // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
     // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Options;
     // use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count::Unique;
     // use crate::physical_plan::expressions::aggregate::partitioned::funnel::StepOrder;
     // use crate::physical_plan::expressions::aggregate::partitioned::funnel::Touch;
-    use crate::physical_plan::expressions::aggregate::AggregateFunction;
-    use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
+    use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
     use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
 
     #[tokio::test]
@@ -518,7 +518,7 @@ mod tests {
             ];
             let count = PartitionedCount::try_new(
                 None,
-                AggregateFunction::new_avg(),
+                AggregateFunction::new_sum(),
                 Some(groups),
                 Column::new_with_schema("user_id", &schema).unwrap(),
                 false,

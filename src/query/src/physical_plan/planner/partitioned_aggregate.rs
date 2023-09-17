@@ -122,6 +122,28 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone {
     }
 }
 
+fn aggregate_old(
+    agg: &logical_plan::partitioned_aggregate::AggregateFunction,
+) -> physical_plan::expressions::aggregate::AggregateFunction {
+    match agg {
+        logical_plan::partitioned_aggregate::AggregateFunction::Sum => {
+            physical_plan::expressions::aggregate::AggregateFunction::new_sum()
+        }
+        logical_plan::partitioned_aggregate::AggregateFunction::Min => {
+            physical_plan::expressions::aggregate::AggregateFunction::new_min()
+        }
+        logical_plan::partitioned_aggregate::AggregateFunction::Max => {
+            physical_plan::expressions::aggregate::AggregateFunction::new_max()
+        }
+        logical_plan::partitioned_aggregate::AggregateFunction::Avg => {
+            physical_plan::expressions::aggregate::AggregateFunction::new_avg()
+        }
+        logical_plan::partitioned_aggregate::AggregateFunction::Count => {
+            physical_plan::expressions::aggregate::AggregateFunction::new_count()
+        }
+    }
+}
+
 macro_rules! count {
     ($ty:ident,$filter:expr,$groups:expr,$predicate:expr,$partition_col:expr,$distinct:expr) => {
         Box::new(Count::<$ty>::try_new(
@@ -147,7 +169,7 @@ macro_rules! aggregate {
 }
 
 macro_rules! partitioned_aggregate {
-    ($ty:ident,$filter:expr,$inner:expr,$outer:expr,$predicate:expr,$groups:expr,$partition_col:expr) => {
+    ($ty:ident,$acc_ty:ident,$filter:expr,$inner:expr,$outer:expr,$predicate:expr,$groups:expr,$partition_col:expr) => {
         Box::new(partitioned::aggregate::Aggregate::<$ty>::try_new(
             $filter,
             $inner,
@@ -213,9 +235,8 @@ pub fn build_partitioned_aggregate_expr(
             let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
-            // let agg = aggregate(&agg);
 
-            let count = match predicate.data_type(schema)? {
+            let expr = match predicate.data_type(schema)? {
                 DataType::Int8 => {
                     let agg = aggregate::<i64>(&agg);
                     aggregate!(i8, i64, filter, groups, predicate, partition_col, agg)
@@ -263,7 +284,7 @@ pub fn build_partitioned_aggregate_expr(
                 _ => return Err(QueryError::Plan("unsupported predicate type".to_string())),
             };
 
-            Ok(count)
+            Ok(expr)
         }
         AggregateExpr::PartitionedCount {
             filter,
@@ -300,12 +321,13 @@ pub fn build_partitioned_aggregate_expr(
             let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
-            let inner = aggregate(&inner_fn);
-            let outer = aggregate(&outer_fn);
+            let inner = aggregate_old(&inner_fn); // TODO remove old
+            let outer = aggregate_old(&outer_fn);
 
             let ret = match predicate.data_type(schema)? {
                 DataType::Int8 => partitioned_aggregate!(
                     i8,
+                    i64,
                     filter,
                     inner,
                     outer,
@@ -315,6 +337,7 @@ pub fn build_partitioned_aggregate_expr(
                 ),
                 DataType::Int16 => partitioned_aggregate!(
                     i16,
+                    i64,
                     filter,
                     inner,
                     outer,
@@ -324,6 +347,7 @@ pub fn build_partitioned_aggregate_expr(
                 ),
                 DataType::Int32 => partitioned_aggregate!(
                     i32,
+                    i64,
                     filter,
                     inner,
                     outer,
@@ -333,6 +357,7 @@ pub fn build_partitioned_aggregate_expr(
                 ),
                 DataType::Int64 => partitioned_aggregate!(
                     i64,
+                    i128,
                     filter,
                     inner,
                     outer,
@@ -342,6 +367,7 @@ pub fn build_partitioned_aggregate_expr(
                 ),
                 DataType::UInt8 => partitioned_aggregate!(
                     u8,
+                    u64,
                     filter,
                     inner,
                     outer,
@@ -351,6 +377,7 @@ pub fn build_partitioned_aggregate_expr(
                 ),
                 DataType::UInt16 => partitioned_aggregate!(
                     u16,
+                    u64,
                     filter,
                     inner,
                     outer,
@@ -360,6 +387,7 @@ pub fn build_partitioned_aggregate_expr(
                 ),
                 DataType::UInt32 => partitioned_aggregate!(
                     u32,
+                    u64,
                     filter,
                     inner,
                     outer,
@@ -369,6 +397,7 @@ pub fn build_partitioned_aggregate_expr(
                 ),
                 DataType::UInt64 => partitioned_aggregate!(
                     u64,
+                    u128,
                     filter,
                     inner,
                     outer,
@@ -378,6 +407,7 @@ pub fn build_partitioned_aggregate_expr(
                 ),
                 DataType::Float32 => partitioned_aggregate!(
                     f32,
+                    f64,
                     filter,
                     inner,
                     outer,
@@ -387,6 +417,7 @@ pub fn build_partitioned_aggregate_expr(
                 ),
                 DataType::Float64 => partitioned_aggregate!(
                     f64,
+                    f64,
                     filter,
                     inner,
                     outer,
@@ -395,6 +426,7 @@ pub fn build_partitioned_aggregate_expr(
                     partition_col
                 ),
                 DataType::Decimal128(_, _) => partitioned_aggregate!(
+                    i128,
                     i128,
                     filter,
                     inner,
