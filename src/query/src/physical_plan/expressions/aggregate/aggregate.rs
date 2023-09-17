@@ -249,6 +249,7 @@ macro_rules! agg {
                     for (row, group) in groups.groups.iter_mut() {
                         rows.push(row.row());
                         let res = group.agg.result();
+
                         res_col_b.append_value(res);
                     }
 
@@ -417,7 +418,7 @@ macro_rules! agg_decimal {
                         &mut self.single_group
                     };
 
-                    bucket.agg.accumulate(val.unwrap() as i128);
+                    bucket.agg.accumulate(val.unwrap());
                 }
 
                 Ok(())
@@ -430,7 +431,7 @@ macro_rules! agg_decimal {
                         .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
                     for (row, group) in groups.groups.iter_mut() {
                         rows.push(row.row());
-                        let res = group.agg.result() * 10i64.pow(DECIMAL_SCALE as u32) as i128;
+                        let res = group.agg.result();
                         res_col_b.append_value(res);
                     }
 
@@ -441,9 +442,7 @@ macro_rules! agg_decimal {
                 } else {
                     let mut res_col_b = Decimal128Builder::with_capacity(1)
                         .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
-                    res_col_b.append_value(
-                        self.single_group.agg.result() * 10i64.pow(DECIMAL_SCALE as u32) as i128,
-                    );
+                    res_col_b.append_value(self.single_group.agg.result());
                     let res_col = res_col_b.finish();
                     let res_col = Arc::new(res_col) as ArrayRef;
                     Ok(vec![res_col])
@@ -476,7 +475,7 @@ macro_rules! agg_decimal {
 agg!(i8, Int8Array, i64, Int64Builder, Int64);
 agg!(i16, Int16Array, i64, Int64Builder, Int64);
 agg!(i32, Int32Array, i64, Int64Builder, Int64);
-agg_decimal!(i64, Int64Array);
+agg_decimal!(i64, Decimal128Array);
 agg_decimal!(i128, Decimal128Array);
 agg!(u8, UInt8Array, u64, UInt64Builder, UInt64);
 agg!(u16, UInt16Array, u64, UInt64Builder, UInt64);
@@ -505,30 +504,31 @@ mod tests {
     use datafusion::physical_expr::PhysicalExprRef;
     use store::test_util::parse_markdown_tables;
 
-    use crate::physical_plan::expressions::aggregate::aggregate2::Aggregate;
+    use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
     use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
     use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 
     #[test]
     fn sum_grouped() {
         let data = r#"
-| user_id(i64)| device(utf8) | v(i64)| event(utf8) |
+| user_id(i64)| device(utf8) | v(decimal)| event(utf8) |
 |-------------|--------------|-------|-------------|
-| 0           | iphone       | 1     | e1          |
-| 0           | android      | 1     | e1          |
-| 0           | android      | 1     | e1          |
-| 0           | osx          | 1     | e1          |
-| 0           | osx          | 1     | e3          |
-| 0           | osx          | 1     | e3          |
+| 0           | iphone       | 1.20     | e1          |
+| 0           | android      | 1000     | e1          |
+| 0           | android      | 1000     | e1          |
+| 0           | osx          | 100     | e1          |
+| 0           | osx          | 20000     | e3          |
+| 0           | osx          | 100000     | e3          |
 "#;
         let res = parse_markdown_tables(data).unwrap();
+        print_batches(res.as_ref()).unwrap();
         let schema = res[0].schema().clone();
         let groups = vec![(
             Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
             "device".to_string(),
             SortField::new(DataType::Utf8),
         )];
-        let mut agg = Aggregate::<i64, i128>::try_new(
+        let mut agg = Aggregate::<i128, i128>::try_new(
             None,
             Some(groups),
             Column::new_with_schema("user_id", &schema).unwrap(),

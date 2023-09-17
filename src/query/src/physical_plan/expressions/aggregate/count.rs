@@ -104,7 +104,7 @@ macro_rules! count {
             }
 
             fn fields(&self) -> Vec<Field> {
-                let field = Field::new("count", DataType::UInt64, true);
+                let field = Field::new("count", DataType::Int64, true);
                 vec![field]
             }
 
@@ -212,10 +212,10 @@ macro_rules! count {
             fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
                 if let Some(groups) = &mut self.groups {
                     let mut rows: Vec<Row> = Vec::with_capacity(groups.groups.len());
-                    let mut res_col_b = UInt64Builder::with_capacity(groups.groups.len());
+                    let mut res_col_b = Int64Builder::with_capacity(groups.groups.len());
                     for (row, group) in groups.groups.iter_mut() {
                         rows.push(row.row());
-                        let res = group.count as u64;
+                        let res = group.count;
                         res_col_b.append_value(res);
                     }
 
@@ -224,8 +224,8 @@ macro_rules! count {
                     let res_col = Arc::new(res_col) as ArrayRef;
                     Ok(vec![group_col, vec![res_col]].concat())
                 } else {
-                    let mut res_col_b = UInt64Builder::with_capacity(1);
-                    res_col_b.append_value(self.single_group.count as u64);
+                    let mut res_col_b = Int64Builder::with_capacity(1);
+                    res_col_b.append_value(self.single_group.count);
                     let res_col = res_col_b.finish();
                     let res_col = Arc::new(res_col) as ArrayRef;
                     Ok(vec![res_col])

@@ -86,39 +86,8 @@ def agg_prop_op_query(agg, field: str):
     return [ts, val]
 
 
-def agg_prop(agg, field: str):
-    assert agg_prop_ch_query(agg, field) == agg_prop_op_query(agg, field)
-
-
-def auth():
-    auth_body = {
-        "email": "admin@email.com",
-        "password": "admin"
-    }
-
-    auth_resp = requests.post(op_addr + "/auth/login", json=auth_body, headers={"Content-Type": "application/json"})
-
-    return auth_resp.json()['accessToken']
-
-
-def test_count():
-    ch_query = """SELECT toUnixTimestamp(toDate(event_created_at, 'UTC')),
-           count(event_user_id)                 as q1,
-           count(distinct event_user_id)        as q2
-    FROM file('*.parquet', Parquet)
-    where event_event = 'Order Completed'
-      and toStartOfDay(event_created_at, 'UTC') >=
-          toStartOfDay(parseDateTime('2023-09-16', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
-    group by 1
-    order by 1 asc format JSONCompactColumns;"""
-
-    ch_resp = requests.get(ch_addr,
-                           params={"query": ch_query})
-    ch_ts = list(map(lambda x: x * 1000000000, ch_resp.json()[0]))
-    ch_val1 = list(map(lambda x: float(x), ch_resp.json()[1]))
-    ch_val2 = list(map(lambda x: float(x), ch_resp.json()[2]))
-
-    op_query = {
+def simple_op_query(query: str):
+    q = {
         "time": {
             "type": "last",
             "last": 3,
@@ -135,10 +104,7 @@ def test_count():
                 "eventName": "Order Completed",
                 "queries": [
                     {
-                        "type": "countEvents"
-                    },
-                    {
-                        "type": "countUniqueGroups"
+                        "type": query
                     },
                 ],
                 "eventType": "regular",
@@ -154,40 +120,88 @@ def test_count():
         "breakdowns": []
     }
 
-    op_token = auth()
-    op_resp = requests.post(
+    token = auth()
+    resp = requests.post(
         "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
-        json=op_query,
+        json=q,
         headers={"Content-Type": "application/json",
-                 "Authorization": "Bearer " + op_token})
+                 "Authorization": "Bearer " + token})
 
-    op_ts = op_resp.json()[1]
-    op_val1 = op_resp.json()[2]
-    op_val2 = op_resp.json()[3]
+    ts = resp.json()[1]
+    val = resp.json()[2]
 
-    assert ch_ts == op_ts
-    assert ch_val1 == op_val1
-    assert ch_val2 == op_val2
+    return [ts, val]
+
+
+def assert_agg_prop(agg, field: str):
+    assert agg_prop_ch_query(agg, field) == agg_prop_op_query(agg, field)
+
+
+def auth():
+    auth_body = {
+        "email": "admin@email.com",
+        "password": "admin"
+    }
+
+    auth_resp = requests.post(op_addr + "/auth/login", json=auth_body, headers={"Content-Type": "application/json"})
+
+    return auth_resp.json()['accessToken']
+
+
+def test_count_events_i64():
+    assert agg_prop_ch_query("count", "event_user_id") == simple_op_query("countEvents")
+
+
+def test_count_events_decimal():
+    assert agg_prop_ch_query("count", "event_revenue") == simple_op_query("countEvents")
+
+
+def test_count_unique_groups_i64():
+    assert agg_prop_ch_query("count", "event_user_id") == simple_op_query("countUniqueGroups")
+
+
+def test_count_unique_groups_decimal():
+    assert agg_prop_ch_query("count", "event_revenue") == simple_op_query("countUniqueGroups")
 
 
 def test_count_uint8():
-    agg_prop("count", "user_cart_items_number")
+    assert_agg_prop("count", "user_cart_items_number")
 
 
 def test_min_uint8():
-    agg_prop("min", "user_cart_items_number")
+    assert_agg_prop("min", "user_cart_items_number")
 
 
 def test_max_uint8():
-    agg_prop("max", "user_cart_items_number")
+    assert_agg_prop("max", "user_cart_items_number")
 
 
 def test_sum_uint8():
-    agg_prop("sum", "user_cart_items_number")
+    assert_agg_prop("sum", "user_cart_items_number")
 
 
 def test_avg_uint8():
-    agg_prop("avg", "user_cart_items_number")
+    assert_agg_prop("avg", "user_cart_items_number")
+
+
+def test_count_decimal():
+    assert_agg_prop("count", "event_revenue")
+
+
+def test_min_decimal():
+    assert_agg_prop("min", "event_revenue")
+
+
+def test_max_decimal():
+    assert_agg_prop("max", "event_revenue")
+
+
+def test_sum_decimal():
+    assert_agg_prop("sum", "event_revenue")
+
+
+def test_avg_decimal():
+    assert_agg_prop("avg", "event_revenue")
 
 
 def test_agg_avg():

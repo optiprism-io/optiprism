@@ -3,7 +3,7 @@ use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 
-pub const DECIMAL_PRECISION: u8 = 19;
+pub const DECIMAL_PRECISION: u8 = 28;
 pub const DECIMAL_SCALE: i8 = 16;
 pub fn int128_to_decimal(v: i128) -> i128 {
     return v;

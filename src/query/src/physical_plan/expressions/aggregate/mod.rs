@@ -24,7 +24,6 @@ use store::test_util::PrimaryIndexType;
 use crate::error::Result;
 
 pub mod aggregate;
-mod aggregate2;
 pub mod count;
 pub mod partitioned;
 

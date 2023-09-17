@@ -205,7 +205,7 @@ impl AggregateExpr {
     pub fn fields(&self, schema: &DFSchema) -> Result<Vec<DFField>> {
         let fields = match self {
             AggregateExpr::Count { .. } => {
-                vec![DFField::new_unqualified("count", DataType::UInt64, true)]
+                vec![DFField::new_unqualified("count", DataType::Int64, true)]
             }
             AggregateExpr::Aggregate { predicate, .. } => {
                 vec![DFField::new_unqualified(
@@ -214,14 +214,16 @@ impl AggregateExpr {
                     true,
                 )]
             }
-            AggregateExpr::PartitionedCount { .. } => vec![DFField::new_unqualified(
-                "partitioned_count",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                true,
-            )],
+            AggregateExpr::PartitionedCount { .. } => {
+                vec![DFField::new_unqualified(
+                    "partitioned_count",
+                    DataType::Int64,
+                    true,
+                )]
+            }
             AggregateExpr::PartitionedAggregate { .. } => vec![DFField::new_unqualified(
                 "partitioned_agg",
-                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                DataType::Int64,
                 true,
             )],
             AggregateExpr::Funnel { groups, steps, .. } => {
