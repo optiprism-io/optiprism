@@ -64,7 +64,6 @@ use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
-use crate::physical_plan::expressions::aggregate::AggregateFunction;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;

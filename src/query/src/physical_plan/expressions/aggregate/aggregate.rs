@@ -418,7 +418,7 @@ macro_rules! agg_decimal {
                         &mut self.single_group
                     };
 
-                    bucket.agg.accumulate(val.unwrap());
+                    bucket.agg.accumulate(val.unwrap() as i128);
                 }
 
                 Ok(())
@@ -471,19 +471,202 @@ macro_rules! agg_decimal {
     };
 }
 
+macro_rules! agg_float {
+    ($ty:ident,$array_ty:ident) => {
+        impl PartitionedAggregateExpr for Aggregate<$ty, f64> {
+            fn group_columns(&self) -> Vec<(PhysicalExprRef, String)> {
+                if let Some(groups) = &self.groups {
+                    groups
+                        .exprs
+                        .iter()
+                        .zip(groups.names.iter())
+                        .map(|(a, b)| (a.clone(), b.clone()))
+                        .collect()
+                } else {
+                    vec![]
+                }
+            }
+
+            fn fields(&self) -> Vec<Field> {
+                let field = Field::new("agg", DataType::Float64, true);
+                vec![field]
+            }
+
+            fn evaluate(
+                &mut self,
+                batch: &RecordBatch,
+                partition_exist: Option<&HashMap<i64, (), RandomState>>,
+            ) -> crate::Result<()> {
+                let filter = if self.filter.is_some() {
+                    Some(
+                        self.filter
+                            .clone()
+                            .unwrap()
+                            .evaluate(batch)?
+                            .into_array(batch.num_rows())
+                            .as_any()
+                            .downcast_ref::<BooleanArray>()
+                            .unwrap()
+                            .clone(),
+                    )
+                } else {
+                    None
+                };
+
+                let a = self
+                    .predicate
+                    .evaluate(batch)?
+                    .into_array(batch.num_rows())
+                    .as_any();
+
+                print_batches(&[batch.to_owned()]).unwrap();
+                println!(
+                    "{:?}",
+                    predicate = self.predicate.evaluate(batch)?.into_array(batch.num_rows())
+                );
+                let predicate = self
+                    .predicate
+                    .evaluate(batch)?
+                    .into_array(batch.num_rows())
+                    .as_any()
+                    .downcast_ref::<$array_ty>()
+                    .unwrap()
+                    .clone();
+
+                let rows = if let Some(groups) = &mut self.groups {
+                    let arrs = groups
+                        .exprs
+                        .iter()
+                        .map(|e| {
+                            e.evaluate(batch)
+                                .and_then(|v| Ok(v.into_array(batch.num_rows()).clone()))
+                        })
+                        .collect::<result::Result<Vec<_>, _>>()?;
+
+                    Some(groups.row_converter.convert_columns(&arrs)?)
+                } else {
+                    None
+                };
+
+                let partitions = self
+                    .partition_col
+                    .evaluate(batch)?
+                    .into_array(batch.num_rows())
+                    .as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap()
+                    .clone();
+
+                let mut skip_partition = 0;
+                let mut skip = false;
+                for (row_id, val) in predicate.into_iter().enumerate() {
+                    if skip {
+                        if partitions.value(row_id) == skip_partition {
+                            continue;
+                        } else {
+                            skip = false;
+                        }
+                    }
+                    if let Some(exists) = partition_exist {
+                        let pid = partitions.value(row_id);
+                        if !exists.contains_key(&pid) {
+                            skip = true;
+                            skip_partition = pid;
+                            continue;
+                        }
+                    }
+                    if let Some(filter) = &filter {
+                        if !check_filter(filter, row_id) {
+                            continue;
+                        }
+                    }
+
+                    if val.is_none() {
+                        continue;
+                    }
+
+                    let bucket = if let Some(groups) = &mut self.groups {
+                        groups
+                            .groups
+                            .entry(rows.as_ref().unwrap().row(row_id).owned())
+                            .or_insert_with(|| {
+                                let mut bucket = Group::new(self.agg.make_new());
+                                bucket
+                            })
+                    } else {
+                        &mut self.single_group
+                    };
+
+                    bucket.agg.accumulate(val.unwrap() as f64);
+                }
+
+                Ok(())
+            }
+
+            fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
+                if let Some(groups) = &mut self.groups {
+                    let mut rows: Vec<Row> = Vec::with_capacity(groups.groups.len());
+                    let mut res_col_b = Float64Builder::with_capacity(groups.groups.len());
+                    for (row, group) in groups.groups.iter_mut() {
+                        rows.push(row.row());
+                        let res = group.agg.result();
+                        res_col_b.append_value(res);
+                    }
+
+                    let group_col = groups.row_converter.convert_rows(rows)?;
+                    let res_col = res_col_b.finish();
+                    let res_col = Arc::new(res_col) as ArrayRef;
+                    Ok(vec![group_col, vec![res_col]].concat())
+                } else {
+                    let mut res_col_b = Float64Builder::with_capacity(1);
+                    res_col_b.append_value(self.single_group.agg.result());
+                    let res_col = res_col_b.finish();
+                    let res_col = Arc::new(res_col) as ArrayRef;
+                    Ok(vec![res_col])
+                }
+            }
+
+            fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>> {
+                let groups = if let Some(groups) = &self.groups {
+                    Some(groups.try_make_new()?)
+                } else {
+                    None
+                };
+                let c = Aggregate::<$ty, f64> {
+                    filter: self.filter.clone(),
+                    groups,
+                    single_group: Group::new(self.agg.make_new()),
+                    predicate: self.predicate.clone(),
+                    partition_col: self.partition_col.clone(),
+                    agg: self.agg.make_new(),
+                    t: Default::default(),
+                };
+
+                Ok(Box::new(c))
+            }
+        }
+    };
+}
+
 //
 agg!(i8, Int8Array, i64, Int64Builder, Int64);
+agg_float!(i8, Int8Array);
 agg!(i16, Int16Array, i64, Int64Builder, Int64);
+agg_float!(i16, Int16Array);
 agg!(i32, Int32Array, i64, Int64Builder, Int64);
-agg_decimal!(i64, Decimal128Array);
+agg_float!(i32, Int32Array);
+agg_decimal!(i64, Int64Array);
 agg_decimal!(i128, Decimal128Array);
 agg!(u8, UInt8Array, u64, UInt64Builder, UInt64);
+agg_float!(u8, UInt8Array);
 agg!(u16, UInt16Array, u64, UInt64Builder, UInt64);
+agg_float!(u16, UInt16Array);
 agg!(u32, UInt32Array, u64, UInt64Builder, UInt64);
-agg_decimal!(u64, Decimal128Array);
+agg_float!(u32, UInt32Array);
+agg_decimal!(u64, UInt64Array);
 agg_decimal!(u128, Decimal128Array);
-agg!(f32, Float32Array, f64, Float64Builder, Float64);
-agg!(f64, Float64Array, f64, Float64Builder, Float64);
+agg_float!(f32, Float32Array);
+agg_float!(f64, Float64Array);
 // agg!(Decimal128Array, Decimal128Array, i128);
 
 #[cfg(test)]
@@ -509,7 +692,7 @@ mod tests {
     use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 
     #[test]
-    fn sum_grouped() {
+    fn sum_grouped_decimal() {
         let data = r#"
 | user_id(i64)| device(utf8) | v(decimal)| event(utf8) |
 |-------------|--------------|-------|-------------|
@@ -534,6 +717,52 @@ mod tests {
             Column::new_with_schema("user_id", &schema).unwrap(),
             Column::new_with_schema("v", &schema).unwrap(),
             AggregateFunction::new_sum(),
+        )
+        .unwrap();
+        for b in res {
+            agg.evaluate(&b, None).unwrap();
+        }
+
+        let res = agg.finalize().unwrap();
+
+        let schema = Schema::new_with_metadata(
+            vec![
+                Field::new("f", DataType::Utf8, true),
+                agg.fields()[0].clone(),
+            ],
+            Default::default(),
+        );
+        println!("{:?}", res);
+        let batch = RecordBatch::try_new(Arc::new(schema), res).unwrap();
+        print_batches(vec![batch].as_ref()).unwrap();
+    }
+
+    #[test]
+    fn avg_grouped_i32() {
+        let data = r#"
+| user_id(i64)| device(utf8) | v(i32)| event(utf8) |
+|-------------|--------------|-------|-------------|
+| 0           | iphone       | 1     | e1          |
+| 0           | android      | 2     | e1          |
+| 0           | android      | 3     | e1          |
+| 0           | osx          | 1     | e1          |
+| 0           | osx          | 2     | e3          |
+| 0           | osx          | 3     | e3          |
+"#;
+        let res = parse_markdown_tables(data).unwrap();
+        print_batches(res.as_ref()).unwrap();
+        let schema = res[0].schema().clone();
+        let groups = vec![(
+            Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
+            "device".to_string(),
+            SortField::new(DataType::Utf8),
+        )];
+        let mut agg = Aggregate::<i32, f64>::try_new(
+            None,
+            Some(groups),
+            Column::new_with_schema("user_id", &schema).unwrap(),
+            Column::new_with_schema("v", &schema).unwrap(),
+            AggregateFunction::new_avg(),
         )
         .unwrap();
         for b in res {

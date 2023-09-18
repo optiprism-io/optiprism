@@ -38,6 +38,7 @@ use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::datatypes::TimeUnit;
 use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 pub use context::Context;
 use convert_case::Case;
 use convert_case::Casing;
@@ -146,10 +147,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
                 .map(|value| match value {
                     None => Ok(Value::Null),
                     Some(v) => {
-                        let d = match Decimal::try_new(v as i64, *s as u32) {
-                            Ok(v) => v,
-                            Err(err) => return Err(err.into()),
-                        };
+                        let d = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32);
                         let d_f = match d.to_f64() {
                             None => {
                                 return Err(PlatformError::Internal(

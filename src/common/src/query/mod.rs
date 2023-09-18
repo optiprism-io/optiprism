@@ -122,6 +122,9 @@ impl From<AggregateFunction> for DFAggregateFunction {
 pub enum PartitionedAggregateFunction {
     Count,
     Sum,
+    Avg,
+    Min,
+    Max,
 }
 
 impl fmt::Display for PartitionedAggregateFunction {

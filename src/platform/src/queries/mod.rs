@@ -282,6 +282,9 @@ impl TryInto<common::query::PartitionedAggregateFunction> for &PartitionedAggreg
                 common::query::PartitionedAggregateFunction::Count
             }
             PartitionedAggregateFunction::Sum => common::query::PartitionedAggregateFunction::Sum,
+            PartitionedAggregateFunction::Avg => common::query::PartitionedAggregateFunction::Avg,
+            PartitionedAggregateFunction::Min => common::query::PartitionedAggregateFunction::Min,
+            PartitionedAggregateFunction::Max => common::query::PartitionedAggregateFunction::Max,
             _ => todo!(),
         })
     }
@@ -296,6 +299,9 @@ impl TryInto<PartitionedAggregateFunction> for common::query::PartitionedAggrega
                 PartitionedAggregateFunction::Count
             }
             common::query::PartitionedAggregateFunction::Sum => PartitionedAggregateFunction::Sum,
+            common::query::PartitionedAggregateFunction::Avg => PartitionedAggregateFunction::Avg,
+            common::query::PartitionedAggregateFunction::Min => PartitionedAggregateFunction::Min,
+            common::query::PartitionedAggregateFunction::Max => PartitionedAggregateFunction::Max,
         })
     }
 }

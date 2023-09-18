@@ -217,8 +217,6 @@ impl PartitionedAggregateExpr for PartitionedCount {
                 group.outer_fn.accumulate(group.count);
                 let res = group.outer_fn.result();
 
-                println!("{res}");
-
                 res_col_b.append_value(res);
             }
 

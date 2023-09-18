@@ -14,6 +14,7 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use common::query;
+use common::query::PartitionedAggregateFunction;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion_common::Column;
@@ -53,9 +54,11 @@ impl Into<AggregateFunction> for &query::AggregateFunction {
 impl Into<AggregateFunction> for &query::PartitionedAggregateFunction {
     fn into(self) -> AggregateFunction {
         match self {
-            query::PartitionedAggregateFunction::Count => AggregateFunction::Count,
-            query::PartitionedAggregateFunction::Sum => AggregateFunction::Sum,
-            _ => panic!("Unsupported partitioned aggregate function: {:?}", self),
+            PartitionedAggregateFunction::Count => AggregateFunction::Count,
+            PartitionedAggregateFunction::Sum => AggregateFunction::Sum,
+            PartitionedAggregateFunction::Avg => AggregateFunction::Avg,
+            PartitionedAggregateFunction::Min => AggregateFunction::Min,
+            PartitionedAggregateFunction::Max => AggregateFunction::Max,
         }
     }
 }
@@ -165,16 +168,57 @@ pub enum AggregateExpr {
     },
 }
 
-fn return_type(col: &Column, schema: &DFSchema) -> Result<DataType> {
+fn return_type(col: &Column, agg: &AggregateFunction, schema: &DFSchema) -> Result<DataType> {
+    let is_float = match agg {
+        AggregateFunction::Avg => true,
+        _ => false,
+    };
+
     let f = schema.field_from_column(col)?;
     let dt = match f.data_type() {
-        DataType::Int8 => DataType::Int64,
-        DataType::Int16 => DataType::Int64,
-        DataType::Int32 => DataType::Int64,
+        DataType::Int8 => {
+            if is_float {
+                DataType::Float64
+            } else {
+                DataType::Int64
+            }
+        }
+        DataType::Int16 => {
+            if is_float {
+                DataType::Float64
+            } else {
+                DataType::Int64
+            }
+        }
+        DataType::Int32 => {
+            if is_float {
+                DataType::Float64
+            } else {
+                DataType::Int64
+            }
+        }
         DataType::Int64 => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-        DataType::UInt8 => DataType::UInt64,
-        DataType::UInt16 => DataType::UInt64,
-        DataType::UInt32 => DataType::UInt64,
+        DataType::UInt8 => {
+            if is_float {
+                DataType::Float64
+            } else {
+                DataType::UInt64
+            }
+        }
+        DataType::UInt16 => {
+            if is_float {
+                DataType::Float64
+            } else {
+                DataType::UInt64
+            }
+        }
+        DataType::UInt32 => {
+            if is_float {
+                DataType::Float64
+            } else {
+                DataType::UInt64
+            }
+        }
         UInt64 => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
         DataType::Float32 => DataType::Float64,
         DataType::Float64 => DataType::Float64,
@@ -207,10 +251,10 @@ impl AggregateExpr {
             AggregateExpr::Count { .. } => {
                 vec![DFField::new_unqualified("count", DataType::Int64, true)]
             }
-            AggregateExpr::Aggregate { predicate, .. } => {
+            AggregateExpr::Aggregate { predicate, agg, .. } => {
                 vec![DFField::new_unqualified(
                     "agg",
-                    return_type(predicate, schema)?,
+                    return_type(predicate, agg, schema)?,
                     true,
                 )]
             }
@@ -221,11 +265,13 @@ impl AggregateExpr {
                     true,
                 )]
             }
-            AggregateExpr::PartitionedAggregate { .. } => vec![DFField::new_unqualified(
-                "partitioned_agg",
-                DataType::Int64,
-                true,
-            )],
+            AggregateExpr::PartitionedAggregate { predicate, .. } => {
+                vec![DFField::new_unqualified(
+                    "partitioned_agg",
+                    return_type(predicate, &AggregateFunction::Avg, schema)?,
+                    true,
+                )]
+            }
             AggregateExpr::Funnel { groups, steps, .. } => {
                 let mut fields = vec![
                     DFField::new_unqualified(
