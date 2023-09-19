@@ -20,6 +20,7 @@ clap = { version = "4.0.29", features = ["derive"] }
 arrow = { version = "42.0.0", features = ["prettyprint"] }
 parquet = "42.0.0"
 chrono = { version = "0.4.23" }
+test_util = { path = "../test_util" }
 common = { path = "../common" }
 csv = "1.1"
 cubic_spline = "1.0.0"

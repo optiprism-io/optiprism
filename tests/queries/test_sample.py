@@ -15,12 +15,14 @@ ch_addr = "http://localhost:8123"
 op_addr = "http://localhost:8080/api/v1"
 
 
+def get_ch_last_time():
+    q = """"""
 def agg_prop_ch_query(agg, field):
     q = """select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, {0}({1}) as sums
         from file('*.parquet', Parquet) as b
         where b.event_event = 'Order Completed'
           and toStartOfDay(event_created_at, 'UTC') >=
-              toStartOfDay(parseDateTime('2023-09-18', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+              toStartOfDay(now(), 'UTC') - INTERVAL 2 day
         group by c order by 1 asc format JSONCompactColumns;""".format(agg, field)
 
     resp = requests.get(ch_addr,
@@ -145,7 +147,7 @@ def partitioned_agg_prop_ch_query(agg, outer_agg, field):
                  from file('*.parquet', Parquet) as b
                  where b.event_event = 'Order Completed'
                    and toStartOfDay(event_created_at, 'UTC') >=
-                       toStartOfDay(parseDateTime('2023-09-18', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+                       toStartOfDay(now(), 'UTC') - INTERVAL 2 day
                  group by event_user_id, c)
         group by c
         order by 1 asc format JSONCompactColumns;""".format(outer_agg, agg, field)
@@ -302,7 +304,7 @@ def test_partitioned_count():
              from file('*.parquet', Parquet) as b
              where b.event_event = 'Order Completed'
                and toStartOfDay(event_created_at, 'UTC') >=
-                   toStartOfDay(parseDateTime('2023-09-18', '%Y-%m-%d'), 'UTC') - INTERVAL 1 day
+                   toStartOfDay(now(), 'UTC') - INTERVAL 2 day
              group by event_user_id, c)
     group by c
     order by 1 asc format JSONCompactColumns;"""

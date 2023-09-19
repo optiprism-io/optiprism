@@ -19,6 +19,8 @@ pub enum DemoError {
     Platform(#[from] PlatformError),
     #[error("Internal: {0:?}")]
     Internal(String),
+    #[error("Bad Request: {0:?}")]
+    BadRequest(String),
     #[error("FileNotFound: {0:?}")]
     FileNotFound(String),
     #[error("IP Address Parse Error: {0:?}")]

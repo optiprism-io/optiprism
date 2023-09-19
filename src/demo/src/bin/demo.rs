@@ -23,6 +23,7 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use clap::Parser;
+use clap::Subcommand;
 use common::rbac::OrganizationRole;
 use common::rbac::ProjectRole;
 use common::rbac::Role;
@@ -32,6 +33,9 @@ use datafusion::parquet::basic::Compression;
 use datafusion::parquet::file::properties::WriterProperties;
 use dateparser::DateTimeUtc;
 use demo::error::DemoError;
+use demo::shop;
+use demo::shop::Config;
+use demo::test;
 use enum_iterator::all;
 use events_gen::generator;
 use events_gen::generator::Generator;
@@ -62,45 +66,58 @@ use uuid::Uuid;
 
 extern crate parse_duration;
 
-#[derive(Parser)]
-#[command(propagate_version = true)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    #[clap(flatten)]
-    tracing: TracingCliArgs,
-    #[arg(long, default_value = "0.0.0.0:8080")]
-    host: SocketAddr,
+#[derive(Parser, Clone)]
+struct Shop {
     #[arg(long)]
     demo_data_path: PathBuf,
-    #[arg(long)]
-    md_path: Option<PathBuf>,
-    #[arg(long)]
-    ui_path: Option<PathBuf>,
-    #[arg(long)]
-    out_parquet: Option<PathBuf>,
     #[arg(long, default_value = "365 days")]
     duration: Option<String>,
     #[arg(long)]
     to_date: Option<String>,
     #[arg(long, default_value = "10")]
     new_daily_users: usize,
+}
+
+#[derive(Parser, Clone)]
+struct Test {}
+
+#[derive(Subcommand, Clone)]
+enum Commands {
+    /// Adds files to myapp
+    Shop(Shop),
+    Test(Test),
+}
+
+#[derive(Parser)]
+#[command(propagate_version = true)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
     #[arg(long)]
+    md_path: Option<PathBuf>,
+    #[clap(flatten)]
+    tracing: TracingCliArgs,
+    #[arg(long, default_value = "0.0.0.0:8080")]
+    host: SocketAddr,
+    #[arg(long, global = true)]
+    out_parquet: Option<PathBuf>,
+    #[arg(long, global = true)]
     partitions: Option<usize>,
+    #[arg(long)]
+    ui_path: Option<PathBuf>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let args = Args::parse();
+    let args = Cli::parse();
     args.tracing.init()?;
 
-    let to_date = match &args.to_date {
-        None => Utc::now(),
-        Some(dt) => dt.parse::<DateTimeUtc>()?.0.with_timezone(&Utc),
-    };
+    if args.command.is_none() {
+        return Err(DemoError::BadRequest("no command specified".to_string()).into());
+    }
 
-    let duration = Duration::from_std(parse_duration::parse(args.duration.unwrap().as_str())?)?;
-    let from_date = to_date - duration;
-    let md_path = match args.md_path {
+    let md_path = match args.md_path.clone() {
         None => temp_dir().join(format!("{}.db", Uuid::new_v4())),
         Some(path) => {
             if !path.try_exists()? {
@@ -113,6 +130,10 @@ async fn main() -> Result<(), anyhow::Error> {
             path
         }
     };
+    debug!("metadata path: {:?}", md_path);
+
+    let store = Arc::new(Store::new(md_path.clone()));
+    let md = Arc::new(MetadataProvider::try_new(store)?);
 
     if let Some(ui_path) = &args.ui_path {
         if !ui_path.try_exists()? {
@@ -120,18 +141,8 @@ async fn main() -> Result<(), anyhow::Error> {
                 DemoError::FileNotFound(format!("ui path {ui_path:?} doesn't exist")).into(),
             );
         }
+        debug!("ui path: {:?}", ui_path);
     }
-
-    if !args.demo_data_path.try_exists()? {
-        return Err(DemoError::FileNotFound(format!(
-            "demo data path {:?} doesn't exist",
-            args.demo_data_path
-        ))
-        .into());
-    }
-
-    let store = Arc::new(Store::new(md_path.clone()));
-    let md = Arc::new(MetadataProvider::try_new(store)?);
 
     info!("creating org structure and admin account...");
     {
@@ -181,43 +192,13 @@ async fn main() -> Result<(), anyhow::Error> {
             })
             .await?;
     }
-    info!("starting demo instance...");
-    debug!("metadata path: {:?}", md_path);
-    debug!("demo data path: {:?}", args.demo_data_path);
-    if args.ui_path.is_some() {
-        debug!("ui path: {:?}", args.ui_path);
-    }
-    debug!("from date {}", from_date);
-    let date_diff = to_date - from_date;
-    debug!("to date {}", to_date);
-    debug!(
-        "time range: {}",
-        humantime::format_duration(date_diff.to_std()?)
-    );
-    debug!("new daily users: {}", args.new_daily_users);
-    let total_users = args.new_daily_users as i64 * date_diff.num_days();
-    info!("expecting total unique users: {total_users}");
-    info!("starting sample data generation...");
 
-    let partitions = {
-        let store_cfg = Config {
-            org_id: 1,
-            project_id: 1,
-            md: md.clone(),
-            from_date,
-            to_date,
-            products_rdr: File::open(args.demo_data_path.join("products.csv"))
-                .map_err(|err| DemoError::Internal(format!("can't open products.csv: {err}")))?,
-            geo_rdr: File::open(args.demo_data_path.join("geo.csv"))
-                .map_err(|err| DemoError::Internal(format!("can't open geo.csv: {err}")))?,
-            device_rdr: File::open(args.demo_data_path.join("device.csv"))
-                .map_err(|err| DemoError::Internal(format!("can't open device.csv: {err}")))?,
-            new_daily_users: args.new_daily_users,
-            batch_size: 4096,
-            partitions: args.partitions.unwrap_or_else(|| num_cpus::get()),
-        };
-
-        gen(&md, store_cfg).await?
+    let partitions = match &args.command {
+        Some(cmd) => match cmd {
+            Commands::Shop(shop) => gen_store(&args, shop, &md).await?,
+            Commands::Test { .. } => gen_test(&md).await?,
+        },
+        _ => unreachable!(),
     };
 
     info!("successfully generated!");
@@ -236,7 +217,6 @@ async fn main() -> Result<(), anyhow::Error> {
         partitions.len(),
         partitions[0].len()
     );
-    debug!("average {} event(s) per 1 user", rows as i64 / total_users);
     debug!(
         "uncompressed dataset in-memory size: {}",
         ByteSize::b(data_size_bytes as u64)
@@ -277,96 +257,74 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(svc.serve().await?)
 }
 
-pub struct Config<R> {
-    pub org_id: u64,
-    pub project_id: u64,
-    pub md: Arc<MetadataProvider>,
-    pub from_date: DateTime<Utc>,
-    pub to_date: DateTime<Utc>,
-    pub products_rdr: R,
-    pub geo_rdr: R,
-    pub device_rdr: R,
-    pub new_daily_users: usize,
-    pub batch_size: usize,
-    pub partitions: usize,
+async fn gen_test(md: &Arc<MetadataProvider>) -> anyhow::Result<Vec<Vec<RecordBatch>>> {
+    info!("starting sample data generation...");
+    test::gen(md, 1, 1).await
 }
 
-pub async fn gen<R>(
+async fn gen_store(
+    args: &Cli,
+    cmd_args: &Shop,
     md: &Arc<MetadataProvider>,
-    cfg: Config<R>,
-) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error>
-where
-    R: io::Read,
-{
-    let mut rng = thread_rng();
-
-    info!("loading profiles...");
-    let profiles = ProfileProvider::try_new_from_csv(
-        cfg.org_id,
-        cfg.project_id,
-        &cfg.md.dictionaries,
-        cfg.geo_rdr,
-        cfg.device_rdr,
-    )?;
-    info!("loading products...");
-    let products = ProductProvider::try_new_from_csv(
-        cfg.org_id,
-        cfg.project_id,
-        &mut rng,
-        cfg.md.dictionaries.clone(),
-        cfg.products_rdr,
-    )
-    .await?;
-    info!("creating entities...");
-    let schema = Arc::new(create_entities(cfg.org_id, cfg.project_id, &cfg.md).await?);
-
-    info!("creating generator...");
-    let gen_cfg = generator::Config {
-        rng: rng.clone(),
-        profiles,
-        from: cfg.from_date,
-        to: cfg.to_date,
-        new_daily_users: cfg.new_daily_users,
-        traffic_hourly_weights: [
-            0.4, 0.37, 0.39, 0.43, 0.45, 0.47, 0.52, 0.6, 0.8, 0.9, 0.85, 0.8, 0.75, 0.85, 1.,
-            0.85, 0.7, 0.63, 0.62, 0.61, 0.59, 0.57, 0.48, 0.4,
-        ],
+) -> anyhow::Result<Vec<Vec<RecordBatch>>> {
+    let to_date = match &cmd_args.to_date {
+        None => Utc::now(),
+        Some(dt) => dt.parse::<DateTimeUtc>()?.0.with_timezone(&Utc),
     };
 
-    let gen = Generator::new(gen_cfg);
+    let duration = Duration::from_std(parse_duration::parse(
+        cmd_args.duration.clone().unwrap().as_str(),
+    )?)?;
+    let from_date = to_date - duration;
 
-    let mut events_map: HashMap<Event, u64> = HashMap::default();
-    for event in all::<Event>() {
-        let md_event = cfg
-            .md
-            .events
-            .get_by_name(cfg.org_id, cfg.project_id, event.to_string().as_str())
-            .await?;
-        events_map.insert(event, md_event.id);
-        block_on(md.dictionaries.get_key_or_create(
-            1,
-            1,
-            "event_event",
-            event.to_string().as_str(),
-        ))?;
+    if !cmd_args.demo_data_path.try_exists()? {
+        return Err(DemoError::FileNotFound(format!(
+            "demo data path {:?} doesn't exist",
+            cmd_args.demo_data_path
+        ))
+        .into());
     }
+    info!("store initialization...");
+    debug!("demo data path: {:?}", cmd_args.demo_data_path);
+    debug!("from date {}", from_date);
+    let date_diff = to_date - from_date;
+    debug!("to date {}", to_date);
+    debug!(
+        "time range: {}",
+        humantime::format_duration(date_diff.to_std()?)
+    );
+    debug!("new daily users: {}", cmd_args.new_daily_users);
+    let total_users = cmd_args.new_daily_users as i64 * date_diff.num_days();
+    info!("expecting total unique users: {total_users}");
+    info!("starting sample data generation...");
 
-    info!("generating events...");
-    let run_cfg = scenario::Config {
-        rng: rng.clone(),
-        gen,
-        schema: schema.clone(),
-        events_map,
-        products,
-        to: cfg.to_date,
-        batch_size: cfg.batch_size,
-        partitions: cfg.partitions,
+    let store_cfg = Config {
+        org_id: 1,
+        project_id: 1,
+        md: md.clone(),
+        from_date,
+        to_date,
+        products_rdr: File::open(cmd_args.demo_data_path.join("products.csv"))
+            .map_err(|err| DemoError::Internal(format!("can't open products.csv: {err}")))?,
+        geo_rdr: File::open(cmd_args.demo_data_path.join("geo.csv"))
+            .map_err(|err| DemoError::Internal(format!("can't open geo.csv: {err}")))?,
+        device_rdr: File::open(cmd_args.demo_data_path.join("device.csv"))
+            .map_err(|err| DemoError::Internal(format!("can't open device.csv: {err}")))?,
+        new_daily_users: cmd_args.new_daily_users,
+        batch_size: 4096,
+        partitions: args.partitions.unwrap_or_else(|| num_cpus::get()),
     };
 
-    let mut scenario = Scenario::new(run_cfg);
-    let result = scenario.run().await?;
+    let result = shop::gen(&md, store_cfg).await?;
+    let mut rows: usize = 0;
+    for partition in result.iter() {
+        for batch in partition.iter() {
+            rows += batch.num_rows();
+        }
+    }
+    debug!("average {} event(s) per 1 user", rows as i64 / total_users);
 
-    Ok(result)
+    return Ok(result);
 }
 
 fn write_parquet(
@@ -468,6 +426,7 @@ fn write_parquet(
 
                             for v in arr {
                                 if let Some(i) = v {
+                                    // TODO make dict cache
                                     let s = block_on(md.dictionaries.get_value(
                                         org_id,
                                         project_id,

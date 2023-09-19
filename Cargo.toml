@@ -14,5 +14,6 @@ members = [
     "src/query",
     "src/service",
     "src/store",
-    "src/ttest"
+    "src/ttest",
+    "src/test_util"
 ]

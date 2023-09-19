@@ -23,4 +23,6 @@ pub enum EventsGenError {
     General(String),
     #[error("FileNotFound: {0:?}")]
     FileNotFound(String),
+    #[error("Other: {0:?}")]
+    AnyhowError(#[from] anyhow::Error),
 }

@@ -11,6 +11,7 @@ chrono = { version = "0.4.23" }
 indicatif = "0.17.2"
 clap = { version = "4.0.29", features = ["derive"] }
 common = { path = "../common" }
+test_util = { path = "../test_util" }
 crossbeam-channel = "0.5.6"
 csv = "1.1"
 datafusion = "27.0.0"
