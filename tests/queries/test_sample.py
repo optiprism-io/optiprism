@@ -7,6 +7,20 @@ aggs = ["min", "max", "avg", "sum", "count"]
 fields = ["i_8", "i_16", "i_32", "i_64", "u_8", "u_16", "u_32", "u_64", "f_32", "f_64", "decimal"]
 
 
+def auth():
+    auth_body = {
+        "email": "admin@email.com",
+        "password": "admin"
+    }
+
+    auth_resp = requests.post(op_addr + "/auth/login", json=auth_body, headers={"Content-Type": "application/json"})
+
+    return auth_resp.json()['accessToken']
+
+
+token = auth()
+
+
 def agg_prop_ch_query(agg, field, distinct=""):
     q = """select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, {0}({2}event_{1}) as sums
         from file('*.parquet', Parquet) as b
@@ -62,7 +76,6 @@ def agg_prop_op_query(agg, field: str, prop_type="event"):
         "breakdowns": []
     }
 
-    token = auth()
     resp = requests.post(
         "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=q,
@@ -109,7 +122,6 @@ def simple_op_query(query: str):
         "breakdowns": []
     }
 
-    token = auth()
     resp = requests.post(
         "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=q,
@@ -183,7 +195,6 @@ def partitioned_agg_prop_op_query(agg, outer_agg, field: str, prop_type="event")
         "breakdowns": []
     }
 
-    token = auth()
     resp = requests.post(
         "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=q,
@@ -198,17 +209,6 @@ def partitioned_agg_prop_op_query(agg, outer_agg, field: str, prop_type="event")
 
 def assert_partitioned_agg_prop(agg, outer_agg, field: str):
     assert partitioned_agg_prop_ch_query(agg, outer_agg, field) == partitioned_agg_prop_op_query(agg, outer_agg, field)
-
-
-def auth():
-    auth_body = {
-        "email": "admin@email.com",
-        "password": "admin"
-    }
-
-    auth_resp = requests.post(op_addr + "/auth/login", json=auth_body, headers={"Content-Type": "application/json"})
-
-    return auth_resp.json()['accessToken']
 
 
 def test_count_events():
@@ -331,12 +331,11 @@ def test_partitioned_count():
         "breakdowns": []
     }
 
-    op_token = auth()
     op_resp = requests.post(
         "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=op_query,
         headers={"Content-Type": "application/json",
-                 "Authorization": "Bearer " + op_token})
+                 "Authorization": "Bearer " + token})
 
     op_ts = op_resp.json()[1]
     op_val1 = op_resp.json()[2]
