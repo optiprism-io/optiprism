@@ -413,7 +413,7 @@ impl Stream for AggregateStream {
         let result = block_on(collect(stream))?;
         let batch = concat_batches(&self.schema, &result)?;
 
-        print_batches(vec![batch.clone()].as_slice())?;
+        // print_batches(vec![batch.clone()].as_slice())?;
         Poll::Ready(Some(Ok(batch)))
     }
 }

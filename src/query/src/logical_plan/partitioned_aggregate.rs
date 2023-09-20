@@ -168,61 +168,82 @@ pub enum AggregateExpr {
     },
 }
 
+enum ReturnType {
+    Float64,
+    Int64,
+    Original,
+    New,
+}
+
 fn return_type(col: &Column, agg: &AggregateFunction, schema: &DFSchema) -> Result<DataType> {
-    let is_float = match agg {
-        AggregateFunction::Avg => true,
-        _ => false,
+    let return_type = match agg {
+        AggregateFunction::Avg => ReturnType::Float64,
+        AggregateFunction::Count => ReturnType::Int64,
+        AggregateFunction::Min | AggregateFunction::Max | AggregateFunction::Count => {
+            ReturnType::Original
+        }
+        _ => ReturnType::New,
     };
 
     let f = schema.field_from_column(col)?;
     let dt = match f.data_type() {
-        DataType::Int8 => {
-            if is_float {
-                DataType::Float64
-            } else {
-                DataType::Int64
-            }
-        }
-        DataType::Int16 => {
-            if is_float {
-                DataType::Float64
-            } else {
-                DataType::Int64
-            }
-        }
-        DataType::Int32 => {
-            if is_float {
-                DataType::Float64
-            } else {
-                DataType::Int64
-            }
-        }
-        DataType::Int64 => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-        DataType::UInt8 => {
-            if is_float {
-                DataType::Float64
-            } else {
-                DataType::UInt64
-            }
-        }
-        DataType::UInt16 => {
-            if is_float {
-                DataType::Float64
-            } else {
-                DataType::UInt64
-            }
-        }
-        DataType::UInt32 => {
-            if is_float {
-                DataType::Float64
-            } else {
-                DataType::UInt64
-            }
-        }
-        UInt64 => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+        DataType::Int8 => match return_type {
+            ReturnType::Float64 => DataType::Float64,
+            ReturnType::Int64 => DataType::Int64,
+            ReturnType::Original => DataType::Int8,
+            ReturnType::New => DataType::Int64,
+        },
+        DataType::Int16 => match return_type {
+            ReturnType::Float64 => DataType::Float64,
+            ReturnType::Int64 => DataType::Int64,
+            ReturnType::Original => DataType::Int16,
+            ReturnType::New => DataType::Int64,
+        },
+        DataType::Int32 => match return_type {
+            ReturnType::Float64 => DataType::Float64,
+            ReturnType::Int64 => DataType::Int64,
+            ReturnType::Original => DataType::Int32,
+            ReturnType::New => DataType::Int64,
+        },
+        DataType::Int64 => match return_type {
+            ReturnType::Float64 => DataType::Float64,
+            ReturnType::Int64 => DataType::Int64,
+            ReturnType::Original => DataType::Int64,
+            ReturnType::New => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+        },
+        // DataType::Int64 => DataType::Float64,
+        DataType::UInt8 => match return_type {
+            ReturnType::Float64 => DataType::Float64,
+            ReturnType::Int64 => DataType::Int64,
+            ReturnType::Original => DataType::UInt8,
+            ReturnType::New => DataType::UInt64,
+        },
+        DataType::UInt16 => match return_type {
+            ReturnType::Float64 => DataType::Float64,
+            ReturnType::Int64 => DataType::Int64,
+            ReturnType::Original => DataType::UInt16,
+            ReturnType::New => DataType::UInt64,
+        },
+        DataType::UInt32 => match return_type {
+            ReturnType::Float64 => DataType::Float64,
+            ReturnType::Int64 => DataType::Int64,
+            ReturnType::Original => DataType::UInt32,
+            ReturnType::New => DataType::UInt64,
+        },
+        UInt64 => match return_type {
+            ReturnType::Float64 => DataType::Float64,
+            ReturnType::Int64 => DataType::Int64,
+            ReturnType::Original => DataType::UInt64,
+            ReturnType::New => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+        },
         DataType::Float32 => DataType::Float64,
         DataType::Float64 => DataType::Float64,
-        DataType::Decimal128(_, _) => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+        DataType::Decimal128(_, _) => match return_type {
+            ReturnType::Float64 => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            ReturnType::Int64 => DataType::Int64,
+            ReturnType::Original => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            ReturnType::New => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+        },
         _ => unreachable!(),
     };
 

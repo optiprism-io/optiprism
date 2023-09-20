@@ -1,29 +1,19 @@
-import json
-
-import pytest
 import requests
-from attr import dataclass
-
-
-@dataclass
-class Query:
-    ch_query: str
-    op_query: object
-
 
 ch_addr = "http://localhost:8123"
 op_addr = "http://localhost:8080/api/v1"
 
+aggs = ["min", "max", "avg", "sum", "count"]
+fields = ["i_8", "i_16", "i_32", "i_64", "u_8", "u_16", "u_32", "u_64", "f_32", "f_64", "decimal"]
 
-def get_ch_last_time():
-    q = """"""
-def agg_prop_ch_query(agg, field):
-    q = """select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, {0}({1}) as sums
+
+def agg_prop_ch_query(agg, field, distinct=""):
+    q = """select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, {0}({2}event_{1}) as sums
         from file('*.parquet', Parquet) as b
-        where b.event_event = 'Order Completed'
+        where b.event_event = 'event'
           and toStartOfDay(event_created_at, 'UTC') >=
               toStartOfDay(now(), 'UTC') - INTERVAL 2 day
-        group by c order by 1 asc format JSONCompactColumns;""".format(agg, field)
+        group by c order by 1 asc format JSONCompactColumns;""".format(agg, field, distinct)
 
     resp = requests.get(ch_addr,
                         params={"query": q})
@@ -35,11 +25,7 @@ def agg_prop_ch_query(agg, field):
     return [ts, val]
 
 
-def agg_prop_op_query(agg, field: str):
-    parts = field.split("_")
-    prop_type = parts[0]
-    prop_name: str = " ".join(list(map(lambda p: p.capitalize(), parts[1:])))
-
+def agg_prop_op_query(agg, field: str, prop_type="event"):
     q = {
         "time": {
             "type": "last",
@@ -54,13 +40,13 @@ def agg_prop_op_query(agg, field: str):
         },
         "events": [
             {
-                "eventName": "Order Completed",
+                "eventName": "event",
                 "queries": [
                     {
                         "type": "aggregateProperty",
                         "aggregate": agg,
                         "propertyType": prop_type,
-                        "propertyName": prop_name
+                        "propertyName": field
                     },
                 ],
                 "eventType": "regular",
@@ -104,7 +90,7 @@ def simple_op_query(query: str):
         },
         "events": [
             {
-                "eventName": "Order Completed",
+                "eventName": "event",
                 "queries": [
                     {
                         "type": query
@@ -143,9 +129,9 @@ def assert_agg_prop(agg, field: str):
 def partitioned_agg_prop_ch_query(agg, outer_agg, field):
     q = """select c, {0}(counts)
         from (
-                 select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, {1}({2}) as counts
+                 select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, {1}(event_{2}) as counts
                  from file('*.parquet', Parquet) as b
-                 where b.event_event = 'Order Completed'
+                 where b.event_event = 'event'
                    and toStartOfDay(event_created_at, 'UTC') >=
                        toStartOfDay(now(), 'UTC') - INTERVAL 2 day
                  group by event_user_id, c)
@@ -159,11 +145,7 @@ def partitioned_agg_prop_ch_query(agg, outer_agg, field):
     return [ch_ts, ch_val]
 
 
-def partitioned_agg_prop_op_query(agg, outer_agg, field: str):
-    parts = field.split("_")
-    prop_type = parts[0]
-    prop_name: str = " ".join(list(map(lambda p: p.capitalize(), parts[1:])))
-
+def partitioned_agg_prop_op_query(agg, outer_agg, field: str, prop_type="event"):
     q = {
         "time": {
             "type": "last",
@@ -178,14 +160,14 @@ def partitioned_agg_prop_op_query(agg, outer_agg, field: str):
         },
         "events": [
             {
-                "eventName": "Order Completed",
+                "eventName": "event",
                 "queries": [
                     {
                         "type": "aggregatePropertyPerGroup",
                         "aggregate": outer_agg,
                         "aggregatePerGroup": agg,
                         "propertyType": prop_type,
-                        "propertyName": prop_name
+                        "propertyName": field
                     },
                 ],
                 "eventType": "regular",
@@ -229,32 +211,23 @@ def auth():
     return auth_resp.json()['accessToken']
 
 
-def test_count_events_i64():
-    assert agg_prop_ch_query("count", "event_user_id") == simple_op_query("countEvents")
+def test_count_events():
+    assert agg_prop_ch_query("count", "event") == simple_op_query("countEvents")
 
 
-def test_count_events_u8():
-    assert agg_prop_ch_query("count", "user_cart_items_number") == simple_op_query("countEvents")
+def test_count_unique_groups():
+    assert agg_prop_ch_query("uniq", "user_id", "") == simple_op_query("countUniqueGroups")
 
 
-def test_count_events_decimal():
-    assert agg_prop_ch_query("count", "event_revenue") == simple_op_query("countEvents")
-
-
-def test_count_unique_groups_u8():
-    assert agg_prop_ch_query("count", "user_cart_items_number") == simple_op_query("countUniqueGroups")
-
-
-def test_count_unique_groups_i64():
-    assert agg_prop_ch_query("count", "event_user_id") == simple_op_query("countUniqueGroups")
-
-
-def test_count_unique_groups_decimal():
-    assert agg_prop_ch_query("count", "event_revenue") == simple_op_query("countUniqueGroups")
+def test_agg_prop():
+    for field in fields:
+        for agg in aggs:
+            print("Test Aggregate Property {0}({1})".format(agg, field))
+            assert_agg_prop(agg, field)
 
 
 def test_count_uint8():
-    assert_agg_prop("count", "user_cart_items_number")
+    assert_agg_prop("avg", "u_8")
 
 
 def test_min_uint8():
@@ -294,7 +267,7 @@ def test_avg_decimal():
 
 
 def test_partitioned_avg_sum_uint8():
-    assert_partitioned_agg_prop("avg", "sum", "event_revenue")
+    assert_partitioned_agg_prop("avg", "sum", "u_8")
 
 
 def test_partitioned_count():
@@ -302,7 +275,7 @@ def test_partitioned_count():
     from (
              select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, count(1) as counts
              from file('*.parquet', Parquet) as b
-             where b.event_event = 'Order Completed'
+             where b.event_event = 'event'
                and toStartOfDay(event_created_at, 'UTC') >=
                    toStartOfDay(now(), 'UTC') - INTERVAL 2 day
              group by event_user_id, c)
@@ -330,7 +303,7 @@ def test_partitioned_count():
         },
         "events": [
             {
-                "eventName": "Order Completed",
+                "eventName": "event",
                 "queries": [
                     {
                         "type": "countPerGroup",

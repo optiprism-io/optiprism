@@ -92,20 +92,20 @@ pub async fn gen(
     .await?;
 
     let props = vec![
-        (("i8", DataType::Int8)),
-        (("i16", DataType::Int16)),
-        (("i32", DataType::Int32)),
-        (("i64", DataType::Int64)),
-        (("u8", DataType::UInt8)),
-        (("u16", DataType::UInt16)),
-        (("u32", DataType::UInt32)),
-        (("u64", DataType::UInt64)),
-        (("f32", DataType::Float32)),
-        (("f64", DataType::Float64)),
+        (("i_8", DataType::Int8)),
+        (("i_16", DataType::Int16)),
+        (("i_32", DataType::Int32)),
+        (("i_64", DataType::Int64)),
+        (("u_8", DataType::UInt8)),
+        (("u_16", DataType::UInt16)),
+        (("u_32", DataType::UInt32)),
+        (("u_64", DataType::UInt64)),
+        (("f_32", DataType::Float32)),
+        (("f_64", DataType::Float64)),
         (("bool", DataType::Boolean)),
         (("string", DataType::Utf8)),
         (("timestamp", DataType::Timestamp(TimeUnit::Second, None))),
-        (("large_utf8", DataType::LargeUtf8)),
+        (("large_utf_8", DataType::LargeUtf8)),
         ((
             "decimal",
             DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
@@ -166,18 +166,17 @@ pub async fn gen(
     let mut b_dec =
         Decimal128Builder::new().with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
     let users = 100;
+    let days = 100;
     let events = 10;
     let new_users = 1.1;
     let new_events = 1.1;
     for user in 0..users {
-        let mut cur_time = Utc::now();
-        for day in 0..users {
+        let mut cur_time = Utc::now() - Duration::days(days);
+        for day in 0..days {
+            let mut event_time = cur_time.clone();
             for event in 0..events {
-                let event_time = cur_time.clone();
-                let d = Duration::days(1).num_seconds() / events;
-                let diff = Duration::seconds(d);
                 b_user_id.append_value(user);
-                b_created_at.append_value(event_time.nanosecond() as i64);
+                b_created_at.append_value(event_time.timestamp_nanos() as i64);
                 b_event.append_value(1);
                 b_i8.append_value(event as i8);
                 b_i16.append_value(event as i16);
@@ -193,9 +192,11 @@ pub async fn gen(
                 b_str.append_value(format!("event {}", event).as_str());
                 b_lstr.append_value(format!("event {}", event).as_str());
                 b_ts.append_value(event * 1000);
-                b_dec.append_value(event as i128);
+                b_dec.append_value(event as i128 * 10_i128.pow(DECIMAL_SCALE as u32));
 
-                event_time.add(diff);
+                let d = Duration::days(1).num_seconds() / events;
+                let diff = Duration::seconds(d);
+                event_time = event_time.add(diff);
             }
             cur_time = cur_time.add(Duration::days(1));
         }

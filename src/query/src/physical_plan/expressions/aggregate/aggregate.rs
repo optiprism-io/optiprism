@@ -16,18 +16,23 @@ use arrow::array::Float32Builder;
 use arrow::array::Float64Array;
 use arrow::array::Float64Builder;
 use arrow::array::Int16Array;
+use arrow::array::Int16Builder;
 use arrow::array::Int32Array;
 use arrow::array::Int32Builder;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::Int8Array;
+use arrow::array::Int8Builder;
 use arrow::array::PrimitiveArray;
 use arrow::array::TimestampMillisecondArray;
 use arrow::array::UInt16Array;
+use arrow::array::UInt16Builder;
 use arrow::array::UInt32Array;
+use arrow::array::UInt32Builder;
 use arrow::array::UInt64Array;
 use arrow::array::UInt64Builder;
 use arrow::array::UInt8Array;
+use arrow::array::UInt8Builder;
 use arrow::buffer::ScalarBuffer;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
@@ -151,17 +156,6 @@ macro_rules! agg {
                     None
                 };
 
-                let a = self
-                    .predicate
-                    .evaluate(batch)?
-                    .into_array(batch.num_rows())
-                    .as_any();
-
-                print_batches(&[batch.to_owned()]).unwrap();
-                println!(
-                    "{:?}",
-                    predicate = self.predicate.evaluate(batch)?.into_array(batch.num_rows())
-                );
                 let predicate = self
                     .predicate
                     .evaluate(batch)?
@@ -235,7 +229,6 @@ macro_rules! agg {
                         &mut self.single_group
                     };
 
-                    println!("asd {:?}", val.unwrap());
                     bucket.agg.accumulate(val.unwrap() as $acc_ty);
                 }
 
@@ -334,17 +327,6 @@ macro_rules! agg_decimal {
                     None
                 };
 
-                let a = self
-                    .predicate
-                    .evaluate(batch)?
-                    .into_array(batch.num_rows())
-                    .as_any();
-
-                print_batches(&[batch.to_owned()]).unwrap();
-                println!(
-                    "{:?}",
-                    predicate = self.predicate.evaluate(batch)?.into_array(batch.num_rows())
-                );
                 let predicate = self
                     .predicate
                     .evaluate(batch)?
@@ -353,6 +335,11 @@ macro_rules! agg_decimal {
                     .downcast_ref::<$array_ty>()
                     .unwrap()
                     .clone();
+
+                let multiply = match predicate.data_type() {
+                    DataType::Decimal128(_, _) => 1,
+                    _ => 10_i128.pow(DECIMAL_SCALE as u32),
+                };
 
                 let rows = if let Some(groups) = &mut self.groups {
                     let arrs = groups
@@ -418,7 +405,7 @@ macro_rules! agg_decimal {
                         &mut self.single_group
                     };
 
-                    bucket.agg.accumulate(val.unwrap() as i128);
+                    bucket.agg.accumulate(val.unwrap() as i128 * multiply);
                 }
 
                 Ok(())
@@ -513,17 +500,6 @@ macro_rules! agg_float {
                     None
                 };
 
-                let a = self
-                    .predicate
-                    .evaluate(batch)?
-                    .into_array(batch.num_rows())
-                    .as_any();
-
-                print_batches(&[batch.to_owned()]).unwrap();
-                println!(
-                    "{:?}",
-                    predicate = self.predicate.evaluate(batch)?.into_array(batch.num_rows())
-                );
                 let predicate = self
                     .predicate
                     .evaluate(batch)?
@@ -649,23 +625,49 @@ macro_rules! agg_float {
 }
 
 //
+agg!(i8, Int8Array, i8, Int8Builder, Int8);
 agg!(i8, Int8Array, i64, Int64Builder, Int64);
 agg_float!(i8, Int8Array);
+
+agg!(i16, Int16Array, i16, Int16Builder, Int16);
 agg!(i16, Int16Array, i64, Int64Builder, Int64);
 agg_float!(i16, Int16Array);
+
+agg!(i32, Int32Array, i32, Int32Builder, Int32);
 agg!(i32, Int32Array, i64, Int64Builder, Int64);
 agg_float!(i32, Int32Array);
+
+agg!(i64, Int64Array, i64, Int64Builder, Int64);
+agg_float!(i64, Int64Array);
 agg_decimal!(i64, Int64Array);
+
+agg!(i128, Decimal128Array, i64, Int64Builder, Int64);
+agg_float!(i128, Decimal128Array);
 agg_decimal!(i128, Decimal128Array);
+
+agg!(u8, UInt8Array, u8, UInt8Builder, UInt8);
+agg!(u8, UInt8Array, i64, Int64Builder, Int64);
 agg!(u8, UInt8Array, u64, UInt64Builder, UInt64);
 agg_float!(u8, UInt8Array);
+
+agg!(u16, UInt16Array, u16, UInt16Builder, UInt16);
+agg!(u16, UInt16Array, i64, Int64Builder, Int64);
 agg!(u16, UInt16Array, u64, UInt64Builder, UInt64);
 agg_float!(u16, UInt16Array);
+
+agg!(u32, UInt32Array, i64, Int64Builder, Int64);
+agg!(u32, UInt32Array, u32, UInt32Builder, UInt32);
 agg!(u32, UInt32Array, u64, UInt64Builder, UInt64);
 agg_float!(u32, UInt32Array);
+
+agg!(u64, UInt64Array, i64, Int64Builder, Int64);
+agg!(u64, UInt64Array, u64, UInt64Builder, UInt64);
+agg_float!(u64, UInt64Array);
 agg_decimal!(u64, UInt64Array);
+
 agg_decimal!(u128, Decimal128Array);
 agg_float!(f32, Float32Array);
+
 agg_float!(f64, Float64Array);
 // agg!(Decimal128Array, Decimal128Array, i128);
 

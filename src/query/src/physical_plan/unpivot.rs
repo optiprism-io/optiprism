@@ -216,8 +216,6 @@ impl Stream for UnpivotStream {
 
         let poll = match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => {
-                println!("????");
-                print_batches(vec![batch.clone()].as_ref())?;
                 Poll::Ready(Some(Ok(unpivot(&batch, self.schema.clone(), &self.cols)?)))
             }
             other => other,

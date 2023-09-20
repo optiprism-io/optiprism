@@ -61,6 +61,7 @@ impl Table {
                 .iter()
                 .cloned()
                 .map(|c| {
+                    println!("{}", c.name);
                     Field::new(
                         &c.name,
                         c.dictionary.unwrap_or_else(|| c.data_type.clone()),
