@@ -63,6 +63,7 @@ use crate::physical_plan::expressions::aggregate::count::Count;
 // use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
 // use crate::physical_plan::expressions::aggregate::count::Count;
 use crate::physical_plan::expressions::aggregate::partitioned;
+use crate::physical_plan::expressions::aggregate::partitioned::count::PartitionedCount;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
@@ -146,6 +147,18 @@ macro_rules! aggregate {
     };
 }
 
+macro_rules! partitioned_count {
+    ($out_ty:ident,$filter:expr,$agg:expr,$groups:expr,$partition_col:expr,$distinct:expr) => {
+        Box::new(PartitionedCount::<$out_ty>::try_new(
+            $filter,
+            $agg,
+            $groups,
+            $partition_col,
+            $distinct,
+        )?) as Box<dyn PartitionedAggregateExpr>
+    };
+}
+
 macro_rules! partitioned_aggregate {
     ($ty:ident,$acc_ty:ident,$filter:expr,$inner:expr,$outer:expr,$predicate:expr,$groups:expr,$partition_col:expr) => {
         Box::new(partitioned::aggregate::Aggregate::<$ty, $acc_ty>::try_new(
@@ -163,7 +176,19 @@ enum ReturnType {
     Float64,
     Int64,
     Original,
-    New,
+    Casted,
+}
+
+fn get_return_type(agg: &logical_plan::partitioned_aggregate::AggregateFunction) -> ReturnType {
+    match agg {
+        logical_plan::partitioned_aggregate::AggregateFunction::Avg => ReturnType::Float64,
+        logical_plan::partitioned_aggregate::AggregateFunction::Count => ReturnType::Int64,
+        logical_plan::partitioned_aggregate::AggregateFunction::Min
+        | logical_plan::partitioned_aggregate::AggregateFunction::Max
+        | logical_plan::partitioned_aggregate::AggregateFunction::Count => ReturnType::Original,
+        logical_plan::partitioned_aggregate::AggregateFunction::Sum => ReturnType::Casted,
+        _ => ReturnType::Casted,
+    }
 }
 
 pub fn build_partitioned_aggregate_expr(
@@ -222,19 +247,8 @@ pub fn build_partitioned_aggregate_expr(
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
 
-            let return_type = match agg {
-                logical_plan::partitioned_aggregate::AggregateFunction::Avg => ReturnType::Float64,
-                logical_plan::partitioned_aggregate::AggregateFunction::Count => ReturnType::Int64,
-                logical_plan::partitioned_aggregate::AggregateFunction::Min
-                | logical_plan::partitioned_aggregate::AggregateFunction::Max
-                | logical_plan::partitioned_aggregate::AggregateFunction::Count => {
-                    ReturnType::Original
-                }
-                _ => ReturnType::New,
-            };
-
             let expr = match predicate.data_type(schema)? {
-                DataType::Int8 => match return_type {
+                DataType::Int8 => match get_return_type(&agg) {
                     ReturnType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(i8, f64, filter, groups, predicate, partition_col, agg)
@@ -247,12 +261,13 @@ pub fn build_partitioned_aggregate_expr(
                         let agg = aggregate::<i8>(&agg);
                         aggregate!(i8, i8, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::New => {
+                    ReturnType::Casted => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(i8, i64, filter, groups, predicate, partition_col, agg)
                     }
                 },
-                DataType::Int16 => match return_type {
+
+                DataType::Int16 => match get_return_type(&agg) {
                     ReturnType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(i16, f64, filter, groups, predicate, partition_col, agg)
@@ -265,12 +280,12 @@ pub fn build_partitioned_aggregate_expr(
                         let agg = aggregate::<i16>(&agg);
                         aggregate!(i16, i16, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::New => {
+                    ReturnType::Casted => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(i16, i64, filter, groups, predicate, partition_col, agg)
                     }
                 },
-                DataType::Int32 => match return_type {
+                DataType::Int32 => match get_return_type(&agg) {
                     ReturnType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(i32, f64, filter, groups, predicate, partition_col, agg)
@@ -283,12 +298,12 @@ pub fn build_partitioned_aggregate_expr(
                         let agg = aggregate::<i32>(&agg);
                         aggregate!(i32, i32, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::New => {
+                    ReturnType::Casted => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(i32, i64, filter, groups, predicate, partition_col, agg)
                     }
                 },
-                DataType::Int64 => match return_type {
+                DataType::Int64 => match get_return_type(&agg) {
                     ReturnType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(i64, f64, filter, groups, predicate, partition_col, agg)
@@ -301,12 +316,12 @@ pub fn build_partitioned_aggregate_expr(
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(i64, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::New => {
+                    ReturnType::Casted => {
                         let agg = aggregate::<i128>(&agg);
                         aggregate!(i64, i128, filter, groups, predicate, partition_col, agg)
                     }
                 },
-                DataType::UInt8 => match return_type {
+                DataType::UInt8 => match get_return_type(&agg) {
                     ReturnType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(u8, f64, filter, groups, predicate, partition_col, agg)
@@ -319,12 +334,12 @@ pub fn build_partitioned_aggregate_expr(
                         let agg = aggregate::<u8>(&agg);
                         aggregate!(u8, u8, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::New => {
+                    ReturnType::Casted => {
                         let agg = aggregate::<u64>(&agg);
                         aggregate!(u8, u64, filter, groups, predicate, partition_col, agg)
                     }
                 },
-                DataType::UInt16 => match return_type {
+                DataType::UInt16 => match get_return_type(&agg) {
                     ReturnType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(u16, f64, filter, groups, predicate, partition_col, agg)
@@ -337,12 +352,12 @@ pub fn build_partitioned_aggregate_expr(
                         let agg = aggregate::<u16>(&agg);
                         aggregate!(u16, u16, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::New => {
+                    ReturnType::Casted => {
                         let agg = aggregate::<u64>(&agg);
                         aggregate!(u16, u64, filter, groups, predicate, partition_col, agg)
                     }
                 },
-                DataType::UInt32 => match return_type {
+                DataType::UInt32 => match get_return_type(&agg) {
                     ReturnType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(u32, f64, filter, groups, predicate, partition_col, agg)
@@ -355,12 +370,12 @@ pub fn build_partitioned_aggregate_expr(
                         let agg = aggregate::<u32>(&agg);
                         aggregate!(u32, u32, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::New => {
+                    ReturnType::Casted => {
                         let agg = aggregate::<u64>(&agg);
                         aggregate!(u32, u64, filter, groups, predicate, partition_col, agg)
                     }
                 },
-                DataType::UInt64 => match return_type {
+                DataType::UInt64 => match get_return_type(&agg) {
                     ReturnType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(u64, f64, filter, groups, predicate, partition_col, agg)
@@ -373,7 +388,7 @@ pub fn build_partitioned_aggregate_expr(
                         let agg = aggregate::<u64>(&agg);
                         aggregate!(u64, u64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::New => {
+                    ReturnType::Casted => {
                         let agg = aggregate::<i128>(&agg);
                         aggregate!(u64, i128, filter, groups, predicate, partition_col, agg)
                     }
@@ -386,7 +401,7 @@ pub fn build_partitioned_aggregate_expr(
                     let agg = aggregate::<f64>(&agg);
                     aggregate!(f64, f64, filter, groups, predicate, partition_col, agg)
                 }
-                DataType::Decimal128(_, _) => match return_type {
+                DataType::Decimal128(_, _) => match get_return_type(&agg) {
                     ReturnType::Float64 => {
                         let agg = aggregate::<i128>(&agg);
                         aggregate!(i128, i128, filter, groups, predicate, partition_col, agg)
@@ -395,7 +410,7 @@ pub fn build_partitioned_aggregate_expr(
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(i128, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Original | ReturnType::New => {
+                    ReturnType::Original | ReturnType::Casted => {
                         let agg = aggregate::<i128>(&agg);
                         aggregate!(i128, i128, filter, groups, predicate, partition_col, agg)
                     }
@@ -415,16 +430,27 @@ pub fn build_partitioned_aggregate_expr(
             let filter = build_filter(filter, &dfschema, schema, &execution_props)?;
             let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let partition_col = col(partition_col, &dfschema);
-            let outer = aggregate(&outer_fn);
-            let count = partitioned::count::PartitionedCount::try_new(
-                filter,
-                outer,
-                groups,
-                partition_col,
-                distinct,
-            )?;
 
-            Ok(Box::new(count) as Box<dyn PartitionedAggregateExpr>)
+            let expr = match get_return_type(&outer_fn) {
+                ReturnType::Float64 => {
+                    let agg = aggregate::<f64>(&outer_fn);
+                    partitioned_count!(f64, filter, agg, groups, partition_col, distinct)
+                }
+                ReturnType::Int64 => {
+                    let agg = aggregate::<i64>(&outer_fn);
+                    partitioned_count!(i64, filter, agg, groups, partition_col, distinct)
+                }
+                ReturnType::Original => {
+                    let agg = aggregate::<i64>(&outer_fn);
+                    partitioned_count!(i64, filter, agg, groups, partition_col, distinct)
+                }
+                ReturnType::Casted => {
+                    let agg = aggregate::<i128>(&outer_fn);
+                    partitioned_count!(i128, filter, agg, groups, partition_col, distinct)
+                }
+            };
+
+            Ok(expr)
         }
         AggregateExpr::PartitionedAggregate {
             filter,

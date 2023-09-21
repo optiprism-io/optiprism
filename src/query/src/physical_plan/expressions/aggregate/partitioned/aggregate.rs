@@ -245,7 +245,6 @@ macro_rules! agg {
 
                         bucket.inner_fn.reset();
                     }
-                    println!("asd2 {:?}", predicate.value(row_id));
                     bucket
                         .inner_fn
                         .accumulate(predicate.value(row_id) as $acc_ty);

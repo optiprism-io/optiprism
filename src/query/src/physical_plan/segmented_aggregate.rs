@@ -516,7 +516,7 @@ mod tests {
                 ),
                 // SortField::new(DataType::Utf8),
             ];
-            let count = PartitionedCount::try_new(
+            let count = PartitionedCount::<i64>::try_new(
                 None,
                 AggregateFunction::new_sum(),
                 Some(groups),
@@ -543,7 +543,7 @@ mod tests {
                 // SortField::new(DataType::Utf8),
                 // ),
             ];
-            let count = PartitionedCount::try_new(
+            let count = PartitionedCount::<i64>::try_new(
                 None,
                 AggregateFunction::new_sum(),
                 Some(groups),
@@ -562,7 +562,7 @@ mod tests {
                 Column::new_with_schema("country", &schema).unwrap(),
                 SortField::new(DataType::Utf8),
             )];
-            let count = PartitionedCount::try_new(
+            let count = PartitionedCount::<i64>::try_new(
                 None,
                 AggregateFunction::new_sum(),
                 None,
@@ -737,7 +737,7 @@ mod tests {
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
         let agg1 = {
-            let count = count::PartitionedCount::try_new(
+            let count = count::PartitionedCount::<i64>::try_new(
                 None,
                 AggregateFunction::new_avg(),
                 None,
@@ -766,7 +766,7 @@ mod tests {
                     SortField::new(DataType::Utf8),
                 ),
             ];
-            let count = PartitionedCount::try_new(
+            let count = PartitionedCount::<i64>::try_new(
                 None,
                 AggregateFunction::new_sum(),
                 Some(groups),
@@ -869,7 +869,7 @@ mod tests {
         let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
 
         let agg1 = {
-            let count = count::PartitionedCount::try_new(
+            let count = count::PartitionedCount::<i64>::try_new(
                 None,
                 AggregateFunction::new_avg(),
                 None,
@@ -898,7 +898,7 @@ mod tests {
                     SortField::new(DataType::Utf8),
                 ),
             ];
-            let count = PartitionedCount::try_new(
+            let count = PartitionedCount::<i64>::try_new(
                 None,
                 AggregateFunction::new_sum(),
                 Some(groups),
