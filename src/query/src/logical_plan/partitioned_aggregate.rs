@@ -279,12 +279,17 @@ impl AggregateExpr {
                     true,
                 )]
             }
-            AggregateExpr::PartitionedCount { .. } => {
-                vec![DFField::new_unqualified(
-                    "partitioned_count",
-                    DataType::Int64,
-                    true,
-                )]
+            AggregateExpr::PartitionedCount { outer_fn, .. } => {
+                let dt = match outer_fn {
+                    AggregateFunction::Avg => DataType::Float64,
+                    AggregateFunction::Count => DataType::Int64,
+                    AggregateFunction::Min | AggregateFunction::Max | AggregateFunction::Count => {
+                        DataType::Int64
+                    }
+                    _ => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+                };
+
+                vec![DFField::new_unqualified("partitioned_count", dt, true)]
             }
             AggregateExpr::PartitionedAggregate { predicate, .. } => {
                 vec![DFField::new_unqualified(
