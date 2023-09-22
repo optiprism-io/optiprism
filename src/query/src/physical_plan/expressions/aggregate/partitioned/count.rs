@@ -386,8 +386,9 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
 
             if bucket.last_partition != partition {
                 let v = bucket.count;
-                let multiply = 10_i128.pow(DECIMAL_SCALE as u32);
-                bucket.outer_fn.accumulate(v as i128 * multiply);
+                bucket
+                    .outer_fn
+                    .accumulate(v as i128 * 10_i128.pow(DECIMAL_SCALE as u32));
                 bucket.last_partition = partition;
 
                 bucket.count = 0;
@@ -409,9 +410,10 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
                 .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
             for (row, group) in groups.groups.iter_mut() {
                 rows.push(row.row());
-                group.outer_fn.accumulate(group.count as i128);
+                group
+                    .outer_fn
+                    .accumulate(group.count as i128 * 10_i128.pow(DECIMAL_SCALE as u32));
                 let res = group.outer_fn.result();
-
                 res_col_b.append_value(res);
             }
 
@@ -424,7 +426,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
                 .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
             self.single_group
                 .outer_fn
-                .accumulate(self.single_group.count as i128);
+                .accumulate(self.single_group.count as i128 * 10_i128.pow(DECIMAL_SCALE as u32));
             let res = self.single_group.outer_fn.result();
             res_col_b.append_value(res);
             let res_col = res_col_b.finish();

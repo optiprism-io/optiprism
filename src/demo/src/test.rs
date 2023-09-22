@@ -168,8 +168,6 @@ pub async fn gen(
     let users = 100;
     let days = 100;
     let events = 10;
-    let new_users = 1.1;
-    let new_events = 1.1;
     for user in 0..users {
         let mut cur_time = Utc::now() - Duration::days(days);
         for day in 0..days {

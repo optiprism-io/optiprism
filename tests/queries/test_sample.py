@@ -226,123 +226,68 @@ def test_agg_prop():
             assert_agg_prop(agg, field)
 
 
-def test_count_uint8():
-    assert_agg_prop("avg", "u_8")
-
-
-def test_min_uint8():
-    assert_agg_prop("min", "user_cart_items_number")
-
-
-def test_max_uint8():
-    assert_agg_prop("max", "user_cart_items_number")
-
-
-def test_sum_uint8():
-    assert_agg_prop("sum", "user_cart_items_number")
-
-
-def test_avg_uint8():
-    assert_agg_prop("avg", "user_cart_items_number")
-
-
-def test_count_decimal():
-    assert_agg_prop("count", "event_revenue")
-
-
-def test_min_decimal():
-    assert_agg_prop("min", "event_revenue")
-
-
-def test_max_decimal():
-    assert_agg_prop("max", "event_revenue")
-
-
-def test_sum_decimal():
-    assert_agg_prop("sum", "event_revenue")
-
-
-def test_avg_decimal():
-    assert_agg_prop("avg", "event_revenue")
-
-
-def test_partitioned_avg_sum_uint8():
-    assert_partitioned_agg_prop("avg", "sum", "u_8")
-
-
 def test_partitioned_count():
-    ch_query = """select c, avg(counts),min(counts),max(counts)
-    from (
-             select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, count(1) as counts
-             from file('*.parquet', Parquet) as b
-             where b.event_event = 'event'
-               and toStartOfDay(event_created_at, 'UTC') >=
-                   toStartOfDay(now(), 'UTC') - INTERVAL 2 day
-             group by event_user_id, c)
-    group by c
-    order by 1 asc format JSONCompactColumns;"""
+    for agg in ["min", "max", "avg", "sum"]:
+        print("Test Partitioned Count ({0})".format(agg))
+        ch_q = """select c, {0}(counts)
+        from (
+                 select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, count(1) as counts
+                 from file('*.parquet', Parquet) as b
+                 where b.event_event = 'event'
+                   and toStartOfDay(event_created_at, 'UTC') >=
+                       toStartOfDay(now(), 'UTC') - INTERVAL 2 day
+                 group by event_user_id, c)
+        group by c
+        order by 1 asc format JSONCompactColumns;""".format(agg)
 
-    ch_resp = requests.get(ch_addr,
-                           params={"query": ch_query})
-    ch_ts = list(map(lambda x: x * 1000000000, ch_resp.json()[0]))
-    ch_val1 = list(map(lambda x: float(x), ch_resp.json()[1]))
-    ch_val2 = list(map(lambda x: float(x), ch_resp.json()[2]))
-    ch_val3 = list(map(lambda x: float(x), ch_resp.json()[3]))
+        ch_resp = requests.get(ch_addr,
+                               params={"query": ch_q})
+        ch_ts = list(map(lambda x: x * 1000000000, ch_resp.json()[0]))
+        ch_val = list(map(lambda x: float(x), ch_resp.json()[1]))
 
-    op_query = {
-        "time": {
-            "type": "last",
-            "last": 3,
-            "unit": "day"
-        },
-        "group": "user",
-        "intervalUnit": "day",
-        "chartType": "line",
-        "analysis": {
-            "type": "linear"
-        },
-        "events": [
-            {
-                "eventName": "event",
-                "queries": [
-                    {
-                        "type": "countPerGroup",
-                        "aggregate": "avg"
-                    },
-                    {
-                        "type": "countPerGroup",
-                        "aggregate": "min"
-                    },
-                    {
-                        "type": "countPerGroup",
-                        "aggregate": "max"
-                    },
-                ],
-                "eventType": "regular",
-                "eventId": 8,
-                "filters": []
-            }
-        ],
-        "filters": {
-            "groupsCondition": "and",
-            "groups": []
-        },
-        "segments": [],
-        "breakdowns": []
-    }
+        op_query = {
+            "time": {
+                "type": "last",
+                "last": 3,
+                "unit": "day"
+            },
+            "group": "user",
+            "intervalUnit": "day",
+            "chartType": "line",
+            "analysis": {
+                "type": "linear"
+            },
+            "events": [
+                {
+                    "eventName": "event",
+                    "queries": [
+                        {
+                            "type": "countPerGroup",
+                            "aggregate": agg
+                        },
+                    ],
+                    "eventType": "regular",
+                    "eventId": 8,
+                    "filters": []
+                }
+            ],
+            "filters": {
+                "groupsCondition": "and",
+                "groups": []
+            },
+            "segments": [],
+            "breakdowns": []
+        }
 
-    op_resp = requests.post(
-        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
-        json=op_query,
-        headers={"Content-Type": "application/json",
-                 "Authorization": "Bearer " + token})
+        op_resp = requests.post(
+            "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
+            json=op_query,
+            headers={"Content-Type": "application/json",
+                     "Authorization": "Bearer " + token})
 
-    op_ts = op_resp.json()[1]
-    op_val1 = op_resp.json()[2]
-    op_val2 = op_resp.json()[3]
-    op_val3 = op_resp.json()[3]
+        print(op_resp.json())
+        op_ts = op_resp.json()[1]
+        op_val = op_resp.json()[2]
 
-    assert ch_ts == op_ts
-    assert ch_val1 == op_val1
-    assert ch_val2 == op_val2
-    assert ch_val3 == op_val3
+        assert ch_ts == op_ts
+        assert ch_val == op_val
