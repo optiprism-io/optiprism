@@ -291,10 +291,14 @@ impl AggregateExpr {
 
                 vec![DFField::new_unqualified("partitioned_count", dt, true)]
             }
-            AggregateExpr::PartitionedAggregate { predicate, .. } => {
+            AggregateExpr::PartitionedAggregate {
+                predicate,
+                inner_fn,
+                ..
+            } => {
                 vec![DFField::new_unqualified(
                     "partitioned_agg",
-                    return_type(predicate, &AggregateFunction::Avg, schema)?,
+                    return_type(predicate, inner_fn, schema)?,
                     true,
                 )]
             }

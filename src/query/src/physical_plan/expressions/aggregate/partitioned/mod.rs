@@ -1,4 +1,5 @@
 pub mod aggregate;
+mod aggregate2;
 pub mod count;
 pub mod funnel;
 

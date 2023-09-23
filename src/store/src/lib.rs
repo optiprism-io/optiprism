@@ -23,8 +23,10 @@ pub mod test_util {
     use arrow2::array::FixedSizeBinaryArray;
     use arrow2::array::Float64Array;
     use arrow2::array::Int128Array;
+    use arrow2::array::Int16Array;
     use arrow2::array::Int32Array;
     use arrow2::array::Int64Array;
+    use arrow2::array::Int8Array;
     use arrow2::array::ListArray;
     use arrow2::array::MutableArray;
     use arrow2::array::MutableBinaryArray;
@@ -180,6 +182,8 @@ pub mod test_util {
     #[derive(Debug, Clone)]
     pub enum Value {
         String(Option<String>),
+        Int8(Option<i8>),
+        Int16(Option<i16>),
         Int32(Option<i32>),
         Int64(Option<i64>),
         Int128(Option<i128>),
@@ -189,6 +193,22 @@ pub mod test_util {
         Timestamp(Option<i64>),
     }
 
+    impl From<Value> for Option<i8> {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::Int8(v) => v,
+                _ => unimplemented!(),
+            }
+        }
+    }
+    impl From<Value> for Option<i16> {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::Int16(v) => v,
+                _ => unimplemented!(),
+            }
+        }
+    }
     impl From<Value> for Option<i32> {
         fn from(value: Value) -> Self {
             match value {
@@ -357,6 +377,8 @@ pub mod test_util {
                     DataType::Decimal(_, _) => Value::Int128(None),
                     DataType::Int64 => Value::Int64(None),
                     DataType::Int32 => Value::Int32(None),
+                    DataType::Int16 => Value::Int16(None),
+                    DataType::Int8 => Value::Int8(None),
                     DataType::Float64 => Value::Float(None),
                     DataType::Boolean => Value::Bool(None),
                     DataType::Utf8 => Value::String(None),
@@ -371,6 +393,8 @@ pub mod test_util {
                     }
                     DataType::Int64 => Value::Int64(Some(data.parse()?)),
                     DataType::Int32 => Value::Int32(Some(data.parse()?)),
+                    DataType::Int16 => Value::Int16(Some(data.parse()?)),
+                    DataType::Int8 => Value::Int8(Some(data.parse()?)),
                     DataType::UInt32 => Value::Int32(Some(data.parse()?)),
                     DataType::UInt64 => Value::Int64(Some(data.parse()?)),
                     DataType::Float64 => Value::Float(Some(data.parse()?)),
@@ -934,6 +958,8 @@ pub mod test_util {
                 match field.data_type() {
                     DataType::Int64
                     | DataType::Int32
+                    | DataType::Int16
+                    | DataType::Int8
                     | DataType::UInt32
                     | DataType::UInt64
                     | DataType::Float64
@@ -972,6 +998,14 @@ pub mod test_util {
                 DataType::Int32 => {
                     let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
                     Int32Array::from(vals).boxed()
+                }
+                DataType::Int8 => {
+                    let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                    Int8Array::from(vals).boxed()
+                }
+                DataType::Int16 => {
+                    let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                    Int16Array::from(vals).boxed()
                 }
                 DataType::UInt32 => {
                     let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
