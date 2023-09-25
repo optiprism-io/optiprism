@@ -18,7 +18,7 @@ def auth():
     return auth_resp.json()['accessToken']
 
 
-# token = auth()
+token = auth()
 
 
 def agg_prop_ch_query(agg, field, distinct=""):

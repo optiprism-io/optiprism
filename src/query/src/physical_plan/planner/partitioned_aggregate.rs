@@ -185,14 +185,23 @@ enum ReturnType {
     Casted,
 }
 
-fn get_return_type(agg: &logical_plan::partitioned_aggregate::AggregateFunction) -> ReturnType {
+fn get_return_type(
+    dt: DataType,
+    agg: &logical_plan::partitioned_aggregate::AggregateFunction,
+) -> DataType {
     match agg {
-        logical_plan::partitioned_aggregate::AggregateFunction::Avg => ReturnType::Float64,
-        logical_plan::partitioned_aggregate::AggregateFunction::Count => ReturnType::Int64,
+        logical_plan::partitioned_aggregate::AggregateFunction::Avg => DataType::Float64,
+        logical_plan::partitioned_aggregate::AggregateFunction::Count => DataType::Int64,
         logical_plan::partitioned_aggregate::AggregateFunction::Min
-        | logical_plan::partitioned_aggregate::AggregateFunction::Max => ReturnType::Original,
-        logical_plan::partitioned_aggregate::AggregateFunction::Sum => ReturnType::Casted,
-        _ => ReturnType::Casted,
+        | logical_plan::partitioned_aggregate::AggregateFunction::Max => dt,
+        logical_plan::partitioned_aggregate::AggregateFunction::Sum => match dt {
+            DataType::Int8 | DataType::Int16 | DataType::Int32 => DataType::Int64,
+            DataType::UInt8 | DataType::UInt16 | DataType::UInt32 => DataType::UInt64,
+            DataType::Int64 | DataType::UInt64 | DataType::Decimal128(_, _) => {
+                DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
+            }
+            _ => unimplemented!("{dt:?}"),
+        },
     }
 }
 
@@ -252,151 +261,144 @@ pub fn build_partitioned_aggregate_expr(
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
 
+            let dt = predicate.data_type(schema)?;
             let expr = match predicate.data_type(schema)? {
-                DataType::Int8 => match get_return_type(&agg) {
-                    ReturnType::Float64 => {
+                DataType::Int8 => match get_return_type(dt, &agg) {
+                    DataType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(i8, f64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Int64 => {
+                    DataType::Int64 => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(i8, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Original => {
+                    DataType::Int8 => {
                         let agg = aggregate::<i8>(&agg);
                         aggregate!(i8, i8, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Casted => {
-                        let agg = aggregate::<i64>(&agg);
-                        aggregate!(i8, i64, filter, groups, predicate, partition_col, agg)
-                    }
+                    _ => unreachable!(),
                 },
 
-                DataType::Int16 => match get_return_type(&agg) {
-                    ReturnType::Float64 => {
+                DataType::Int16 => match get_return_type(dt, &agg) {
+                    DataType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(i16, f64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Int64 => {
+                    DataType::Int64 => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(i16, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Original => {
+                    DataType::Int16 => {
                         let agg = aggregate::<i16>(&agg);
                         aggregate!(i16, i16, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Casted => {
-                        let agg = aggregate::<i64>(&agg);
-                        aggregate!(i16, i64, filter, groups, predicate, partition_col, agg)
-                    }
+                    _ => unreachable!(),
                 },
-                DataType::Int32 => match get_return_type(&agg) {
-                    ReturnType::Float64 => {
+                DataType::Int32 => match get_return_type(dt, &agg) {
+                    DataType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(i32, f64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Int64 => {
+                    DataType::Int64 => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(i32, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Original => {
+                    DataType::Int32 => {
                         let agg = aggregate::<i32>(&agg);
                         aggregate!(i32, i32, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Casted => {
-                        let agg = aggregate::<i64>(&agg);
-                        aggregate!(i32, i64, filter, groups, predicate, partition_col, agg)
-                    }
+                    _ => unreachable!(),
                 },
-                DataType::Int64 => match get_return_type(&agg) {
-                    ReturnType::Float64 => {
+                DataType::Int64 => match get_return_type(dt, &agg) {
+                    DataType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(i64, f64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Int64 => {
+                    DataType::Int64 => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(i64, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Original => {
-                        let agg = aggregate::<i64>(&agg);
-                        aggregate!(i64, i64, filter, groups, predicate, partition_col, agg)
-                    }
-                    ReturnType::Casted => {
+                    DataType::Decimal128(_, _) => {
                         let agg = aggregate::<i128>(&agg);
                         aggregate!(i64, i128, filter, groups, predicate, partition_col, agg)
                     }
+                    _ => unreachable!(),
                 },
-                DataType::UInt8 => match get_return_type(&agg) {
-                    ReturnType::Float64 => {
+                DataType::UInt8 => match get_return_type(dt, &agg) {
+                    DataType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(u8, f64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Int64 => {
+                    DataType::Int64 => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(u8, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Original => {
+                    DataType::UInt8 => {
                         let agg = aggregate::<u8>(&agg);
                         aggregate!(u8, u8, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Casted => {
+                    DataType::UInt64 => {
                         let agg = aggregate::<u64>(&agg);
                         aggregate!(u8, u64, filter, groups, predicate, partition_col, agg)
                     }
+                    _ => unreachable!(),
                 },
-                DataType::UInt16 => match get_return_type(&agg) {
-                    ReturnType::Float64 => {
+                DataType::UInt16 => match get_return_type(dt, &agg) {
+                    DataType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(u16, f64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Int64 => {
+                    DataType::Int64 => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(u16, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Original => {
+                    DataType::UInt16 => {
                         let agg = aggregate::<u16>(&agg);
                         aggregate!(u16, u16, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Casted => {
+                    DataType::UInt64 => {
                         let agg = aggregate::<u64>(&agg);
                         aggregate!(u16, u64, filter, groups, predicate, partition_col, agg)
                     }
+                    _ => unreachable!(),
                 },
-                DataType::UInt32 => match get_return_type(&agg) {
-                    ReturnType::Float64 => {
+                DataType::UInt32 => match get_return_type(dt, &agg) {
+                    DataType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(u32, f64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Int64 => {
+                    DataType::Int64 => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(u32, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Original => {
+                    DataType::UInt32 => {
                         let agg = aggregate::<u32>(&agg);
                         aggregate!(u32, u32, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Casted => {
+                    DataType::UInt64 => {
                         let agg = aggregate::<u64>(&agg);
                         aggregate!(u32, u64, filter, groups, predicate, partition_col, agg)
                     }
+                    _ => unreachable!(),
                 },
-                DataType::UInt64 => match get_return_type(&agg) {
-                    ReturnType::Float64 => {
+                DataType::UInt64 => match get_return_type(dt, &agg) {
+                    DataType::Float64 => {
                         let agg = aggregate::<f64>(&agg);
                         aggregate!(u64, f64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Int64 => {
+                    DataType::Int64 => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(u64, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Original => {
+                    DataType::UInt64 => {
                         let agg = aggregate::<u64>(&agg);
                         aggregate!(u64, u64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Casted => {
+                    DataType::Decimal128(_, _) => {
                         let agg = aggregate::<i128>(&agg);
                         aggregate!(u64, i128, filter, groups, predicate, partition_col, agg)
                     }
+                    _ => unreachable!(),
                 },
                 DataType::Float32 => {
                     let agg = aggregate::<f64>(&agg);
@@ -406,19 +408,20 @@ pub fn build_partitioned_aggregate_expr(
                     let agg = aggregate::<f64>(&agg);
                     aggregate!(f64, f64, filter, groups, predicate, partition_col, agg)
                 }
-                DataType::Decimal128(_, _) => match get_return_type(&agg) {
-                    ReturnType::Float64 => {
+                DataType::Decimal128(_, _) => match get_return_type(dt, &agg) {
+                    DataType::Float64 => {
                         let agg = aggregate::<i128>(&agg);
                         aggregate!(i128, i128, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Int64 => {
+                    DataType::Int64 => {
                         let agg = aggregate::<i64>(&agg);
                         aggregate!(i128, i64, filter, groups, predicate, partition_col, agg)
                     }
-                    ReturnType::Original | ReturnType::Casted => {
+                    DataType::Decimal128(_, _) => {
                         let agg = aggregate::<i128>(&agg);
                         aggregate!(i128, i128, filter, groups, predicate, partition_col, agg)
                     }
+                    _ => unreachable!(),
                 },
                 _ => return Err(QueryError::Plan("unsupported predicate type".to_string())),
             };
@@ -436,23 +439,20 @@ pub fn build_partitioned_aggregate_expr(
             let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let partition_col = col(partition_col, &dfschema);
 
-            let expr = match get_return_type(&outer_fn) {
-                ReturnType::Float64 => {
+            let expr = match get_return_type(DataType::Int64, &outer_fn) {
+                DataType::Float64 => {
                     let agg = aggregate::<f64>(&outer_fn);
                     partitioned_count!(f64, filter, agg, groups, partition_col, distinct)
                 }
-                ReturnType::Int64 => {
+                DataType::Int64 => {
                     let agg = aggregate::<i64>(&outer_fn);
                     partitioned_count!(i64, filter, agg, groups, partition_col, distinct)
                 }
-                ReturnType::Original => {
-                    let agg = aggregate::<i64>(&outer_fn);
-                    partitioned_count!(i64, filter, agg, groups, partition_col, distinct)
-                }
-                ReturnType::Casted => {
+                DataType::Decimal128(_, _) => {
                     let agg = aggregate::<i128>(&outer_fn);
                     partitioned_count!(i128, filter, agg, groups, partition_col, distinct)
                 }
+                _ => unreachable!(),
             };
 
             Ok(expr)
