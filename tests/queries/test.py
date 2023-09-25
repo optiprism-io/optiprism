@@ -18,7 +18,7 @@ def auth():
     return auth_resp.json()['accessToken']
 
 
-token = auth()
+# token = auth()
 
 
 def agg_prop_ch_query(agg, field, distinct=""):
@@ -291,3 +291,30 @@ def test_partitioned_count():
 
         assert ch_ts == op_ts
         assert ch_val == op_val
+
+
+def return_type(typ, agg):
+    if agg == "min" or agg == "max":
+        return typ
+    elif agg == "count":
+        return "i64"
+    elif agg == "avg":
+        return "f64"
+    else:
+        if typ == "i8":
+            return "i64"
+        elif typ == "i64":
+            return "i128"
+        elif typ == "f64":
+            return "f64"
+        return "casted"
+
+
+def test_agg_combinations():
+    print()
+    for agg in aggs:
+        rt1 = return_type("i8", agg)
+        print("{0}: {1}".format(agg, rt1))
+        for agg2 in aggs:
+            rt2 = return_type(rt1, agg2)
+            print("  {0}: {1}".format(agg2, rt2))

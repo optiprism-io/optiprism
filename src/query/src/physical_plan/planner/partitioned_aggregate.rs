@@ -10,6 +10,8 @@ use arrow::datatypes::DataType;
 use arrow::datatypes::Schema;
 use axum::async_trait;
 use common::query::Operator;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use datafusion::execution::context::QueryPlanner as DFQueryPlanner;
 use datafusion::execution::context::SessionState;
 use datafusion::physical_expr::create_physical_expr;
@@ -160,11 +162,11 @@ macro_rules! partitioned_count {
 }
 
 macro_rules! partitioned_aggregate {
-    ($ty:ident,$inner_acc_ty:ident,$out_acc_ty:ident,$filter:expr,$inner:expr,$outer:expr,$predicate:expr,$groups:expr,$partition_col:expr) => {
-        Box::new(partitioned::aggregate::Aggregate::<
+    ($ty:ident,$inner_acc_ty:ident,$outer_acc_ty:ident,$filter:expr,$inner:expr,$outer:expr,$predicate:expr,$groups:expr,$partition_col:expr) => {
+        Box::new(partitioned::aggregate2::Aggregate::<
             $ty,
             $inner_acc_ty,
-            $out_acc_ty,
+            $outer_acc_ty,
         >::try_new(
             $filter,
             $inner,
@@ -188,8 +190,7 @@ fn get_return_type(agg: &logical_plan::partitioned_aggregate::AggregateFunction)
         logical_plan::partitioned_aggregate::AggregateFunction::Avg => ReturnType::Float64,
         logical_plan::partitioned_aggregate::AggregateFunction::Count => ReturnType::Int64,
         logical_plan::partitioned_aggregate::AggregateFunction::Min
-        | logical_plan::partitioned_aggregate::AggregateFunction::Max
-        | logical_plan::partitioned_aggregate::AggregateFunction::Count => ReturnType::Original,
+        | logical_plan::partitioned_aggregate::AggregateFunction::Max => ReturnType::Original,
         logical_plan::partitioned_aggregate::AggregateFunction::Sum => ReturnType::Casted,
         _ => ReturnType::Casted,
     }
@@ -470,34 +471,27 @@ pub fn build_partitioned_aggregate_expr(
             let groups = build_groups(groups, &dfschema, schema, &execution_props)?;
             let predicate = col(predicate, &dfschema);
             let partition_col = col(partition_col, &dfschema);
-            let ret = match predicate.data_type(schema)? {
-                DataType::Int8 => match (get_return_type(&inner_fn), get_return_type(&outer_fn)) {
-                    (ReturnType::Float64, ReturnType::Float64) => {
-                        let inner = aggregate::<f64>(&inner_fn);
-                        let outer = aggregate::<f64>(&outer_fn);
 
-                        partitioned_aggregate!(
-                            i8,
-                            i128,
-                            i128,
-                            filter,
-                            inner,
-                            outer,
-                            predicate,
-                            groups,
-                            partition_col
-                        )
-                    }
-                    (DataType::Int8, DataType::Int64) => {
-                        unimplemented!()
-                    }
-                    (DataType::Int8, DataType::Int64) => {
-                        unimplemented!()
-                    }
-                    _ => return Err(QueryError::Plan("unsupported type".to_string())),
-                },
-                _ => return Err(QueryError::Plan("unsupported predicate type".to_string())),
-            };
+            let aggs = vec![
+                logical_plan::partitioned_aggregate::AggregateFunction::Min,
+                logical_plan::partitioned_aggregate::AggregateFunction::Max,
+                logical_plan::partitioned_aggregate::AggregateFunction::Avg,
+                logical_plan::partitioned_aggregate::AggregateFunction::Sum,
+                logical_plan::partitioned_aggregate::AggregateFunction::Count,
+            ];
+            let inner = aggregate::<i64>(&inner_fn);
+            let outer = aggregate::<i64>(&outer_fn);
+            let ret = partitioned_aggregate!(
+                i8,
+                i64,
+                i64,
+                filter,
+                inner,
+                outer,
+                predicate,
+                groups,
+                partition_col
+            );
 
             Ok(ret)
         }
