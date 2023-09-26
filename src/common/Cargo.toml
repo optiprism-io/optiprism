@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
+arrow = { version = "42.0.0" }
 arrow-schema = { version = "42.0.0", features = ["serde"] }
 async-trait = "0.1.59"
 chrono = { version = "0.4.23", features = ["serde"] }

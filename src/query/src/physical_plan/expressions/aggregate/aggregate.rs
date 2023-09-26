@@ -42,6 +42,8 @@ use arrow::row::Row;
 use arrow::row::RowConverter;
 use arrow::row::SortField;
 use arrow::util::pretty::print_batches;
+use common::arrow::DecimalBuilder;
+use common::DECIMAL_MULTIPLIER;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use datafusion::parquet::format::ColumnChunk;
@@ -115,7 +117,7 @@ where
 }
 
 macro_rules! agg {
-    ($ty:ident,$array_ty:ident,$acc_ty:ident,$b:ident,$dt:ident) => {
+    ($ty:ident,$array_ty:ident,$acc_ty:ident,$b:ident,$mul:expr,$div:expr,$dt:expr) => {
         impl PartitionedAggregateExpr for Aggregate<$ty, $acc_ty> {
             fn group_columns(&self) -> Vec<(PhysicalExprRef, String)> {
                 if let Some(groups) = &self.groups {
@@ -131,7 +133,7 @@ macro_rules! agg {
             }
 
             fn fields(&self) -> Vec<Field> {
-                let field = Field::new("agg", DataType::$dt, true);
+                let field = Field::new("agg", $dt, true);
                 vec![field]
             }
 
@@ -229,7 +231,9 @@ macro_rules! agg {
                         &mut self.single_group
                     };
 
-                    bucket.agg.accumulate(val.unwrap() as $acc_ty);
+                    bucket
+                        .agg
+                        .accumulate(val.unwrap() as $acc_ty * $mul as $acc_ty / $div as $acc_ty);
                 }
 
                 Ok(())
@@ -281,394 +285,176 @@ macro_rules! agg {
     };
 }
 
-macro_rules! agg_decimal {
-    ($ty:ident,$array_ty:ident) => {
-        impl PartitionedAggregateExpr for Aggregate<$ty, i128> {
-            fn group_columns(&self) -> Vec<(PhysicalExprRef, String)> {
-                if let Some(groups) = &self.groups {
-                    groups
-                        .exprs
-                        .iter()
-                        .zip(groups.names.iter())
-                        .map(|(a, b)| (a.clone(), b.clone()))
-                        .collect()
-                } else {
-                    vec![]
-                }
-            }
-
-            fn fields(&self) -> Vec<Field> {
-                let field = Field::new(
-                    "agg",
-                    DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-                    true,
-                );
-                vec![field]
-            }
-
-            fn evaluate(
-                &mut self,
-                batch: &RecordBatch,
-                partition_exist: Option<&HashMap<i64, (), RandomState>>,
-            ) -> crate::Result<()> {
-                let filter = if self.filter.is_some() {
-                    Some(
-                        self.filter
-                            .clone()
-                            .unwrap()
-                            .evaluate(batch)?
-                            .into_array(batch.num_rows())
-                            .as_any()
-                            .downcast_ref::<BooleanArray>()
-                            .unwrap()
-                            .clone(),
-                    )
-                } else {
-                    None
-                };
-
-                let predicate = self
-                    .predicate
-                    .evaluate(batch)?
-                    .into_array(batch.num_rows())
-                    .as_any()
-                    .downcast_ref::<$array_ty>()
-                    .unwrap()
-                    .clone();
-
-                let multiply = match predicate.data_type() {
-                    DataType::Decimal128(_, _) => 1,
-                    _ => 10_i128.pow(DECIMAL_SCALE as u32),
-                };
-
-                let rows = if let Some(groups) = &mut self.groups {
-                    let arrs = groups
-                        .exprs
-                        .iter()
-                        .map(|e| {
-                            e.evaluate(batch)
-                                .and_then(|v| Ok(v.into_array(batch.num_rows()).clone()))
-                        })
-                        .collect::<result::Result<Vec<_>, _>>()?;
-
-                    Some(groups.row_converter.convert_columns(&arrs)?)
-                } else {
-                    None
-                };
-
-                let partitions = self
-                    .partition_col
-                    .evaluate(batch)?
-                    .into_array(batch.num_rows())
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .clone();
-
-                let mut skip_partition = 0;
-                let mut skip = false;
-                for (row_id, val) in predicate.into_iter().enumerate() {
-                    if skip {
-                        if partitions.value(row_id) == skip_partition {
-                            continue;
-                        } else {
-                            skip = false;
-                        }
-                    }
-                    if let Some(exists) = partition_exist {
-                        let pid = partitions.value(row_id);
-                        if !exists.contains_key(&pid) {
-                            skip = true;
-                            skip_partition = pid;
-                            continue;
-                        }
-                    }
-                    if let Some(filter) = &filter {
-                        if !check_filter(filter, row_id) {
-                            continue;
-                        }
-                    }
-
-                    if val.is_none() {
-                        continue;
-                    }
-
-                    let bucket = if let Some(groups) = &mut self.groups {
-                        groups
-                            .groups
-                            .entry(rows.as_ref().unwrap().row(row_id).owned())
-                            .or_insert_with(|| {
-                                let mut bucket = Group::new(self.agg.make_new());
-                                bucket
-                            })
-                    } else {
-                        &mut self.single_group
-                    };
-
-                    bucket.agg.accumulate(val.unwrap() as i128 * multiply);
-                }
-
-                Ok(())
-            }
-
-            fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
-                if let Some(groups) = &mut self.groups {
-                    let mut rows: Vec<Row> = Vec::with_capacity(groups.groups.len());
-                    let mut res_col_b = Decimal128Builder::with_capacity(groups.groups.len())
-                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
-                    for (row, group) in groups.groups.iter_mut() {
-                        rows.push(row.row());
-                        let res = group.agg.result();
-                        res_col_b.append_value(res);
-                    }
-
-                    let group_col = groups.row_converter.convert_rows(rows)?;
-                    let res_col = res_col_b.finish();
-                    let res_col = Arc::new(res_col) as ArrayRef;
-                    Ok(vec![group_col, vec![res_col]].concat())
-                } else {
-                    let mut res_col_b = Decimal128Builder::with_capacity(1)
-                        .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
-                    res_col_b.append_value(self.single_group.agg.result());
-                    let res_col = res_col_b.finish();
-                    let res_col = Arc::new(res_col) as ArrayRef;
-                    Ok(vec![res_col])
-                }
-            }
-
-            fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>> {
-                let groups = if let Some(groups) = &self.groups {
-                    Some(groups.try_make_new()?)
-                } else {
-                    None
-                };
-                let c = Aggregate::<$ty, i128> {
-                    filter: self.filter.clone(),
-                    groups,
-                    single_group: Group::new(self.agg.make_new()),
-                    predicate: self.predicate.clone(),
-                    partition_col: self.partition_col.clone(),
-                    agg: self.agg.make_new(),
-                    t: Default::default(),
-                };
-
-                Ok(Box::new(c))
-            }
-        }
-    };
-}
-
-macro_rules! agg_float {
-    ($ty:ident,$array_ty:ident) => {
-        impl PartitionedAggregateExpr for Aggregate<$ty, f64> {
-            fn group_columns(&self) -> Vec<(PhysicalExprRef, String)> {
-                if let Some(groups) = &self.groups {
-                    groups
-                        .exprs
-                        .iter()
-                        .zip(groups.names.iter())
-                        .map(|(a, b)| (a.clone(), b.clone()))
-                        .collect()
-                } else {
-                    vec![]
-                }
-            }
-
-            fn fields(&self) -> Vec<Field> {
-                let field = Field::new("agg", DataType::Float64, true);
-                vec![field]
-            }
-
-            fn evaluate(
-                &mut self,
-                batch: &RecordBatch,
-                partition_exist: Option<&HashMap<i64, (), RandomState>>,
-            ) -> crate::Result<()> {
-                let filter = if self.filter.is_some() {
-                    Some(
-                        self.filter
-                            .clone()
-                            .unwrap()
-                            .evaluate(batch)?
-                            .into_array(batch.num_rows())
-                            .as_any()
-                            .downcast_ref::<BooleanArray>()
-                            .unwrap()
-                            .clone(),
-                    )
-                } else {
-                    None
-                };
-
-                let predicate = self
-                    .predicate
-                    .evaluate(batch)?
-                    .into_array(batch.num_rows())
-                    .as_any()
-                    .downcast_ref::<$array_ty>()
-                    .unwrap()
-                    .clone();
-
-                let rows = if let Some(groups) = &mut self.groups {
-                    let arrs = groups
-                        .exprs
-                        .iter()
-                        .map(|e| {
-                            e.evaluate(batch)
-                                .and_then(|v| Ok(v.into_array(batch.num_rows()).clone()))
-                        })
-                        .collect::<result::Result<Vec<_>, _>>()?;
-
-                    Some(groups.row_converter.convert_columns(&arrs)?)
-                } else {
-                    None
-                };
-
-                let partitions = self
-                    .partition_col
-                    .evaluate(batch)?
-                    .into_array(batch.num_rows())
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .unwrap()
-                    .clone();
-
-                let mut skip_partition = 0;
-                let mut skip = false;
-                for (row_id, val) in predicate.into_iter().enumerate() {
-                    if skip {
-                        if partitions.value(row_id) == skip_partition {
-                            continue;
-                        } else {
-                            skip = false;
-                        }
-                    }
-                    if let Some(exists) = partition_exist {
-                        let pid = partitions.value(row_id);
-                        if !exists.contains_key(&pid) {
-                            skip = true;
-                            skip_partition = pid;
-                            continue;
-                        }
-                    }
-                    if let Some(filter) = &filter {
-                        if !check_filter(filter, row_id) {
-                            continue;
-                        }
-                    }
-
-                    if val.is_none() {
-                        continue;
-                    }
-
-                    let bucket = if let Some(groups) = &mut self.groups {
-                        groups
-                            .groups
-                            .entry(rows.as_ref().unwrap().row(row_id).owned())
-                            .or_insert_with(|| {
-                                let mut bucket = Group::new(self.agg.make_new());
-                                bucket
-                            })
-                    } else {
-                        &mut self.single_group
-                    };
-
-                    bucket.agg.accumulate(val.unwrap() as f64);
-                }
-
-                Ok(())
-            }
-
-            fn finalize(&mut self) -> Result<Vec<ArrayRef>> {
-                if let Some(groups) = &mut self.groups {
-                    let mut rows: Vec<Row> = Vec::with_capacity(groups.groups.len());
-                    let mut res_col_b = Float64Builder::with_capacity(groups.groups.len());
-                    for (row, group) in groups.groups.iter_mut() {
-                        rows.push(row.row());
-                        let res = group.agg.result();
-                        res_col_b.append_value(res);
-                    }
-
-                    let group_col = groups.row_converter.convert_rows(rows)?;
-                    let res_col = res_col_b.finish();
-                    let res_col = Arc::new(res_col) as ArrayRef;
-                    Ok(vec![group_col, vec![res_col]].concat())
-                } else {
-                    let mut res_col_b = Float64Builder::with_capacity(1);
-                    res_col_b.append_value(self.single_group.agg.result());
-                    let res_col = res_col_b.finish();
-                    let res_col = Arc::new(res_col) as ArrayRef;
-                    Ok(vec![res_col])
-                }
-            }
-
-            fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>> {
-                let groups = if let Some(groups) = &self.groups {
-                    Some(groups.try_make_new()?)
-                } else {
-                    None
-                };
-                let c = Aggregate::<$ty, f64> {
-                    filter: self.filter.clone(),
-                    groups,
-                    single_group: Group::new(self.agg.make_new()),
-                    predicate: self.predicate.clone(),
-                    partition_col: self.partition_col.clone(),
-                    agg: self.agg.make_new(),
-                    t: Default::default(),
-                };
-
-                Ok(Box::new(c))
-            }
-        }
-    };
-}
-
 //
-agg!(i8, Int8Array, i8, Int8Builder, Int8);
-agg!(i8, Int8Array, i64, Int64Builder, Int64);
-agg_float!(i8, Int8Array);
+agg!(i8, Int8Array, i8, Int8Builder, 1, 1, DataType::Int8);
+agg!(i8, Int8Array, i64, Int64Builder, 1, 1, DataType::Int64);
+agg!(i8, Int8Array, f64, Float64Builder, 1, 1, DataType::Float64);
 
-agg!(i16, Int16Array, i16, Int16Builder, Int16);
-agg!(i16, Int16Array, i64, Int64Builder, Int64);
-agg_float!(i16, Int16Array);
+agg!(i16, Int16Array, i16, Int16Builder, 1, 1, DataType::Int16);
+agg!(i16, Int16Array, i64, Int64Builder, 1, 1, DataType::Int64);
+agg!(
+    i16,
+    Int16Array,
+    f64,
+    Float64Builder,
+    1,
+    1,
+    DataType::Float64
+);
 
-agg!(i32, Int32Array, i32, Int32Builder, Int32);
-agg!(i32, Int32Array, i64, Int64Builder, Int64);
-agg_float!(i32, Int32Array);
+agg!(i32, Int32Array, i32, Int32Builder, 1, 1, DataType::Int32);
+agg!(i32, Int32Array, i64, Int64Builder, 1, 1, DataType::Int64);
+agg!(
+    i32,
+    Int32Array,
+    f64,
+    Float64Builder,
+    1,
+    1,
+    DataType::Float64
+);
 
-agg!(i64, Int64Array, i64, Int64Builder, Int64);
-agg_float!(i64, Int64Array);
-agg_decimal!(i64, Int64Array);
+agg!(i64, Int64Array, i64, Int64Builder, 1, 1, DataType::Int64);
+agg!(
+    i64,
+    Int64Array,
+    f64,
+    Float64Builder,
+    1,
+    1,
+    DataType::Float64
+);
+agg!(
+    i64,
+    Int64Array,
+    i128,
+    DecimalBuilder,
+    DECIMAL_MULTIPLIER,
+    1,
+    DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
+);
 
-agg!(i128, Decimal128Array, i64, Int64Builder, Int64);
-agg_float!(i128, Decimal128Array);
-agg_decimal!(i128, Decimal128Array);
+agg!(
+    i128,
+    Decimal128Array,
+    i64,
+    Int64Builder,
+    1,
+    DECIMAL_MULTIPLIER,
+    DataType::Int64
+);
+agg!(
+    i128,
+    Decimal128Array,
+    f64,
+    Float64Builder,
+    1,
+    DECIMAL_MULTIPLIER,
+    DataType::Float64
+);
+agg!(
+    i128,
+    Decimal128Array,
+    i128,
+    DecimalBuilder,
+    1,
+    1,
+    DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
+);
 
-agg!(u8, UInt8Array, u8, UInt8Builder, UInt8);
-agg!(u8, UInt8Array, i64, Int64Builder, Int64);
-agg!(u8, UInt8Array, u64, UInt64Builder, UInt64);
-agg_float!(u8, UInt8Array);
+agg!(u8, UInt8Array, u8, UInt8Builder, 1, 1, DataType::UInt8);
+agg!(u8, UInt8Array, i64, Int64Builder, 1, 1, DataType::Int64);
+agg!(u8, UInt8Array, u64, UInt64Builder, 1, 1, DataType::UInt64);
+agg!(u8, UInt8Array, f64, Float64Builder, 1, 1, DataType::Float64);
 
-agg!(u16, UInt16Array, u16, UInt16Builder, UInt16);
-agg!(u16, UInt16Array, i64, Int64Builder, Int64);
-agg!(u16, UInt16Array, u64, UInt64Builder, UInt64);
-agg_float!(u16, UInt16Array);
+agg!(u16, UInt16Array, u16, UInt16Builder, 1, 1, DataType::UInt16);
+agg!(u16, UInt16Array, i64, Int64Builder, 1, 1, DataType::Int64);
+agg!(u16, UInt16Array, u64, UInt64Builder, 1, 1, DataType::UInt64);
+agg!(
+    u16,
+    UInt16Array,
+    f64,
+    Float64Builder,
+    1,
+    1,
+    DataType::Float64
+);
 
-agg!(u32, UInt32Array, i64, Int64Builder, Int64);
-agg!(u32, UInt32Array, u32, UInt32Builder, UInt32);
-agg!(u32, UInt32Array, u64, UInt64Builder, UInt64);
-agg_float!(u32, UInt32Array);
+agg!(u32, UInt32Array, i64, Int64Builder, 1, 1, DataType::Int64);
+agg!(u32, UInt32Array, u32, UInt32Builder, 1, 1, DataType::UInt32);
+agg!(u32, UInt32Array, u64, UInt64Builder, 1, 1, DataType::UInt64);
+agg!(
+    u32,
+    UInt32Array,
+    f64,
+    Float64Builder,
+    1,
+    1,
+    DataType::Float64
+);
 
-agg!(u64, UInt64Array, i64, Int64Builder, Int64);
-agg!(u64, UInt64Array, u64, UInt64Builder, UInt64);
-agg_float!(u64, UInt64Array);
-agg_decimal!(u64, UInt64Array);
+agg!(u64, UInt64Array, i64, Int64Builder, 1, 1, DataType::Int64);
+agg!(u64, UInt64Array, u64, UInt64Builder, 1, 1, DataType::UInt64);
+agg!(
+    u64,
+    UInt64Array,
+    f64,
+    Float64Builder,
+    1,
+    1,
+    DataType::Float64
+);
+agg!(
+    u64,
+    UInt64Array,
+    i128,
+    DecimalBuilder,
+    DECIMAL_MULTIPLIER,
+    1,
+    DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
+);
 
-agg_decimal!(u128, Decimal128Array);
-agg_float!(f32, Float32Array);
+// agg!(
+// u128,
+// i128,
+// i128,
+// DecimalBuilder,
+// 1,
+// 1,
+// DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
+// );
+agg!(
+    f32,
+    Float32Array,
+    f32,
+    Float32Builder,
+    1,
+    1,
+    DataType::Float32
+);
+agg!(f32, Float32Array, i64, Int64Builder, 1, 1, DataType::Int64);
+agg!(
+    f32,
+    Float32Array,
+    f64,
+    Float64Builder,
+    1,
+    1,
+    DataType::Float64
+);
 
-agg_float!(f64, Float64Array);
+agg!(
+    f64,
+    Float64Array,
+    f64,
+    Float64Builder,
+    1,
+    1,
+    DataType::Float64
+);
+agg!(f64, Float64Array, i64, Int64Builder, 1, 1, DataType::Int64);
+// agg_float!(f32, Float32Array);
+// agg_float!(f64, Float64Array);
 // agg!(Decimal128Array, Decimal128Array, i128);
 
 #[cfg(test)]

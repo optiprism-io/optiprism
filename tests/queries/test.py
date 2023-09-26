@@ -157,7 +157,7 @@ def partitioned_agg_prop_ch_query(agg, outer_agg, field):
     return [ch_ts, ch_val]
 
 
-def partitioned_agg_prop_op_query(agg, outer_agg, field: str, prop_type="event"):
+def partitioned_agg_prop_op_query(agg, outer_agg, typ: str, prop_type="event"):
     q = {
         "time": {
             "type": "last",
@@ -179,7 +179,7 @@ def partitioned_agg_prop_op_query(agg, outer_agg, field: str, prop_type="event")
                         "aggregate": outer_agg,
                         "aggregatePerGroup": agg,
                         "propertyType": prop_type,
-                        "propertyName": field
+                        "propertyName": typ
                     },
                 ],
                 "eventType": "regular",
@@ -207,8 +207,8 @@ def partitioned_agg_prop_op_query(agg, outer_agg, field: str, prop_type="event")
     return [ts, val]
 
 
-def assert_partitioned_agg_prop(agg, outer_agg, field: str):
-    assert partitioned_agg_prop_ch_query(agg, outer_agg, field) == partitioned_agg_prop_op_query(agg, outer_agg, field)
+def assert_partitioned_agg_prop(agg, outer_agg, typ: str):
+    assert partitioned_agg_prop_ch_query(agg, outer_agg, typ) == partitioned_agg_prop_op_query(agg, outer_agg, typ)
 
 
 def test_count_events():
@@ -224,6 +224,16 @@ def test_agg_prop():
         for agg in aggs:
             print("Test Aggregate Property {0}({1})".format(agg, field))
             assert_agg_prop(agg, field)
+
+
+def test_partitioned_agg():
+    for field in fields:
+        for outer_agg in aggs:
+            for inner_agg in aggs:
+                print("Test Partitioned Aggregate Property {outer}({inner}({field}))".format(outer=outer_agg,
+                                                                                             inner=inner_agg,
+                                                                                             field=field))
+                assert_partitioned_agg_prop(inner_agg, outer_agg, field)
 
 
 def test_partitioned_count():
@@ -300,21 +310,131 @@ def return_type(typ, agg):
         return "i64"
     elif agg == "avg":
         return "f64"
-    else:
-        if typ == "i8":
+    elif agg == "sum":
+        if typ == "i8" or typ == "i16" or typ == "i32":
             return "i64"
+        elif typ == "u8" or typ == "u16" or typ == "u32":
+            return "u64"
         elif typ == "i64":
             return "i128"
+        elif typ == "u64":
+            return "u128"
+        elif typ == "f32":
+            return "f64"
         elif typ == "f64":
             return "f64"
-        return "casted"
+        elif typ == "i128" or typ == "u128":
+            return "i128"
 
 
 def test_agg_combinations():
+    data_types = {
+        "i8": "Int8",
+        "i16": "Int16",
+        "i32": "Int32",
+        "i64": "Int64",
+        "i128": "Decimal128(DECIMAL_PRECISION,DECIMAL_SCALE)",
+        "u8": "UInt8",
+        "u16": "UInt16",
+        "u32": "UInt32",
+        "u64": "UInt64",
+        "u128": "Decimal128(DECIMAL_PRECISION,DECIMAL_SCALE)",
+        "f32": "Float32",
+        "f64": "Float64",
+    }
+
+    arrs = {
+        "i8": "Int8Array",
+        "i16": "Int16Array",
+        "i32": "Int32Array",
+        "i64": "Int64Array",
+        "i128": "Int128Array",
+        "u8": "UInt8Array",
+        "u16": "UInt16Array",
+        "u32": "UInt32Array",
+        "u64": "UInt64Array",
+        "u128": "Int128Array",
+        "f32": "Float32Array",
+        "f64": "Float64Array",
+    }
+
+    builders = {
+        "i8": "Int8Builder",
+        "i16": "Int16Builder",
+        "i32": "Int32Builder",
+        "i64": "Int64Builder",
+        "i128": "Decimal128Builder",
+        "u8": "UInt8Builder",
+        "u16": "UInt16Builder",
+        "u32": "UInt32Builder",
+        "u64": "UInt64Builder",
+        "u128": "DecimalBuilder",
+        "f32": "Float32Builder",
+        "f64": "Float64Builder",
+    }
+    types = ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "i128"]
+
+    # agg!(i32, Int32Array, i32, i32, Int32Builder, 1, DataType::Int8);
+    agg_tpl = "agg!({typ}, {arr}, {inner_type}, {outer_type}, {outer_builder}, {multiplier}, DataType::{outer_data_type});"
+    outer = """
+    DataType::{data_type} => {{
+                    let t1 = get_return_type(DataType::{data_type}, &inner_fn);
+                    let t2 = get_return_type(t1, &outer_fn);
+                    match (&t1, &t2) {{
+                        {inner}
+                        _=>unimplemented!()
+                    }}
+    }}
+                    """
+    tpl = """(&DataType::{data_type_1}, &DataType::{data_type_2}) => {{
+                            let inner = aggregate::<{agg_type_1}>(&inner_fn);
+                            let outer = aggregate::<{agg_type_2}>(&outer_fn);
+                            partitioned_aggregate!(
+                                {typ},
+                                {agg_type_1},
+                                {agg_type_2},
+                                filter,
+                                inner,
+                                outer,
+                                predicate,
+                                groups,
+                                partition_col
+                            )
+                        }}"""
     print()
-    for agg in aggs:
-        rt1 = return_type("i8", agg)
-        print("{0}: {1}".format(agg, rt1))
-        for agg2 in aggs:
-            rt2 = return_type(rt1, agg2)
-            print("  {0}: {1}".format(agg2, rt2))
+    for typ in types:
+        inner = ""
+        cache = {}
+        for agg in aggs:
+            rt1 = return_type(typ, agg)
+            for agg2 in aggs:
+                rt2 = return_type(rt1, agg2)
+                key = "{0} - {1}".format(rt1, rt2)
+                if key not in cache:
+                    res = tpl.format(data_type_1=data_types[rt1], data_type_2=data_types[rt2], agg_type_1=rt1,
+                                     agg_type_2=rt2,
+                                     typ=typ)
+                    inner += res
+                    cache[key] = True
+        print(outer.format(data_type=data_types[typ], inner=inner))
+
+    for typ in types:
+        cache = {}
+        for agg in aggs:
+            rt1 = return_type(typ, agg)
+            for agg2 in aggs:
+                rt2 = return_type(rt1, agg2)
+                key = "{0} - {1}".format(rt1, rt2)
+                if key not in cache:
+                    cache[key] = True
+                    mul = "1"
+                    if rt2 == "f64" or rt2 == "f32":
+                        mul = "1."
+                    elif rt1 != "i128" and rt2 == "i128":
+                        mul = "DECIMAL_MULTIPLIER"
+                    elif rt2 != "i128" or (rt1 == "i128" and rt2 == "i128"):
+                        mul = "1"
+                    print(agg_tpl.format(typ=typ, arr=arrs[typ], inner_type=rt1, outer_type=rt2,
+                                         outer_builder=builders[rt2],
+                                         multiplier=mul,
+                                         outer_data_type=data_types[rt2]))
