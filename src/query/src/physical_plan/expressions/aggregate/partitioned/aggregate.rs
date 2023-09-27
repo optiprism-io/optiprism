@@ -54,7 +54,7 @@ use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunctio
 
 #[derive(Debug)]
 struct Group<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     inner_fn: AggregateFunction<T>,
     outer_fn: AggregateFunction<T>,
@@ -63,7 +63,7 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 }
 
 impl<T> Group<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     pub fn new(inner_fn: AggregateFunction<T>, outer_fn: AggregateFunction<T>) -> Self {
         Self {
@@ -78,8 +78,8 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 #[derive(Debug)]
 pub struct Aggregate<T, OT>
 where
-    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     filter: Option<PhysicalExprRef>,
     predicate: Column,
@@ -96,8 +96,8 @@ where
 
 impl<T, OT> Aggregate<T, OT>
 where
-    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     pub fn try_new(
         filter: Option<PhysicalExprRef>,
@@ -245,7 +245,7 @@ macro_rules! agg {
 
                         bucket.inner_fn.reset();
                     }
-                    println!("asd2 {:?}", predicate.value(row_id));
+
                     bucket
                         .inner_fn
                         .accumulate(predicate.value(row_id) as $acc_ty);

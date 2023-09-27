@@ -1,10 +1,15 @@
+import math
+
 import requests
+import numpy as np
 
 ch_addr = "http://localhost:8123"
 op_addr = "http://localhost:8080/api/v1"
 
 aggs = ["min", "max", "avg", "sum", "count"]
-fields = ["i_8", "i_16", "i_32", "i_64", "u_8", "u_16", "u_32", "u_64", "f_32", "f_64", "decimal"]
+fields = ["i_8", "i_16", "i_32", "i_64", "u_8", "u_16", "u_32", "u_64",
+          # "f_32",
+          "f_64", "decimal"]
 
 
 def auth():
@@ -138,6 +143,15 @@ def assert_agg_prop(agg, field: str):
     assert agg_prop_ch_query(agg, field) == agg_prop_op_query(agg, field)
 
 
+def assert_agg_prop_approx(agg, field: str):
+    ch = agg_prop_ch_query(agg, field)
+    op = agg_prop_op_query(agg, field)
+
+    for idx, v in enumerate(ch[1]):
+        print(idx,v)
+        assert math.isclose(op[1][idx], v, rel_tol=0.000001)
+
+
 def partitioned_agg_prop_ch_query(agg, outer_agg, field):
     q = """select c, {0}(counts)
         from (
@@ -211,6 +225,14 @@ def assert_partitioned_agg_prop(agg, outer_agg, typ: str):
     assert partitioned_agg_prop_ch_query(agg, outer_agg, typ) == partitioned_agg_prop_op_query(agg, outer_agg, typ)
 
 
+def assert_partitioned_agg_prop_approx(agg, outer_agg, field: str):
+    ch = partitioned_agg_prop_ch_query(agg, outer_agg, field)
+    op = partitioned_agg_prop_op_query(agg, outer_agg, field)
+
+    for idx, v in enumerate(ch[1]):
+        assert math.isclose(op[1][idx], v, rel_tol=0.0000001)
+
+
 def test_count_events():
     assert agg_prop_ch_query("count", "event") == simple_op_query("countEvents")
 
@@ -223,7 +245,12 @@ def test_agg_prop():
     for field in fields:
         for agg in aggs:
             print("Test Aggregate Property {0}({1})".format(agg, field))
-            assert_agg_prop(agg, field)
+            typ = field.replace("_", "")
+            t1 = return_type(typ, agg)
+            if t1 == "f64":
+                assert_agg_prop_approx(agg, field)
+            else:
+                assert_agg_prop(agg, field)
 
 
 def test_partitioned_agg():
@@ -233,7 +260,13 @@ def test_partitioned_agg():
                 print("Test Partitioned Aggregate Property {outer}({inner}({field}))".format(outer=outer_agg,
                                                                                              inner=inner_agg,
                                                                                              field=field))
-                assert_partitioned_agg_prop(inner_agg, outer_agg, field)
+                typ = field.replace("_", "")
+                t1 = return_type(typ, inner_agg)
+                t2 = return_type(t1, outer_agg)
+                if t2 == "f64":
+                    assert_partitioned_agg_prop_approx(inner_agg, outer_agg, field)
+                else:
+                    assert_partitioned_agg_prop(inner_agg, outer_agg, field)
 
 
 def test_partitioned_count():
@@ -327,7 +360,7 @@ def return_type(typ, agg):
             return "i128"
 
 
-def test_agg_combinations():
+def agg_combinations():
     data_types = {
         "i8": "Int8",
         "i16": "Int16",

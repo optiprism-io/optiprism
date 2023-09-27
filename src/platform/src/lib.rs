@@ -134,7 +134,23 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
         arrow::datatypes::DataType::UInt16 => arr_to_json_values!(arr, UInt16Array),
         arrow::datatypes::DataType::UInt32 => arr_to_json_values!(arr, UInt32Array),
         arrow::datatypes::DataType::UInt64 => arr_to_json_values!(arr, UInt64Array),
-        arrow::datatypes::DataType::Float32 => arr_to_json_values!(arr, Float32Array),
+        arrow::datatypes::DataType::Float32 => {
+            let arr = arr.as_any().downcast_ref::<Float32Array>().unwrap();
+            Ok(arr
+                .iter()
+                .map(|value| {
+                    println!(
+                        "{:?} {:?}",
+                        value,
+                        value.map(|v| (v as f64 * 1000000.0).trunc() / 1000000.0)
+                    );
+                    // https://stackoverflow.com/questions/73871891/how-to-serialize-a-struct-containing-f32-using-serde-json
+                    json!(value.map(|v| (v as f64 * 1000000.0).trunc() / 1000000.0))
+                })
+                .collect())
+
+            // arr_to_json_values!(arr, Float32Array)
+        }
         arrow::datatypes::DataType::Float64 => arr_to_json_values!(arr, Float64Array),
         arrow::datatypes::DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
         arrow::datatypes::DataType::Utf8 => arr_to_json_values!(arr, StringArray),

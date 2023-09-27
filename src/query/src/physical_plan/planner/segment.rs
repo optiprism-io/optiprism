@@ -83,7 +83,7 @@ use crate::physical_plan::segmented_aggregate::SegmentedAggregateExec;
 use crate::physical_plan::unpivot::UnpivotExec;
 
 fn aggregate<T>(agg: &logical_plan::segment::AggregateFunction) -> AggregateFunction<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone {
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display {
     match agg {
         logical_plan::segment::AggregateFunction::Sum => AggregateFunction::new_sum(),
         logical_plan::segment::AggregateFunction::Min => AggregateFunction::new_min(),

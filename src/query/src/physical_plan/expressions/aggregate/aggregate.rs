@@ -64,13 +64,13 @@ use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunctio
 
 #[derive(Debug)]
 struct Group<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     agg: AggregateFunction<T>,
 }
 
 impl<T> Group<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     pub fn new(agg: AggregateFunction<T>) -> Self {
         Self { agg }
@@ -80,8 +80,8 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 #[derive(Debug)]
 pub struct Aggregate<T, OT>
 where
-    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     filter: Option<PhysicalExprRef>,
     groups: Option<Groups<Group<OT>>>,
@@ -94,8 +94,8 @@ where
 
 impl<T, OT> Aggregate<T, OT>
 where
-    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     pub fn try_new(
         filter: Option<PhysicalExprRef>,
@@ -231,6 +231,10 @@ macro_rules! agg {
                         &mut self.single_group
                     };
 
+                    println!(
+                        "{}",
+                        val.unwrap() as $acc_ty * $mul as $acc_ty / $div as $acc_ty
+                    );
                     bucket
                         .agg
                         .accumulate(val.unwrap() as $acc_ty * $mul as $acc_ty / $div as $acc_ty);

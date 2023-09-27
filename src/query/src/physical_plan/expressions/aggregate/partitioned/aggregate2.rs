@@ -64,8 +64,8 @@ use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunctio
 #[derive(Debug)]
 struct Group<IT, OT>
 where
-    IT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
+    IT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     inner_fn: AggregateFunction<IT>,
     outer_fn: AggregateFunction<OT>,
@@ -75,8 +75,8 @@ where
 
 impl<IT, OT> Group<IT, OT>
 where
-    IT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
+    IT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     pub fn new(inner_fn: AggregateFunction<IT>, outer_fn: AggregateFunction<OT>) -> Self {
         Self {
@@ -91,9 +91,9 @@ where
 #[derive(Debug)]
 pub struct Aggregate<T, IT, OT>
 where
-    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    IT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+    IT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     filter: Option<PhysicalExprRef>,
     predicate: Column,
@@ -110,9 +110,9 @@ where
 
 impl<T, IT, OT> Aggregate<T, IT, OT>
 where
-    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    IT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
-    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone,
+    T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+    IT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
+    OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display,
 {
     pub fn try_new(
         filter: Option<PhysicalExprRef>,
@@ -257,7 +257,9 @@ macro_rules! agg {
                     if bucket.last_partition != partition {
                         let v = bucket.inner_fn.result();
                         // for float multiply will be 1., which will be optimized in release mode
-                        bucket.outer_fn.accumulate(v as $outer_acc_ty * $mul);
+                        bucket
+                            .outer_fn
+                            .accumulate(v as $outer_acc_ty * $mul as $outer_acc_ty);
                         bucket.last_partition = partition;
 
                         bucket.inner_fn.reset();
@@ -274,12 +276,11 @@ macro_rules! agg {
                 if let Some(groups) = &mut self.groups {
                     let mut rows: Vec<Row> = Vec::with_capacity(groups.groups.len());
                     let mut res_col_b = $b::with_capacity(groups.groups.len());
-                    println!("{:?}", res_col_b);
                     for (row, group) in groups.groups.iter_mut() {
                         rows.push(row.row());
                         group
                             .outer_fn
-                            .accumulate(group.inner_fn.result() as $outer_acc_ty);
+                            .accumulate(group.inner_fn.result() as $outer_acc_ty * $mul);
                         let res = group.outer_fn.result();
                         res_col_b.append_value(res);
                     }
@@ -481,7 +482,7 @@ agg!(
     i128,
     i128,
     DecimalBuilder,
-    1,
+    DECIMAL_MULTIPLIER,
     DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
 );
 agg!(
@@ -532,7 +533,7 @@ agg!(
     u64,
     i128,
     DecimalBuilder,
-    1,
+    DECIMAL_MULTIPLIER,
     DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
 );
 agg!(u8, UInt8Array, u64, i64, Int64Builder, 1, DataType::Int64);
@@ -617,7 +618,7 @@ agg!(
     u64,
     i128,
     DecimalBuilder,
-    1,
+    DECIMAL_MULTIPLIER,
     DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
 );
 agg!(u16, UInt16Array, u64, i64, Int64Builder, 1, DataType::Int64);
@@ -702,7 +703,7 @@ agg!(
     u64,
     i128,
     DecimalBuilder,
-    1,
+    DECIMAL_MULTIPLIER,
     DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
 );
 agg!(u32, UInt32Array, u64, i64, Int64Builder, 1, DataType::Int64);
@@ -749,7 +750,7 @@ agg!(
     u64,
     i128,
     DecimalBuilder,
-    1,
+    DECIMAL_MULTIPLIER,
     DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
 );
 agg!(u64, UInt64Array, u64, i64, Int64Builder, 1, DataType::Int64);
@@ -769,7 +770,7 @@ agg!(
     i128,
     i128,
     DecimalBuilder,
-    1,
+    DECIMAL_MULTIPLIER,
     DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
 );
 agg!(
@@ -950,7 +951,7 @@ agg!(
     i128,
     f64,
     Float64Builder,
-    1.,
+    1. / DECIMAL_MULTIPLIER as f64,
     DataType::Float64
 );
 agg!(
@@ -968,7 +969,7 @@ agg!(
     f64,
     f64,
     Float64Builder,
-    1.,
+    1. / DECIMAL_MULTIPLIER as f64,
     DataType::Float64
 );
 agg!(

@@ -1,4 +1,5 @@
 use std::collections::BinaryHeap;
+use std::fmt::Display;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -47,10 +48,9 @@ use crate::physical_plan::expressions::segmentation::boolean_op::Operator;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
 
-// TODO change to simple i128? Like in Partitioned module
 #[derive(Debug, Clone)]
 pub enum AggregateFunction<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     Sum(T),
     Min(T),
@@ -60,7 +60,7 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 }
 
 impl<T> AggregateFunction<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     pub fn new_sum() -> Self {
         AggregateFunction::Sum(T::zero())
@@ -146,7 +146,7 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 
 #[derive(Debug)]
 struct Inner<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     agg: AggregateFunction<T>,
     last_partition: i64,
@@ -156,7 +156,7 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 
 #[derive(Debug)]
 pub struct Aggregate<T, OT, Op>
-where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     filter: PhysicalExprRef,
     predicate: Column,
@@ -171,7 +171,7 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 }
 
 impl<T, OT, Op> Aggregate<T, OT, Op>
-where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     pub fn new(
         filter: PhysicalExprRef,

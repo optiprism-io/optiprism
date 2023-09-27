@@ -42,7 +42,7 @@ use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunctio
 
 #[derive(Debug)]
 struct Group<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     count: i64,
     outer_fn: AggregateFunction<T>,
@@ -51,7 +51,7 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 }
 
 impl<T> Group<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     pub fn new(outer_fn: AggregateFunction<T>) -> Self {
         Self {
@@ -65,7 +65,7 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 
 #[derive(Debug)]
 pub struct PartitionedCount<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     filter: Option<PhysicalExprRef>,
     outer_fn: AggregateFunction<T>,
@@ -78,7 +78,7 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
 }
 
 impl<T> PartitionedCount<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
 {
     pub fn try_new(
         filter: Option<PhysicalExprRef>,

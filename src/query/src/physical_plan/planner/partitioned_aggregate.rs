@@ -113,7 +113,7 @@ fn build_groups(
 fn aggregate<T>(
     agg: &logical_plan::partitioned_aggregate::AggregateFunction,
 ) -> AggregateFunction<T>
-where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone {
+where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display {
     match agg {
         logical_plan::partitioned_aggregate::AggregateFunction::Sum => AggregateFunction::new_sum(),
         logical_plan::partitioned_aggregate::AggregateFunction::Min => AggregateFunction::new_min(),

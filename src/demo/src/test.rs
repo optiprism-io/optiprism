@@ -24,6 +24,7 @@ use arrow::record_batch::RecordBatch;
 use chrono::DateTime;
 use chrono::Datelike;
 use chrono::Duration;
+use chrono::DurationRound;
 use chrono::NaiveDateTime;
 use chrono::Timelike;
 use chrono::Utc;
@@ -35,6 +36,7 @@ use metadata::database::TableRef;
 use metadata::error::DatabaseError;
 use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
+use rust_decimal::Decimal;
 use test_util::create_event;
 use test_util::create_property;
 use test_util::CreatePropertyMainRequest;
@@ -144,8 +146,9 @@ pub async fn gen(
         Err(err) => return Err(err.into()),
     };
 
+    let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0)
+        .duration_trunc(Duration::days(1))?;
     let schema = table.arrow_schema();
-
     let mut b_user_id = Int64Builder::new();
     let mut b_created_at = TimestampNanosecondBuilder::new();
     let mut b_event = UInt64Builder::new();
@@ -169,12 +172,12 @@ pub async fn gen(
     let days = 100;
     let events = 10;
     for user in 0..users {
-        let mut cur_time = Utc::now() - Duration::days(days);
+        let mut cur_time = now - Duration::days(days);
         for day in 0..days {
             let mut event_time = cur_time.clone();
             for event in 0..events {
                 b_user_id.append_value(user);
-                b_created_at.append_value(event_time.timestamp_nanos() as i64);
+                b_created_at.append_value(event_time.timestamp_nanos());
                 b_event.append_value(1);
                 b_i8.append_value(event as i8);
                 b_i16.append_value(event as i16);
@@ -184,13 +187,15 @@ pub async fn gen(
                 b_u16.append_value(event as u16);
                 b_u32.append_value(event as u32);
                 b_u64.append_value(event as u64);
-                b_f32.append_value(event as f32);
-                b_f64.append_value(event as f64);
+                b_f32.append_value(event as f32 * 1.1);
+                b_f64.append_value(event as f64 * 1.1);
                 b_b.append_value(event % 2 == 0);
                 b_str.append_value(format!("event {}", event).as_str());
                 b_lstr.append_value(format!("event {}", event).as_str());
                 b_ts.append_value(event * 1000);
-                b_dec.append_value(event as i128 * 10_i128.pow(DECIMAL_SCALE as u32));
+                b_dec.append_value(
+                    event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100,
+                );
 
                 let d = Duration::days(1).num_seconds() / events;
                 let diff = Duration::seconds(d);
