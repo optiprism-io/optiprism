@@ -170,7 +170,7 @@ pub async fn gen(
         Decimal128Builder::new().with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
     let users = 100;
     let days = 100;
-    let events = 10;
+    let events = 100;
     for user in 0..users {
         let mut cur_time = now - Duration::days(days);
         for day in 0..days {

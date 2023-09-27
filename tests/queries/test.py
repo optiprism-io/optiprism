@@ -148,7 +148,6 @@ def assert_agg_prop_approx(agg, field: str):
     op = agg_prop_op_query(agg, field)
 
     for idx, v in enumerate(ch[1]):
-        print(idx,v)
         assert math.isclose(op[1][idx], v, rel_tol=0.000001)
 
 
@@ -247,7 +246,8 @@ def test_agg_prop():
             print("Test Aggregate Property {0}({1})".format(agg, field))
             typ = field.replace("_", "")
             t1 = return_type(typ, agg)
-            if t1 == "f64":
+            print(typ,agg,t1)
+            if t1 == "f64" or t1 == "i128" or t1 == "u128":
                 assert_agg_prop_approx(agg, field)
             else:
                 assert_agg_prop(agg, field)
@@ -263,7 +263,7 @@ def test_partitioned_agg():
                 typ = field.replace("_", "")
                 t1 = return_type(typ, inner_agg)
                 t2 = return_type(t1, outer_agg)
-                if t2 == "f64":
+                if t2 == "f64" or t2 == "i128" or t2 == "u128":
                     assert_partitioned_agg_prop_approx(inner_agg, outer_agg, field)
                 else:
                     assert_partitioned_agg_prop(inner_agg, outer_agg, field)
@@ -356,7 +356,7 @@ def return_type(typ, agg):
             return "f64"
         elif typ == "f64":
             return "f64"
-        elif typ == "i128" or typ == "u128":
+        elif typ == "i128" or typ == "u128" or typ=="decimal":
             return "i128"
 
 
