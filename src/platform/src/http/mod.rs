@@ -8,6 +8,7 @@ pub mod group_records;
 pub mod properties;
 pub mod queries;
 pub mod reports;
+pub mod track;
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -67,9 +68,10 @@ impl Service {
         auth_cfg: crate::auth::Config,
         addr: SocketAddr,
     ) -> Self {
+        info!("attaching api routes...");
+
         let mut router = Router::new();
 
-        info!("attaching api routes...");
         router = accounts::attach_routes(router);
         router = auth::attach_routes(router);
         router = events::attach_routes(router);
@@ -81,6 +83,8 @@ impl Service {
         router = reports::attach_routes(router);
         router = event_records::attach_routes(router);
         router = group_records::attach_routes(router);
+        router = track::attach_routes(router);
+
         router = router.clone().nest("/api/v1", router);
         router = router
             .layer(Extension(md.accounts.clone()))
