@@ -335,11 +335,10 @@ impl LogicalPlanBuilder {
         let mut input = self
             .build_filter_logical_plan(input.clone(), &self.es.events[event_id])
             .await?;
-        input = self
+        let (mut input, group_expr) = self
             .build_aggregate_logical_plan(input, &self.es.events[event_id], segment_inputs)
             .await?;
 
-        println!("asd@ {:?}", input.schema());
         // unpivot aggregate values into value column
         if self.ctx.format != Format::Compact {
             input = {
@@ -372,12 +371,18 @@ impl LogicalPlanBuilder {
         }
 
         input = {
+            let sort_expr = group_expr
+                .into_iter()
+                .map(|expr| {
+                    Expr::Sort(expr::Sort {
+                        expr: Box::new(expr),
+                        asc: true,
+                        nulls_first: false,
+                    })
+                })
+                .collect::<Vec<_>>();
             let sort = Sort {
-                expr: vec![Expr::Sort(expr::Sort {
-                    expr: Box::new(col(event_fields::CREATED_AT)),
-                    asc: true,
-                    nulls_first: false,
-                })],
+                expr: sort_expr,
                 input: Arc::new(input),
                 fetch: None,
             };
@@ -455,7 +460,7 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         event: &Event,
         segment_inputs: Option<Vec<LogicalPlan>>,
-    ) -> Result<LogicalPlan> {
+    ) -> Result<(LogicalPlan, Vec<Expr>)> {
         let mut group_expr: Vec<Expr> = vec![];
 
         let ts_col = Expr::Column(Column::from_qualified_name(event_fields::CREATED_AT));
@@ -573,9 +578,12 @@ impl LogicalPlanBuilder {
             aggr_expr,
         )?;
 
-        Ok(LogicalPlan::Extension(Extension {
-            node: Arc::new(agg_node),
-        }))
+        Ok((
+            LogicalPlan::Extension(Extension {
+                node: Arc::new(agg_node),
+            }),
+            group_expr.into_iter().map(|(a, b)| a).collect::<Vec<_>>(),
+        ))
     }
 
     /// builds event filters expression

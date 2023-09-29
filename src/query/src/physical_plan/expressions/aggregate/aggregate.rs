@@ -231,10 +231,6 @@ macro_rules! agg {
                         &mut self.single_group
                     };
 
-                    println!(
-                        "{}",
-                        val.unwrap() as $acc_ty * $mul as $acc_ty / $div as $acc_ty
-                    );
                     bucket
                         .agg
                         .accumulate(val.unwrap() as $acc_ty * $mul as $acc_ty / $div as $acc_ty);
@@ -524,7 +520,6 @@ mod tests {
             ],
             Default::default(),
         );
-        println!("{:?}", res);
         let batch = RecordBatch::try_new(Arc::new(schema), res).unwrap();
         print_batches(vec![batch].as_ref()).unwrap();
     }

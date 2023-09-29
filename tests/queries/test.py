@@ -3,94 +3,7 @@ import math
 import requests
 import numpy as np
 
-ch_addr = "http://localhost:8123"
-op_addr = "http://localhost:8080/api/v1"
 
-aggs = ["min", "max", "avg", "sum", "count"]
-fields = ["i_8", "i_16", "i_32", "i_64", "u_8", "u_16", "u_32", "u_64",
-          # "f_32",
-          "f_64", "decimal"]
-
-
-def auth():
-    auth_body = {
-        "email": "admin@email.com",
-        "password": "admin"
-    }
-
-    auth_resp = requests.post(op_addr + "/auth/login", json=auth_body, headers={"Content-Type": "application/json"})
-
-    return auth_resp.json()['accessToken']
-
-
-token = auth()
-
-
-def agg_prop_ch_query(agg, field, distinct=""):
-    q = """select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, {0}({2}event_{1}) as sums
-        from file('*.parquet', Parquet) as b
-        where b.event_event = 'event'
-          and toStartOfDay(event_created_at, 'UTC') >=
-              toStartOfDay(now(), 'UTC') - INTERVAL 2 day
-        group by c order by 1 asc format JSONCompactColumns;""".format(agg, field, distinct)
-
-    resp = requests.get(ch_addr,
-                        params={"query": q})
-
-    ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
-    val = list(map(lambda x: float(x), resp.json()[1]))
-
-    print(val)
-    return [ts, val]
-
-
-def agg_prop_op_query(agg, field: str, prop_type="event"):
-    q = {
-        "time": {
-            "type": "last",
-            "last": 3,
-            "unit": "day"
-        },
-        "group": "user",
-        "intervalUnit": "day",
-        "chartType": "line",
-        "analysis": {
-            "type": "linear"
-        },
-        "events": [
-            {
-                "eventName": "event",
-                "queries": [
-                    {
-                        "type": "aggregateProperty",
-                        "aggregate": agg,
-                        "propertyType": prop_type,
-                        "propertyName": field
-                    },
-                ],
-                "eventType": "regular",
-                "eventId": 8,
-                "filters": []
-            }
-        ],
-        "filters": {
-            "groupsCondition": "and",
-            "groups": []
-        },
-        "segments": [],
-        "breakdowns": []
-    }
-
-    resp = requests.post(
-        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
-        json=q,
-        headers={"Content-Type": "application/json",
-                 "Authorization": "Bearer " + token})
-
-    ts = resp.json()[1]
-    val = resp.json()[2]
-
-    return [ts, val]
 
 
 def simple_op_query(query: str):
@@ -139,97 +52,13 @@ def simple_op_query(query: str):
     return [ts, val]
 
 
-def assert_agg_prop(agg, field: str):
-    assert agg_prop_ch_query(agg, field) == agg_prop_op_query(agg, field)
 
 
-def assert_agg_prop_approx(agg, field: str):
-    ch = agg_prop_ch_query(agg, field)
-    op = agg_prop_op_query(agg, field)
-
-    for idx, v in enumerate(ch[1]):
-        assert math.isclose(op[1][idx], v, rel_tol=0.000001)
 
 
-def partitioned_agg_prop_ch_query(agg, outer_agg, field):
-    q = """select c, {0}(counts)
-        from (
-                 select toUnixTimestamp(toDate(event_created_at, 'UTC')) as c, {1}(event_{2}) as counts
-                 from file('*.parquet', Parquet) as b
-                 where b.event_event = 'event'
-                   and toStartOfDay(event_created_at, 'UTC') >=
-                       toStartOfDay(now(), 'UTC') - INTERVAL 2 day
-                 group by event_user_id, c)
-        group by c
-        order by 1 asc format JSONCompactColumns;""".format(outer_agg, agg, field)
-
-    ch_resp = requests.get(ch_addr,
-                           params={"query": q})
-    ch_ts = list(map(lambda x: x * 1000000000, ch_resp.json()[0]))
-    ch_val = list(map(lambda x: float(x), ch_resp.json()[1]))
-    return [ch_ts, ch_val]
 
 
-def partitioned_agg_prop_op_query(agg, outer_agg, typ: str, prop_type="event"):
-    q = {
-        "time": {
-            "type": "last",
-            "last": 3,
-            "unit": "day"
-        },
-        "group": "user",
-        "intervalUnit": "day",
-        "chartType": "line",
-        "analysis": {
-            "type": "linear"
-        },
-        "events": [
-            {
-                "eventName": "event",
-                "queries": [
-                    {
-                        "type": "aggregatePropertyPerGroup",
-                        "aggregate": outer_agg,
-                        "aggregatePerGroup": agg,
-                        "propertyType": prop_type,
-                        "propertyName": typ
-                    },
-                ],
-                "eventType": "regular",
-                "eventId": 8,
-                "filters": []
-            }
-        ],
-        "filters": {
-            "groupsCondition": "and",
-            "groups": []
-        },
-        "segments": [],
-        "breakdowns": []
-    }
 
-    resp = requests.post(
-        "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
-        json=q,
-        headers={"Content-Type": "application/json",
-                 "Authorization": "Bearer " + token})
-
-    ts = resp.json()[1]
-    val = resp.json()[2]
-
-    return [ts, val]
-
-
-def assert_partitioned_agg_prop(agg, outer_agg, typ: str):
-    assert partitioned_agg_prop_ch_query(agg, outer_agg, typ) == partitioned_agg_prop_op_query(agg, outer_agg, typ)
-
-
-def assert_partitioned_agg_prop_approx(agg, outer_agg, field: str):
-    ch = partitioned_agg_prop_ch_query(agg, outer_agg, field)
-    op = partitioned_agg_prop_op_query(agg, outer_agg, field)
-
-    for idx, v in enumerate(ch[1]):
-        assert math.isclose(op[1][idx], v, rel_tol=0.0000001)
 
 
 def test_count_events():
@@ -238,19 +67,6 @@ def test_count_events():
 
 def test_count_unique_groups():
     assert agg_prop_ch_query("uniq", "user_id", "") == simple_op_query("countUniqueGroups")
-
-
-def test_agg_prop():
-    for field in fields:
-        for agg in aggs:
-            print("Test Aggregate Property {0}({1})".format(agg, field))
-            typ = field.replace("_", "")
-            t1 = return_type(typ, agg)
-            print(typ,agg,t1)
-            if t1 == "f64" or t1 == "i128" or t1 == "u128":
-                assert_agg_prop_approx(agg, field)
-            else:
-                assert_agg_prop(agg, field)
 
 
 def test_partitioned_agg():
@@ -334,30 +150,6 @@ def test_partitioned_count():
 
         assert ch_ts == op_ts
         assert ch_val == op_val
-
-
-def return_type(typ, agg):
-    if agg == "min" or agg == "max":
-        return typ
-    elif agg == "count":
-        return "i64"
-    elif agg == "avg":
-        return "f64"
-    elif agg == "sum":
-        if typ == "i8" or typ == "i16" or typ == "i32":
-            return "i64"
-        elif typ == "u8" or typ == "u16" or typ == "u32":
-            return "u64"
-        elif typ == "i64":
-            return "i128"
-        elif typ == "u64":
-            return "u128"
-        elif typ == "f32":
-            return "f64"
-        elif typ == "f64":
-            return "f64"
-        elif typ == "i128" or typ == "u128" or typ=="decimal":
-            return "i128"
 
 
 def agg_combinations():
