@@ -16,7 +16,7 @@ def aggregate_property_query(agg, field, group=None, distinct=False, interval="d
         from file('*.parquet', Parquet) as b
         where b.event_event = 'event'
           and event_created_at >=
-              date_trunc('{interval}',now(),'UTC') - INTERVAL {period} {period_interval}
+              now() - INTERVAL {period} {period_interval}
         group by {group} order by {group} asc format JSONCompactColumns;""".format(agg=agg, field=field, distinct=d,
                                                                                    period=period,
                                                                                    period_interval=period_interval,
@@ -63,8 +63,8 @@ def partitioned_aggregate_property_query(agg, outer_agg, field, group=None, inte
                  select toUnixTimestamp({interval}(event_created_at, 'UTC')) as c, {group} {inner_agg}(event_{field}) as counts
                  from file('*.parquet', Parquet) as b
                  where b.event_event = 'event'
-                   and toStartOfDay(event_created_at, 'UTC') >=
-                       toStartOfDay(now(), 'UTC') - INTERVAL {period} {period_interval}
+                   and event_created_at >=
+                       now() - INTERVAL {period} {period_interval}
                  group by event_user_id,c {group})
         group by c {group}
         order by 1 asc format JSONCompactColumns;""".format(outer_agg=outer_agg, inner_agg=agg, field=field,

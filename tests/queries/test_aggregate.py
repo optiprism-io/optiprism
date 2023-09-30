@@ -27,21 +27,18 @@ def test_types():
                 assert ch == op
 
 
-# fixme
 def test_periods():
-    for interval in ["week","minute", "hour", "day", "week", "month", "year"]:
+    for interval in ["minute", "hour", "day", "week", "month", "year"]:
         for period in [1, 2, 10, 20, 30, 60]:
-            for period_interval in ["hour", "day", "week", "month", "year"]:
-                sys.stdout.flush()
-                print("Test Period interval={interval}, period={period}, period_interval={period_interval}".format(
-                    interval=interval, period=period, period_interval=period_interval), flush=True)
-                ch = clickhouse.aggregate_property_query("sum", "i_8", interval=interval, period=period,
-                                                         period_interval=period_interval)
-                op = optiprism.aggregate_property_query("sum", "i_8", period=period, time_unit=period_interval,
-                                                        interval_unit=interval)
-                print(ch)
-                print(op)
-                assert ch == op
+            print("Test Period interval={interval}, period={period}, period_interval={period_interval}".format(
+                interval=interval, period=period, period_interval=interval), flush=True)
+            ch = clickhouse.aggregate_property_query("sum", "i_8", interval=interval, period=period,
+                                                     period_interval=interval)
+            op = optiprism.aggregate_property_query("sum", "i_8", period=period, time_unit=interval,
+                                                    interval_unit=interval)
+            print(ch)
+            print(op)
+            assert ch == op
 
 
 def test_grouped():

@@ -412,28 +412,28 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         event: &Event,
     ) -> Result<LogicalPlan> {
-        let cur_time = match &self.es.interval_unit {
-            TimeIntervalUnit::Second => self
-                .ctx
-                .cur_time
-                .duration_trunc(Duration::seconds(1))
-                .unwrap(),
-            TimeIntervalUnit::Minute => self
-                .ctx
-                .cur_time
-                .duration_trunc(Duration::minutes(1))
-                .unwrap(),
-            TimeIntervalUnit::Hour => self
-                .ctx
-                .cur_time
-                .duration_trunc(Duration::hours(1))
-                .unwrap(),
-            TimeIntervalUnit::Day => self.ctx.cur_time.duration_trunc(Duration::days(1)).unwrap(),
-            TimeIntervalUnit::Week => self.ctx.cur_time.beginning_of_week(),
-            TimeIntervalUnit::Month => self.ctx.cur_time.beginning_of_month(),
-            TimeIntervalUnit::Year => self.ctx.cur_time.beginning_of_year(),
-        };
-
+        let cur_time = self.ctx.cur_time.clone();
+        // let cur_time = match &self.es.interval_unit {
+        // TimeIntervalUnit::Second => self
+        // .ctx
+        // .cur_time
+        // .duration_trunc(Duration::seconds(1))
+        // .unwrap(),
+        // TimeIntervalUnit::Minute => self
+        // .ctx
+        // .cur_time
+        // .duration_trunc(Duration::minutes(1))
+        // .unwrap(),
+        // TimeIntervalUnit::Hour => self
+        // .ctx
+        // .cur_time
+        // .duration_trunc(Duration::hours(1))
+        // .unwrap(),
+        // TimeIntervalUnit::Day => self.ctx.cur_time.duration_trunc(Duration::days(1)).unwrap(),
+        // TimeIntervalUnit::Week => self.ctx.cur_time.beginning_of_week(),
+        // TimeIntervalUnit::Month => self.ctx.cur_time.beginning_of_month(),
+        // TimeIntervalUnit::Year => self.ctx.cur_time.beginning_of_year(),
+        // };
         // let cur_time = self.cur_time.duration_trunc(trunc).unwrap();
         // time expression
         let mut expr = time_expression(
