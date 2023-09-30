@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
 use axum::async_trait;
+use chrono::DateTime;
+use chrono::TimeZone;
+use chrono::Utc;
 use common::rbac::ProjectPermission;
 use query::context::Format;
 use serde_json::Value;
@@ -42,6 +45,13 @@ impl Provider for ProviderImpl {
             ProjectPermission::ExploreReports,
         )?;
         let lreq = req.try_into()?;
+        let cur_time = match query.timestamp {
+            None => Utc::now(),
+            Some(ts_sec) => DateTime::from_naive_utc_and_offset(
+                chrono::NaiveDateTime::from_timestamp_millis(ts_sec * 1000).unwrap(),
+                Utc,
+            ),
+        };
         let ctx = query::Context {
             organization_id,
             project_id,
@@ -53,6 +63,7 @@ impl Provider for ProviderImpl {
                     _ => unimplemented!(),
                 },
             },
+            cur_time,
         };
 
         let data = self.query.event_segmentation(ctx, lreq).await?;

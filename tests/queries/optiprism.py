@@ -18,15 +18,23 @@ token = auth()
 
 
 def aggregate_property_query(agg, field: str, prop_type="event",
-                             breakdowns=None):
+                             breakdowns=None, period=2, time_unit="day", interval_unit="day"):
+    b = []
+    if breakdowns is not None:
+        for breakdown in breakdowns:
+            b.append({
+                "type": "property",
+                "propertyType": "event",
+                "propertyName": breakdown
+            })
     q = {
         "time": {
             "type": "last",
-            "last": 3,
-            "unit": "day"
+            "last": period,
+            "unit": time_unit
         },
         "group": "user",
-        "intervalUnit": "day",
+        "intervalUnit": interval_unit,
         "chartType": "line",
         "analysis": {
             "type": "linear"
@@ -42,7 +50,7 @@ def aggregate_property_query(agg, field: str, prop_type="event",
                         "propertyName": field
                     },
                 ],
-                "breakdowns": breakdowns,
+                "breakdowns": b,
                 "eventType": "regular",
                 "eventId": 8,
                 "filters": []
@@ -56,14 +64,18 @@ def aggregate_property_query(agg, field: str, prop_type="event",
         "breakdowns": []
     }
 
+    print(q)
     resp = requests.post(
         "{0}/organizations/1/projects/1/queries/event-segmentation?format=jsonCompact".format(op_addr),
         json=q,
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
 
+    if len(resp.json()[0]) == 0:
+        return []
+
     ts = resp.json()[1]
-    if breakdowns != None:
+    if breakdowns is not None:
         group = resp.json()[2]
         val = resp.json()[3]
 
@@ -74,13 +86,23 @@ def aggregate_property_query(agg, field: str, prop_type="event",
         return [ts, val]
 
 
-def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="event", last=3, interval_unit="day",
+def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="event", time_last=2, unit="day",
+                                         interval_unit="day",
                                          breakdowns=None):
+    b = []
+    if breakdowns is not None:
+        for breakdown in breakdowns:
+            b.append({
+                "type": "property",
+                "propertyType": "event",
+                "propertyName": breakdown
+            })
+
     q = {
         "time": {
             "type": "last",
-            "last": last,
-            "unit": "day"
+            "last": time_last,
+            "unit": unit
         },
         "group": "user",
         "intervalUnit": interval_unit,
@@ -100,7 +122,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="ev
                         "propertyName": typ
                     },
                 ],
-                "breakdowns": breakdowns,
+                "breakdowns": b,
                 "eventType": "regular",
                 "eventId": 8,
                 "filters": []
@@ -121,7 +143,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="ev
                  "Authorization": "Bearer " + token})
 
     ts = resp.json()[1]
-    if breakdowns != None:
+    if breakdowns is not None:
         group = resp.json()[2]
         val = resp.json()[3]
 
@@ -132,14 +154,24 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="ev
         return [ts, val]
 
 
-def partitioned_aggregate_property_query_grouped(agg, outer_agg, typ: str, prop_type="event", last=3,
-                                                 interval_unit="day",
-                                                 breakdowns=None):
+def simple_query(query: str, time_last=2, unit="day",
+                 interval_unit="day",
+                 breakdowns=None):
+
+    b = []
+    if breakdowns is not None:
+        for breakdown in breakdowns:
+            b.append({
+                "type": "property",
+                "propertyType": "event",
+                "propertyName": breakdown
+            })
+
     q = {
         "time": {
             "type": "last",
-            "last": last,
-            "unit": "day"
+            "last": time_last,
+            "unit": unit
         },
         "group": "user",
         "intervalUnit": interval_unit,
@@ -152,17 +184,13 @@ def partitioned_aggregate_property_query_grouped(agg, outer_agg, typ: str, prop_
                 "eventName": "event",
                 "queries": [
                     {
-                        "type": "aggregatePropertyPerGroup",
-                        "aggregate": outer_agg,
-                        "aggregatePerGroup": agg,
-                        "propertyType": prop_type,
-                        "propertyName": typ
+                        "type": query
                     },
                 ],
-                "breakdowns": breakdowns,
                 "eventType": "regular",
                 "eventId": 8,
-                "filters": []
+                "filters": [],
+                "breakdowns": b,
             }
         ],
         "filters": {
@@ -180,7 +208,12 @@ def partitioned_aggregate_property_query_grouped(agg, outer_agg, typ: str, prop_
                  "Authorization": "Bearer " + token})
 
     ts = resp.json()[1]
-    group = resp.json()[1]
-    val = resp.json()[2]
+    if breakdowns is not None:
+        group = resp.json()[2]
+        val = resp.json()[3]
 
-    return [ts, group, val]
+        return [ts, group, val]
+    else:
+        val = resp.json()[2]
+
+        return [ts, val]

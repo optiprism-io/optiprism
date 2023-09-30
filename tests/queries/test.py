@@ -61,30 +61,6 @@ def simple_op_query(query: str):
 
 
 
-def test_count_events():
-    assert agg_prop_ch_query("count", "event") == simple_op_query("countEvents")
-
-
-def test_count_unique_groups():
-    assert agg_prop_ch_query("uniq", "user_id", "") == simple_op_query("countUniqueGroups")
-
-
-def test_partitioned_agg():
-    for field in fields:
-        for outer_agg in aggs:
-            for inner_agg in aggs:
-                print("Test Partitioned Aggregate Property {outer}({inner}({field}))".format(outer=outer_agg,
-                                                                                             inner=inner_agg,
-                                                                                             field=field))
-                typ = field.replace("_", "")
-                t1 = return_type(typ, inner_agg)
-                t2 = return_type(t1, outer_agg)
-                if t2 == "f64" or t2 == "i128" or t2 == "u128":
-                    assert_partitioned_agg_prop_approx(inner_agg, outer_agg, field)
-                else:
-                    assert_partitioned_agg_prop(inner_agg, outer_agg, field)
-
-
 def test_partitioned_count():
     for agg in ["min", "max", "avg", "sum"]:
         print("Test Partitioned Count ({0})".format(agg))

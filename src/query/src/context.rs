@@ -1,3 +1,6 @@
+use chrono::DateTime;
+use chrono::Utc;
+
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub enum Format {
     #[default]
@@ -10,6 +13,7 @@ pub struct Context {
     pub organization_id: u64,
     pub project_id: u64,
     pub format: Format,
+    pub cur_time: DateTime<Utc>,
 }
 
 impl Context {

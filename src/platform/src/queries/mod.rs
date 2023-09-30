@@ -31,6 +31,7 @@ pub enum QueryResponseFormat {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct QueryParams {
     format: Option<QueryResponseFormat>,
+    timestamp: Option<i64>,
 }
 
 #[async_trait]

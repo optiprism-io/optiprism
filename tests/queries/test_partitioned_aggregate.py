@@ -3,7 +3,7 @@ import math
 from queries import clickhouse, optiprism, main
 
 
-def test_partitioned_aggregate():
+def test_types():
     for field in main.fields:
         for outer_agg in main.aggs:
             for inner_agg in main.aggs:

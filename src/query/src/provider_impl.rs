@@ -76,7 +76,6 @@ impl Provider for ProviderImpl {
         let cur_time = Utc::now();
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx,
-            cur_time,
             self.metadata.clone(),
             self.input.clone(),
             es.clone(),

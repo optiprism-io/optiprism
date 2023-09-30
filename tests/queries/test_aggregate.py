@@ -1,4 +1,5 @@
 import math
+import sys
 
 import requests
 
@@ -6,7 +7,7 @@ import main
 from queries import clickhouse, optiprism
 
 
-def test_aggregate_property():
+def test_types():
     for field in main.fields:
         for agg in main.aggs:
             print("Test Aggregate Property {0}({1})".format(agg, field))
@@ -19,22 +20,34 @@ def test_aggregate_property():
                 for idx, v in enumerate(ch[1]):
                     assert math.isclose(op[1][idx], v, rel_tol=0.000001)
             else:
-                ch = clickhouse.aggregate_property_query(agg, field)
-                op = optiprism.aggregate_property_query(agg, field)
+                ch = clickhouse.aggregate_property_query(agg, field, period=10)
+                op = optiprism.aggregate_property_query(agg, field, period=10)
+                print(ch)
+                print(op)
                 assert ch == op
 
 
-def test_aggregate_property_grouped():
+# fixme
+def test_periods():
+    for interval in ["week","minute", "hour", "day", "week", "month", "year"]:
+        for period in [1, 2, 10, 20, 30, 60]:
+            for period_interval in ["hour", "day", "week", "month", "year"]:
+                sys.stdout.flush()
+                print("Test Period interval={interval}, period={period}, period_interval={period_interval}".format(
+                    interval=interval, period=period, period_interval=period_interval), flush=True)
+                ch = clickhouse.aggregate_property_query("sum", "i_8", interval=interval, period=period,
+                                                         period_interval=period_interval)
+                op = optiprism.aggregate_property_query("sum", "i_8", period=period, time_unit=period_interval,
+                                                        interval_unit=interval)
+                print(ch)
+                print(op)
+                assert ch == op
+
+
+def test_grouped():
     agg = "sum"
     group = "group"
 
-    ch = clickhouse.aggregate_property_query_grouped(agg, group, group=group)
-    breakdowns = [
-        {
-            "type": "property",
-            "propertyType": "event",
-            "propertyName": group
-        }
-    ]
-    op = optiprism.aggregate_property_query(agg, group, breakdowns=breakdowns)
+    ch = clickhouse.aggregate_property_query(agg, group, group=group)
+    op = optiprism.aggregate_property_query(agg, group, breakdowns=[group])
     assert ch == op

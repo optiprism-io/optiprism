@@ -113,6 +113,7 @@ pub async fn gen(
             DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
         )),
         (("group", DataType::Int64)),
+        (("v", DataType::Int64)),
     ];
 
     for (name, dt) in props {
@@ -170,6 +171,7 @@ pub async fn gen(
     let mut b_dec =
         Decimal128Builder::new().with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
     let mut b_group = Int64Builder::new();
+    let mut b_v = Int64Builder::new();
     let users = 100;
     let days = 100;
     let events = 100;
@@ -199,6 +201,11 @@ pub async fn gen(
                     event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100,
                 );
                 b_group.append_value(event % (events / 2));
+                if user % 2 == 0 {
+                    b_v.append_value(event);
+                } else {
+                    b_v.append_value(event * 2);
+                }
                 let d = Duration::days(1).num_seconds() / events;
                 let diff = Duration::seconds(d);
                 event_time = event_time.add(diff);
@@ -227,6 +234,7 @@ pub async fn gen(
             Arc::new(b_lstr.finish()) as ArrayRef,
             Arc::new(b_dec.finish()) as ArrayRef,
             Arc::new(b_group.finish()) as ArrayRef,
+            Arc::new(b_v.finish()) as ArrayRef,
         ]
     };
 

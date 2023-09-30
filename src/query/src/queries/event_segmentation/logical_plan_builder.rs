@@ -40,6 +40,7 @@ use futures::executor;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
+use now::DateTimeNow;
 use tracing::debug;
 
 use crate::context::Format;
@@ -70,7 +71,6 @@ const COL_DATE: &str = "date";
 
 pub struct LogicalPlanBuilder {
     ctx: Context,
-    cur_time: DateTime<Utc>,
     metadata: Arc<MetadataProvider>,
     es: EventSegmentation,
 }
@@ -140,7 +140,6 @@ impl LogicalPlanBuilder {
     /// creates logical plan for event segmentation
     pub async fn build(
         ctx: Context,
-        cur_time: DateTime<Utc>,
         metadata: Arc<MetadataProvider>,
         input: LogicalPlan,
         es: EventSegmentation,
@@ -149,7 +148,6 @@ impl LogicalPlanBuilder {
         let events = es.events.clone();
         let builder = LogicalPlanBuilder {
             ctx: ctx.clone(),
-            cur_time,
             metadata,
             es: es.clone(),
         };
@@ -393,7 +391,7 @@ impl LogicalPlanBuilder {
         if self.ctx.format != Format::Compact {
             // pivot date
             input = {
-                let (from_time, to_time) = self.es.time.range(self.cur_time);
+                let (from_time, to_time) = self.es.time.range(self.ctx.cur_time.clone());
                 let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
                 LogicalPlan::Extension(Extension {
                     node: Arc::new(PivotNode::try_new(
@@ -414,19 +412,29 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         event: &Event,
     ) -> Result<LogicalPlan> {
-        let trunc = match &self.es.interval_unit {
-            TimeIntervalUnit::Second => Duration::seconds(1),
-            TimeIntervalUnit::Minute => Duration::minutes(1),
-            TimeIntervalUnit::Hour => Duration::hours(1),
-            TimeIntervalUnit::Day => Duration::days(1),
-            TimeIntervalUnit::Week => Duration::weeks(1),
-            TimeIntervalUnit::Month => Duration::weeks(1) * 4,
-            TimeIntervalUnit::Year => Duration::weeks(1) * 365,
+        let cur_time = match &self.es.interval_unit {
+            TimeIntervalUnit::Second => self
+                .ctx
+                .cur_time
+                .duration_trunc(Duration::seconds(1))
+                .unwrap(),
+            TimeIntervalUnit::Minute => self
+                .ctx
+                .cur_time
+                .duration_trunc(Duration::minutes(1))
+                .unwrap(),
+            TimeIntervalUnit::Hour => self
+                .ctx
+                .cur_time
+                .duration_trunc(Duration::hours(1))
+                .unwrap(),
+            TimeIntervalUnit::Day => self.ctx.cur_time.duration_trunc(Duration::days(1)).unwrap(),
+            TimeIntervalUnit::Week => self.ctx.cur_time.beginning_of_week(),
+            TimeIntervalUnit::Month => self.ctx.cur_time.beginning_of_month(),
+            TimeIntervalUnit::Year => self.ctx.cur_time.beginning_of_year(),
         };
 
-        let cur_time = self.cur_time.duration_trunc(trunc).unwrap();
-        // TODO remove
-        let cur_time = cur_time.add(Duration::days(1));
+        // let cur_time = self.cur_time.duration_trunc(trunc).unwrap();
         // time expression
         let mut expr = time_expression(
             event_fields::CREATED_AT,

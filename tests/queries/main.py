@@ -1,7 +1,10 @@
+import time
+
 fields = ["i_8", "i_16", "i_32", "i_64", "u_8", "u_16", "u_32", "u_64",
           # "f_32",
           "f_64", "decimal"]
 aggs = ["min", "max", "avg", "sum", "count"]
+
 
 def return_type(typ, agg):
     if agg == "min" or agg == "max":
@@ -25,3 +28,6 @@ def return_type(typ, agg):
             return "f64"
         elif typ == "i128" or typ == "u128" or typ == "decimal":
             return "i128"
+
+
+now = int(time.time())
