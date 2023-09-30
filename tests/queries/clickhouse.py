@@ -44,7 +44,9 @@ def aggregate_property_query(agg, field, group=None, distinct=False, interval="d
 def partitioned_aggregate_property_query(agg, outer_agg, field, group=None, interval="day", period=2,
                                          period_interval="day"):
     i = ""
-    if interval == "hour":
+    if interval == "minute":
+        i = "toMinute"
+    elif interval == "hour":
         i = "toHour"
     elif interval == "day":
         i = "toDate"
@@ -60,7 +62,7 @@ def partitioned_aggregate_property_query(agg, outer_agg, field, group=None, inte
         g = ", event_{0}".format(group)
     q = """select c, {group} {outer_agg}(counts)
         from (
-                 select toUnixTimestamp({interval}(event_created_at, 'UTC')) as c, {group} {inner_agg}(event_{field}) as counts
+                 select toUnixTimestamp(date_trunc('{interval}',event_created_at, 'UTC')) as c, {group} {inner_agg}(event_{field}) as counts
                  from file('*.parquet', Parquet) as b
                  where b.event_event = 'event'
                    and event_created_at >=
@@ -70,11 +72,14 @@ def partitioned_aggregate_property_query(agg, outer_agg, field, group=None, inte
         order by 1 asc format JSONCompactColumns;""".format(outer_agg=outer_agg, inner_agg=agg, field=field,
                                                             period=period,
                                                             period_interval=period_interval,
-                                                            interval=i,
+                                                            interval=interval,
                                                             group=g)
 
+    print(q)
     resp = requests.get(ch_addr,
                         params={"query": q})
+    if not resp.json():
+        return []
     ts = list(map(lambda x: x * 1000000000, resp.json()[0]))
 
     if group is None:

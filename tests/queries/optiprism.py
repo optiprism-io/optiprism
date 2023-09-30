@@ -86,7 +86,7 @@ def aggregate_property_query(agg, field: str, prop_type="event",
         return [ts, val]
 
 
-def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="event", time_last=2, unit="day",
+def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="event", period=2, time_unit="day",
                                          interval_unit="day",
                                          breakdowns=None):
     b = []
@@ -101,8 +101,8 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="ev
     q = {
         "time": {
             "type": "last",
-            "last": time_last,
-            "unit": unit
+            "last": period,
+            "unit": time_unit
         },
         "group": "user",
         "intervalUnit": interval_unit,
@@ -141,6 +141,9 @@ def partitioned_aggregate_property_query(agg, outer_agg, typ: str, prop_type="ev
         json=q,
         headers={"Content-Type": "application/json",
                  "Authorization": "Bearer " + token})
+
+    if len(resp.json()[0]) == 0:
+        return []
 
     ts = resp.json()[1]
     if breakdowns is not None:

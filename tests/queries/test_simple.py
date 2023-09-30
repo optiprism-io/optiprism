@@ -17,8 +17,8 @@ def test_count_events_grouped():
 
 # fixme
 def test_count_events_uniq():
-    ch = clickhouse.aggregate_property_query("uniq", "user_id", period=30)
-    op = optiprism.simple_query("countUniqueGroups", time_last=30)
+    ch = clickhouse.aggregate_property_query("uniq", "user_id", period=3)
+    op = optiprism.simple_query("countUniqueGroups", time_last=3)
 
     print(ch)
     print(op)

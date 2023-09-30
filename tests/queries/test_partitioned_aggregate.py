@@ -24,3 +24,17 @@ def test_types():
                     ch = clickhouse.partitioned_aggregate_property_query(inner_agg, outer_agg, field)
                     op = optiprism.partitioned_aggregate_property_query(inner_agg, outer_agg, field)
                     assert ch == op
+
+
+def test_periods():
+    for interval in ["minute", "hour", "day", "week", "month", "year"]:
+        for period in [1, 2, 10, 20, 30, 60]:
+            print("Test Period interval={interval}, period={period}, period_interval={period_interval}".format(
+                interval=interval, period=period, period_interval=interval), flush=True)
+            ch = clickhouse.partitioned_aggregate_property_query("min", "max", "i_8", interval=interval, period=period,
+                                                                 period_interval=interval)
+            op = optiprism.partitioned_aggregate_property_query("min", "max", "i_8", period=period, time_unit=interval,
+                                                                interval_unit=interval)
+            print(ch)
+            print(op)
+            assert ch == op
