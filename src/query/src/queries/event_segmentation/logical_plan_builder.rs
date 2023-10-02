@@ -601,7 +601,7 @@ impl LogicalPlanBuilder {
             })
             .collect::<Result<Vec<Expr>>>()?;
 
-        if filters_exprs.len() > 1 {
+        if filters_exprs.len() == 1 {
             return Ok(filters_exprs[0].clone());
         }
 
