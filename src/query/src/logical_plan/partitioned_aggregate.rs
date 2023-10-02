@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::collections::HashMap;
-use std::default;
+
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::hash::Hasher;
@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use arrow::datatypes::DataType;
 use arrow::datatypes::DataType::Decimal128;
-use arrow::datatypes::DataType::UInt64;
+
 use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
 use chrono::Duration;
@@ -22,7 +22,7 @@ use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
-use datafusion_expr::ExprSchemable;
+
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
@@ -175,7 +175,7 @@ enum ReturnType {
     New,
 }
 
-fn return_type(dt: DataType, agg: &AggregateFunction, schema: &DFSchema) -> DataType {
+fn return_type(dt: DataType, agg: &AggregateFunction, _schema: &DFSchema) -> DataType {
     match agg {
         AggregateFunction::Avg => DataType::Float64,
         AggregateFunction::Count => DataType::Int64,
@@ -340,7 +340,7 @@ impl PartitionedAggregateNode {
         let mut agg_result_fields: Vec<DFField> = Vec::new();
         let input_schema = input.schema();
 
-        for (agg_idx, (agg, name)) in agg_expr.iter().enumerate() {
+        for (_agg_idx, (agg, name)) in agg_expr.iter().enumerate() {
             for group_expr in agg.group_exprs() {
                 group_cols.insert(group_expr.display_name()?, ());
             }

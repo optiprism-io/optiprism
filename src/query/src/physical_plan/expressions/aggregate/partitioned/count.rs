@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::result;
 use std::sync::Arc;
-use std::sync::Mutex;
 
-use ahash::AHasher;
+
+
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
@@ -12,24 +12,24 @@ use arrow::array::Decimal128Builder;
 use arrow::array::Float64Builder;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
-use arrow::array::UInt64Builder;
-use arrow::buffer::ScalarBuffer;
+
+
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::record_batch::RecordBatch;
-use arrow::row::OwnedRow;
+
 use arrow::row::Row;
-use arrow::row::RowConverter;
+
 use arrow::row::SortField;
-use common::types::int128_to_decimal;
+
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-use datafusion::parquet::format::ColumnChunk;
+
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
-use datafusion_common::ScalarValue;
-use datafusion_expr::ColumnarValue;
+
+
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
@@ -83,7 +83,7 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
     pub fn try_new(
         filter: Option<PhysicalExprRef>,
         outer_fn: AggregateFunction<T>,
-        groups: Option<(Vec<(PhysicalExprRef, String, SortField)>)>,
+        groups: Option<Vec<(PhysicalExprRef, String, SortField)>>,
         partition_col: Column,
         distinct: bool,
     ) -> Result<Self> {
@@ -187,7 +187,7 @@ macro_rules! count {
                             .groups
                             .entry(rows.as_ref().unwrap().row(row_id).owned())
                             .or_insert_with(|| {
-                                let mut bucket = Group::new(self.outer_fn.make_new());
+                                let bucket = Group::new(self.outer_fn.make_new());
                                 bucket
                             })
                     } else {
@@ -366,7 +366,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
                     .groups
                     .entry(rows.as_ref().unwrap().row(row_id).owned())
                     .or_insert_with(|| {
-                        let mut bucket = Group::new(self.outer_fn.make_new());
+                        let bucket = Group::new(self.outer_fn.make_new());
                         bucket
                     })
             } else {
@@ -461,15 +461,15 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    use arrow::array::Int64Array;
+    
     use arrow::datatypes::DataType;
-    use arrow::datatypes::Field;
-    use arrow::datatypes::Schema;
-    use arrow::record_batch::RecordBatch;
+    
+    
+    
     use arrow::row::SortField;
-    use arrow::util::pretty::print_batches;
-    use common::DECIMAL_PRECISION;
-    use common::DECIMAL_SCALE;
+    
+    
+    
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
     use store::test_util::parse_markdown_tables;

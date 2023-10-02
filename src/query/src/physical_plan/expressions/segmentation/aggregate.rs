@@ -1,14 +1,14 @@
-use std::collections::BinaryHeap;
-use std::fmt::Display;
+
+
 use std::marker::PhantomData;
-use std::sync::Arc;
+
 use std::sync::Mutex;
 
 use arrow::array::Array;
 use arrow::array::ArrayBuilder;
-use arrow::array::ArrayRef;
+
 use arrow::array::BooleanArray;
-use arrow::array::BooleanBuilder;
+
 use arrow::array::Decimal128Array;
 use arrow::array::Float32Array;
 use arrow::array::Float64Array;
@@ -17,23 +17,23 @@ use arrow::array::Int32Array;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::Int8Array;
-use arrow::array::PrimitiveArray;
+
 use arrow::array::TimestampMillisecondArray;
 use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::buffer::ScalarBuffer;
-use arrow::compute::filter;
-use arrow::compute::filter_record_batch;
-use arrow::datatypes::DataType;
-use arrow::datatypes::Field;
-use arrow::datatypes::Schema;
-use arrow::datatypes::SchemaRef;
+
+
+
+
+
+
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
+
 use chrono::Duration;
-use common::DECIMAL_SCALE;
+
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
@@ -44,7 +44,7 @@ use num_traits::NumCast;
 use crate::error::Result;
 use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
-use crate::physical_plan::expressions::segmentation::boolean_op::Operator;
+
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
 
@@ -316,8 +316,8 @@ mod tests {
     use arrow::array::Array;
     use arrow::array::Int64Array;
     use arrow::record_batch::RecordBatch;
-    use arrow2::array::Int32Array;
-    use common::DECIMAL_SCALE;
+    
+    
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;
@@ -373,7 +373,7 @@ mod tests {
             let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
             let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
-            let mut agg = Aggregate::<i64, i128, Gt>::new(
+            let agg = Aggregate::<i64, i128, Gt>::new(
                 Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("ts", &schema).unwrap(),
                 Column::new_with_schema("v", &schema).unwrap(),
@@ -391,7 +391,7 @@ mod tests {
                     .unwrap()
                     .values();
 
-                let res = agg.evaluate(&b, p).unwrap();
+                let _res = agg.evaluate(&b, p).unwrap();
             }
             let res = agg.finalize().unwrap();
             let exp = Int64Array::from(vec![None, Some(1), None]);
@@ -427,7 +427,7 @@ mod tests {
             let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
             let right = Decimal::from_str_exact("4.33").unwrap();
-            let mut agg = Aggregate::<i128, i128, boolean_op::Eq>::new(
+            let agg = Aggregate::<i128, i128, boolean_op::Eq>::new(
                 Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("ts", &schema).unwrap(),
                 Column::new_with_schema("v", &schema).unwrap(),
@@ -445,7 +445,7 @@ mod tests {
                     .unwrap()
                     .values();
 
-                let res = agg.evaluate(&b, p).unwrap();
+                let _res = agg.evaluate(&b, p).unwrap();
             }
             let res = agg.finalize().unwrap();
             let exp = Int64Array::from(vec![None, Some(1)]);

@@ -1,22 +1,22 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use arrow::array::Decimal128Array;
-use arrow::array::Decimal128Builder;
-use arrow::array::Float32Builder;
-use arrow::array::Float64Builder;
-use arrow::array::Int64Builder;
-use arrow::datatypes::DataType;
-use arrow::datatypes::Schema;
+
+
+
+
+
+
+
 use axum::async_trait;
-use common::query::Operator;
+
 use datafusion::execution::context::QueryPlanner as DFQueryPlanner;
 use datafusion::execution::context::SessionState;
-use datafusion::physical_expr::create_physical_expr;
-use datafusion::physical_expr::execution_props::ExecutionProps;
+
+
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
-use datafusion::physical_expr::PhysicalExprRef;
+
 use datafusion::physical_plan::expressions;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_planner::DefaultPhysicalPlanner;
@@ -24,47 +24,47 @@ use datafusion::physical_planner::ExtensionPlanner as DFExtensionPlanner;
 use datafusion::physical_planner::PhysicalPlanner;
 use datafusion_common::DFSchema;
 use datafusion_common::DataFusionError;
-use datafusion_common::ExprSchema;
+
 use datafusion_common::Result as DFResult;
-use datafusion_common::ScalarValue;
-use datafusion_common::ScalarValue::Int8;
-use datafusion_common::ToDFSchema;
-use datafusion_expr::Expr;
+
+
+
+
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
-use crate::error::QueryError;
+
 use crate::error::Result;
-use crate::expr::property_col;
-use crate::logical_plan;
+
+
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
-use crate::logical_plan::partitioned_aggregate::funnel::ExcludeExpr;
-use crate::logical_plan::partitioned_aggregate::funnel::Filter;
-use crate::logical_plan::partitioned_aggregate::funnel::StepOrder;
-use crate::logical_plan::partitioned_aggregate::funnel::Touch;
-use crate::logical_plan::partitioned_aggregate::AggregateExpr;
+
+
+
+
+
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregateNode;
-use crate::logical_plan::partitioned_aggregate::SortField;
+
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::segment::SegmentNode;
 // use crate::logical_plan::_segmentation::AggregateFunction;
 // use crate::logical_plan::_segmentation::SegmentationNode;
 // use crate::logical_plan::_segmentation::TimeRange;
 use crate::logical_plan::unpivot::UnpivotNode;
-use crate::physical_plan;
+
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
-use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
-use crate::physical_plan::expressions::aggregate::count::Count;
+
+
 // use crate::physical_plan::expressions::aggregate::aggregate;
 // use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
 // use crate::physical_plan::expressions::aggregate::count::Count;
-use crate::physical_plan::expressions::aggregate::partitioned;
-use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
-use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
+
+
+
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
-use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
+
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_expr;
@@ -104,7 +104,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
         node: &dyn UserDefinedLogicalNode,
         logical_inputs: &[&LogicalPlan],
         physical_inputs: &[Arc<dyn ExecutionPlan>],
-        ctx_state: &SessionState,
+        _ctx_state: &SessionState,
     ) -> DFResult<Option<Arc<dyn ExecutionPlan>>> {
         let any = node.as_any();
         let plan = if any.downcast_ref::<MergeNode>().is_some() {

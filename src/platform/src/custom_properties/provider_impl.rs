@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::async_trait;
 use common::rbac::ProjectPermission;
 
-use crate::custom_properties;
+
 use crate::custom_properties::CustomProperty;
 use crate::custom_properties::Provider;
 use crate::Context;

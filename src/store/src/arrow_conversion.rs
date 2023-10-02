@@ -1,6 +1,6 @@
 use std::mem;
-use std::ops::Deref;
-use std::sync::mpsc;
+
+
 use std::sync::Arc;
 
 use arrow::ffi::ArrowArray;
@@ -11,7 +11,7 @@ use arrow2::datatypes::IntervalUnit;
 use arrow2::datatypes::TimeUnit;
 use arrow_array::make_array;
 use arrow_array::ArrayRef;
-use arrow_data::ArrayData;
+
 
 use crate::error::Result;
 
@@ -101,7 +101,7 @@ pub mod arrow2_to_arrow1 {
     use std::mem;
 
     use arrow::ffi::ArrowArray;
-    use arrow2::datatypes::DataType;
+    
     use arrow2::datatypes::Field;
     use arrow_array::make_array;
 
@@ -123,17 +123,17 @@ pub mod arrow2_to_arrow1 {
 pub mod arrow1_to_arrow2 {
     use std::mem;
 
-    use arrow::ffi::ArrowArray;
+    
     use arrow::ffi::ArrowArrayRef;
     use arrow2::array::Array;
     use arrow2::datatypes::DataType;
     use arrow2::datatypes::Field;
     use arrow2::ffi::import_array_from_c;
-    use arrow_array::make_array;
+    
     use arrow_array::ArrayRef;
     use arrow_data::ffi::FFI_ArrowArray;
-    use arrow_data::ArrayData;
-    use arrow_schema::ffi::FFI_ArrowSchema;
+    
+    
 
     use crate::error::Result;
 
@@ -161,7 +161,7 @@ pub mod arrow1_to_arrow2 {
 #[cfg(test)]
 mod tests {
     use arrow2::array::Int64Array;
-    use arrow2::array::MutablePrimitiveArray;
+    
     use arrow2::datatypes::DataType as DataType2;
     use arrow2::datatypes::Field as Field2;
 

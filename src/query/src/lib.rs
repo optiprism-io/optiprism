@@ -151,7 +151,7 @@ impl From<ArrayRef> for StaticArray {
             DataType::Float64 => {
                 StaticArray::Float64(arr.as_any().downcast_ref::<Float64Array>().unwrap().clone())
             }
-            DataType::Timestamp(tu, tz) => match tu {
+            DataType::Timestamp(tu, _tz) => match tu {
                 TimeUnit::Second => StaticArray::TimestampSecond(
                     arr.as_any()
                         .downcast_ref::<TimestampSecondArray>()
@@ -393,8 +393,8 @@ mod tests {
     use arrow::array::Array;
     use arrow::array::ArrayRef;
     use arrow::array::Int64Array;
-    use arrow::array::PrimitiveArray;
-    use arrow::datatypes::Int64Type;
+    
+    
     use datafusion_common::ScalarValue;
 
     use crate::OneColSpansState;

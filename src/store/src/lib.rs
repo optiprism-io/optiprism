@@ -14,9 +14,9 @@ pub mod test_util {
     use std::io::Write;
     use std::path::Path;
     use std::sync::Arc;
-    use std::time::Instant;
+    
 
-    use anyhow::anyhow;
+    
     use arrow2::array::Array;
     use arrow2::array::BinaryArray;
     use arrow2::array::BooleanArray;
@@ -31,8 +31,8 @@ pub mod test_util {
     use arrow2::array::MutableArray;
     use arrow2::array::MutableBinaryArray;
     use arrow2::array::MutableBooleanArray;
-    use arrow2::array::MutableFixedSizeBinaryArray;
-    use arrow2::array::MutableFixedSizeListArray;
+    
+    
     use arrow2::array::MutableListArray;
     use arrow2::array::MutablePrimitiveArray;
     use arrow2::array::MutableUtf8Array;
@@ -51,26 +51,26 @@ pub mod test_util {
     use arrow2::datatypes::Schema;
     use arrow2::datatypes::TimeUnit;
     use arrow2::io::parquet::read;
-    use arrow2::io::parquet::write::array_to_page_nested;
-    use arrow2::io::parquet::write::array_to_page_simple;
-    use arrow2::io::parquet::write::to_parquet_schema;
+    
+    
+    
     use arrow2::io::parquet::write::transverse;
     use arrow2::io::parquet::write::FileWriter;
     use arrow2::io::parquet::write::RowGroupIterator;
     use arrow2::io::parquet::write::WriteOptions;
     use arrow2::offset::Offset;
-    use arrow2::offset::Offsets;
+    
     use arrow2::types::NativeType;
-    use arrow_array::Decimal128Array;
+    
     use arrow_array::RecordBatch;
-    use arrow_schema::DECIMAL128_MAX_PRECISION;
+    
     use chrono::NaiveDateTime;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
     use parquet2::compression::CompressionOptions;
     use parquet2::encoding::Encoding;
-    use parquet2::schema::types::PrimitiveType;
-    use parquet2::write::FileSeqWriter;
+    
+    
     use parquet2::write::Version;
     use rust_decimal::Decimal;
     use tracing_subscriber::filter::FilterExt;
@@ -383,7 +383,7 @@ pub mod test_util {
                     DataType::Boolean => Value::Bool(None),
                     DataType::Utf8 => Value::String(None),
                     DataType::List(_) => Value::List(None),
-                    DataType::Timestamp(tu, tz) => Value::Int64(None),
+                    DataType::Timestamp(_tu, _tz) => Value::Int64(None),
                     _ => unimplemented!(),
                 },
                 false => match data_type {
@@ -401,8 +401,8 @@ pub mod test_util {
                     DataType::Boolean => Value::Bool(Some(data.parse()?)),
                     DataType::Utf8 => Value::String(Some(data.parse()?)),
                     DataType::Decimal(_, _) => Value::Int128(Some(data.parse()?)),
-                    DataType::Timestamp(tu, tz) => {
-                        let v: i64 = data.parse().or_else(|v| {
+                    DataType::Timestamp(_tu, _tz) => {
+                        let v: i64 = data.parse().or_else(|_v| {
                             NaiveDateTime::parse_from_str(data, "%Y-%m-%d %H:%M:%S").and_then(|v| {
                                 let v = v.timestamp();
                                 Ok(v)
@@ -583,7 +583,7 @@ pub mod test_util {
             if nulls.is_some() && idx % nulls.unwrap() == 0 {
                 ret.push(None);
             } else {
-                let a = std::mem::size_of::<T>();
+                let _a = std::mem::size_of::<T>();
                 // println!("{}", idx % div);
                 ret.push(Some(T::from(idx % div).unwrap()));
             }
@@ -981,7 +981,7 @@ pub mod test_util {
                             .collect();
                         out[idx].push(Value::List(Some(vals)));
                     }
-                    DataType::Timestamp(ts, tz) => {}
+                    DataType::Timestamp(_ts, _tz) => {}
                     _ => unimplemented!(),
                 }
             }
@@ -1333,7 +1333,7 @@ pub mod test_util {
                         _ => unimplemented!(),
                     },
                     PhysicalType::LargeList => match &field.data_type {
-                        DataType::LargeList(inner) => match &field.data_type.to_physical_type() {
+                        DataType::LargeList(_inner) => match &field.data_type.to_physical_type() {
                             PhysicalType::Boolean => {
                                 gen_boolean_data_list_array::<i64>(len, nulls_periodicity).boxed()
                             }
@@ -1446,7 +1446,7 @@ pub mod test_util {
     pub fn read_parquet<R: Read + Seek>(reader: &mut R) -> Vec<Chunk<Box<dyn Array>>> {
         let metadata = read::read_metadata(reader).unwrap();
         let schema = read::infer_schema(&metadata).unwrap();
-        let mut chunks = read::FileReader::new(
+        let chunks = read::FileReader::new(
             reader,
             metadata.row_groups,
             schema,

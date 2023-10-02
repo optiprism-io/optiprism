@@ -43,6 +43,7 @@ async fn test_reports() -> Result<()> {
             events: vec![],
             filters: None,
             breakdowns: None,
+            segments: None,
         }),
     };
 
@@ -65,6 +66,7 @@ async fn test_reports() -> Result<()> {
             events: vec![],
             filters: None,
             breakdowns: None,
+            segments: None,
         })),
     };
 

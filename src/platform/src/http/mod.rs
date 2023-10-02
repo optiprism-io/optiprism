@@ -129,7 +129,7 @@ impl Service {
         // format!("Unhandled internal error: {}", error),
         // )
         // };
-        let mut router = self.router;
+        let router = self.router;
         info!("attaching ui static files handler...");
         let router = router.nest_service(
             "/assets",

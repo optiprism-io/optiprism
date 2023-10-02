@@ -2,9 +2,9 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
-use std::fmt::Formatter;
-use std::mem;
-use std::ops::Deref;
+
+
+
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -14,24 +14,24 @@ use std::task::Poll;
 use ahash::HashMapExt;
 use ahash::RandomState;
 use arrow::array::Array;
-use arrow::array::ArrayDataBuilder;
+
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
-use arrow::array::Int64Builder;
-use arrow::array::ListBuilder;
-use arrow::array::UInt64Array;
+
+
+
 use arrow::compute::concat_batches;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-use arrow::error::Result as ArrowResult;
+
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
-use arrow_row::OwnedRow;
-use arrow_row::RowConverter;
-use arrow_row::SortField;
+
+
+
+
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
@@ -43,7 +43,7 @@ use datafusion::physical_plan::aggregates::AggregateMode;
 use datafusion::physical_plan::aggregates::PhysicalGroupBy;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
-use datafusion::physical_plan::hash_utils::create_hashes;
+
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -98,7 +98,7 @@ impl SegmentedAggregateExec {
             let mut agg_fields: Vec<FieldRef> = Vec::new();
             let agg = agg.lock().unwrap();
 
-            for (expr, col_name) in agg.group_columns() {
+            for (_expr, col_name) in agg.group_columns() {
                 group_cols.insert(col_name.clone(), ());
                 let f = input_schema.field_with_name(col_name.as_str())?;
 
@@ -191,8 +191,8 @@ impl ExecutionPlan for SegmentedAggregateExec {
                     .map(|_| {
                         self.agg_expr
                             .iter()
-                            .map(|(e, name)| {
-                                let mut agg = e.lock().unwrap();
+                            .map(|(e, _name)| {
+                                let agg = e.lock().unwrap();
                                 Arc::new(Mutex::new(agg.make_new().unwrap()))
                             })
                             .collect::<Vec<_>>()
@@ -262,7 +262,7 @@ impl Stream for AggregateStream {
             return Poll::Ready(None);
         }
 
-        let cloned_time = self.baseline_metrics.elapsed_compute().clone();
+        let _cloned_time = self.baseline_metrics.elapsed_compute().clone();
         let partition_col = self.partition_col.clone();
 
         let exist = if let Some(partition_streams) = &mut self.partition_streams {
@@ -420,17 +420,17 @@ impl Stream for AggregateStream {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    
     use std::sync::Arc;
     use std::sync::Mutex;
 
-    use arrow::array::ArrayRef;
-    use arrow::array::BooleanArray;
-    use arrow::array::Int32Array;
-    use arrow::array::Int8Array;
-    use arrow::array::StringArray;
+    
+    
+    
+    
+    
     use arrow::datatypes::DataType;
-    use arrow::record_batch::RecordBatch;
+    
     use arrow::util::pretty::print_batches;
     use arrow_row::SortField;
     use chrono::DateTime;
@@ -558,7 +558,7 @@ mod tests {
         };
 
         let pagg3 = {
-            let groups = vec![(
+            let _groups = vec![(
                 Column::new_with_schema("country", &schema).unwrap(),
                 SortField::new(DataType::Utf8),
             )];

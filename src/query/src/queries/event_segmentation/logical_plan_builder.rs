@@ -1,34 +1,34 @@
 use std::collections::HashMap;
-use std::ops::Add;
+
 use std::sync::Arc;
 
-use chrono::DateTime;
-use chrono::Duration;
-use chrono::DurationRound;
-use chrono::Utc;
+
+
+
+
 use common::query::event_segmentation::Breakdown;
 use common::query::event_segmentation::DidEventAggregate;
 use common::query::event_segmentation::Event;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
-use common::query::event_segmentation::Segment;
+
 use common::query::event_segmentation::SegmentCondition;
 use common::query::time_columns;
 use common::query::EventFilter;
-use common::query::PartitionedAggregateFunction;
+
 use common::query::PropertyRef;
-use common::query::TimeIntervalUnit;
-use datafusion::physical_plan::aggregates::AggregateFunction;
+
+
 use datafusion_common::Column;
-use datafusion_common::DFSchema;
-use datafusion_common::ScalarValue;
+
+
 use datafusion_expr::col;
 use datafusion_expr::expr;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
-use datafusion_expr::utils::exprlist_to_fields;
-use datafusion_expr::Aggregate;
+
+
 use datafusion_expr::BuiltinScalarFunction;
 use datafusion_expr::Expr;
 use datafusion_expr::ExprSchemable;
@@ -40,7 +40,7 @@ use futures::executor;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
-use now::DateTimeNow;
+
 use tracing::debug;
 
 use crate::context::Format;
@@ -330,7 +330,7 @@ impl LogicalPlanBuilder {
         event_id: usize,
         segment_inputs: Option<Vec<LogicalPlan>>,
     ) -> Result<LogicalPlan> {
-        let mut input = self
+        let input = self
             .build_filter_logical_plan(input.clone(), &self.es.events[event_id])
             .await?;
         let (mut input, group_expr) = self
@@ -504,7 +504,7 @@ impl LogicalPlanBuilder {
         let group_expr = group_expr
             .iter()
             .enumerate()
-            .map(|(idx, expr)| {
+            .map(|(_idx, expr)| {
                 (expr.to_owned(), SortField {
                     data_type: expr.get_type(input.schema()).unwrap(),
                 })
@@ -590,7 +590,7 @@ impl LogicalPlanBuilder {
             LogicalPlan::Extension(Extension {
                 node: Arc::new(agg_node),
             }),
-            group_expr.into_iter().map(|(a, b)| a).collect::<Vec<_>>(),
+            group_expr.into_iter().map(|(a, _b)| a).collect::<Vec<_>>(),
         ))
     }
 

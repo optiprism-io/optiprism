@@ -21,12 +21,12 @@ use arrow::array::UInt8Builder;
 use arrow::datatypes::DataType;
 use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
-use chrono::DateTime;
-use chrono::Datelike;
+
+
 use chrono::Duration;
 use chrono::DurationRound;
 use chrono::NaiveDateTime;
-use chrono::Timelike;
+
 use chrono::Utc;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -36,7 +36,7 @@ use metadata::database::TableRef;
 use metadata::error::DatabaseError;
 use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
-use rust_decimal::Decimal;
+
 use test_util::create_event;
 use test_util::create_property;
 use test_util::CreatePropertyMainRequest;
@@ -177,7 +177,7 @@ pub async fn gen(
     let events = 100;
     for user in 0..users {
         let mut cur_time = now - Duration::days(days);
-        for day in 0..days {
+        for _day in 0..days {
             let mut event_time = cur_time.clone();
             for event in 0..events {
                 b_user_id.append_value(user);

@@ -1,9 +1,9 @@
-use std::cell::RefCell;
+
 use std::collections::HashMap;
-use std::collections::VecDeque;
+
 use std::result;
 use std::sync::Arc;
-use std::sync::Mutex;
+
 
 use ahash::RandomState;
 use arrow::array::ArrayRef;
@@ -12,20 +12,20 @@ use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::TimestampMillisecondArray;
 use arrow::compute::concat;
-use arrow::compute::concat_batches;
+
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
-use arrow_row::OwnedRow;
-use arrow_row::RowConverter;
+
+
 use arrow_row::SortField;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::DurationRound;
-use chrono::Months;
+
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use common::DECIMAL_PRECISION;
@@ -36,7 +36,7 @@ use datafusion::physical_expr::PhysicalExprRef;
 use datafusion_common::ScalarValue;
 use rust_decimal::Decimal;
 
-use crate::error::QueryError;
+
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::evaluate_batch;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Batch;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Count;
@@ -215,7 +215,7 @@ impl Group {
             },
         };
 
-        let mut ts = NaiveDateTime::from_timestamp_opt(self.steps[0].ts, 0).unwrap();
+        let ts = NaiveDateTime::from_timestamp_opt(self.steps[0].ts, 0).unwrap();
         let ts = ts.duration_trunc(bucket_size).unwrap();
         let k = ts.timestamp_millis();
 
@@ -229,8 +229,8 @@ impl Group {
             for idx in 0..self.steps_completed {
                 b.steps[idx].count += 1;
                 if idx > 0 {
-                    b.steps[idx].total_time += (self.steps[idx - 1].ts - self.steps[0].ts);
-                    b.steps[idx].total_time_from_start += (self.steps[idx].ts - self.steps[0].ts);
+                    b.steps[idx].total_time += self.steps[idx - 1].ts - self.steps[0].ts;
+                    b.steps[idx].total_time_from_start += self.steps[idx].ts - self.steps[0].ts;
                 }
             }
         });
@@ -285,7 +285,7 @@ pub struct Options {
     pub touch: Touch,
     pub partition_col: Column,
     pub bucket_size: Duration,
-    pub groups: Option<(Vec<(PhysicalExprRef, String, SortField)>)>,
+    pub groups: Option<Vec<(PhysicalExprRef, String, SortField)>>,
 }
 
 struct PartitionRow<'a> {
@@ -497,7 +497,7 @@ impl PartitionedAggregateExpr for Funnel {
                     .groups
                     .entry(rows.as_ref().unwrap().row(row_id).owned())
                     .or_insert_with(|| {
-                        let mut group = Group::new(self.steps_len, &self.buckets);
+                        let group = Group::new(self.steps_len, &self.buckets);
                         group
                     })
             } else {
@@ -734,7 +734,7 @@ impl PartitionedAggregateExpr for Funnel {
             let step_arrs = (0..steps)
                 .into_iter()
                 .map(|idx| {
-                    let mut arrs = vec![
+                    let arrs = vec![
                         Arc::new(step_total[idx].finish()) as ArrayRef,
                         Arc::new(
                             step_time_to_convert[idx]
@@ -810,7 +810,7 @@ mod tests {
     use std::sync::Arc;
 
     use ahash::RandomState;
-    use arrow::array::Int64Array;
+    
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
@@ -828,12 +828,12 @@ mod tests {
     use datafusion::physical_expr::PhysicalExprRef;
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
-    use store::test_util::parse_markdown_table_v1;
+    
     use store::test_util::parse_markdown_tables;
     use tracing_test::traced_test;
 
     use crate::event_eq;
-    use crate::expected_debug;
+    
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::event_eq_;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::DebugStep;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;

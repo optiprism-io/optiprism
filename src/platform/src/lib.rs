@@ -46,7 +46,7 @@ use datafusion_common::ScalarValue;
 pub use error::PlatformError;
 pub use error::Result;
 use metadata::MetadataProvider;
-use query::DataTable;
+
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -157,7 +157,7 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
         arrow::datatypes::DataType::Timestamp(TimeUnit::Nanosecond, _) => {
             arr_to_json_values!(arr, TimestampNanosecondArray)
         }
-        arrow::datatypes::DataType::Decimal128(_, s) => {
+        arrow::datatypes::DataType::Decimal128(_, _s) => {
             let arr = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
             arr.iter()
                 .map(|value| match value {

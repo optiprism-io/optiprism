@@ -1,7 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::NamedQuery;
-use datafusion_common::ScalarValue;
+
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;

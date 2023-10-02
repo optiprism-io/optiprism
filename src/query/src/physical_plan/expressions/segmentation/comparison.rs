@@ -52,14 +52,14 @@ impl SegmentExpr for And {
         batch: &RecordBatch,
         partitions: &ScalarBuffer<i64>,
     ) -> Result<Option<Int64Array>> {
-        let mut inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock().unwrap();
         let left = inner.left.evaluate(batch, partitions)?;
         let right = inner.right.evaluate(batch, partitions)?;
         Ok(Self::and(left, right))
     }
 
     fn finalize(&self) -> Result<Int64Array> {
-        let mut inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock().unwrap();
         Ok(Self::and(Some(inner.left.finalize()?), Some(inner.right.finalize()?)).unwrap())
     }
 }
@@ -106,14 +106,14 @@ impl SegmentExpr for Or {
         batch: &RecordBatch,
         partitions: &ScalarBuffer<i64>,
     ) -> Result<Option<Int64Array>> {
-        let mut inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock().unwrap();
         let left = inner.left.evaluate(batch, partitions)?;
         let right = inner.right.evaluate(batch, partitions)?;
         Ok(Self::or(left, right))
     }
 
     fn finalize(&self) -> Result<Int64Array> {
-        let mut inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock().unwrap();
         Ok(Self::or(Some(inner.left.finalize()?), Some(inner.right.finalize()?)).unwrap())
     }
 }
@@ -149,8 +149,8 @@ mod tests {
     impl SegmentExpr for Test {
         fn evaluate(
             &self,
-            batch: &RecordBatch,
-            partitions: &ScalarBuffer<i64>,
+            _batch: &RecordBatch,
+            _partitions: &ScalarBuffer<i64>,
         ) -> Result<Option<Int64Array>> {
             Ok(self.a.clone())
         }

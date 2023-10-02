@@ -7,12 +7,6 @@ pub const DECIMAL_PRECISION: u8 = 28;
 pub const DECIMAL_SCALE: i8 = 16;
 pub const DECIMAL_MULTIPLIER: i128 = 10_i128.pow(DECIMAL_SCALE as u32);
 
-pub fn int128_to_decimal(v: i128) -> i128 {
-    return v;
-    let multiplier = 10_i128.pow(DECIMAL_SCALE as u32);
-    v * multiplier
-}
-
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash, Default)]
 pub enum OptionalProperty<T> {
     #[default]

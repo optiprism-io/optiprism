@@ -1,9 +1,9 @@
 use arrow::array::Decimal128Builder;
 use arrow::array::PrimitiveBuilder;
 use arrow::datatypes::Decimal128Type;
-use arrow_schema::ArrowError;
 
-use crate::scalar::ScalarValueRef::Decimal128;
+
+
 use crate::DECIMAL_PRECISION;
 use crate::DECIMAL_SCALE;
 

@@ -5,8 +5,8 @@ use axum::extract::Path;
 use axum::extract::Query;
 use axum::routing;
 use axum::Router;
-use serde::Deserialize;
-use serde::Serialize;
+
+
 use serde_json::Value;
 
 use crate::http::Json;
@@ -15,7 +15,7 @@ use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::queries::QueryParams;
 use crate::Context;
-use crate::DataTable;
+
 use crate::ListResponse;
 use crate::QueryResponse;
 use crate::Result;

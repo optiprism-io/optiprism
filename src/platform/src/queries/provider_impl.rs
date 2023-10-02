@@ -14,7 +14,7 @@ use crate::queries::Provider;
 use crate::queries::QueryParams;
 use crate::queries::QueryResponseFormat;
 use crate::Context;
-use crate::DataTable;
+
 use crate::ListResponse;
 use crate::QueryResponse;
 use crate::Result;

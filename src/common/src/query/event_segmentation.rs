@@ -4,7 +4,7 @@ use datafusion_common::ScalarValue;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::error::CommonError;
+
 use crate::query::time_columns;
 use crate::query::AggregateFunction;
 use crate::query::EventFilter;

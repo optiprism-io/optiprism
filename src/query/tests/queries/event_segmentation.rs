@@ -31,8 +31,8 @@ use metadata::custom_events;
 use metadata::custom_events::CreateCustomEventRequest;
 use query::error::Result;
 use query::event_fields;
-use query::physical_plan::plannerd::QueryPlanner;
-use query::queries::event_segmentation::logical_plan_builder::build;
+use query::physical_plan::planner::planner::QueryPlanner;
+use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
 use query::test_util::create_entities;
 use query::test_util::create_md;
 use query::test_util::events_provider;
@@ -165,6 +165,8 @@ async fn test_filters() -> Result<()> {
     let _ctx = Context {
         organization_id: org_id,
         project_id: proj_id,
+        cur_time: Default::default(),
+        format: Default::default(),
     };
 
     create_entities(md.clone(), org_id, proj_id).await?;
@@ -282,15 +284,17 @@ async fn test_query() -> Result<()> {
     let ctx = Context {
         organization_id: org_id,
         project_id: proj_id,
+        cur_time: Default::default(),
+        format: Default::default(),
     };
 
     create_entities(md.clone(), org_id, proj_id).await?;
     let input = events_provider(md.database.clone(), org_id, proj_id).await?;
     println!("{:?}", input.schema());
-    let cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:50:00.000000+00:00")
+    let _cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:50:00.000000+00:00")
         .unwrap()
         .with_timezone(&Utc);
-    let plan = build(&ctx, &md, cur_time, input, &es).await?;
+    let plan = LogicalPlanBuilder::build(ctx, md, input, es).await?;
     println!("logical plan: {:?}", plan);
 
     let runtime = Arc::new(RuntimeEnv::default());
@@ -390,13 +394,15 @@ async fn test_custom_events() -> Result<()> {
     let ctx = Context {
         organization_id: org_id,
         project_id: proj_id,
+        cur_time: Default::default(),
+        format: Default::default(),
     };
 
     let input = events_provider(md.database.clone(), org_id, proj_id).await?;
-    let cur_time = DateTime::parse_from_rfc3339("2021-09-08T14:42:00.000000+00:00")
+    let _cur_time = DateTime::parse_from_rfc3339("2021-09-08T14:42:00.000000+00:00")
         .unwrap()
         .with_timezone(&Utc);
-    let plan = build(&ctx, &md, cur_time, input, &es).await?;
+    let plan = LogicalPlanBuilder::build(ctx, md, input, es).await?;
     println!("logical plan: {:?}", plan);
 
     let runtime = Arc::new(RuntimeEnv::default());

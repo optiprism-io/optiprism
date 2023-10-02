@@ -10,12 +10,12 @@ use metadata::database::Column;
 use metadata::database::Table;
 use metadata::database::TableRef;
 use metadata::error::DatabaseError;
-use metadata::events;
-use metadata::events::Event as MDEvent;
-use metadata::properties;
+
+
+
 use metadata::properties::provider_impl::Namespace;
-use metadata::properties::CreatePropertyRequest;
-use metadata::properties::Property;
+
+
 use metadata::MetadataProvider;
 use test_util::create_event;
 use test_util::create_property;

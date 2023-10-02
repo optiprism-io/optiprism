@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::env::temp_dir;
 use std::fmt::Write;
 use std::fs::File;
-use std::io;
-use std::net::SocketAddr;
+
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -51,9 +51,9 @@ use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
 use platform::auth::password::make_password_hash;
 // use rand::ableRng;
-use rand::prelude::StdRng;
+
 use rand::thread_rng;
-use rand::Rng;
+
 use service::tracing::TracingCliArgs;
 use tracing::debug;
 use tracing::info;

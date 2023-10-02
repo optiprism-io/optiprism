@@ -1,9 +1,9 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-use std::fmt::Formatter;
-use std::mem;
-use std::ops::Deref;
+
+
+
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -13,11 +13,11 @@ use arrow::array::ArrayRef;
 use arrow::array::UInt64Array;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
-use arrow::datatypes::Schema;
+
 use arrow::datatypes::SchemaRef;
-use arrow::error::Result as ArrowResult;
+
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
+
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::PhysicalExpr;
@@ -33,7 +33,7 @@ use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
-use datafusion_common::ScalarValue;
+
 use futures::Stream;
 use futures::StreamExt;
 
@@ -57,7 +57,7 @@ impl PartitionExec {
     ) -> Result<Self> {
         let field = Field::new(partition_col_name.clone(), DataType::UInt64, false);
         let mut schema = (*input.schema()).clone();
-        let a = schema.fields();
+        let _a = schema.fields();
 
         schema.fields = vec![vec![Arc::new(field)], schema.fields.to_vec()]
             .concat()
@@ -195,12 +195,12 @@ impl Stream for PartitionStream {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::ArrayRef;
-    use arrow::array::BooleanArray;
-    use arrow::array::Int32Array;
-    use arrow::array::Int8Array;
-    use arrow::array::StringArray;
-    use arrow::record_batch::RecordBatch;
+    
+    
+    
+    
+    
+    
     use arrow::util::pretty::print_batches;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_plan::common::collect;

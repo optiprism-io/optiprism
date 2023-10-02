@@ -167,6 +167,8 @@ mod tests {
         let _ctx = Context {
             organization_id: org_id,
             project_id: proj_id,
+            cur_time: Default::default(),
+            format: Default::default(),
         };
 
         create_entities(md.clone(), org_id, proj_id).await?;
@@ -210,33 +212,33 @@ mod tests {
             analysis: Analysis::Linear,
             compare: None,
             events: vec![
-               /* Event::new(
-                    EventRef::RegularName("View Product".to_string()),
-                    // Some(vec![
-                    // EventFilter::Property {
-                    // property: PropertyRef::User("Is Premium".to_string()),
-                    // operation: PropValueOperation::Eq,
-                    // value: Some(vec![ScalarValue::Boolean(Some(true))]),
-                    // },
-                    // EventFilter::Property {
-                    // property: PropertyRef::User("Country".to_string()),
-                    // operation: PropValueOperation::Eq,
-                    // value: Some(vec![
-                    // ScalarValue::Utf8(Some("spain".to_string())),
-                    // ScalarValue::Utf8(Some("german".to_string())),
-                    // ]),
-                    // },
-                    // ]),
-                    None,
-                    Some(vec![Breakdown::Property(PropertyRef::User(
-                        "Device".to_string(),
-                    ))]),
-                    // None,
-                    vec![NamedQuery::new(
-                        Query::CountEvents,
-                        Some("0_count".to_string()),
-                    )],
-                ),*/
+                /* Event::new(
+                     EventRef::RegularName("View Product".to_string()),
+                     // Some(vec![
+                     // EventFilter::Property {
+                     // property: PropertyRef::User("Is Premium".to_string()),
+                     // operation: PropValueOperation::Eq,
+                     // value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                     // },
+                     // EventFilter::Property {
+                     // property: PropertyRef::User("Country".to_string()),
+                     // operation: PropValueOperation::Eq,
+                     // value: Some(vec![
+                     // ScalarValue::Utf8(Some("spain".to_string())),
+                     // ScalarValue::Utf8(Some("german".to_string())),
+                     // ]),
+                     // },
+                     // ]),
+                     None,
+                     Some(vec![Breakdown::Property(PropertyRef::User(
+                         "Device".to_string(),
+                     ))]),
+                     // None,
+                     vec![NamedQuery::new(
+                         Query::CountEvents,
+                         Some("0_count".to_string()),
+                     )],
+                 ),*/
                 Event::new(
                     EventRef::RegularName("Buy Product".to_string()),
                     None,
@@ -284,14 +286,16 @@ mod tests {
         let ctx = Context {
             organization_id: org_id,
             project_id: proj_id,
+            cur_time: Default::default(),
+            format: Default::default(),
         };
 
         create_entities(md.clone(), org_id, proj_id).await?;
         let input = events_provider(md.database.clone(), org_id, proj_id).await?;
-        let cur_time = DateTime::parse_from_rfc3339("2021-09-16T13:49:00.000000+00:00")
+        let _cur_time = DateTime::parse_from_rfc3339("2021-09-16T13:49:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
         println!("logical plan: {}", plan.display_indent_schema());
 
         let runtime = Arc::new(RuntimeEnv::default());
@@ -391,13 +395,15 @@ mod tests {
         let ctx = Context {
             organization_id: org_id,
             project_id: proj_id,
+            cur_time: Default::default(),
+            format: Default::default(),
         };
 
         let input = events_provider(md.database.clone(), org_id, proj_id).await?;
-        let cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
+        let _cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
         println!("logical plan: {}", plan.display_indent_schema());
 
         let runtime = Arc::new(RuntimeEnv::default());

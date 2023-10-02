@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+
 use std::env::temp_dir;
 use std::fmt::Write;
 use std::fs::File;
-use std::io;
+
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -19,7 +19,7 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use bytesize::ByteSize;
-use chrono::DateTime;
+
 use chrono::Duration;
 use chrono::Utc;
 use clap::Parser;
@@ -36,15 +36,15 @@ use demo::error::DemoError;
 use demo::shop;
 use demo::shop::Config;
 use demo::test;
-use enum_iterator::all;
-use events_gen::generator;
-use events_gen::generator::Generator;
-use events_gen::store::events::Event;
-use events_gen::store::products::ProductProvider;
-use events_gen::store::profiles::ProfileProvider;
-use events_gen::store::scenario;
-use events_gen::store::scenario::Scenario;
-use events_gen::store::schema::create_entities;
+
+
+
+
+
+
+
+
+
 use futures::executor::block_on;
 use indicatif::ProgressBar;
 use indicatif::ProgressState;
@@ -58,7 +58,7 @@ use metadata::MetadataProvider;
 use platform::auth;
 use platform::auth::password::make_password_hash;
 use query::ProviderImpl;
-use rand::thread_rng;
+
 use service::tracing::TracingCliArgs;
 use tracing::debug;
 use tracing::info;

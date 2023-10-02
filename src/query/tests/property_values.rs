@@ -13,9 +13,9 @@ mod tests {
     use datafusion::prelude::SessionContext;
     use datafusion_common::ScalarValue;
     use query::error::Result;
-    use query::physical_plan::plannerd::QueryPlanner;
-    use query::queries::property_values::build;
+    use query::physical_plan::planner::planner::QueryPlanner;
     use query::queries::property_values::Filter;
+    use query::queries::property_values::LogicalPlanBuilder;
     use query::queries::property_values::PropertyValues;
     use query::test_util::create_entities;
     use query::test_util::create_md;
@@ -32,6 +32,8 @@ mod tests {
         let ctx = Context {
             organization_id: org_id,
             project_id: proj_id,
+            format: Default::default(),
+            cur_time: Default::default(),
         };
 
         create_entities(md.clone(), org_id, proj_id).await?;
@@ -46,7 +48,7 @@ mod tests {
             }),
         };
 
-        let plan = build(&ctx, &md, input, &req).await?;
+        let plan = LogicalPlanBuilder::build(ctx, md, input, req).await?;
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
         let session_state = SessionState::with_config_rt(config, runtime)

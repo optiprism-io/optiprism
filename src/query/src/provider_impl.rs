@@ -4,7 +4,7 @@ use std::time::Instant;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::pretty_format_batches;
+
 use async_trait::async_trait;
 use chrono::Utc;
 use common::query::event_segmentation::EventSegmentation;
@@ -137,6 +137,6 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
     println!("{:?}", schema);
     let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
-    let a = concat_batches(&schema, &batches, rows_count)?;
+    let _a = concat_batches(&schema, &batches, rows_count)?;
     Ok(concat_batches(&schema, &batches, rows_count)?)
 }

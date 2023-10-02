@@ -1,9 +1,9 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-use std::fmt::Formatter;
-use std::mem;
-use std::ops::Deref;
+
+
+
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -12,21 +12,21 @@ use std::task::Poll;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
-use arrow::array::UInt64Array;
+
 use arrow::compute::concat;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-use arrow::error::Result as ArrowResult;
+
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
+
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
-use datafusion::physical_plan::hash_utils::create_hashes;
+
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
@@ -37,7 +37,7 @@ use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
-use datafusion_common::ScalarValue;
+
 use futures::Stream;
 use futures::StreamExt;
 
@@ -245,12 +245,12 @@ impl Stream for SegmentStream {
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::ArrayRef;
-    use arrow::array::BooleanArray;
-    use arrow::array::Int32Array;
-    use arrow::array::Int8Array;
-    use arrow::array::StringArray;
-    use arrow::record_batch::RecordBatch;
+    
+    
+    
+    
+    
+    
     use arrow::util::pretty::print_batches;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
@@ -268,7 +268,7 @@ mod tests {
     use crate::physical_plan::expressions::segmentation::boolean_op;
     use crate::physical_plan::expressions::segmentation::count::Count;
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-    use crate::physical_plan::partition::PartitionExec;
+    
     use crate::physical_plan::segment::SegmentExec;
 
     #[tokio::test]

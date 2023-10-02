@@ -62,7 +62,7 @@ use crate::reports::UpdateReportRequest;
 use crate::Column;
 use crate::ColumnType;
 use crate::Context;
-use crate::DataTable;
+
 use crate::EventFilter;
 use crate::EventRef;
 use crate::JSONQueryResponse;

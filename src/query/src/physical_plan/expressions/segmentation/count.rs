@@ -1,26 +1,26 @@
-use std::collections::BinaryHeap;
+
 use std::marker::PhantomData;
-use std::sync::Arc;
+
 use std::sync::Mutex;
 
 use arrow::array::Array;
 use arrow::array::ArrayBuilder;
-use arrow::array::ArrayRef;
+
 use arrow::array::BooleanArray;
-use arrow::array::BooleanBuilder;
+
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
-use arrow::array::PrimitiveArray;
+
 use arrow::array::TimestampMillisecondArray;
 use arrow::buffer::ScalarBuffer;
-use arrow::compute::filter;
-use arrow::compute::filter_record_batch;
-use arrow::datatypes::DataType;
-use arrow::datatypes::Field;
-use arrow::datatypes::Schema;
-use arrow::datatypes::SchemaRef;
+
+
+
+
+
+
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
+
 use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
@@ -179,7 +179,7 @@ mod tests {
 
     use arrow::array::Array;
     use arrow::array::Int64Array;
-    use arrow2::array::Int32Array;
+    
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;
@@ -218,7 +218,7 @@ mod tests {
             let left = Arc::new(Column::new_with_schema("event", &res[0].schema()).unwrap());
             let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("1".to_string()))));
             let f = BinaryExpr::new(left, Operator::Eq, right);
-            let mut count = Count::<boolean_op::Gt>::new(
+            let count = Count::<boolean_op::Gt>::new(
                 Arc::new(f) as PhysicalExprRef,
                 Column::new_with_schema("ts", &res[0].schema()).unwrap(),
                 2,
