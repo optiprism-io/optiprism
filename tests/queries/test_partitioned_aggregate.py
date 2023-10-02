@@ -35,6 +35,4 @@ def test_periods():
                                                                  period_interval=interval)
             op = optiprism.partitioned_aggregate_property_query("min", "max", "i_8", period=period, time_unit=interval,
                                                                 interval_unit=interval)
-            print(ch)
-            print(op)
             assert ch == op
