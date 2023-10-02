@@ -45,7 +45,7 @@ pub struct ExcludeExpr {
 
 #[derive(Clone)]
 pub struct StepExpr {
-    expr: PhysicalExprRef,
+    _expr: PhysicalExprRef,
 }
 
 #[derive(Clone, Debug)]
@@ -112,7 +112,7 @@ impl Batch {
 // calculate expressions
 fn evaluate_batch(
     batch: RecordBatch,
-    steps_expr: &Vec<PhysicalExprRef>,
+    steps_expr: &[PhysicalExprRef],
     exclude_expr: &Option<Vec<ExcludeExpr>>,
     constants: &Option<Vec<Column>>,
     ts_col: &Column,

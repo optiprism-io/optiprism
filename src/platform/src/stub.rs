@@ -62,7 +62,6 @@ use crate::reports::UpdateReportRequest;
 use crate::Column;
 use crate::ColumnType;
 use crate::Context;
-
 use crate::EventFilter;
 use crate::EventRef;
 use crate::JSONQueryResponse;
@@ -75,7 +74,7 @@ use crate::Result;
 
 lazy_static! {
     pub static ref DATE_TIME: DateTime<Utc> =
-        DateTime::from_utc(NaiveDateTime::from_timestamp_opt(0, 0).unwrap(), Utc);
+        DateTime::from_naive_utc_and_offset(NaiveDateTime::from_timestamp_opt(0, 0).unwrap(), Utc);
 }
 
 pub struct Accounts {}

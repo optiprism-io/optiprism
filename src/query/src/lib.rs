@@ -52,7 +52,6 @@ use arrow2::array::Int128Array;
 use async_trait::async_trait;
 use common::query::event_segmentation::EventSegmentation;
 pub use context::Context;
-use datafusion_common::ScalarValue;
 pub use error::Result;
 pub use provider_impl::ProviderImpl;
 
@@ -73,12 +72,6 @@ pub mod event_fields {
 }
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
-
-macro_rules! static_array_enum_variant {
-    ($variant:ident) => {
-        $variant($variantArray)
-    };
-}
 
 macro_rules! static_array_enum {
     ($($ident:ident)+) => {
@@ -334,101 +327,6 @@ impl DataTable {
     }
 }
 
-macro_rules! make_one_col_spans {
-    ($spans_state:expr, $arr:expr,$arr_type:ident,$_type:ident, $scalar_type:ident) => {{
-        $spans_state.spans.clear();
-
-        let arr = $arr.as_any().downcast_ref::<$arr_type>().unwrap();
-        let mut last_value: Option<$_type> = if $spans_state.first {
-            $spans_state.first = false;
-            match arr.is_null(0) {
-                true => None,
-                false => Some(arr.value(0)),
-            }
-        } else {
-            match $spans_state.last_partition_value {
-                ScalarValue::$scalar_type(v) => v,
-                _ => unreachable!(),
-            }
-        };
-
-        for v in arr.iter() {
-            match last_value.partial_cmp(&v) {
-                Some(ord) => match ord {
-                    Ordering::Less | Ordering::Greater => {
-                        $spans_state.spans.push(true);
-                        last_value = v.clone();
-                    }
-                    Ordering::Equal => $spans_state.spans.push(false),
-                },
-                _ => unreachable!(),
-            };
-        }
-
-        $spans_state.last_partition_value = ScalarValue::$scalar_type(last_value);
-    }};
-}
-
-pub struct OneColSpansState {
-    pub first: bool,
-    pub last_partition_value: ScalarValue,
-    pub spans: Vec<bool>,
-}
-
-impl OneColSpansState {
-    pub fn new(len: usize) -> Self {
-        Self {
-            first: true,
-            last_partition_value: ScalarValue::Null,
-            spans: Vec::with_capacity(len),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    pub use std::cmp::Ordering;
-    use std::sync::Arc;
-
-    use arrow::array::Array;
-    use arrow::array::ArrayRef;
-    use arrow::array::Int64Array;
-    
-    
-    use datafusion_common::ScalarValue;
-
-    use crate::OneColSpansState;
-
-    #[test]
-    fn test_make_one_col_spans() {
-        let arr = Arc::new(Int64Array::from(vec![1, 1, 1, 1, 2, 2])) as ArrayRef;
-        let mut state = OneColSpansState::new(arr.len());
-
-        make_one_col_spans!(state, arr, Int64Array, i64, Int64);
-
-        assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(2)));
-        assert_eq!(state.spans, vec![false, false, false, false, true, false]);
-
-        let arr = Arc::new(Int64Array::from(vec![2, 2, 2, 2, 3])) as ArrayRef;
-        make_one_col_spans!(state, arr, Int64Array, i64, Int64);
-
-        assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(3)));
-        assert_eq!(state.spans, vec![false, false, false, false, true]);
-
-        let arr = Arc::new(Int64Array::from(vec![4, 4])) as ArrayRef;
-        make_one_col_spans!(state, arr, Int64Array, i64, Int64);
-
-        assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(4)));
-        assert_eq!(state.spans, vec![true, false]);
-
-        let arr = Arc::new(Int64Array::from(vec![5])) as ArrayRef;
-        make_one_col_spans!(state, arr, Int64Array, i64, Int64);
-
-        assert_eq!(state.last_partition_value, ScalarValue::Int64(Some(5)));
-        assert_eq!(state.spans, vec![true]);
-    }
-}
-
 pub mod test_util {
     use std::env::temp_dir;
     use std::path::PathBuf;
@@ -441,7 +339,6 @@ pub mod test_util {
     use datafusion::datasource::listing::ListingTableConfig;
     use datafusion::datasource::listing::ListingTableUrl;
     use datafusion::datasource::provider_as_source;
-    use datafusion::datasource::TableProvider;
     use datafusion::execution::options::ReadOptions;
     use datafusion::prelude::CsvReadOptions;
     use datafusion::prelude::SessionConfig;

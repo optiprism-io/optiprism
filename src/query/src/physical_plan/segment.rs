@@ -1,9 +1,6 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-
-
-
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -12,21 +9,17 @@ use std::task::Poll;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
-
 use arrow::compute::concat;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-
 use arrow::record_batch::RecordBatch;
-
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
-
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
 use datafusion::physical_plan::metrics::MetricsSet;
@@ -37,7 +30,6 @@ use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
-
 use futures::Stream;
 use futures::StreamExt;
 
@@ -117,7 +109,7 @@ impl ExecutionPlan for SegmentExec {
         partition: usize,
         context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
-        let stream = self.input.execute(partition, context.clone())?;
+        let stream = self.input.execute(partition, context)?;
 
         let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
         Ok(Box::pin(SegmentStream {
@@ -186,11 +178,9 @@ impl Stream for SegmentStream {
                         .clone();
 
                     let vals = partition.values();
-                    let res = self
-                        .expr
+                    self.expr
                         .evaluate(&batch, vals)
-                        .map_err(|e| e.into_datafusion_execution_error())?;
-                    res
+                        .map_err(|e| e.into_datafusion_execution_error())?
                 }
                 Poll::Ready(None) => {
                     self.is_ended = true;
@@ -212,7 +202,7 @@ impl Stream for SegmentStream {
                 .iter()
                 .filter(|v| v.is_some())
                 .collect::<Vec<_>>();
-            if v.len() > 0 {
+            if !v.is_empty() {
                 let arr = Int64Array::from(v);
                 self.out_buf.push(arr);
             }
@@ -237,7 +227,6 @@ impl Stream for SegmentStream {
 
             return Poll::Ready(Some(Ok(result)));
         }
-        unreachable!()
     }
 }
 
@@ -245,12 +234,6 @@ impl Stream for SegmentStream {
 mod tests {
     use std::sync::Arc;
 
-    
-    
-    
-    
-    
-    
     use arrow::util::pretty::print_batches;
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
@@ -268,7 +251,6 @@ mod tests {
     use crate::physical_plan::expressions::segmentation::boolean_op;
     use crate::physical_plan::expressions::segmentation::count::Count;
     use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
-    
     use crate::physical_plan::segment::SegmentExec;
 
     #[tokio::test]
@@ -308,7 +290,7 @@ mod tests {
 
         let batches = parse_markdown_tables(data).unwrap();
         let schema = batches[0].schema();
-        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+        let input = MemoryExec::try_new(&[batches], schema.clone(), None)?;
 
         let left = Arc::new(Column::new_with_schema("event", &schema).unwrap());
         let right = Arc::new(Literal::new(ScalarValue::Utf8(Some("e1".to_string()))));

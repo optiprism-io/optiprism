@@ -1,28 +1,13 @@
-
-
 use arrow::datatypes::DataType;
 use chrono::DateTime;
 use chrono::Utc;
-
-
-
 use datafusion_common::ScalarValue;
-
-
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::expr_fn::or;
 pub use datafusion_expr::lit;
 pub use datafusion_expr::lit_timestamp_nano;
-
-
-
 use datafusion_expr::Expr;
-
 pub use datafusion_expr::Literal;
-
-
-
-
 
 use crate::error::QueryError;
 use crate::Result;

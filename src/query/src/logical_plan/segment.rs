@@ -6,19 +6,16 @@ use std::sync::Arc;
 
 use common::query;
 use common::query::event_segmentation::QueryAggregate;
-
 use common::query::event_segmentation::SegmentTime;
 use datafusion_common::Column;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
-
 use datafusion_common::ScalarValue;
 use datafusion_expr::Expr;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
 use crate::error::QueryError;
-
 use crate::Result;
 
 #[derive(Clone, PartialEq, Eq, Hash)]

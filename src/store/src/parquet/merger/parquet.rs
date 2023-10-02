@@ -419,11 +419,11 @@ impl<R: Read + Seek> CompressedPageIterator<R> {
         })
     }
 
-    pub fn schema(&self) -> &SchemaDescriptor {
+    pub fn _schema(&self) -> &SchemaDescriptor {
         self.metadata.schema()
     }
 
-    pub fn get_col_path(&self, col_id: usize) -> ColumnPath {
+    pub fn _get_col_path(&self, col_id: usize) -> ColumnPath {
         self.metadata.schema().columns()[col_id]
             .path_in_schema
             .clone()

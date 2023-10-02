@@ -4,7 +4,6 @@ use arrow::array::ArrayRef;
 use arrow::array::Decimal128Builder;
 use arrow::array::Int64Builder;
 use arrow::array::TimestampNanosecondBuilder;
-
 use arrow::array::UInt16Builder;
 use arrow::array::UInt64Builder;
 use arrow::array::UInt8Builder;

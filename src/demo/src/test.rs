@@ -21,12 +21,9 @@ use arrow::array::UInt8Builder;
 use arrow::datatypes::DataType;
 use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
-
-
 use chrono::Duration;
 use chrono::DurationRound;
 use chrono::NaiveDateTime;
-
 use chrono::Utc;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -36,7 +33,6 @@ use metadata::database::TableRef;
 use metadata::error::DatabaseError;
 use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
-
 use test_util::create_event;
 use test_util::create_property;
 use test_util::CreatePropertyMainRequest;
@@ -94,26 +90,26 @@ pub async fn gen(
     .await?;
 
     let props = vec![
-        (("i_8", DataType::Int8)),
-        (("i_16", DataType::Int16)),
-        (("i_32", DataType::Int32)),
-        (("i_64", DataType::Int64)),
-        (("u_8", DataType::UInt8)),
-        (("u_16", DataType::UInt16)),
-        (("u_32", DataType::UInt32)),
-        (("u_64", DataType::UInt64)),
-        (("f_32", DataType::Float32)),
-        (("f_64", DataType::Float64)),
-        (("bool", DataType::Boolean)),
-        (("string", DataType::Utf8)),
-        (("timestamp", DataType::Timestamp(TimeUnit::Second, None))),
-        (("large_utf_8", DataType::LargeUtf8)),
-        ((
+        ("i_8", DataType::Int8),
+        ("i_16", DataType::Int16),
+        ("i_32", DataType::Int32),
+        ("i_64", DataType::Int64),
+        ("u_8", DataType::UInt8),
+        ("u_16", DataType::UInt16),
+        ("u_32", DataType::UInt32),
+        ("u_64", DataType::UInt64),
+        ("f_32", DataType::Float32),
+        ("f_64", DataType::Float64),
+        ("bool", DataType::Boolean),
+        ("string", DataType::Utf8),
+        ("timestamp", DataType::Timestamp(TimeUnit::Second, None)),
+        ("large_utf_8", DataType::LargeUtf8),
+        (
             "decimal",
             DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-        )),
-        (("group", DataType::Int64)),
-        (("v", DataType::Int64)),
+        ),
+        ("group", DataType::Int64),
+        ("v", DataType::Int64),
     ];
 
     for (name, dt) in props {
@@ -148,7 +144,8 @@ pub async fn gen(
         Err(err) => return Err(err.into()),
     };
 
-    let now = NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0)
+    let now = NaiveDateTime::from_timestamp_opt(Utc::now().timestamp(), 0)
+        .unwrap()
         .duration_trunc(Duration::days(1))?;
     let schema = table.arrow_schema();
     let mut b_user_id = Int64Builder::new();
@@ -178,7 +175,7 @@ pub async fn gen(
     for user in 0..users {
         let mut cur_time = now - Duration::days(days);
         for _day in 0..days {
-            let mut event_time = cur_time.clone();
+            let mut event_time = cur_time;
             for event in 0..events {
                 b_user_id.append_value(user);
                 b_created_at.append_value(event_time.timestamp_nanos());

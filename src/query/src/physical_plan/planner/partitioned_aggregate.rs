@@ -9,7 +9,6 @@ use datafusion::physical_expr::execution_props::ExecutionProps;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion_common::DFSchema;
-use datafusion_common::ExprSchema;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ToDFSchema;
 use datafusion_expr::Expr;
@@ -51,23 +50,19 @@ fn build_groups(
     execution_props: &ExecutionProps,
 ) -> Result<Option<Vec<(PhysicalExprRef, String, arrow_row::SortField)>>> {
     let ret = groups
-        .clone()
         .map(|g| {
             g.iter()
                 .map(|(expr, sf)| {
-                    create_physical_expr(&expr, &dfschema, schema, &execution_props).and_then(
-                        |physexpr| {
-                            let sf = arrow_row::SortField::new(sf.data_type.clone());
-                            Ok((
-                                physexpr as PhysicalExprRef,
-                                expr.display_name().unwrap(),
-                                sf.to_owned(),
-                            ))
-                        },
-                    )
+                    create_physical_expr(expr, dfschema, schema, execution_props).map(|physexpr| {
+                        let sf = arrow_row::SortField::new(sf.data_type.clone());
+                        (
+                            physexpr as PhysicalExprRef,
+                            expr.display_name().unwrap(),
+                            sf,
+                        )
+                    })
                 })
                 .collect::<DFResult<Vec<_>>>()
-                .and_then(|f| Ok(f))
         })
         .transpose()?;
 
@@ -142,13 +137,6 @@ macro_rules! partitioned_aggregate {
     };
 }
 
-enum ReturnType {
-    Float64,
-    Int64,
-    Original,
-    Casted,
-}
-
 fn get_return_type(
     dt: DataType,
     agg: &logical_plan::partitioned_aggregate::AggregateFunction,
@@ -176,7 +164,7 @@ pub fn build_partitioned_aggregate_expr(
 ) -> Result<Box<dyn PartitionedAggregateExpr>> {
     let dfschema = schema.clone().to_dfschema()?;
     let execution_props = ExecutionProps::new();
-    let ret = match expr {
+    match expr {
         AggregateExpr::Count {
             filter,
             groups,
@@ -1703,21 +1691,6 @@ pub fn build_partitioned_aggregate_expr(
                                 partition_col
                             )
                         }
-                        (&DataType::Decimal128(_, _), &DataType::Decimal128(_, _)) => {
-                            let inner = aggregate::<i128>(&inner_fn);
-                            let outer = aggregate::<i128>(&outer_fn);
-                            partitioned_aggregate!(
-                                u64,
-                                i128,
-                                i128,
-                                filter,
-                                inner,
-                                outer,
-                                predicate,
-                                groups,
-                                partition_col
-                            )
-                        }
                         (&DataType::Decimal128(_, _), &DataType::Int64) => {
                             let inner = aggregate::<u128>(&inner_fn);
                             let outer = aggregate::<i64>(&outer_fn);
@@ -2146,29 +2119,24 @@ pub fn build_partitioned_aggregate_expr(
             let steps = steps
                 .iter()
                 .map(|(expr, step_order)| {
-                    create_physical_expr(&expr, &dfschema, schema, &execution_props).and_then(
-                        |expr| {
-                            let step_order = match step_order {
-                                StepOrder::Sequential => partitioned::funnel::StepOrder::Sequential,
-                                StepOrder::Any(v) => {
-                                    partitioned::funnel::StepOrder::Any(v.to_owned())
-                                }
-                            };
+                    create_physical_expr(expr, &dfschema, schema, &execution_props).map(|expr| {
+                        let step_order = match step_order {
+                            StepOrder::Sequential => partitioned::funnel::StepOrder::Sequential,
+                            StepOrder::Any(v) => partitioned::funnel::StepOrder::Any(v.to_owned()),
+                        };
 
-                            Ok((expr, step_order))
-                        },
-                    )
+                        (expr, step_order)
+                    })
                 })
                 .collect::<DFResult<Vec<_>>>()?;
 
             let exclude = exclude
-                .clone()
                 .map(|exprs| {
                     exprs
                         .iter()
                         .map(|expr| {
                             create_physical_expr(&expr.expr, &dfschema, schema, &execution_props)
-                                .and_then(|pexpr| {
+                                .map(|pexpr| {
                                     let _exclude_steps = expr.steps.clone().map(|es| {
                                         es.iter()
                                             .map(|es| partitioned::funnel::ExcludeSteps {
@@ -2178,17 +2146,17 @@ pub fn build_partitioned_aggregate_expr(
                                             .collect::<Vec<_>>()
                                     });
 
-                                    Ok(partitioned::funnel::ExcludeExpr {
+                                    partitioned::funnel::ExcludeExpr {
                                         expr: pexpr,
                                         steps: None,
-                                    })
+                                    }
                                 })
                         })
                         .collect::<DFResult<Vec<_>>>()
                 })
                 .transpose()?;
 
-            let constants = constants.clone().map(|cols| {
+            let constants = constants.map(|cols| {
                 cols.iter()
                     .map(|c| col(c.to_owned(), &dfschema))
                     .collect::<Vec<_>>()
@@ -2205,7 +2173,7 @@ pub fn build_partitioned_aggregate_expr(
                 }
             };
 
-            let filter = filter.clone().map(|f| match f {
+            let filter = filter.map(|f| match f {
                 Filter::DropOffOnAnyStep => partitioned::funnel::Filter::DropOffOnAnyStep,
                 Filter::DropOffOnStep(s) => partitioned::funnel::Filter::DropOffOnStep(s),
                 Filter::TimeToConvert(a, b) => partitioned::funnel::Filter::TimeToConvert(a, b),
@@ -2238,7 +2206,5 @@ pub fn build_partitioned_aggregate_expr(
             let funnel = Funnel::try_new(opts)?;
             Ok(Box::new(funnel) as Box<dyn PartitionedAggregateExpr>)
         }
-    };
-
-    ret
+    }
 }

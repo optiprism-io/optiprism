@@ -1,14 +1,9 @@
-
-
 use std::marker::PhantomData;
-
 use std::sync::Mutex;
 
 use arrow::array::Array;
 use arrow::array::ArrayBuilder;
-
 use arrow::array::BooleanArray;
-
 use arrow::array::Decimal128Array;
 use arrow::array::Float32Array;
 use arrow::array::Float64Array;
@@ -17,23 +12,14 @@ use arrow::array::Int32Array;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::Int8Array;
-
 use arrow::array::TimestampMillisecondArray;
 use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
 use arrow::buffer::ScalarBuffer;
-
-
-
-
-
-
 use arrow::record_batch::RecordBatch;
-
 use chrono::Duration;
-
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
@@ -44,7 +30,6 @@ use num_traits::NumCast;
 use crate::error::Result;
 use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::boolean_op::ComparisonOp;
-
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
 
@@ -166,7 +151,7 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Displa
     op: PhantomData<Op>,
     right: OT,
     typ: PhantomData<T>,
-    time_window: i64,
+    _time_window: i64,
     out_batch_size: usize,
 }
 
@@ -198,9 +183,7 @@ where OT: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Displa
             op: Default::default(),
             right,
             typ: Default::default(),
-            time_window: time_window
-                .map(|t| t)
-                .unwrap_or(Duration::days(365).num_milliseconds()),
+            _time_window: time_window.unwrap_or(Duration::days(365).num_milliseconds()),
             out_batch_size,
         }
     }
@@ -316,8 +299,6 @@ mod tests {
     use arrow::array::Array;
     use arrow::array::Int64Array;
     use arrow::record_batch::RecordBatch;
-    
-    
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;

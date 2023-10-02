@@ -1,26 +1,14 @@
-
 use std::marker::PhantomData;
-
 use std::sync::Mutex;
 
 use arrow::array::Array;
 use arrow::array::ArrayBuilder;
-
 use arrow::array::BooleanArray;
-
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
-
 use arrow::array::TimestampMillisecondArray;
 use arrow::buffer::ScalarBuffer;
-
-
-
-
-
-
 use arrow::record_batch::RecordBatch;
-
 use chrono::Duration;
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
@@ -49,7 +37,7 @@ pub struct Count<Op> {
     time_range: TimeRange,
     op: PhantomData<Op>,
     right: i64,
-    time_window: i64,
+    _time_window: i64,
     out_batch_size: usize,
 }
 
@@ -75,15 +63,13 @@ impl<Op> Count<Op> {
             time_range,
             op: Default::default(),
             right,
-            time_window: time_window
-                .map(|t| t)
-                .unwrap_or(Duration::days(365).num_milliseconds()),
+            _time_window: time_window.unwrap_or(Duration::days(365).num_milliseconds()),
             out_batch_size,
         }
     }
 }
 
-impl<'a, Op> SegmentExpr for Count<Op>
+impl<Op> SegmentExpr for Count<Op>
 where Op: ComparisonOp<i64>
 {
     fn evaluate(
@@ -179,7 +165,6 @@ mod tests {
 
     use arrow::array::Array;
     use arrow::array::Int64Array;
-    
     use datafusion::physical_expr::expressions::BinaryExpr;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::expressions::Literal;

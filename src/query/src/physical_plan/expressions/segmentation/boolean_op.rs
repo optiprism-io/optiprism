@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 use std::fmt::Display;
 
-
-
 #[derive(Debug, Clone)]
 pub enum Operator {
     Eq,
@@ -25,7 +23,7 @@ impl<T> ComparisonOp<T> for Eq
 where T: PartialEq
 {
     fn perform(left: T, right: T) -> bool {
-        return left == right;
+        left == right
     }
 
     fn op() -> Operator {
@@ -46,7 +44,7 @@ impl<T> ComparisonOp<T> for NotEq
 where T: PartialEq
 {
     fn perform(left: T, right: T) -> bool {
-        return left != right;
+        left != right
     }
 
     fn op() -> Operator {
@@ -67,7 +65,7 @@ impl<T> ComparisonOp<T> for Gt
 where T: Ord
 {
     fn perform(left: T, right: T) -> bool {
-        return left > right;
+        left > right
     }
 
     fn op() -> Operator {
@@ -88,7 +86,7 @@ impl<T> ComparisonOp<T> for Lt
 where T: Ord
 {
     fn perform(left: T, right: T) -> bool {
-        return left < right;
+        left < right
     }
 
     fn op() -> Operator {
@@ -109,7 +107,7 @@ impl<T> ComparisonOp<T> for GtEq
 where T: Ord
 {
     fn perform(left: T, right: T) -> bool {
-        return left >= right;
+        left >= right
     }
 
     fn op() -> Operator {
@@ -130,7 +128,7 @@ impl<T> ComparisonOp<T> for LtEq
 where T: Ord
 {
     fn perform(left: T, right: T) -> bool {
-        return left <= right;
+        left <= right
     }
 
     fn op() -> Operator {

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use axum::async_trait;
 use chrono::DateTime;
-use chrono::TimeZone;
 use chrono::Utc;
 use common::rbac::ProjectPermission;
 use query::context::Format;
@@ -14,7 +13,6 @@ use crate::queries::Provider;
 use crate::queries::QueryParams;
 use crate::queries::QueryResponseFormat;
 use crate::Context;
-
 use crate::ListResponse;
 use crate::QueryResponse;
 use crate::Result;
@@ -60,7 +58,6 @@ impl Provider for ProviderImpl {
                 Some(format) => match format {
                     QueryResponseFormat::Json => Format::Regular,
                     QueryResponseFormat::JsonCompact => Format::Compact,
-                    _ => unimplemented!(),
                 },
             },
             cur_time,

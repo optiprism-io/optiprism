@@ -1,7 +1,6 @@
 use chrono::DateTime;
 use chrono::Utc;
 use common::query::event_segmentation::NamedQuery;
-
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -751,11 +750,9 @@ impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCon
                 property_name,
                 operation: operation.try_into()?,
                 value: match value {
-                    Some(v) if v.len() > 0 => Some(
-                        v.iter()
-                            .map(|v| json_value_to_scalar(v))
-                            .collect::<Result<_>>()?,
-                    ),
+                    Some(v) if !v.is_empty() => {
+                        Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?)
+                    }
                     _ => None,
                 },
                 // value
@@ -779,11 +776,9 @@ impl TryInto<common::query::event_segmentation::SegmentCondition> for SegmentCon
                 property_name,
                 operation: operation.try_into()?,
                 value: match value {
-                    Some(v) if v.len() > 0 => Some(
-                        v.iter()
-                            .map(|v| json_value_to_scalar(v))
-                            .collect::<Result<_>>()?,
-                    ),
+                    Some(v) if !v.is_empty() => {
+                        Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?)
+                    }
                     _ => None,
                 },
                 time: time.try_into()?,
@@ -922,11 +917,7 @@ impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCon
                             if v.is_empty() {
                                 None
                             } else {
-                                Some(
-                                    v.iter()
-                                        .map(|v| scalar_to_json_value(v))
-                                        .collect::<Result<_>>(),
-                                )
+                                Some(v.iter().map(scalar_to_json_value).collect::<Result<_>>())
                             }
                         },
                     )
@@ -947,11 +938,7 @@ impl TryInto<SegmentCondition> for common::query::event_segmentation::SegmentCon
                             if v.is_empty() {
                                 None
                             } else {
-                                Some(
-                                    v.iter()
-                                        .map(|v| scalar_to_json_value(v))
-                                        .collect::<Result<_>>(),
-                                )
+                                Some(v.iter().map(scalar_to_json_value).collect::<Result<_>>())
                             }
                         },
                     )

@@ -394,7 +394,7 @@ mod tests {
             Field::new("d", DataType::Int64, false),
         ]);
 
-        let res = try_merge_schemas(vec![s1.clone(), s2])?;
+        let res = try_merge_schemas(vec![s1, s2])?;
 
         let exp = Schema::from(vec![
             Field::new("a", DataType::Int64, false),
@@ -415,7 +415,7 @@ mod tests {
             Field::new("b", DataType::Int8, false),
         ]);
 
-        let res = try_merge_schemas(vec![s1.clone(), s2]);
+        let res = try_merge_schemas(vec![s1, s2]);
         assert!(res.is_err());
         Ok(())
     }

@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::result;
 use std::sync::Arc;
 
-
-
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
@@ -12,24 +10,16 @@ use arrow::array::Decimal128Builder;
 use arrow::array::Float64Builder;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
-
-
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::record_batch::RecordBatch;
-
 use arrow::row::Row;
-
 use arrow::row::SortField;
-
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
-
-
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
@@ -325,10 +315,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
             let arrs = groups
                 .exprs
                 .iter()
-                .map(|e| {
-                    e.evaluate(batch)
-                        .and_then(|v| Ok(v.into_array(batch.num_rows()).clone()))
-                })
+                .map(|e| e.evaluate(batch).map(|v| v.into_array(batch.num_rows())))
                 .collect::<result::Result<Vec<_>, _>>()?;
 
             Some(groups.row_converter.convert_columns(&arrs)?)
@@ -365,10 +352,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
                 groups
                     .groups
                     .entry(rows.as_ref().unwrap().row(row_id).owned())
-                    .or_insert_with(|| {
-                        let bucket = Group::new(self.outer_fn.make_new());
-                        bucket
-                    })
+                    .or_insert_with(|| Group::new(self.outer_fn.make_new()))
             } else {
                 &mut self.single_group
             };
@@ -449,7 +433,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
             skip: false,
             skip_partition: 0,
             single_group: Group::new(self.outer_fn.make_new()),
-            distinct: self.distinct.clone(),
+            distinct: self.distinct,
         };
 
         Ok(Box::new(c))
@@ -461,15 +445,8 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    
     use arrow::datatypes::DataType;
-    
-    
-    
     use arrow::row::SortField;
-    
-    
-    
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
     use store::test_util::parse_markdown_tables;
@@ -510,7 +487,7 @@ mod tests {
 | 4            | windows      | 0     | 6      | e3
 "#;
         let res = parse_markdown_tables(data).unwrap();
-        let schema = res[0].schema().clone();
+        let schema = res[0].schema();
         let groups = vec![(
             Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
             "device".to_owned(),
@@ -543,7 +520,7 @@ mod tests {
 | 1            | 1
 "#;
         let res = parse_markdown_tables(data).unwrap();
-        let schema = res[0].schema().clone();
+        let schema = res[0].schema();
         let hash = HashMap::from_iter([(0, ()), (1, ()), (4, ())]);
         let mut agg = PartitionedCount::<f64>::try_new(
             None,

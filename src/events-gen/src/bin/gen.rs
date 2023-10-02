@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::env::temp_dir;
 use std::fmt::Write;
 use std::fs::File;
-
-
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -51,9 +49,7 @@ use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
 use platform::auth::password::make_password_hash;
 // use rand::ableRng;
-
 use rand::thread_rng;
-
 use service::tracing::TracingCliArgs;
 use tracing::debug;
 use tracing::info;
@@ -61,8 +57,8 @@ use uuid::Uuid;
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
 enum Format {
-    CSV,
-    TSV,
+    Csv,
+    Tsv,
     #[default]
     Parquet,
 }
@@ -264,7 +260,7 @@ async fn main() -> Result<(), anyhow::Error> {
         products,
         to: to_date,
         batch_size: 4096,
-        partitions: args.partitions.unwrap_or_else(|| num_cpus::get()),
+        partitions: args.partitions.unwrap_or_else(num_cpus::get),
     };
 
     let mut scenario = Scenario::new(run_cfg);

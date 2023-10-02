@@ -3,14 +3,11 @@ use std::marker::PhantomData;
 use std::result;
 use std::sync::Arc;
 
-
-
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::Decimal128Array;
-
 use arrow::array::Float32Array;
 use arrow::array::Float32Builder;
 use arrow::array::Float64Array;
@@ -23,8 +20,6 @@ use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::Int8Array;
 use arrow::array::Int8Builder;
-
-
 use arrow::array::UInt16Array;
 use arrow::array::UInt16Builder;
 use arrow::array::UInt32Array;
@@ -33,25 +28,18 @@ use arrow::array::UInt64Array;
 use arrow::array::UInt64Builder;
 use arrow::array::UInt8Array;
 use arrow::array::UInt8Builder;
-
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::record_batch::RecordBatch;
-
 use arrow::row::Row;
-
 use arrow::row::SortField;
-
 use common::arrow::DecimalBuilder;
 use common::DECIMAL_MULTIPLIER;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
-
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
-
-
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
@@ -459,18 +447,15 @@ agg!(f64, Float64Array, i64, Int64Builder, 1, 1, DataType::Int64);
 
 #[cfg(test)]
 mod tests {
-    
+
     use std::sync::Arc;
 
-    
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
     use arrow::record_batch::RecordBatch;
     use arrow::row::SortField;
     use arrow::util::pretty::print_batches;
-    
-    
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
     use store::test_util::parse_markdown_tables;
@@ -493,7 +478,7 @@ mod tests {
 "#;
         let res = parse_markdown_tables(data).unwrap();
         print_batches(res.as_ref()).unwrap();
-        let schema = res[0].schema().clone();
+        let schema = res[0].schema();
         let groups = vec![(
             Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
             "device".to_string(),
@@ -538,7 +523,7 @@ mod tests {
 "#;
         let res = parse_markdown_tables(data).unwrap();
         print_batches(res.as_ref()).unwrap();
-        let schema = res[0].schema().clone();
+        let schema = res[0].schema();
         let groups = vec![(
             Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
             "device".to_string(),

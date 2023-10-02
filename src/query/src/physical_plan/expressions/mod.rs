@@ -1,8 +1,6 @@
 use arrow::array::Array;
 use arrow::array::BooleanArray;
 
-
-
 // pub mod _partitioned;
 // pub mod _segmentation;
 pub mod aggregate;

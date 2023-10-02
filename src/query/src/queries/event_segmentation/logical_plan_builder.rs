@@ -1,34 +1,21 @@
 use std::collections::HashMap;
-
 use std::sync::Arc;
-
-
-
-
 
 use common::query::event_segmentation::Breakdown;
 use common::query::event_segmentation::DidEventAggregate;
 use common::query::event_segmentation::Event;
 use common::query::event_segmentation::EventSegmentation;
 use common::query::event_segmentation::Query;
-
 use common::query::event_segmentation::SegmentCondition;
 use common::query::time_columns;
 use common::query::EventFilter;
-
 use common::query::PropertyRef;
-
-
 use datafusion_common::Column;
-
-
 use datafusion_expr::col;
 use datafusion_expr::expr;
 use datafusion_expr::expr::ScalarFunction;
 use datafusion_expr::expr_fn::and;
 use datafusion_expr::lit;
-
-
 use datafusion_expr::BuiltinScalarFunction;
 use datafusion_expr::Expr;
 use datafusion_expr::ExprSchemable;
@@ -40,7 +27,6 @@ use futures::executor;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
 use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
-
 use tracing::debug;
 
 use crate::context::Format;
@@ -66,8 +52,6 @@ use crate::Context;
 
 pub const COL_AGG_NAME: &str = "agg_name";
 const COL_VALUE: &str = "value";
-const COL_EVENT: &str = "event";
-const COL_DATE: &str = "date";
 
 pub struct LogicalPlanBuilder {
     ctx: Context,
@@ -281,7 +265,7 @@ impl LogicalPlanBuilder {
                         time,
                     } => SegmentExpr::Aggregate {
                         filter: event_expr,
-                        predicate: property_col(&self.ctx, &self.metadata, &property)
+                        predicate: property_col(&self.ctx, &self.metadata, property)
                             .await?
                             .try_into_col()?,
                         ts_col: Column::from_qualified_name(event_fields::CREATED_AT),
@@ -391,7 +375,7 @@ impl LogicalPlanBuilder {
         if self.ctx.format != Format::Compact {
             // pivot date
             input = {
-                let (from_time, to_time) = self.es.time.range(self.ctx.cur_time.clone());
+                let (from_time, to_time) = self.es.time.range(self.ctx.cur_time);
                 let result_cols = time_columns(from_time, to_time, &self.es.interval_unit);
                 LogicalPlan::Extension(Extension {
                     node: Arc::new(PivotNode::try_new(
@@ -412,7 +396,7 @@ impl LogicalPlanBuilder {
         input: LogicalPlan,
         event: &Event,
     ) -> Result<LogicalPlan> {
-        let cur_time = self.ctx.cur_time.clone();
+        let cur_time = self.ctx.cur_time;
         // let cur_time = match &self.es.interval_unit {
         // TimeIntervalUnit::Second => self
         // .ctx

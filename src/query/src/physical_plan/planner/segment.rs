@@ -1,71 +1,25 @@
 use std::sync::Arc;
 
-
 use arrow::array::Decimal128Array;
-
-
-
-
-
 use arrow::datatypes::Schema;
-
-
-
-
-
 use datafusion::physical_expr::execution_props::ExecutionProps;
-
-
-
-
-
-
-
-
-
-
-
-
 use datafusion_common::ScalarValue;
-
 use datafusion_common::ToDFSchema;
-
-
-
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
 
-
-
 use crate::error::Result;
-
 use crate::logical_plan;
-
-
-
-
-
-
-
-
-
-
-
 // use crate::logical_plan::_segmentation::AggregateFunction;
 // use crate::logical_plan::_segmentation::SegmentationNode;
 // use crate::logical_plan::_segmentation::TimeRange;
 
-
-
 // use crate::physical_plan::expressions::aggregate::aggregate;
 // use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
 
-
-
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
-
 use crate::physical_plan::expressions::segmentation::aggregate::Aggregate;
 use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 use crate::physical_plan::expressions::segmentation::boolean_op::*;
@@ -74,13 +28,8 @@ use crate::physical_plan::expressions::segmentation::comparison::Or;
 use crate::physical_plan::expressions::segmentation::count::Count;
 use crate::physical_plan::expressions::segmentation::time_range::TimeRange;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
-
-
 use crate::physical_plan::planner::build_filter;
 use crate::physical_plan::planner::planner::col;
-
-
-
 
 fn aggregate<T>(agg: &logical_plan::segment::AggregateFunction) -> AggregateFunction<T>
 where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display {

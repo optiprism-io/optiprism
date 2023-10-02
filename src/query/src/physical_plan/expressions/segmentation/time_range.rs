@@ -1,12 +1,8 @@
 use std::fmt::Debug;
 
-
-
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
-
-
 
 #[derive(Debug, Clone)]
 pub enum TimeRange {
@@ -17,7 +13,7 @@ pub enum TimeRange {
 }
 
 pub fn from_milli(m: i64) -> DateTime<Utc> {
-    DateTime::<Utc>::from_utc(
+    DateTime::from_naive_utc_and_offset(
         chrono::NaiveDateTime::from_timestamp_millis(m).unwrap(),
         Utc,
     )

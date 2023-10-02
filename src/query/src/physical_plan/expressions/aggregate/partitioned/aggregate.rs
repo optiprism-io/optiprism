@@ -1042,7 +1042,7 @@ mod tests {
 | 1            | 127     |
 "#;
         let res = parse_markdown_tables(data).unwrap();
-        let schema = res[0].schema().clone();
+        let schema = res[0].schema();
         let hash = HashMap::from_iter([(0, ()), (1, ()), (4, ())]);
         {
             let mut agg = Aggregate::<i8, i8, i8>::try_new(

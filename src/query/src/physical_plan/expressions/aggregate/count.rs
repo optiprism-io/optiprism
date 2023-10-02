@@ -3,14 +3,11 @@ use std::marker::PhantomData;
 use std::result;
 use std::sync::Arc;
 
-
-
 use ahash::RandomState;
 use arrow::array::Array;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanArray;
 use arrow::array::Decimal128Array;
-
 use arrow::array::Float32Array;
 use arrow::array::Float64Array;
 use arrow::array::Int16Array;
@@ -18,29 +15,18 @@ use arrow::array::Int32Array;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::Int8Array;
-
-
 use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
-
 use arrow::array::UInt8Array;
-
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::record_batch::RecordBatch;
-
 use arrow::row::Row;
-
 use arrow::row::SortField;
-
-
-
 use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
-
-
 
 use crate::error::Result;
 use crate::physical_plan::expressions::aggregate::Groups;
@@ -270,15 +256,11 @@ count!(Decimal128Array, Decimal128Array);
 
 #[cfg(test)]
 mod tests {
-    
+
     use std::sync::Arc;
 
-    
     use arrow::datatypes::DataType;
-    
-    
     use arrow::row::SortField;
-    
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_expr::PhysicalExprRef;
     use store::test_util::parse_markdown_tables;
@@ -299,7 +281,7 @@ mod tests {
 | 0           | osx          | 1     | e3          |
 "#;
         let res = parse_markdown_tables(data).unwrap();
-        let schema = res[0].schema().clone();
+        let schema = res[0].schema();
         let groups = vec![(
             Arc::new(Column::new_with_schema("device", &schema).unwrap()) as PhysicalExprRef,
             "device".to_string(),

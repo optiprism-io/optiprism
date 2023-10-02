@@ -2,8 +2,6 @@ use arrow::array::Decimal128Builder;
 use arrow::array::PrimitiveBuilder;
 use arrow::datatypes::Decimal128Type;
 
-
-
 use crate::DECIMAL_PRECISION;
 use crate::DECIMAL_SCALE;
 

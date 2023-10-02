@@ -4,7 +4,6 @@ use chrono::Utc;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::Context;
-
 use crate::ListResponse;
 use crate::PlatformError;
 use crate::QueryResponse;

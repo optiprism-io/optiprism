@@ -1,9 +1,6 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-
-
-
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -13,11 +10,8 @@ use arrow::array::ArrayRef;
 use arrow::array::UInt64Array;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
-
 use arrow::datatypes::SchemaRef;
-
 use arrow::record_batch::RecordBatch;
-
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::PhysicalExpr;
@@ -33,7 +27,6 @@ use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion_common::Result as DFResult;
-
 use futures::Stream;
 use futures::StreamExt;
 
@@ -113,7 +106,7 @@ impl ExecutionPlan for PartitionExec {
         partition: usize,
         context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
-        let stream = self.input.execute(partition, context.clone())?;
+        let stream = self.input.execute(partition, context)?;
 
         let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
         Ok(Box::pin(PartitionStream {
@@ -195,12 +188,6 @@ impl Stream for PartitionStream {
 mod tests {
     use std::sync::Arc;
 
-    
-    
-    
-    
-    
-    
     use arrow::util::pretty::print_batches;
     use datafusion::physical_expr::expressions::Column;
     use datafusion::physical_plan::common::collect;
@@ -246,7 +233,7 @@ mod tests {
 
         let batches = parse_markdown_tables(data).unwrap();
         let schema = batches[0].schema();
-        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+        let input = MemoryExec::try_new(&[batches], schema.clone(), None)?;
 
         let seg = PartitionExec::try_new(
             Arc::new(input),

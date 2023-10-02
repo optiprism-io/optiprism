@@ -2,9 +2,6 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
-
-
-
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -14,24 +11,15 @@ use std::task::Poll;
 use ahash::HashMapExt;
 use ahash::RandomState;
 use arrow::array::Array;
-
 use arrow::array::ArrayRef;
 use arrow::array::Int64Array;
-
-
-
 use arrow::compute::concat_batches;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
-
 use arrow::record_batch::RecordBatch;
-
-
-
-
 use axum::async_trait;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
@@ -43,7 +31,6 @@ use datafusion::physical_plan::aggregates::AggregateMode;
 use datafusion::physical_plan::aggregates::PhysicalGroupBy;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::expressions::PhysicalSortExpr;
-
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::metrics::BaselineMetrics;
 use datafusion::physical_plan::metrics::ExecutionPlanMetricsSet;
@@ -76,10 +63,6 @@ pub struct SegmentedAggregateExec {
     agg_schemas: Vec<SchemaRef>,
     metrics: ExecutionPlanMetricsSet,
     group_fields: Vec<FieldRef>,
-}
-
-struct Group {
-    cols: Vec<ScalarValue>,
 }
 
 impl SegmentedAggregateExec {
@@ -124,7 +107,7 @@ impl SegmentedAggregateExec {
             .filter(|f| group_cols.contains_key(f.name()))
             .cloned()
             .collect::<Vec<_>>();
-        let group_fields = vec![vec![segment_field], group_fields.clone()].concat();
+        let group_fields = vec![vec![segment_field], group_fields].concat();
         let fields: Vec<FieldRef> = vec![group_fields.clone(), agg_result_fields].concat();
 
         let schema = Schema::new(fields);
@@ -185,9 +168,8 @@ impl ExecutionPlan for SegmentedAggregateExec {
     ) -> DFResult<SendableRecordBatchStream> {
         let stream = self.input.execute(partition, context.clone())?;
         let (agg_expr, partition_streams) =
-            if let Some(partition_inputs) = &self.partition_inputs && self.agg_expr.len() > 0 {
+            if let Some(partition_inputs) = &self.partition_inputs && !self.agg_expr.is_empty() {
                 let aggs = (0..partition_inputs.len())
-                    .into_iter()
                     .map(|_| {
                         self.agg_expr
                             .iter()
@@ -369,7 +351,7 @@ impl Stream for AggregateStream {
                 batches.push(result);
             }
         }
-        let batch = concat_batches(&self.schema, batches.iter().map(|b| b).collect::<Vec<_>>())?;
+        let batch = concat_batches(&self.schema, batches.iter().collect::<Vec<_>>())?;
 
         // merge
         let agg_fields = self.schema.fields()[self.group_fields.len()..].to_owned();
@@ -395,7 +377,7 @@ impl Stream for AggregateStream {
 
         let group_by = PhysicalGroupBy::new_single(group_by_expr);
         let input = Arc::new(MemoryExec::try_new(
-            &vec![vec![batch]],
+            &[vec![batch]],
             self.schema.clone(),
             None,
         )?);
@@ -420,17 +402,11 @@ impl Stream for AggregateStream {
 
 #[cfg(test)]
 mod tests {
-    
+
     use std::sync::Arc;
     use std::sync::Mutex;
 
-    
-    
-    
-    
-    
     use arrow::datatypes::DataType;
-    
     use arrow::util::pretty::print_batches;
     use arrow_row::SortField;
     use chrono::DateTime;
@@ -500,7 +476,7 @@ mod tests {
 
         let batches = parse_markdown_tables(data).unwrap();
         let schema = batches[0].schema();
-        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+        let input = MemoryExec::try_new(&[batches], schema.clone(), None)?;
 
         let pagg1 = {
             // let groups = vec![(
@@ -654,9 +630,7 @@ mod tests {
 
             let batches = parse_markdown_tables(data).unwrap();
             let schema = batches[0].schema();
-            let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
-
-            input
+            MemoryExec::try_new(&[batches], schema, None)?
         };
 
         let pinput2 = {
@@ -670,9 +644,7 @@ mod tests {
 
             let batches = parse_markdown_tables(data).unwrap();
             let schema = batches[0].schema();
-            let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
-
-            input
+            MemoryExec::try_new(&[batches], schema, None)?
         };
 
         let seg = SegmentedAggregateExec::try_new(
@@ -734,7 +706,7 @@ mod tests {
 
         let batches = parse_markdown_tables(data).unwrap();
         let schema = batches[0].schema();
-        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+        let input = MemoryExec::try_new(&[batches], schema.clone(), None)?;
 
         let agg1 = {
             let count = count::PartitionedCount::<i64>::try_new(
@@ -792,9 +764,7 @@ mod tests {
 
             let batches = parse_markdown_tables(data).unwrap();
             let schema = batches[0].schema();
-            let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
-
-            input
+            MemoryExec::try_new(&[batches], schema, None)?
         };
 
         let pinput2 = {
@@ -808,9 +778,7 @@ mod tests {
 
             let batches = parse_markdown_tables(data).unwrap();
             let schema = batches[0].schema();
-            let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
-
-            input
+            MemoryExec::try_new(&[batches], schema, None)?
         };
 
         let seg = SegmentedAggregateExec::try_new(
@@ -866,7 +834,7 @@ mod tests {
 
         let batches = parse_markdown_tables(data).unwrap();
         let schema = batches[0].schema();
-        let input = MemoryExec::try_new(&vec![batches], schema.clone(), None)?;
+        let input = MemoryExec::try_new(&[batches], schema.clone(), None)?;
 
         let agg1 = {
             let count = count::PartitionedCount::<i64>::try_new(

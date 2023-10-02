@@ -46,7 +46,6 @@ use datafusion_common::ScalarValue;
 pub use error::PlatformError;
 pub use error::Result;
 use metadata::MetadataProvider;
-
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -447,7 +446,7 @@ impl TryInto<common::query::EventFilter> for &EventFilter {
                 value: match value {
                     None => None,
                     Some(v) => {
-                        if v.len() == 0 {
+                        if v.is_empty() {
                             None
                         } else {
                             Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?)

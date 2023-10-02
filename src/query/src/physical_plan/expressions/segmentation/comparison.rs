@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use arrow::array::Array;
 use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::buffer::ScalarBuffer;
@@ -9,11 +8,13 @@ use arrow::record_batch::RecordBatch;
 
 use crate::error::Result;
 use crate::physical_plan::expressions::segmentation::SegmentExpr;
+
 #[derive(Debug)]
 struct AndInner {
     left: Arc<dyn SegmentExpr>,
     right: Arc<dyn SegmentExpr>,
 }
+
 #[derive(Debug)]
 pub struct And {
     inner: Arc<Mutex<AndInner>>,
@@ -31,18 +32,18 @@ impl And {
                 let mut out = Int64Builder::with_capacity(left.len());
 
                 left.iter().zip(right.iter()).for_each(|(l, r)| {
-                    if l.is_some() && r.is_some() {
-                        out.append_value(l.unwrap());
+                    if let Some(l) = l && r.is_some() {
+                        out.append_value(l);
                     } else {
                         out.append_null();
                     }
                 });
 
-                return Some(out.finish());
+                Some(out.finish())
             }
-            (None, None) => return None,
+            (None, None) => None,
             _ => unreachable!(),
-        };
+        }
     }
 }
 
@@ -64,10 +65,6 @@ impl SegmentExpr for And {
     }
 }
 
-struct OrInner {
-    left: Arc<dyn SegmentExpr>,
-    right: Arc<dyn SegmentExpr>,
-}
 #[derive(Debug)]
 pub struct Or {
     inner: Arc<Mutex<AndInner>>,
@@ -92,11 +89,11 @@ impl Or {
                     }
                 });
 
-                return Some(out.finish());
+                Some(out.finish())
             }
-            (None, None) => return None,
+            (None, None) => None,
             _ => unreachable!(),
-        };
+        }
     }
 }
 
@@ -138,12 +135,6 @@ mod tests {
     struct Test {
         a: Option<Int64Array>,
         f: Int64Array,
-    }
-
-    impl Test {
-        fn new(a: Option<Int64Array>, f: Int64Array) -> Self {
-            Self { a, f }
-        }
     }
 
     impl SegmentExpr for Test {

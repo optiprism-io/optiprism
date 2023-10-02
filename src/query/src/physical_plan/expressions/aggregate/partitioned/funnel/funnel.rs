@@ -1,9 +1,6 @@
-
 use std::collections::HashMap;
-
 use std::result;
 use std::sync::Arc;
-
 
 use ahash::RandomState;
 use arrow::array::ArrayRef;
@@ -12,20 +9,16 @@ use arrow::array::Int64Array;
 use arrow::array::Int64Builder;
 use arrow::array::TimestampMillisecondArray;
 use arrow::compute::concat;
-
 use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
-
-
 use arrow_row::SortField;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::DurationRound;
-
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use common::DECIMAL_PRECISION;
@@ -35,7 +28,6 @@ use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use datafusion_common::ScalarValue;
 use rust_decimal::Decimal;
-
 
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::evaluate_batch;
 use crate::physical_plan::expressions::aggregate::partitioned::funnel::Batch;
@@ -72,7 +64,7 @@ struct Step {
 #[derive(Debug)]
 struct Row {
     row_id: usize,
-    batch_id: usize,
+    _batch_id: usize,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -94,9 +86,9 @@ struct Group {
     skip: bool,
     first: bool,
     cur_partition: i64,
-    cur_row_id: i64,
+    _cur_row_id: i64,
     partition_start: Row,
-    partition_len: i64,
+    _partition_len: i64,
     const_row: Option<Row>,
     cur_step: usize,
     steps: Vec<Step>,
@@ -114,7 +106,6 @@ impl Group {
                     total_funnels: 0,
                     completed_funnels: 0,
                     steps: (0..steps_len)
-                        .into_iter()
                         .map(|_| StepResult {
                             count: 0,
                             total_time: 0,
@@ -130,16 +121,15 @@ impl Group {
             skip: false,
             first: true,
             cur_partition: 0,
-            cur_row_id: 0,
+            _cur_row_id: 0,
             partition_start: Row {
                 row_id: 0,
-                batch_id: 0,
+                _batch_id: 0,
             },
-            partition_len: 0,
+            _partition_len: 0,
             const_row: None,
             cur_step: 0,
             steps: (0..steps_len)
-                .into_iter()
                 .map(|_| Step {
                     ts: 0,
                     row_id: 0,
@@ -151,7 +141,7 @@ impl Group {
         }
     }
 
-    fn check_exclude(&self, exclude: &Vec<Exclude>, cur_row_id: usize) -> bool {
+    fn check_exclude(&self, exclude: &[Exclude], cur_row_id: usize) -> bool {
         for excl in exclude.iter() {
             let mut to_check = false;
             // check if this exclude is relevant to current step
@@ -167,17 +157,15 @@ impl Group {
                 to_check = true;
             }
 
-            if to_check {
-                if excl.exists.value(cur_row_id) {
-                    return false;
-                }
+            if to_check && excl.exists.value(cur_row_id) {
+                return false;
             }
         }
 
         true
     }
 
-    fn check_constants(&self, constants: &Vec<StaticArray>, cur_row_id: usize) -> bool {
+    fn check_constants(&self, constants: &[StaticArray], cur_row_id: usize) -> bool {
         let const_row = self.const_row.as_ref().unwrap();
         for (const_idx, first_const) in constants.iter().enumerate() {
             // compare the const values of current row and first row
@@ -256,7 +244,7 @@ pub struct Funnel {
     partition_col: Column,
     buf: HashMap<usize, Batch, RandomState>,
     batch_id: usize,
-    processed_batches: usize,
+    _processed_batches: usize,
     debug: Vec<(usize, usize, DebugStep)>,
     buckets: Vec<i64>,
     bucket_size: Duration,
@@ -288,12 +276,6 @@ pub struct Options {
     pub groups: Option<Vec<(PhysicalExprRef, String, SortField)>>,
 }
 
-struct PartitionRow<'a> {
-    row_id: usize,
-    batch_id: usize,
-    batch: &'a Batch,
-}
-
 impl Funnel {
     pub fn try_new(opts: Options) -> crate::error::Result<Self> {
         let from = opts
@@ -307,12 +289,11 @@ impl Funnel {
             .unwrap()
             .timestamp_millis();
         let mut buckets = (from..to)
-            .into_iter()
             .step_by(opts.bucket_size.num_milliseconds() as usize)
             .collect::<Vec<i64>>();
 
         // case where bucket size is bigger than time range
-        if buckets.len() == 0 {
+        if buckets.is_empty() {
             buckets.push(from);
         }
 
@@ -338,7 +319,7 @@ impl Funnel {
             partition_col: opts.partition_col,
             buf: Default::default(),
             batch_id: 0,
-            processed_batches: 0,
+            _processed_batches: 0,
             debug: Vec::with_capacity(100),
             buckets: buckets.clone(),
             bucket_size: opts.bucket_size,
@@ -401,8 +382,7 @@ impl PartitionedAggregateExpr for Funnel {
 
         // add fields for each step
         let mut step_fields = (0..self.steps_len)
-            .into_iter()
-            .map(|step_id| {
+            .flat_map(|step_id| {
                 let fields = vec![
                     Field::new(format!("step{}_total", step_id), DataType::Int64, true),
                     Field::new(
@@ -418,7 +398,6 @@ impl PartitionedAggregateExpr for Funnel {
                 ];
                 fields
             })
-            .flatten()
             .collect::<Vec<_>>();
         fields.append(&mut step_fields);
 
@@ -452,10 +431,7 @@ impl PartitionedAggregateExpr for Funnel {
             let arrs = groups
                 .exprs
                 .iter()
-                .map(|e| {
-                    e.evaluate(batch)
-                        .and_then(|v| Ok(v.into_array(batch.num_rows()).clone()))
-                })
+                .map(|e| e.evaluate(batch).map(|v| v.into_array(batch.num_rows())))
                 .collect::<result::Result<Vec<_>, _>>()?;
 
             Some(groups.row_converter.convert_columns(&arrs)?)
@@ -496,10 +472,7 @@ impl PartitionedAggregateExpr for Funnel {
                 groups
                     .groups
                     .entry(rows.as_ref().unwrap().row(row_id).owned())
-                    .or_insert_with(|| {
-                        let group = Group::new(self.steps_len, &self.buckets);
-                        group
-                    })
+                    .or_insert_with(|| Group::new(self.steps_len, &self.buckets))
             } else {
                 &mut self.single_group
             };
@@ -511,12 +484,12 @@ impl PartitionedAggregateExpr for Funnel {
                 group.first = false;
                 group.partition_start = Row {
                     row_id: 0,
-                    batch_id: self.batch_id,
+                    _batch_id: self.batch_id,
                 };
                 group.cur_partition = partitions.value(0);
             }
 
-            let mut batch = self.buf.get(&batch_id).unwrap();
+            let batch = self.buf.get(&batch_id).unwrap();
             let cur_ts = batch.ts.value(row_id);
             if group.cur_step > 0 {
                 if let Some(exclude) = &batch.exclude {
@@ -533,7 +506,7 @@ impl PartitionedAggregateExpr for Funnel {
                 }
 
                 if cur_ts - group.steps[0].ts > self.window.num_milliseconds() {
-                    group.push_result(&self.filter, self.bucket_size.clone());
+                    group.push_result(&self.filter, self.bucket_size);
                     self.debug.push((batch_id, row_id, DebugStep::OutOfWindow));
                     group.steps[0] = group.steps[group.cur_step].clone();
                     group.cur_step = 0;
@@ -543,13 +516,16 @@ impl PartitionedAggregateExpr for Funnel {
             }
             if group.cur_step == 0 {
                 if batch.constants.is_some() {
-                    group.const_row = Some(Row { row_id, batch_id })
+                    group.const_row = Some(Row {
+                        row_id,
+                        _batch_id: batch_id,
+                    })
                 }
             } else {
                 // compare current value with constant
                 // get constant row
                 if let Some(constants) = &batch.constants {
-                    if !group.check_constants(&constants, row_id) {
+                    if !group.check_constants(constants, row_id) {
                         self.debug
                             .push((batch_id, row_id, DebugStep::ConstantViolation));
                         group.steps[0] = group.steps[group.cur_step].clone();
@@ -562,13 +538,13 @@ impl PartitionedAggregateExpr for Funnel {
             }
 
             if batch_id == self.batch_id && partitions.value(row_id) != group.cur_partition {
-                group.push_result(&self.filter, self.bucket_size.clone());
+                group.push_result(&self.filter, self.bucket_size);
                 self.debug.push((batch_id, row_id, DebugStep::NewPartition));
                 group.cur_partition = partitions.value(row_id);
                 self.cur_partition = partitions.value(row_id);
                 group.partition_start = Row {
                     row_id: 0,
-                    batch_id: self.batch_id,
+                    _batch_id: self.batch_id,
                 };
                 group.cur_step = 0;
                 group.skip = false;
@@ -605,8 +581,7 @@ impl PartitionedAggregateExpr for Funnel {
                         // uncommit for single funnel per partition
                         // self.skip = true;
 
-                        let is_completed =
-                            group.push_result(&self.filter, self.bucket_size.clone());
+                        let is_completed = group.push_result(&self.filter, self.bucket_size);
                         if is_completed && self.count == Count::Unique {
                             self.skip_partition = true;
                         }
@@ -622,7 +597,6 @@ impl PartitionedAggregateExpr for Funnel {
                 if batch_id > self.batch_id {
                     break;
                 }
-                batch = self.buf.get(&batch_id).unwrap();
             }
             self.debug.push((batch_id, row_id, DebugStep::NextRow));
         }
@@ -638,7 +612,7 @@ impl PartitionedAggregateExpr for Funnel {
             let mut rows: Vec<arrow_row::Row> = Vec::with_capacity(groups.groups.len());
             for (row, group) in &mut groups.groups {
                 rows.push(row.row());
-                group.push_result(&self.filter, self.bucket_size.clone());
+                group.push_result(&self.filter, self.bucket_size);
             }
             let group_arrs = groups.row_converter.convert_rows(rows)?;
 
@@ -651,7 +625,7 @@ impl PartitionedAggregateExpr for Funnel {
             (Some(group_arrs), buckets)
         } else {
             self.single_group
-                .push_result(&self.filter, self.bucket_size.clone());
+                .push_result(&self.filter, self.bucket_size);
             (None, vec![&self.single_group.buckets])
         };
 
@@ -671,20 +645,17 @@ impl PartitionedAggregateExpr for Funnel {
             let mut completed = Int64Builder::with_capacity(arr_len);
             // step total col
             let mut step_total = (0..steps)
-                .into_iter()
                 .map(|_| Int64Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
             let mut step_time_to_convert = (0..steps)
-                .into_iter()
                 .map(|_| Decimal128Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
             let mut step_time_to_convert_from_start = (0..steps)
-                .into_iter()
                 .map(|_| Decimal128Builder::with_capacity(arr_len))
                 .collect::<Vec<_>>();
 
             // iterate over buckets and fill values to builders
-            for (_, bucket) in buckets {
+            for bucket in buckets.values() {
                 total.append_value(bucket.total_funnels);
                 completed.append_value(bucket.completed_funnels);
                 for (step_id, step) in bucket.steps.iter().enumerate() {
@@ -725,15 +696,14 @@ impl PartitionedAggregateExpr for Funnel {
                     .map(|arr| {
                         // make scalar value from group and stretch it to array size of buckets len
                         ScalarValue::try_from_array(arr.as_ref(), group_id)
-                            .and_then(|v| Ok(v.to_array_of_size(buckets.len())))
+                            .map(|v| v.to_array_of_size(buckets.len()))
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 arrs = [garr, arrs].concat();
             }
 
             let step_arrs = (0..steps)
-                .into_iter()
-                .map(|idx| {
+                .flat_map(|idx| {
                     let arrs = vec![
                         Arc::new(step_total[idx].finish()) as ArrayRef,
                         Arc::new(
@@ -751,13 +721,11 @@ impl PartitionedAggregateExpr for Funnel {
                     ];
                     arrs
                 })
-                .flatten()
                 .collect::<Vec<_>>();
             res.push([arrs, step_arrs].concat());
         }
 
         let res = (0..res[0].len())
-            .into_iter()
             .map(|col_id| {
                 let arrs = res.iter().map(|v| v[col_id].as_ref()).collect::<Vec<_>>();
                 concat(&arrs).unwrap()
@@ -777,7 +745,7 @@ impl PartitionedAggregateExpr for Funnel {
         let res = Self {
             input_schema: self.input_schema.clone(),
             ts_col: self.ts_col.clone(),
-            window: self.window.clone(),
+            window: self.window,
             steps_expr: self.steps_expr.clone(),
             steps_orders: self.steps_orders.clone(),
             exclude_expr: self.exclude_expr.clone(),
@@ -788,7 +756,7 @@ impl PartitionedAggregateExpr for Funnel {
             partition_col: self.partition_col.clone(),
             buf: Default::default(),
             batch_id: 0,
-            processed_batches: 0,
+            _processed_batches: 0,
             debug: vec![],
             buckets: self.buckets.clone(),
             bucket_size: self.bucket_size,
@@ -810,7 +778,6 @@ mod tests {
     use std::sync::Arc;
 
     use ahash::RandomState;
-    
     use arrow::datatypes::DataType;
     use arrow::datatypes::Field;
     use arrow::datatypes::Schema;
@@ -828,12 +795,10 @@ mod tests {
     use datafusion::physical_expr::PhysicalExprRef;
     use datafusion_common::ScalarValue;
     use datafusion_expr::Operator;
-    
     use store::test_util::parse_markdown_tables;
     use tracing_test::traced_test;
 
     use crate::event_eq;
-    
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::event_eq_;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::DebugStep;
     use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
@@ -1471,7 +1436,7 @@ asd
 | 1      | 2020-04-12 22:15:57      | 3      | 1      |
 "#;
         let res = parse_markdown_tables(data).unwrap();
-        let schema = res[0].schema().clone();
+        let schema = res[0].schema();
         let hash = HashMap::from_iter([(0, ()), (1, ()), (2, ()), (3, ())]);
 
         let e1 = {
@@ -1555,7 +1520,7 @@ asd
 | 2      | 2020-04-12 22:12:57      | 3      | 1      |
 "#;
         let res = parse_markdown_tables(data).unwrap();
-        let schema = res[0].schema().clone();
+        let schema = res[0].schema();
         let hash = HashMap::from_iter([(0, ()), (1, ()), (2, ()), (3, ())]);
 
         let e1 = {
@@ -1643,7 +1608,7 @@ asd
 | 2      | 2020-04-12 22:12:57 | ios          | 3      | 1      |
 "#;
         let res = parse_markdown_tables(data).unwrap();
-        let schema = res[0].schema().clone();
+        let schema = res[0].schema();
         let hash = HashMap::from_iter([(0, ()), (1, ()), (2, ()), (3, ())]);
 
         let e1 = {
@@ -1728,7 +1693,7 @@ asd
 | 3      | 2020-04-12 22:17:57 | android      | 1      | 1      |
 "#;
         let res = parse_markdown_tables(data).unwrap();
-        let schema = res[0].schema().clone();
+        let schema = res[0].schema();
         let hash = HashMap::from_iter([(1, ())]);
 
         let e1 = {

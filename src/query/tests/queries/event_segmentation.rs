@@ -411,9 +411,9 @@ async fn test_custom_events() -> Result<()> {
         .with_query_planner(Arc::new(QueryPlanner {}))
         .with_optimizer_rules(vec![]);
 
-    let exec_ctx = SessionContext::with_state(session_state);
-    let physical_plan = exec_ctx.create_physical_plan(&plan).await?;
-
+    let exec_ctx = SessionContext::with_state(session_state.clone());
+    let physical_plan = session_state.create_physical_plan(&plan).await?;
+    // println!("physical plan: {:#?}", physical_plan);
     let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
     print_batches(&result)?;
 

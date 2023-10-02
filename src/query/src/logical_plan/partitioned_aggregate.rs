@@ -1,6 +1,5 @@
 use std::any::Any;
 use std::collections::HashMap;
-
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::hash::Hasher;
@@ -8,7 +7,6 @@ use std::sync::Arc;
 
 use arrow::datatypes::DataType;
 use arrow::datatypes::DataType::Decimal128;
-
 use arrow::datatypes::TimeUnit;
 use chrono::DateTime;
 use chrono::Duration;
@@ -22,7 +20,6 @@ use datafusion_common::DFField;
 use datafusion_common::DFSchema;
 use datafusion_common::DFSchemaRef;
 use datafusion_expr::Expr;
-
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
@@ -38,22 +35,22 @@ pub enum AggregateFunction {
     Count,
 }
 
-impl Into<AggregateFunction> for &query::AggregateFunction {
-    fn into(self) -> AggregateFunction {
-        match self {
+impl From<&query::AggregateFunction> for AggregateFunction {
+    fn from(value: &query::AggregateFunction) -> Self {
+        match value {
             query::AggregateFunction::Count => AggregateFunction::Count,
             query::AggregateFunction::Sum => AggregateFunction::Sum,
             query::AggregateFunction::Min => AggregateFunction::Min,
             query::AggregateFunction::Max => AggregateFunction::Max,
             query::AggregateFunction::Avg => AggregateFunction::Avg,
-            _ => panic!("Unsupported aggregate function: {:?}", self),
+            _ => panic!("Unsupported aggregate function: {:?}", value),
         }
     }
 }
 
-impl Into<AggregateFunction> for &query::PartitionedAggregateFunction {
-    fn into(self) -> AggregateFunction {
-        match self {
+impl From<&query::PartitionedAggregateFunction> for AggregateFunction {
+    fn from(value: &query::PartitionedAggregateFunction) -> Self {
+        match value {
             PartitionedAggregateFunction::Count => AggregateFunction::Count,
             PartitionedAggregateFunction::Sum => AggregateFunction::Sum,
             PartitionedAggregateFunction::Avg => AggregateFunction::Avg,
@@ -62,7 +59,6 @@ impl Into<AggregateFunction> for &query::PartitionedAggregateFunction {
         }
     }
 }
-
 pub mod funnel {
     use chrono::Duration;
     use datafusion_expr::Expr;
@@ -168,13 +164,6 @@ pub enum AggregateExpr {
     },
 }
 
-enum ReturnType {
-    Float64,
-    Int64,
-    Original,
-    New,
-}
-
 fn return_type(dt: DataType, agg: &AggregateFunction, _schema: &DFSchema) -> DataType {
     match agg {
         AggregateFunction::Avg => DataType::Float64,
@@ -239,9 +228,7 @@ impl AggregateExpr {
                 let dt = match outer_fn {
                     AggregateFunction::Avg => DataType::Float64,
                     AggregateFunction::Count => DataType::Int64,
-                    AggregateFunction::Min | AggregateFunction::Max | AggregateFunction::Count => {
-                        DataType::Int64
-                    }
+                    AggregateFunction::Min | AggregateFunction::Max => DataType::Int64,
                     _ => Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 };
 
@@ -287,8 +274,7 @@ impl AggregateExpr {
 
                 // add fields for each step
                 let mut step_fields = (0..steps.len())
-                    .into_iter()
-                    .map(|step_id| {
+                    .flat_map(|step_id| {
                         let fields = vec![
                             DFField::new_unqualified(
                                 format!("step{}_total", step_id).as_str(),
@@ -308,7 +294,6 @@ impl AggregateExpr {
                         ];
                         fields
                     })
-                    .flatten()
                     .collect::<Vec<_>>();
                 fields.append(&mut step_fields);
 
@@ -351,7 +336,7 @@ impl PartitionedAggregateNode {
                     f.data_type().to_owned(),
                     f.is_nullable(),
                 );
-                agg_result_fields.push(f.clone().into());
+                agg_result_fields.push(f.clone());
             }
         }
 
@@ -363,8 +348,8 @@ impl PartitionedAggregateNode {
             .filter(|f| group_cols.contains_key(f.name()))
             .cloned()
             .collect::<Vec<_>>();
-        let group_fields = vec![vec![segment_field], group_fields.clone()].concat();
-        let fields: Vec<DFField> = vec![group_fields.clone(), agg_result_fields].concat();
+        let group_fields = vec![vec![segment_field], group_fields].concat();
+        let fields: Vec<DFField> = vec![group_fields, agg_result_fields].concat();
         let schema = DFSchema::new_with_metadata(fields, Default::default())?;
         let ret = Self {
             input,
@@ -396,7 +381,7 @@ impl UserDefinedLogicalNode for PartitionedAggregateNode {
         let mut inputs = vec![];
         inputs.push(&self.input);
         if let Some(pi) = &self.partition_inputs {
-            inputs.extend(pi.iter().map(|x| x));
+            inputs.extend(pi.iter());
         }
 
         inputs

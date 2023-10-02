@@ -2,25 +2,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-
-
-
-
-
 use crate::custom_properties::CustomProperty;
 use crate::custom_properties::Provider;
-
-
-
-
 use crate::metadata::ListResponse;
-
-
-
 use crate::store::path_helpers::list;
-
-
-
 use crate::store::path_helpers::org_proj_ns;
 use crate::store::Store;
 use crate::Result;

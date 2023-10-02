@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -38,7 +37,6 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::error::Result as ArrowResult;
 use arrow::record_batch::RecordBatch;
-
 use axum::async_trait;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;

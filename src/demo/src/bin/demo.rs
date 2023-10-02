@@ -1,9 +1,8 @@
-
 use std::env::temp_dir;
 use std::fmt::Write;
 use std::fs::File;
-
 use std::net::SocketAddr;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -19,7 +18,6 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use bytesize::ByteSize;
-
 use chrono::Duration;
 use chrono::Utc;
 use clap::Parser;
@@ -36,15 +34,6 @@ use demo::error::DemoError;
 use demo::shop;
 use demo::shop::Config;
 use demo::test;
-
-
-
-
-
-
-
-
-
 use futures::executor::block_on;
 use indicatif::ProgressBar;
 use indicatif::ProgressState;
@@ -58,7 +47,6 @@ use metadata::MetadataProvider;
 use platform::auth;
 use platform::auth::password::make_password_hash;
 use query::ProviderImpl;
-
 use service::tracing::TracingCliArgs;
 use tracing::debug;
 use tracing::info;
@@ -202,11 +190,9 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     info!("successfully generated!");
-    let mut rows: usize = 0;
     let mut data_size_bytes: usize = 0;
     for partition in partitions.iter() {
         for batch in partition.iter() {
-            rows += batch.num_rows();
             for column in batch.columns() {
                 data_size_bytes += column.get_array_memory_size();
             }
@@ -312,10 +298,10 @@ async fn gen_store(
             .map_err(|err| DemoError::Internal(format!("can't open device.csv: {err}")))?,
         new_daily_users: cmd_args.new_daily_users,
         batch_size: 4096,
-        partitions: args.partitions.unwrap_or_else(|| num_cpus::get()),
+        partitions: args.partitions.unwrap_or_else(num_cpus::get),
     };
 
-    let result = shop::gen(&md, store_cfg).await?;
+    let result = shop::gen(md, store_cfg).await?;
     let mut rows: usize = 0;
     for partition in result.iter() {
         for batch in partition.iter() {
@@ -324,15 +310,15 @@ async fn gen_store(
     }
     debug!("average {} event(s) per 1 user", rows as i64 / total_users);
 
-    return Ok(result);
+    Ok(result)
 }
 
 fn write_parquet(
     org_id: u64,
     project_id: u64,
     md: &Arc<MetadataProvider>,
-    path: &PathBuf,
-    partitions: &Vec<Vec<RecordBatch>>,
+    path: &Path,
+    partitions: &[Vec<RecordBatch>],
     schema: &SchemaRef,
 ) -> Result<(), anyhow::Error> {
     info!("converting dictionaries to raw...");

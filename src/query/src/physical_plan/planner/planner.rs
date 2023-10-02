@@ -1,22 +1,10 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-
-
-
-
-
-
-
 use axum::async_trait;
-
 use datafusion::execution::context::QueryPlanner as DFQueryPlanner;
 use datafusion::execution::context::SessionState;
-
-
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::PhysicalExpr;
-
 use datafusion::physical_plan::expressions;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_planner::DefaultPhysicalPlanner;
@@ -24,47 +12,27 @@ use datafusion::physical_planner::ExtensionPlanner as DFExtensionPlanner;
 use datafusion::physical_planner::PhysicalPlanner;
 use datafusion_common::DFSchema;
 use datafusion_common::DataFusionError;
-
 use datafusion_common::Result as DFResult;
-
-
-
-
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::UserDefinedLogicalNode;
 
-
 use crate::error::Result;
-
-
 use crate::logical_plan::dictionary_decode::DictionaryDecodeNode;
 use crate::logical_plan::merge::MergeNode;
-
-
-
-
-
 use crate::logical_plan::partitioned_aggregate::PartitionedAggregateNode;
-
 use crate::logical_plan::pivot::PivotNode;
 use crate::logical_plan::segment::SegmentNode;
 // use crate::logical_plan::_segmentation::AggregateFunction;
 // use crate::logical_plan::_segmentation::SegmentationNode;
 // use crate::logical_plan::_segmentation::TimeRange;
 use crate::logical_plan::unpivot::UnpivotNode;
-
 use crate::physical_plan::dictionary_decode::DictionaryDecodeExec;
-
-
 // use crate::physical_plan::expressions::aggregate::aggregate;
 // use crate::physical_plan::expressions::aggregate::aggregate::Aggregate;
 // use crate::physical_plan::expressions::aggregate::count::Count;
 
-
-
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel;
 // use crate::physical_plan::expressions::aggregate::partitioned::funnel::funnel::Funnel;
-
 use crate::physical_plan::merge::MergeExec;
 use crate::physical_plan::pivot::PivotExec;
 use crate::physical_plan::planner::partitioned_aggregate::build_partitioned_aggregate_expr;
@@ -154,10 +122,10 @@ impl DFExtensionPlanner for ExtensionPlanner {
             let exec = DictionaryDecodeExec::new(physical_inputs[0].clone(), decode_cols);
             Some(Arc::new(exec) as Arc<dyn ExecutionPlan>)
         } else if let Some(node) = any.downcast_ref::<PartitionedAggregateNode>() {
-            let partition_inputs = match &node.partition_inputs {
-                None => None,
-                Some(c) => Some(physical_inputs[1..c.len()].to_vec()),
-            };
+            let partition_inputs = node
+                .partition_inputs
+                .clone()
+                .map(|c| physical_inputs[1..c.len()].to_vec());
 
             let partition_col = Column::new(
                 node.partition_col.name.as_str(),
@@ -171,7 +139,7 @@ impl DFExtensionPlanner for ExtensionPlanner {
                 .into_iter()
                 .map(|(expr, name)| {
                     build_partitioned_aggregate_expr(expr, &physical_inputs[0].schema())
-                        .and_then(|expr| Ok((Arc::new(Mutex::new(expr)), name)))
+                        .map(|expr| (Arc::new(Mutex::new(expr)), name))
                 })
                 .collect::<Result<Vec<_>>>()
                 .map_err(|err| DataFusionError::Plan(err.to_string()))?;

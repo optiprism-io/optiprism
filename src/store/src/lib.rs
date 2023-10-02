@@ -14,9 +14,7 @@ pub mod test_util {
     use std::io::Write;
     use std::path::Path;
     use std::sync::Arc;
-    
 
-    
     use arrow2::array::Array;
     use arrow2::array::BinaryArray;
     use arrow2::array::BooleanArray;
@@ -28,11 +26,8 @@ pub mod test_util {
     use arrow2::array::Int64Array;
     use arrow2::array::Int8Array;
     use arrow2::array::ListArray;
-    use arrow2::array::MutableArray;
     use arrow2::array::MutableBinaryArray;
     use arrow2::array::MutableBooleanArray;
-    
-    
     use arrow2::array::MutableListArray;
     use arrow2::array::MutablePrimitiveArray;
     use arrow2::array::MutableUtf8Array;
@@ -51,29 +46,20 @@ pub mod test_util {
     use arrow2::datatypes::Schema;
     use arrow2::datatypes::TimeUnit;
     use arrow2::io::parquet::read;
-    
-    
-    
     use arrow2::io::parquet::write::transverse;
     use arrow2::io::parquet::write::FileWriter;
     use arrow2::io::parquet::write::RowGroupIterator;
     use arrow2::io::parquet::write::WriteOptions;
     use arrow2::offset::Offset;
-    
     use arrow2::types::NativeType;
-    
     use arrow_array::RecordBatch;
-    
     use chrono::NaiveDateTime;
     use common::DECIMAL_PRECISION;
     use common::DECIMAL_SCALE;
     use parquet2::compression::CompressionOptions;
     use parquet2::encoding::Encoding;
-    
-    
     use parquet2::write::Version;
     use rust_decimal::Decimal;
-    use tracing_subscriber::filter::FilterExt;
 
     use crate::arrow_conversion::arrow2_to_arrow1;
 
@@ -107,72 +93,72 @@ pub mod test_util {
         }
     }
 
-    impl Into<i128> for ListValue {
-        fn into(self) -> i128 {
-            match self {
+    impl From<ListValue> for i128 {
+        fn from(value: ListValue) -> Self {
+            match value {
                 ListValue::Int128(v) => v,
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<i64> for ListValue {
-        fn into(self) -> i64 {
-            match self {
+    impl From<ListValue> for i64 {
+        fn from(value: ListValue) -> Self {
+            match value {
                 ListValue::Int64(v) => v,
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<i32> for ListValue {
-        fn into(self) -> i32 {
-            match self {
+    impl From<ListValue> for i32 {
+        fn from(value: ListValue) -> Self {
+            match value {
                 ListValue::Int32(v) => v,
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<u32> for ListValue {
-        fn into(self) -> u32 {
-            match self {
+    impl From<ListValue> for u32 {
+        fn from(value: ListValue) -> Self {
+            match value {
                 ListValue::Int32(v) => v as u32,
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<u64> for ListValue {
-        fn into(self) -> u64 {
-            match self {
+    impl From<ListValue> for u64 {
+        fn from(value: ListValue) -> Self {
+            match value {
                 ListValue::Int64(v) => v as u64,
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<f64> for ListValue {
-        fn into(self) -> f64 {
-            match self {
+    impl From<ListValue> for f64 {
+        fn from(value: ListValue) -> Self {
+            match value {
                 ListValue::Float(v) => v,
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<bool> for ListValue {
-        fn into(self) -> bool {
-            match self {
+    impl From<ListValue> for bool {
+        fn from(value: ListValue) -> Self {
+            match value {
                 ListValue::Bool(v) => v,
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<String> for ListValue {
-        fn into(self) -> String {
-            match self {
+    impl From<ListValue> for String {
+        fn from(value: ListValue) -> Self {
+            match value {
                 ListValue::String(v) => v,
                 _ => unimplemented!(),
             }
@@ -201,6 +187,7 @@ pub mod test_util {
             }
         }
     }
+
     impl From<Value> for Option<i16> {
         fn from(value: Value) -> Self {
             match value {
@@ -209,6 +196,7 @@ pub mod test_util {
             }
         }
     }
+
     impl From<Value> for Option<i32> {
         fn from(value: Value) -> Self {
             match value {
@@ -290,72 +278,72 @@ pub mod test_util {
         }
     }
 
-    impl Into<Option<Vec<i128>>> for Value {
-        fn into(self) -> Option<Vec<i128>> {
-            match self {
+    impl From<Value> for Option<Vec<i128>> {
+        fn from(value: Value) -> Self {
+            match value {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<Option<Vec<i64>>> for Value {
-        fn into(self) -> Option<Vec<i64>> {
-            match self {
+    impl From<Value> for Option<Vec<i64>> {
+        fn from(value: Value) -> Self {
+            match value {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<Option<Vec<i32>>> for Value {
-        fn into(self) -> Option<Vec<i32>> {
-            match self {
+    impl From<Value> for Option<Vec<i32>> {
+        fn from(value: Value) -> Self {
+            match value {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<Option<Vec<u64>>> for Value {
-        fn into(self) -> Option<Vec<u64>> {
-            match self {
+    impl From<Value> for Option<Vec<u64>> {
+        fn from(value: Value) -> Self {
+            match value {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<Option<Vec<u32>>> for Value {
-        fn into(self) -> Option<Vec<u32>> {
-            match self {
+    impl From<Value> for Option<Vec<u32>> {
+        fn from(value: Value) -> Self {
+            match value {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<Option<Vec<f64>>> for Value {
-        fn into(self) -> Option<Vec<f64>> {
-            match self {
+    impl From<Value> for Option<Vec<f64>> {
+        fn from(value: Value) -> Self {
+            match value {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<Option<Vec<String>>> for Value {
-        fn into(self) -> Option<Vec<String>> {
-            match self {
+    impl From<Value> for Option<Vec<String>> {
+        fn from(value: Value) -> Self {
+            match value {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
                 _ => unimplemented!(),
             }
         }
     }
 
-    impl Into<Option<Vec<bool>>> for Value {
-        fn into(self) -> Option<Vec<bool>> {
-            match self {
+    impl From<Value> for Option<Vec<bool>> {
+        fn from(value: Value) -> Self {
+            match value {
                 Value::List(v) => v.map(|v| {
                     v.into_iter()
                         .map(|v| match v {
@@ -400,13 +388,10 @@ pub mod test_util {
                     DataType::Float64 => Value::Float(Some(data.parse()?)),
                     DataType::Boolean => Value::Bool(Some(data.parse()?)),
                     DataType::Utf8 => Value::String(Some(data.parse()?)),
-                    DataType::Decimal(_, _) => Value::Int128(Some(data.parse()?)),
                     DataType::Timestamp(_tu, _tz) => {
                         let v: i64 = data.parse().or_else(|_v| {
-                            NaiveDateTime::parse_from_str(data, "%Y-%m-%d %H:%M:%S").and_then(|v| {
-                                let v = v.timestamp();
-                                Ok(v)
-                            })
+                            NaiveDateTime::parse_from_str(data, "%Y-%m-%d %H:%M:%S")
+                                .map(|v| v.timestamp())
                         })?;
                         Value::Int64(Some(v))
                     }
@@ -941,7 +926,7 @@ pub mod test_util {
     ) -> anyhow::Result<Vec<Box<dyn Array>>> {
         let mut out: Vec<Vec<Value>> = vec![vec![]; fields.len()];
         for row in data.lines().skip(3) {
-            if row.trim().len() == 0 {
+            if row.trim().is_empty() {
                 continue;
             }
             let v = row
@@ -981,7 +966,6 @@ pub mod test_util {
                             .collect();
                         out[idx].push(Value::List(Some(vals)));
                     }
-                    DataType::Timestamp(_ts, _tz) => {}
                     _ => unimplemented!(),
                 }
             }
@@ -1170,11 +1154,11 @@ pub mod test_util {
         let header = data.lines().collect::<Vec<_>>()[1].trim();
         let fields = header.split('|').skip(1).collect::<Vec<_>>();
         let fields = fields[0..fields.len() - 1]
-            .into_iter()
+            .iter()
             .map(|v| {
-                let parts = v.split("(").collect::<Vec<_>>();
+                let parts = v.split('(').collect::<Vec<_>>();
                 let name = parts[0].trim();
-                let ty = parts[1].split(")").collect::<Vec<_>>()[0].trim();
+                let ty = parts[1].split(')').collect::<Vec<_>>()[0].trim();
 
                 let dt = match ty {
                     "i8" => DataType::Int8,
@@ -1391,9 +1375,8 @@ pub mod test_util {
                         .arrays()
                         .iter()
                         .map(|arr| {
-                            let take_idx = PrimitiveArray::from_vec(
-                                (idx..end).into_iter().map(|v| v as i64).collect(),
-                            );
+                            let take_idx =
+                                PrimitiveArray::from_vec((idx as i64..end as i64).collect());
                             take(arr.as_ref(), &take_idx).unwrap()
                             // arr.sliced(idx, end - idx) // TODO slice is not working, producing enormous pages amount while writing to parquet
                         })
@@ -1414,7 +1397,6 @@ pub mod test_util {
                     for stream_id in 0..out_count {
                         // calculate indexes for each out. Example: slice 1..10, 3 outs. We'll take [1, 4, 7, 10], [2, 5, 8], [3, 6, 9]
                         let take_idx = (0..end - idx)
-                            .into_iter()
                             .skip(stream_id)
                             .step_by(out_count)
                             .map(|v| (v + idx) as i64)
@@ -1460,7 +1442,6 @@ pub mod test_util {
 
     pub fn concat_chunks(chunks: Vec<Chunk<Box<dyn Array>>>) -> Chunk<Box<dyn Array>> {
         let arrs = (0..chunks[0].arrays().len())
-            .into_iter()
             .map(|arr_id| {
                 let to_concat = chunks
                     .iter()
@@ -1480,7 +1461,7 @@ pub mod test_util {
     ) -> Chunk<Box<dyn Array>> {
         let arrs = chunk
             .columns()
-            .into_iter()
+            .iter()
             .enumerate()
             .filter_map(|(col_id, col)| {
                 if col_id >= idx_cols_len && (col_id + shift) % nth == 0 {
@@ -1582,10 +1563,7 @@ pub mod test_util {
             .map(|f| transverse(&f.data_type, |_| Encoding::Plain))
             .collect();
 
-        let chunks = chunks
-            .into_iter()
-            .map(|chunk| Ok(chunk))
-            .collect::<Vec<_>>();
+        let chunks = chunks.into_iter().map(Ok).collect::<Vec<_>>();
         let row_groups =
             RowGroupIterator::try_new(chunks.into_iter(), &schema, options, encodings)?;
 
@@ -1645,6 +1623,6 @@ mod tests {
 "#;
 
         let res = parse_markdown_table_v1(data).unwrap();
-        print_batches(&vec![res]).unwrap();
+        print_batches(&[res]).unwrap();
     }
 }
