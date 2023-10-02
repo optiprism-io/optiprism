@@ -15,6 +15,6 @@ members = [
     "src/query",
     "src/service",
     "src/store",
-    "src/ttest",
     "src/test_util"
-]
+,
+    "src/ttest",]

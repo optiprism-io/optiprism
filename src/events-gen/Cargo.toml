@@ -5,34 +5,34 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
-service = { path = "../service" }
 anyhow = "1.0.66"
-humantime = "2.1.0"
-rust_decimal = { version = "1.27.0", features = ["serde-float"] }
-bytesize = "1.1.0"
-num_cpus = "1.14.0"
-crossbeam-channel = "0.5.6"
-parse_duration = "2.1.1"
-enum-iterator = "1.2.0"
-dateparser = "0.2.0"
-platform = { path = "../platform" }
-clap = { version = "4.0.29", features = ["derive"] }
 arrow = { version = "42.0.0", features = ["prettyprint"] }
-parquet = "42.0.0"
+bytesize = "1.1.0"
 chrono = { version = "0.4.23" }
-test_util = { path = "../test_util" }
+clap = { version = "4.0.29", features = ["derive"] }
 common = { path = "../common" }
+crossbeam-channel = "0.5.6"
 csv = "1.1"
 cubic_spline = "1.0.0"
+dateparser = "0.2.0"
+enum-iterator = "1.2.0"
 futures = "0.3.25"
+humantime = "2.1.0"
 indicatif = "0.17.2"
 lazy_static = "1.4.0"
 metadata = { path = "../metadata" }
+num_cpus = "1.14.0"
+parquet = "42.0.0"
+parse_duration = "2.1.1"
+platform = { path = "../platform" }
 rand = "0.8.5"
-uuid = { version = "1.2.2", features = ["serde", "v4"] }
+rust_decimal = { version = "1.27.0", features = ["serde-float"] }
 serde = { version = "1.0.149", features = ["derive"] }
+service = { path = "../service" }
 strum = "0.24"
 strum_macros = "0.24"
+test_util = { path = "../test_util" }
 thiserror = "1.0.37"
 tokio = { version = "1.23.0", features = ["full"] }
 tracing = "0.1.37"
+uuid = { version = "1.2.2", features = ["serde", "v4"] }

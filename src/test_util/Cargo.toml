@@ -2,10 +2,9 @@
 name = "test_util"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-metadata = { path = "../metadata" }
-arrow = { version = "42.0.0", features = ["prettyprint"] }
 anyhow = { version = "1.0.66", features = [] }
+arrow = { version = "42.0.0", features = ["prettyprint"] }
+metadata = { path = "../metadata" }
