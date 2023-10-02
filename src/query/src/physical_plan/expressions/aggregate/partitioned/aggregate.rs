@@ -145,7 +145,6 @@ macro_rules! agg {
 
             fn fields(&self) -> Vec<Field> {
                 let field = Field::new("partitioned_agg", $dt, true);
-                println!("{:?}", field);
                 vec![field]
             }
 
@@ -1059,7 +1058,6 @@ mod tests {
             }
 
             let ar = agg.finalize().unwrap();
-            println!("{:?}", ar);
         }
         {
             let mut agg = Aggregate::<i8, i8, f64>::try_new(
@@ -1076,7 +1074,6 @@ mod tests {
             }
 
             let ar = agg.finalize().unwrap();
-            println!("{:?}", ar);
         }
         {
             let mut agg = Aggregate::<i8, i64, f64>::try_new(
@@ -1093,7 +1090,6 @@ mod tests {
             }
 
             let ar = agg.finalize().unwrap();
-            println!("{:?}", ar);
         }
 
         {
@@ -1111,7 +1107,6 @@ mod tests {
             }
 
             let ar = agg.finalize().unwrap();
-            println!("{:?}", ar);
         }
     }
 }

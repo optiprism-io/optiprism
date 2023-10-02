@@ -577,7 +577,6 @@ pub fn build_partitioned_aggregate_expr(
                     let t2 = get_return_type(t1.clone(), &outer_fn);
                     match (&t1, &t2) {
                         (&DataType::Int16, &DataType::Int16) => {
-                            println!("111wae");
                             let inner = aggregate::<i16>(&inner_fn);
                             let outer = aggregate::<i16>(&outer_fn);
                             partitioned_aggregate!(
@@ -608,7 +607,6 @@ pub fn build_partitioned_aggregate_expr(
                             )
                         }
                         (&DataType::Int16, &DataType::Int64) => {
-                            println!("222wae");
                             let inner = aggregate::<i16>(&inner_fn);
                             let outer = aggregate::<i64>(&outer_fn);
                             partitioned_aggregate!(

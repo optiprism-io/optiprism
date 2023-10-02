@@ -5,7 +5,6 @@ use std::path::Path;
 
 use rocksdb::ColumnFamilyDescriptor;
 use rocksdb::Options;
-use rocksdb::SliceTransform;
 use rocksdb::WriteBatch;
 use rocksdb::DB;
 
@@ -27,21 +26,16 @@ fn cf_descriptor(cf: ColumnFamily, opts: Options) -> ColumnFamilyDescriptor {
     }
 }
 
-fn first_three(k: &[u8]) -> &[u8] {
-    println!("cc {}", std::str::from_utf8(&k[..15]).unwrap());
-    &k[..15]
-}
-
 impl Store {
     pub fn new<P: AsRef<Path>>(path: P) -> Store {
         let mut opts = Options::default();
         opts.create_if_missing(true);
 
         // TODO manage how to properly work with prefixes
-        let prefix_extractor = SliceTransform::create("first_three", first_three, None);
-        opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(10));
+        // let prefix_extractor = SliceTransform::create("first_three", first_three, None);
+        // opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(10));
         opts.create_missing_column_families(true);
-        opts.set_prefix_extractor(prefix_extractor);
+        // opts.set_prefix_extractor(prefix_extractor);
 
         let cf_descriptors = vec![cf_descriptor(ColumnFamily::General, opts.clone())];
 

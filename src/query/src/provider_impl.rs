@@ -84,7 +84,6 @@ impl Provider for ProviderImpl {
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 
         let result = execute_plan(&plan).await?;
-        println!("sdf {:?}", result);
         let metric_cols = es.time_columns(cur_time);
         let cols = result
             .schema()
@@ -134,7 +133,6 @@ async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let duration = start.elapsed();
     debug!("elapsed: {:?}", duration);
     let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
-    println!("{:?}", schema);
     let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
     let _a = concat_batches(&schema, &batches, rows_count)?;
     Ok(concat_batches(&schema, &batches, rows_count)?)

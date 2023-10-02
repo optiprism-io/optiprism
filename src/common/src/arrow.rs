@@ -12,7 +12,6 @@ impl DecimalBuilder {
         let a = Decimal128Builder::with_capacity(capacity)
             .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
             .unwrap();
-        println!("aa# {:?}", a);
         a
     }
 }

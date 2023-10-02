@@ -138,11 +138,6 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
             Ok(arr
                 .iter()
                 .map(|value| {
-                    println!(
-                        "{:?} {:?}",
-                        value,
-                        value.map(|v| (v as f64 * 1000000.0).trunc() / 1000000.0)
-                    );
                     // https://stackoverflow.com/questions/73871891/how-to-serialize-a-struct-containing-f32-using-serde-json
                     json!(value.map(|v| (v as f64 * 1000000.0).trunc() / 1000000.0))
                 })

@@ -290,7 +290,6 @@ async fn test_query() -> Result<()> {
 
     create_entities(md.clone(), org_id, proj_id).await?;
     let input = events_provider(md.database.clone(), org_id, proj_id).await?;
-    println!("{:?}", input.schema());
     let _cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:50:00.000000+00:00")
         .unwrap()
         .with_timezone(&Utc);

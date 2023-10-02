@@ -300,6 +300,5 @@ mod tests {
         }
 
         let res = count.finalize();
-        println!("{:?}", res);
     }
 }

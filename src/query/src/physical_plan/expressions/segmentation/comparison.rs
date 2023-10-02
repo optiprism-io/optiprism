@@ -170,8 +170,6 @@ mod tests {
         let res = and
             .evaluate(rb, &ScalarBuffer::from(vec![1, 2, 3]))
             .unwrap();
-
-        println!("{:?}", res);
     }
 
     #[test]
@@ -193,7 +191,5 @@ mod tests {
         let res = and
             .evaluate(rb, &ScalarBuffer::from(vec![1, 2, 3]))
             .unwrap();
-
-        println!("{:?}", res);
     }
 }

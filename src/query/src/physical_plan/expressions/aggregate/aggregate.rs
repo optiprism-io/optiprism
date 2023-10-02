@@ -550,7 +550,6 @@ mod tests {
             ],
             Default::default(),
         );
-        println!("{:?}", res);
         let batch = RecordBatch::try_new(Arc::new(schema), res).unwrap();
         print_batches(vec![batch].as_ref()).unwrap();
     }

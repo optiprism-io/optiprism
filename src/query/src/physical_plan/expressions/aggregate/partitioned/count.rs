@@ -507,7 +507,6 @@ mod tests {
         }
 
         let res = count.finalize();
-        println!("{:?}", res);
     }
 
     #[test]
@@ -535,7 +534,5 @@ mod tests {
         }
 
         let res = agg.finalize().unwrap();
-
-        println!("{:?}", res);
     }
 }

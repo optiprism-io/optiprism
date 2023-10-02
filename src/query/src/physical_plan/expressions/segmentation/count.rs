@@ -220,10 +220,8 @@ mod tests {
                     .values();
 
                 let res = count.evaluate(&b, p).unwrap();
-                println!("{:?}", res);
             }
             let res = count.finalize().unwrap();
-            println!("{:?}", res);
         }
     }
 }

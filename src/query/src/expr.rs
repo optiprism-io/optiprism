@@ -43,7 +43,6 @@ pub fn time_expression<S: ExprSchema>(
     let ts_type = ts_col.get_type(schema)?;
 
     let (from, to) = time.range(cur_time);
-    println!("{:?} {:?} {:?}", from, to, cur_time);
     let from_expr = binary_expr(
         ts_col.clone(),
         Operator::GtEq,

@@ -130,7 +130,6 @@ impl RecordBatchBuilder {
         state: &State,
         profile: &Profile,
     ) -> Result<()> {
-        // println!("event: {event}, time: {}", NaiveDateTime::from_timestamp(state.cur_timestamp, 0));
         self.user_id.append_value(state.user_id);
         self.created_at
             .append_value(state.cur_timestamp * 10i64.pow(9));

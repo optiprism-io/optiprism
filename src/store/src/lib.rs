@@ -569,7 +569,6 @@ pub mod test_util {
                 ret.push(None);
             } else {
                 let _a = std::mem::size_of::<T>();
-                // println!("{}", idx % div);
                 ret.push(Some(T::from(idx % div).unwrap()));
             }
         }
