@@ -1,4 +1,4 @@
-//! Entities related to tracking
+//! Ingester entities.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
