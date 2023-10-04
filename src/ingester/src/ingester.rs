@@ -11,16 +11,18 @@ use serde::Deserialize;
 type Timestamp = i64;
 
 #[derive(Debug, Deserialize)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct TrackRequest {
     user_id: String,
     sent_at: Option<DateTime<Utc>>,
     context: Option<Context>,
     event: String,
-    properties: HashMap<String, Option<PropValue>>,
+    properties: Option<HashMap<String, Option<PropValue>>>,
+    user_properties: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
 pub(crate) enum PropValue {
     String(String),
     Float64(f64),
