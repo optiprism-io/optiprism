@@ -8,14 +8,15 @@ use axum::Extension;
 use axum::Json;
 use axum::Router;
 use hyper::StatusCode;
+use metadata::events::Provider as EventsProvider;
+use metadata::properties::Provider as PropertiesProvider;
 use serde::Serialize;
 
 use crate::ingester::TrackRequest;
 
 async fn create(
-    // Extension(event_kind_provider): Extension<Arc<dyn ...>>, // TODO(metadata) provide kinds of events (user searched/user clicked/etc)
-    // Extension(event_property_provider): Extension<Arc<dyn ...>>, // TODO(metadata) provide event properties (shared fields)
-    // Extension(event_provider): Extension<Arc<dyn ...>>, // TODO provider to perform actual events persistence
+    Extension(event_provider): Extension<Arc<dyn EventsProvider>>,
+    Extension(properties_provider): Extension<Arc<dyn PropertiesProvider>>,
     Path((organization_id, project_id)): Path<(u64, u64)>,
     Json(request): Json<TrackRequest>,
 ) -> Result<(StatusCode, Json<TrackResponse>), StatusCode> {

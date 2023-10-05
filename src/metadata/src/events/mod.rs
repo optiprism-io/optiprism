@@ -19,16 +19,21 @@ pub trait Provider: Sync + Send {
         project_id: u64,
         req: CreateEventRequest,
     ) -> Result<Event>;
+
     async fn get_or_create(
         &self,
         organization_id: u64,
         project_id: u64,
         req: CreateEventRequest,
     ) -> Result<Event>;
+
     async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event>;
+
     async fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str)
     -> Result<Event>;
+
     async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Event>>;
+
     async fn update(
         &self,
         organization_id: u64,
@@ -36,6 +41,7 @@ pub trait Provider: Sync + Send {
         event_id: u64,
         req: UpdateEventRequest,
     ) -> Result<Event>;
+
     async fn attach_property(
         &self,
         organization_id: u64,
@@ -43,6 +49,7 @@ pub trait Provider: Sync + Send {
         event_id: u64,
         prop_id: u64,
     ) -> Result<Event>;
+
     async fn detach_property(
         &self,
         organization_id: u64,

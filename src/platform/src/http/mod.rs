@@ -8,7 +8,6 @@ pub mod group_records;
 pub mod properties;
 pub mod queries;
 pub mod reports;
-pub mod track;
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -83,7 +82,6 @@ impl Service {
         router = reports::attach_routes(router);
         router = event_records::attach_routes(router);
         router = group_records::attach_routes(router);
-        router = track::attach_routes(router);
 
         router = router.clone().nest("/api/v1", router);
         router = router
