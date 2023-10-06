@@ -1,4 +1,5 @@
 pub mod accounts;
+pub mod atomic_counters;
 pub mod custom_events;
 pub mod dashboards;
 pub mod database;

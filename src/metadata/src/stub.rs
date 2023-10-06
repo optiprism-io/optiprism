@@ -69,8 +69,10 @@ use crate::teams::UpdateTeamRequest;
 use crate::Result;
 
 lazy_static! {
-    pub static ref DATE_TIME: DateTime<Utc> =
-        DateTime::from_utc(NaiveDateTime::from_timestamp_opt(1000, 0).unwrap(), Utc);
+    pub static ref DATE_TIME: DateTime<Utc> = DateTime::from_naive_utc_and_offset(
+        NaiveDateTime::from_timestamp_opt(1000, 0).unwrap(),
+        Utc
+    );
 }
 
 pub struct Accounts {}

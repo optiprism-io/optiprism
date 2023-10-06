@@ -133,6 +133,7 @@ impl Store {
     }
 
     pub async fn next_seq<K: AsRef<[u8]>>(&self, key: K) -> Result<u64> {
+        // TODO: not atomic without external locking
         let id = self.db.get(key.as_ref())?;
         let result: u64 = match id {
             Some(v) => u64::from_le_bytes(v.try_into().unwrap()) + 1,
