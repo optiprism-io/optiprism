@@ -7,6 +7,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use hyper::Uri;
 use serde::Deserialize;
+use serde::Serialize;
 
 type Timestamp = i64;
 
@@ -55,4 +56,15 @@ pub(crate) struct Page {
     title: String,
     #[serde(with = "http_serde::uri")]
     url: Uri,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TrackResponse {
+    pub id: u64,
+}
+
+impl From<u64> for TrackResponse {
+    fn from(id: u64) -> Self {
+        TrackResponse { id }
+    }
 }

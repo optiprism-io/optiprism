@@ -2,6 +2,6 @@
 
 #[deny(missing_docs)]
 mod http;
-mod ingester;
+pub mod ingester;
 
 pub use http::attach_routes;

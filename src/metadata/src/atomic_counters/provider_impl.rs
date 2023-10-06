@@ -26,6 +26,15 @@ pub struct ProviderImpl {
     lock: RwLock<()>, // TODO: investigate other ways for atomicity
 }
 
+impl ProviderImpl {
+    pub fn new(store: Arc<Store>) -> Self {
+        Self {
+            store,
+            lock: RwLock::new(()),
+        }
+    }
+}
+
 #[async_trait]
 impl Provider for ProviderImpl {
     async fn next_event_record(&self, organization_id: u64, project_id: u64) -> Result<u64> {
