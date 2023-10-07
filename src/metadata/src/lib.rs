@@ -15,6 +15,8 @@ pub mod store;
 pub mod stub;
 pub mod teams;
 
+pub use arrow;
+
 pub use error::Result;
 
 pub use crate::metadata::MetadataProvider;

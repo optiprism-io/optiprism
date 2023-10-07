@@ -1,25 +1,33 @@
 //! Ingester entities.
 
+mod error;
+pub(crate) mod storage;
+
 use std::collections::HashMap;
 use std::net::IpAddr;
 
 use chrono::DateTime;
 use chrono::Utc;
+pub use error::Error;
 use hyper::Uri;
 use serde::Deserialize;
 use serde::Serialize;
 
+pub(crate) const DEFAULT_USER_ID: u64 = 1;
+
 type Timestamp = i64;
+
+pub(crate) type Properties = HashMap<String, Option<PropValue>>;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TrackRequest {
-    user_id: String,
-    sent_at: Option<DateTime<Utc>>,
-    context: Option<Context>,
-    event: String,
-    properties: Option<HashMap<String, Option<PropValue>>>,
-    user_properties: Option<HashMap<String, String>>,
+    pub user_id: String,
+    pub sent_at: Option<DateTime<Utc>>,
+    pub context: Option<Context>,
+    pub event: String,
+    pub properties: Option<Properties>,
+    pub user_properties: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,28 +42,28 @@ pub(crate) enum PropValue {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Context {
-    library: TrackingLibrary,
-    page: Option<Page>,
-    user_agent: String,
-    ip: IpAddr,
+    pub library: TrackingLibrary,
+    pub page: Option<Page>,
+    pub user_agent: String,
+    pub ip: IpAddr,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct TrackingLibrary {
-    name: String,
-    version: String,
+    pub name: String,
+    pub version: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Page {
     #[serde(with = "http_serde::uri")]
-    path: Uri,
+    pub path: Uri,
     #[serde(with = "http_serde::uri")]
-    referrer: Uri,
-    search: String,
-    title: String,
+    pub referrer: Uri,
+    pub search: String,
+    pub title: String,
     #[serde(with = "http_serde::uri")]
-    url: Uri,
+    pub url: Uri,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
