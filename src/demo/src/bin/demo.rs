@@ -79,7 +79,7 @@ enum Commands {
 #[derive(Parser)]
 #[command(propagate_version = true)]
 #[command(author, version, about, long_about = None)]
-struct Cli {
+pub struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
     #[arg(long)]
@@ -92,6 +92,8 @@ struct Cli {
     out_parquet: Option<PathBuf>,
     #[arg(long, global = true)]
     partitions: Option<usize>,
+    #[arg(long, global = true, default_value = "4096")]
+    batch_size: usize,
     #[arg(long)]
     ui_path: Option<PathBuf>,
 }
@@ -184,7 +186,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let partitions = match &args.command {
         Some(cmd) => match cmd {
             Commands::Shop(shop) => gen_store(&args, shop, &md).await?,
-            Commands::Test { .. } => gen_test(&md).await?,
+            Commands::Test { .. } => gen_test(&args, &md).await?,
         },
         _ => unreachable!(),
     };
@@ -243,9 +245,10 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(svc.serve().await?)
 }
 
-async fn gen_test(md: &Arc<MetadataProvider>) -> anyhow::Result<Vec<Vec<RecordBatch>>> {
+async fn gen_test(args: &Cli, md: &Arc<MetadataProvider>) -> anyhow::Result<Vec<Vec<RecordBatch>>> {
     info!("starting sample data generation...");
-    test::gen(md, 1, 1).await
+    let partitions = args.partitions.unwrap_or_else(num_cpus::get);
+    test::gen(partitions, args.batch_size, md, 1, 1).await
 }
 
 async fn gen_store(

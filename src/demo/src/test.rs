@@ -1,6 +1,7 @@
 use std::ops::Add;
 use std::sync::Arc;
 
+use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
 use arrow::array::BooleanBuilder;
 use arrow::array::Decimal128Builder;
@@ -19,8 +20,10 @@ use arrow::array::UInt32Builder;
 use arrow::array::UInt64Builder;
 use arrow::array::UInt8Builder;
 use arrow::datatypes::DataType;
+use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use chrono::Duration;
 use chrono::DurationRound;
 use chrono::NaiveDateTime;
@@ -37,7 +40,93 @@ use test_util::create_event;
 use test_util::create_property;
 use test_util::CreatePropertyMainRequest;
 
+struct Builders {
+    b_user_id: Int64Builder,
+    b_created_at: TimestampNanosecondBuilder,
+    b_event: UInt64Builder,
+    b_i8: Int8Builder,
+    b_i16: Int16Builder,
+    b_i32: Int32Builder,
+    b_i64: Int64Builder,
+    b_u8: UInt8Builder,
+    b_u16: UInt16Builder,
+    b_u32: UInt32Builder,
+    b_u64: UInt64Builder,
+    b_f32: Float32Builder,
+    b_f64: Float64Builder,
+    b_b: BooleanBuilder,
+    b_str: StringBuilder,
+    b_ts: TimestampSecondBuilder,
+    b_lstr: LargeStringBuilder,
+    b_dec: Decimal128Builder,
+    b_group: Int64Builder,
+    b_v: Int64Builder,
+}
+
+impl Builders {
+    pub fn new() -> Self {
+        Self {
+            b_user_id: Int64Builder::new(),
+            b_created_at: TimestampNanosecondBuilder::new(),
+            b_event: UInt64Builder::new(),
+            b_i8: Int8Builder::new(),
+            b_i16: Int16Builder::new(),
+            b_i32: Int32Builder::new(),
+            b_i64: Int64Builder::new(),
+            b_u8: UInt8Builder::new(),
+            b_u16: UInt16Builder::new(),
+            b_u32: UInt32Builder::new(),
+            b_u64: UInt64Builder::new(),
+            b_f32: Float32Builder::new(),
+            b_f64: Float64Builder::new(),
+            b_b: BooleanBuilder::new(),
+            b_str: StringBuilder::new(),
+            b_ts: TimestampSecondBuilder::new(),
+            b_lstr: LargeStringBuilder::new(),
+            b_dec: Decimal128Builder::new()
+                .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
+                .unwrap(),
+            b_group: Int64Builder::new(),
+            b_v: Int64Builder::new(),
+        }
+    }
+
+    pub fn finish(&mut self, schema: SchemaRef) -> RecordBatch {
+        let arrs = {
+            vec![
+                Arc::new(self.b_user_id.finish()) as ArrayRef,
+                Arc::new(self.b_created_at.finish()) as ArrayRef,
+                Arc::new(self.b_event.finish()) as ArrayRef,
+                Arc::new(self.b_i8.finish()) as ArrayRef,
+                Arc::new(self.b_i16.finish()) as ArrayRef,
+                Arc::new(self.b_i32.finish()) as ArrayRef,
+                Arc::new(self.b_i64.finish()) as ArrayRef,
+                Arc::new(self.b_u8.finish()) as ArrayRef,
+                Arc::new(self.b_u16.finish()) as ArrayRef,
+                Arc::new(self.b_u32.finish()) as ArrayRef,
+                Arc::new(self.b_u64.finish()) as ArrayRef,
+                Arc::new(self.b_f32.finish()) as ArrayRef,
+                Arc::new(self.b_f64.finish()) as ArrayRef,
+                Arc::new(self.b_b.finish()) as ArrayRef,
+                Arc::new(self.b_str.finish()) as ArrayRef,
+                Arc::new(self.b_ts.finish()) as ArrayRef,
+                Arc::new(self.b_lstr.finish()) as ArrayRef,
+                Arc::new(self.b_dec.finish()) as ArrayRef,
+                Arc::new(self.b_group.finish()) as ArrayRef,
+                Arc::new(self.b_v.finish()) as ArrayRef,
+            ]
+        };
+        RecordBatch::try_new(schema, arrs).unwrap()
+    }
+
+    pub fn len(&self) -> usize {
+        self.b_user_id.len()
+    }
+}
+
 pub async fn gen(
+    partitions: usize,
+    batch_size: usize,
     md: &Arc<MetadataProvider>,
     org_id: u64,
     proj_id: u64,
@@ -148,61 +237,63 @@ pub async fn gen(
         .unwrap()
         .duration_trunc(Duration::days(1))?;
     let schema = table.arrow_schema();
-    let mut b_user_id = Int64Builder::new();
-    let mut b_created_at = TimestampNanosecondBuilder::new();
-    let mut b_event = UInt64Builder::new();
-    let mut b_i8 = Int8Builder::new();
-    let mut b_i16 = Int16Builder::new();
-    let mut b_i32 = Int32Builder::new();
-    let mut b_i64 = Int64Builder::new();
-    let mut b_u8 = UInt8Builder::new();
-    let mut b_u16 = UInt16Builder::new();
-    let mut b_u32 = UInt32Builder::new();
-    let mut b_u64 = UInt64Builder::new();
-    let mut b_f32 = Float32Builder::new();
-    let mut b_f64 = Float64Builder::new();
-    let mut b_b = BooleanBuilder::new();
-    let mut b_str = StringBuilder::new();
-    let mut b_ts = TimestampSecondBuilder::new();
-    let mut b_lstr = LargeStringBuilder::new();
-    let mut b_dec =
-        Decimal128Builder::new().with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)?;
-    let mut b_group = Int64Builder::new();
-    let mut b_v = Int64Builder::new();
-    let users = 100;
-    let days = 100;
-    let events = 100;
+
+    let mut res = vec![Vec::new(); partitions];
+
+    let mut builders = Vec::new();
+    for p in 0..partitions {
+        builders.push(Builders::new());
+    }
+    let users = 2;
+    let days = 2;
+    let events = 2;
     for user in 0..users {
+        let partition = user % partitions;
         let mut cur_time = now - Duration::days(days);
         for _day in 0..days {
             let mut event_time = cur_time;
             for event in 0..events {
-                b_user_id.append_value(user);
-                b_created_at.append_value(event_time.timestamp_nanos());
-                b_event.append_value(1);
-                b_i8.append_value(event as i8);
-                b_i16.append_value(event as i16);
-                b_i32.append_value(event as i32);
-                b_i64.append_value(event);
-                b_u8.append_value(event as u8);
-                b_u16.append_value(event as u16);
-                b_u32.append_value(event as u32);
-                b_u64.append_value(event as u64);
-                b_f32.append_value(event as f32 * 1.1);
-                b_f64.append_value(event as f64 * 1.1);
-                b_b.append_value(event % 2 == 0);
-                b_str.append_value(format!("event {}", event).as_str());
-                b_lstr.append_value(format!("event {}", event).as_str());
-                b_ts.append_value(event * 1000);
-                b_dec.append_value(
+                builders[partition].b_user_id.append_value(user as i64);
+                builders[partition]
+                    .b_created_at
+                    .append_value(event_time.timestamp_nanos());
+                builders[partition].b_event.append_value(1);
+                builders[partition].b_i8.append_value(event as i8);
+                builders[partition].b_i16.append_value(event as i16);
+                builders[partition].b_i32.append_value(event as i32);
+                builders[partition].b_i64.append_value(event);
+                builders[partition].b_u8.append_value(event as u8);
+                builders[partition].b_u16.append_value(event as u16);
+                builders[partition].b_u32.append_value(event as u32);
+                builders[partition].b_u64.append_value(event as u64);
+                builders[partition].b_f32.append_value(event as f32 * 1.1);
+                builders[partition].b_f64.append_value(event as f64 * 1.1);
+                builders[partition].b_b.append_value(event % 2 == 0);
+                builders[partition]
+                    .b_str
+                    .append_value(format!("event {}", event).as_str());
+                builders[partition]
+                    .b_lstr
+                    .append_value(format!("event {}", event).as_str());
+                builders[partition].b_ts.append_value(event * 1000);
+                builders[partition].b_dec.append_value(
                     event as i128 * 10_i128.pow(DECIMAL_SCALE as u32) + event as i128 * 100,
                 );
-                b_group.append_value(event % (events / 2));
+                builders[partition]
+                    .b_group
+                    .append_value(event % (events / 2));
+                // two group of users with different "v" value to proper integration tests
                 if user % 2 == 0 {
-                    b_v.append_value(event);
+                    builders[partition].b_v.append_value(event);
                 } else {
-                    b_v.append_value(event * 2);
+                    builders[partition].b_v.append_value(event * 2);
                 }
+
+                if builders[partition].len() >= batch_size {
+                    let batch = builders[partition].finish(Arc::new(schema.clone()));
+                    res[partition].push(batch);
+                }
+
                 let d = Duration::days(1).num_seconds() / events;
                 let diff = Duration::seconds(d);
                 event_time = event_time.add(diff);
@@ -210,32 +301,16 @@ pub async fn gen(
             cur_time = cur_time.add(Duration::days(1));
         }
     }
-    let cols = {
-        vec![
-            Arc::new(b_user_id.finish()) as ArrayRef,
-            Arc::new(b_created_at.finish()) as ArrayRef,
-            Arc::new(b_event.finish()) as ArrayRef,
-            Arc::new(b_i8.finish()) as ArrayRef,
-            Arc::new(b_i16.finish()) as ArrayRef,
-            Arc::new(b_i32.finish()) as ArrayRef,
-            Arc::new(b_i64.finish()) as ArrayRef,
-            Arc::new(b_u8.finish()) as ArrayRef,
-            Arc::new(b_u16.finish()) as ArrayRef,
-            Arc::new(b_u32.finish()) as ArrayRef,
-            Arc::new(b_u64.finish()) as ArrayRef,
-            Arc::new(b_f32.finish()) as ArrayRef,
-            Arc::new(b_f64.finish()) as ArrayRef,
-            Arc::new(b_b.finish()) as ArrayRef,
-            Arc::new(b_str.finish()) as ArrayRef,
-            Arc::new(b_ts.finish()) as ArrayRef,
-            Arc::new(b_lstr.finish()) as ArrayRef,
-            Arc::new(b_dec.finish()) as ArrayRef,
-            Arc::new(b_group.finish()) as ArrayRef,
-            Arc::new(b_v.finish()) as ArrayRef,
-        ]
-    };
 
-    let rb = RecordBatch::try_new(Arc::new(schema), cols)?;
+    for (partition, batches) in res.iter_mut().enumerate() {
+        if builders[partition].len() > 0 {
+            let batch = builders[partition].finish(Arc::new(schema.clone()));
+            batches.push(batch);
+        }
+    }
 
-    Ok(vec![vec![rb]])
+    for i in &res {
+        print_batches(i)?;
+    }
+    Ok(res)
 }

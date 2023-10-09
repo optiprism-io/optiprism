@@ -78,7 +78,7 @@ impl ExecutionPlan for SegmentExec {
     }
 
     fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
+        Partitioning::UnknownPartitioning(1)
     }
 
     fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {

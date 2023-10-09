@@ -3,10 +3,17 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use std::pin::Pin;
+use std::sync::mpsc;
+// use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::Context;
 use std::task::Poll;
+use std::thread;
+use std::thread::sleep;
+use std::thread::spawn;
+use std::thread::JoinHandle;
+use std::time::Duration;
 
 use ahash::HashMapExt;
 use ahash::RandomState;
@@ -20,7 +27,11 @@ use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::print_batches;
 use axum::async_trait;
+use crossbeam::channel::bounded;
+use crossbeam::channel::unbounded;
+use crossbeam::channel::Sender;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
 use datafusion::physical_expr::expressions::Column;
@@ -43,11 +54,14 @@ use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion::prelude::SessionContext;
+use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
 use futures::executor::block_on;
 use futures::Stream;
 use futures::StreamExt;
+use tokio::join;
+use tokio::task;
 
 use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
@@ -124,191 +138,107 @@ impl SegmentedAggregateExec {
     }
 }
 
-#[async_trait]
-impl ExecutionPlan for SegmentedAggregateExec {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-
-    fn output_partitioning(&self) -> Partitioning {
-        self.input.output_partitioning()
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![self.input.clone()]
-    }
-
-    fn with_new_children(
-        self: Arc<Self>,
-        children: Vec<Arc<dyn ExecutionPlan>>,
-    ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(
-            SegmentedAggregateExec::try_new(
-                children[0].clone(),
-                self.partition_inputs.clone(),
-                self.partition_col.clone(),
-                self.agg_expr.clone(),
-            )
-            .map_err(QueryError::into_datafusion_execution_error)?,
-        ))
-    }
-
-    fn execute(
-        &self,
-        partition: usize,
-        context: Arc<TaskContext>,
-    ) -> DFResult<SendableRecordBatchStream> {
-        let stream = self.input.execute(partition, context.clone())?;
-        let (agg_expr, partition_streams) =
-            if let Some(partition_inputs) = &self.partition_inputs && !self.agg_expr.is_empty() {
-                let aggs = (0..partition_inputs.len())
-                    .map(|_| {
-                        self.agg_expr
-                            .iter()
-                            .map(|(e, _name)| {
-                                let agg = e.lock().unwrap();
-                                Arc::new(Mutex::new(agg.make_new().unwrap()))
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .collect::<Vec<_>>();
-
-                let streams = partition_inputs
-                    .iter()
-                    .map(|s| s.execute(partition, context.clone()))
-                    .collect::<DFResult<Vec<_>>>()?;
-                (aggs, Some(streams))
-            } else {
-                (vec![self.agg_expr.iter().map(|(expr,_)|expr.clone()).collect::<Vec<_>>()], None)
-            };
-
-        let _baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
-        Ok(Box::pin(AggregateStream {
-            is_ended: false,
-            stream,
-            schema: self.schema.clone(),
-            agg_schemas: self.agg_schemas.clone(),
-            baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
-            partition_col: self.partition_col.clone(),
-            partition_streams,
-            agg_expr,
-            group_fields: self.group_fields.clone(),
-        }))
-    }
-
-    fn metrics(&self) -> Option<MetricsSet> {
-        Some(self.metrics.clone_inner())
-    }
-
-    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "SegmentedAggregateExec")
-    }
-
-    fn statistics(&self) -> Statistics {
-        Statistics::default()
-    }
-}
-
-struct AggregateStream {
-    is_ended: bool,
-    stream: SendableRecordBatchStream,
-    partition_streams: Option<Vec<SendableRecordBatchStream>>,
-    partition_col: Column,
+struct RunnerOptions {
+    partitions: Option<Arc<Vec<HashMap<i64, (), RandomState>>>>,
     agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
+    input: Arc<dyn ExecutionPlan>,
     group_fields: Vec<FieldRef>,
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
     baseline_metrics: BaselineMetrics,
 }
 
-impl RecordBatchStream for AggregateStream {
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-}
+async fn collect_partition(
+    mut partition_stream: SendableRecordBatchStream,
+    partition_col: Column,
+) -> Result<HashMap<i64, (), RandomState>> {
+    let mut exist: HashMap<i64, (), RandomState> = ahash::HashMap::new();
 
-#[async_trait]
-impl Stream for AggregateStream {
-    type Item = DFResult<RecordBatch>;
+    loop {
+        match partition_stream.next().await {
+            Some(Ok(batch)) => {
+                let vals = partition_col
+                    .evaluate(&batch)?
+                    .into_array(batch.num_rows())
+                    .as_any()
+                    .downcast_ref::<Int64Array>()
+                    .unwrap()
+                    .clone();
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.is_ended {
-            return Poll::Ready(None);
-        }
-
-        let _cloned_time = self.baseline_metrics.elapsed_compute().clone();
-        let partition_col = self.partition_col.clone();
-
-        let exist = if let Some(partition_streams) = &mut self.partition_streams {
-            let mut exist: Vec<HashMap<i64, (), RandomState>> =
-                vec![ahash::HashMap::new(); partition_streams.len()];
-
-            for (segment_id, partitioned_stream) in partition_streams.iter_mut().enumerate() {
-                loop {
-                    match partitioned_stream.poll_next_unpin(cx) {
-                        Poll::Ready(Some(Ok(batch))) => {
-                            let vals = partition_col
-                                .evaluate(&batch)?
-                                .into_array(batch.num_rows())
-                                .as_any()
-                                .downcast_ref::<Int64Array>()
-                                .unwrap()
-                                .clone();
-
-                            for val in vals.iter() {
-                                exist[segment_id].insert(val.unwrap(), ());
-                            }
-                        }
-
-                        Poll::Ready(None) => {
-                            break;
-                        }
-                        _ => unreachable!(),
-                    }
+                for val in vals.iter() {
+                    exist.insert(val.unwrap(), ());
                 }
             }
-            Some(exist)
-        } else {
-            None
+
+            None => {
+                break;
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    Ok(exist)
+}
+
+struct Runner {
+    // tx: Sender<RecordBatch>,
+    partitions: Option<Arc<Vec<HashMap<i64, (), RandomState>>>>,
+    agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
+    input: SendableRecordBatchStream,
+    group_fields: Vec<FieldRef>,
+    schema: SchemaRef,
+    agg_schemas: Vec<SchemaRef>,
+    baseline_metrics: BaselineMetrics,
+}
+
+impl Runner {
+    fn new(
+        opts: RunnerOptions,
+        partition: usize,
+        // tx: Sender<RecordBatch>,
+        ctx: Arc<TaskContext>,
+    ) -> DFResult<Self> {
+        let res = Self {
+            // tx,
+            partitions: opts.partitions,
+            agg_expr: opts.agg_expr,
+            input: opts.input.execute(partition, ctx)?,
+            group_fields: opts.group_fields.clone(),
+            schema: opts.schema.clone(),
+            agg_schemas: opts.agg_schemas.clone(),
+            baseline_metrics: opts.baseline_metrics.clone(),
         };
-        let segments_count = if let Some(streams) = &self.partition_streams {
+
+        Ok(res)
+    }
+
+    fn run(&mut self, tx: Sender<RecordBatch>) -> Result<()> {
+        let segments_count = if let Some(streams) = &self.partitions {
             streams.len()
         } else {
             1
         };
 
         loop {
-            match self.stream.poll_next_unpin(cx) {
-                Poll::Ready(Some(Ok(batch))) => {
+            match block_on(self.input.next()) {
+                Some(Ok(batch)) => {
                     for segment in 0..segments_count {
                         for aggm in self.agg_expr[segment].iter() {
                             let mut agg = aggm.lock().unwrap();
 
-                            if let Some(exist) = &exist {
-                                agg.evaluate(&batch, Some(&exist[segment]))
-                                    .map_err(QueryError::into_datafusion_execution_error)?
+                            if let Some(exist) = &self.partitions {
+                                agg.evaluate(&batch, Some(&exist[segment]))?
                             } else {
-                                agg.evaluate(&batch, None)
-                                    .map_err(QueryError::into_datafusion_execution_error)?
+                                agg.evaluate(&batch, None)?
                             }
                         }
                     }
                 }
-                Poll::Ready(None) => {
-                    self.is_ended = true;
-
+                None => {
                     break;
                 }
-                other => {
-                    return other;
+                Some(Err(er)) => {
+                    return Err(QueryError::from(er));
                 }
             };
         }
@@ -395,14 +325,179 @@ impl Stream for AggregateStream {
         let result = block_on(collect(stream))?;
         let batch = concat_batches(&self.schema, &result)?;
 
-        // print_batches(vec![batch.clone()].as_slice())?;
-        Poll::Ready(Some(Ok(batch)))
+        tx.send(batch)
+            .map_err(|err| QueryError::Internal(err.to_string()))
+    }
+}
+
+fn run(runners: Vec<Runner>, tx: Sender<RecordBatch>) {
+    for mut runner in runners.into_iter() {
+        let tx = tx.clone();
+        spawn(move || runner.run(tx).unwrap());
+    }
+}
+
+#[async_trait]
+impl ExecutionPlan for SegmentedAggregateExec {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+
+    fn output_partitioning(&self) -> Partitioning {
+        Partitioning::UnknownPartitioning(1)
+    }
+
+    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
+        None
+    }
+
+    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
+        vec![self.input.clone()]
+    }
+
+    fn with_new_children(
+        self: Arc<Self>,
+        children: Vec<Arc<dyn ExecutionPlan>>,
+    ) -> datafusion_common::Result<Arc<dyn ExecutionPlan>> {
+        Ok(Arc::new(
+            SegmentedAggregateExec::try_new(
+                children[0].clone(),
+                self.partition_inputs.clone(),
+                self.partition_col.clone(),
+                self.agg_expr.clone(),
+            )
+            .map_err(QueryError::into_datafusion_execution_error)?,
+        ))
+    }
+
+    fn execute(
+        &self,
+        partition: usize,
+        context: Arc<TaskContext>,
+    ) -> DFResult<SendableRecordBatchStream> {
+        let mut res: Vec<HashMap<i64, (), RandomState>> = Vec::new();
+        let partitions = if let Some(inputs) = &self.partition_inputs {
+            for input in inputs {
+                let executed = input.execute(0, context.clone())?;
+                let collected = block_on(collect_partition(executed, self.partition_col.clone()))
+                    .map_err(QueryError::into_datafusion_execution_error)?;
+                res.push(collected);
+            }
+            Some(Arc::new(res))
+        } else {
+            None
+        };
+
+        let agg_expr = if let Some(inputs) = &self.partition_inputs {
+            (0..inputs.len())
+                .map(|_| {
+                    self.agg_expr
+                        .iter()
+                        .map(|(e, _name)| {
+                            let agg = e.lock().unwrap();
+                            Arc::new(Mutex::new(agg.make_new().unwrap()))
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        } else {
+            vec![
+                self.agg_expr
+                    .iter()
+                    .map(|(expr, _)| expr.clone())
+                    .collect::<Vec<_>>(),
+            ]
+        };
+
+        let partition_count = self.input.output_partitioning().partition_count();
+
+        let runners = (0..partition_count)
+            .into_iter()
+            .map(|partition| {
+                let opts = RunnerOptions {
+                    partitions: partitions.clone(),
+                    input: self.input.clone(),
+                    schema: self.schema.clone(),
+                    group_fields: self.group_fields.clone(),
+                    agg_schemas: self.agg_schemas.clone(),
+                    agg_expr: agg_expr.clone(),
+                    baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
+                };
+                Runner::new(opts, partition, context.clone())
+            })
+            .collect::<DFResult<Vec<_>>>()?;
+        let (tx, rx) = bounded(5);
+        // let (tx, rx) = mpsc::channel();
+        run(runners, tx);
+
+        let mut completed = partition_count;
+        let mut result: Vec<RecordBatch> = Vec::with_capacity(partition_count);
+        while let batch = rx.recv().unwrap() {
+            result.push(batch);
+            completed -= 1;
+            if completed == 0 {
+                break;
+            }
+        }
+
+        Ok(Box::pin(AggregateStream {
+            is_ended: false,
+            schema: self.schema.clone(),
+            idx: 0,
+            result,
+        }))
+    }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
+    }
+
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "SegmentedAggregateExec")
+    }
+
+    fn statistics(&self) -> Statistics {
+        Statistics::default()
+    }
+}
+
+struct AggregateStream {
+    is_ended: bool,
+    schema: SchemaRef,
+    idx: usize,
+    result: Vec<RecordBatch>,
+}
+
+impl RecordBatchStream for AggregateStream {
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
+}
+
+#[async_trait]
+impl Stream for AggregateStream {
+    type Item = DFResult<RecordBatch>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.is_ended {
+            return Poll::Ready(None);
+        }
+        if self.idx == self.result.len() - 1 {
+            self.is_ended = true;
+        }
+
+        let res = self.result[self.idx].clone();
+        self.idx += 1;
+        Poll::Ready(Some(Ok(res)))
     }
 }
 
 #[cfg(test)]
 mod tests {
-
     use std::sync::Arc;
     use std::sync::Mutex;
 
