@@ -222,14 +222,17 @@ impl Runner {
         loop {
             match block_on(self.input.next()) {
                 Some(Ok(batch)) => {
+                    println!("orig");
+                    print_batches(&[batch.clone()]).unwrap();
+                    println!("/orig");
                     for segment in 0..segments_count {
                         for aggm in self.agg_expr[segment].iter() {
                             let mut agg = aggm.lock().unwrap();
 
                             if let Some(exist) = &self.partitions {
-                                agg.evaluate(&batch, Some(&exist[segment]))?
+                                agg.evaluate(&batch, Some(&exist[segment]))?;
                             } else {
-                                agg.evaluate(&batch, None)?
+                                agg.evaluate(&batch, None)?;
                             }
                         }
                     }
@@ -243,13 +246,14 @@ impl Runner {
             };
         }
 
-        let mut batches: Vec<RecordBatch> = Vec::with_capacity(10);
+        let mut batches: Vec<RecordBatch> = Vec::with_capacity(10); // todo why 10?
         for segment in 0..segments_count {
             for (agg_idx, aggrm) in self.agg_expr[segment].iter().enumerate() {
                 let mut aggr = aggrm.lock().unwrap();
                 let agg_cols = aggr
                     .finalize()
                     .map_err(QueryError::into_datafusion_execution_error)?;
+                println!("AGG COLS {:?}", agg_cols);
                 let seg_col =
                     ScalarValue::Int64(Some(segment as i64)).to_array_of_size(agg_cols[0].len());
                 let cols = vec![vec![seg_col], agg_cols].concat();
@@ -324,7 +328,6 @@ impl Runner {
         let stream = partial_aggregate.execute(0, task_ctx)?;
         let result = block_on(collect(stream))?;
         let batch = concat_batches(&self.schema, &result)?;
-
         tx.send(batch)
             .map_err(|err| QueryError::Internal(err.to_string()))
     }
@@ -332,6 +335,7 @@ impl Runner {
 
 fn run(runners: Vec<Runner>, tx: Sender<RecordBatch>) {
     for mut runner in runners.into_iter() {
+        println!("RUN");
         let tx = tx.clone();
         spawn(move || runner.run(tx).unwrap());
     }
@@ -392,32 +396,35 @@ impl ExecutionPlan for SegmentedAggregateExec {
             None
         };
 
-        let agg_expr = if let Some(inputs) = &self.partition_inputs {
-            (0..inputs.len())
-                .map(|_| {
-                    self.agg_expr
-                        .iter()
-                        .map(|(e, _name)| {
-                            let agg = e.lock().unwrap();
-                            Arc::new(Mutex::new(agg.make_new().unwrap()))
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>()
-        } else {
-            vec![
-                self.agg_expr
-                    .iter()
-                    .map(|(expr, _)| expr.clone())
-                    .collect::<Vec<_>>(),
-            ]
-        };
-
         let partition_count = self.input.output_partitioning().partition_count();
 
         let runners = (0..partition_count)
             .into_iter()
             .map(|partition| {
+                let agg_expr = if let Some(inputs) = &self.partition_inputs {
+                    (0..inputs.len())
+                        .map(|_| {
+                            self.agg_expr
+                                .iter()
+                                .map(|(e, _name)| {
+                                    let agg = e.lock().unwrap();
+                                    Arc::new(Mutex::new(agg.make_new().unwrap()))
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .collect::<Vec<_>>()
+                } else {
+                    vec![
+                        self.agg_expr
+                            .iter()
+                            .map(|(e, _name)| {
+                                let agg = e.lock().unwrap();
+                                Arc::new(Mutex::new(agg.make_new().unwrap()))
+                            })
+                            .collect::<Vec<_>>(),
+                    ]
+                };
+
                 let opts = RunnerOptions {
                     partitions: partitions.clone(),
                     input: self.input.clone(),
@@ -437,6 +444,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
         let mut completed = partition_count;
         let mut result: Vec<RecordBatch> = Vec::with_capacity(partition_count);
         while let batch = rx.recv().unwrap() {
+            print_batches(&[batch.clone()]).unwrap();
             result.push(batch);
             completed -= 1;
             if completed == 0 {

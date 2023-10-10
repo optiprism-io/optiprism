@@ -99,6 +99,7 @@ macro_rules! count {
                 batch: &RecordBatch,
                 partition_exist: Option<&HashMap<i64, (), RandomState>>,
             ) -> crate::Result<()> {
+                println!("batch");
                 let filter = if self.filter.is_some() {
                     Some(
                         self.filter
@@ -189,6 +190,7 @@ macro_rules! count {
                         &mut self.single_group
                     };
 
+                    println!("COUNT: {}", bucket.count);
                     bucket.count += 1;
                 }
 

@@ -245,7 +245,7 @@ pub async fn gen(
         builders.push(Builders::new());
     }
     let users = 2;
-    let days = 2;
+    let days = 1;
     let events = 2;
     for user in 0..users {
         let partition = user % partitions;
