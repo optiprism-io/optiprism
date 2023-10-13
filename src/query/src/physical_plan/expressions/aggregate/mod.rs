@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::fmt::Debug;
 
 use ahash::HashMap;
@@ -8,8 +9,10 @@ use arrow_row::OwnedRow;
 use arrow_row::RowConverter;
 use arrow_row::SortField;
 use datafusion::physical_expr::PhysicalExprRef;
+use datafusion_expr::AggregateFunction;
 
 use crate::error::Result;
+use crate::physical_plan::expressions::segmentation;
 
 pub mod aggregate;
 pub mod count;
@@ -64,4 +67,7 @@ pub trait PartitionedAggregateExpr: Send + Sync + Debug {
     ) -> Result<()>;
     fn finalize(&mut self) -> Result<Vec<ArrayRef>>;
     fn make_new(&self) -> Result<Box<dyn PartitionedAggregateExpr>>;
+    fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()>;
+    fn as_any(&self) -> &dyn Any;
+    fn op(&self) -> &str;
 }

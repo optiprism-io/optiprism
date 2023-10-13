@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::result;
 use std::sync::Arc;
@@ -769,6 +770,17 @@ impl PartitionedAggregateExpr for Funnel {
         };
 
         Ok(Box::new(res))
+    }
+
+    fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> crate::Result<()> {
+        todo!()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn op(&self) -> &str {
+        unreachable!()
     }
 }
 

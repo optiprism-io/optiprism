@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::result;
@@ -49,7 +50,6 @@ use crate::physical_plan::expressions::aggregate::Groups;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::expressions::check_filter;
 use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
-
 #[derive(Debug)]
 struct Group<T>
 where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
@@ -268,6 +268,18 @@ macro_rules! agg {
                 };
 
                 Ok(Box::new(c))
+            }
+
+            fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()> {
+                unimplemented!();
+            }
+
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+
+            fn op(&self) -> &str {
+                self.agg.op()
             }
         }
     };

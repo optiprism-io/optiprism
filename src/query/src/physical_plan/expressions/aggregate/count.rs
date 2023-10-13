@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::result;
@@ -32,6 +33,7 @@ use crate::error::Result;
 use crate::physical_plan::expressions::aggregate::Groups;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::expressions::check_filter;
+use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 
 #[derive(Debug)]
 struct Group {
@@ -237,6 +239,41 @@ macro_rules! count {
                 };
 
                 Ok(Box::new(c))
+            }
+
+            fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()> {
+                println!("merge");
+                let other = other.as_any().downcast_ref::<Count<$ty>>().unwrap();
+                if let Some(groups) = &mut self.groups {
+                    println!("g1");
+                    if let Some(other_groups) = &other.groups {
+                        println!("21");
+
+                        for (row, group) in other_groups.groups.iter() {
+                            let bucket =
+                                groups.groups.entry(row.row().owned()).or_insert_with(|| {
+                                    let bucket = Group::new();
+
+                                    bucket
+                                });
+                            bucket.count += group.count;
+                        }
+                    } else {
+                        self.single_group.count += other.single_group.count;
+                    }
+                } else {
+                    self.single_group.count += other.single_group.count;
+                }
+
+                Ok(())
+            }
+
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+
+            fn op(&self) -> &str {
+                "count"
             }
         }
     };

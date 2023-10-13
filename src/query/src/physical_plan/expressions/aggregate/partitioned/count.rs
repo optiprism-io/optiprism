@@ -1,4 +1,7 @@
+use std::any::Any;
 use std::collections::HashMap;
+use std::io;
+use std::io::Write;
 use std::result;
 use std::sync::Arc;
 
@@ -275,6 +278,18 @@ macro_rules! count {
 
                 Ok(Box::new(c))
             }
+
+            fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()> {
+                unimplemented!("count");
+            }
+
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+
+            fn op(&self) -> &str {
+                self.outer_fn.op()
+            }
         }
     };
 }
@@ -452,6 +467,18 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
         };
 
         Ok(Box::new(c))
+    }
+
+    fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()> {
+        todo!()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn op(&self) -> &str {
+        self.outer_fn.op()
     }
 }
 

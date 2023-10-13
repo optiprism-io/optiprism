@@ -127,6 +127,16 @@ where T: Copy + Num + Bounded + NumCast + PartialOrd + Clone + std::fmt::Display
             AggregateFunction::Count(s) => *s = T::zero(),
         }
     }
+
+    pub fn op(&self) -> &str {
+        match self {
+            AggregateFunction::Sum(_) => "sum",
+            AggregateFunction::Min(_) => "min",
+            AggregateFunction::Max(_) => "max",
+            AggregateFunction::Avg(_, _) => "avg",
+            AggregateFunction::Count(_) => "count",
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -1,5 +1,7 @@
 use std::any::Any;
+use std::collections::BinaryHeap;
 use std::collections::HashMap;
+use std::default;
 use std::fmt;
 use std::fmt::Debug;
 use std::pin::Pin;
@@ -28,14 +30,21 @@ use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
+use arrow_row::OwnedRow;
+use arrow_row::RowConverter;
+use arrow_row::SortField;
 use axum::async_trait;
 use crossbeam::channel::bounded;
 use crossbeam::channel::unbounded;
 use crossbeam::channel::Sender;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
+use datafusion::physical_expr::expressions::Avg;
 use datafusion::physical_expr::expressions::Column;
+use datafusion::physical_expr::expressions::Count;
 use datafusion::physical_expr::expressions::Max;
+use datafusion::physical_expr::expressions::Min;
+use datafusion::physical_expr::expressions::Sum;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
 use datafusion::physical_plan::aggregates::AggregateMode;
@@ -57,6 +66,7 @@ use datafusion::prelude::SessionContext;
 use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
+use datafusion_expr::AggregateFunction;
 use futures::executor::block_on;
 use futures::Stream;
 use futures::StreamExt;
@@ -64,9 +74,64 @@ use tokio::join;
 use tokio::task;
 
 use crate::error::QueryError;
+use crate::physical_plan::expressions::aggregate;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
+use crate::physical_plan::expressions::segmentation;
 use crate::Result;
 
+macro_rules! combine_results {
+    ($self:expr,$agg_idx:expr,$agg_field:expr,$agg_expr:expr,$groups:expr,$batches:expr,$res_batches:expr, $ty:ident) => {{
+        let agg_fn = match $agg_expr.op() {
+            "count" => segmentation::aggregate::AggregateFunction::new_sum(),
+            "min" => segmentation::aggregate::AggregateFunction::new_min(),
+            "max" => segmentation::aggregate::AggregateFunction::new_max(),
+            "sum" => segmentation::aggregate::AggregateFunction::new_sum(),
+            "avg" => segmentation::aggregate::AggregateFunction::new_avg(),
+            _ => unimplemented!(),
+        };
+        let mut agg = aggregate::aggregate::Aggregate::<$ty, $ty>::try_new(
+            None,
+            Some($groups.clone()),
+            Column::new_with_schema("segment", &$self.schema)?,
+            Column::new_with_schema($agg_field.name(), &$self.schema)?,
+            agg_fn,
+        )
+        .map_err(QueryError::into_datafusion_execution_error)?;
+
+        for batch in $batches.iter() {
+            agg.evaluate(batch, None)
+                .map_err(QueryError::into_datafusion_execution_error)?;
+        }
+        let cols = agg
+            .finalize()
+            .map_err(QueryError::into_datafusion_execution_error)?;
+
+        let schema = $self.agg_schemas[$agg_idx].clone();
+        let segment_field = Arc::new(Field::new("segment", DataType::Int64, false)) as FieldRef;
+        println!("1 {:?}", schema);
+        println!("2 {:?}", $self.group_fields);
+        let schema = Arc::new(Schema::new(
+            vec![vec![segment_field], schema.fields().to_vec()].concat(),
+        ));
+        let batch = RecordBatch::try_new(schema, cols)?;
+        let cols = $self
+            .schema
+            .fields()
+            .iter()
+            .map(
+                |field| match batch.schema().index_of(field.name().as_str()) {
+                    Ok(col_idx) => Ok(batch.column(col_idx).clone()),
+                    Err(_) => {
+                        let v = ScalarValue::try_from(field.data_type())?;
+                        Ok(v.to_array_of_size(batch.column(0).len()))
+                    }
+                },
+            )
+            .collect::<DFResult<Vec<ArrayRef>>>()?;
+        let result = RecordBatch::try_new($self.schema.clone(), cols)?;
+        $res_batches.push(result);
+    }};
+}
 #[derive(Debug)]
 pub struct SegmentedAggregateExec {
     input: Arc<dyn ExecutionPlan>,
@@ -287,47 +352,6 @@ impl Runner {
         }
         let batch = concat_batches(&self.schema, batches.iter().collect::<Vec<_>>())?;
 
-        // merge
-        let agg_fields = self.schema.fields()[self.group_fields.len()..].to_owned();
-        let aggs: Vec<Arc<dyn DFAggregateExpr>> = agg_fields
-            .iter()
-            .map(|f| {
-                Arc::new(Max::new(
-                    col(f.name(), &self.schema).unwrap(),
-                    f.name().to_owned(),
-                    f.data_type().to_owned(),
-                )) as Arc<dyn DFAggregateExpr>
-            })
-            .collect::<Vec<_>>();
-
-        let session_ctx = SessionContext::new();
-        let task_ctx = session_ctx.task_ctx();
-
-        let group_by_expr = self
-            .group_fields
-            .iter()
-            .map(|f| (col(f.name(), &self.schema).unwrap(), f.name().to_owned()))
-            .collect::<Vec<_>>();
-
-        let group_by = PhysicalGroupBy::new_single(group_by_expr);
-        let input = Arc::new(MemoryExec::try_new(
-            &[vec![batch]],
-            self.schema.clone(),
-            None,
-        )?);
-        let partial_aggregate = Arc::new(DFAggregateExec::try_new(
-            AggregateMode::Final,
-            group_by,
-            aggs,
-            vec![None],
-            vec![None],
-            input,
-            self.schema.clone(),
-        )?);
-
-        let stream = partial_aggregate.execute(0, task_ctx)?;
-        let result = block_on(collect(stream))?;
-        let batch = concat_batches(&self.schema, &result)?;
         tx.send(batch)
             .map_err(|err| QueryError::Internal(err.to_string()))
     }
@@ -335,7 +359,6 @@ impl Runner {
 
 fn run(runners: Vec<Runner>, tx: Sender<RecordBatch>) {
     for mut runner in runners.into_iter() {
-        println!("RUN");
         let tx = tx.clone();
         spawn(move || runner.run(tx).unwrap());
     }
@@ -442,21 +465,290 @@ impl ExecutionPlan for SegmentedAggregateExec {
         run(runners, tx);
 
         let mut completed = partition_count;
-        let mut result: Vec<RecordBatch> = Vec::with_capacity(partition_count);
+        let mut batches: Vec<RecordBatch> = Vec::with_capacity(partition_count);
         while let batch = rx.recv().unwrap() {
+            println!("final");
             print_batches(&[batch.clone()]).unwrap();
-            result.push(batch);
+            batches.push(batch);
             completed -= 1;
             if completed == 0 {
                 break;
             }
         }
 
+        println!("{:?}", self.group_fields);
+        let groups = self
+            .group_fields
+            .iter()
+            .map(|f| {
+                (
+                    col(f.name(), &self.schema).unwrap(),
+                    f.name().to_owned(),
+                    SortField::new(f.data_type().to_owned()),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        println!("{:?}", groups);
+        println!("!?");
+
+        let agg_fields = self.schema.fields()[self.group_fields.len()..].to_owned();
+        let mut res_batches = vec![];
+        for (agg_idx, (agg_expr, agg_field)) in
+            self.agg_expr.iter().zip(agg_fields.iter()).enumerate()
+        {
+            let agg_expr = agg_expr.0.lock().unwrap();
+
+            match agg_expr.fields()[0].data_type() {
+                DataType::Int8 => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        i8
+                    )
+                }
+                DataType::Int16 => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        i16
+                    )
+                }
+                DataType::Int32 => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        i32
+                    )
+                }
+                DataType::Int64 => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        i64
+                    )
+                }
+                DataType::UInt8 => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        u8
+                    )
+                }
+                DataType::UInt16 => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        u16
+                    )
+                }
+                DataType::UInt32 => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        u32
+                    )
+                }
+                DataType::UInt64 => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        u64
+                    )
+                }
+                DataType::Float32 => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        f32
+                    )
+                }
+                DataType::Float64 => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        f64
+                    )
+                }
+                DataType::Decimal128(_, _) => {
+                    combine_results!(
+                        self,
+                        agg_idx,
+                        agg_field,
+                        agg_expr,
+                        groups,
+                        batches,
+                        res_batches,
+                        i128
+                    )
+                }
+                _ => unimplemented!("{:?}", agg_expr.fields()[0].data_type()),
+            };
+        }
+        let out = concat_batches(&self.schema, &res_batches)?;
+        println!("pbpbpb");
+        print_batches(&[out.clone()]).unwrap();
+        // let mut c = aggregate::aggregate::Aggregate::<i64, i64>::try_new(
+        //     None,
+        //     Some(groups),
+        //     Column::new_with_schema("segment", &self.schema)?,
+        //     Column::new_with_schema("0_count", &self.schema)?,
+        //     segmentation::aggregate::AggregateFunction::new_avg(),
+        // )
+        // .map_err(QueryError::into_datafusion_execution_error)?;
+        // for batch in batches.iter() {
+        //     c.evaluate(batch, None)
+        //         .map_err(QueryError::into_datafusion_execution_error)?;
+        // }
+        // let arrs = c
+        //     .finalize()
+        //     .map_err(QueryError::into_datafusion_execution_error)?;
+        // let rb = RecordBatch::try_new(self.schema.clone(), arrs)?;
+        // println!("{:?}",arrs);
+        // print_batches(&[rb.clone()])?;
+        // let mut result: HashMap<OwnedRow, Vec<ScalarValue>> = Default::default();
+        // let agg_fields = self.schema.fields()[self.group_fields.len()..].to_owned();
+        // let sort_fields = agg_fields
+        // .iter()
+        // .map(|f| SortField::new(f.data_type().to_owned()))
+        // .collect::<Vec<_>>();
+        // for (batch_idx, batch) in batches.iter().enumerate() {
+        // let mut rc = RowConverter::new(sort_fields.clone())?;
+        //
+        // let rows = rc.convert_columns(&batch.columns()[0..self.group_fields.len()])?;
+        // for (row_id, row) in rows.iter().enumerate() {
+        // match result.get_mut(&row.owned()) {
+        // None => {
+        // let cols = batch.columns()[self.group_fields.len()..]
+        // .iter()
+        // .map(|arr| ScalarValue::try_from_array(arr, row_id))
+        // .collect::<Result<_>>()?;
+        // result.insert(row.owned(), cols);
+        // }
+        // Some(vals) => {
+        // let mut out = vec![];
+        // for (idx, lhs) in vals.iter().enumerate() {
+        // let rhs = ScalarValue::try_from_array(
+        // batch.columns()[self.group_fields.len()..][idx].as_ref(),
+        // row_id,
+        // )?;
+        //
+        // let val = match self.agg_expr[idx].0.lock().unwrap().out_op() {
+        // AggregateFunction::Count => lhs.add(rhs)?,
+        // _ => unimplemented!(),
+        // };
+        // out.push(val);
+        // }
+        // vals = out;
+        // }
+        // }
+        // }
+        // }
+        //
+        // print_batches(&[batches[0].clone()]).unwrap();
+
+        // merge
+        let agg_fields = self.schema.fields()[self.group_fields.len()..].to_owned();
+        let aggs: Vec<Arc<dyn DFAggregateExpr>> = agg_fields
+            .iter()
+            .map(|f| {
+                println!("{:?}", col(f.name(), &self.schema).unwrap());
+
+                Arc::new(Max::new(
+                    col(f.name(), &self.schema).unwrap(),
+                    f.name().to_owned(),
+                    f.data_type().to_owned(),
+                )) as Arc<dyn DFAggregateExpr>
+            })
+            .collect::<Vec<_>>();
+
+        let session_ctx = SessionContext::new();
+        let task_ctx = session_ctx.task_ctx();
+
+        let group_by_expr = self
+            .group_fields
+            .iter()
+            .map(|f| {
+                println!("gf col {:?}", col(f.name(), &self.schema).unwrap());
+                (col(f.name(), &self.schema).unwrap(), f.name().to_owned())
+            })
+            .collect::<Vec<_>>();
+
+        let group_by = PhysicalGroupBy::new_single(group_by_expr);
+        let input = Arc::new(MemoryExec::try_new(
+            &[vec![out]],
+            self.schema.clone(),
+            None,
+        )?);
+        let partial_aggregate = Arc::new(DFAggregateExec::try_new(
+            AggregateMode::Final,
+            group_by,
+            aggs,
+            vec![None],
+            vec![None],
+            input,
+            self.schema.clone(),
+        )?);
+
+        println!("{:?}", partial_aggregate);
+        let stream = partial_aggregate.execute(0, task_ctx)?;
+        let batches = block_on(collect(stream))?;
+        let result = concat_batches(&self.schema, &batches)?;
         Ok(Box::pin(AggregateStream {
             is_ended: false,
             schema: self.schema.clone(),
             idx: 0,
-            result,
+            result: batches,
         }))
     }
 
@@ -810,7 +1102,6 @@ mod tests {
         let batches = parse_markdown_tables(data).unwrap();
         let schema = batches[0].schema();
         let input = MemoryExec::try_new(&[batches], schema.clone(), None)?;
-
         let agg1 = {
             let count = count::PartitionedCount::<i64>::try_new(
                 None,
@@ -955,6 +1246,8 @@ mod tests {
         };
 
         let agg2 = {
+            print!("!");
+
             let groups = vec![
                 (
                     Arc::new(Column::new_with_schema("country", &schema).unwrap())
@@ -969,6 +1262,7 @@ mod tests {
                     SortField::new(DataType::Utf8),
                 ),
             ];
+
             let count = PartitionedCount::<i64>::try_new(
                 None,
                 AggregateFunction::new_sum(),

@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::result;
@@ -310,6 +311,18 @@ macro_rules! agg {
                 };
 
                 Ok(Box::new(c))
+            }
+
+            fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()> {
+                unimplemented!();
+            }
+
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+
+            fn op(&self) -> &str {
+                self.outer_fn.op()
             }
         }
     };
