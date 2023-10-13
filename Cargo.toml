@@ -15,4 +15,5 @@ members = [
     "src/query",
     "src/service",
     "src/store",
+    "src/sources",
 ]

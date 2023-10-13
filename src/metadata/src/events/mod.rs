@@ -27,8 +27,10 @@ pub trait Provider: Sync + Send {
         req: CreateEventRequest,
     ) -> Result<Event>;
 
+    // TODO: a Result<Option<Event>> perhaps?
     async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event>;
 
+    // TODO: a Result<Option<Event>> perhaps?
     async fn get_by_name(&self, organization_id: u64, project_id: u64, name: &str)
     -> Result<Event>;
 

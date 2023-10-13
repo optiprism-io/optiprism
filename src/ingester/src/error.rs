@@ -1,4 +1,4 @@
-//! Ingester's error module
+//! Ingester error definitions.
 
 use metadata::error::MetadataError;
 

@@ -1,3 +1,5 @@
+//! Module responsible for required metadata updates.
+
 //! Module for ingester's metadata/store interaction.
 
 use metadata::arrow::datatypes::DataType;
@@ -9,12 +11,13 @@ use metadata::properties::CreatePropertyRequest;
 use metadata::properties::Provider as PropertiesProvider;
 use metadata::properties::Status as PropertyStatus;
 
-use super::Properties;
-use super::TrackRequest;
-use super::DEFAULT_USER_ID;
+use crate::input::Properties;
 
-/// Get properties' metadata IDs from tracking request part, creating any if necessary.
-async fn create_properties_metadata<PP>(
+const DEFAULT_USER_ID: u64 = 1;
+
+/// Get properties' metadata IDs from tracking request part, creating any if necessary,
+/// applicable both to event and user properties.
+pub(crate) async fn create_properties_metadata<PP>(
     properties_provider: &PP,
     organization_id: u64,
     project_id: u64,
@@ -50,40 +53,25 @@ where
 }
 
 /// Get event's metadata ID based of tracking request data, creating one if needed.
-pub(crate) async fn create_event_metadata<EP, PP>(
+pub(crate) async fn create_event_metadata<EP>(
     events_provider: &EP,
-    properties_provider: &PP,
     organization_id: u64,
     project_id: u64,
-    request: TrackRequest,
+    event_name: String,
+    event_properties_ids: Option<Vec<u64>>,
 ) -> Result<u64, MetadataError>
 where
     EP: EventsProvider + ?Sized,
-    PP: PropertiesProvider + ?Sized,
 {
-    let properties = if let Some(properties) = request.properties {
-        Some(
-            create_properties_metadata(
-                properties_provider,
-                organization_id,
-                project_id,
-                properties,
-            )
-            .await?,
-        )
-    } else {
-        None
-    };
-
     let create_event_metadata_req = CreateEventRequest {
         created_by: DEFAULT_USER_ID,
         tags: None,
-        name: request.event,
+        name: event_name,
         display_name: None,
         description: None,
         status: EventStatus::Enabled,
         is_system: false,
-        properties,
+        properties: event_properties_ids,
         custom_properties: None,
     };
     events_provider
