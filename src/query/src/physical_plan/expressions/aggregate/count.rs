@@ -101,7 +101,6 @@ macro_rules! count {
                 batch: &RecordBatch,
                 partition_exist: Option<&HashMap<i64, (), RandomState>>,
             ) -> crate::Result<()> {
-                println!("batch");
                 let filter = if self.filter.is_some() {
                     Some(
                         self.filter
@@ -192,7 +191,6 @@ macro_rules! count {
                         &mut self.single_group
                     };
 
-                    println!("COUNT: {}", bucket.count);
                     bucket.count += 1;
                 }
 
@@ -242,13 +240,9 @@ macro_rules! count {
             }
 
             fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()> {
-                println!("merge");
                 let other = other.as_any().downcast_ref::<Count<$ty>>().unwrap();
                 if let Some(groups) = &mut self.groups {
-                    println!("g1");
                     if let Some(other_groups) = &other.groups {
-                        println!("21");
-
                         for (row, group) in other_groups.groups.iter() {
                             let bucket =
                                 groups.groups.entry(row.row().owned()).or_insert_with(|| {

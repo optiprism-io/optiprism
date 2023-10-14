@@ -44,7 +44,16 @@ def test_periods():
 def test_grouped():
     agg = "sum"
     group = "group"
+    print(optiprism.token)
 
     ch = clickhouse.aggregate_property_query(agg, group, group=group)
     op = optiprism.aggregate_property_query(agg, group, breakdowns=[group])
     assert ch == op
+
+
+def test_all_aggregates():
+    for field in main.fields:
+        ch = clickhouse.all_aggregates_query(field)
+        op = optiprism.all_aggregates_query(field)
+
+        assert ch == op

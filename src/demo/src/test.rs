@@ -244,9 +244,9 @@ pub async fn gen(
     for p in 0..partitions {
         builders.push(Builders::new());
     }
-    let users = 2;
-    let days = 1;
-    let events = 2;
+    let users = 100;
+    let days = 60;
+    let events = 10;
     for user in 0..users {
         let partition = user % partitions;
         let mut cur_time = now - Duration::days(days);
@@ -309,8 +309,5 @@ pub async fn gen(
         }
     }
 
-    for i in &res {
-        print_batches(i)?;
-    }
     Ok(res)
 }
