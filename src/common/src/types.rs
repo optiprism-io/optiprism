@@ -3,8 +3,9 @@ use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 
-pub const DECIMAL_PRECISION: u8 = 19;
-pub const DECIMAL_SCALE: i8 = 10;
+pub const DECIMAL_PRECISION: u8 = 28;
+pub const DECIMAL_SCALE: i8 = 16;
+pub const DECIMAL_MULTIPLIER: i128 = 10_i128.pow(DECIMAL_SCALE as u32);
 
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash, Default)]
 pub enum OptionalProperty<T> {

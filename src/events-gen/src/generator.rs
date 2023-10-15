@@ -10,8 +10,8 @@ use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 
-use crate::profiles::Profile;
-use crate::profiles::ProfileProvider;
+use crate::store::profiles::Profile;
+use crate::store::profiles::ProfileProvider;
 
 pub struct Generator {
     rng: ThreadRng,

@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod auth;
 pub mod custom_events;
+pub mod custom_properties;
 pub mod dashboards;
 pub mod event_records;
 pub mod events;
@@ -76,11 +77,13 @@ impl Service {
         router = custom_events::attach_routes(router);
         router = properties::attach_event_routes(router);
         router = properties::attach_user_routes(router);
+        router = custom_properties::attach_routes(router);
         router = queries::attach_routes(router);
         router = dashboards::attach_routes(router);
         router = reports::attach_routes(router);
         router = event_records::attach_routes(router);
         router = group_records::attach_routes(router);
+        // fixme get rid of cloning
         router = router.clone().nest("/api/v1", router);
         router = router
             .layer(Extension(md.accounts.clone()))
@@ -90,6 +93,7 @@ impl Service {
             .layer(Extension(platform.custom_events.clone()))
             .layer(Extension(platform.event_properties.clone()))
             .layer(Extension(platform.user_properties.clone()))
+            .layer(Extension(platform.custom_properties.clone()))
             .layer(Extension(auth_cfg))
             .layer(Extension(platform.query.clone()))
             .layer(Extension(platform.dashboards.clone()))
@@ -125,7 +129,7 @@ impl Service {
         // format!("Unhandled internal error: {}", error),
         // )
         // };
-        let mut router = self.router;
+        let router = self.router;
         info!("attaching ui static files handler...");
         let router = router.nest_service(
             "/assets",

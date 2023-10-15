@@ -85,6 +85,7 @@ impl From<DFAggregateFunction> for AggregateFunction {
             }
             DFAggregateFunction::ApproxMedian => AggregateFunction::ApproxMedian,
             DFAggregateFunction::Grouping => AggregateFunction::Grouping,
+            _ => unimplemented!(),
         }
     }
 }
@@ -121,6 +122,9 @@ impl From<AggregateFunction> for DFAggregateFunction {
 pub enum PartitionedAggregateFunction {
     Count,
     Sum,
+    Avg,
+    Min,
+    Max,
 }
 
 impl fmt::Display for PartitionedAggregateFunction {
@@ -397,7 +401,7 @@ impl QueryTime {
         match self {
             QueryTime::Between { from, to } => (*from, *to),
             QueryTime::From(from) => (*from, cur_time),
-            QueryTime::Last { last, unit } => (cur_time + unit.relative_duration(-*last), cur_time),
+            QueryTime::Last { last, unit } => (cur_time - unit.relative_duration(*last), cur_time),
         }
     }
 }
@@ -414,6 +418,17 @@ pub enum TimeIntervalUnit {
 }
 
 impl TimeIntervalUnit {
+    pub fn duration(&self, n: i64) -> Duration {
+        match self {
+            TimeIntervalUnit::Second => Duration::seconds(n),
+            TimeIntervalUnit::Minute => Duration::minutes(n),
+            TimeIntervalUnit::Hour => Duration::hours(n),
+            TimeIntervalUnit::Day => Duration::days(n),
+            TimeIntervalUnit::Week => Duration::weeks(n),
+            TimeIntervalUnit::Month => Duration::days(n * 31),
+            TimeIntervalUnit::Year => Duration::days(n * 31 * 12),
+        }
+    }
     pub fn relative_duration(&self, n: i64) -> RelativeDuration {
         match self {
             TimeIntervalUnit::Second => RelativeDuration::seconds(n),

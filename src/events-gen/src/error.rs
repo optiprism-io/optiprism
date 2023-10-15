@@ -19,4 +19,10 @@ pub enum EventsGenError {
     MetadataError(#[from] MetadataError),
     #[error("UserSessionEnded")]
     UserSessionEnded,
+    #[error("General {0:?}")]
+    General(String),
+    #[error("FileNotFound: {0:?}")]
+    FileNotFound(String),
+    #[error("Other: {0:?}")]
+    AnyhowError(#[from] anyhow::Error),
 }

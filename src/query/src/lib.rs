@@ -1,6 +1,54 @@
+#![feature(let_chains, concat_idents)]
+#![feature(exclusive_range_pattern)]
+#![feature(slice_group_by)]
+
+extern crate core;
+
+pub use std::cmp::Ordering;
+
+use arrow::array::Array;
 use arrow::array::ArrayRef;
+use arrow::array::BinaryArray;
+use arrow::array::BooleanArray;
+use arrow::array::Date32Array;
+use arrow::array::Date64Array;
+use arrow::array::Decimal128Array;
+use arrow::array::Decimal256Array;
+use arrow::array::DurationMicrosecondArray;
+use arrow::array::DurationMillisecondArray;
+use arrow::array::DurationNanosecondArray;
+use arrow::array::DurationSecondArray;
+use arrow::array::FixedSizeBinaryArray;
+use arrow::array::Float16Array;
+use arrow::array::Float32Array;
+use arrow::array::Float64Array;
+use arrow::array::Int16Array;
+use arrow::array::Int32Array;
+use arrow::array::Int64Array;
+use arrow::array::Int8Array;
+use arrow::array::IntervalDayTimeArray;
+use arrow::array::IntervalMonthDayNanoArray;
+use arrow::array::IntervalYearMonthArray;
+use arrow::array::LargeBinaryArray;
+use arrow::array::LargeStringArray;
+use arrow::array::StringArray;
+use arrow::array::Time32MillisecondArray;
+use arrow::array::Time32SecondArray;
+use arrow::array::Time64MicrosecondArray;
+use arrow::array::Time64NanosecondArray;
+use arrow::array::TimestampMicrosecondArray;
+use arrow::array::TimestampMillisecondArray;
+use arrow::array::TimestampNanosecondArray;
+use arrow::array::TimestampSecondArray;
+use arrow::array::UInt16Array;
+use arrow::array::UInt32Array;
+use arrow::array::UInt64Array;
+use arrow::array::UInt8Array;
 use arrow::datatypes::DataType;
+use arrow::datatypes::IntervalUnit;
 use arrow::datatypes::SchemaRef;
+use arrow::datatypes::TimeUnit;
+use arrow2::array::Int128Array;
 use async_trait::async_trait;
 use common::query::event_segmentation::EventSegmentation;
 pub use context::Context;
@@ -24,6 +72,226 @@ pub mod event_fields {
 }
 
 pub const DEFAULT_BATCH_SIZE: usize = 4096;
+
+macro_rules! static_array_enum {
+    ($($ident:ident)+) => {
+        #[derive(Debug,Clone)]
+        pub enum StaticArray {
+            $($ident(concat_idents!($ident,Array)),)+
+        }
+    }
+}
+
+static_array_enum! {
+    Int8 Int16 Int32 Int64 Int128 UInt8 UInt16 UInt32 UInt64 Float16 Float32 Float64 Boolean
+    TimestampNanosecond TimestampMicrosecond TimestampMillisecond  Time32Second Time32Millisecond  Time64Microsecond Time64Nanosecond DurationSecond DurationMillisecond DurationMicrosecond IntervalYearMonth IntervalDayTime IntervalMonthDayNano Date32 Date64 DurationNanosecond
+    TimestampSecond FixedSizeBinary Binary LargeBinary String LargeString Decimal128 Decimal256
+}
+
+macro_rules! impl_into_static_array {
+    ($($ident:ident)+) => {
+        impl StaticArray {
+    fn eq_values(&self, left_row_id: usize, right:&StaticArray,right_row_id: usize) -> bool {
+        match (self,right) {
+             $((StaticArray::$ident(a),StaticArray::$ident(b))=>a.value(left_row_id) == b.value(right_row_id)),+,
+            _=>unreachable!()
+        }
+        }
+    }
+    }
+}
+
+impl_into_static_array!( Int8 Int16 Int32 Int64 Int128 UInt8 UInt16 UInt32 UInt64 Float16 Float32 Float64 Boolean
+    TimestampNanosecond TimestampMicrosecond TimestampMillisecond  Time32Second Time32Millisecond  Time64Microsecond Time64Nanosecond DurationSecond DurationMillisecond DurationMicrosecond IntervalYearMonth IntervalDayTime IntervalMonthDayNano Date32 Date64 DurationNanosecond
+    TimestampSecond FixedSizeBinary Binary LargeBinary String LargeString);
+
+impl From<ArrayRef> for StaticArray {
+    fn from(arr: ArrayRef) -> Self {
+        match arr.data_type() {
+            DataType::Boolean => {
+                StaticArray::Boolean(arr.as_any().downcast_ref::<BooleanArray>().unwrap().clone())
+            }
+            DataType::Int8 => {
+                StaticArray::Int8(arr.as_any().downcast_ref::<Int8Array>().unwrap().clone())
+            }
+            DataType::Int16 => {
+                StaticArray::Int16(arr.as_any().downcast_ref::<Int16Array>().unwrap().clone())
+            }
+            DataType::Int32 => {
+                StaticArray::Int32(arr.as_any().downcast_ref::<Int32Array>().unwrap().clone())
+            }
+            DataType::Int64 => {
+                StaticArray::Int64(arr.as_any().downcast_ref::<Int64Array>().unwrap().clone())
+            }
+            DataType::UInt8 => {
+                StaticArray::UInt8(arr.as_any().downcast_ref::<UInt8Array>().unwrap().clone())
+            }
+            DataType::UInt16 => {
+                StaticArray::UInt16(arr.as_any().downcast_ref::<UInt16Array>().unwrap().clone())
+            }
+            DataType::UInt32 => {
+                StaticArray::UInt32(arr.as_any().downcast_ref::<UInt32Array>().unwrap().clone())
+            }
+            DataType::UInt64 => {
+                StaticArray::UInt64(arr.as_any().downcast_ref::<UInt64Array>().unwrap().clone())
+            }
+            DataType::Float16 => {
+                StaticArray::Float16(arr.as_any().downcast_ref::<Float16Array>().unwrap().clone())
+            }
+            DataType::Float32 => {
+                StaticArray::Float32(arr.as_any().downcast_ref::<Float32Array>().unwrap().clone())
+            }
+            DataType::Float64 => {
+                StaticArray::Float64(arr.as_any().downcast_ref::<Float64Array>().unwrap().clone())
+            }
+            DataType::Timestamp(tu, _tz) => match tu {
+                TimeUnit::Second => StaticArray::TimestampSecond(
+                    arr.as_any()
+                        .downcast_ref::<TimestampSecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Millisecond => StaticArray::TimestampMillisecond(
+                    arr.as_any()
+                        .downcast_ref::<TimestampMillisecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Microsecond => StaticArray::TimestampMicrosecond(
+                    arr.as_any()
+                        .downcast_ref::<TimestampMicrosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Nanosecond => StaticArray::TimestampNanosecond(
+                    arr.as_any()
+                        .downcast_ref::<TimestampNanosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+            },
+            DataType::Date32 => {
+                StaticArray::Date32(arr.as_any().downcast_ref::<Date32Array>().unwrap().clone())
+            }
+            DataType::Date64 => {
+                StaticArray::Date64(arr.as_any().downcast_ref::<Date64Array>().unwrap().clone())
+            }
+            DataType::Time32(tu) => match tu {
+                TimeUnit::Second => StaticArray::Time32Second(
+                    arr.as_any()
+                        .downcast_ref::<Time32SecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Millisecond => StaticArray::Time32Millisecond(
+                    arr.as_any()
+                        .downcast_ref::<Time32MillisecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                _ => unimplemented!(),
+            },
+            DataType::Time64(tu) => match tu {
+                TimeUnit::Microsecond => StaticArray::Time64Microsecond(
+                    arr.as_any()
+                        .downcast_ref::<Time64MicrosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Nanosecond => StaticArray::Time64Nanosecond(
+                    arr.as_any()
+                        .downcast_ref::<Time64NanosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                _ => unimplemented!(),
+            },
+            DataType::Duration(tu) => match tu {
+                TimeUnit::Second => StaticArray::DurationSecond(
+                    arr.as_any()
+                        .downcast_ref::<DurationSecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Millisecond => StaticArray::DurationMillisecond(
+                    arr.as_any()
+                        .downcast_ref::<DurationMillisecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Microsecond => StaticArray::DurationMicrosecond(
+                    arr.as_any()
+                        .downcast_ref::<DurationMicrosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                TimeUnit::Nanosecond => StaticArray::DurationNanosecond(
+                    arr.as_any()
+                        .downcast_ref::<DurationNanosecondArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+            },
+            DataType::Interval(i) => match i {
+                IntervalUnit::YearMonth => StaticArray::IntervalYearMonth(
+                    arr.as_any()
+                        .downcast_ref::<IntervalYearMonthArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                IntervalUnit::DayTime => StaticArray::IntervalDayTime(
+                    arr.as_any()
+                        .downcast_ref::<IntervalDayTimeArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                IntervalUnit::MonthDayNano => StaticArray::IntervalMonthDayNano(
+                    arr.as_any()
+                        .downcast_ref::<IntervalMonthDayNanoArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+            },
+            DataType::Binary => {
+                StaticArray::Binary(arr.as_any().downcast_ref::<BinaryArray>().unwrap().clone())
+            }
+            DataType::FixedSizeBinary(_) => StaticArray::FixedSizeBinary(
+                arr.as_any()
+                    .downcast_ref::<FixedSizeBinaryArray>()
+                    .unwrap()
+                    .clone(),
+            ),
+            DataType::LargeBinary => StaticArray::LargeBinary(
+                arr.as_any()
+                    .downcast_ref::<LargeBinaryArray>()
+                    .unwrap()
+                    .clone(),
+            ),
+            DataType::Utf8 => {
+                StaticArray::String(arr.as_any().downcast_ref::<StringArray>().unwrap().clone())
+            }
+            DataType::LargeUtf8 => StaticArray::LargeString(
+                arr.as_any()
+                    .downcast_ref::<LargeStringArray>()
+                    .unwrap()
+                    .clone(),
+            ),
+            DataType::Decimal128(_, _) => StaticArray::Decimal128(
+                arr.as_any()
+                    .downcast_ref::<Decimal128Array>()
+                    .unwrap()
+                    .clone(),
+            ),
+            DataType::Decimal256(_, _) => StaticArray::Decimal256(
+                arr.as_any()
+                    .downcast_ref::<Decimal256Array>()
+                    .unwrap()
+                    .clone(),
+            ),
+            _ => unimplemented!(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ColumnType {
@@ -65,6 +333,8 @@ pub mod test_util {
     use std::sync::Arc;
 
     use arrow::datatypes::DataType;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use datafusion::datasource::listing::ListingTable;
     use datafusion::datasource::listing::ListingTableConfig;
     use datafusion::datasource::listing::ListingTableUrl;
@@ -168,7 +438,7 @@ pub mod test_util {
                 TableRef::Events(org_id, proj_id),
                 Column::new(
                     event_fields::USER_ID.to_string(),
-                    DataType::UInt64,
+                    DataType::Int64,
                     false,
                     None,
                 ),
@@ -344,7 +614,7 @@ pub mod test_util {
                 name: "Revenue".to_string(),
                 description: None,
                 display_name: None,
-                typ: DataType::Float64,
+                typ: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
                 status: properties::Status::Enabled,
                 nullable: true,
                 is_array: false,

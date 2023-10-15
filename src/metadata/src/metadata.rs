@@ -5,6 +5,7 @@ use serde::Serialize;
 
 use crate::accounts;
 use crate::custom_events;
+use crate::custom_properties;
 use crate::dashboards;
 use crate::database;
 use crate::dictionaries;
@@ -24,6 +25,7 @@ pub struct MetadataProvider {
     pub custom_events: Arc<dyn custom_events::Provider>,
     pub event_properties: Arc<dyn properties::Provider>,
     pub user_properties: Arc<dyn properties::Provider>,
+    pub custom_properties: Arc<dyn custom_properties::Provider>,
     pub organizations: Arc<dyn organizations::Provider>,
     pub projects: Arc<dyn projects::Provider>,
     pub accounts: Arc<dyn accounts::Provider>,
@@ -41,6 +43,7 @@ impl MetadataProvider {
             custom_events: Arc::new(custom_events::ProviderImpl::new(store.clone(), events)),
             event_properties: Arc::new(properties::ProviderImpl::new_event(store.clone())),
             user_properties: Arc::new(properties::ProviderImpl::new_user(store.clone())),
+            custom_properties: Arc::new(custom_properties::ProviderImpl::new(store.clone())),
             organizations: Arc::new(organizations::ProviderImpl::new(store.clone())),
             projects: Arc::new(projects::ProviderImpl::new(store.clone())),
             accounts: Arc::new(accounts::ProviderImpl::new(store.clone())),
@@ -57,6 +60,7 @@ impl MetadataProvider {
             custom_events: Arc::new(stub::CustomEvents {}),
             event_properties: Arc::new(stub::Properties {}),
             user_properties: Arc::new(stub::Properties {}),
+            custom_properties: Arc::new(stub::CustomProperties {}),
             organizations: Arc::new(stub::Organizations {}),
             projects: Arc::new(stub::Projects {}),
             accounts: Arc::new(stub::Accounts {}),

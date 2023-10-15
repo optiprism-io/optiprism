@@ -5,13 +5,14 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
-arrow-schema = { version = "38.0.0", features = ["serde"] }
+arrow = { version = "42.0.0" }
+arrow-schema = { version = "42.0.0", features = ["serde"] }
 async-trait = "0.1.59"
 chrono = { version = "0.4.23", features = ["serde"] }
 chronoutil = "0.2.3"
-datafusion = "24.0.0"
-datafusion-common = "24.0.0"
-datafusion-expr = "24.0.0"
+datafusion = "27.0.0"
+datafusion-common = "27.0.0"
+datafusion-expr = "27.0.0"
 jsonwebtoken = "8.2.0"
 lazy_static = "1.4.0"
 rand = "0.8.5"

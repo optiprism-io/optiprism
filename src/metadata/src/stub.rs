@@ -28,6 +28,8 @@ use crate::custom_events;
 use crate::custom_events::CreateCustomEventRequest;
 use crate::custom_events::CustomEvent;
 use crate::custom_events::UpdateCustomEventRequest;
+use crate::custom_properties;
+use crate::custom_properties::CustomProperty;
 use crate::dashboards;
 use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
@@ -69,8 +71,10 @@ use crate::teams::UpdateTeamRequest;
 use crate::Result;
 
 lazy_static! {
-    pub static ref DATE_TIME: DateTime<Utc> =
-        DateTime::from_utc(NaiveDateTime::from_timestamp_opt(1000, 0).unwrap(), Utc);
+    pub static ref DATE_TIME: DateTime<Utc> = DateTime::from_naive_utc_and_offset(
+        NaiveDateTime::from_timestamp_opt(1000, 0).unwrap(),
+        Utc
+    );
 }
 
 pub struct Accounts {}
@@ -269,6 +273,7 @@ impl Reports {
                 }],
                 filters: None,
                 breakdowns: None,
+                segments: None,
             }),
         }
     }
@@ -550,6 +555,38 @@ impl properties::Provider for Properties {
     }
 }
 
+pub struct CustomProperties {}
+
+impl CustomProperties {
+    pub fn property() -> CustomProperty {
+        CustomProperty {
+            id: 1,
+            created_at: *DATE_TIME,
+            updated_at: Some(*DATE_TIME),
+            created_by: 1,
+            updated_by: Some(1),
+            project_id: 1,
+            tags: Some(vec!["tag".to_string()]),
+            name: "name".to_string(),
+            description: Some("description".to_string()),
+        }
+    }
+}
+
+#[async_trait]
+impl custom_properties::Provider for CustomProperties {
+    async fn list(
+        &self,
+        _organization_id: u64,
+        _project_id: u64,
+    ) -> Result<ListResponse<CustomProperty>> {
+        Ok(ListResponse {
+            data: vec![CustomProperties::property()],
+            meta: ResponseMetadata { next: None },
+        })
+    }
+}
+
 pub struct Database {}
 
 #[async_trait]
@@ -574,7 +611,7 @@ impl database::Provider for Database {
         Ok(())
     }
 }
-
+#[derive(Debug)]
 pub struct Dictionaries {}
 
 #[async_trait]

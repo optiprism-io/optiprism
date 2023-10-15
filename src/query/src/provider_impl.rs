@@ -4,7 +4,6 @@ use std::time::Instant;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::pretty_format_batches;
 use async_trait::async_trait;
 use chrono::Utc;
 use common::query::event_segmentation::EventSegmentation;
@@ -21,7 +20,7 @@ use datafusion_expr::LogicalPlan;
 use metadata::MetadataProvider;
 use tracing::debug;
 
-use crate::physical_plan::planner::QueryPlanner;
+use crate::physical_plan::planner::planner::QueryPlanner;
 use crate::queries::event_segmentation;
 use crate::queries::event_segmentation::logical_plan_builder::COL_AGG_NAME;
 use crate::queries::property_values;
@@ -76,7 +75,6 @@ impl Provider for ProviderImpl {
         let cur_time = Utc::now();
         let plan = event_segmentation::logical_plan_builder::LogicalPlanBuilder::build(
             ctx,
-            cur_time,
             self.metadata.clone(),
             self.input.clone(),
             es.clone(),
@@ -86,7 +84,6 @@ impl Provider for ProviderImpl {
         // let plan = LogicalPlanBuilder::from(plan).explain(true, true)?.build()?;
 
         let result = execute_plan(&plan).await?;
-
         let metric_cols = es.time_columns(cur_time);
         let cols = result
             .schema()
@@ -98,9 +95,9 @@ impl Provider for ProviderImpl {
                     true => ColumnType::MetricValue,
                     false => {
                         if field.name() == COL_AGG_NAME {
-                            ColumnType::Metric
-                        } else {
                             ColumnType::Dimension
+                        } else {
+                            ColumnType::Metric
                         }
                     }
                 };
@@ -122,24 +119,21 @@ impl Provider for ProviderImpl {
 async fn execute_plan(plan: &LogicalPlan) -> Result<RecordBatch> {
     let start = Instant::now();
     let runtime = Arc::new(RuntimeEnv::default());
-    let state = SessionState::with_config_rt(SessionConfig::new(), runtime)
-        .with_query_planner(Arc::new(QueryPlanner {}))
-        .with_optimizer_rules(vec![]);
+    let state =
+        SessionState::with_config_rt(SessionConfig::new().with_target_partitions(1), runtime)
+            .with_query_planner(Arc::new(QueryPlanner {}))
+            .with_optimizer_rules(vec![]);
     let exec_ctx = SessionContext::with_state(state.clone());
     debug!("logical plan: {:?}", plan);
     let physical_plan = state.create_physical_plan(plan).await?;
     let displayable_plan = displayable(physical_plan.as_ref());
 
-    debug!("physical plan: {}", displayable_plan.indent());
+    debug!("physical plan: {}", displayable_plan.indent(true));
     let batches = collect(physical_plan, exec_ctx.task_ctx()).await?;
-    for batch in batches.iter() {
-        println!("{}", pretty_format_batches(&[batch.clone()])?);
-    }
-
     let duration = start.elapsed();
     debug!("elapsed: {:?}", duration);
     let schema: Arc<Schema> = Arc::new(plan.schema().as_ref().into());
     let rows_count = batches.iter().fold(0, |acc, x| acc + x.num_rows());
-
-    Ok(concat_batches(&schema, &batches, rows_count)?)
+    let res = concat_batches(&schema, &batches, rows_count)?;
+    Ok(res)
 }

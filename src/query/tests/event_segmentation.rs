@@ -33,7 +33,7 @@ mod tests {
     use metadata::custom_events::CreateCustomEventRequest;
     use query::error::Result;
     use query::event_fields;
-    use query::physical_plan::planner::QueryPlanner;
+    use query::physical_plan::planner::planner::QueryPlanner;
     use query::queries::event_segmentation::logical_plan_builder::LogicalPlanBuilder;
     use query::test_util::create_entities;
     use query::test_util::create_md;
@@ -153,6 +153,7 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Device".to_string(),
             ))]),
+            segments: None,
         };
 
         let mut path = temp_dir();
@@ -166,6 +167,8 @@ mod tests {
         let _ctx = Context {
             organization_id: org_id,
             project_id: proj_id,
+            cur_time: Default::default(),
+            format: Default::default(),
         };
 
         create_entities(md.clone(), org_id, proj_id).await?;
@@ -200,55 +203,54 @@ mod tests {
             // to,
             // },
             time: QueryTime::Last {
-                last: 30,
+                last: 20,
                 unit: TimeIntervalUnit::Day,
             },
             group: event_fields::USER_ID.to_string(),
-            interval_unit: TimeIntervalUnit::Week,
+            interval_unit: TimeIntervalUnit::Day,
             chart_type: ChartType::Line,
             analysis: Analysis::Linear,
             compare: None,
             events: vec![
-                Event::new(
-                    EventRef::RegularName("View Product".to_string()),
-                    Some(vec![
-                        EventFilter::Property {
-                            property: PropertyRef::User("Is Premium".to_string()),
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![ScalarValue::Boolean(Some(true))]),
-                        },
-                        EventFilter::Property {
-                            property: PropertyRef::User("Country".to_string()),
-                            operation: PropValueOperation::Eq,
-                            value: Some(vec![
-                                ScalarValue::Utf8(Some("spain".to_string())),
-                                ScalarValue::Utf8(Some("german".to_string())),
-                            ]),
-                        },
-                    ]),
-                    Some(vec![Breakdown::Property(PropertyRef::User(
-                        "Device".to_string(),
-                    ))]),
-                    vec![NamedQuery::new(
-                        Query::CountEvents,
-                        Some("count1".to_string()),
-                    )],
-                ),
+                /* Event::new(
+                     EventRef::RegularName("View Product".to_string()),
+                     // Some(vec![
+                     // EventFilter::Property {
+                     // property: PropertyRef::User("Is Premium".to_string()),
+                     // operation: PropValueOperation::Eq,
+                     // value: Some(vec![ScalarValue::Boolean(Some(true))]),
+                     // },
+                     // EventFilter::Property {
+                     // property: PropertyRef::User("Country".to_string()),
+                     // operation: PropValueOperation::Eq,
+                     // value: Some(vec![
+                     // ScalarValue::Utf8(Some("spain".to_string())),
+                     // ScalarValue::Utf8(Some("german".to_string())),
+                     // ]),
+                     // },
+                     // ]),
+                     None,
+                     Some(vec![Breakdown::Property(PropertyRef::User(
+                         "Device".to_string(),
+                     ))]),
+                     // None,
+                     vec![NamedQuery::new(
+                         Query::CountEvents,
+                         Some("0_count".to_string()),
+                     )],
+                 ),*/
                 Event::new(
                     EventRef::RegularName("Buy Product".to_string()),
                     None,
                     None, /* Some(vec![Breakdown::Property(PropertyRef::Event("Product Name".to_string()))]), */
                     vec![
-                        NamedQuery::new(Query::CountEvents, Some("count2".to_string())),
-                        NamedQuery::new(
-                            Query::CountUniqueGroups,
-                            Some("count_unique_users".to_string()),
-                        ),
+                        NamedQuery::new(Query::CountEvents, Some("0_count".to_string())),
+                        NamedQuery::new(Query::CountUniqueGroups, Some("1_count".to_string())),
                         NamedQuery::new(
                             Query::CountPerGroup {
                                 aggregate: AggregateFunction::Avg,
                             },
-                            Some("count_per_user".to_string()),
+                            Some("2_count".to_string()),
                         ),
                         NamedQuery::new(
                             Query::AggregatePropertyPerGroup {
@@ -256,15 +258,15 @@ mod tests {
                                 aggregate_per_group: PartitionedAggregateFunction::Sum,
                                 aggregate: AggregateFunction::Avg,
                             },
-                            Some("avg_revenue_per_user".to_string()),
+                            Some("3_agg".to_string()),
                         ),
-                        NamedQuery::new(
-                            Query::AggregateProperty {
-                                property: PropertyRef::Event("Revenue".to_string()),
-                                aggregate: AggregateFunction::Sum,
-                            },
-                            Some("sum_revenue".to_string()),
-                        ),
+                        // NamedQuery::new(
+                        // Query::AggregateProperty {
+                        // property: PropertyRef::Event("Revenue".to_string()),
+                        // aggregate: AggregateFunction::Sum,
+                        // },
+                        // Some("4_agg".to_string()),
+                        // ),
                     ],
                 ),
             ],
@@ -272,6 +274,8 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Country".to_string(),
             ))]),
+            // breakdowns: None,
+            segments: None,
         };
 
         let md = create_md()?;
@@ -282,16 +286,17 @@ mod tests {
         let ctx = Context {
             organization_id: org_id,
             project_id: proj_id,
+            cur_time: Default::default(),
+            format: Default::default(),
         };
 
         create_entities(md.clone(), org_id, proj_id).await?;
         let input = events_provider(md.database.clone(), org_id, proj_id).await?;
-        println!("{:?}", input.schema());
-        let cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
+        let _cur_time = DateTime::parse_from_rfc3339("2021-09-16T13:49:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
-        println!("logical plan: {:?}", plan);
+        let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
+        println!("logical plan: {}", plan.display_indent_schema());
 
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);
@@ -301,7 +306,7 @@ mod tests {
 
         let exec_ctx = SessionContext::with_state(session_state.clone());
         let physical_plan = session_state.create_physical_plan(&plan).await?;
-
+        // println!("physical plan: {:#?}", physical_plan);
         let result = collect(physical_plan, exec_ctx.task_ctx()).await?;
         print_batches(&result)?;
 
@@ -384,19 +389,22 @@ mod tests {
             breakdowns: Some(vec![Breakdown::Property(PropertyRef::User(
                 "Country".to_string(),
             ))]),
+            segments: None,
         };
 
         let ctx = Context {
             organization_id: org_id,
             project_id: proj_id,
+            cur_time: Default::default(),
+            format: Default::default(),
         };
 
         let input = events_provider(md.database.clone(), org_id, proj_id).await?;
-        let cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
+        let _cur_time = DateTime::parse_from_rfc3339("2021-09-08T13:42:00.000000+00:00")
             .unwrap()
             .with_timezone(&Utc);
-        let plan = LogicalPlanBuilder::build(ctx, cur_time, md.clone(), input, es).await?;
-        println!("logical plan: {:?}", plan);
+        let plan = LogicalPlanBuilder::build(ctx, md.clone(), input, es).await?;
+        println!("logical plan: {}", plan.display_indent_schema());
 
         let runtime = Arc::new(RuntimeEnv::default());
         let config = SessionConfig::new().with_target_partitions(1);

@@ -13,14 +13,18 @@ pub mod test_util {
     use std::io::Seek;
     use std::io::Write;
     use std::path::Path;
+    use std::sync::Arc;
 
     use arrow2::array::Array;
     use arrow2::array::BinaryArray;
     use arrow2::array::BooleanArray;
     use arrow2::array::FixedSizeBinaryArray;
     use arrow2::array::Float64Array;
+    use arrow2::array::Int128Array;
+    use arrow2::array::Int16Array;
     use arrow2::array::Int32Array;
     use arrow2::array::Int64Array;
+    use arrow2::array::Int8Array;
     use arrow2::array::ListArray;
     use arrow2::array::MutableBinaryArray;
     use arrow2::array::MutableBooleanArray;
@@ -29,14 +33,18 @@ pub mod test_util {
     use arrow2::array::MutableUtf8Array;
     use arrow2::array::PrimitiveArray;
     use arrow2::array::TryExtend;
+    use arrow2::array::UInt32Array;
+    use arrow2::array::UInt64Array;
     use arrow2::array::Utf8Array;
     use arrow2::chunk::Chunk;
+    use arrow2::compute::cast::integer_to_decimal;
     use arrow2::compute::concatenate::concatenate;
     use arrow2::compute::take::take;
     use arrow2::datatypes::DataType;
     use arrow2::datatypes::Field;
     use arrow2::datatypes::PhysicalType;
     use arrow2::datatypes::Schema;
+    use arrow2::datatypes::TimeUnit;
     use arrow2::io::parquet::read;
     use arrow2::io::parquet::write::transverse;
     use arrow2::io::parquet::write::FileWriter;
@@ -44,15 +52,23 @@ pub mod test_util {
     use arrow2::io::parquet::write::WriteOptions;
     use arrow2::offset::Offset;
     use arrow2::types::NativeType;
+    use arrow_array::RecordBatch;
+    use chrono::NaiveDateTime;
+    use common::DECIMAL_PRECISION;
+    use common::DECIMAL_SCALE;
     use parquet2::compression::CompressionOptions;
     use parquet2::encoding::Encoding;
     use parquet2::write::Version;
+    use rust_decimal::Decimal;
+
+    use crate::arrow_conversion::arrow2_to_arrow1;
 
     #[derive(Debug, Clone)]
     pub enum ListValue {
         String(String),
         Int32(i32),
         Int64(i64),
+        Int128(i128),
         Float(f64),
         Bool(bool),
     }
@@ -67,11 +83,22 @@ pub mod test_util {
             Ok(match data_type {
                 DataType::Int64 => ListValue::Int64(data.parse()?),
                 DataType::Int32 => ListValue::Int32(data.parse()?),
+                DataType::UInt32 => ListValue::Int32(data.parse()?),
+                DataType::UInt64 => ListValue::Int64(data.parse()?),
                 DataType::Float64 => ListValue::Float(data.parse()?),
                 DataType::Boolean => ListValue::Bool(data.parse()?),
                 DataType::Utf8 => ListValue::String(data.parse()?),
                 _ => unimplemented!("{:?}", data_type),
             })
+        }
+    }
+
+    impl From<ListValue> for i128 {
+        fn from(value: ListValue) -> Self {
+            match value {
+                ListValue::Int128(v) => v,
+                _ => unimplemented!(),
+            }
         }
     }
 
@@ -88,6 +115,24 @@ pub mod test_util {
         fn from(value: ListValue) -> Self {
             match value {
                 ListValue::Int32(v) => v,
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    impl From<ListValue> for u32 {
+        fn from(value: ListValue) -> Self {
+            match value {
+                ListValue::Int32(v) => v as u32,
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    impl From<ListValue> for u64 {
+        fn from(value: ListValue) -> Self {
+            match value {
+                ListValue::Int64(v) => v as u64,
                 _ => unimplemented!(),
             }
         }
@@ -123,11 +168,33 @@ pub mod test_util {
     #[derive(Debug, Clone)]
     pub enum Value {
         String(Option<String>),
+        Int8(Option<i8>),
+        Int16(Option<i16>),
         Int32(Option<i32>),
         Int64(Option<i64>),
+        Int128(Option<i128>),
         Float(Option<f64>),
         Bool(Option<bool>),
         List(Option<Vec<ListValue>>),
+        Timestamp(Option<i64>),
+    }
+
+    impl From<Value> for Option<i8> {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::Int8(v) => v,
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    impl From<Value> for Option<i16> {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::Int16(v) => v,
+                _ => unimplemented!(),
+            }
+        }
     }
 
     impl From<Value> for Option<i32> {
@@ -143,6 +210,33 @@ pub mod test_util {
         fn from(value: Value) -> Self {
             match value {
                 Value::Int64(v) => v,
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    impl From<Value> for Option<i128> {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::Int128(v) => v,
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    impl From<Value> for Option<u32> {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::Int32(v) => v.map(|v| v as u32),
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    impl From<Value> for Option<u64> {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::Int64(v) => v.map(|v| v as u64),
                 _ => unimplemented!(),
             }
         }
@@ -184,6 +278,15 @@ pub mod test_util {
         }
     }
 
+    impl From<Value> for Option<Vec<i128>> {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
+                _ => unimplemented!(),
+            }
+        }
+    }
+
     impl From<Value> for Option<Vec<i64>> {
         fn from(value: Value) -> Self {
             match value {
@@ -194,6 +297,24 @@ pub mod test_util {
     }
 
     impl From<Value> for Option<Vec<i32>> {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    impl From<Value> for Option<Vec<u64>> {
+        fn from(value: Value) -> Self {
+            match value {
+                Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    impl From<Value> for Option<Vec<u32>> {
         fn from(value: Value) -> Self {
             match value {
                 Value::List(v) => v.map(|v| v.into_iter().map(|v| v.into()).collect()),
@@ -241,20 +362,39 @@ pub mod test_util {
             let data = data.trim();
             let val = match data.is_empty() {
                 true => match data_type {
+                    DataType::Decimal(_, _) => Value::Int128(None),
                     DataType::Int64 => Value::Int64(None),
                     DataType::Int32 => Value::Int32(None),
+                    DataType::Int16 => Value::Int16(None),
+                    DataType::Int8 => Value::Int8(None),
                     DataType::Float64 => Value::Float(None),
                     DataType::Boolean => Value::Bool(None),
                     DataType::Utf8 => Value::String(None),
                     DataType::List(_) => Value::List(None),
+                    DataType::Timestamp(_tu, _tz) => Value::Int64(None),
                     _ => unimplemented!(),
                 },
                 false => match data_type {
+                    DataType::Decimal(_, _) => {
+                        let a = Decimal::from_str_exact(data).unwrap();
+                        Value::Int128(Some(a.mantissa()))
+                    }
                     DataType::Int64 => Value::Int64(Some(data.parse()?)),
                     DataType::Int32 => Value::Int32(Some(data.parse()?)),
+                    DataType::Int16 => Value::Int16(Some(data.parse()?)),
+                    DataType::Int8 => Value::Int8(Some(data.parse()?)),
+                    DataType::UInt32 => Value::Int32(Some(data.parse()?)),
+                    DataType::UInt64 => Value::Int64(Some(data.parse()?)),
                     DataType::Float64 => Value::Float(Some(data.parse()?)),
                     DataType::Boolean => Value::Bool(Some(data.parse()?)),
                     DataType::Utf8 => Value::String(Some(data.parse()?)),
+                    DataType::Timestamp(_tu, _tz) => {
+                        let v: i64 = data.parse().or_else(|_v| {
+                            NaiveDateTime::parse_from_str(data, "%Y-%m-%d %H:%M:%S")
+                                .map(|v| v.timestamp())
+                        })?;
+                        Value::Int64(Some(v))
+                    }
                     _ => unimplemented!(),
                 },
             };
@@ -740,51 +880,54 @@ pub mod test_util {
         array.into()
     }
 
-    // Parses a markdown table into a vector of arrays:
-    //  * Types supported: Int64, Int32, Float64, Boolean, Utf8, List
-    //  * List types supported: Int64, Int32, Float64, Boolean, Utf8
-    //  * List should be only one level deep
-    //
-    // # Arguments
-    // * `data`   - The markdown table. The first row must be the header. You can use a list of values
-    //              separated by commas to create a list array
-    // * `fields` - The fields of the table
-    //
-    // # Example
-    //     let data = r#"
-    // ```markdown
-    // | a | b     | c    | d     | e     |
-    // |---|-------|------|-------|-------|
-    // | 1 | true  | test | 1,2,3 | a,b,c |
-    // | 2 |       |      | 1,2   | b     |
-    // | 3 | false | lala |       |       |
-    // ```
-    //     "#;
-    //     let fields = vec![
-    //         Field::new("a", DataType::Int64, true),
-    //         Field::new("b", DataType::Boolean, true),
-    //         Field::new("c", DataType::Utf8, true),
-    //         Field::new("d", DataType::List(Box::new(Field::new("1", DataType::Int32, true))), true),
-    //         Field::new("e", DataType::List(Box::new(Field::new("1", DataType::Utf8, true))), true),
-    //     ];
-    //
-    //     let parsed = parse_markdown_table(data.to_string(), &fields)?;
-    //     println!("{:#?}", parsed);
-    //
-    //    // Output:
-    //    // [
-    //    //  Int64[1, 2, 3],
-    //    //  BooleanArray[true, None, false],
-    //    //  LargeUtf8Array[test, None, lala],
-    //    //  ListArray[[1, 2, 3], [1, 2], None],
-    //    //  ListArray[[a, b, c], [b], None],
-    //    // ]
+    /// Parses a markdown table into a vector of arrays:
+    ///  * Types supported: Int64, Int32, Float64, Boolean, Utf8, List
+    ///  * List types supported: Int64, Int32, Float64, Boolean, Utf8
+    ///  * List should be only one level deep
+    ///
+    /// # Arguments
+    /// * `data`   - The markdown table. The first row must be the header. You can use a list of values
+    ///              separated by commas to create a list array
+    /// * `fields` - The fields of the table
+    ///
+    /// # Example
+    ///     let data = r#"
+    /// ```markdown
+    /// | a | b     | c    | d     | e     |
+    /// |---|-------|------|-------|-------|
+    /// | 1 | true  | test | 1,2,3 | a,b,c |
+    /// | 2 |       |      | 1,2   | b     |
+    /// | 3 | false | lala |       |       |
+    /// ```
+    ///     "#;
+    ///     let fields = vec![
+    ///         Field::new("a", DataType::Int64, true),
+    ///         Field::new("b", DataType::Boolean, true),
+    ///         Field::new("c", DataType::Utf8, true),
+    ///         Field::new("d", DataType::List(Box::new(Field::new("1", DataType::Int32, true))), true),
+    ///         Field::new("e", DataType::List(Box::new(Field::new("1", DataType::Utf8, true))), true),
+    ///     ];
+    ///
+    ///     let parsed = parse_markdown_table(data.to_string(), &fields)?;
+    ///     println!("{:#?}", parsed);
+    ///
+    ///    // Output:
+    ///    // [
+    ///    //  Int64[1, 2, 3],
+    ///    //  BooleanArray[true, None, false],
+    ///    //  LargeUtf8Array[test, None, lala],
+    ///    //  ListArray[[1, 2, 3], [1, 2], None],
+    ///    //  ListArray[[a, b, c], [b], None],
+    ///    // ]
     pub fn parse_markdown_table(
         data: &str,
         fields: &[Field],
     ) -> anyhow::Result<Vec<Box<dyn Array>>> {
         let mut out: Vec<Vec<Value>> = vec![vec![]; fields.len()];
         for row in data.lines().skip(3) {
+            if row.trim().is_empty() {
+                continue;
+            }
             let v = row
                 .split('|')
                 .skip(1)
@@ -799,9 +942,18 @@ pub mod test_util {
                 match field.data_type() {
                     DataType::Int64
                     | DataType::Int32
+                    | DataType::Int16
+                    | DataType::Int8
+                    | DataType::UInt32
+                    | DataType::UInt64
                     | DataType::Float64
+                    | DataType::Float32
                     | DataType::Boolean
-                    | DataType::Utf8 => out[idx].push(Value::parse(val, field.data_type())?),
+                    | DataType::Utf8
+                    | DataType::Decimal(_, _)
+                    | DataType::Timestamp(_, _) => {
+                        out[idx].push(Value::parse(val, field.data_type())?)
+                    }
                     DataType::List(f) | DataType::LargeList(f) => {
                         if val.trim().is_empty() {
                             out[idx].push(Value::List(None));
@@ -822,13 +974,29 @@ pub mod test_util {
             .into_iter()
             .zip(fields.iter())
             .map(|(vals, field)| match field.data_type() {
-                DataType::Int64 => {
+                DataType::Int64 | DataType::Timestamp(TimeUnit::Millisecond, _) => {
                     let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
                     Int64Array::from(vals).boxed()
                 }
                 DataType::Int32 => {
                     let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
                     Int32Array::from(vals).boxed()
+                }
+                DataType::Int8 => {
+                    let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                    Int8Array::from(vals).boxed()
+                }
+                DataType::Int16 => {
+                    let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                    Int16Array::from(vals).boxed()
+                }
+                DataType::UInt32 => {
+                    let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                    UInt32Array::from(vals).boxed()
+                }
+                DataType::UInt64 => {
+                    let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                    UInt64Array::from(vals).boxed()
                 }
                 DataType::Float64 => {
                     let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
@@ -841,9 +1009,24 @@ pub mod test_util {
                 DataType::Utf8 => {
                     let vals: Vec<Option<String>> =
                         vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-                    Utf8Array::<i64>::from(vals).boxed()
+                    Utf8Array::<i32>::from(vals).boxed()
+                }
+                DataType::Decimal(_, _) => {
+                    let vals = vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                    let a = Int128Array::from(vals);
+
+                    // todo make type casting for decimal lists
+                    let a =
+                        integer_to_decimal(&a, DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize);
+                    a.boxed()
                 }
                 DataType::List(inner) => match inner.data_type() {
+                    DataType::Decimal(_, _) => {
+                        let vals: Vec<Option<Vec<i128>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_primitive_array::<i32, _, _, _>(vals, inner.data_type.clone())
+                            .boxed()
+                    }
                     DataType::Int64 => {
                         let vals: Vec<Option<Vec<i64>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
@@ -880,6 +1063,12 @@ pub mod test_util {
                     _ => unimplemented!(),
                 },
                 DataType::LargeList(inner) => match inner.data_type {
+                    DataType::Decimal(_, _) => {
+                        let vals: Vec<Option<Vec<i128>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_primitive_array::<i64, _, _, _>(vals, inner.data_type.clone())
+                            .boxed()
+                    }
                     DataType::Int64 => {
                         let vals: Vec<Option<Vec<i64>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
@@ -888,6 +1077,18 @@ pub mod test_util {
                     }
                     DataType::Int32 => {
                         let vals: Vec<Option<Vec<i32>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_primitive_array::<i64, _, _, _>(vals, inner.data_type.clone())
+                            .boxed()
+                    }
+                    DataType::UInt32 => {
+                        let vals: Vec<Option<Vec<u32>>> =
+                            vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
+                        create_list_primitive_array::<i64, _, _, _>(vals, inner.data_type.clone())
+                            .boxed()
+                    }
+                    DataType::UInt64 => {
+                        let vals: Vec<Option<Vec<u64>>> =
                             vals.into_iter().map(|v| v.into()).collect::<Vec<_>>();
                         create_list_primitive_array::<i64, _, _, _>(vals, inner.data_type.clone())
                             .boxed()
@@ -920,6 +1121,81 @@ pub mod test_util {
             .collect::<Vec<_>>();
 
         Ok(result)
+    }
+
+    pub fn parse_markdown_tables(data: &str) -> anyhow::Result<Vec<RecordBatch>> {
+        let mut iter = data.lines();
+        let br = iter.next().unwrap();
+        let h1 = iter.next().unwrap();
+        let h2 = iter.next().unwrap();
+
+        let mut result = vec![];
+        let mut table = vec![br, h1.clone(), h2.clone()];
+        while let Some(line) = iter.next() {
+            let cols = line.split('|').skip(1).collect::<Vec<_>>();
+            if cols[0].trim() == "" {
+                result.push(parse_markdown_table_v1(table.join("\n").as_str())?);
+                table.clear();
+                table.push(br);
+                table.push(h1.clone());
+                table.push(h2.clone());
+            } else {
+                table.push(line);
+            }
+        }
+
+        result.push(parse_markdown_table_v1(table.join("\n").as_str())?);
+        Ok(result)
+    }
+
+    // parse markdown table into arrow record batch
+    pub fn parse_markdown_table_v1(data: &str) -> anyhow::Result<RecordBatch> {
+        let header = data.lines().collect::<Vec<_>>()[1].trim();
+        let fields = header.split('|').skip(1).collect::<Vec<_>>();
+        let fields = fields[0..fields.len() - 1]
+            .iter()
+            .map(|v| {
+                let parts = v.split('(').collect::<Vec<_>>();
+                let name = parts[0].trim();
+                let ty = parts[1].split(')').collect::<Vec<_>>()[0].trim();
+
+                let dt = match ty {
+                    "i8" => DataType::Int8,
+                    "i16" => DataType::Int16,
+                    "i32" => DataType::Int32,
+                    "i64" => DataType::Int64,
+                    "u8" => DataType::UInt8,
+                    "u16" => DataType::UInt16,
+                    "u32" => DataType::UInt32,
+                    "u64" => DataType::UInt64,
+                    "f32" => DataType::Float32,
+                    "f64" => DataType::Float64,
+                    "decimal" => {
+                        DataType::Decimal(DECIMAL_PRECISION as usize, DECIMAL_SCALE as usize)
+                    }
+                    "bool" => DataType::Boolean,
+                    "utf8" => DataType::Utf8,
+                    "large_utf8" => DataType::LargeUtf8,
+                    "ts_nano" => DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    "ts_micro" => DataType::Timestamp(TimeUnit::Microsecond, None),
+                    "ts_milli" => DataType::Timestamp(TimeUnit::Millisecond, None),
+                    "ts" => DataType::Timestamp(TimeUnit::Millisecond, None),
+                    "ts_second" => DataType::Timestamp(TimeUnit::Second, None),
+                    _ => unimplemented!("unsupported type: {}", ty),
+                };
+                Field::new(name, dt, true)
+            })
+            .collect::<Vec<_>>();
+
+        let arrs = parse_markdown_table(data, &fields)?;
+        let (arrs, fields): (Vec<Arc<dyn arrow_array::Array>>, Vec<arrow_schema::Field>) = arrs
+            .into_iter()
+            .zip(fields)
+            .map(|(arr, field)| arrow2_to_arrow1(arr, field).unwrap())
+            .unzip();
+
+        let schema = Arc::new(arrow_schema::Schema::new(fields));
+        Ok(RecordBatch::try_new(schema, arrs)?)
     }
 
     // generates chunk with index columns and data columns
@@ -1099,7 +1375,7 @@ pub mod test_util {
                         .iter()
                         .map(|arr| {
                             let take_idx =
-                                PrimitiveArray::from_vec((idx..end).map(|v| v as i64).collect());
+                                PrimitiveArray::from_vec((idx as i64..end as i64).collect());
                             take(arr.as_ref(), &take_idx).unwrap()
                             // arr.sliced(idx, end - idx) // TODO slice is not working, producing enormous pages amount while writing to parquet
                         })
@@ -1117,7 +1393,7 @@ pub mod test_util {
                     let to_take = values_per_row_group * out_count;
                     let end = std::cmp::min(idx + to_take, chunk.len());
 
-                    for (stream_id, chunks) in res.iter_mut().enumerate().take(out_count) {
+                    for stream_id in 0..out_count {
                         // calculate indexes for each out. Example: slice 1..10, 3 outs. We'll take [1, 4, 7, 10], [2, 5, 8], [3, 6, 9]
                         let take_idx = (0..end - idx)
                             .skip(stream_id)
@@ -1132,9 +1408,8 @@ pub mod test_util {
                             .map(|arr| take(arr.as_ref(), &take_idx).unwrap())
                             .collect::<Vec<_>>();
 
-                        chunks.push(Chunk::new(out));
+                        res[stream_id].push(Chunk::new(out));
                     }
-
                     idx += to_take;
                 }
             }
@@ -1318,5 +1593,35 @@ pub mod test_util {
             data_pagesize_limit,
             values_per_row_group,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow::util::pretty::print_batches;
+
+    use crate::test_util::parse_markdown_table_v1;
+
+    #[test]
+    fn test_pare_markdown_table_v1() {
+        let data = r#"
+| user_id(i64) | ts(ts)  | event(utf8) | const(i64)  |
+|---------|-----|-------|--------|
+| 0       | 1   | e1    | 1      |
+| 0       | 2   | e2    | 1      |
+| 0       | 3   | e3    | 1      |
+| 0       | 4   | e1    | 1      |
+| 0       | 5   | e1    | 1      |
+| 0       | 6   | e2    | 1      |
+| 0       | 7   | e3    | 1      |
+| 1       | 5   | e1    | 1      |
+| 1       | 6   | e3    | 1      |
+| 1       | 7   | e1    | 1      |
+| 1       | 8   | e2    | 1      |
+| 2       | 9   | e1    | 1      |
+"#;
+
+        let res = parse_markdown_table_v1(data).unwrap();
+        print_batches(&[res]).unwrap();
     }
 }

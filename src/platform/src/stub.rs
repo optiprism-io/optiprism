@@ -22,6 +22,8 @@ use crate::custom_events;
 use crate::custom_events::CreateCustomEventRequest;
 use crate::custom_events::CustomEvent;
 use crate::custom_events::UpdateCustomEventRequest;
+use crate::custom_properties;
+use crate::custom_properties::CustomProperty;
 use crate::dashboards;
 use crate::dashboards::CreateDashboardRequest;
 use crate::dashboards::Dashboard;
@@ -50,6 +52,7 @@ use crate::queries::event_segmentation::ChartType;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::event_segmentation::Query;
 use crate::queries::property_values::ListPropertyValuesRequest;
+use crate::queries::QueryParams;
 use crate::queries::QueryTime;
 use crate::queries::TimeIntervalUnit;
 use crate::reports;
@@ -59,18 +62,19 @@ use crate::reports::UpdateReportRequest;
 use crate::Column;
 use crate::ColumnType;
 use crate::Context;
-use crate::DataTable;
 use crate::EventFilter;
 use crate::EventRef;
+use crate::JSONQueryResponse;
 use crate::ListResponse;
 use crate::PropValueOperation;
 use crate::PropertyRef;
+use crate::QueryResponse;
 use crate::ResponseMetadata;
 use crate::Result;
 
 lazy_static! {
     pub static ref DATE_TIME: DateTime<Utc> =
-        DateTime::from_utc(NaiveDateTime::from_timestamp_opt(0, 0).unwrap(), Utc);
+        DateTime::from_naive_utc_and_offset(NaiveDateTime::from_timestamp_opt(0, 0).unwrap(), Utc);
 }
 
 pub struct Accounts {}
@@ -439,6 +443,41 @@ impl properties::Provider for Properties {
     }
 }
 
+pub struct CustomProperties {}
+
+impl CustomProperties {
+    pub fn property() -> CustomProperty {
+        CustomProperty {
+            id: 1,
+            created_at: *DATE_TIME,
+            updated_at: Some(*DATE_TIME),
+            created_by: 1,
+            updated_by: Some(1),
+            project_id: 1,
+            tags: Some(vec!["tag".to_string()]),
+            name: "name".to_string(),
+            description: Some("description".to_string()),
+        }
+    }
+}
+
+#[async_trait]
+impl custom_properties::Provider for CustomProperties {
+    async fn list(
+        &self,
+        _ctx: Context,
+        _organization_id: u64,
+        _project_id: u64,
+    ) -> Result<ListResponse<CustomProperty>> {
+        Ok(ListResponse {
+            data: vec![CustomProperties::property()],
+            meta: ResponseMetadata {
+                next: Some("next".to_string()),
+            },
+        })
+    }
+}
+
 pub struct Queries {}
 
 impl Queries {
@@ -473,8 +512,9 @@ impl queries::Provider for Queries {
         _organization_id: u64,
         _project_id: u64,
         _req: EventSegmentation,
-    ) -> Result<DataTable> {
-        Ok(DataTable::new(vec![Column {
+        _query: QueryParams,
+    ) -> Result<QueryResponse> {
+        let columns = vec![Column {
             typ: ColumnType::Dimension,
             name: "name".to_string(),
             is_nullable: true,
@@ -482,7 +522,9 @@ impl queries::Provider for Queries {
             data: vec![Value::from(1)],
             step: Some(1),
             compare_values: Some(vec![Value::from(2)]),
-        }]))
+        }];
+
+        Ok(QueryResponse::JSON(JSONQueryResponse { columns }))
     }
 
     async fn property_values(

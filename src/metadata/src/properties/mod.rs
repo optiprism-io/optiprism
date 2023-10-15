@@ -81,7 +81,7 @@ impl Property {
         let mut name: String = self
             .name
             .chars()
-            .filter(|c| c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace())
+            .filter(|c| c.is_ascii_alphabetic() || c.is_numeric() || c.is_whitespace() || c == &'_')
             .collect();
         name = name.to_case(Case::Snake);
         name = name.trim().to_string();

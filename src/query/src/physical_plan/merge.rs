@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-use std::fmt::Formatter;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -32,6 +31,7 @@ use futures::StreamExt;
 use crate::error::QueryError;
 use crate::Result;
 
+#[derive(Debug)]
 pub struct MergeExec {
     inputs: Vec<Arc<dyn ExecutionPlan>>,
     schema: SchemaRef,
@@ -48,12 +48,6 @@ impl MergeExec {
             schema: Arc::new(schema),
             metrics: ExecutionPlanMetricsSet::new(),
         })
-    }
-}
-
-impl Debug for MergeExec {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MergeExec")
     }
 }
 

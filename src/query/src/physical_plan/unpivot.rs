@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Debug;
-use std::fmt::Formatter;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
@@ -67,6 +66,7 @@ use crate::error::QueryError;
 use crate::Result;
 
 /// `UNPIVOT` execution plan operator. Unpivot transforms columns into rows. E.g.
+#[derive(Debug)]
 pub struct UnpivotExec {
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
@@ -123,12 +123,6 @@ impl UnpivotExec {
             value_col,
             metrics: ExecutionPlanMetricsSet::new(),
         })
-    }
-}
-
-impl Debug for UnpivotExec {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "UnpivotExec")
     }
 }
 

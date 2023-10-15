@@ -4,6 +4,7 @@ pub mod accounts;
 pub mod auth;
 pub mod context;
 pub mod custom_events;
+pub mod custom_properties;
 pub mod dashboards;
 pub mod datatype;
 pub mod error;
@@ -30,11 +31,14 @@ use arrow::array::Int32Array;
 use arrow::array::Int64Array;
 use arrow::array::Int8Array;
 use arrow::array::StringArray;
+use arrow::array::TimestampNanosecondArray;
 use arrow::array::UInt16Array;
 use arrow::array::UInt32Array;
 use arrow::array::UInt64Array;
 use arrow::array::UInt8Array;
+use arrow::datatypes::TimeUnit;
 use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 pub use context::Context;
 use convert_case::Case;
 use convert_case::Casing;
@@ -57,6 +61,7 @@ pub struct PlatformProvider {
     pub custom_events: Arc<dyn custom_events::Provider>,
     pub event_properties: Arc<dyn properties::Provider>,
     pub user_properties: Arc<dyn properties::Provider>,
+    pub custom_properties: Arc<dyn custom_properties::Provider>,
     pub accounts: Arc<dyn accounts::Provider>,
     pub auth: Arc<dyn auth::Provider>,
     pub query: Arc<dyn queries::Provider>,
@@ -81,6 +86,7 @@ impl PlatformProvider {
             user_properties: Arc::new(properties::ProviderImpl::new_user(
                 md.user_properties.clone(),
             )),
+            custom_properties: Arc::new(stub::CustomProperties {}),
             accounts: Arc::new(accounts::ProviderImpl::new(md.accounts.clone())),
             auth: Arc::new(auth::ProviderImpl::new(md.accounts.clone(), auth_cfg)),
             query: Arc::new(queries::ProviderImpl::new(query_prov)),
@@ -97,6 +103,7 @@ impl PlatformProvider {
             custom_events: Arc::new(stub::CustomEvents {}),
             event_properties: Arc::new(stub::Properties {}),
             user_properties: Arc::new(stub::Properties {}),
+            custom_properties: Arc::new(stub::CustomProperties {}),
             accounts: Arc::new(stub::Accounts {}),
             auth: Arc::new(stub::Auth {}),
             query: Arc::new(stub::Queries {}),
@@ -126,20 +133,31 @@ pub fn array_ref_to_json_values(arr: &ArrayRef) -> Result<Vec<Value>> {
         arrow::datatypes::DataType::UInt16 => arr_to_json_values!(arr, UInt16Array),
         arrow::datatypes::DataType::UInt32 => arr_to_json_values!(arr, UInt32Array),
         arrow::datatypes::DataType::UInt64 => arr_to_json_values!(arr, UInt64Array),
-        arrow::datatypes::DataType::Float32 => arr_to_json_values!(arr, Float32Array),
+        arrow::datatypes::DataType::Float32 => {
+            let arr = arr.as_any().downcast_ref::<Float32Array>().unwrap();
+            Ok(arr
+                .iter()
+                .map(|value| {
+                    // https://stackoverflow.com/questions/73871891/how-to-serialize-a-struct-containing-f32-using-serde-json
+                    json!(value.map(|v| (v as f64 * 1000000.0).trunc() / 1000000.0))
+                })
+                .collect())
+
+            // arr_to_json_values!(arr, Float32Array)
+        }
         arrow::datatypes::DataType::Float64 => arr_to_json_values!(arr, Float64Array),
         arrow::datatypes::DataType::Boolean => arr_to_json_values!(arr, BooleanArray),
         arrow::datatypes::DataType::Utf8 => arr_to_json_values!(arr, StringArray),
-        arrow::datatypes::DataType::Decimal128(_, s) => {
+        arrow::datatypes::DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+            arr_to_json_values!(arr, TimestampNanosecondArray)
+        }
+        arrow::datatypes::DataType::Decimal128(_, _s) => {
             let arr = arr.as_any().downcast_ref::<Decimal128Array>().unwrap();
             arr.iter()
                 .map(|value| match value {
                     None => Ok(Value::Null),
                     Some(v) => {
-                        let d = match Decimal::try_new(v as i64, *s as u32) {
-                            Ok(v) => v,
-                            Err(err) => return Err(err.into()),
-                        };
+                        let d = Decimal::from_i128_with_scale(v, DECIMAL_SCALE as u32);
                         let d_f = match d.to_f64() {
                             None => {
                                 return Err(PlatformError::Internal(
@@ -422,7 +440,13 @@ impl TryInto<common::query::EventFilter> for &EventFilter {
                 operation: operation.to_owned().try_into()?,
                 value: match value {
                     None => None,
-                    Some(v) => Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?),
+                    Some(v) => {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.iter().map(json_value_to_scalar).collect::<Result<_>>()?)
+                        }
+                    }
                 },
             },
             _ => todo!(),
@@ -475,22 +499,25 @@ pub struct Column {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct DataTable {
+pub struct JSONQueryResponse {
     columns: Vec<Column>,
 }
 
-impl DataTable {
-    pub fn new(columns: Vec<Column>) -> Self {
-        Self { columns }
-    }
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct JSONCompactQueryResponse(Vec<Vec<Value>>);
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+#[serde(untagged)]
+pub enum QueryResponse {
+    JSON(JSONQueryResponse),
+    JSONCompact(JSONCompactQueryResponse),
 }
 
-impl TryFrom<query::DataTable> for DataTable {
-    type Error = PlatformError;
-
-    fn try_from(value: query::DataTable) -> std::result::Result<Self, Self::Error> {
-        let cols = value
-            .columns
+impl QueryResponse {
+    pub fn try_new_json(columns: Vec<query::Column>) -> Result<Self> {
+        let columns = columns
             .iter()
             .cloned()
             .map(|column| match array_ref_to_json_values(&column.data) {
@@ -507,7 +534,20 @@ impl TryFrom<query::DataTable> for DataTable {
             })
             .collect::<Result<_>>()?;
 
-        Ok(DataTable::new(cols))
+        Ok(Self::JSON(JSONQueryResponse { columns }))
+    }
+
+    pub fn try_new_json_compact(columns: Vec<query::Column>) -> Result<Self> {
+        let data = columns
+            .iter()
+            .cloned()
+            .map(|column| match array_ref_to_json_values(&column.data) {
+                Ok(data) => Ok(data),
+                Err(err) => Err(err),
+            })
+            .collect::<Result<_>>()?;
+
+        Ok(Self::JSONCompact(JSONCompactQueryResponse(data)))
     }
 }
 

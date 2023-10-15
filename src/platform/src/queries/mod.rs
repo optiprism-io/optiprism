@@ -4,9 +4,9 @@ use chrono::Utc;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::ListPropertyValuesRequest;
 use crate::Context;
-use crate::DataTable;
 use crate::ListResponse;
 use crate::PlatformError;
+use crate::QueryResponse;
 
 pub mod event_segmentation;
 pub mod property_values;
@@ -20,6 +20,19 @@ use serde_json::Value;
 
 use crate::Result;
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum QueryResponseFormat {
+    Json,
+    JsonCompact,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct QueryParams {
+    format: Option<QueryResponseFormat>,
+    timestamp: Option<i64>,
+}
+
 #[async_trait]
 pub trait Provider: Sync + Send {
     async fn event_segmentation(
@@ -28,7 +41,8 @@ pub trait Provider: Sync + Send {
         organization_id: u64,
         project_id: u64,
         req: EventSegmentation,
-    ) -> Result<DataTable>;
+        params: QueryParams,
+    ) -> Result<QueryResponse>;
 
     async fn property_values(
         &self,
@@ -268,6 +282,9 @@ impl TryInto<common::query::PartitionedAggregateFunction> for &PartitionedAggreg
                 common::query::PartitionedAggregateFunction::Count
             }
             PartitionedAggregateFunction::Sum => common::query::PartitionedAggregateFunction::Sum,
+            PartitionedAggregateFunction::Avg => common::query::PartitionedAggregateFunction::Avg,
+            PartitionedAggregateFunction::Min => common::query::PartitionedAggregateFunction::Min,
+            PartitionedAggregateFunction::Max => common::query::PartitionedAggregateFunction::Max,
             _ => todo!(),
         })
     }
@@ -282,6 +299,9 @@ impl TryInto<PartitionedAggregateFunction> for common::query::PartitionedAggrega
                 PartitionedAggregateFunction::Count
             }
             common::query::PartitionedAggregateFunction::Sum => PartitionedAggregateFunction::Sum,
+            common::query::PartitionedAggregateFunction::Avg => PartitionedAggregateFunction::Avg,
+            common::query::PartitionedAggregateFunction::Min => PartitionedAggregateFunction::Min,
+            common::query::PartitionedAggregateFunction::Max => PartitionedAggregateFunction::Max,
         })
     }
 }

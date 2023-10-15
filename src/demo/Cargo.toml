@@ -5,19 +5,20 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.66"
-arrow = { version = "38.0.0", features = ["prettyprint"] }
+arrow = { version = "42.0.0", features = ["prettyprint"] }
 bytesize = "1.1.0"
 chrono = { version = "0.4.23" }
 clap = { version = "4.0.29", features = ["derive"] }
 common = { path = "../common" }
 crossbeam-channel = "0.5.6"
 csv = "1.1"
-datafusion = "24.0.0"
+datafusion = "27.0.0"
 dateparser = "0.2.0"
 enum-iterator = "1.2.0"
 events-gen = { path = "../events-gen" }
 futures = "0.3.25"
 humantime = "2.1.0"
+indicatif = "0.17.2"
 metadata = { path = "../metadata" }
 num_cpus = "1.14.0"
 parse_duration = "2.1.1"
@@ -29,6 +30,7 @@ serde = { version = "1.0.149", features = ["derive"] }
 service = { path = "../service" }
 strum = "0.24"
 strum_macros = "0.24"
+test_util = { path = "../test_util" }
 thiserror = "1.0.37"
 time = "0.3.17"
 tokio = { version = "1.23.0", features = ["full"] }

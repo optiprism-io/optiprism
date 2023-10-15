@@ -166,7 +166,6 @@ fn profile(tc: TestCase, case_id: usize, step: ProfileStep) {
         ProfileStep::Merge => {
             let idx_cols_len = tc.idx_fields.len();
             let readers = (0..tc.gen_out_streams_count)
-                .into_iter()
                 .map(|stream_id| File::open(stream_parquet_path(stream_id, case_id)).unwrap())
                 .collect::<Vec<_>>();
 
@@ -379,7 +378,7 @@ fn test_merge() -> anyhow::Result<()> {
                 Field::new("idx1", DataType::Int64, false),
                 Field::new("idx2", DataType::Int64, false),
             ],
-            data_fields: data_fields.clone(),
+            data_fields,
             gen_null_values_periodicity: None,
             gen_exclusive_row_groups_periodicity: Some(2),
             primary_index_type: PrimaryIndexType::Partitioned(100),
@@ -400,6 +399,7 @@ fn test_merge() -> anyhow::Result<()> {
 }
 
 // #[test]
+// todo Move to benches
 fn test_profile_merge() {
     let data_fields = vec![
         Field::new("f1", DataType::Boolean, true),
@@ -465,7 +465,7 @@ fn test_profile_merge() {
         },
         TestCase {
             idx_fields: vec![Field::new("idx1", DataType::Int64, false)],
-            data_fields: data_fields.clone(),
+            data_fields,
             gen_null_values_periodicity: None,
             gen_exclusive_row_groups_periodicity: Some(2),
             primary_index_type: PrimaryIndexType::Sequential(100_000),
@@ -495,7 +495,6 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
     let cols = 3;
 
     let fields = (0..cols)
-        .into_iter()
         .map(|idx| Field::new(format!("f{}", idx).as_str(), DataType::Int64, idx > 0))
         .collect::<Vec<_>>();
 
@@ -505,13 +504,10 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
 
     let stream_chunks = (0..streams)
-        .into_iter()
         .map(|stream_id| {
             let arrs = (0..cols)
-                .into_iter()
                 .map(|_| {
                     let vec = (0..len)
-                        .into_iter()
                         .step_by(streams)
                         .filter_map(|idx| {
                             if idx + (stream_id as i64) < len {
@@ -560,9 +556,8 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
     );
 
     let exp = (0..cols)
-        .into_iter()
         .map(|_| {
-            let vec = (0..len).into_iter().collect::<Vec<_>>();
+            let vec = (0..len).collect::<Vec<_>>();
 
             PrimitiveArray::<i64>::from_slice(vec.as_slice()).boxed()
         })
@@ -579,17 +574,17 @@ fn test_different_row_group_sizes() -> anyhow::Result<()> {
 fn test_merge_with_missing_columns() -> anyhow::Result<()> {
     let cols = vec![
         vec![
-            PrimitiveArray::<i64>::from_slice(&[1, 4, 7]).boxed(),
-            PrimitiveArray::<i64>::from_slice(&[1, 4, 7]).boxed(),
-            PrimitiveArray::<i64>::from_slice(&[1, 4, 7]).boxed(),
+            PrimitiveArray::<i64>::from_slice([1, 4, 7]).boxed(),
+            PrimitiveArray::<i64>::from_slice([1, 4, 7]).boxed(),
+            PrimitiveArray::<i64>::from_slice([1, 4, 7]).boxed(),
         ],
         vec![
-            PrimitiveArray::<i64>::from_slice(&[2, 5, 8]).boxed(),
-            PrimitiveArray::<i64>::from_slice(&[2, 5, 8]).boxed(),
+            PrimitiveArray::<i64>::from_slice([2, 5, 8]).boxed(),
+            PrimitiveArray::<i64>::from_slice([2, 5, 8]).boxed(),
         ],
         vec![
-            PrimitiveArray::<i64>::from_slice(&[3, 6, 9]).boxed(),
-            PrimitiveArray::<i64>::from_slice(&[3, 6, 9]).boxed(),
+            PrimitiveArray::<i64>::from_slice([3, 6, 9]).boxed(),
+            PrimitiveArray::<i64>::from_slice([3, 6, 9]).boxed(),
         ],
     ];
 
@@ -628,7 +623,7 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
     let final_chunk = read_parquet_as_one_chunk(&mut out);
 
     let exp = vec![
-        PrimitiveArray::<i64>::from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9]).boxed(),
+        PrimitiveArray::<i64>::from_slice([1, 2, 3, 4, 5, 6, 7, 8, 9]).boxed(),
         PrimitiveArray::<i64>::from(vec![
             Some(1),
             Some(2),
@@ -668,10 +663,10 @@ fn test_merge_with_missing_columns() -> anyhow::Result<()> {
 fn test_pick_with_null_columns() -> anyhow::Result<()> {
     let cols = vec![
         vec![
-            PrimitiveArray::<i64>::from_slice(&[1, 2, 3]).boxed(),
-            PrimitiveArray::<i64>::from_slice(&[1, 2, 3]).boxed(),
+            PrimitiveArray::<i64>::from_slice([1, 2, 3]).boxed(),
+            PrimitiveArray::<i64>::from_slice([1, 2, 3]).boxed(),
         ],
-        vec![PrimitiveArray::<i64>::from_slice(&[4, 5, 6]).boxed()],
+        vec![PrimitiveArray::<i64>::from_slice([4, 5, 6]).boxed()],
     ];
 
     let fields = vec![
@@ -701,7 +696,7 @@ fn test_pick_with_null_columns() -> anyhow::Result<()> {
     let final_chunk = read_parquet_as_one_chunk(&mut out);
 
     let exp = Chunk::new(vec![
-        PrimitiveArray::<i64>::from_slice(&[1, 2, 3, 4, 5, 6]).boxed(),
+        PrimitiveArray::<i64>::from_slice([1, 2, 3, 4, 5, 6]).boxed(),
         PrimitiveArray::<i64>::from(vec![Some(1), Some(2), Some(3), None, None, None]).boxed(),
     ]);
 

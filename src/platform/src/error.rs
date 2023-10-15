@@ -26,6 +26,7 @@ use query::error::QueryError;
 use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
+use tracing::debug;
 
 pub type Result<T> = result::Result<T, PlatformError>;
 
@@ -332,12 +333,14 @@ impl ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        debug!("ApiError: {:?}", self);
         (self.status, Json(ApiErrorWrapper { error: self })).into_response()
     }
 }
 
 impl IntoResponse for PlatformError {
     fn into_response(self) -> Response {
+        debug!("PlatformError: {:?}", self);
         self.into_api_error().into_response()
     }
 }
