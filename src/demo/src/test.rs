@@ -23,7 +23,6 @@ use arrow::datatypes::DataType;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
 use chrono::Duration;
 use chrono::DurationRound;
 use chrono::NaiveDateTime;
@@ -241,7 +240,7 @@ pub async fn gen(
     let mut res = vec![Vec::new(); partitions];
 
     let mut builders = Vec::new();
-    for p in 0..partitions {
+    for _p in 0..partitions {
         builders.push(Builders::new());
     }
     let users = 100;

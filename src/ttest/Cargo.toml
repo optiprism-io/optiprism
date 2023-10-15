@@ -6,12 +6,12 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.23"
+futures = "0.3.28"
 itertools = "0.11.0"
+rand = "0.8.5"
 tokio = { version = "1.23.0", features = [
     "macros",
     "rt",
     "rt-multi-thread",
     "sync",
 ] }
-futures = "0.3.28"
-rand = "0.8.5"

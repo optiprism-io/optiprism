@@ -1,21 +1,14 @@
 use std::any::Any;
-use std::collections::BinaryHeap;
 use std::collections::HashMap;
-use std::default;
 use std::fmt;
 use std::fmt::Debug;
 use std::pin::Pin;
-use std::sync::mpsc;
 // use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::Context;
 use std::task::Poll;
-use std::thread;
-use std::thread::sleep;
 use std::thread::spawn;
-use std::thread::JoinHandle;
-use std::time::Duration;
 
 use ahash::HashMapExt;
 use ahash::RandomState;
@@ -29,22 +22,14 @@ use arrow::datatypes::FieldRef;
 use arrow::datatypes::Schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
-use arrow_row::OwnedRow;
-use arrow_row::RowConverter;
 use arrow_row::SortField;
 use axum::async_trait;
 use crossbeam::channel::bounded;
-use crossbeam::channel::unbounded;
 use crossbeam::channel::Sender;
 use datafusion::execution::context::TaskContext;
 use datafusion::physical_expr::expressions::col;
-use datafusion::physical_expr::expressions::Avg;
 use datafusion::physical_expr::expressions::Column;
-use datafusion::physical_expr::expressions::Count;
 use datafusion::physical_expr::expressions::Max;
-use datafusion::physical_expr::expressions::Min;
-use datafusion::physical_expr::expressions::Sum;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_plan::aggregates::AggregateExec as DFAggregateExec;
 use datafusion::physical_plan::aggregates::AggregateMode;
@@ -63,15 +48,11 @@ use datafusion::physical_plan::RecordBatchStream;
 use datafusion::physical_plan::SendableRecordBatchStream;
 use datafusion::physical_plan::Statistics;
 use datafusion::prelude::SessionContext;
-use datafusion_common::DataFusionError;
 use datafusion_common::Result as DFResult;
 use datafusion_common::ScalarValue;
-use datafusion_expr::AggregateFunction;
 use futures::executor::block_on;
 use futures::Stream;
 use futures::StreamExt;
-use tokio::join;
-use tokio::task;
 
 use crate::error::QueryError;
 use crate::physical_plan::expressions::aggregate;
@@ -207,10 +188,10 @@ impl SegmentedAggregateExec {
 // runner runs aggregation on single thread
 struct RunnerOptions {
     partitions: Option<Arc<Vec<HashMap<i64, (), RandomState>>>>,
+    // Segments<Aggs<>>
     agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
     // single partition input
     input: Arc<dyn ExecutionPlan>,
-    group_fields: Vec<FieldRef>,
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
     baseline_metrics: BaselineMetrics,
@@ -253,7 +234,6 @@ struct Runner {
     partitions: Option<Arc<Vec<HashMap<i64, (), RandomState>>>>,
     agg_expr: Vec<Vec<Arc<Mutex<Box<dyn PartitionedAggregateExpr>>>>>,
     input: SendableRecordBatchStream,
-    group_fields: Vec<FieldRef>,
     schema: SchemaRef,
     agg_schemas: Vec<SchemaRef>,
     baseline_metrics: BaselineMetrics,
@@ -271,7 +251,6 @@ impl Runner {
             partitions: opts.partitions,
             agg_expr: opts.agg_expr,
             input: opts.input.execute(partition, ctx)?,
-            group_fields: opts.group_fields.clone(),
             schema: opts.schema.clone(),
             agg_schemas: opts.agg_schemas.clone(),
             baseline_metrics: opts.baseline_metrics.clone(),
@@ -402,7 +381,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
 
     fn execute(
         &self,
-        partition: usize,
+        _partition: usize,
         context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
         let mut res: Vec<HashMap<i64, (), RandomState>> = Vec::new();
@@ -421,7 +400,6 @@ impl ExecutionPlan for SegmentedAggregateExec {
         let partition_count = self.input.output_partitioning().partition_count();
 
         let runners = (0..partition_count)
-            .into_iter()
             .map(|partition| {
                 let agg_expr = if let Some(inputs) = &self.partition_inputs {
                     (0..inputs.len())
@@ -451,7 +429,6 @@ impl ExecutionPlan for SegmentedAggregateExec {
                     partitions: partitions.clone(),
                     input: self.input.clone(),
                     schema: self.schema.clone(),
-                    group_fields: self.group_fields.clone(),
                     agg_schemas: self.agg_schemas.clone(),
                     agg_expr: agg_expr.clone(),
                     baseline_metrics: BaselineMetrics::new(&self.metrics, partition),
@@ -670,7 +647,7 @@ impl ExecutionPlan for SegmentedAggregateExec {
 
         let stream = partial_aggregate.execute(0, task_ctx)?;
         let batches = block_on(collect(stream))?;
-        let result = concat_batches(&self.schema, &batches)?;
+        let _result = concat_batches(&self.schema, &batches)?;
         Ok(Box::pin(AggregateStream {
             is_ended: false,
             schema: self.schema.clone(),
@@ -709,7 +686,7 @@ impl RecordBatchStream for AggregateStream {
 impl Stream for AggregateStream {
     type Item = DFResult<RecordBatch>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.is_ended {
             return Poll::Ready(None);
         }

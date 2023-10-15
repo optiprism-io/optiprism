@@ -1,7 +1,5 @@
 use std::any::Any;
 use std::collections::HashMap;
-use std::io;
-use std::io::Write;
 use std::result;
 use std::sync::Arc;
 
@@ -24,7 +22,6 @@ use datafusion::physical_expr::expressions::Column;
 use datafusion::physical_expr::PhysicalExpr;
 use datafusion::physical_expr::PhysicalExprRef;
 use hyperlog_simd::HyperLogLog;
-use hyperlog_simd::HyperLogLogPlusPlus;
 use num_traits::Bounded;
 use num_traits::Num;
 use num_traits::NumCast;
@@ -279,7 +276,7 @@ macro_rules! count {
                 Ok(Box::new(c))
             }
 
-            fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()> {
+            fn merge(&mut self, _other: &dyn PartitionedAggregateExpr) -> Result<()> {
                 unimplemented!("count");
             }
 
@@ -469,7 +466,7 @@ impl PartitionedAggregateExpr for PartitionedCount<i128> {
         Ok(Box::new(c))
     }
 
-    fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()> {
+    fn merge(&mut self, _other: &dyn PartitionedAggregateExpr) -> Result<()> {
         todo!()
     }
 
@@ -548,7 +545,7 @@ mod tests {
             count.evaluate(&b, Some(&hash)).unwrap();
         }
 
-        let res = count.finalize();
+        let _res = count.finalize();
     }
 
     #[test]
@@ -575,6 +572,6 @@ mod tests {
             agg.evaluate(&b, Some(&hash)).unwrap();
         }
 
-        let res = agg.finalize().unwrap();
+        let _res = agg.finalize().unwrap();
     }
 }

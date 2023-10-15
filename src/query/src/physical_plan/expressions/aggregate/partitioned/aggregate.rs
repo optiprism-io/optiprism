@@ -313,7 +313,7 @@ macro_rules! agg {
                 Ok(Box::new(c))
             }
 
-            fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()> {
+            fn merge(&mut self, _other: &dyn PartitionedAggregateExpr) -> Result<()> {
                 unimplemented!();
             }
 
@@ -1070,7 +1070,7 @@ mod tests {
                 agg.evaluate(b, Some(&hash)).unwrap();
             }
 
-            let ar = agg.finalize().unwrap();
+            let _ar = agg.finalize().unwrap();
         }
         {
             let mut agg = Aggregate::<i8, i8, f64>::try_new(
@@ -1086,7 +1086,7 @@ mod tests {
                 agg.evaluate(b, Some(&hash)).unwrap();
             }
 
-            let ar = agg.finalize().unwrap();
+            let _ar = agg.finalize().unwrap();
         }
         {
             let mut agg = Aggregate::<i8, i64, f64>::try_new(
@@ -1102,7 +1102,7 @@ mod tests {
                 agg.evaluate(b, Some(&hash)).unwrap();
             }
 
-            let ar = agg.finalize().unwrap();
+            let _ar = agg.finalize().unwrap();
         }
 
         {
@@ -1119,7 +1119,7 @@ mod tests {
                 agg.evaluate(b, Some(&hash)).unwrap();
             }
 
-            let ar = agg.finalize().unwrap();
+            let _ar = agg.finalize().unwrap();
         }
     }
 }

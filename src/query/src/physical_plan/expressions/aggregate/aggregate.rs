@@ -270,7 +270,7 @@ macro_rules! agg {
                 Ok(Box::new(c))
             }
 
-            fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> Result<()> {
+            fn merge(&mut self, _other: &dyn PartitionedAggregateExpr) -> Result<()> {
                 unimplemented!();
             }
 

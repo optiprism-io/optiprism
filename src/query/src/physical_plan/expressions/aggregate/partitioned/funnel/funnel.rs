@@ -772,7 +772,7 @@ impl PartitionedAggregateExpr for Funnel {
         Ok(Box::new(res))
     }
 
-    fn merge(&mut self, other: &dyn PartitionedAggregateExpr) -> crate::Result<()> {
+    fn merge(&mut self, _other: &dyn PartitionedAggregateExpr) -> crate::Result<()> {
         todo!()
     }
 

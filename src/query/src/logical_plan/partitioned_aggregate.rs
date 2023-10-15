@@ -232,7 +232,7 @@ impl AggregateExpr {
             } => {
                 let dt = schema.field_from_column(predicate)?.data_type();
                 let rt1 = return_type(dt.to_owned(), inner_fn, schema);
-                let rt2 = return_type(rt1.clone(), outer_fn, schema);
+                let rt2 = return_type(rt1, outer_fn, schema);
                 vec![DFField::new_unqualified("partitioned_agg", rt2, true)]
             }
             AggregateExpr::Funnel { groups, steps, .. } => {

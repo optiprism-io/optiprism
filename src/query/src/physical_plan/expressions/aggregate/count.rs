@@ -33,7 +33,6 @@ use crate::error::Result;
 use crate::physical_plan::expressions::aggregate::Groups;
 use crate::physical_plan::expressions::aggregate::PartitionedAggregateExpr;
 use crate::physical_plan::expressions::check_filter;
-use crate::physical_plan::expressions::segmentation::aggregate::AggregateFunction;
 
 #[derive(Debug)]
 struct Group {
@@ -332,6 +331,6 @@ mod tests {
             count.evaluate(&b, None).unwrap();
         }
 
-        let res = count.finalize();
+        let _res = count.finalize();
     }
 }

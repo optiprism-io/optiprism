@@ -167,7 +167,7 @@ mod tests {
 
         let schema = Schema::new(vec![Field::new("sdf", DataType::Boolean, true)]);
         let rb = &RecordBatch::new_empty(Arc::new(schema));
-        let res = and
+        let _res = and
             .evaluate(rb, &ScalarBuffer::from(vec![1, 2, 3]))
             .unwrap();
     }
@@ -188,7 +188,7 @@ mod tests {
 
         let schema = Schema::new(vec![Field::new("sdf", DataType::Boolean, true)]);
         let rb = &RecordBatch::new_empty(Arc::new(schema));
-        let res = and
+        let _res = and
             .evaluate(rb, &ScalarBuffer::from(vec![1, 2, 3]))
             .unwrap();
     }

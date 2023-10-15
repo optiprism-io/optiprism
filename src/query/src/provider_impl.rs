@@ -4,7 +4,6 @@ use std::time::Instant;
 use arrow::array::ArrayRef;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::print_batches;
 use async_trait::async_trait;
 use chrono::Utc;
 use common::query::event_segmentation::EventSegmentation;

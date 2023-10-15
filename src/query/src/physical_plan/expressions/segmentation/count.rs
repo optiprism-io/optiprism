@@ -219,9 +219,9 @@ mod tests {
                     .unwrap()
                     .values();
 
-                let res = count.evaluate(&b, p).unwrap();
+                let _res = count.evaluate(&b, p).unwrap();
             }
-            let res = count.finalize().unwrap();
+            let _res = count.finalize().unwrap();
         }
     }
 }

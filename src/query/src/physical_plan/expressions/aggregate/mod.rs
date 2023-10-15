@@ -9,10 +9,8 @@ use arrow_row::OwnedRow;
 use arrow_row::RowConverter;
 use arrow_row::SortField;
 use datafusion::physical_expr::PhysicalExprRef;
-use datafusion_expr::AggregateFunction;
 
 use crate::error::Result;
-use crate::physical_plan::expressions::segmentation;
 
 pub mod aggregate;
 pub mod count;
