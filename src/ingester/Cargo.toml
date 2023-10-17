@@ -1,0 +1,29 @@
+[package]
+name = "ingester"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uaparser = "0.6.1"
+metadata = { path = "../metadata" }
+chrono = { version = "0.4.23", features = ["serde"] }
+serde = { version = "1.0.189", features = ["derive"] }
+serde_json = "1.0.107"
+rust_decimal = { version = "1.27.0", features = ["serde-with-float"] }
+thiserror = "1.0.37"
+tracing = "0.1.37"
+tracing-core = "0.1.30"
+tracing-subscriber = "0.3"
+tokio = { version = "1.23.0", features = [
+    "macros",
+    "rt",
+    "rt-multi-thread",
+    "sync",
+] }
+axum = { version = "0.6.1", features = ["headers"] }
+tower = "0.4.13"
+tower-cookies = { version = "0.9.0", features = ["axum-core"] }
+tower-http = { version = "0.4.0", features = ["fs", "trace","cors"] }
+log = "0.4.20"
+common = { path = "../common" }
+futures = "0.3.25"
