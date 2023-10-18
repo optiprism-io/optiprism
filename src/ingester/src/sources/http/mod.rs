@@ -9,8 +9,6 @@ use axum::routing;
 use axum::Json;
 use axum::Router;
 use axum::Server;
-use metadata::store::index::hash_map::HashMap;
-use metadata::MetadataProvider;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tower_http::cors::Any;
@@ -19,9 +17,9 @@ use tracing::info;
 
 use crate::error::Result;
 use crate::executor::Executor;
+use crate::sink::Sink;
 use crate::sources::http::track::TrackRequest;
 use crate::sources::http::track::TrackResponse;
-use crate::Sink;
 
 mod track;
 
@@ -69,7 +67,7 @@ impl App {
             user_properties: None,
         };
 
-        self.executor.lock().unwrap().execute(track)
+        self.executor.lock().unwrap().execute(token, track)
     }
 }
 

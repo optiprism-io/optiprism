@@ -5,7 +5,7 @@ use serde::Serializer;
 
 pub const DECIMAL_PRECISION: u8 = 28;
 pub const DECIMAL_SCALE: i8 = 16;
-pub const DECIMAL_MULTIPLIER: i128 = 10_pub i128.pow(DECIMAL_SCALE as u32);
+pub const DECIMAL_MULTIPLIER: i128 = 10i128.pow(DECIMAL_SCALE as u32);
 
 pub const USER_COLUMN_CLIENT_FAMILY: &str = "Client Family";
 pub const USER_COLUMN_CLIENT_VERSION_MINOR: &str = "Client Version Minor";
@@ -19,7 +19,6 @@ pub const USER_COLUMN_OS_VERSION_MAJOR: &str = "OS Version Major";
 pub const USER_COLUMN_OS_VERSION_MINOR: &str = "OS Version Minor";
 pub const USER_COLUMN_OS_VERSION_PATCH: &str = "OS Version Patch";
 pub const USER_COLUMN_OS_VERSION_PATCH_MINOR: &str = "OS Version Patch Minor";
-
 
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash, Default)]
 pub enum OptionalProperty<T> {

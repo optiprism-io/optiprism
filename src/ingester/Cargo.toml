@@ -19,6 +19,7 @@ tokio = { version = "1.23.0", features = [
     "rt",
     "rt-multi-thread",
     "sync",
+    "signal"
 ] }
 axum = { version = "0.6.1", features = ["headers"] }
 tower = "0.4.13"
@@ -27,3 +28,6 @@ tower-http = { version = "0.4.0", features = ["fs", "trace","cors"] }
 log = "0.4.20"
 common = { path = "../common" }
 futures = "0.3.25"
+clap = { version = "4.0.29", features = ["derive"] }
+service = { path = "../service" }
+anyhow = "1.0.75"

@@ -15,7 +15,7 @@ use crate::track::Property;
 use crate::track::Track;
 use crate::Context;
 
-struct UserAgent {
+pub struct UserAgent {
     ua_parser: UserAgentParser,
     event_properties: Arc<dyn properties::Provider>,
     user_properties: Arc<dyn properties::Provider>,

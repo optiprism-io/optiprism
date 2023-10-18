@@ -2,6 +2,7 @@ use crate::error::Result;
 use crate::processor::Processor;
 use crate::sink::Sink;
 use crate::track::Track;
+use crate::Context;
 
 pub struct Executor {
     processors: Vec<Box<dyn Processor>>,
@@ -13,13 +14,17 @@ impl Executor {
         Self { processors, sinks }
     }
 
-    pub fn execute(&mut self, mut track: Track) -> Result<()> {
+    pub fn execute(&mut self, token: &str, mut track: Track) -> Result<()> {
+        let ctx = Context {
+            project_id: 1,
+            organization_id: 1,
+        };
         for processor in &mut self.processors {
-            track = processor.track(track)?;
+            track = processor.track(&ctx, track)?;
         }
 
         for sink in &mut self.sinks {
-            sink.track(track.clone())?;
+            sink.track(&ctx, track.clone())?;
         }
         Ok(())
     }

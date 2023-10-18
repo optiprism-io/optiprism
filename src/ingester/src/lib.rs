@@ -1,10 +1,11 @@
-mod error;
+pub mod error;
 pub mod executor;
-mod processor;
-mod processors;
-mod sink;
-mod sources;
-mod track;
+pub mod processor;
+pub mod processors;
+pub mod sink;
+pub mod sinks;
+pub mod sources;
+pub mod track;
 
 pub struct Context {
     project_id: u64,
