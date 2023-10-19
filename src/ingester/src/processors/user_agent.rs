@@ -15,7 +15,7 @@ use crate::processor::Processor;
 use crate::track::PropValue;
 use crate::track::Property;
 use crate::track::Track;
-use crate::Context;
+use crate::AppContext;
 
 pub struct UserAgent {
     ua_parser: UserAgentParser,
@@ -44,18 +44,15 @@ impl UserAgent {
 }
 
 impl Processor for UserAgent {
-    fn track(&self, ctx: &Context, mut track: Track) -> crate::error::Result<Track> {
-        if track.context.is_none() {
-            return Ok(track);
-        }
-        let context = track.context.clone().unwrap();
+    fn track(&self, ctx: &AppContext, mut track: Track) -> crate::error::Result<Track> {
+        let context = track.context.clone();
         if context.user_agent.is_none() {
             return Ok(track);
         }
         let ua = context.user_agent.clone().unwrap();
         let client = self.ua_parser.parse(&ua);
-        let mut user_props = if let Some(props) = &track.properties {
-            track.properties.to_owned().unwrap()
+        let mut user_props = if let Some(props) = &track.resolved_properties {
+            track.resolved_properties.to_owned().unwrap()
         } else {
             vec![]
         };
@@ -233,7 +230,7 @@ impl Processor for UserAgent {
             user_props.push(prop);
         }
 
-        track.properties = Some(user_props);
+        track.resolved_properties = Some(user_props);
 
         Ok(track)
     }

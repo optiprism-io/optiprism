@@ -1,7 +1,7 @@
+use crate::destination::Destination;
 use crate::error::Result;
-use crate::sink::Sink;
 use crate::track;
-use crate::Context;
+use crate::AppContext;
 
 pub struct DebugSink {}
 
@@ -11,8 +11,8 @@ impl DebugSink {
     }
 }
 
-impl Sink for DebugSink {
-    fn track(&self, ctx: &Context, track: track::Track) -> Result<()> {
+impl Destination for DebugSink {
+    fn track(&self, ctx: &AppContext, track: track::Track) -> Result<()> {
         println!("track: {:?}", track);
         Ok(())
     }

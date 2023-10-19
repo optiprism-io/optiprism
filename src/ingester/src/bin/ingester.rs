@@ -100,8 +100,8 @@ async fn main() -> Result<(), anyhow::Error> {
     processors.push(Arc::new(ua) as Arc<dyn processor::Processor>);
 
     let mut sinks = Vec::new();
-    let debug_sink = ingester::sinks::debug::DebugSink::new();
-    sinks.push(Arc::new(debug_sink) as Arc<dyn ingester::sink::Sink>);
+    let debug_sink = ingester::destinations::debug::DebugSink::new();
+    sinks.push(Arc::new(debug_sink) as Arc<dyn ingester::destination::Destination>);
     let exec = Executor::new(processors, sinks);
     let svc = sources::http::Service::new(exec, args.host);
 

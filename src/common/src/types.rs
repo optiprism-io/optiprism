@@ -20,6 +20,10 @@ pub const USER_COLUMN_OS_VERSION_MINOR: &str = "OS Version Minor";
 pub const USER_COLUMN_OS_VERSION_PATCH: &str = "OS Version Patch";
 pub const USER_COLUMN_OS_VERSION_PATCH_MINOR: &str = "OS Version Patch Minor";
 
+pub const EVENT_CLICK: &str = "Click";
+pub const EVENT_PAGE: &str = "Page";
+pub const EVENT_SCREEN: &str = "Screen";
+
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash, Default)]
 pub enum OptionalProperty<T> {
     #[default]
