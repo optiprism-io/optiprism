@@ -9,6 +9,11 @@ use axum::routing;
 use axum::Json;
 use axum::Router;
 use axum::Server;
+use axum_macros::debug_handler;
+use chrono::DateTime;
+use chrono::Utc;
+use rust_decimal::Decimal;
+use serde::Deserialize;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tower_http::cors::Any;
@@ -23,13 +28,33 @@ use crate::sources::http::track::TrackResponse;
 
 mod track;
 
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum PropValue {
+    Date(DateTime<Utc>),
+    String(String),
+    Number(Decimal),
+    Bool(bool),
+}
+
+impl From<PropValue> for crate::track::PropValue {
+    fn from(value: PropValue) -> Self {
+        match value {
+            PropValue::Date(v) => crate::track::PropValue::Date(v),
+            PropValue::String(v) => crate::track::PropValue::String(v),
+            PropValue::Number(v) => crate::track::PropValue::Number(v),
+            PropValue::Bool(v) => crate::track::PropValue::Bool(v),
+        }
+    }
+}
+
 #[derive(Clone)]
 struct App {
-    executor: Mutex<Executor>,
+    executor: Arc<Mutex<Executor>>,
 }
 
 impl App {
-    pub fn track(&self, token: &str, req: TrackRequest) -> Result<()> {
+    pub fn track(&self, token: String, req: TrackRequest) -> Result<()> {
         let context = req.context.map(|ctx| crate::track::Context {
             library: ctx.library.map(|lib| crate::track::Library {
                 name: lib.name.clone(),
@@ -48,13 +73,13 @@ impl App {
 
         let raw_properties = req
             .properties
-            .iter()
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.into()))
             .collect::<_>();
         let raw_user_properties = req
             .user_properties
-            .iter()
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.into()))
             .collect::<_>();
         let track = crate::track::Track {
             user_id: req.user_id.clone(),
@@ -81,7 +106,7 @@ impl Service {
         let mut router = Router::new();
 
         let state = App {
-            executor: Mutex::new(executor),
+            executor: Arc::new(Mutex::new(executor)),
         };
         info!("attaching api routes...");
         let cors = CorsLayer::new()
@@ -114,13 +139,12 @@ impl Service {
     }
 }
 
+#[debug_handler]
 async fn track(
-    State(state): State(App),
-    Path(token): Path<&str>,
+    State(state): State<App>,
+    Path(token): Path<String>,
     Json(request): Json<TrackRequest>,
-) -> Result<(StatusCode, Json<TrackResponse>)> {
-    Ok((
-        StatusCode::CREATED,
-        Json(state.0.track(token, request).await?),
-    ))
+) -> Result<StatusCode> {
+    state.track(token, request)?;
+    Ok(StatusCode::CREATED)
 }

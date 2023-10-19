@@ -5,7 +5,7 @@
 .actrc
 target
 Cargo.lock
-
+data
 node_modules
 dist
 dist-ssr

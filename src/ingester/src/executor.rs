@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::error::Result;
 use crate::processor::Processor;
 use crate::sink::Sink;
@@ -5,16 +7,16 @@ use crate::track::Track;
 use crate::Context;
 
 pub struct Executor {
-    processors: Vec<Box<dyn Processor>>,
-    sinks: Vec<Box<dyn Sink>>,
+    processors: Vec<Arc<dyn Processor>>,
+    sinks: Vec<Arc<dyn Sink>>,
 }
 
 impl Executor {
-    pub fn new(processors: Vec<Box<dyn Processor>>, sinks: Vec<Box<dyn Sink>>) -> Self {
+    pub fn new(processors: Vec<Arc<dyn Processor>>, sinks: Vec<Arc<dyn Sink>>) -> Self {
         Self { processors, sinks }
     }
 
-    pub fn execute(&mut self, token: &str, mut track: Track) -> Result<()> {
+    pub fn execute(&mut self, token: String, mut track: Track) -> Result<()> {
         let ctx = Context {
             project_id: 1,
             organization_id: 1,

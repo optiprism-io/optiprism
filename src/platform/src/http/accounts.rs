@@ -5,12 +5,12 @@ use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::routing;
 use axum::Router;
+use common::http::Json;
 
 use crate::accounts;
 use crate::accounts::Account;
 use crate::accounts::CreateAccountRequest;
 use crate::accounts::UpdateAccountRequest;
-use crate::http::Json;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;

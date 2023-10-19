@@ -9,6 +9,7 @@ use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::Json;
 use common::error::CommonError;
+use common::http::ApiError;
 use metadata::error::AccountError;
 use metadata::error::CustomEventError;
 use metadata::error::DashboardError;
@@ -46,12 +47,6 @@ pub enum AuthError {
     CantParseBearerHeader,
     #[error("can't parse access token")]
     CantParseAccessToken,
-}
-
-impl Display for ApiError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message.clone().unwrap_or_default())
-    }
 }
 
 #[derive(Error, Debug)]
@@ -185,6 +180,8 @@ impl PlatformError {
                 CommonError::DataFusionError(err) => ApiError::internal(err.to_string()),
                 CommonError::JWTError(err) => ApiError::internal(err.to_string()),
                 CommonError::EntityMapping => ApiError::internal(err.to_string()),
+                CommonError::BadRequest(err) => ApiError::bad_request(err),
+                CommonError::Serde(err) => ApiError::bad_request(err.to_string()),
             },
             PlatformError::Auth(err) => match err {
                 AuthError::InvalidCredentials => ApiError::unauthorized(err),
@@ -210,24 +207,6 @@ impl PlatformError {
             PlatformError::EntityMap => ApiError::internal("map error"),
         }
     }
-}
-
-#[derive(Error, Serialize, Debug, Clone)]
-pub struct ApiError {
-    #[serde(serialize_with = "serialize_http_code")]
-    pub status: StatusCode,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    pub fields: BTreeMap<String, String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ApiErrorWrapper {
-    pub error: ApiError,
 }
 
 #[derive(Default)]
@@ -259,82 +238,6 @@ impl ValidationError {
         } else {
             Err(PlatformError::InvalidFields(self.fields))
         }
-    }
-}
-
-pub fn serialize_http_code<S: Serializer>(
-    status: &StatusCode,
-    ser: S,
-) -> std::result::Result<S::Ok, S::Error> {
-    ser.serialize_u16(status.as_u16())
-}
-
-impl ApiError {
-    pub fn bad_request(err: impl ToString) -> Self {
-        ApiError::new(StatusCode::BAD_REQUEST).with_message(err.to_string())
-    }
-
-    pub fn forbidden(err: impl ToString) -> Self {
-        ApiError::new(StatusCode::FORBIDDEN).with_message(err.to_string())
-    }
-
-    pub fn unauthorized(err: impl ToString) -> Self {
-        ApiError::new(StatusCode::UNAUTHORIZED).with_message(err.to_string())
-    }
-
-    pub fn conflict(err: impl ToString) -> Self {
-        ApiError::new(StatusCode::CONFLICT).with_message(err.to_string())
-    }
-
-    pub fn not_found(err: impl ToString) -> Self {
-        ApiError::new(StatusCode::NOT_FOUND).with_message(err.to_string())
-    }
-
-    pub fn internal(err: impl ToString) -> Self {
-        ApiError::new(StatusCode::INTERNAL_SERVER_ERROR).with_message(err.to_string())
-    }
-
-    pub fn new(status: StatusCode) -> Self {
-        Self {
-            status,
-            code: None,
-            message: None,
-            fields: BTreeMap::new(),
-        }
-    }
-
-    pub fn with_fields(self, fields: BTreeMap<String, String>) -> Self {
-        Self {
-            status: self.status,
-            code: self.code,
-            message: self.message,
-            fields,
-        }
-    }
-
-    pub fn with_message(self, message: String) -> Self {
-        Self {
-            status: self.status,
-            code: self.code,
-            message: Some(message),
-            fields: self.fields,
-        }
-    }
-
-    pub fn append_inner_message(self, inner: String) -> Self {
-        Self {
-            status: self.status,
-            code: self.code,
-            message: self.message.map(|msg| format!("{msg}: {inner}")),
-            fields: self.fields,
-        }
-    }
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        debug!("ApiError: {:?}", self);
-        (self.status, Json(ApiErrorWrapper { error: self })).into_response()
     }
 }
 

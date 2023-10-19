@@ -4,6 +4,7 @@ use axum::extract::Extension;
 use axum::routing::post;
 use axum::Router;
 use axum_macros::debug_handler;
+use common::http::Json;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
@@ -16,7 +17,6 @@ use crate::auth::Config;
 use crate::auth::LogInRequest;
 use crate::auth::SignUpRequest;
 use crate::auth::TokensResponse;
-use crate::http::Json;
 use crate::PlatformError;
 use crate::Result;
 

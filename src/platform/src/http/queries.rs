@@ -5,9 +5,9 @@ use axum::extract::Path;
 use axum::extract::Query;
 use axum::routing;
 use axum::Router;
+use common::http::Json;
 use serde_json::Value;
 
-use crate::http::Json;
 use crate::queries;
 use crate::queries::event_segmentation::EventSegmentation;
 use crate::queries::property_values::ListPropertyValuesRequest;

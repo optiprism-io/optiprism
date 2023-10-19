@@ -9,6 +9,8 @@ use metadata::properties;
 use uaparser::Parser;
 use uaparser::UserAgentParser;
 
+use crate::error::IngesterError;
+use crate::error::Result;
 use crate::processor::Processor;
 use crate::track::PropValue;
 use crate::track::Property;
@@ -23,34 +25,40 @@ pub struct UserAgent {
 }
 
 impl UserAgent {
-    pub fn new(
+    pub fn try_new(
         event_properties: Arc<dyn properties::Provider>,
         user_properties: Arc<dyn properties::Provider>,
         events: Arc<dyn events::Provider>,
         db_path: fs::File,
-    ) -> Self {
-        let ua_parser = UserAgentParser::from_file(db_path).expect("Parser creation failed");
+    ) -> Result<Self> {
+        let ua_parser = UserAgentParser::from_file(db_path)
+            .map_err(|e| IngesterError::General(e.to_string()))?;
 
-        Self {
+        Ok(Self {
             ua_parser,
             event_properties,
             user_properties,
             events,
-        }
+        })
     }
 }
 
 impl Processor for UserAgent {
-    fn track(&mut self, ctx: &Context, mut track: Track) -> crate::error::Result<Track> {
+    fn track(&self, ctx: &Context, mut track: Track) -> crate::error::Result<Track> {
         if track.context.is_none() {
             return Ok(track);
         }
-        let context = track.context.unwrap();
+        let context = track.context.clone().unwrap();
         if context.user_agent.is_none() {
             return Ok(track);
         }
-        let ua = context.user_agent.unwrap();
+        let ua = context.user_agent.clone().unwrap();
         let client = self.ua_parser.parse(&ua);
+        let mut user_props = if let Some(props) = &track.properties {
+            track.properties.to_owned().unwrap()
+        } else {
+            vec![]
+        };
 
         // client family
         {
@@ -64,10 +72,7 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(client.user_agent.family.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+            user_props.push(prop);
         }
 
         // client version major
@@ -82,10 +87,7 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(v.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+            user_props.push(prop);
         }
 
         // client version minor
@@ -100,10 +102,7 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(v.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+            user_props.push(prop);
         }
 
         // device family
@@ -118,10 +117,8 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(client.device.family.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+
+            user_props.push(prop);
         }
 
         // device brand
@@ -136,10 +133,8 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(brand.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+
+            user_props.push(prop);
         }
 
         // device brand
@@ -154,10 +149,8 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(model.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+
+            user_props.push(prop);
         }
 
         // os family
@@ -172,10 +165,8 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(client.os.family.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+
+            user_props.push(prop);
         }
 
         // os major
@@ -190,10 +181,8 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(v.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+
+            user_props.push(prop);
         }
 
         // os minor
@@ -208,10 +197,8 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(v.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+
+            user_props.push(prop);
         }
 
         // os major
@@ -226,10 +213,8 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(v.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+
+            user_props.push(prop);
         }
 
         // os major
@@ -244,11 +229,11 @@ impl Processor for UserAgent {
                 id: prop.id,
                 value: PropValue::String(v.to_string()),
             };
-            if track.properties.is_none() {
-                track.properties = Some(vec![prop]);
-            }
-            track.properties.unwrap().push(prop);
+
+            user_props.push(prop);
         }
+
+        track.properties = Some(user_props);
 
         Ok(track)
     }

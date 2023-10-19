@@ -5,8 +5,8 @@ use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::routing;
 use axum::Router;
+use common::http::Json;
 
-use crate::http::Json;
 use crate::reports;
 use crate::reports::CreateReportRequest;
 use crate::reports::Report;

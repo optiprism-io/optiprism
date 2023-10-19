@@ -5,12 +5,12 @@ use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::routing;
 use axum::Router;
+use common::http::Json;
 
 use crate::custom_events;
 use crate::custom_events::CreateCustomEventRequest;
 use crate::custom_events::CustomEvent;
 use crate::custom_events::UpdateCustomEventRequest;
-use crate::http::Json;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;

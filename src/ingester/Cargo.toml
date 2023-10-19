@@ -4,11 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+arrow = { version = "42.0.0" }
+
 uaparser = "0.6.1"
 metadata = { path = "../metadata" }
 chrono = { version = "0.4.23", features = ["serde"] }
-serde = { version = "1.0.189", features = ["derive"] }
-serde_json = "1.0.107"
+serde = { version = "1.0.149", features = ["derive"] }
+serde_json = "1.0.89"
+serde_with = "3.0.0"
 rust_decimal = { version = "1.27.0", features = ["serde-with-float"] }
 thiserror = "1.0.37"
 tracing = "0.1.37"
@@ -22,6 +25,7 @@ tokio = { version = "1.23.0", features = [
     "signal"
 ] }
 axum = { version = "0.6.1", features = ["headers"] }
+axum-macros = "0.3.8"
 tower = "0.4.13"
 tower-cookies = { version = "0.9.0", features = ["axum-core"] }
 tower-http = { version = "0.4.0", features = ["fs", "trace","cors"] }
@@ -31,3 +35,4 @@ futures = "0.3.25"
 clap = { version = "4.0.29", features = ["derive"] }
 service = { path = "../service" }
 anyhow = "1.0.75"
+hyper = "0.14.27"

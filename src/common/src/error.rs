@@ -16,4 +16,8 @@ pub enum CommonError {
     JWTError(#[from] JWTError),
     #[error("EntityMapping")]
     EntityMapping,
+    #[error("BadRequest")]
+    BadRequest(String),
+    #[error("serde: {0:?}")]
+    Serde(#[from] serde_json::Error),
 }

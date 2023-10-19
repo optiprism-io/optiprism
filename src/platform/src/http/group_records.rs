@@ -4,12 +4,12 @@ use axum::extract::Extension;
 use axum::extract::Path;
 use axum::routing;
 use axum::Router;
+use common::http::Json;
 
 use crate::group_records;
 use crate::group_records::GroupRecord;
 use crate::group_records::ListGroupRecordsRequest;
 use crate::group_records::UpdateGroupRecordRequest;
-use crate::http::Json;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;

@@ -4,11 +4,11 @@ use axum::extract::Extension;
 use axum::extract::Path;
 use axum::routing;
 use axum::Router;
+use common::http::Json;
 
 use crate::event_records;
 use crate::event_records::EventRecord;
 use crate::event_records::ListEventRecordsRequest;
-use crate::http::Json;
 use crate::Context;
 use crate::ListResponse;
 use crate::Result;

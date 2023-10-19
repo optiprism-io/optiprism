@@ -4,8 +4,8 @@ use axum::extract::Extension;
 use axum::extract::Path;
 use axum::routing;
 use axum::Router;
+use common::http::Json;
 
-use crate::http::Json;
 use crate::properties;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;

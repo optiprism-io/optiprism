@@ -6,6 +6,8 @@ use chrono::Utc;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
+use crate::sources::http::PropValue;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackRequest {
@@ -43,14 +45,6 @@ pub struct Page {
     pub url: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum PropValue {
-    Date(DateTime<Utc>),
-    String(String),
-    Number(Decimal),
-    Bool(bool),
-}
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackResponse {}

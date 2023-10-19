@@ -46,6 +46,7 @@ pub struct Property {
     pub id: u64,
     pub value: PropValue,
 }
+
 #[derive(Debug, Clone)]
 pub enum PropValue {
     Date(DateTime<Utc>),
