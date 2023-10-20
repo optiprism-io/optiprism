@@ -1,17 +1,24 @@
+use std::collections::HashMap;
 use std::net::Ipv4Addr;
 
 use chrono::DateTime;
 use chrono::Utc;
+use error::Result;
 use rust_decimal::Decimal;
 
-pub mod destination;
 pub mod destinations;
 pub mod error;
 pub mod executor;
-pub mod processor;
 pub mod processors;
 pub mod sources;
-pub mod track;
+
+pub trait Processor<T>: Send + Sync {
+    fn process(&self, ctx: &AppContext, req: T) -> Result<T>;
+}
+
+pub trait Destination<T>: Send + Sync {
+    fn send(&self, ctx: &AppContext, req: T) -> Result<()>;
+}
 
 pub struct AppContext {
     project_id: u64,
@@ -44,6 +51,7 @@ pub struct Page {
 #[derive(Debug, Clone)]
 pub struct Property {
     pub id: u64,
+    pub name: String,
     pub value: PropValue,
 }
 
@@ -53,4 +61,37 @@ pub enum PropValue {
     String(String),
     Number(Decimal),
     Bool(bool),
+}
+
+#[derive(Debug, Clone)]
+pub struct Event {
+    pub id: u64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Identify {
+    pub user_id: Option<String>,
+    pub resolved_user_id: Option<i64>,
+    pub sent_at: DateTime<Utc>,
+    pub context: Context,
+    pub event: String,
+    pub user_properties: Option<HashMap<String, PropValue>>,
+    pub resolved_user_properties: Option<Vec<Property>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Track {
+    pub user_id: Option<String>,
+    pub anonymous_id: Option<String>,
+    pub resolved_user_id: Option<i64>,
+    pub resolved_anonymous_user_id: Option<i64>,
+    pub sent_at: DateTime<Utc>,
+    pub context: Context,
+    pub event: String,
+    pub resolved_event: Option<Event>,
+    pub properties: Option<HashMap<String, PropValue>>,
+    pub user_properties: Option<HashMap<String, PropValue>>,
+    pub resolved_properties: Option<Vec<Property>>,
+    pub resolved_user_properties: Option<Vec<Property>>,
 }

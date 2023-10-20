@@ -20,9 +20,12 @@ use common::types::USER_COLUMN_OS_VERSION_PATCH;
 use common::types::USER_COLUMN_OS_VERSION_PATCH_MINOR;
 use futures::executor::block_on;
 use ingester::executor::Executor;
-use ingester::processor;
-use ingester::processors::user_agent;
+use ingester::processors::user_agent::track;
 use ingester::sources;
+use ingester::Destination;
+use ingester::Identify;
+use ingester::Processor;
+use ingester::Track;
 use metadata::events;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
@@ -55,9 +58,6 @@ async fn main() -> Result<(), anyhow::Error> {
     info!("starting http instance...");
 
     let store = Arc::new(Store::new(args.md_path.clone()));
-
-    let mut processors = Vec::new();
-
     let user_props = Arc::new(properties::ProviderImpl::new_user(store.clone()));
 
     // todo move somewhere else
@@ -93,17 +93,41 @@ async fn main() -> Result<(), anyhow::Error> {
             }))?;
         }
     }
-    let event_props = Arc::new(properties::ProviderImpl::new_event(store.clone()));
-    let events = Arc::new(events::ProviderImpl::new(store.clone()));
-    let ua =
-        user_agent::UserAgent::try_new(event_props, user_props, events, File::open(args.ua_path)?)?;
-    processors.push(Arc::new(ua) as Arc<dyn processor::Processor>);
 
-    let mut sinks = Vec::new();
-    let debug_sink = ingester::destinations::debug::DebugSink::new();
-    sinks.push(Arc::new(debug_sink) as Arc<dyn ingester::destination::Destination>);
-    let exec = Executor::new(processors, sinks);
-    let svc = sources::http::Service::new(exec, args.host);
+    let event_props = Arc::new(properties::ProviderImpl::new_event(store.clone()));
+
+    let events = Arc::new(events::ProviderImpl::new(store.clone()));
+    let mut track_processors = Vec::new();
+    let ua = track::UserAgent::try_new(
+        event_props.clone(),
+        user_props.clone(),
+        File::open(args.ua_path)?,
+    )?;
+    track_processors.push(Arc::new(ua) as Arc<dyn Processor<Track>>);
+
+    let mut track_destinations = Vec::new();
+    let track_debug_dst = ingester::destinations::debug::track::Debug::new();
+    track_destinations.push(Arc::new(track_debug_dst) as Arc<dyn Destination<Track>>);
+    let track_exec = Executor::<Track>::new(
+        track_processors.clone(),
+        track_destinations.clone(),
+        event_props.clone(),
+        user_props.clone(),
+        events.clone(),
+    );
+
+    let mut identify_processors = Vec::new();
+    let mut identify_destinations = Vec::new();
+    let identify_debug_dst = ingester::destinations::debug::identify::Debug::new();
+    identify_destinations.push(Arc::new(identify_debug_dst) as Arc<dyn Destination<Identify>>);
+    let identify_exec = Executor::<Identify>::new(
+        identify_processors,
+        identify_destinations,
+        event_props.clone(),
+        user_props.clone(),
+        events.clone(),
+    );
+    let svc = sources::http::service::Service::new(track_exec, identify_exec, args.host);
 
     info!("start listening on {}", args.host);
 

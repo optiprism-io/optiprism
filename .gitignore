@@ -4,6 +4,7 @@
 
 .actrc
 target
+tmp
 Cargo.lock
 data
 node_modules

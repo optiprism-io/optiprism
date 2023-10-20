@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -24,16 +25,13 @@ use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 use tracing::info;
 
-use crate::destination::Destination;
 use crate::error::Result;
 use crate::executor::Executor;
-use crate::sources::http::track::TrackRequest;
-use crate::sources::http::track::TrackResponse;
+use crate::Destination;
 
-mod identify;
-mod track;
+pub mod service;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Context {
     pub library: Option<Library>,
@@ -42,14 +40,14 @@ pub struct Context {
     pub ip: Option<Ipv4Addr>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Library {
     pub name: String,
     pub version: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Page {
     pub path: Option<String>,
@@ -59,7 +57,7 @@ pub struct Page {
     pub url: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum PropValue {
     Date(DateTime<Utc>),
@@ -68,165 +66,95 @@ pub enum PropValue {
     Bool(bool),
 }
 
-impl From<PropValue> for crate::track::PropValue {
+impl From<PropValue> for crate::PropValue {
     fn from(value: PropValue) -> Self {
         match value {
-            PropValue::Date(v) => crate::track::PropValue::Date(v),
-            PropValue::String(v) => crate::track::PropValue::String(v),
-            PropValue::Number(v) => crate::track::PropValue::Number(v),
-            PropValue::Bool(v) => crate::track::PropValue::Bool(v),
+            PropValue::Date(v) => crate::PropValue::Date(v),
+            PropValue::String(v) => crate::PropValue::String(v),
+            PropValue::Number(v) => crate::PropValue::Number(v),
+            PropValue::Bool(v) => crate::PropValue::Bool(v),
         }
     }
 }
 
-#[derive(Clone)]
-struct App {
-    executor: Arc<Mutex<Executor>>,
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IdentifyRequest {
+    pub user_id: Option<String>,
+    pub anonymous_id: Option<String>,
+    pub sent_at: DateTime<Utc>,
+    pub context: Context,
+    #[serde(rename = "type")]
+    pub typ: String,
+    pub event: Option<String>,
+    #[serde(rename = "traits")]
+    pub user_properties: Option<HashMap<String, PropValue>>,
 }
 
-impl App {
-    pub fn track(&self, token: String, req: TrackRequest) -> Result<()> {
-        let context = crate::track::Context {
-            library: req.context.library.map(|lib| crate::track::Library {
-                name: lib.name.clone(),
-                version: lib.version.clone(),
-            }),
-            page: req.context.page.map(|page| crate::track::Page {
-                path: page.path.clone(),
-                referrer: page.referrer.clone(),
-                search: page.search.clone(),
-                title: page.title.clone(),
-                url: page.url.clone(),
-            }),
-            user_agent: req.context.user_agent.clone(),
-            ip: req.context.ip.clone(),
-        };
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Type {
+    Track,
+    Identify,
+    Page,
+    Screen,
+}
 
-        let raw_properties = req
-            .properties
-            .into_iter()
-            .map(|(k, v)| (k.to_owned(), v.into()))
-            .collect::<_>();
-        let raw_user_properties = req
-            .user_properties
-            .into_iter()
-            .map(|(k, v)| (k.to_owned(), v.into()))
-            .collect::<_>();
-        let track = crate::track::Track {
-            user_id: req.user_id.clone(),
-            anonymous_id: req.anonymous_id.clone(),
-            resolved_user_id: None,
-            resolved_anonymous_user_id: None,
-            sent_at: req.sent_at.clone(),
-            context,
-            event: req.event.clone().unwrap(),
-            properties: raw_properties,
-            user_properties: raw_user_properties,
-            resolved_properties: None,
-            resolved_user_properties: None,
-        };
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackRequest {
+    pub user_id: Option<String>,
+    pub anonymous_id: Option<String>,
+    pub sent_at: DateTime<Utc>,
+    pub context: Context,
+    #[serde(rename = "type")]
+    pub typ: Type,
+    pub event: Option<String>,
+    pub properties: Option<HashMap<String, PropValue>>,
+    pub user_properties: Option<HashMap<String, PropValue>>,
+}
 
-        self.executor.lock().unwrap().track(token, track)
+#[cfg(test)]
+mod tests {
+    use crate::sources::http::TrackRequest;
+
+    #[test]
+    fn test_request() {
+        const PAYLOAD: &str = r#"
+        {
+  "anonymousId": "23adfd82-aa0f-45a7-a756-24f2a7a4c895",
+  "context": {
+    "library": {
+      "name": "analytics.js",
+      "version": "2.11.1"
+    },
+    "page": {
+      "path": "/academy/",
+      "referrer": "",
+      "search": "",
+      "title": "Analytics Academy",
+      "url": "https://segment.com/academy/"
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.86 Safari/537.36",
+    "ip": "108.0.78.21"
+  },
+  "event": "Course Clicked",
+  "integrations": {},
+  "messageId": "ajs-f8ca1e4de5024d9430b3928bd8ac6b96",
+  "properties": {
+    "title": "Intro to Analytics"
+  },
+  "receivedAt": "2015-12-12T19:11:01.266Z",
+  "sentAt": "2015-12-12T19:11:01.169Z",
+  "timestamp": "2015-12-12T19:11:01.249Z",
+  "type": "track",
+  "userId": "AiUGstSDIg",
+  "originalTimestamp": "2015-12-12T19:11:01.152Z"
+}
+    "#;
+
+        let res: TrackRequest = serde_json::from_str(PAYLOAD).unwrap();
+
+        println!("{:?}", res);
     }
-
-    pub fn click(&self, token: String, mut req: TrackRequest) -> Result<()> {
-        req.event = Some(EVENT_CLICK.to_string());
-        self.track(token, req)
-    }
-
-    pub fn page(&self, token: String, mut req: TrackRequest) -> Result<()> {
-        req.event = Some(EVENT_PAGE.to_string());
-        self.track(token, req)
-    }
-
-    pub fn screen(&self, token: String, mut req: TrackRequest) -> Result<()> {
-        req.event = Some(EVENT_SCREEN.to_string());
-        self.track(token, req)
-    }
-}
-
-pub struct Service {
-    router: Router,
-    addr: SocketAddr,
-}
-
-impl Service {
-    pub fn new(executor: Executor, addr: SocketAddr) -> Self {
-        let mut router = Router::new();
-
-        let state = App {
-            executor: Arc::new(Mutex::new(executor)),
-        };
-        info!("attaching api routes...");
-        let cors = CorsLayer::new()
-            .allow_methods(Any)
-            .allow_origin(Any)
-            .allow_headers(Any);
-
-        let router = router
-            .route("/v1/ingest/:token/track", routing::post(track))
-            .route("/v1/ingest/:token/click", routing::post(click))
-            .route("/v1/ingest/:token/page", routing::post(page))
-            .route("/v1/ingest/:token/screen", routing::post(screen))
-            .layer(cors)
-            .with_state(state);
-
-        Self { router, addr }
-    }
-
-    pub async fn serve(self) -> Result<()> {
-        let server = Server::bind(&self.addr).serve(self.router.into_make_service());
-        let graceful = server.with_graceful_shutdown(async {
-            let mut sig_int = tokio::signal::unix::signal(SignalKind::interrupt())
-                .expect("failed to install signal");
-            let mut sig_term = tokio::signal::unix::signal(SignalKind::terminate())
-                .expect("failed to install signal");
-            select! {
-                _=sig_int.recv()=>info!("SIGINT received"),
-                _=sig_term.recv()=>info!("SIGTERM received"),
-            }
-        });
-
-        Ok(graceful.await?)
-    }
-}
-
-#[debug_handler]
-async fn track(
-    State(state): State<App>,
-    Path(token): Path<String>,
-    Json(request): Json<TrackRequest>,
-) -> Result<StatusCode> {
-    state.track(token, request)?;
-    Ok(StatusCode::CREATED)
-}
-
-#[debug_handler]
-async fn click(
-    State(state): State<App>,
-    Path(token): Path<String>,
-    Json(request): Json<TrackRequest>,
-) -> Result<StatusCode> {
-    state.click(token, request)?;
-    Ok(StatusCode::CREATED)
-}
-
-#[debug_handler]
-async fn page(
-    State(state): State<App>,
-    Path(token): Path<String>,
-    Json(request): Json<TrackRequest>,
-) -> Result<StatusCode> {
-    state.page(token, request)?;
-    Ok(StatusCode::CREATED)
-}
-
-#[debug_handler]
-async fn screen(
-    State(state): State<App>,
-    Path(token): Path<String>,
-    Json(request): Json<TrackRequest>,
-) -> Result<StatusCode> {
-    state.screen(token, request)?;
-    Ok(StatusCode::CREATED)
 }
