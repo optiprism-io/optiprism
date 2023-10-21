@@ -9,6 +9,7 @@ use axum::response::Response;
 use common::http::ApiError;
 use common::http::Json;
 use hyper::StatusCode;
+use maxminddb::MaxMindDBError;
 use metadata::error::MetadataError;
 use serde::Serialize;
 use serde::Serializer;
@@ -25,6 +26,8 @@ pub enum IngesterError {
     Hyper(#[from] hyper::Error),
     #[error("metadata: {0:?}")]
     Metadata(#[from] MetadataError),
+    #[error("maxmind: {0:?}")]
+    Maxmind(#[from] MaxMindDBError),
 }
 
 impl IntoResponse for IngesterError {
@@ -45,6 +48,13 @@ impl IntoResponse for IngesterError {
             }
             .into_response(),
             IngesterError::Metadata(err) => ApiError {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                code: None,
+                message: Some(err.to_string()),
+                fields: Default::default(),
+            }
+            .into_response(),
+            IngesterError::Maxmind(err) => ApiError {
                 status: StatusCode::INTERNAL_SERVER_ERROR,
                 code: None,
                 message: Some(err.to_string()),

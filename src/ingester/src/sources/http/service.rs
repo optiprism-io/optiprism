@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use axum::extract::ConnectInfo;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -25,54 +26,90 @@ use crate::executor::Executor;
 use crate::sources::http::IdentifyRequest;
 use crate::sources::http::TrackRequest;
 use crate::Context;
+use crate::RequestContext;
 
 #[debug_handler]
 async fn track(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<App>,
     Path(token): Path<String>,
     Json(request): Json<TrackRequest>,
 ) -> Result<StatusCode> {
-    state.track(token, request)?;
+    let ctx = RequestContext {
+        organization_id: None,
+        project_id: None,
+        client_ip: addr.ip(),
+        token,
+    };
+    state.track(&ctx, request)?;
     Ok(StatusCode::CREATED)
 }
 
 #[debug_handler]
 async fn click(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<App>,
     Path(token): Path<String>,
     Json(request): Json<TrackRequest>,
 ) -> Result<StatusCode> {
-    state.click(token, request)?;
+    let ctx = RequestContext {
+        organization_id: None,
+        project_id: None,
+        client_ip: addr.ip(),
+        token,
+    };
+    state.click(&ctx, request)?;
     Ok(StatusCode::CREATED)
 }
 
 #[debug_handler]
 async fn page(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<App>,
     Path(token): Path<String>,
     Json(request): Json<TrackRequest>,
 ) -> Result<StatusCode> {
-    state.page(token, request)?;
+    let ctx = RequestContext {
+        organization_id: None,
+        project_id: None,
+        client_ip: addr.ip(),
+        token,
+    };
+    state.page(&ctx, request)?;
     Ok(StatusCode::CREATED)
 }
 
 #[debug_handler]
 async fn screen(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<App>,
     Path(token): Path<String>,
     Json(request): Json<TrackRequest>,
 ) -> Result<StatusCode> {
-    state.screen(token, request)?;
+    let ctx = RequestContext {
+        organization_id: None,
+        project_id: None,
+        client_ip: addr.ip(),
+        token,
+    };
+    state.screen(&ctx, request)?;
     Ok(StatusCode::CREATED)
 }
 
 #[debug_handler]
 async fn identify(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<App>,
     Path(token): Path<String>,
     Json(request): Json<IdentifyRequest>,
 ) -> Result<StatusCode> {
-    state.identify(token, request)?;
+    let ctx = RequestContext {
+        organization_id: None,
+        project_id: None,
+        client_ip: addr.ip(),
+        token,
+    };
+    state.identify(&ctx, request)?;
     Ok(StatusCode::CREATED)
 }
 
@@ -83,7 +120,7 @@ struct App {
 }
 
 impl App {
-    pub fn track(&self, token: String, req: TrackRequest) -> Result<()> {
+    pub fn track(&self, ctx: &RequestContext, req: TrackRequest) -> Result<()> {
         let context = Context {
             library: req.context.library.map(|lib| crate::Library {
                 name: lib.name.clone(),
@@ -125,25 +162,25 @@ impl App {
             resolved_user_properties: None,
         };
 
-        self.track.lock().unwrap().execute(token, track)
+        self.track.lock().unwrap().execute(ctx, track)
     }
 
-    pub fn click(&self, token: String, mut req: TrackRequest) -> Result<()> {
+    pub fn click(&self, ctx: &RequestContext, mut req: TrackRequest) -> Result<()> {
         req.event = Some(EVENT_CLICK.to_string());
-        self.track(token, req)
+        self.track(ctx, req)
     }
 
-    pub fn page(&self, token: String, mut req: TrackRequest) -> Result<()> {
+    pub fn page(&self, ctx: &RequestContext, mut req: TrackRequest) -> Result<()> {
         req.event = Some(EVENT_PAGE.to_string());
-        self.track(token, req)
+        self.track(ctx, req)
     }
 
-    pub fn screen(&self, token: String, mut req: TrackRequest) -> Result<()> {
+    pub fn screen(&self, ctx: &RequestContext, mut req: TrackRequest) -> Result<()> {
         req.event = Some(EVENT_SCREEN.to_string());
-        self.track(token, req)
+        self.track(ctx, req)
     }
 
-    pub fn identify(&self, token: String, mut req: IdentifyRequest) -> Result<()> {
+    pub fn identify(&self, ctx: &RequestContext, mut req: IdentifyRequest) -> Result<()> {
         let context = Context {
             library: req.context.library.map(|lib| crate::Library {
                 name: lib.name.clone(),
@@ -175,7 +212,7 @@ impl App {
             resolved_user_properties: None,
         };
 
-        self.identify.lock().unwrap().execute(token, track)
+        self.identify.lock().unwrap().execute(ctx, track)
     }
 }
 
@@ -215,7 +252,10 @@ impl Service {
     }
 
     pub async fn serve(self) -> Result<()> {
-        let server = Server::bind(&self.addr).serve(self.router.into_make_service());
+        let server = Server::bind(&self.addr).serve(
+            self.router
+                .into_make_service_with_connect_info::<SocketAddr>(),
+        );
         let graceful = server.with_graceful_shutdown(async {
             let mut sig_int = tokio::signal::unix::signal(SignalKind::interrupt())
                 .expect("failed to install signal");

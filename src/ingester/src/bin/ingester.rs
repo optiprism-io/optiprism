@@ -6,10 +6,12 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::Duration;
 use clap::Parser;
+use common::types::USER_COLUMN_CITY;
 use common::types::USER_COLUMN_CLIENT_FAMILY;
 use common::types::USER_COLUMN_CLIENT_VERSION_MAJOR;
 use common::types::USER_COLUMN_CLIENT_VERSION_MINOR;
 use common::types::USER_COLUMN_CLIENT_VERSION_PATCH;
+use common::types::USER_COLUMN_COUNTRY;
 use common::types::USER_COLUMN_DEVICE_BRAND;
 use common::types::USER_COLUMN_DEVICE_FAMILY;
 use common::types::USER_COLUMN_DEVICE_MODEL;
@@ -19,7 +21,10 @@ use common::types::USER_COLUMN_OS_VERSION_MINOR;
 use common::types::USER_COLUMN_OS_VERSION_PATCH;
 use common::types::USER_COLUMN_OS_VERSION_PATCH_MINOR;
 use futures::executor::block_on;
+use ingester::error::IngesterError;
 use ingester::executor::Executor;
+use ingester::processors::geo;
+use ingester::processors::user_agent;
 use ingester::processors::user_agent::identify;
 use ingester::processors::user_agent::track;
 use ingester::sources;
@@ -36,6 +41,7 @@ use metadata::store::Store;
 use metadata::MetadataProvider;
 use service::tracing::TracingCliArgs;
 use tracing::info;
+use uaparser::UserAgentParser;
 
 #[derive(Parser)]
 #[command(propagate_version = true)]
@@ -46,7 +52,9 @@ struct Args {
     #[arg(long)]
     md_path: PathBuf,
     #[arg(long)]
-    ua_path: PathBuf,
+    ua_db_path: PathBuf,
+    #[arg(long)]
+    geo_city_path: PathBuf,
     #[arg(long, default_value = "0.0.0.0:8080")]
     host: SocketAddr,
 }
@@ -76,6 +84,8 @@ async fn main() -> Result<(), anyhow::Error> {
             USER_COLUMN_OS_VERSION_MINOR,
             USER_COLUMN_OS_VERSION_PATCH,
             USER_COLUMN_OS_VERSION_PATCH_MINOR,
+            USER_COLUMN_COUNTRY,
+            USER_COLUMN_CITY,
         ];
         for prop in props {
             block_on(user_props.create(1, 1, CreatePropertyRequest {
@@ -99,8 +109,15 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let events = Arc::new(events::ProviderImpl::new(store.clone()));
     let mut track_processors = Vec::new();
-    let ua = track::UserAgent::try_new(user_props.clone(), File::open(args.ua_path.clone())?)?;
+    let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
+        .map_err(|e| IngesterError::General(e.to_string()))?;
+    let ua = user_agent::track::UserAgent::try_new(user_props.clone(), ua_parser)?;
     track_processors.push(Arc::new(ua) as Arc<dyn Processor<Track>>);
+
+    // todo make common
+    let city_rdr = maxminddb::Reader::open_readfile(args.geo_city_path.clone())?;
+    let geo = geo::track::Geo::try_new(user_props.clone(), city_rdr)?;
+    track_processors.push(Arc::new(geo) as Arc<dyn Processor<Track>>);
 
     let mut track_destinations = Vec::new();
     let track_debug_dst = ingester::destinations::debug::track::Debug::new();
@@ -114,8 +131,15 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     let mut identify_processors = Vec::new();
-    let ua = identify::UserAgent::try_new(user_props.clone(), File::open(args.ua_path)?)?;
+    let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
+        .map_err(|e| IngesterError::General(e.to_string()))?;
+
+    let ua = user_agent::identify::UserAgent::try_new(user_props.clone(), ua_parser)?;
     identify_processors.push(Arc::new(ua) as Arc<dyn Processor<Identify>>);
+
+    let city_rdr = maxminddb::Reader::open_readfile(args.geo_city_path.clone())?;
+    let geo = geo::identify::Geo::try_new(user_props.clone(), city_rdr)?;
+    identify_processors.push(Arc::new(geo) as Arc<dyn Processor<Identify>>);
 
     let mut identify_destinations = Vec::new();
     let identify_debug_dst = ingester::destinations::debug::identify::Debug::new();

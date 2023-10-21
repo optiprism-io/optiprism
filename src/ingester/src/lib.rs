@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::net::Ipv4Addr;
 
 use chrono::DateTime;
@@ -20,9 +21,12 @@ pub trait Destination<T>: Send + Sync {
     fn send(&self, ctx: &RequestContext, req: T) -> Result<()>;
 }
 
+#[derive(Debug, Clone)]
 pub struct RequestContext {
-    project_id: u64,
-    organization_id: u64,
+    project_id: Option<u64>,
+    organization_id: Option<u64>,
+    client_ip: IpAddr,
+    token: String,
 }
 
 #[derive(Debug, Clone)]
@@ -30,7 +34,7 @@ pub struct Context {
     pub library: Option<Library>,
     pub page: Option<Page>,
     pub user_agent: Option<String>,
-    pub ip: Option<Ipv4Addr>,
+    pub ip: Option<IpAddr>,
 }
 
 #[derive(Debug, Clone)]

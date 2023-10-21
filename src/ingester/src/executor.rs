@@ -55,7 +55,11 @@ fn resolve_property(
         dictionary_type,
     };
 
-    let prop = block_on(properties.get_or_create(ctx.organization_id, ctx.project_id, req))?;
+    let prop = block_on(properties.get_or_create(
+        ctx.organization_id.unwrap(),
+        ctx.project_id.unwrap(),
+        req,
+    ))?;
     Ok(Property {
         id: prop.id,
         name,
@@ -100,11 +104,11 @@ impl Executor<Track> {
         }
     }
 
-    pub fn execute(&mut self, token: String, mut req: Track) -> Result<()> {
-        let ctx = RequestContext {
-            project_id: 1,
-            organization_id: 1,
-        };
+    pub fn execute(&mut self, ctx: &RequestContext, mut req: Track) -> Result<()> {
+        // todo get from token
+        let mut ctx = ctx.to_owned();
+        ctx.organization_id = Some(1);
+        ctx.project_id = Some(1);
 
         if let Some(props) = &req.properties {
             req.resolved_properties =
@@ -132,8 +136,8 @@ impl Executor<Track> {
         };
 
         let md_event = block_on(self.events.get_or_create(
-            ctx.organization_id,
-            ctx.project_id,
+            ctx.organization_id.unwrap(),
+            ctx.project_id.unwrap(),
             event_req,
         ))?;
 
@@ -172,11 +176,11 @@ impl Executor<Identify> {
         }
     }
 
-    pub fn execute(&mut self, token: String, mut req: Identify) -> Result<()> {
-        let ctx = RequestContext {
-            project_id: 1,
-            organization_id: 1,
-        };
+    pub fn execute(&mut self, ctx: &RequestContext, mut req: Identify) -> Result<()> {
+        // todo get from token
+        let mut ctx = ctx.to_owned();
+        ctx.organization_id = Some(1);
+        ctx.project_id = Some(1);
 
         for processor in &mut self.processors {
             req = processor.process(&ctx, req)?;

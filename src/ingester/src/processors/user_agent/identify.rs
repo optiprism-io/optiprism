@@ -27,11 +27,8 @@ pub struct UserAgent {
 impl UserAgent {
     pub fn try_new(
         user_properties: Arc<dyn properties::Provider>,
-        db_path: fs::File,
+        ua_parser: UserAgentParser,
     ) -> Result<Self> {
-        let ua_parser = UserAgentParser::from_file(db_path)
-            .map_err(|e| IngesterError::General(e.to_string()))?;
-
         Ok(Self {
             ua_parser,
             user_properties,
@@ -41,8 +38,7 @@ impl UserAgent {
 
 impl Processor<Identify> for UserAgent {
     fn process(&self, ctx: &RequestContext, mut req: Identify) -> Result<Identify> {
-        let context = req.context.clone();
-        if context.user_agent.is_none() {
+        if req.context.user_agent.is_none() {
             return Ok(req);
         }
         let mut user_props = if let Some(props) = &req.resolved_user_properties {

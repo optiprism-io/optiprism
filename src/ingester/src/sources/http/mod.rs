@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -37,7 +38,7 @@ pub struct Context {
     pub library: Option<Library>,
     pub page: Option<Page>,
     pub user_agent: Option<String>,
-    pub ip: Option<Ipv4Addr>,
+    pub ip: Option<IpAddr>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

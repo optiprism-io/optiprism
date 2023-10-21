@@ -27,13 +27,12 @@ pub fn resolve_properties(
     let ua = context.user_agent.clone().unwrap();
     let client = ua_parser.parse(&ua);
 
+    let org_id = ctx.organization_id.unwrap();
+    let proj_id = ctx.project_id.unwrap();
     // client family
     {
-        let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
-            types::USER_COLUMN_CLIENT_FAMILY,
-        ))?;
+        let prop =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_CLIENT_FAMILY))?;
 
         let prop = Property {
             id: prop.id,
@@ -46,8 +45,8 @@ pub fn resolve_properties(
     // client version major
     if let Some(v) = client.user_agent.major {
         let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
+            org_id,
+            proj_id,
             types::USER_COLUMN_CLIENT_VERSION_MAJOR,
         ))?;
 
@@ -62,8 +61,8 @@ pub fn resolve_properties(
     // client version minor
     if let Some(v) = client.user_agent.minor {
         let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
+            org_id,
+            proj_id,
             types::USER_COLUMN_CLIENT_VERSION_MINOR,
         ))?;
 
@@ -77,11 +76,8 @@ pub fn resolve_properties(
 
     // device family
     {
-        let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
-            types::USER_COLUMN_DEVICE_FAMILY,
-        ))?;
+        let prop =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_DEVICE_FAMILY))?;
 
         let prop = Property {
             id: prop.id,
@@ -94,11 +90,8 @@ pub fn resolve_properties(
 
     // device brand
     if let Some(brand) = client.device.brand {
-        let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
-            types::USER_COLUMN_DEVICE_BRAND,
-        ))?;
+        let prop =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_DEVICE_BRAND))?;
 
         let prop = Property {
             id: prop.id,
@@ -111,11 +104,8 @@ pub fn resolve_properties(
 
     // device brand
     if let Some(model) = client.device.model {
-        let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
-            types::USER_COLUMN_DEVICE_MODEL,
-        ))?;
+        let prop =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_DEVICE_MODEL))?;
 
         let prop = Property {
             id: prop.id,
@@ -128,11 +118,7 @@ pub fn resolve_properties(
 
     // os family
     {
-        let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
-            types::USER_COLUMN_OS_FAMILY,
-        ))?;
+        let prop = block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_OS_FAMILY))?;
 
         let prop = Property {
             id: prop.id,
@@ -145,11 +131,8 @@ pub fn resolve_properties(
 
     // os major
     if let Some(v) = client.os.major {
-        let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
-            types::USER_COLUMN_OS_VERSION_MAJOR,
-        ))?;
+        let prop =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_OS_VERSION_MAJOR))?;
 
         let prop = Property {
             id: prop.id,
@@ -162,11 +145,8 @@ pub fn resolve_properties(
 
     // os minor
     if let Some(v) = client.os.minor {
-        let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
-            types::USER_COLUMN_OS_VERSION_MINOR,
-        ))?;
+        let prop =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_OS_VERSION_MINOR))?;
 
         let prop = Property {
             id: prop.id,
@@ -179,11 +159,8 @@ pub fn resolve_properties(
 
     // os major
     if let Some(v) = client.os.patch {
-        let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
-            types::USER_COLUMN_OS_VERSION_PATCH,
-        ))?;
+        let prop =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_OS_VERSION_PATCH))?;
 
         let prop = Property {
             id: prop.id,
@@ -197,8 +174,8 @@ pub fn resolve_properties(
     // os major
     if let Some(v) = client.os.patch_minor {
         let prop = block_on(props_prov.get_by_name(
-            ctx.organization_id,
-            ctx.project_id,
+            org_id,
+            proj_id,
             types::USER_COLUMN_OS_VERSION_PATCH_MINOR,
         ))?;
 
