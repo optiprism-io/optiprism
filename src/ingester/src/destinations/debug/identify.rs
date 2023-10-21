@@ -1,7 +1,7 @@
 use crate::error::Result;
-use crate::AppContext;
 use crate::Destination;
 use crate::Identify;
+use crate::RequestContext;
 use crate::Track;
 
 pub struct Debug {}
@@ -13,7 +13,7 @@ impl Debug {
 }
 
 impl Destination<Identify> for Debug {
-    fn send(&self, ctx: &AppContext, req: Identify) -> Result<()> {
+    fn send(&self, ctx: &RequestContext, req: Identify) -> Result<()> {
         println!("identify: {:?}", req);
         Ok(())
     }

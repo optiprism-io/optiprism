@@ -66,6 +66,16 @@ async fn screen(
     Ok(StatusCode::CREATED)
 }
 
+#[debug_handler]
+async fn identify(
+    State(state): State<App>,
+    Path(token): Path<String>,
+    Json(request): Json<IdentifyRequest>,
+) -> Result<StatusCode> {
+    state.identify(token, request)?;
+    Ok(StatusCode::CREATED)
+}
+
 #[derive(Clone)]
 struct App {
     track: Arc<Mutex<Executor<crate::Track>>>,
@@ -197,6 +207,7 @@ impl Service {
             .route("/v1/ingest/:token/click", routing::post(click))
             .route("/v1/ingest/:token/page", routing::post(page))
             .route("/v1/ingest/:token/screen", routing::post(screen))
+            .route("/v1/ingest/:token/identify", routing::post(identify))
             .layer(cors)
             .with_state(state);
 

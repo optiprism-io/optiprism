@@ -39,8 +39,8 @@ impl UserAgent {
     }
 }
 
-impl Processor<Track> for UserAgent {
-    fn process(&self, ctx: &RequestContext, mut req: Track) -> Result<Track> {
+impl Processor<Identify> for UserAgent {
+    fn process(&self, ctx: &RequestContext, mut req: Identify) -> Result<Identify> {
         let context = req.context.clone();
         if context.user_agent.is_none() {
             return Ok(req);
@@ -58,7 +58,7 @@ impl Processor<Track> for UserAgent {
             &self.ua_parser,
         )?;
         if !user_props.is_empty() {
-            req.resolved_properties = Some(user_props);
+            req.resolved_user_properties = Some(user_props);
         }
 
         Ok(req)

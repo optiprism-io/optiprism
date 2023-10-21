@@ -20,6 +20,7 @@ use common::types::USER_COLUMN_OS_VERSION_PATCH;
 use common::types::USER_COLUMN_OS_VERSION_PATCH_MINOR;
 use futures::executor::block_on;
 use ingester::executor::Executor;
+use ingester::processors::user_agent::identify;
 use ingester::processors::user_agent::track;
 use ingester::sources;
 use ingester::Destination;
@@ -90,7 +91,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 is_array: false,
                 is_dictionary: true,
                 dictionary_type: Some(DataType::Int64),
-            }))?;
+            }));
         }
     }
 
@@ -98,11 +99,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let events = Arc::new(events::ProviderImpl::new(store.clone()));
     let mut track_processors = Vec::new();
-    let ua = track::UserAgent::try_new(
-        event_props.clone(),
-        user_props.clone(),
-        File::open(args.ua_path)?,
-    )?;
+    let ua = track::UserAgent::try_new(user_props.clone(), File::open(args.ua_path.clone())?)?;
     track_processors.push(Arc::new(ua) as Arc<dyn Processor<Track>>);
 
     let mut track_destinations = Vec::new();
@@ -117,6 +114,9 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     let mut identify_processors = Vec::new();
+    let ua = identify::UserAgent::try_new(user_props.clone(), File::open(args.ua_path)?)?;
+    identify_processors.push(Arc::new(ua) as Arc<dyn Processor<Identify>>);
+
     let mut identify_destinations = Vec::new();
     let identify_debug_dst = ingester::destinations::debug::identify::Debug::new();
     identify_destinations.push(Arc::new(identify_debug_dst) as Arc<dyn Destination<Identify>>);

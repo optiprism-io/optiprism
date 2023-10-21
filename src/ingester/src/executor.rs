@@ -13,17 +13,17 @@ use metadata::properties::CreatePropertyRequest;
 use metadata::properties::Status;
 
 use crate::error::Result;
-use crate::AppContext;
 use crate::Destination;
 use crate::Event;
 use crate::Identify;
 use crate::Processor;
 use crate::PropValue;
 use crate::Property;
+use crate::RequestContext;
 use crate::Track;
 
 fn resolve_property(
-    ctx: &AppContext,
+    ctx: &RequestContext,
     properties: &Arc<dyn properties::Provider>,
     name: String,
     val: &PropValue,
@@ -64,7 +64,7 @@ fn resolve_property(
 }
 
 fn resolve_properties(
-    ctx: &AppContext,
+    ctx: &RequestContext,
     properties: &Arc<dyn properties::Provider>,
     props: &HashMap<String, PropValue>,
 ) -> Result<Vec<Property>> {
@@ -101,7 +101,7 @@ impl Executor<Track> {
     }
 
     pub fn execute(&mut self, token: String, mut req: Track) -> Result<()> {
-        let ctx = AppContext {
+        let ctx = RequestContext {
             project_id: 1,
             organization_id: 1,
         };
@@ -173,7 +173,7 @@ impl Executor<Identify> {
     }
 
     pub fn execute(&mut self, token: String, mut req: Identify) -> Result<()> {
-        let ctx = AppContext {
+        let ctx = RequestContext {
             project_id: 1,
             organization_id: 1,
         };

@@ -13,14 +13,14 @@ pub mod processors;
 pub mod sources;
 
 pub trait Processor<T>: Send + Sync {
-    fn process(&self, ctx: &AppContext, req: T) -> Result<T>;
+    fn process(&self, ctx: &RequestContext, req: T) -> Result<T>;
 }
 
 pub trait Destination<T>: Send + Sync {
-    fn send(&self, ctx: &AppContext, req: T) -> Result<()>;
+    fn send(&self, ctx: &RequestContext, req: T) -> Result<()>;
 }
 
-pub struct AppContext {
+pub struct RequestContext {
     project_id: u64,
     organization_id: u64,
 }

@@ -1,6 +1,6 @@
 use crate::error::Result;
-use crate::AppContext;
 use crate::Destination;
+use crate::RequestContext;
 use crate::Track;
 
 pub struct Debug {}
@@ -12,7 +12,7 @@ impl Debug {
 }
 
 impl Destination<Track> for Debug {
-    fn send(&self, ctx: &AppContext, req: Track) -> Result<()> {
+    fn send(&self, ctx: &RequestContext, req: Track) -> Result<()> {
         println!("track: {:?}", req);
         Ok(())
     }
