@@ -164,6 +164,9 @@ impl PlatformError {
                 MetadataError::Report(err) => match err {
                     ReportError::ReportNotFound(_) => ApiError::not_found(err.to_string()),
                 },
+                MetadataError::AlreadyExists(err) => ApiError::conflict(err.to_string()),
+                MetadataError::NotFound(err) => ApiError::not_found(err.to_string()),
+                MetadataError::Internal(err) => ApiError::internal(err.to_string()),
             },
             PlatformError::Query(err) => match err {
                 QueryError::Internal(err) => ApiError::internal(err),

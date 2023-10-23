@@ -8,6 +8,7 @@ use common::DECIMAL_SCALE;
 use futures::executor::block_on;
 use metadata::events;
 use metadata::events::CreateEventRequest;
+use metadata::projects;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
 use metadata::properties::Status;
@@ -85,6 +86,7 @@ pub struct Executor<T> {
     event_properties: Arc<dyn properties::Provider>,
     user_properties: Arc<dyn properties::Provider>,
     events: Arc<dyn events::Provider>,
+    projects: Arc<dyn projects::Provider>,
 }
 
 impl Executor<Track> {
@@ -94,6 +96,7 @@ impl Executor<Track> {
         event_properties: Arc<dyn properties::Provider>,
         user_properties: Arc<dyn properties::Provider>,
         events: Arc<dyn events::Provider>,
+        projects: Arc<dyn projects::Provider>,
     ) -> Self {
         Self {
             processors,
@@ -101,14 +104,15 @@ impl Executor<Track> {
             event_properties,
             user_properties,
             events,
+            projects,
         }
     }
 
     pub fn execute(&mut self, ctx: &RequestContext, mut req: Track) -> Result<()> {
-        // todo get from token
+        let project = block_on(self.projects.get_by_token(ctx.token.as_str()))?;
         let mut ctx = ctx.to_owned();
-        ctx.organization_id = Some(1);
-        ctx.project_id = Some(1);
+        ctx.organization_id = Some(project.organization_id);
+        ctx.project_id = Some(project.id);
 
         if let Some(props) = &req.properties {
             req.resolved_properties =
@@ -166,6 +170,7 @@ impl Executor<Identify> {
         event_properties: Arc<dyn properties::Provider>,
         user_properties: Arc<dyn properties::Provider>,
         events: Arc<dyn events::Provider>,
+        projects: Arc<dyn projects::Provider>,
     ) -> Self {
         Self {
             processors,
@@ -173,14 +178,16 @@ impl Executor<Identify> {
             event_properties,
             user_properties,
             events,
+            projects,
         }
     }
 
     pub fn execute(&mut self, ctx: &RequestContext, mut req: Identify) -> Result<()> {
-        // todo get from token
         let mut ctx = ctx.to_owned();
-        ctx.organization_id = Some(1);
-        ctx.project_id = Some(1);
+        let project = block_on(self.projects.get_by_token(ctx.token.as_str()))?;
+        let mut ctx = ctx.to_owned();
+        ctx.organization_id = Some(project.organization_id);
+        ctx.project_id = Some(project.id);
 
         for processor in &mut self.processors {
             req = processor.process(&ctx, req)?;

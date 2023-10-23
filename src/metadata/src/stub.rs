@@ -700,6 +700,7 @@ impl Projects {
             updated_by: Some(1),
             organization_id: 1,
             name: "name".to_string(),
+            token: "token".to_string(),
         }
     }
 }
@@ -711,6 +712,10 @@ impl projects::Provider for Projects {
     }
 
     async fn get_by_id(&self, _organization_id: u64, _project_id: u64) -> Result<Project> {
+        Ok(Projects::project())
+    }
+
+    async fn get_by_token(&self, token: &str) -> Result<Project> {
         Ok(Projects::project())
     }
 

@@ -10,10 +10,12 @@ use serde::Serialize;
 
 use crate::metadata::ListResponse;
 use crate::Result;
+
 #[async_trait]
 pub trait Provider: Sync + Send {
     async fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project>;
     async fn get_by_id(&self, organization_id: u64, project_id: u64) -> Result<Project>;
+    async fn get_by_token(&self, token: &str) -> Result<Project>;
     async fn list(&self, organization_id: u64) -> Result<ListResponse<Project>>;
     async fn update(
         &self,
@@ -33,6 +35,7 @@ pub struct Project {
     pub updated_by: Option<u64>,
     pub organization_id: u64,
     pub name: String,
+    pub token: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

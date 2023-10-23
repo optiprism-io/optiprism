@@ -218,6 +218,13 @@ impl Project {
             _name: None,
         }
     }
+    pub fn new() -> Self {
+        Self {
+            _organization_id: 0,
+            _id: None,
+            _name: None,
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -347,6 +354,12 @@ pub enum StoreError {
 
 #[derive(Error, Debug)]
 pub enum MetadataError {
+    #[error("already exists ({0:?}")]
+    AlreadyExists(String),
+    #[error("not found {0:?}")]
+    NotFound(String),
+    #[error("internal: {0:?}")]
+    Internal(String),
     #[error("database {0:?}")]
     Database(#[from] DatabaseError),
     #[error("dashboard {0:?}")]

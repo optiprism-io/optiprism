@@ -47,13 +47,12 @@ impl IntoResponse for IngesterError {
                 fields: Default::default(),
             }
             .into_response(),
-            IngesterError::Metadata(err) => ApiError {
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                code: None,
-                message: Some(err.to_string()),
-                fields: Default::default(),
-            }
-            .into_response(),
+            IngesterError::Metadata(err) => match err {
+                MetadataError::AlreadyExists(err) => ApiError::conflict(err).into_response(),
+                MetadataError::NotFound(err) => ApiError::not_found(err).into_response(),
+                MetadataError::Internal(err) => ApiError::internal(err).into_response(),
+                _ => ApiError::internal(err.to_string()).into_response(),
+            },
             IngesterError::Maxmind(err) => ApiError {
                 status: StatusCode::INTERNAL_SERVER_ERROR,
                 code: None,

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use arrow::datatypes::DataType;
 use chrono::Duration;
 use clap::Parser;
+use common::rbac::Role;
 use common::types::USER_COLUMN_CITY;
 use common::types::USER_COLUMN_CLIENT_FAMILY;
 use common::types::USER_COLUMN_CLIENT_VERSION_MAJOR;
@@ -32,7 +33,14 @@ use ingester::Destination;
 use ingester::Identify;
 use ingester::Processor;
 use ingester::Track;
+use metadata::accounts::CreateAccountRequest;
+use metadata::accounts::Provider as AccountsProvider;
 use metadata::events;
+use metadata::organizations::CreateOrganizationRequest;
+use metadata::organizations::Provider as OrganizationProvider;
+use metadata::projects;
+use metadata::projects::CreateProjectRequest;
+use metadata::projects::Provider as ProjectsProvider;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
 use metadata::properties::Provider;
@@ -40,6 +48,7 @@ use metadata::properties::Status;
 use metadata::store::Store;
 use metadata::MetadataProvider;
 use service::tracing::TracingCliArgs;
+use tracing::debug;
 use tracing::info;
 use uaparser::UserAgentParser;
 
@@ -88,26 +97,73 @@ async fn main() -> Result<(), anyhow::Error> {
             USER_COLUMN_CITY,
         ];
         for prop in props {
-            block_on(user_props.create(1, 1, CreatePropertyRequest {
-                created_by: 1,
-                tags: None,
-                name: prop.to_string(),
-                description: None,
-                display_name: None,
-                typ: DataType::Utf8,
-                status: Status::Enabled,
-                is_system: true,
-                nullable: false,
-                is_array: false,
-                is_dictionary: true,
-                dictionary_type: Some(DataType::Int64),
-            }));
+            let _ = user_props
+                .create(1, 1, CreatePropertyRequest {
+                    created_by: 1,
+                    tags: None,
+                    name: prop.to_string(),
+                    description: None,
+                    display_name: None,
+                    typ: DataType::Utf8,
+                    status: Status::Enabled,
+                    is_system: true,
+                    nullable: false,
+                    is_array: false,
+                    is_dictionary: true,
+                    dictionary_type: Some(DataType::Int64),
+                })
+                .await;
+        }
+
+        let accs = Arc::new(metadata::accounts::ProviderImpl::new(store.clone()));
+        let admin = accs
+            .create(CreateAccountRequest {
+                created_by: None,
+                password_hash: "sdf".to_string(),
+                email: "admin@email.com".to_string(),
+                first_name: Some("admin".to_string()),
+                last_name: None,
+                role: Some(Role::Admin),
+                organizations: None,
+                projects: None,
+                teams: None,
+            })
+            .await;
+        match admin {
+            Ok(admin) => {
+                let orgs = Arc::new(metadata::organizations::ProviderImpl::new(store.clone()));
+
+                let org = orgs
+                    .create(CreateOrganizationRequest {
+                        created_by: admin.id,
+                        name: "Test Organization".to_string(),
+                    })
+                    .await;
+
+                match org {
+                    Ok(org) => {
+                        let projects =
+                            Arc::new(metadata::projects::ProviderImpl::new(store.clone()));
+                        _ = projects
+                            .create(org.id, CreateProjectRequest {
+                                created_by: admin.id,
+                                name: "Test Project".to_string(),
+                            })
+                            .await;
+                    }
+                    Err(_) => {}
+                }
+            }
+            Err(_) => {}
         }
     }
 
     let event_props = Arc::new(properties::ProviderImpl::new_event(store.clone()));
 
     let events = Arc::new(events::ProviderImpl::new(store.clone()));
+    let projects = Arc::new(projects::ProviderImpl::new(store.clone()));
+    let proj = block_on(projects.get_by_id(1, 1))?;
+    debug!("project token: {}", proj.token);
     let mut track_processors = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
         .map_err(|e| IngesterError::General(e.to_string()))?;
@@ -128,6 +184,7 @@ async fn main() -> Result<(), anyhow::Error> {
         event_props.clone(),
         user_props.clone(),
         events.clone(),
+        projects.clone(),
     );
 
     let mut identify_processors = Vec::new();
@@ -150,6 +207,7 @@ async fn main() -> Result<(), anyhow::Error> {
         event_props.clone(),
         user_props.clone(),
         events.clone(),
+        projects.clone(),
     );
     let svc = sources::http::service::Service::new(track_exec, identify_exec, args.host);
 
