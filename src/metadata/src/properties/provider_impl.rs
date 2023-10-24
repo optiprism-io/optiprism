@@ -16,7 +16,7 @@ use crate::properties::CreatePropertyRequest;
 use crate::properties::Property;
 use crate::properties::Provider;
 use crate::properties::UpdatePropertyRequest;
-use crate::store::index::hash_map::StoreHashMap;
+use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -91,7 +91,7 @@ fn index_display_name_key(
 
 pub struct ProviderImpl {
     store: Arc<Store>,
-    idx: StoreHashMap,
+    idx: HashMap,
     guard: RwLock<()>,
     ns: Namespace,
 }
@@ -100,7 +100,7 @@ impl ProviderImpl {
     pub fn new_user(kv: Arc<Store>) -> Self {
         ProviderImpl {
             store: kv.clone(),
-            idx: StoreHashMap::new(kv),
+            idx: HashMap::new(kv),
             guard: RwLock::new(()),
             ns: Namespace::User,
         }
@@ -109,7 +109,7 @@ impl ProviderImpl {
     pub fn new_event(kv: Arc<Store>) -> Self {
         ProviderImpl {
             store: kv.clone(),
-            idx: StoreHashMap::new(kv),
+            idx: HashMap::new(kv),
             guard: RwLock::new(()),
             ns: Namespace::Event,
         }

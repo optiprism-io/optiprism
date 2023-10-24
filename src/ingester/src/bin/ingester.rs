@@ -41,8 +41,6 @@ use metadata::organizations::Provider as OrganizationProvider;
 use metadata::projects;
 use metadata::projects::CreateProjectRequest;
 use metadata::projects::Provider as ProjectsProvider;
-use metadata::projects::SDKLogLevel;
-use metadata::projects::SDK;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
 use metadata::properties::Provider;
@@ -150,10 +148,6 @@ async fn main() -> Result<(), anyhow::Error> {
                             .create(org.id, CreateProjectRequest {
                                 created_by: admin.id,
                                 name: "Test Project".to_string(),
-                                sdk: SDK {
-                                    autotrack_pageviews: false,
-                                    log_level: SDKLogLevel::Debug,
-                                },
                             })
                             .await;
                     }
@@ -215,13 +209,7 @@ async fn main() -> Result<(), anyhow::Error> {
         events.clone(),
         projects.clone(),
     );
-    let svc = sources::http::service::Service::new(
-        track_exec,
-        identify_exec,
-        args.host,
-        projects.clone(),
-        "http://localhost:8083/v1".to_string(),
-    );
+    let svc = sources::http::service::Service::new(track_exec, identify_exec, args.host);
 
     info!("start listening on {}", args.host);
 

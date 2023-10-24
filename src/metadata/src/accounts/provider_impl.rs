@@ -16,7 +16,7 @@ use crate::error::AccountError;
 use crate::error::MetadataError;
 use crate::error::StoreError;
 use crate::metadata::ListResponse;
-use crate::store::index::hash_map::StoreHashMap;
+use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -37,7 +37,7 @@ fn index_email_key(email: &str) -> Option<Vec<u8>> {
 
 pub struct ProviderImpl {
     store: Arc<Store>,
-    idx: StoreHashMap,
+    idx: HashMap,
     guard: RwLock<()>,
 }
 
@@ -45,7 +45,7 @@ impl ProviderImpl {
     pub fn new(kv: Arc<Store>) -> Self {
         ProviderImpl {
             store: kv.clone(),
-            idx: StoreHashMap::new(kv),
+            idx: HashMap::new(kv),
             guard: RwLock::new(()),
         }
     }

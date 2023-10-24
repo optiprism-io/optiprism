@@ -53,9 +53,7 @@ use crate::organizations::UpdateOrganizationRequest;
 use crate::projects;
 use crate::projects::CreateProjectRequest;
 use crate::projects::Project;
-use crate::projects::SDKLogLevel;
 use crate::projects::UpdateProjectRequest;
-use crate::projects::SDK;
 use crate::properties;
 use crate::properties::CreatePropertyRequest;
 use crate::properties::Property;
@@ -703,10 +701,6 @@ impl Projects {
             organization_id: 1,
             name: "name".to_string(),
             token: "token".to_string(),
-            sdk: SDK {
-                autotrack_pageviews: false,
-                log_level: SDKLogLevel::Debug,
-            },
         }
     }
 }
