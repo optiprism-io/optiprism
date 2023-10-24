@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
-use std::net::Ipv4Addr;
 
 use chrono::DateTime;
 use chrono::Utc;

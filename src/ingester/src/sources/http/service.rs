@@ -15,6 +15,9 @@ use common::http::Json;
 use common::types::EVENT_CLICK;
 use common::types::EVENT_PAGE;
 use common::types::EVENT_SCREEN;
+use futures::executor::block_on;
+use metadata::projects;
+use sailfish::TemplateOnce;
 use tokio::select;
 use tokio::signal::unix::SignalKind;
 use tower_http::cors::Any;
@@ -113,10 +116,29 @@ async fn identify(
     Ok(StatusCode::CREATED)
 }
 
+#[debug_handler]
+async fn sdk(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    State(state): State<App>,
+    Path(token): Path<String>,
+) -> Result<String> {
+    let ctx = RequestContext {
+        organization_id: None,
+        project_id: None,
+        client_ip: addr.ip(),
+        token,
+    };
+    let result = state.sdk(&ctx)?;
+
+    Ok(result)
+}
+
 #[derive(Clone)]
 struct App {
     track: Arc<Mutex<Executor<crate::Track>>>,
     identify: Arc<Mutex<Executor<crate::Identify>>>,
+    projects: Arc<dyn projects::Provider>,
+    server_url: String,
 }
 
 impl App {
@@ -214,6 +236,24 @@ impl App {
 
         self.identify.lock().unwrap().execute(ctx, track)
     }
+
+    pub fn sdk(&self, ctx: &RequestContext) -> Result<String> {
+        let project = block_on(self.projects.get_by_token(ctx.token.as_str()))?;
+        let tpl = SDKTemplate {
+            server_url: self.server_url.clone(),
+            autotrack_pageviews: project.sdk.autotrack_pageviews,
+            log_level: project.sdk.log_level.to_string(),
+        };
+        Ok(tpl.render_once()?)
+    }
+}
+
+#[derive(TemplateOnce)]
+#[template(path = "/Users/maximbogdanov/optiprism/optiprism/data/js_sdk/core.stpl")]
+struct SDKTemplate {
+    server_url: String,
+    autotrack_pageviews: bool,
+    log_level: String,
 }
 
 pub struct Service {
@@ -226,12 +266,16 @@ impl Service {
         track_exec: Executor<crate::Track>,
         identify_exec: Executor<crate::Identify>,
         addr: SocketAddr,
+        projects: Arc<dyn projects::Provider>,
+        server_url: String,
     ) -> Self {
         let mut router = Router::new();
 
         let state = App {
             track: Arc::new(Mutex::new(track_exec)),
             identify: Arc::new(Mutex::new((identify_exec))),
+            projects,
+            server_url,
         };
         info!("attaching api routes...");
         let cors = CorsLayer::new()
@@ -245,6 +289,7 @@ impl Service {
             .route("/v1/ingest/:token/page", routing::post(page))
             .route("/v1/ingest/:token/screen", routing::post(screen))
             .route("/v1/ingest/:token/identify", routing::post(identify))
+            .route("/v1/:token/sdk.js", routing::get(sdk))
             .layer(cors)
             .with_state(state);
 

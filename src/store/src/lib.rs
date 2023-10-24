@@ -7,6 +7,80 @@ pub mod arrow_conversion;
 pub mod error;
 pub mod parquet;
 
+use std::fmt::Debug;
+
+use error::Result;
+
+pub enum Value {
+    Int8(i8),
+    Int16(i16),
+    Int32(i32),
+    Int64(i64),
+    Int128(i128),
+    UInt8(u8),
+    UInt16(u16),
+    UInt32(u32),
+    UInt64(u64),
+    Float32(f32),
+    Float64(f64),
+    Boolean(bool),
+    Timestamp(i64),
+    Decimal(i128),
+    Binary(Vec<u8>),
+    Utf8(Vec<u8>),
+    ListInt8(Vec<i8>),
+    ListInt16(Vec<i16>),
+    ListInt32(Vec<i32>),
+    ListInt64(Vec<i64>),
+    ListInt128(Vec<i128>),
+    ListUInt8(Vec<u8>),
+    ListUInt16(Vec<u16>),
+    ListUInt32(Vec<u32>),
+    ListUInt64(Vec<u64>),
+    ListFloat32(Vec<f32>),
+    ListFloat64(Vec<f64>),
+    ListBoolean(Vec<bool>),
+    ListTimestamp(Vec<i64>),
+    ListDecimal(Vec<i128>),
+    ListBinary(Vec<Vec<u8>>),
+    ListUtf8(Vec<Vec<u8>>),
+}
+
+pub enum UpdateValueOp {
+    Insert,
+    Increment,
+    Decrement,
+}
+
+pub struct UpdateRowValue {
+    col: String,
+    op: UpdateValueOp,
+    value: Value,
+}
+
+pub enum ValueOp {
+    Insert,
+    Increment,
+    Decrement,
+}
+
+pub struct RowValue {
+    col: String,
+    op: ValueOp,
+    value: Value,
+}
+
+pub trait SortedMergeTree: Sync + Send + Debug {
+    fn insert(&mut self, value: Vec<RowValue>) -> Result<()>;
+    fn delete(&mut self, col: &str, eq_value: Value) -> Result<()>;
+}
+
+pub trait ReplacingMergeTree: Sync + Send + Debug {
+    fn insert(&mut self, value: Vec<RowValue>) -> Result<()>;
+    fn update(&mut self, value: Vec<UpdateRowValue>) -> Result<()>;
+    fn delete(&mut self, col: &str, eq_value: Value) -> Result<()>;
+}
+
 pub mod test_util {
     use std::fs::File;
     use std::io::Read;

@@ -5,13 +5,13 @@ use crate::store::Store;
 use crate::Result;
 
 #[derive(Clone)]
-pub struct HashMap {
+pub struct StoreHashMap {
     store: Arc<Store>,
 }
 
-impl HashMap {
+impl StoreHashMap {
     pub fn new(store: Arc<Store>) -> Self {
-        HashMap { store }
+        StoreHashMap { store }
     }
 
     pub async fn check_insert_constraints(&self, keys: &[Option<Vec<u8>>]) -> Result<()> {

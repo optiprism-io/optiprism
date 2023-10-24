@@ -11,6 +11,7 @@ use common::http::Json;
 use hyper::StatusCode;
 use maxminddb::MaxMindDBError;
 use metadata::error::MetadataError;
+use sailfish::RenderError;
 use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
@@ -28,6 +29,8 @@ pub enum IngesterError {
     Metadata(#[from] MetadataError),
     #[error("maxmind: {0:?}")]
     Maxmind(#[from] MaxMindDBError),
+    #[error("render: {0:?}")]
+    Render(#[from] RenderError),
 }
 
 impl IntoResponse for IngesterError {
@@ -60,6 +63,8 @@ impl IntoResponse for IngesterError {
                 fields: Default::default(),
             }
             .into_response(),
+
+            IngesterError::Render(err) => ApiError::internal(err).into_response(),
         }
     }
 }

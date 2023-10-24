@@ -12,7 +12,7 @@ use crate::error::MetadataError;
 use crate::error::StoreError;
 use crate::error::TeamError;
 use crate::metadata::ListResponse;
-use crate::store::index::hash_map::HashMap;
+use crate::store::index::hash_map::StoreHashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -45,7 +45,7 @@ fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
 
 pub struct ProviderImpl {
     store: Arc<Store>,
-    idx: HashMap,
+    idx: StoreHashMap,
     guard: RwLock<()>,
 }
 
@@ -53,7 +53,7 @@ impl ProviderImpl {
     pub fn new(kv: Arc<Store>) -> Self {
         ProviderImpl {
             store: kv.clone(),
-            idx: HashMap::new(kv),
+            idx: StoreHashMap::new(kv),
             guard: RwLock::new(()),
         }
     }

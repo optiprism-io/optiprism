@@ -17,7 +17,7 @@ use crate::events::Provider;
 use crate::events::UpdateEventRequest;
 use crate::metadata::ListResponse;
 use crate::properties::provider_impl::Namespace;
-use crate::store::index::hash_map::HashMap;
+use crate::store::index::hash_map::StoreHashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
 use crate::store::path_helpers::make_id_seq_key;
@@ -71,7 +71,7 @@ fn index_display_name_key(
 
 pub struct ProviderImpl {
     store: Arc<Store>,
-    idx: HashMap,
+    idx: StoreHashMap,
     guard: RwLock<()>,
 }
 
@@ -79,7 +79,7 @@ impl ProviderImpl {
     pub fn new(kv: Arc<Store>) -> Self {
         ProviderImpl {
             store: kv.clone(),
-            idx: HashMap::new(kv),
+            idx: StoreHashMap::new(kv),
             guard: RwLock::new(()),
         }
     }

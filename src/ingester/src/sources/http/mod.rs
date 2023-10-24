@@ -1,33 +1,11 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
-use std::net::Ipv4Addr;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::sync::Mutex;
 
-use axum::extract::Path;
-use axum::extract::State;
-use axum::http::StatusCode;
-use axum::routing;
-use axum::Json;
-use axum::Router;
-use axum::Server;
-use axum_macros::debug_handler;
 use chrono::DateTime;
 use chrono::Utc;
-use common::types::EVENT_CLICK;
-use common::types::EVENT_PAGE;
-use common::types::EVENT_SCREEN;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use tokio::select;
-use tokio::signal::unix::SignalKind;
-use tower_http::cors::Any;
-use tower_http::cors::CorsLayer;
-use tracing::info;
 
-use crate::error::Result;
-use crate::executor::Executor;
 use crate::Destination;
 
 pub mod service;
