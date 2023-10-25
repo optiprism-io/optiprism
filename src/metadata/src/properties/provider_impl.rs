@@ -15,6 +15,7 @@ use crate::metadata::ListResponse;
 use crate::properties::CreatePropertyRequest;
 use crate::properties::Property;
 use crate::properties::Provider;
+use crate::properties::Type;
 use crate::properties::UpdatePropertyRequest;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
@@ -25,34 +26,19 @@ use crate::store::path_helpers::org_proj_ns;
 use crate::store::Store;
 use crate::Result;
 
-#[derive(Clone, Debug)]
-pub enum Namespace {
-    Event,
-    User,
-}
-
 const IDX_NAME: &[u8] = b"name";
 const IDX_DISPLAY_NAME: &[u8] = b"display_name";
-
-impl Namespace {
-    pub fn as_bytes(&self) -> &[u8] {
-        match self {
-            Namespace::Event => "event_properties".as_bytes(),
-            Namespace::User => "user_properties".as_bytes(),
-        }
-    }
-}
 
 fn index_keys(
     organization_id: u64,
     project_id: u64,
-    ns: &Namespace,
+    typ: &Type,
     name: &str,
     display_name: Option<String>,
 ) -> Vec<Option<Vec<u8>>> {
     [
-        index_name_key(organization_id, project_id, ns, name),
-        index_display_name_key(organization_id, project_id, ns, display_name),
+        index_name_key(organization_id, project_id, typ, name),
+        index_display_name_key(organization_id, project_id, typ, display_name),
     ]
     .to_vec()
 }
@@ -60,12 +46,12 @@ fn index_keys(
 fn index_name_key(
     organization_id: u64,
     project_id: u64,
-    ns: &Namespace,
+    typ: &Type,
     name: &str,
 ) -> Option<Vec<u8>> {
     Some(
         make_index_key(
-            org_proj_ns(organization_id, project_id, ns.as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, typ.as_name().as_bytes()).as_slice(),
             IDX_NAME,
             name,
         )
@@ -76,12 +62,12 @@ fn index_name_key(
 fn index_display_name_key(
     organization_id: u64,
     project_id: u64,
-    ns: &Namespace,
+    typ: &Type,
     display_name: Option<String>,
 ) -> Option<Vec<u8>> {
     display_name.map(|v| {
         make_index_key(
-            org_proj_ns(organization_id, project_id, ns.as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, typ.as_name().as_bytes()).as_slice(),
             IDX_DISPLAY_NAME,
             v.as_str(),
         )
@@ -93,7 +79,7 @@ pub struct ProviderImpl {
     store: Arc<Store>,
     idx: HashMap,
     guard: RwLock<()>,
-    ns: Namespace,
+    typ: Type,
 }
 
 impl ProviderImpl {
@@ -102,7 +88,7 @@ impl ProviderImpl {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
-            ns: Namespace::User,
+            typ: Type::User,
         }
     }
 
@@ -111,7 +97,7 @@ impl ProviderImpl {
             store: kv.clone(),
             idx: HashMap::new(kv),
             guard: RwLock::new(()),
-            ns: Namespace::Event,
+            typ: Type::Event,
         }
     }
 
@@ -124,7 +110,7 @@ impl ProviderImpl {
         match self
             .idx
             .get(make_index_key(
-                org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
+                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
                 IDX_NAME,
                 name,
             ))
@@ -134,7 +120,6 @@ impl ProviderImpl {
                 Err(PropertyError::PropertyNotFound(error::Property {
                     organization_id,
                     project_id,
-                    namespace: self.ns.clone(),
                     event_id: None,
                     property_id: None,
                     property_name: Some(name.to_string()),
@@ -155,7 +140,7 @@ impl ProviderImpl {
         let idx_keys = index_keys(
             organization_id,
             project_id,
-            &self.ns,
+            &self.typ,
             &req.name,
             req.display_name.clone(),
         );
@@ -164,7 +149,6 @@ impl ProviderImpl {
                 return Err(PropertyError::PropertyAlreadyExist(error::Property {
                     organization_id,
                     project_id,
-                    namespace: self.ns.clone(),
                     event_id: None,
                     property_id: None,
                     property_name: Some(req.name),
@@ -178,7 +162,7 @@ impl ProviderImpl {
         let id = self
             .store
             .next_seq(make_id_seq_key(
-                org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
+                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
             ))
             .await?;
         let created_at = Utc::now();
@@ -195,6 +179,7 @@ impl ProviderImpl {
             description: req.description,
             display_name: req.display_name,
             typ: req.typ,
+            data_type: req.data_type,
             status: req.status,
             nullable: req.nullable,
             is_array: req.is_array,
@@ -207,7 +192,8 @@ impl ProviderImpl {
         self.store
             .put(
                 make_data_value_key(
-                    org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
+                    org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes())
+                        .as_slice(),
                     prop.id,
                 ),
                 &data,
@@ -252,7 +238,7 @@ impl Provider for ProviderImpl {
 
     async fn get_by_id(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Property> {
         let key = make_data_value_key(
-            org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
             id,
         );
 
@@ -260,7 +246,6 @@ impl Provider for ProviderImpl {
             None => Err(PropertyError::PropertyNotFound(error::Property {
                 organization_id,
                 project_id,
-                namespace: self.ns.clone(),
                 event_id: None,
                 property_id: Some(id),
                 property_name: None,
@@ -283,7 +268,7 @@ impl Provider for ProviderImpl {
     async fn list(&self, organization_id: u64, project_id: u64) -> Result<ListResponse<Property>> {
         list(
             self.store.clone(),
-            org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
+            org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
         )
         .await
     }
@@ -308,13 +293,13 @@ impl Provider for ProviderImpl {
             idx_keys.push(index_name_key(
                 organization_id,
                 project_id,
-                &self.ns,
+                &self.typ,
                 name.as_str(),
             ));
             idx_prev_keys.push(index_name_key(
                 organization_id,
                 project_id,
-                &self.ns,
+                &self.typ,
                 prev_prop.name.as_str(),
             ));
             prop.name = name.to_owned();
@@ -323,13 +308,13 @@ impl Provider for ProviderImpl {
             idx_keys.push(index_display_name_key(
                 organization_id,
                 project_id,
-                &self.ns,
+                &self.typ,
                 display_name.clone(),
             ));
             idx_prev_keys.push(index_display_name_key(
                 organization_id,
                 project_id,
-                &self.ns,
+                &self.typ,
                 prev_prop.display_name,
             ));
             prop.display_name = display_name.to_owned();
@@ -343,7 +328,6 @@ impl Provider for ProviderImpl {
                 return Err(PropertyError::PropertyAlreadyExist(error::Property {
                     organization_id,
                     project_id,
-                    namespace: self.ns.clone(),
                     event_id: None,
                     property_id: Some(property_id),
                     property_name: None,
@@ -364,6 +348,10 @@ impl Provider for ProviderImpl {
         }
         if let OptionalProperty::Some(typ) = req.typ {
             prop.typ = typ;
+        }
+
+        if let OptionalProperty::Some(typ) = req.data_type {
+            prop.data_type = typ;
         }
         if let OptionalProperty::Some(status) = req.status {
             prop.status = status;
@@ -388,7 +376,8 @@ impl Provider for ProviderImpl {
         self.store
             .put(
                 make_data_value_key(
-                    org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
+                    org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes())
+                        .as_slice(),
                     prop.id,
                 ),
                 &data,
@@ -407,7 +396,7 @@ impl Provider for ProviderImpl {
         let prop = self.get_by_id(organization_id, project_id, id).await?;
         self.store
             .delete(make_data_value_key(
-                org_proj_ns(organization_id, project_id, self.ns.as_bytes()).as_slice(),
+                org_proj_ns(organization_id, project_id, self.typ.as_name().as_bytes()).as_slice(),
                 id,
             ))
             .await?;
@@ -417,7 +406,7 @@ impl Provider for ProviderImpl {
                 index_keys(
                     organization_id,
                     project_id,
-                    &self.ns,
+                    &self.typ,
                     &prop.name,
                     prop.display_name.clone(),
                 )

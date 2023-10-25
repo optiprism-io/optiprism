@@ -51,6 +51,7 @@ pub trait Provider: Sync + Send {
         prop_id: u64,
     ) -> Result<Event>;
     async fn delete(&self, organization_id: u64, project_id: u64, id: u64) -> Result<Event>;
+    async fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64>;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]

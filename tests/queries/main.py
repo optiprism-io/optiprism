@@ -1,7 +1,6 @@
 import time
 
 fields = ["i_8", "i_16", "i_32", "i_64", "u_8", "u_16", "u_32", "u_64",
-          # "f_32",
           "f_64", "decimal"]
 aggs = ["min", "max", "avg", "sum", "count"]
 

@@ -1,14 +1,14 @@
 use std::env::temp_dir;
 use std::sync::Arc;
 
-use arrow::datatypes::DataType;
 use common::types::OptionalProperty;
 use metadata::error::Result;
-use metadata::properties::provider_impl::Namespace;
 use metadata::properties::CreatePropertyRequest;
+use metadata::properties::DataType;
 use metadata::properties::Provider;
 use metadata::properties::ProviderImpl;
 use metadata::properties::Status;
+use metadata::properties::Type;
 use metadata::properties::UpdatePropertyRequest;
 use metadata::store::Store;
 use uuid::Uuid;
@@ -26,7 +26,8 @@ async fn test_properties() -> Result<()> {
         name: "prop1".to_string(),
         description: Some("".to_string()),
         display_name: None,
-        typ: DataType::Null,
+        typ: Type::Event,
+        data_type: DataType::String,
         status: Status::Enabled,
         is_system: false,
         nullable: false,
@@ -42,6 +43,7 @@ async fn test_properties() -> Result<()> {
         description: OptionalProperty::None,
         display_name: OptionalProperty::None,
         typ: OptionalProperty::None,
+        data_type: OptionalProperty::None,
         status: OptionalProperty::None,
         is_system: OptionalProperty::None,
         nullable: OptionalProperty::None,
@@ -72,7 +74,7 @@ async fn test_properties() -> Result<()> {
         .await?;
     assert_eq!(res.id, 1);
 
-    assert_eq!(res.column_name(Namespace::User), "user_prop_1".to_string());
+    assert_eq!(res.column_name(), "event_prop_1".to_string());
 
     let mut create_prop2 = create_prop_req.clone();
     create_prop2.name = "prop2".to_string();

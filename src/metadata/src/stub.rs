@@ -56,6 +56,7 @@ use crate::projects::Project;
 use crate::projects::UpdateProjectRequest;
 use crate::properties;
 use crate::properties::CreatePropertyRequest;
+use crate::properties::DictionaryType;
 use crate::properties::Property;
 use crate::properties::UpdatePropertyRequest;
 use crate::reports;
@@ -463,6 +464,10 @@ impl events::Provider for Events {
     async fn delete(&self, _organization_id: u64, _project_id: u64, _id: u64) -> Result<Event> {
         Ok(Events::event())
     }
+
+    async fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64> {
+        unreachable!()
+    }
 }
 
 pub struct Properties {}
@@ -480,13 +485,14 @@ impl Properties {
             name: "name".to_string(),
             description: Some("description".to_string()),
             display_name: Some("display_name".to_string()),
-            typ: DataType::Null,
+            typ: properties::Type::Event,
+            data_type: properties::DataType::UInt16,
             status: properties::Status::Enabled,
             is_system: true,
             nullable: true,
             is_array: true,
             is_dictionary: true,
-            dictionary_type: Some(DataType::UInt8),
+            dictionary_type: Some(properties::DictionaryType::UInt8),
         }
     }
 }
@@ -602,7 +608,7 @@ impl database::Provider for Database {
                 "col".to_string(),
                 DataType::UInt8,
                 true,
-                Some(DataType::Int16),
+                Some(DictionaryType::UInt64),
             )],
         })
     }

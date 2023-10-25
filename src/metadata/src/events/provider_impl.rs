@@ -16,7 +16,6 @@ use crate::events::Event;
 use crate::events::Provider;
 use crate::events::UpdateEventRequest;
 use crate::metadata::ListResponse;
-use crate::properties::provider_impl::Namespace;
 use crate::store::index::hash_map::HashMap;
 use crate::store::path_helpers::list;
 use crate::store::path_helpers::make_data_value_key;
@@ -27,6 +26,7 @@ use crate::store::Store;
 use crate::Result;
 
 const NAMESPACE: &[u8] = b"events";
+const RECORDS_NAMESPACE: &[u8] = b"events/records";
 const IDX_NAME: &[u8] = b"name";
 const IDX_DISPLAY_NAME: &[u8] = b"display_name";
 
@@ -357,7 +357,6 @@ impl Provider for ProviderImpl {
                     return Err(EventError::PropertyAlreadyExist(error::Property {
                         organization_id,
                         project_id,
-                        namespace: Namespace::Event,
                         event_id: Some(event_id),
                         property_id: Some(prop_id),
                         property_name: None,
@@ -395,7 +394,6 @@ impl Provider for ProviderImpl {
                 return Err(EventError::PropertyNotFound(error::Property {
                     organization_id,
                     project_id,
-                    namespace: Namespace::Event,
                     event_id: Some(event_id),
                     property_id: Some(prop_id),
                     property_name: None,
@@ -407,7 +405,6 @@ impl Provider for ProviderImpl {
                     return Err(EventError::PropertyAlreadyExist(error::Property {
                         organization_id,
                         project_id,
-                        namespace: Namespace::Event,
                         event_id: Some(event_id),
                         property_id: Some(prop_id),
                         property_name: None,
@@ -453,5 +450,16 @@ impl Provider for ProviderImpl {
             .await?;
 
         Ok(event)
+    }
+
+    async fn generate_record_id(&self, organization_id: u64, project_id: u64) -> Result<u64> {
+        let id = self
+            .store
+            .next_seq(make_id_seq_key(
+                org_proj_ns(organization_id, project_id, RECORDS_NAMESPACE).as_slice(),
+            ))
+            .await?;
+
+        Ok(id)
     }
 }

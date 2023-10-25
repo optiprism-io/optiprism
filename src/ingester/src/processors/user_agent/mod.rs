@@ -31,12 +31,11 @@ pub fn resolve_properties(
     let proj_id = ctx.project_id.unwrap();
     // client family
     {
-        let prop =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_CLIENT_FAMILY))?;
+        let property =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_CLIENT_FAMILY))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_CLIENT_FAMILY.to_string(),
+            property,
             value: PropValue::String(client.user_agent.family.to_string()),
         };
         user_props.push(prop);
@@ -44,15 +43,14 @@ pub fn resolve_properties(
 
     // client version major
     if let Some(v) = client.user_agent.major {
-        let prop = block_on(props_prov.get_by_name(
+        let property = block_on(props_prov.get_by_name(
             org_id,
             proj_id,
-            types::USER_COLUMN_CLIENT_VERSION_MAJOR,
+            types::USER_PROPERTY_CLIENT_VERSION_MAJOR,
         ))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_CLIENT_VERSION_MAJOR.to_string(),
+            property,
             value: PropValue::String(v.to_string()),
         };
         user_props.push(prop);
@@ -60,15 +58,14 @@ pub fn resolve_properties(
 
     // client version minor
     if let Some(v) = client.user_agent.minor {
-        let prop = block_on(props_prov.get_by_name(
+        let property = block_on(props_prov.get_by_name(
             org_id,
             proj_id,
-            types::USER_COLUMN_CLIENT_VERSION_MINOR,
+            types::USER_PROPERTY_CLIENT_VERSION_MINOR,
         ))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_CLIENT_VERSION_MINOR.to_string(),
+            property,
             value: PropValue::String(v.to_string()),
         };
         user_props.push(prop);
@@ -76,12 +73,11 @@ pub fn resolve_properties(
 
     // device family
     {
-        let prop =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_DEVICE_FAMILY))?;
+        let property =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_DEVICE_FAMILY))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_DEVICE_FAMILY.to_string(),
+            property,
             value: PropValue::String(client.device.family.to_string()),
         };
 
@@ -90,12 +86,11 @@ pub fn resolve_properties(
 
     // device brand
     if let Some(brand) = client.device.brand {
-        let prop =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_DEVICE_BRAND))?;
+        let property =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_DEVICE_BRAND))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_DEVICE_BRAND.to_string(),
+            property,
             value: PropValue::String(brand.to_string()),
         };
 
@@ -104,12 +99,11 @@ pub fn resolve_properties(
 
     // device brand
     if let Some(model) = client.device.model {
-        let prop =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_DEVICE_MODEL))?;
+        let property =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_DEVICE_MODEL))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_DEVICE_MODEL.to_string(),
+            property,
             value: PropValue::String(model.to_string()),
         };
 
@@ -118,11 +112,11 @@ pub fn resolve_properties(
 
     // os family
     {
-        let prop = block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_OS_FAMILY))?;
+        let property =
+            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_OS_FAMILY))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_OS_FAMILY.to_string(),
+            property,
             value: PropValue::String(client.os.family.to_string()),
         };
 
@@ -131,12 +125,14 @@ pub fn resolve_properties(
 
     // os major
     if let Some(v) = client.os.major {
-        let prop =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_OS_VERSION_MAJOR))?;
+        let property = block_on(props_prov.get_by_name(
+            org_id,
+            proj_id,
+            types::USER_PROPERTY_OS_VERSION_MAJOR,
+        ))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_OS_VERSION_MAJOR.to_string(),
+            property,
             value: PropValue::String(v.to_string()),
         };
 
@@ -145,12 +141,14 @@ pub fn resolve_properties(
 
     // os minor
     if let Some(v) = client.os.minor {
-        let prop =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_OS_VERSION_MINOR))?;
+        let property = block_on(props_prov.get_by_name(
+            org_id,
+            proj_id,
+            types::USER_PROPERTY_OS_VERSION_MINOR,
+        ))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_OS_VERSION_MINOR.to_string(),
+            property,
             value: PropValue::String(v.to_string()),
         };
 
@@ -159,12 +157,14 @@ pub fn resolve_properties(
 
     // os major
     if let Some(v) = client.os.patch {
-        let prop =
-            block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_OS_VERSION_PATCH))?;
+        let property = block_on(props_prov.get_by_name(
+            org_id,
+            proj_id,
+            types::USER_PROPERTY_OS_VERSION_PATCH,
+        ))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_OS_VERSION_PATCH.to_string(),
+            property,
             value: PropValue::String(v.to_string()),
         };
 
@@ -173,15 +173,14 @@ pub fn resolve_properties(
 
     // os major
     if let Some(v) = client.os.patch_minor {
-        let prop = block_on(props_prov.get_by_name(
+        let property = block_on(props_prov.get_by_name(
             org_id,
             proj_id,
-            types::USER_COLUMN_OS_VERSION_PATCH_MINOR,
+            types::USER_PROPERTY_OS_VERSION_PATCH_MINOR,
         ))?;
 
         let prop = Property {
-            id: prop.id,
-            name: types::USER_COLUMN_OS_VERSION_PATCH_MINOR.to_string(),
+            property,
             value: PropValue::String(v.to_string()),
         };
 

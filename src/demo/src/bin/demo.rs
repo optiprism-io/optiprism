@@ -41,7 +41,8 @@ use indicatif::ProgressStyle;
 use metadata::accounts::CreateAccountRequest;
 use metadata::organizations::CreateOrganizationRequest;
 use metadata::projects::CreateProjectRequest;
-use metadata::properties::provider_impl::Namespace;
+use metadata::properties::DictionaryType;
+use metadata::properties::Type;
 use metadata::store::Store;
 use metadata::MetadataProvider;
 use platform::auth;
@@ -351,21 +352,21 @@ fn write_parquet(
         if field.name().starts_with("event_") {
             let prop = event_props
                 .iter()
-                .find(|p| p.column_name(Namespace::Event) == *field.name())
+                .find(|p| p.column_name() == *field.name())
                 .unwrap();
             out_fields.push(Field::new(
-                prop.column_name(Namespace::Event),
-                prop.typ.clone(),
+                prop.column_name(),
+                prop.data_type.clone().into(),
                 prop.nullable,
             ));
         } else if field.name().starts_with("user_") {
             let prop = user_props
                 .iter()
-                .find(|p| p.column_name(Namespace::User) == *field.name())
+                .find(|p| p.column_name() == *field.name())
                 .unwrap();
             out_fields.push(Field::new(
-                prop.column_name(Namespace::User),
-                prop.typ.clone(),
+                prop.column_name(),
+                prop.data_type.clone().into(),
                 prop.nullable,
             ));
         } else {
@@ -390,12 +391,12 @@ fn write_parquet(
                 let prop = if field.name().starts_with("event_") {
                     event_props
                         .iter()
-                        .find(|p| p.column_name(Namespace::Event) == *field.name())
+                        .find(|p| p.column_name() == *field.name())
                         .unwrap()
                 } else if field.name().starts_with("user_") {
                     user_props
                         .iter()
-                        .find(|p| p.column_name(Namespace::User) == *field.name())
+                        .find(|p| p.column_name() == *field.name())
                         .unwrap()
                 } else {
                     unimplemented!("{}", field.name())
@@ -407,7 +408,7 @@ fn write_parquet(
                     let field = Field::new(field.name(), DataType::Utf8, field.is_nullable());
                     fields.push(field.clone());
                     let arr = match typ {
-                        DataType::UInt8 => {
+                        DictionaryType::UInt8 => {
                             let arr = batch.columns()[idx]
                                 .as_any()
                                 .downcast_ref::<UInt8Array>()
@@ -430,7 +431,7 @@ fn write_parquet(
 
                             Arc::new(b.finish()) as ArrayRef
                         }
-                        DataType::UInt16 => {
+                        DictionaryType::UInt16 => {
                             let arr = batch.columns()[idx]
                                 .as_any()
                                 .downcast_ref::<UInt16Array>()
@@ -451,7 +452,7 @@ fn write_parquet(
 
                             Arc::new(b.finish()) as ArrayRef
                         }
-                        DataType::UInt32 => {
+                        DictionaryType::UInt32 => {
                             let arr = batch.columns()[idx]
                                 .as_any()
                                 .downcast_ref::<UInt32Array>()
@@ -472,7 +473,7 @@ fn write_parquet(
 
                             Arc::new(b.finish()) as ArrayRef
                         }
-                        DataType::UInt64 => {
+                        DictionaryType::UInt64 => {
                             let arr = batch.columns()[idx]
                                 .as_any()
                                 .downcast_ref::<UInt64Array>()
@@ -493,16 +494,14 @@ fn write_parquet(
 
                             Arc::new(b.finish()) as ArrayRef
                         }
-                        _ => unimplemented!("dictionary type {:?} is unsupported", prop.typ),
+                        _ => unimplemented!("dictionary type {:?} is unsupported", prop.data_type),
                     };
 
                     cols.push(arr);
                 } else {
                     let field = Field::new(
                         field.name(),
-                        prop.dictionary_type
-                            .clone()
-                            .unwrap_or_else(|| prop.typ.clone()),
+                        prop.data_type.clone().into(),
                         field.is_nullable(),
                     );
                     fields.push(field.clone());

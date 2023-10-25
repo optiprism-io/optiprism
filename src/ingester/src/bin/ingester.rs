@@ -3,24 +3,23 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use arrow::datatypes::DataType;
 use chrono::Duration;
 use clap::Parser;
 use common::rbac::Role;
-use common::types::USER_COLUMN_CITY;
-use common::types::USER_COLUMN_CLIENT_FAMILY;
-use common::types::USER_COLUMN_CLIENT_VERSION_MAJOR;
-use common::types::USER_COLUMN_CLIENT_VERSION_MINOR;
-use common::types::USER_COLUMN_CLIENT_VERSION_PATCH;
-use common::types::USER_COLUMN_COUNTRY;
-use common::types::USER_COLUMN_DEVICE_BRAND;
-use common::types::USER_COLUMN_DEVICE_FAMILY;
-use common::types::USER_COLUMN_DEVICE_MODEL;
-use common::types::USER_COLUMN_OS_FAMILY;
-use common::types::USER_COLUMN_OS_VERSION_MAJOR;
-use common::types::USER_COLUMN_OS_VERSION_MINOR;
-use common::types::USER_COLUMN_OS_VERSION_PATCH;
-use common::types::USER_COLUMN_OS_VERSION_PATCH_MINOR;
+use common::types::USER_PROPERTY_CITY;
+use common::types::USER_PROPERTY_CLIENT_FAMILY;
+use common::types::USER_PROPERTY_CLIENT_VERSION_MAJOR;
+use common::types::USER_PROPERTY_CLIENT_VERSION_MINOR;
+use common::types::USER_PROPERTY_CLIENT_VERSION_PATCH;
+use common::types::USER_PROPERTY_COUNTRY;
+use common::types::USER_PROPERTY_DEVICE_BRAND;
+use common::types::USER_PROPERTY_DEVICE_FAMILY;
+use common::types::USER_PROPERTY_DEVICE_MODEL;
+use common::types::USER_PROPERTY_OS_FAMILY;
+use common::types::USER_PROPERTY_OS_VERSION_MAJOR;
+use common::types::USER_PROPERTY_OS_VERSION_MINOR;
+use common::types::USER_PROPERTY_OS_VERSION_PATCH;
+use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
 use futures::executor::block_on;
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
@@ -43,6 +42,8 @@ use metadata::projects::CreateProjectRequest;
 use metadata::projects::Provider as ProjectsProvider;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
+use metadata::properties::DataType;
+use metadata::properties::DictionaryType;
 use metadata::properties::Provider;
 use metadata::properties::Status;
 use metadata::store::Store;
@@ -81,20 +82,20 @@ async fn main() -> Result<(), anyhow::Error> {
     // todo move somewhere else
     {
         let props = vec![
-            USER_COLUMN_CLIENT_FAMILY,
-            USER_COLUMN_CLIENT_VERSION_MINOR,
-            USER_COLUMN_CLIENT_VERSION_MAJOR,
-            USER_COLUMN_CLIENT_VERSION_PATCH,
-            USER_COLUMN_DEVICE_FAMILY,
-            USER_COLUMN_DEVICE_BRAND,
-            USER_COLUMN_DEVICE_MODEL,
-            USER_COLUMN_OS_FAMILY,
-            USER_COLUMN_OS_VERSION_MAJOR,
-            USER_COLUMN_OS_VERSION_MINOR,
-            USER_COLUMN_OS_VERSION_PATCH,
-            USER_COLUMN_OS_VERSION_PATCH_MINOR,
-            USER_COLUMN_COUNTRY,
-            USER_COLUMN_CITY,
+            USER_PROPERTY_CLIENT_FAMILY,
+            USER_PROPERTY_CLIENT_VERSION_MINOR,
+            USER_PROPERTY_CLIENT_VERSION_MAJOR,
+            USER_PROPERTY_CLIENT_VERSION_PATCH,
+            USER_PROPERTY_DEVICE_FAMILY,
+            USER_PROPERTY_DEVICE_BRAND,
+            USER_PROPERTY_DEVICE_MODEL,
+            USER_PROPERTY_OS_FAMILY,
+            USER_PROPERTY_OS_VERSION_MAJOR,
+            USER_PROPERTY_OS_VERSION_MINOR,
+            USER_PROPERTY_OS_VERSION_PATCH,
+            USER_PROPERTY_OS_VERSION_PATCH_MINOR,
+            USER_PROPERTY_COUNTRY,
+            USER_PROPERTY_CITY,
         ];
         for prop in props {
             let _ = user_props
@@ -104,13 +105,14 @@ async fn main() -> Result<(), anyhow::Error> {
                     name: prop.to_string(),
                     description: None,
                     display_name: None,
-                    typ: DataType::Utf8,
+                    typ: properties::Type::User,
+                    data_type: DataType::String,
                     status: Status::Enabled,
                     is_system: true,
                     nullable: false,
                     is_array: false,
                     is_dictionary: true,
-                    dictionary_type: Some(DataType::Int64),
+                    dictionary_type: Some(DictionaryType::UInt64),
                 })
                 .await;
         }
@@ -166,7 +168,7 @@ async fn main() -> Result<(), anyhow::Error> {
     debug!("project token: {}", proj.token);
     let mut track_processors = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
-        .map_err(|e| IngesterError::General(e.to_string()))?;
+        .map_err(|e| IngesterError::Internal(e.to_string()))?;
     let ua = user_agent::track::UserAgent::try_new(user_props.clone(), ua_parser)?;
     track_processors.push(Arc::new(ua) as Arc<dyn Processor<Track>>);
 
@@ -189,7 +191,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let mut identify_processors = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
-        .map_err(|e| IngesterError::General(e.to_string()))?;
+        .map_err(|e| IngesterError::Internal(e.to_string()))?;
 
     let ua = user_agent::identify::UserAgent::try_new(user_props.clone(), ua_parser)?;
     identify_processors.push(Arc::new(ua) as Arc<dyn Processor<Identify>>);

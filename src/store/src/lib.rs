@@ -9,9 +9,13 @@ pub mod parquet;
 
 use std::fmt::Debug;
 
+use chrono::DateTime;
+use chrono::Utc;
 use error::Result;
 
+#[derive(Clone, Debug)]
 pub enum Value {
+    Null,
     Int8(i8),
     Int16(i16),
     Int32(i32),
@@ -24,10 +28,10 @@ pub enum Value {
     Float32(f32),
     Float64(f64),
     Boolean(bool),
-    Timestamp(i64),
+    Timestamp(DateTime<Utc>),
     Decimal(i128),
     Binary(Vec<u8>),
-    Utf8(Vec<u8>),
+    String(String),
     ListInt8(Vec<i8>),
     ListInt16(Vec<i16>),
     ListInt32(Vec<i32>),
@@ -43,31 +47,41 @@ pub enum Value {
     ListTimestamp(Vec<i64>),
     ListDecimal(Vec<i128>),
     ListBinary(Vec<Vec<u8>>),
-    ListUtf8(Vec<Vec<u8>>),
+    ListString(Vec<String>),
 }
-
+#[derive(Clone, Debug)]
 pub enum UpdateValueOp {
     Insert,
     Increment,
     Decrement,
 }
-
+#[derive(Clone, Debug)]
 pub struct UpdateRowValue {
     col: String,
     op: UpdateValueOp,
     value: Value,
 }
-
+#[derive(Clone, Debug)]
 pub enum ValueOp {
     Insert,
     Increment,
     Decrement,
 }
-
+#[derive(Clone, Debug)]
 pub struct RowValue {
     col: String,
     op: ValueOp,
     value: Value,
+}
+
+impl RowValue {
+    pub fn new_insert(col: String, value: Value) -> Self {
+        Self {
+            col,
+            op: ValueOp::Insert,
+            value,
+        }
+    }
 }
 
 pub trait SortedMergeTree: Sync + Send + Debug {

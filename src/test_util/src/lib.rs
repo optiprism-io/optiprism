@@ -1,13 +1,18 @@
 use std::sync::Arc;
 
-use arrow::datatypes::DataType;
+use arrow::datatypes::TimeUnit;
+use common::types::TIME_UNIT;
+use common::DECIMAL_PRECISION;
+use common::DECIMAL_SCALE;
 use metadata::database::Column;
 use metadata::events;
 use metadata::events::Event;
 use metadata::properties;
-use metadata::properties::provider_impl::Namespace;
 use metadata::properties::CreatePropertyRequest;
+use metadata::properties::DataType;
+use metadata::properties::DictionaryType;
 use metadata::properties::Property;
+use metadata::properties::Type;
 use metadata::MetadataProvider;
 
 pub async fn create_event(
@@ -34,14 +39,14 @@ pub async fn create_event(
 
 pub struct CreatePropertyMainRequest {
     pub name: String,
+    pub typ: Type,
     pub data_type: DataType,
     pub nullable: bool,
-    pub dict: Option<DataType>,
+    pub dict: Option<DictionaryType>,
 }
 
 pub async fn create_property(
     md: &Arc<MetadataProvider>,
-    ns: Namespace,
     org_id: u64,
     proj_id: u64,
     main_req: CreatePropertyMainRequest,
@@ -53,7 +58,8 @@ pub async fn create_property(
         name: main_req.name.clone(),
         description: None,
         display_name: None,
-        typ: main_req.data_type.clone(),
+        typ: main_req.typ,
+        data_type: main_req.data_type.clone(),
         status: properties::Status::Enabled,
         is_system: false,
         nullable: main_req.nullable,
@@ -62,22 +68,32 @@ pub async fn create_property(
         dictionary_type: main_req.dict.clone(),
     };
 
-    let prop = match ns {
-        Namespace::Event => {
-            md.event_properties
-                .get_or_create(org_id, proj_id, req)
-                .await?
+    let prop = md
+        .event_properties
+        .get_or_create(org_id, proj_id, req)
+        .await?;
+
+    let dt = match main_req.data_type {
+        DataType::String => arrow::datatypes::DataType::Utf8,
+        DataType::Int8 => arrow::datatypes::DataType::Int8,
+        DataType::Int16 => arrow::datatypes::DataType::Int16,
+        DataType::Int32 => arrow::datatypes::DataType::Int32,
+        DataType::Int64 => arrow::datatypes::DataType::Int64,
+        DataType::UInt8 => arrow::datatypes::DataType::UInt8,
+        DataType::UInt16 => arrow::datatypes::DataType::UInt16,
+        DataType::UInt32 => arrow::datatypes::DataType::UInt32,
+        DataType::UInt64 => arrow::datatypes::DataType::UInt64,
+        DataType::Float64 => arrow::datatypes::DataType::Float64,
+        DataType::Decimal => {
+            arrow::datatypes::DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE)
         }
-        Namespace::User => {
-            md.user_properties
-                .get_or_create(org_id, proj_id, req)
-                .await?
-        }
+        DataType::Boolean => arrow::datatypes::DataType::Boolean,
+        DataType::Timestamp => arrow::datatypes::DataType::Timestamp(TIME_UNIT, None),
     };
 
     cols.push(Column::new(
-        prop.column_name(ns),
-        main_req.data_type,
+        prop.column_name(),
+        dt,
         main_req.nullable,
         main_req.dict,
     ));

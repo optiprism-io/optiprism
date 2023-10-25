@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use arrow::datatypes::DataType;
 use arrow::datatypes::Schema;
 use arrow::datatypes::TimeUnit;
 use common::DECIMAL_PRECISION;
@@ -10,7 +9,9 @@ use metadata::database::Column;
 use metadata::database::Table;
 use metadata::database::TableRef;
 use metadata::error::DatabaseError;
-use metadata::properties::provider_impl::Namespace;
+use metadata::properties::DataType;
+use metadata::properties::DictionaryType;
+use metadata::properties::Type;
 use metadata::MetadataProvider;
 use test_util::create_event;
 use test_util::create_property;
@@ -28,11 +29,11 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "User ID".to_string(),
+            typ: Type::Event,
             data_type: DataType::Int64,
             nullable: false,
             dict: None,
@@ -43,12 +44,12 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Created At".to_string(),
-            data_type: DataType::Timestamp(TimeUnit::Nanosecond, None),
+            typ: Type::Event,
+            data_type: DataType::Timestamp,
             nullable: false,
             dict: None,
         },
@@ -58,14 +59,14 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Event".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::Event,
+            data_type: DataType::String,
             nullable: false,
-            dict: Some(DataType::UInt64),
+            dict: Some(DictionaryType::UInt64),
         },
         &mut cols,
     )
@@ -74,14 +75,14 @@ pub async fn create_entities(
     // create event props
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Product Name".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::Event,
+            data_type: DataType::String,
             nullable: true,
-            dict: Some(DataType::UInt16),
+            dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
     )
@@ -89,14 +90,14 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Product Category".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::Event,
+            data_type: DataType::String,
             nullable: true,
-            dict: Some(DataType::UInt16),
+            dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
     )
@@ -104,14 +105,14 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Product Subcategory".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::Event,
+            data_type: DataType::String,
             nullable: true,
-            dict: Some(DataType::UInt16),
+            dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
     )
@@ -119,14 +120,14 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Product Brand".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::Event,
+            data_type: DataType::String,
             nullable: true,
-            dict: Some(DataType::UInt16),
+            dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
     )
@@ -134,12 +135,12 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Product Price".to_string(),
-            data_type: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            typ: Type::Event,
+            data_type: DataType::Decimal,
             nullable: true,
             dict: None,
         },
@@ -149,12 +150,12 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Product Discount Price".to_string(),
-            data_type: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            typ: Type::Event,
+            data_type: DataType::Decimal,
             nullable: true,
             dict: None,
         },
@@ -164,12 +165,12 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::User,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Spent Total".to_string(),
-            data_type: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            typ: Type::Event,
+            data_type: DataType::Decimal,
             nullable: true,
             dict: None,
         },
@@ -179,11 +180,11 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::User,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Products Bought".to_string(),
+            typ: Type::Event,
             data_type: DataType::UInt8,
             nullable: true,
             dict: None,
@@ -194,11 +195,11 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::User,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Cart Items Number".to_string(),
+            typ: Type::Event,
             data_type: DataType::UInt8,
             nullable: true,
             dict: None,
@@ -209,12 +210,12 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::User,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Cart Amount".to_string(),
-            data_type: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            typ: Type::Event,
+            data_type: DataType::Decimal,
             nullable: true,
             dict: None,
         },
@@ -224,12 +225,12 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Revenue".to_string(),
-            data_type: DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+            typ: Type::Event,
+            data_type: DataType::Decimal,
             nullable: true,
             dict: None,
         },
@@ -239,14 +240,14 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::User,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Country".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::User,
+            data_type: DataType::String,
             nullable: true,
-            dict: Some(DataType::UInt16),
+            dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
     )
@@ -254,14 +255,14 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::User,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "City".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::User,
+            data_type: DataType::String,
             nullable: true,
-            dict: Some(DataType::UInt16),
+            dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
     )
@@ -269,14 +270,14 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::User,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Device".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::User,
+            data_type: DataType::String,
             nullable: true,
-            dict: Some(DataType::UInt16),
+            dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
     )
@@ -284,14 +285,14 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::User,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Device Category".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::User,
+            data_type: DataType::String,
             nullable: true,
-            dict: Some(DataType::UInt16),
+            dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
     )
@@ -299,14 +300,14 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::User,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Os".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::User,
+            data_type: DataType::String,
             nullable: true,
-            dict: Some(DataType::UInt16),
+            dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
     )
@@ -314,14 +315,14 @@ pub async fn create_entities(
 
     create_property(
         md,
-        Namespace::User,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Os Version".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::User,
+            data_type: DataType::String,
             nullable: true,
-            dict: Some(DataType::UInt16),
+            dict: Some(DictionaryType::UInt16),
         },
         &mut cols,
     )

@@ -264,7 +264,6 @@ impl Team {
 pub struct Property {
     pub organization_id: u64,
     pub project_id: u64,
-    pub namespace: properties::provider_impl::Namespace,
     pub event_id: Option<u64>,
     pub property_id: Option<u64>,
     pub property_name: Option<String>,

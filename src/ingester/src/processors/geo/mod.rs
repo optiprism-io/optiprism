@@ -33,12 +33,14 @@ pub fn resolve_properties(
     if let Some(country) = city.country {
         if let Some(names) = country.names {
             if let Some(name) = names.get("en") {
-                let prop =
-                    block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_COUNTRY))?;
+                let prop = block_on(props_prov.get_by_name(
+                    org_id,
+                    proj_id,
+                    types::USER_PROPERTY_COUNTRY,
+                ))?;
 
                 let prop = Property {
-                    id: prop.id,
-                    name: types::USER_COLUMN_COUNTRY.to_string(),
+                    property: prop,
                     value: PropValue::String(name.to_string()),
                 };
                 user_props.push(prop);
@@ -50,11 +52,10 @@ pub fn resolve_properties(
         if let Some(names) = city.names {
             if let Some(name) = names.get("en") {
                 let prop =
-                    block_on(props_prov.get_by_name(org_id, proj_id, types::USER_COLUMN_CITY))?;
+                    block_on(props_prov.get_by_name(org_id, proj_id, types::USER_PROPERTY_CITY))?;
 
                 let prop = Property {
-                    id: prop.id,
-                    name: types::USER_COLUMN_CITY.to_string(),
+                    property: prop,
                     value: PropValue::String(name.to_string()),
                 };
                 user_props.push(prop);

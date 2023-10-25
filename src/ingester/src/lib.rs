@@ -4,6 +4,8 @@ use std::net::IpAddr;
 use chrono::DateTime;
 use chrono::Utc;
 use error::Result;
+use metadata::events;
+use metadata::properties;
 use rust_decimal::Decimal;
 
 pub mod destinations;
@@ -53,9 +55,13 @@ pub struct Page {
 
 #[derive(Debug, Clone)]
 pub struct Property {
-    pub id: u64,
-    pub name: String,
+    pub property: properties::Property,
     pub value: PropValue,
+}
+#[derive(Debug, Clone)]
+pub struct Event {
+    pub record_id: u64,
+    pub event: events::Event,
 }
 
 #[derive(Debug, Clone)]
@@ -64,12 +70,6 @@ pub enum PropValue {
     String(String),
     Number(Decimal),
     Bool(bool),
-}
-
-#[derive(Debug, Clone)]
-pub struct Event {
-    pub id: u64,
-    pub name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +90,7 @@ pub struct Track {
     pub resolved_user_id: Option<i64>,
     pub resolved_anonymous_user_id: Option<i64>,
     pub sent_at: DateTime<Utc>,
+    pub timestamp: DateTime<Utc>,
     pub context: Context,
     pub event: String,
     pub resolved_event: Option<Event>,

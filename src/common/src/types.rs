@@ -1,3 +1,5 @@
+use arrow_schema::TimeUnit;
+use lazy_static::lazy_static;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
@@ -6,23 +8,48 @@ use serde::Serializer;
 pub const DECIMAL_PRECISION: u8 = 28;
 pub const DECIMAL_SCALE: i8 = 16;
 pub const DECIMAL_MULTIPLIER: i128 = 10i128.pow(DECIMAL_SCALE as u32);
+pub const TIME_UNIT: TimeUnit = TimeUnit::Nanosecond;
 
-pub const USER_COLUMN_CLIENT_FAMILY: &str = "Client Family";
-pub const USER_COLUMN_CLIENT_VERSION_MINOR: &str = "Client Version Minor";
-pub const USER_COLUMN_CLIENT_VERSION_MAJOR: &str = "Client Version Major";
-pub const USER_COLUMN_CLIENT_VERSION_PATCH: &str = "Version Patch";
-pub const USER_COLUMN_DEVICE_FAMILY: &str = "Device Family";
-pub const USER_COLUMN_DEVICE_BRAND: &str = "Device Brand";
-pub const USER_COLUMN_DEVICE_MODEL: &str = "Device Model";
-pub const USER_COLUMN_OS_FAMILY: &str = "OS Family";
-pub const USER_COLUMN_OS_VERSION_MAJOR: &str = "OS Version Major";
-pub const USER_COLUMN_OS_VERSION_MINOR: &str = "OS Version Minor";
-pub const USER_COLUMN_OS_VERSION_PATCH: &str = "OS Version Patch";
-pub const USER_COLUMN_OS_VERSION_PATCH_MINOR: &str = "OS Version Patch Minor";
+pub const COLUMN_USER_ID: &str = "user_id";
+pub const COLUMN_TIMESTAMP: &str = "ts";
+pub const COLUMN_REAL_TIMESTAMP: &str = "real_ts";
+pub const COLUMN_EVENT_ID: &str = "event_id";
+pub const COLUMN_EVENT: &str = "event";
 
-pub const USER_COLUMN_COUNTRY: &str = "Country";
-pub const USER_COLUMN_CITY: &str = "City";
+pub const USER_PROPERTY_CLIENT_FAMILY: &str = "Client Family";
+pub const USER_PROPERTY_CLIENT_VERSION_MINOR: &str = "Client Version Minor";
+pub const USER_PROPERTY_CLIENT_VERSION_MAJOR: &str = "Client Version Major";
+pub const USER_PROPERTY_CLIENT_VERSION_PATCH: &str = "Version Patch";
+pub const USER_PROPERTY_DEVICE_FAMILY: &str = "Device Family";
+pub const USER_PROPERTY_DEVICE_BRAND: &str = "Device Brand";
+pub const USER_PROPERTY_DEVICE_MODEL: &str = "Device Model";
+pub const USER_PROPERTY_OS_FAMILY: &str = "OS Family";
+pub const USER_PROPERTY_OS_VERSION_MAJOR: &str = "OS Version Major";
+pub const USER_PROPERTY_OS_VERSION_MINOR: &str = "OS Version Minor";
+pub const USER_PROPERTY_OS_VERSION_PATCH: &str = "OS Version Patch";
+pub const USER_PROPERTY_OS_VERSION_PATCH_MINOR: &str = "OS Version Patch Minor";
+pub const USER_PROPERTY_COUNTRY: &str = "Country";
+pub const USER_PROPERTY_CITY: &str = "City";
 
+pub const DICT_EVENTS: &str = "events";
+lazy_static! {
+    pub static ref USER_PROPERTIES: Vec<&'static str> = vec![
+        USER_PROPERTY_CLIENT_FAMILY,
+        USER_PROPERTY_CLIENT_VERSION_MINOR,
+        USER_PROPERTY_CLIENT_VERSION_MAJOR,
+        USER_PROPERTY_CLIENT_VERSION_PATCH,
+        USER_PROPERTY_DEVICE_FAMILY,
+        USER_PROPERTY_DEVICE_BRAND,
+        USER_PROPERTY_DEVICE_MODEL,
+        USER_PROPERTY_OS_FAMILY,
+        USER_PROPERTY_OS_VERSION_MAJOR,
+        USER_PROPERTY_OS_VERSION_MINOR,
+        USER_PROPERTY_OS_VERSION_PATCH,
+        USER_PROPERTY_OS_VERSION_PATCH_MINOR,
+        USER_PROPERTY_COUNTRY,
+        USER_PROPERTY_CITY
+    ];
+}
 pub const EVENT_CLICK: &str = "Click";
 pub const EVENT_PAGE: &str = "Page";
 pub const EVENT_SCREEN: &str = "Screen";

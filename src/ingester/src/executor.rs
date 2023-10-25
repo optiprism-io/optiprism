@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use arrow::datatypes::DataType;
 use chrono::Utc;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
@@ -11,6 +10,8 @@ use metadata::events::CreateEventRequest;
 use metadata::projects;
 use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
+use metadata::properties::DataType;
+use metadata::properties::DictionaryType;
 use metadata::properties::Status;
 
 use crate::error::Result;
@@ -26,18 +27,19 @@ use crate::Track;
 fn resolve_property(
     ctx: &RequestContext,
     properties: &Arc<dyn properties::Provider>,
+    typ: properties::Type,
     name: String,
     val: &PropValue,
 ) -> Result<Property> {
     let dt = match val {
-        PropValue::Date(_) => DataType::Date64,
-        PropValue::String(_) => DataType::Utf8,
-        PropValue::Number(_) => DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
+        PropValue::Date(_) => DataType::Timestamp,
+        PropValue::String(_) => DataType::String,
+        PropValue::Number(_) => DataType::Decimal,
         PropValue::Bool(_) => DataType::Boolean,
     };
 
     let (is_dictionary, dictionary_type) = if let PropValue::String(_) = val {
-        (true, Some(DataType::UInt64))
+        (true, Some(DictionaryType::UInt64))
     } else {
         (false, None)
     };
@@ -47,10 +49,11 @@ fn resolve_property(
         name: name.clone(),
         description: None,
         display_name: None,
-        typ: dt,
+        typ,
+        data_type: DataType::String,
         status: Status::Enabled,
         is_system: false,
-        nullable: false,
+        nullable: true,
         is_array: false,
         is_dictionary,
         dictionary_type,
@@ -62,8 +65,7 @@ fn resolve_property(
         req,
     ))?;
     Ok(Property {
-        id: prop.id,
-        name,
+        property: prop,
         value: val.to_owned().into(),
     })
 }
@@ -71,11 +73,12 @@ fn resolve_property(
 fn resolve_properties(
     ctx: &RequestContext,
     properties: &Arc<dyn properties::Provider>,
+    typ: properties::Type,
     props: &HashMap<String, PropValue>,
 ) -> Result<Vec<Property>> {
     let resolved_props = props
         .iter()
-        .map(|(k, v)| resolve_property(&ctx, properties, k.to_owned(), v))
+        .map(|(k, v)| resolve_property(&ctx, properties, typ.clone(), k.to_owned(), v))
         .collect::<Result<Vec<Property>>>()?;
     Ok(resolved_props)
 }
@@ -115,13 +118,21 @@ impl Executor<Track> {
         ctx.project_id = Some(project.id);
 
         if let Some(props) = &req.properties {
-            req.resolved_properties =
-                Some(resolve_properties(&ctx, &self.event_properties, props)?);
+            req.resolved_properties = Some(resolve_properties(
+                &ctx,
+                &self.event_properties,
+                properties::Type::Event,
+                props,
+            )?);
         }
 
         if let Some(props) = &req.user_properties {
-            req.resolved_user_properties =
-                Some(resolve_properties(&ctx, &self.user_properties, props)?);
+            req.resolved_user_properties = Some(resolve_properties(
+                &ctx,
+                &self.user_properties,
+                properties::Type::Event,
+                props,
+            )?);
         }
 
         let event_req = CreateEventRequest {
@@ -135,7 +146,7 @@ impl Executor<Track> {
             properties: req
                 .resolved_properties
                 .clone()
-                .map(|props| props.iter().map(|p| p.id).collect::<Vec<u64>>()),
+                .map(|props| props.iter().map(|p| p.property.id).collect::<Vec<u64>>()),
             custom_properties: None,
         };
 
@@ -145,10 +156,15 @@ impl Executor<Track> {
             event_req,
         ))?;
 
+        let rec_id = block_on(
+            self.events
+                .generate_record_id(ctx.organization_id.unwrap(), ctx.project_id.unwrap()),
+        )?;
         let event = Event {
-            id: md_event.id,
-            name: req.event.to_owned(),
+            record_id: rec_id,
+            event: md_event,
         };
+
         req.resolved_event = Some(event);
 
         for processor in &mut self.processors {

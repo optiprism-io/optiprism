@@ -106,7 +106,8 @@ pub enum Type {
 pub struct TrackRequest {
     pub user_id: Option<String>,
     pub anonymous_id: Option<String>,
-    pub sent_at: DateTime<Utc>,
+    pub sent_at: Option<DateTime<Utc>>,
+    pub timestamp: Option<DateTime<Utc>>,
     pub context: Context,
     #[serde(rename = "type")]
     pub typ: Type,

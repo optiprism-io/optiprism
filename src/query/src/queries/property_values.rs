@@ -17,7 +17,7 @@ use datafusion_expr::Filter as PlanFilter;
 use datafusion_expr::LogicalPlan;
 use datafusion_expr::Sort;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
-use metadata::properties::provider_impl::Namespace;
+use metadata::properties;
 use metadata::MetadataProvider;
 
 use crate::error::Result;
@@ -29,12 +29,12 @@ use crate::Context;
 pub struct LogicalPlanBuilder {}
 
 macro_rules! property_col {
-    ($ctx:expr,$md:expr,$input:expr,$prop_name:expr,$md_namespace:ident,$namespace:expr) => {{
+    ($ctx:expr,$md:expr,$input:expr,$prop_name:expr,$md_namespace:ident) => {{
         let prop = $md
             .$md_namespace
             .get_by_name($ctx.organization_id, $ctx.project_id, $prop_name)
             .await?;
-        let col_name = prop.column_name($namespace);
+        let col_name = prop.column_name();
         let expr = col(col_name.as_str());
 
         let _aggr_schema =
@@ -80,24 +80,10 @@ impl LogicalPlanBuilder {
 
         let input = match &req.property {
             PropertyRef::User(prop_name) => {
-                property_col!(
-                    ctx,
-                    metadata,
-                    input,
-                    prop_name,
-                    user_properties,
-                    Namespace::User
-                )
+                property_col!(ctx, metadata, input, prop_name, user_properties)
             }
             PropertyRef::Event(prop_name) => {
-                property_col!(
-                    ctx,
-                    metadata,
-                    input,
-                    prop_name,
-                    event_properties,
-                    Namespace::Event
-                )
+                property_col!(ctx, metadata, input, prop_name, event_properties)
             }
             PropertyRef::Custom(_id) => unimplemented!(),
         };

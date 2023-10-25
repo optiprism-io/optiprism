@@ -1,11 +1,13 @@
 use chrono::Utc;
 use common::types::OptionalProperty;
 use metadata::metadata::ListResponse;
+use metadata::properties;
 use metadata::properties::CreatePropertyRequest;
-use platform::datatype::DataType;
-use platform::datatype::DictionaryDataType;
+use platform::datatype::DictionaryType;
+use platform::properties::DataType;
 use platform::properties::Property;
 use platform::properties::Status;
+use platform::properties::Type;
 use platform::properties::UpdatePropertyRequest;
 use reqwest::Client;
 use reqwest::StatusCode;
@@ -52,8 +54,9 @@ async fn test_event_properties() -> anyhow::Result<()> {
         nullable: true,
         is_array: true,
         is_dictionary: true,
-        dictionary_type: Some(DictionaryDataType::UInt8),
+        dictionary_type: Some(DictionaryType::UInt8),
         is_system: false,
+        typ: Type::Event,
     };
 
     // list without props should be empty
@@ -89,7 +92,8 @@ async fn test_event_properties() -> anyhow::Result<()> {
             name: prop1.name.clone(),
             description: prop1.description.clone(),
             display_name: prop1.display_name.clone(),
-            typ: prop1.data_type.clone().try_into()?,
+            typ: prop1.typ.clone().into(),
+            data_type: properties::DataType::String,
             status: prop1.status.clone().into(),
             nullable: prop1.nullable,
             is_array: prop1.is_array,

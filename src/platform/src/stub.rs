@@ -30,7 +30,7 @@ use crate::dashboards::Dashboard;
 use crate::dashboards::Panel;
 use crate::dashboards::UpdateDashboardRequest;
 use crate::datatype::DataType;
-use crate::datatype::DictionaryDataType;
+use crate::datatype::DictionaryType;
 use crate::event_records;
 use crate::event_records::EventRecord;
 use crate::event_records::ListEventRecordsRequest;
@@ -374,13 +374,14 @@ impl Properties {
             name: "name".to_string(),
             display_name: Some("display_name".to_string()),
             description: Some("description".to_string()),
-            data_type: DataType::Number,
+            typ: properties::Type::Event,
+            data_type: properties::DataType::Decimal,
             status: properties::Status::Enabled,
             is_system: true,
             nullable: true,
             is_array: true,
             is_dictionary: true,
-            dictionary_type: Some(DictionaryDataType::UInt8),
+            dictionary_type: Some(DictionaryType::UInt8),
         }
     }
 }
@@ -518,7 +519,7 @@ impl queries::Provider for Queries {
             typ: ColumnType::Dimension,
             name: "name".to_string(),
             is_nullable: true,
-            data_type: DataType::Number,
+            data_type: DataType::Decimal,
             data: vec![Value::from(1)],
             step: Some(1),
             compare_values: Some(vec![Value::from(2)]),
