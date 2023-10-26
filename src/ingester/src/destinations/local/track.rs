@@ -6,7 +6,6 @@ use common::types::COLUMN_EVENT_ID;
 use common::types::COLUMN_REAL_TIMESTAMP;
 use common::types::COLUMN_TIMESTAMP;
 use common::types::COLUMN_USER_ID;
-use common::types::DICT_EVENTS;
 use futures::executor::block_on;
 use metadata::dictionaries;
 use metadata::properties;
@@ -77,10 +76,6 @@ fn property_to_value(
             ));
         }
     } else {
-        println!(
-            "{} {:?} {:?}",
-            prop.name, &prop.data_type, &event_prop.value
-        );
         match (&prop.data_type, &event_prop.value) {
             (DataType::String, PropValue::String(v)) => Value::String(v.to_owned()),
             (DataType::Int8, PropValue::Number(v)) => Value::Int8(v.to_i8().unwrap()),
@@ -124,9 +119,9 @@ impl Destination<Track> for Local {
         ));
         values.push(RowValue::new(
             COLUMN_EVENT_ID.to_string(),
-            Value::UInt64(req.resolved_event.unwrap().record_id),
+            Value::UInt64(req.resolved_event.as_ref().unwrap().record_id),
         ));
-        let event_id = req.resolved_event.unwrap().event.id;
+        let event_id = req.resolved_event.as_ref().unwrap().event.id;
 
         values.push(RowValue::new(
             COLUMN_EVENT.to_string(),
@@ -155,14 +150,14 @@ impl Destination<Track> for Local {
                         if event_prop.property.id == prop.id {
                             found = true;
                             let value = property_to_value(ctx, &prop, &event_prop, &self.dict)?;
-                            values.push(RowValue::new_insert(prop.column_name(), value));
+                            values.push(RowValue::new(prop.column_name(), value));
                         };
                     }
                 }
                 _ => {}
             }
             if !found {
-                values.push(RowValue::new_insert(prop.column_name(), Value::Null));
+                values.push(RowValue::new(prop.column_name(), Value::Null));
             }
         }
         let user_props = req
@@ -177,14 +172,14 @@ impl Destination<Track> for Local {
                         if event_prop.property.id == prop.id {
                             found = true;
                             let value = property_to_value(ctx, &prop, &event_prop, &self.dict)?;
-                            values.push(RowValue::new_insert(prop.column_name(), value));
+                            values.push(RowValue::new(prop.column_name(), value));
                         };
                     }
                 }
                 _ => {}
             }
             if !found {
-                values.push(RowValue::new_insert(prop.column_name(), Value::Null));
+                values.push(RowValue::new(prop.column_name(), Value::Null));
             }
         }
 
