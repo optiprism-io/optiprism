@@ -88,7 +88,6 @@ pub struct Track {
     pub user_id: Option<String>,
     pub anonymous_id: Option<String>,
     pub resolved_user_id: Option<i64>,
-    pub resolved_anonymous_user_id: Option<i64>,
     pub sent_at: DateTime<Utc>,
     pub timestamp: DateTime<Utc>,
     pub context: Context,

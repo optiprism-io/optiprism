@@ -13,6 +13,7 @@ use maxminddb::MaxMindDBError;
 use metadata::error::MetadataError;
 use serde::Serialize;
 use serde::Serializer;
+use store::error::StoreError;
 use thiserror::Error;
 use tracing::debug;
 
@@ -28,6 +29,8 @@ pub enum IngesterError {
     Hyper(#[from] hyper::Error),
     #[error("metadata: {0:?}")]
     Metadata(#[from] MetadataError),
+    #[error("store: {0:?}")]
+    Store(#[from] StoreError),
     #[error("maxmind: {0:?}")]
     Maxmind(#[from] MaxMindDBError),
 }
@@ -45,6 +48,7 @@ impl IntoResponse for IngesterError {
             },
             IngesterError::Maxmind(err) => ApiError::internal(err).into_response(),
             IngesterError::BadRequest(err) => ApiError::bad_request(err).into_response(),
+            IngesterError::Store(err) => ApiError::internal(err).into_response(),
         }
     }
 }

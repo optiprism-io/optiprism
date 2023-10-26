@@ -152,7 +152,6 @@ impl App {
             user_id: req.user_id.clone(),
             anonymous_id: req.anonymous_id.clone(),
             resolved_user_id: None,
-            resolved_anonymous_user_id: None,
             sent_at: req.sent_at.unwrap_or_else(|| Utc::now()),
             timestamp: req.timestamp.unwrap_or_else(|| Utc::now()),
             context,

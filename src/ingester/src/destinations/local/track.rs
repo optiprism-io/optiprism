@@ -27,22 +27,26 @@ use crate::Property;
 use crate::RequestContext;
 use crate::Track;
 
-pub struct Debug {
+pub struct Local {
     tbl: Arc<dyn SortedMergeTree>,
     dict: Arc<dyn dictionaries::Provider>,
-    properties: Arc<dyn properties::Provider>,
+    event_properties: Arc<dyn properties::Provider>,
+    user_properties: Arc<dyn properties::Provider>,
 }
 
-impl Debug {
+impl Local {
     pub fn new(
         tbl: Arc<dyn SortedMergeTree>,
         dict: Arc<dyn dictionaries::Provider>,
-        properties: Arc<dyn properties::Provider>,
+        event_properties: Arc<dyn properties::Provider>,
+        user_properties: Arc<dyn properties::Provider>,
     ) -> Self {
         Self {
             tbl,
             dict,
-            properties,
+
+            event_properties,
+            user_properties,
         }
     }
 }
@@ -58,7 +62,7 @@ fn property_to_value(
             let dict_id = block_on(dict.get_key_or_create(
                 ctx.organization_id.unwrap(),
                 ctx.project_id.unwrap(),
-                prop.name.as_str(),
+                prop.column_name().as_str(),
                 str_v.as_str(),
             ))?;
             match prop.dictionary_type.clone().unwrap() {
@@ -73,6 +77,10 @@ fn property_to_value(
             ));
         }
     } else {
+        println!(
+            "{} {:?} {:?}",
+            prop.name, &prop.data_type, &event_prop.value
+        );
         match (&prop.data_type, &event_prop.value) {
             (DataType::String, PropValue::String(v)) => Value::String(v.to_owned()),
             (DataType::Int8, PropValue::Number(v)) => Value::Int8(v.to_i8().unwrap()),
@@ -98,38 +106,39 @@ fn property_to_value(
     Ok(val)
 }
 
-impl Destination<Track> for Debug {
+impl Destination<Track> for Local {
     fn send(&self, ctx: &RequestContext, req: Track) -> Result<()> {
         let mut values = Vec::new();
 
-        values.push(RowValue::new_insert(
+        values.push(RowValue::new(
             COLUMN_USER_ID.to_string(),
             Value::Int64(req.resolved_user_id.unwrap()),
         ));
-        values.push(RowValue::new_insert(
+        values.push(RowValue::new(
             COLUMN_TIMESTAMP.to_string(),
             Value::Timestamp(req.timestamp),
         ));
-        values.push(RowValue::new_insert(
+        values.push(RowValue::new(
             COLUMN_REAL_TIMESTAMP.to_string(),
             Value::Timestamp(Utc::now()),
         ));
-        values.push(RowValue::new_insert(
+        values.push(RowValue::new(
             COLUMN_EVENT_ID.to_string(),
             Value::UInt64(req.resolved_event.unwrap().record_id),
         ));
-        let event_id = block_on(self.dict.get_key_or_create(
-            ctx.organization_id.unwrap(),
-            ctx.project_id.unwrap(),
-            DICT_EVENTS,
-            req.event.as_str(),
-        ))?;
-        values.push(RowValue::new_insert(
+        let event_id = req.resolved_event.unwrap().event.id;
+
+        values.push(RowValue::new(
             COLUMN_EVENT.to_string(),
             Value::UInt16(event_id as u16),
         ));
-        let props_provider = block_on(
-            self.properties
+        let event_res = block_on(
+            self.event_properties
+                .list(ctx.organization_id.unwrap(), ctx.project_id.unwrap()),
+        )?;
+
+        let user_res = block_on(
+            self.user_properties
                 .list(ctx.organization_id.unwrap(), ctx.project_id.unwrap()),
         )?;
 
@@ -137,11 +146,8 @@ impl Destination<Track> for Debug {
             .resolved_properties
             .map(|v| v.clone())
             .unwrap_or_else(|| vec![]);
-        let user_props = req
-            .resolved_user_properties
-            .map(|v| v.clone())
-            .unwrap_or_else(|| vec![]);
-        for prop in props_provider.data {
+
+        for prop in event_res.data {
             let mut found = false;
             match prop.typ {
                 Type::Event => {
@@ -153,22 +159,36 @@ impl Destination<Track> for Debug {
                         };
                     }
                 }
-                Type::User => {
-                    for user_prop in &user_props {
-                        if user_prop.property.id == prop.id {
+                _ => {}
+            }
+            if !found {
+                values.push(RowValue::new_insert(prop.column_name(), Value::Null));
+            }
+        }
+        let user_props = req
+            .resolved_user_properties
+            .map(|v| v.clone())
+            .unwrap_or_else(|| vec![]);
+        for prop in user_res.data {
+            let mut found = false;
+            match prop.typ {
+                Type::Event => {
+                    for event_prop in &user_props {
+                        if event_prop.property.id == prop.id {
                             found = true;
-                            let value = property_to_value(ctx, &prop, &user_prop, &self.dict)?;
+                            let value = property_to_value(ctx, &prop, &event_prop, &self.dict)?;
                             values.push(RowValue::new_insert(prop.column_name(), value));
                         };
                     }
                 }
+                _ => {}
             }
             if !found {
                 values.push(RowValue::new_insert(prop.column_name(), Value::Null));
             }
         }
 
-        println!("{:?}", values);
+        self.tbl.insert(values)?;
         Ok(())
     }
 }

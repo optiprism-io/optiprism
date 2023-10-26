@@ -70,29 +70,24 @@ pub enum ValueOp {
 #[derive(Clone, Debug)]
 pub struct RowValue {
     col: String,
-    op: ValueOp,
     value: Value,
 }
 
 impl RowValue {
-    pub fn new_insert(col: String, value: Value) -> Self {
-        Self {
-            col,
-            op: ValueOp::Insert,
-            value,
-        }
+    pub fn new(col: String, value: Value) -> Self {
+        Self { col, value }
     }
 }
 
-pub trait SortedMergeTree: Sync + Send + Debug {
-    fn insert(&mut self, value: Vec<RowValue>) -> Result<()>;
-    fn delete(&mut self, col: &str, eq_value: Value) -> Result<()>;
+pub trait SortedMergeTree: Sync + Send {
+    fn insert(&self, value: Vec<RowValue>) -> Result<()>;
+    fn delete(&self, col: &str, eq_value: Value) -> Result<()>;
 }
 
-pub trait ReplacingMergeTree: Sync + Send + Debug {
-    fn insert(&mut self, value: Vec<RowValue>) -> Result<()>;
-    fn update(&mut self, value: Vec<UpdateRowValue>) -> Result<()>;
-    fn delete(&mut self, col: &str, eq_value: Value) -> Result<()>;
+pub trait ReplacingMergeTree: Sync + Send {
+    fn insert(&self, value: Vec<RowValue>) -> Result<()>;
+    fn update(&self, value: Vec<UpdateRowValue>) -> Result<()>;
+    fn delete(&self, col: &str, eq_value: Value) -> Result<()>;
 }
 
 pub mod test_util {

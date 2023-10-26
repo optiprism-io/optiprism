@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::fs::File;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -34,6 +36,7 @@ use ingester::Processor;
 use ingester::Track;
 use metadata::accounts::CreateAccountRequest;
 use metadata::accounts::Provider as AccountsProvider;
+use metadata::dictionaries;
 use metadata::events;
 use metadata::organizations::CreateOrganizationRequest;
 use metadata::organizations::Provider as OrganizationProvider;
@@ -49,6 +52,9 @@ use metadata::properties::Status;
 use metadata::store::Store;
 use metadata::MetadataProvider;
 use service::tracing::TracingCliArgs;
+use store::RowValue;
+use store::SortedMergeTree;
+use store::Value;
 use tracing::debug;
 use tracing::info;
 use uaparser::UserAgentParser;
@@ -161,9 +167,10 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     let event_props = Arc::new(properties::ProviderImpl::new_event(store.clone()));
-
     let events = Arc::new(events::ProviderImpl::new(store.clone()));
     let projects = Arc::new(projects::ProviderImpl::new(store.clone()));
+    let dicts = Arc::new(dictionaries::ProviderImpl::new(store.clone()));
+
     let proj = block_on(projects.get_by_id(1, 1))?;
     debug!("project token: {}", proj.token);
     let mut track_processors = Vec::new();
@@ -178,8 +185,13 @@ async fn main() -> Result<(), anyhow::Error> {
     track_processors.push(Arc::new(geo) as Arc<dyn Processor<Track>>);
 
     let mut track_destinations = Vec::new();
-    let track_debug_dst = ingester::destinations::debug::track::Debug::new();
-    track_destinations.push(Arc::new(track_debug_dst) as Arc<dyn Destination<Track>>);
+    let track_local_dst = ingester::destinations::local::track::Local::new(
+        Arc::new(Tbl::new()),
+        dicts.clone(),
+        event_props.clone(),
+        user_props.clone(),
+    );
+    track_destinations.push(Arc::new(track_local_dst) as Arc<dyn Destination<Track>>);
     let track_exec = Executor::<Track>::new(
         track_processors.clone(),
         track_destinations.clone(),
@@ -187,6 +199,7 @@ async fn main() -> Result<(), anyhow::Error> {
         user_props.clone(),
         events.clone(),
         projects.clone(),
+        dicts.clone(),
     );
 
     let mut identify_processors = Vec::new();
@@ -210,10 +223,29 @@ async fn main() -> Result<(), anyhow::Error> {
         user_props.clone(),
         events.clone(),
         projects.clone(),
+        dicts.clone(),
     );
     let svc = sources::http::service::Service::new(track_exec, identify_exec, args.host);
 
     info!("start listening on {}", args.host);
 
     Ok(svc.serve().await?)
+}
+
+struct Tbl {}
+impl Tbl {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl SortedMergeTree for Tbl {
+    fn insert(&self, value: Vec<RowValue>) -> store::error::Result<()> {
+        println!("{:?}", value);
+        Ok(())
+    }
+
+    fn delete(&self, col: &str, eq_value: Value) -> store::error::Result<()> {
+        todo!()
+    }
 }

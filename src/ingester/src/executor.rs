@@ -2,9 +2,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Utc;
+use common::types::DICT_USERS;
 use common::DECIMAL_PRECISION;
 use common::DECIMAL_SCALE;
 use futures::executor::block_on;
+use metadata::dictionaries;
 use metadata::events;
 use metadata::events::CreateEventRequest;
 use metadata::projects;
@@ -14,6 +16,7 @@ use metadata::properties::DataType;
 use metadata::properties::DictionaryType;
 use metadata::properties::Status;
 
+use crate::error::IngesterError;
 use crate::error::Result;
 use crate::Destination;
 use crate::Event;
@@ -31,7 +34,7 @@ fn resolve_property(
     name: String,
     val: &PropValue,
 ) -> Result<Property> {
-    let dt = match val {
+    let data_type = match val {
         PropValue::Date(_) => DataType::Timestamp,
         PropValue::String(_) => DataType::String,
         PropValue::Number(_) => DataType::Decimal,
@@ -50,7 +53,7 @@ fn resolve_property(
         description: None,
         display_name: None,
         typ,
-        data_type: DataType::String,
+        data_type,
         status: Status::Enabled,
         is_system: false,
         nullable: true,
@@ -90,6 +93,7 @@ pub struct Executor<T> {
     user_properties: Arc<dyn properties::Provider>,
     events: Arc<dyn events::Provider>,
     projects: Arc<dyn projects::Provider>,
+    dicts: Arc<dyn dictionaries::Provider>,
 }
 
 impl Executor<Track> {
@@ -100,6 +104,7 @@ impl Executor<Track> {
         user_properties: Arc<dyn properties::Provider>,
         events: Arc<dyn events::Provider>,
         projects: Arc<dyn projects::Provider>,
+        dicts: Arc<dyn dictionaries::Provider>,
     ) -> Self {
         Self {
             processors,
@@ -108,6 +113,7 @@ impl Executor<Track> {
             user_properties,
             events,
             projects,
+            dicts,
         }
     }
 
@@ -117,6 +123,27 @@ impl Executor<Track> {
         ctx.organization_id = Some(project.organization_id);
         ctx.project_id = Some(project.id);
 
+        let user_id = match (&req.user_id, &req.anonymous_id) {
+            (Some(user_id), None) => block_on(self.dicts.get_key_or_create(
+                ctx.organization_id.unwrap(),
+                ctx.project_id.unwrap(),
+                DICT_USERS,
+                user_id.as_str(),
+            ))?,
+            (None, Some(user_id)) => block_on(self.dicts.get_key_or_create(
+                ctx.organization_id.unwrap(),
+                ctx.project_id.unwrap(),
+                DICT_USERS,
+                user_id.as_str(),
+            ))?,
+            _ => {
+                return Err(IngesterError::BadRequest(
+                    "user_id or anonymous_id must be set".to_string(),
+                ));
+            }
+        };
+
+        req.resolved_user_id = Some(user_id as i64);
         if let Some(props) = &req.properties {
             req.resolved_properties = Some(resolve_properties(
                 &ctx,
@@ -156,12 +183,12 @@ impl Executor<Track> {
             event_req,
         ))?;
 
-        let rec_id = block_on(
+        let record_id = block_on(
             self.events
                 .generate_record_id(ctx.organization_id.unwrap(), ctx.project_id.unwrap()),
         )?;
         let event = Event {
-            record_id: rec_id,
+            record_id,
             event: md_event,
         };
 
@@ -187,6 +214,7 @@ impl Executor<Identify> {
         user_properties: Arc<dyn properties::Provider>,
         events: Arc<dyn events::Provider>,
         projects: Arc<dyn projects::Provider>,
+        dicts: Arc<dyn dictionaries::Provider>,
     ) -> Self {
         Self {
             processors,
@@ -195,6 +223,8 @@ impl Executor<Identify> {
             user_properties,
             events,
             projects,
+
+            dicts,
         }
     }
 

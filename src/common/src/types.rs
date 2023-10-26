@@ -31,7 +31,8 @@ pub const USER_PROPERTY_OS_VERSION_PATCH_MINOR: &str = "OS Version Patch Minor";
 pub const USER_PROPERTY_COUNTRY: &str = "Country";
 pub const USER_PROPERTY_CITY: &str = "City";
 
-pub const DICT_EVENTS: &str = "events";
+pub const DICT_USERS: &str = "users";
+
 lazy_static! {
     pub static ref USER_PROPERTIES: Vec<&'static str> = vec![
         USER_PROPERTY_CLIENT_FAMILY,
