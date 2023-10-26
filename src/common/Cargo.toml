@@ -20,3 +20,10 @@ serde = { version = "1.0.149", features = ["derive"] }
 serde_json = "1.0.89"
 serde_with = "3.0.0"
 thiserror = "1.0.37"
+axum = { version = "0.6.1", features = ["headers"] }
+log = "0.4.20"
+axum-core = "0.3.0"
+regex = "1"
+tracing = "0.1.37"
+hyper = "0.14.27"
+bytes = "1.4.0"

@@ -7,6 +7,89 @@ pub mod arrow_conversion;
 pub mod error;
 pub mod parquet;
 
+use std::fmt::Debug;
+
+use chrono::DateTime;
+use chrono::Utc;
+use error::Result;
+
+#[derive(Clone, Debug)]
+pub enum Value {
+    Null,
+    Int8(i8),
+    Int16(i16),
+    Int32(i32),
+    Int64(i64),
+    Int128(i128),
+    UInt8(u8),
+    UInt16(u16),
+    UInt32(u32),
+    UInt64(u64),
+    Float32(f32),
+    Float64(f64),
+    Boolean(bool),
+    Timestamp(DateTime<Utc>),
+    Decimal(i128),
+    Binary(Vec<u8>),
+    String(String),
+    ListInt8(Vec<i8>),
+    ListInt16(Vec<i16>),
+    ListInt32(Vec<i32>),
+    ListInt64(Vec<i64>),
+    ListInt128(Vec<i128>),
+    ListUInt8(Vec<u8>),
+    ListUInt16(Vec<u16>),
+    ListUInt32(Vec<u32>),
+    ListUInt64(Vec<u64>),
+    ListFloat32(Vec<f32>),
+    ListFloat64(Vec<f64>),
+    ListBoolean(Vec<bool>),
+    ListTimestamp(Vec<i64>),
+    ListDecimal(Vec<i128>),
+    ListBinary(Vec<Vec<u8>>),
+    ListString(Vec<String>),
+}
+#[derive(Clone, Debug)]
+pub enum UpdateValueOp {
+    Insert,
+    Increment,
+    Decrement,
+}
+#[derive(Clone, Debug)]
+pub struct UpdateRowValue {
+    col: String,
+    op: UpdateValueOp,
+    value: Value,
+}
+#[derive(Clone, Debug)]
+pub enum ValueOp {
+    Insert,
+    Increment,
+    Decrement,
+}
+#[derive(Clone, Debug)]
+pub struct RowValue {
+    col: String,
+    value: Value,
+}
+
+impl RowValue {
+    pub fn new(col: String, value: Value) -> Self {
+        Self { col, value }
+    }
+}
+
+pub trait SortedMergeTree: Sync + Send {
+    fn insert(&self, value: Vec<RowValue>) -> Result<()>;
+    fn delete(&self, col: &str, eq_value: Value) -> Result<()>;
+}
+
+pub trait ReplacingMergeTree: Sync + Send {
+    fn insert(&self, value: Vec<RowValue>) -> Result<()>;
+    fn update(&self, value: Vec<UpdateRowValue>) -> Result<()>;
+    fn delete(&self, col: &str, eq_value: Value) -> Result<()>;
+}
+
 pub mod test_util {
     use std::fs::File;
     use std::io::Read;

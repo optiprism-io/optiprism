@@ -8,6 +8,7 @@ pub use provider_impl::ProviderImpl;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::properties::DictionaryType;
 use crate::Result;
 
 #[async_trait]
@@ -35,7 +36,7 @@ pub struct Column {
     pub name: String,
     pub data_type: DataType,
     pub nullable: bool,
-    pub dictionary: Option<DataType>,
+    pub dictionary: Option<DictionaryType>,
 }
 
 impl Column {
@@ -43,7 +44,7 @@ impl Column {
         name: String,
         data_type: DataType,
         nullable: bool,
-        dictionary: Option<DataType>,
+        dictionary: Option<DictionaryType>,
     ) -> Column {
         Column {
             name,
@@ -63,7 +64,10 @@ impl Table {
                 .map(|c| {
                     Field::new(
                         &c.name,
-                        c.dictionary.unwrap_or_else(|| c.data_type.clone()),
+                        match c.dictionary {
+                            None => c.data_type.into(),
+                            Some(v) => v.into(),
+                        },
                         c.nullable,
                     )
                 })

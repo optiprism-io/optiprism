@@ -5,6 +5,9 @@ use bincode::deserialize;
 use bincode::serialize;
 use chrono::Utc;
 use common::types::OptionalProperty;
+use rand::distributions::Alphanumeric;
+use rand::distributions::DistString;
+use rand::thread_rng;
 use tokio::sync::RwLock;
 
 use crate::error;
@@ -24,11 +27,17 @@ use crate::store::path_helpers::make_index_key;
 use crate::store::path_helpers::org_ns;
 use crate::store::Store;
 use crate::Result;
+
 const NAMESPACE: &[u8] = b"projects";
 const IDX_NAME: &[u8] = b"name";
+const IDX_TOKEN: &[u8] = b"token";
 
-fn index_keys(organization_id: u64, name: &str) -> Vec<Option<Vec<u8>>> {
-    [index_name_key(organization_id, name)].to_vec()
+fn index_keys(organization_id: u64, name: &str, token: &str) -> Vec<Option<Vec<u8>>> {
+    [
+        index_name_key(organization_id, name),
+        index_token_key(token),
+    ]
+    .to_vec()
 }
 
 fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
@@ -40,6 +49,10 @@ fn index_name_key(organization_id: u64, name: &str) -> Option<Vec<u8>> {
         )
         .to_vec(),
     )
+}
+
+fn index_token_key(token: &str) -> Option<Vec<u8>> {
+    Some(make_index_key(NAMESPACE, IDX_NAME, token).to_vec())
 }
 
 pub struct ProviderImpl {
@@ -62,18 +75,16 @@ impl ProviderImpl {
 impl Provider for ProviderImpl {
     async fn create(&self, organization_id: u64, req: CreateProjectRequest) -> Result<Project> {
         let _guard = self.guard.write().await;
+        let token = Alphanumeric.sample_string(&mut thread_rng(), 64);
 
-        let idx_keys = index_keys(organization_id, &req.name);
+        let idx_keys = index_keys(organization_id, &req.name, token.as_str());
 
         match self.idx.check_insert_constraints(idx_keys.as_ref()).await {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(
-                    ProjectError::ProjectAlreadyExist(error::Project::new_with_name(
-                        organization_id,
-                        req.name,
-                    ))
-                    .into(),
-                );
+                return Err(MetadataError::AlreadyExists(format!(
+                    "project with name {:?}",
+                    req.name
+                )));
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -95,6 +106,7 @@ impl Provider for ProviderImpl {
             updated_by: None,
             organization_id,
             name: req.name,
+            token,
         };
         let data = serialize(&project)?;
         self.store
@@ -113,12 +125,18 @@ impl Provider for ProviderImpl {
         let key = make_data_value_key(org_ns(organization_id, NAMESPACE).as_slice(), project_id);
 
         match self.store.get(key).await? {
-            None => Err(ProjectError::ProjectNotFound(error::Project::new_with_id(
-                organization_id,
-                project_id,
-            ))
-            .into()),
+            None => Err(MetadataError::NotFound(format!("project {project_id}"))),
             Some(value) => Ok(deserialize(&value)?),
+        }
+    }
+
+    async fn get_by_token(&self, token: &str) -> Result<Project> {
+        match self.idx.get(index_token_key(token).unwrap()).await {
+            Err(MetadataError::Store(StoreError::KeyNotFound(_))) => Err(MetadataError::NotFound(
+                format!("project with token {:?}", token),
+            )),
+            Err(other) => Err(other),
+            Ok(data) => Ok(deserialize(&data)?),
         }
     }
 
@@ -155,13 +173,10 @@ impl Provider for ProviderImpl {
             .await
         {
             Err(MetadataError::Store(StoreError::KeyAlreadyExists(_))) => {
-                return Err(
-                    ProjectError::ProjectAlreadyExist(error::Project::new_with_id(
-                        organization_id,
-                        project_id,
-                    ))
-                    .into(),
-                );
+                return Err(MetadataError::AlreadyExists(format!(
+                    "project {:?}",
+                    req.name
+                )));
             }
             Err(other) => return Err(other),
             Ok(_) => {}
@@ -196,7 +211,7 @@ impl Provider for ProviderImpl {
             .await?;
 
         self.idx
-            .delete(index_keys(organization_id, &project.name).as_ref())
+            .delete(index_keys(organization_id, &project.name, project.token.as_str()).as_ref())
             .await?;
 
         Ok(project)

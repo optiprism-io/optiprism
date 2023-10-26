@@ -21,7 +21,7 @@ use datafusion_expr::ExprSchemable;
 use datafusion_expr::Operator;
 use futures::executor;
 use metadata::dictionaries;
-use metadata::properties::provider_impl::Namespace;
+use metadata::properties::DictionaryType;
 use metadata::MetadataProvider;
 
 use crate::error::QueryError;
@@ -161,7 +161,7 @@ pub async fn event_filters_expression(
 pub async fn encode_property_dict_values(
     ctx: &Context,
     dictionaries: &Arc<dyn dictionaries::Provider>,
-    dict_type: &DataType,
+    dict_type: &DictionaryType,
     col_name: &str,
     values: &[ScalarValue],
 ) -> Result<Vec<ScalarValue>> {
@@ -179,10 +179,10 @@ pub async fn encode_property_dict_values(
                     .await?;
 
                 let scalar_value = match dict_type {
-                    DataType::UInt8 => ScalarValue::UInt8(Some(key as u8)),
-                    DataType::UInt16 => ScalarValue::UInt16(Some(key as u16)),
-                    DataType::UInt32 => ScalarValue::UInt32(Some(key as u32)),
-                    DataType::UInt64 => ScalarValue::UInt64(Some(key)),
+                    DictionaryType::UInt8 => ScalarValue::UInt8(Some(key as u8)),
+                    DictionaryType::UInt16 => ScalarValue::UInt16(Some(key as u16)),
+                    DictionaryType::UInt32 => ScalarValue::UInt32(Some(key as u32)),
+                    DictionaryType::UInt64 => ScalarValue::UInt64(Some(key)),
                     _ => {
                         return Err(QueryError::Plan(format!(
                             "unsupported dictionary type \"{dict_type:?}\""
@@ -192,7 +192,7 @@ pub async fn encode_property_dict_values(
 
                 ret.push(scalar_value);
             } else {
-                ret.push(ScalarValue::try_from(dict_type)?);
+                ret.push(ScalarValue::try_from(DataType::from(dict_type.to_owned()))?);
             }
         } else {
             return Err(QueryError::Plan(format!(
@@ -219,7 +219,7 @@ pub async fn property_expression(
                 .user_properties
                 .get_by_name(ctx.organization_id, ctx.project_id, prop_name)
                 .await?;
-            let col_name = prop.column_name(Namespace::User);
+            let col_name = prop.column_name();
             let col = col(col_name.as_str());
 
             if values.is_none() {
@@ -245,7 +245,7 @@ pub async fn property_expression(
                 .event_properties
                 .get_by_name(ctx.organization_id, ctx.project_id, prop_name)
                 .await?;
-            let col_name = prop.column_name(Namespace::Event);
+            let col_name = prop.column_name();
             let col = col(col_name.as_str());
 
             if values.is_none() {
@@ -281,14 +281,14 @@ pub async fn property_col(
                 .user_properties
                 .get_by_name(ctx.organization_id, ctx.project_id, prop_name)
                 .await?;
-            col(prop.column_name(Namespace::User).as_str())
+            col(prop.column_name().as_str())
         }
         PropertyRef::Event(prop_name) => {
             let prop = md
                 .event_properties
                 .get_by_name(ctx.organization_id, ctx.project_id, prop_name)
                 .await?;
-            col(prop.column_name(Namespace::Event).as_str())
+            col(prop.column_name().as_str())
         }
         PropertyRef::Custom(_prop_name) => unimplemented!(),
     })

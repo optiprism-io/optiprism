@@ -19,7 +19,6 @@ use arrow::array::UInt16Builder;
 use arrow::array::UInt32Builder;
 use arrow::array::UInt64Builder;
 use arrow::array::UInt8Builder;
-use arrow::datatypes::DataType;
 use arrow::datatypes::SchemaRef;
 use arrow::datatypes::TimeUnit;
 use arrow::record_batch::RecordBatch;
@@ -33,7 +32,9 @@ use metadata::database::Column;
 use metadata::database::Table;
 use metadata::database::TableRef;
 use metadata::error::DatabaseError;
-use metadata::properties::provider_impl::Namespace;
+use metadata::properties::DataType;
+use metadata::properties::DictionaryType;
+use metadata::properties::Type;
 use metadata::MetadataProvider;
 use test_util::create_event;
 use test_util::create_property;
@@ -51,12 +52,10 @@ struct Builders {
     b_u16: UInt16Builder,
     b_u32: UInt32Builder,
     b_u64: UInt64Builder,
-    b_f32: Float32Builder,
     b_f64: Float64Builder,
     b_b: BooleanBuilder,
     b_str: StringBuilder,
-    b_ts: TimestampSecondBuilder,
-    b_lstr: LargeStringBuilder,
+    b_ts: TimestampNanosecondBuilder,
     b_dec: Decimal128Builder,
     b_group: Int64Builder,
     b_v: Int64Builder,
@@ -76,12 +75,10 @@ impl Builders {
             b_u16: UInt16Builder::new(),
             b_u32: UInt32Builder::new(),
             b_u64: UInt64Builder::new(),
-            b_f32: Float32Builder::new(),
             b_f64: Float64Builder::new(),
             b_b: BooleanBuilder::new(),
             b_str: StringBuilder::new(),
-            b_ts: TimestampSecondBuilder::new(),
-            b_lstr: LargeStringBuilder::new(),
+            b_ts: TimestampNanosecondBuilder::new(),
             b_dec: Decimal128Builder::new()
                 .with_precision_and_scale(DECIMAL_PRECISION, DECIMAL_SCALE)
                 .unwrap(),
@@ -104,12 +101,10 @@ impl Builders {
                 Arc::new(self.b_u16.finish()) as ArrayRef,
                 Arc::new(self.b_u32.finish()) as ArrayRef,
                 Arc::new(self.b_u64.finish()) as ArrayRef,
-                Arc::new(self.b_f32.finish()) as ArrayRef,
                 Arc::new(self.b_f64.finish()) as ArrayRef,
                 Arc::new(self.b_b.finish()) as ArrayRef,
                 Arc::new(self.b_str.finish()) as ArrayRef,
                 Arc::new(self.b_ts.finish()) as ArrayRef,
-                Arc::new(self.b_lstr.finish()) as ArrayRef,
                 Arc::new(self.b_dec.finish()) as ArrayRef,
                 Arc::new(self.b_group.finish()) as ArrayRef,
                 Arc::new(self.b_v.finish()) as ArrayRef,
@@ -134,11 +129,11 @@ pub async fn gen(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "User ID".to_string(),
+            typ: Type::Event,
             data_type: DataType::Int64,
             nullable: false,
             dict: None,
@@ -149,12 +144,12 @@ pub async fn gen(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Created At".to_string(),
-            data_type: DataType::Timestamp(TimeUnit::Nanosecond, None),
+            typ: Type::Event,
+            data_type: DataType::Timestamp,
             nullable: false,
             dict: None,
         },
@@ -164,14 +159,14 @@ pub async fn gen(
 
     create_property(
         md,
-        Namespace::Event,
         org_id,
         proj_id,
         CreatePropertyMainRequest {
             name: "Event".to_string(),
-            data_type: DataType::Utf8,
+            typ: Type::Event,
+            data_type: DataType::String,
             nullable: false,
-            dict: Some(DataType::UInt64),
+            dict: Some(DictionaryType::UInt64),
         },
         &mut cols,
     )
@@ -186,16 +181,11 @@ pub async fn gen(
         ("u_16", DataType::UInt16),
         ("u_32", DataType::UInt32),
         ("u_64", DataType::UInt64),
-        ("f_32", DataType::Float32),
         ("f_64", DataType::Float64),
         ("bool", DataType::Boolean),
-        ("string", DataType::Utf8),
-        ("timestamp", DataType::Timestamp(TimeUnit::Second, None)),
-        ("large_utf_8", DataType::LargeUtf8),
-        (
-            "decimal",
-            DataType::Decimal128(DECIMAL_PRECISION, DECIMAL_SCALE),
-        ),
+        ("string", DataType::String),
+        ("timestamp", DataType::Timestamp),
+        ("decimal", DataType::Decimal),
         ("group", DataType::Int64),
         ("v", DataType::Int64),
     ];
@@ -203,11 +193,11 @@ pub async fn gen(
     for (name, dt) in props {
         create_property(
             md,
-            Namespace::Event,
             org_id,
             proj_id,
             CreatePropertyMainRequest {
                 name: name.to_string(),
+                typ: Type::Event,
                 data_type: dt,
                 nullable: true,
                 dict: None,
@@ -265,14 +255,10 @@ pub async fn gen(
                 builders[partition].b_u16.append_value(event as u16);
                 builders[partition].b_u32.append_value(event as u32);
                 builders[partition].b_u64.append_value(event as u64);
-                builders[partition].b_f32.append_value(event as f32 * 1.1);
                 builders[partition].b_f64.append_value(event as f64 * 1.1);
                 builders[partition].b_b.append_value(event % 2 == 0);
                 builders[partition]
                     .b_str
-                    .append_value(format!("event {}", event).as_str());
-                builders[partition]
-                    .b_lstr
                     .append_value(format!("event {}", event).as_str());
                 builders[partition].b_ts.append_value(event * 1000);
                 builders[partition].b_dec.append_value(

@@ -25,7 +25,6 @@ use datafusion_expr::LogicalPlan;
 use datafusion_expr::Sort;
 use futures::executor;
 use metadata::dictionaries::provider_impl::SingleDictionaryProvider;
-use metadata::properties::provider_impl::Namespace;
 use metadata::MetadataProvider;
 use tracing::debug;
 
@@ -70,20 +69,12 @@ macro_rules! breakdowns_to_dicts {
                     $cols_hash.insert(prop.to_owned(), ());
 
                     match prop {
-                        PropertyRef::User(name) => dictionary_prop_to_col!(
-                            $self,
-                            user_properties,
-                            Namespace::User,
-                            name,
-                            $decode_cols
-                        ),
-                        PropertyRef::Event(name) => dictionary_prop_to_col!(
-                            $self,
-                            event_properties,
-                            Namespace::Event,
-                            name,
-                            $decode_cols
-                        ),
+                        PropertyRef::User(name) => {
+                            dictionary_prop_to_col!($self, user_properties, name, $decode_cols)
+                        }
+                        PropertyRef::Event(name) => {
+                            dictionary_prop_to_col!($self, event_properties, name, $decode_cols)
+                        }
                         _ => {}
                     }
                 }
@@ -93,7 +84,7 @@ macro_rules! breakdowns_to_dicts {
 }
 
 macro_rules! dictionary_prop_to_col {
-    ($self:expr, $md_namespace:ident, $namespace:expr, $prop_name:expr,  $decode_cols:expr) => {{
+    ($self:expr, $md_namespace:ident, $prop_name:expr,  $decode_cols:expr) => {{
         let prop = $self
             .metadata
             .$md_namespace
@@ -107,7 +98,7 @@ macro_rules! dictionary_prop_to_col {
             continue;
         }
 
-        let col_name = prop.column_name($namespace);
+        let col_name = prop.column_name();
         let dict = SingleDictionaryProvider::new(
             $self.ctx.organization_id,
             $self.ctx.project_id,

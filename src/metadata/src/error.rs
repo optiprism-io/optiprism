@@ -218,6 +218,13 @@ impl Project {
             _name: None,
         }
     }
+    pub fn new() -> Self {
+        Self {
+            _organization_id: 0,
+            _id: None,
+            _name: None,
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -257,7 +264,6 @@ impl Team {
 pub struct Property {
     pub organization_id: u64,
     pub project_id: u64,
-    pub namespace: properties::provider_impl::Namespace,
     pub event_id: Option<u64>,
     pub property_id: Option<u64>,
     pub property_name: Option<String>,
@@ -347,6 +353,12 @@ pub enum StoreError {
 
 #[derive(Error, Debug)]
 pub enum MetadataError {
+    #[error("already exists ({0:?}")]
+    AlreadyExists(String),
+    #[error("not found {0:?}")]
+    NotFound(String),
+    #[error("internal: {0:?}")]
+    Internal(String),
     #[error("database {0:?}")]
     Database(#[from] DatabaseError),
     #[error("dashboard {0:?}")]

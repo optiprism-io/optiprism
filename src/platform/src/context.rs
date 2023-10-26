@@ -1,12 +1,22 @@
 use std::sync::Arc;
 
 use axum::async_trait;
+use axum::body::HttpBody;
 use axum::extract::Extension;
 use axum::extract::TypedHeader;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
+use axum::http;
 use axum::http::request::Parts;
+use axum::http::HeaderMap;
+use axum::http::HeaderValue;
+use axum::http::Request;
+use axum::middleware::Next;
+use axum_core::body;
 use axum_core::extract::FromRequestParts;
+use axum_core::response::IntoResponse;
+use axum_core::response::Response;
+use bytes::Bytes;
 use common::rbac::OrganizationPermission;
 use common::rbac::OrganizationRole;
 use common::rbac::Permission;
@@ -16,6 +26,8 @@ use common::rbac::Role;
 use common::rbac::ORGANIZATION_PERMISSIONS;
 use common::rbac::PERMISSIONS;
 use common::rbac::PROJECT_PERMISSIONS;
+use hyper::Body;
+use serde_json::Value;
 
 use crate::auth;
 use crate::auth::token::parse_access_token;
@@ -181,4 +193,55 @@ where S: Send + Sync
 
         Ok(ctx)
     }
+}
+
+fn content_length(headers: &HeaderMap<HeaderValue>) -> Option<u64> {
+    headers
+        .get(http::header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok()?.parse::<u64>().ok())
+}
+
+pub async fn print_request_response(
+    mut req: Request<Body>,
+    next: Next<Body>,
+) -> Result<impl IntoResponse> {
+    tracing::debug!("request headers = {:?}", req.headers());
+
+    if content_length(req.headers()).is_some() {
+        let (parts, body) = req.into_parts();
+        let bytes = buffer_and_print("request", body).await?;
+        req = Request::from_parts(parts, Body::from(bytes));
+    }
+
+    let res = next.run(req).await;
+    if content_length(res.headers()).is_none() {
+        return Ok(res);
+    }
+
+    let (parts, body) = res.into_parts();
+    let bytes = buffer_and_print("response", body).await?;
+
+    Ok(Response::from_parts(parts, body::boxed(Body::from(bytes))))
+}
+
+async fn buffer_and_print<B>(direction: &str, body: B) -> Result<Bytes>
+where
+    B: HttpBody<Data = Bytes>,
+    B::Error: std::fmt::Display,
+{
+    let bytes = match hyper::body::to_bytes(body).await {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            return Err(PlatformError::BadRequest(format!(
+                "failed to read {direction} body: {err}"
+            )));
+        }
+    };
+
+    if let Ok(body) = std::str::from_utf8(&bytes) {
+        let v = serde_json::from_slice::<Value>(body.as_bytes())?;
+        tracing::debug!("{} body = {}", direction, serde_json::to_string_pretty(&v)?);
+    }
+
+    Ok(bytes)
 }

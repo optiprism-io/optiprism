@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Optiprism <dev@optiprism.io>"]
 
 [dependencies]
+rand = { version = "0.8.5", features = [] }
 arrow = { version = "42.0.0" }
 async-trait = "0.1.59"
 bincode = "1.3.3"

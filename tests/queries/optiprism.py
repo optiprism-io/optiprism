@@ -16,6 +16,7 @@ def auth():
 
 token = auth()
 
+
 def aggregate_property_query(agg, field: str, prop_type="event",
                              breakdowns=None, period=2, time_unit="day", interval_unit="day"):
     b = []
