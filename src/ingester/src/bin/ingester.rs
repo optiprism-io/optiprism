@@ -25,15 +25,15 @@ use common::types::USER_PROPERTY_OS_VERSION_PATCH_MINOR;
 use futures::executor::block_on;
 use ingester::error::IngesterError;
 use ingester::executor::Executor;
-use ingester::processors::geo;
-use ingester::processors::user_agent;
-use ingester::processors::user_agent::identify;
-use ingester::processors::user_agent::track;
 use ingester::sources;
+use ingester::transformers::geo;
+use ingester::transformers::user_agent;
+use ingester::transformers::user_agent::identify;
+use ingester::transformers::user_agent::track;
 use ingester::Destination;
 use ingester::Identify;
-use ingester::Processor;
 use ingester::Track;
+use ingester::Transformer;
 use metadata::accounts::CreateAccountRequest;
 use metadata::accounts::Provider as AccountsProvider;
 use metadata::dictionaries;
@@ -173,16 +173,16 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let proj = block_on(projects.get_by_id(1, 1))?;
     debug!("project token: {}", proj.token);
-    let mut track_processors = Vec::new();
+    let mut track_transformers = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
         .map_err(|e| IngesterError::Internal(e.to_string()))?;
     let ua = user_agent::track::UserAgent::try_new(user_props.clone(), ua_parser)?;
-    track_processors.push(Arc::new(ua) as Arc<dyn Processor<Track>>);
+    track_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Track>>);
 
     // todo make common
     let city_rdr = maxminddb::Reader::open_readfile(args.geo_city_path.clone())?;
     let geo = geo::track::Geo::try_new(user_props.clone(), city_rdr)?;
-    track_processors.push(Arc::new(geo) as Arc<dyn Processor<Track>>);
+    track_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Track>>);
 
     let mut track_destinations = Vec::new();
     let track_local_dst = ingester::destinations::local::track::Local::new(
@@ -193,7 +193,7 @@ async fn main() -> Result<(), anyhow::Error> {
     );
     track_destinations.push(Arc::new(track_local_dst) as Arc<dyn Destination<Track>>);
     let track_exec = Executor::<Track>::new(
-        track_processors.clone(),
+        track_transformers.clone(),
         track_destinations.clone(),
         event_props.clone(),
         user_props.clone(),
@@ -202,22 +202,22 @@ async fn main() -> Result<(), anyhow::Error> {
         dicts.clone(),
     );
 
-    let mut identify_processors = Vec::new();
+    let mut identify_transformers = Vec::new();
     let ua_parser = UserAgentParser::from_file(File::open(args.ua_db_path.clone())?)
         .map_err(|e| IngesterError::Internal(e.to_string()))?;
 
     let ua = user_agent::identify::UserAgent::try_new(user_props.clone(), ua_parser)?;
-    identify_processors.push(Arc::new(ua) as Arc<dyn Processor<Identify>>);
+    identify_transformers.push(Arc::new(ua) as Arc<dyn Transformer<Identify>>);
 
     let city_rdr = maxminddb::Reader::open_readfile(args.geo_city_path.clone())?;
     let geo = geo::identify::Geo::try_new(user_props.clone(), city_rdr)?;
-    identify_processors.push(Arc::new(geo) as Arc<dyn Processor<Identify>>);
+    identify_transformers.push(Arc::new(geo) as Arc<dyn Transformer<Identify>>);
 
     let mut identify_destinations = Vec::new();
     let identify_debug_dst = ingester::destinations::debug::identify::Debug::new();
     identify_destinations.push(Arc::new(identify_debug_dst) as Arc<dyn Destination<Identify>>);
     let identify_exec = Executor::<Identify>::new(
-        identify_processors,
+        identify_transformers,
         identify_destinations,
         event_props.clone(),
         user_props.clone(),

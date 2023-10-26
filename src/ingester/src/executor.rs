@@ -21,11 +21,11 @@ use crate::error::Result;
 use crate::Destination;
 use crate::Event;
 use crate::Identify;
-use crate::Processor;
 use crate::PropValue;
 use crate::Property;
 use crate::RequestContext;
 use crate::Track;
+use crate::Transformer;
 
 fn resolve_property(
     ctx: &RequestContext,
@@ -87,7 +87,7 @@ fn resolve_properties(
 }
 
 pub struct Executor<T> {
-    processors: Vec<Arc<dyn Processor<T>>>,
+    transformers: Vec<Arc<dyn Transformer<T>>>,
     destinations: Vec<Arc<dyn Destination<T>>>,
     event_properties: Arc<dyn properties::Provider>,
     user_properties: Arc<dyn properties::Provider>,
@@ -98,7 +98,7 @@ pub struct Executor<T> {
 
 impl Executor<Track> {
     pub fn new(
-        processors: Vec<Arc<dyn Processor<Track>>>,
+        transformers: Vec<Arc<dyn Transformer<Track>>>,
         destinations: Vec<Arc<dyn Destination<Track>>>,
         event_properties: Arc<dyn properties::Provider>,
         user_properties: Arc<dyn properties::Provider>,
@@ -107,7 +107,7 @@ impl Executor<Track> {
         dicts: Arc<dyn dictionaries::Provider>,
     ) -> Self {
         Self {
-            processors,
+            transformers,
             destinations,
             event_properties,
             user_properties,
@@ -194,8 +194,8 @@ impl Executor<Track> {
 
         req.resolved_event = Some(event);
 
-        for processor in &mut self.processors {
-            req = processor.process(&ctx, req)?;
+        for transformer in &mut self.transformers {
+            req = transformer.process(&ctx, req)?;
         }
 
         for dest in &mut self.destinations {
@@ -208,7 +208,7 @@ impl Executor<Track> {
 
 impl Executor<Identify> {
     pub fn new(
-        processors: Vec<Arc<dyn Processor<Identify>>>,
+        transformers: Vec<Arc<dyn Transformer<Identify>>>,
         destinations: Vec<Arc<dyn Destination<Identify>>>,
         event_properties: Arc<dyn properties::Provider>,
         user_properties: Arc<dyn properties::Provider>,
@@ -217,7 +217,7 @@ impl Executor<Identify> {
         dicts: Arc<dyn dictionaries::Provider>,
     ) -> Self {
         Self {
-            processors,
+            transformers,
             destinations,
             event_properties,
             user_properties,
@@ -235,8 +235,8 @@ impl Executor<Identify> {
         ctx.organization_id = Some(project.organization_id);
         ctx.project_id = Some(project.id);
 
-        for processor in &mut self.processors {
-            req = processor.process(&ctx, req)?;
+        for transformer in &mut self.transformers {
+            req = transformer.process(&ctx, req)?;
         }
 
         for dest in &mut self.destinations {

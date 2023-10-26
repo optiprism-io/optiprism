@@ -11,10 +11,10 @@ use rust_decimal::Decimal;
 pub mod destinations;
 pub mod error;
 pub mod executor;
-pub mod processors;
 pub mod sources;
+pub mod transformers;
 
-pub trait Processor<T>: Send + Sync {
+pub trait Transformer<T>: Send + Sync {
     fn process(&self, ctx: &RequestContext, req: T) -> Result<T>;
 }
 
